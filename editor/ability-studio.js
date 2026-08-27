@@ -155,49 +155,41 @@
     return response;
   }
 
-  function aiSearchTerms(prompt) {
-    return [...new Set(prompt.toLowerCase().match(/[a-z0-9]+/g) || [])].filter(term => term.length > 2).slice(0, 40);
-  }
-
-  function compactAiParameter(parameter) {
-    return Object.fromEntries(
-      ["path", "label", "value", "rawValue", "control", "editable", "optional", "min", "max", "options"]
+  function compactAiParameter(parameter, optionSetIndex) {
+    const compact = Object.fromEntries(
+      ["path", "label", "rawValue", "control", "editable", "optional", "min", "max"]
         .filter(key => Object.hasOwn(parameter, key))
         .map(key => [key, parameter[key]]),
     );
+    if (!Object.hasOwn(compact, "rawValue") && Object.hasOwn(parameter, "value")) {
+      compact.value = parameter.value;
+    }
+    if (Array.isArray(parameter.options) && parameter.options.length > 0) {
+      compact.optionsRef = optionSetIndex(parameter.options);
+    }
+    return compact;
   }
 
-  function aiComponentSignature(rule) {
-    return JSON.stringify([
-      rule.source.attrType,
-      rule.hook.id,
-      (rule.conditions || []).map(condition => [condition.kind, condition.source?.attrType]),
-      (rule.effects || []).map(effect => [effect.kind, effect.source?.attrType]),
-      (rule.parameters || []).map(parameter => [parameter.path, parameter.control, parameter.editable]),
-    ]);
-  }
-
-  function compactAiComponentRule(rule) {
+  function compactAiComponentRule(rule, optionSetIndex) {
     return {
       label: rule.label,
-      summary: rule.summary,
       source: rule.source,
       hook: {
         id: rule.hook.id,
         label: rule.hook.label,
         mode: rule.hook.mode,
       },
-      parameters: (rule.parameters || []).map(compactAiParameter),
+      parameters: (rule.parameters || [])
+        .filter(parameter => parameter.editable)
+        .map(parameter => compactAiParameter(parameter, optionSetIndex)),
       conditions: (rule.conditions || []).map(condition => ({
         label: condition.label,
-        summary: condition.summary,
         kind: condition.kind,
         required: condition.required,
         source: condition.source,
       })),
       effects: (rule.effects || []).map(effect => ({
         label: effect.label,
-        summary: effect.summary,
         kind: effect.kind,
         scope: effect.scope,
         source: effect.source,
@@ -205,103 +197,42 @@
     };
   }
 
-  function aiComponentContext(prompt) {
-    const normalizedPrompt = prompt.toLowerCase();
-    const terms = aiSearchTerms(prompt);
-    const matches = [];
-    for (const ability of componentCatalog) {
-      for (const rule of ability.rules || []) {
-        const haystack = componentHaystack(ability, rule);
-        let score = terms.reduce((total, term) => total + (haystack.includes(term) ? 3 : 0), 0);
-        if (normalizedPrompt.includes(ability.name.toLowerCase())) {
-          score += 60;
-        }
-        if (normalizedPrompt.includes(rule.label.toLowerCase())) {
-          score += 40;
-        }
-        if (rule.hook?.label && normalizedPrompt.includes(rule.hook.label.toLowerCase())) {
-          score += 15;
-        }
-        matches.push({ ability, rule, score });
+  function aiComponentContext() {
+    const componentOptionSets = [];
+    const optionSetIds = new Map();
+    const optionSetIndex = options => {
+      const key = JSON.stringify(options);
+      if (!optionSetIds.has(key)) {
+        optionSetIds.set(key, componentOptionSets.length);
+        componentOptionSets.push(options);
       }
-    }
-    matches.sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name));
-    const selected = [];
-    const signatures = new Set();
-    for (const match of matches) {
-      const signature = aiComponentSignature(match.rule);
-      if (signatures.has(signature)) {
-        continue;
-      }
-      signatures.add(signature);
-      selected.push(match);
-      if (selected.length >= 8) {
-        break;
-      }
-    }
-    const grouped = new Map();
-    for (const { ability, rule } of selected) {
-      if (!grouped.has(ability.id)) {
-        grouped.set(ability.id, {
-          id: ability.id,
-          name: ability.name,
-          description: ability.description,
-          rules: [],
-        });
-      }
-      grouped.get(ability.id).rules.push(compactAiComponentRule(rule));
-    }
-    return [...grouped.values()];
+      return optionSetIds.get(key);
+    };
+    const componentCandidates = componentCatalog.map(ability => ({
+      id: ability.id,
+      name: ability.name,
+      description: ability.description,
+      rules: (ability.rules || []).map(rule => compactAiComponentRule(rule, optionSetIndex)),
+    }));
+    return { componentCandidates, componentOptionSets };
   }
 
-  function aiAbilityContext(prompt, componentCandidates) {
-    const normalizedPrompt = prompt.toLowerCase();
-    const terms = aiSearchTerms(prompt);
-    const componentAbilityIds = new Set(componentCandidates.map(ability => ability.id));
-    return getAbilityCatalog()
-      .map(ability => {
-        const name = String(ability.name || "").toLowerCase();
-        const description = String(ability.description || ability.desc || "").toLowerCase();
-        const score =
-          (name && normalizedPrompt.includes(name) ? 100 : 0)
-          + (componentAbilityIds.has(ability.id) ? 20 : 0)
-          + terms.reduce(
-            (total, term) => total + (name.includes(term) ? 10 : 0) + (description.includes(term) ? 2 : 0),
-            0,
-          );
-        return { ability, score };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name))
-      .slice(0, 16)
-      .map(({ ability }) => ({
-        id: ability.id,
-        name: ability.name,
-        description: ability.description || ability.desc || "",
-      }));
+  function aiAbilityContext() {
+    return getAbilityCatalog().map(ability => ({
+      id: ability.id,
+      name: ability.name,
+      description: ability.description || ability.desc || "",
+    }));
   }
 
-  function aiMoveContext(prompt) {
-    const normalizedPrompt = prompt.toLowerCase();
-    const terms = aiSearchTerms(prompt);
-    return moveCatalog
-      .map(move => {
-        const haystack = `${move.name} ${move.type || ""} ${move.category || ""}`.toLowerCase();
-        const score =
-          (normalizedPrompt.includes(String(move.name).toLowerCase()) ? 100 : 0)
-          + terms.reduce((total, term) => total + (haystack.includes(term) ? 3 : 0), 0);
-        return { move, score };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((left, right) => right.score - left.score || left.move.name.localeCompare(right.move.name))
-      .slice(0, 16)
-      .map(({ move }) => ({
-        id: move.id,
-        name: move.name,
-        type: move.type,
-        category: move.category,
-        power: move.power,
-      }));
+  function aiMoveContext() {
+    return moveCatalog.map(move => ({
+      id: move.id,
+      name: move.name,
+      type: move.type,
+      category: move.category,
+      power: move.power,
+    }));
   }
 
   function cleanAiFilter(filter) {
@@ -455,7 +386,7 @@
     aiAbortController = new AbortController();
     refreshInspector();
     try {
-      const componentCandidates = aiComponentContext(prompt);
+      const { componentCandidates, componentOptionSets } = aiComponentContext();
       const response = await aiRequest(
         "/generate",
         {
@@ -463,9 +394,10 @@
           prompt,
           currentBlueprint: currentEntry() ? clone(currentEntry()) : null,
           primitiveCatalog,
-          abilityIndex: aiAbilityContext(prompt, componentCandidates),
+          abilityIndex: aiAbilityContext(),
           componentCandidates,
-          moveIndex: aiMoveContext(prompt),
+          componentOptionSets,
+          moveIndex: aiMoveContext(),
         },
         aiAbortController.signal,
       );

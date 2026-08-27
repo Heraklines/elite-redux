@@ -28,6 +28,7 @@ interface RateWindow {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const publicPaths = new Set(["/generate", "/cancel"]);
+const maxGenerateBodyBytes = 8_388_608;
 
 function base64(bytes: Uint8Array): string {
   let value = "";
@@ -233,7 +234,7 @@ export default {
       return withCors(json({ error: "Ability builder secrets are not configured" }, 503), origin, env);
     }
     const contentLength = Number(request.headers.get("Content-Length") ?? 0);
-    if (contentLength > 524_288) {
+    if (contentLength > maxGenerateBodyBytes) {
       return withCors(json({ error: "Ability builder request is too large" }, 413), origin, env);
     }
     const headers = new Headers(request.headers);

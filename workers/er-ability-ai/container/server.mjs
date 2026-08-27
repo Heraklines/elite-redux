@@ -12,9 +12,10 @@ const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
-const nimModel = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
-const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "poolside/laguna-xs-2.1";
+const nimModel = process.env.NVIDIA_NIM_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
+const maxGenerateBodyBytes = 8_388_608;
 let activeTurn = null;
 let generationBusy = false;
 
@@ -209,12 +210,133 @@ const outputSchema = {
   additionalProperties: false,
 };
 
+const blueprintExamples = [
+  {
+    explanation: "Burn contact targets after attacking.",
+    blueprint: {
+      version: 1,
+      id: 20000,
+      name: "Cinder Touch",
+      description: "After this Pokemon lands a damaging contact Fire-type move, it burns the target.",
+      generation: 9,
+      includes: [],
+      mechanics: [],
+      componentRules: [],
+      rules: [
+        {
+          key: "burn-contact-target",
+          trigger: "after-attack",
+          chance: 100,
+          conditionLogic: "all",
+          conditions: [
+            {
+              kind: "move",
+              minPercent: null,
+              maxPercent: null,
+              status: null,
+              weather: null,
+              terrain: null,
+              filter: { type: "FIRE", category: null, flag: "MAKES_CONTACT", damaging: true },
+            },
+          ],
+          effects: [
+            {
+              kind: "status",
+              target: "other",
+              stat: null,
+              stages: null,
+              status: "BURN",
+              percent: null,
+              weather: null,
+              terrain: null,
+            },
+          ],
+        },
+      ],
+      modifiers: [],
+      flags: { bypassFaint: false, ignorable: false, unsuppressable: false, uncopiable: false, unreplaceable: false },
+    },
+  },
+  {
+    explanation: "Arm a scripted Eruption while the holder is at low HP, then use it after attacking.",
+    blueprint: {
+      version: 1,
+      id: 20001,
+      name: "Critical Eruption",
+      description: "At low HP, this Pokemon follows its attack with a 50 BP Eruption.",
+      generation: 9,
+      includes: [],
+      mechanics: [],
+      componentRules: [
+        {
+          key: "low-hp-eruption",
+          prerequisiteHooks: [{ abilityId: 66, attrIndex: 0, attrType: "LowHpMoveTypePowerBoostAbAttr" }],
+          hook: { abilityId: 5119, attrIndex: 0, attrType: "PostAttackScriptedMoveAbAttr" },
+          chance: 100,
+          conditionLogic: "all",
+          conditions: [
+            {
+              abilityId: 66,
+              attrIndex: 0,
+              attrType: "LowHpMoveTypePowerBoostAbAttr",
+              kind: "holder",
+              conditionIndex: null,
+            },
+            {
+              abilityId: 5119,
+              attrIndex: 0,
+              attrType: "PostAttackScriptedMoveAbAttr",
+              kind: "event",
+              conditionIndex: null,
+            },
+          ],
+          effects: [
+            {
+              abilityId: 5119,
+              attrIndex: 0,
+              attrType: "PostAttackScriptedMoveAbAttr",
+              parameterOverrides: { "opts.moveId": 284, "opts.power": 50 },
+            },
+          ],
+        },
+      ],
+      rules: [],
+      modifiers: [],
+      flags: { bypassFaint: false, ignorable: false, unsuppressable: false, uncopiable: false, unreplaceable: false },
+    },
+  },
+  {
+    explanation: "Combine two complete abilities and add a filtered passive modifier.",
+    blueprint: {
+      version: 1,
+      id: 20002,
+      name: "Blazing Dancer",
+      description: "Has the complete effects of Blaze and Dancer, and further strengthens Fire-type moves.",
+      generation: 9,
+      includes: [66, 216],
+      mechanics: [],
+      componentRules: [],
+      rules: [],
+      modifiers: [
+        {
+          kind: "move-power",
+          multiplier: 1.2,
+          stat: null,
+          amount: null,
+          filter: { type: "FIRE", category: null, flag: null, damaging: true },
+        },
+      ],
+      flags: { bypassFaint: false, ignorable: false, unsuppressable: false, uncopiable: false, unreplaceable: false },
+    },
+  },
+];
+
 function writeJson(response, value, status = 200) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   response.end(JSON.stringify(value));
 }
 
-async function readBody(request, limit = 524_288) {
+async function readBody(request, limit = maxGenerateBodyBytes) {
   const chunks = [];
   let length = 0;
   for await (const chunk of request) {
@@ -454,6 +576,7 @@ function validateParameterOverrides(source, parameters, payload, label) {
   const moveIds = new Set((payload.moveIndex || []).map(move => Number(move.id)));
   for (const [path, value] of Object.entries(overrides)) {
     const parameter = definitions.get(path);
+    const options = parameter?.options || payload.componentOptionSets?.[parameter?.optionsRef] || [];
     if (!parameter?.editable) {
       throw new Error(`${label} cannot override ${path}`);
     }
@@ -499,14 +622,11 @@ function validateParameterOverrides(source, parameters, payload, label) {
         throw new Error(`${label}.${path} must be boolean`);
       }
     } else if (parameter.control === "select") {
-      if (!(parameter.options || []).some(option => option.value === value)) {
+      if (!options.some(option => option.value === value)) {
         throw new Error(`${label}.${path} is not an available option`);
       }
     } else if (parameter.control === "multi-select") {
-      if (
-        !Array.isArray(value)
-        || value.some(item => !(parameter.options || []).some(option => option.value === item))
-      ) {
+      if (!Array.isArray(value) || value.some(item => !options.some(option => option.value === item))) {
         throw new Error(`${label}.${path} contains an unavailable option`);
       }
     } else {
@@ -515,7 +635,167 @@ function validateParameterOverrides(source, parameters, payload, label) {
   }
 }
 
+function requireCatalogValue(values, value, label) {
+  if (value != null && !values.includes(value)) {
+    throw new Error(`${label} is not available`);
+  }
+}
+
+function validateMoveFilter(filter, catalog, label) {
+  if (!filter || typeof filter !== "object" || Array.isArray(filter)) {
+    throw new Error(`${label} must define a move filter`);
+  }
+  requireCatalogValue(catalog.types || [], filter.type, `${label}.type`);
+  requireCatalogValue(catalog.categories || [], filter.category, `${label}.category`);
+  requireCatalogValue(catalog.moveFlags || [], filter.flag, `${label}.flag`);
+  if (filter.damaging != null && typeof filter.damaging !== "boolean") {
+    throw new Error(`${label}.damaging must be boolean`);
+  }
+}
+
+function validateSimpleCondition(condition, catalog, label) {
+  requireCatalogValue(catalog.conditionKinds || [], condition.kind, `${label}.kind`);
+  if (condition.kind === "move") {
+    validateMoveFilter(condition.filter, catalog, `${label}.filter`);
+  }
+  if ((condition.kind === "holder-status" || condition.kind === "other-status") && condition.status !== "NONE") {
+    requireCatalogValue(catalog.statuses || [], condition.status, `${label}.status`);
+  }
+  if (condition.kind === "weather") {
+    requireCatalogValue(catalog.weathers || [], condition.weather, `${label}.weather`);
+  }
+  if (condition.kind === "terrain") {
+    requireCatalogValue(catalog.terrains || [], condition.terrain, `${label}.terrain`);
+  }
+  for (const key of ["minPercent", "maxPercent"]) {
+    if (condition[key] != null && (typeof condition[key] !== "number" || condition[key] < 0 || condition[key] > 100)) {
+      throw new Error(`${label}.${key} must be 0-100`);
+    }
+  }
+}
+
+function validateSimpleEffect(effect, catalog, label) {
+  requireCatalogValue(catalog.effectKinds || [], effect.kind, `${label}.kind`);
+  if (effect.target != null) {
+    requireCatalogValue(catalog.targets || [], effect.target, `${label}.target`);
+  }
+  if (effect.kind === "stat-stage") {
+    requireCatalogValue(catalog.stats || [], effect.stat, `${label}.stat`);
+    if (!Number.isInteger(effect.stages) || effect.stages === 0 || Math.abs(effect.stages) > 6) {
+      throw new Error(`${label}.stages must be a non-zero integer from -6 to 6`);
+    }
+  } else if (effect.kind === "status") {
+    requireCatalogValue(catalog.statuses || [], effect.status, `${label}.status`);
+  } else if (effect.kind === "heal-percent") {
+    if (typeof effect.percent !== "number" || effect.percent < 1 || effect.percent > 100) {
+      throw new Error(`${label}.percent must be 1-100`);
+    }
+  } else if (effect.kind === "set-weather") {
+    requireCatalogValue(catalog.weathers || [], effect.weather, `${label}.weather`);
+  } else if (effect.kind === "set-terrain") {
+    requireCatalogValue(catalog.terrains || [], effect.terrain, `${label}.terrain`);
+  }
+}
+
+function validateModifier(modifier, catalog, label) {
+  requireCatalogValue(catalog.modifierKinds || [], modifier.kind, `${label}.kind`);
+  if (modifier.kind === "move-power" || modifier.kind === "received-damage") {
+    if (typeof modifier.multiplier !== "number" || !Number.isFinite(modifier.multiplier)) {
+      throw new Error(`${label}.multiplier must be a number`);
+    }
+    validateMoveFilter(modifier.filter, catalog, `${label}.filter`);
+  } else if (modifier.kind === "stat-multiplier") {
+    requireCatalogValue(catalog.statMultiplierStats || [], modifier.stat, `${label}.stat`);
+    if (typeof modifier.multiplier !== "number" || !Number.isFinite(modifier.multiplier)) {
+      throw new Error(`${label}.multiplier must be a number`);
+    }
+  } else if (modifier.kind === "priority" && !Number.isInteger(modifier.amount)) {
+    throw new Error(`${label}.amount must be an integer`);
+  }
+}
+
+function validateBlueprintShape(result, payload) {
+  const blueprint = result?.blueprint;
+  const catalog = payload.primitiveCatalog || {};
+  if (!blueprint || typeof blueprint !== "object" || Array.isArray(blueprint)) {
+    throw new Error("The model did not return an ability blueprint");
+  }
+  if (typeof result.explanation !== "string" || result.explanation.trim().length === 0) {
+    throw new Error("The model did not explain the generated draft");
+  }
+  if (blueprint.version !== 1 || !Number.isInteger(blueprint.id) || blueprint.id < 20000 || blueprint.id > 29999) {
+    throw new Error("The model returned invalid blueprint identity fields");
+  }
+  if (typeof blueprint.name !== "string" || blueprint.name.trim().length < 2 || blueprint.name.length > 40) {
+    throw new Error("The model returned an invalid ability name");
+  }
+  if (
+    typeof blueprint.description !== "string"
+    || blueprint.description.trim().length < 2
+    || blueprint.description.length > 500
+  ) {
+    throw new Error("The model returned an invalid ability description");
+  }
+  const limits = { includes: 12, mechanics: 64, componentRules: 32, rules: 24, modifiers: 24 };
+  for (const [key, limit] of Object.entries(limits)) {
+    if (!Array.isArray(blueprint[key]) || blueprint[key].length > limit) {
+      throw new Error(`The model returned an invalid ${key} list`);
+    }
+  }
+  if (Object.keys(limits).every(key => blueprint[key].length === 0)) {
+    throw new Error("The model returned an empty ability blueprint");
+  }
+  const componentKeys = new Set();
+  for (const [index, rule] of blueprint.componentRules.entries()) {
+    if (!rule || typeof rule !== "object" || !/^[a-z0-9-]{1,48}$/.test(rule.key) || componentKeys.has(rule.key)) {
+      throw new Error(`Component rule ${index + 1} has an invalid key`);
+    }
+    componentKeys.add(rule.key);
+    if (!rule.hook || !Array.isArray(rule.prerequisiteHooks) || !Array.isArray(rule.conditions)) {
+      throw new Error(`Component rule ${index + 1} is incomplete`);
+    }
+    if (!Array.isArray(rule.effects) || rule.effects.length === 0) {
+      throw new Error(`Component rule ${index + 1} has no effects`);
+    }
+    if (rule.chance < 1 || rule.chance > 100 || !["all", "any"].includes(rule.conditionLogic)) {
+      throw new Error(`Component rule ${index + 1} has invalid execution settings`);
+    }
+    for (const [conditionIndex, condition] of rule.conditions.entries()) {
+      if (!Number.isInteger(condition.abilityId)) {
+        validateSimpleCondition(condition, catalog, `Component rule ${index + 1} condition ${conditionIndex + 1}`);
+      }
+    }
+    for (const [effectIndex, effect] of rule.effects.entries()) {
+      if (!Number.isInteger(effect.abilityId)) {
+        validateSimpleEffect(effect, catalog, `Component rule ${index + 1} effect ${effectIndex + 1}`);
+      }
+    }
+  }
+  const ruleKeys = new Set();
+  for (const [index, rule] of blueprint.rules.entries()) {
+    if (!rule || typeof rule !== "object" || !/^[a-z0-9-]{1,40}$/.test(rule.key) || ruleKeys.has(rule.key)) {
+      throw new Error(`Rule ${index + 1} has an invalid key`);
+    }
+    ruleKeys.add(rule.key);
+    requireCatalogValue(catalog.triggers || [], rule.trigger, `Rule ${index + 1}.trigger`);
+    if (rule.chance < 1 || rule.chance > 100 || !["all", "any"].includes(rule.conditionLogic)) {
+      throw new Error(`Rule ${index + 1} has invalid execution settings`);
+    }
+    if (!Array.isArray(rule.conditions) || !Array.isArray(rule.effects) || rule.effects.length === 0) {
+      throw new Error(`Rule ${index + 1} is incomplete`);
+    }
+    rule.conditions.forEach((condition, conditionIndex) =>
+      validateSimpleCondition(condition, catalog, `Rule ${index + 1} condition ${conditionIndex + 1}`),
+    );
+    rule.effects.forEach((effect, effectIndex) =>
+      validateSimpleEffect(effect, catalog, `Rule ${index + 1} effect ${effectIndex + 1}`),
+    );
+  }
+  blueprint.modifiers.forEach((modifier, index) => validateModifier(modifier, catalog, `Modifier ${index + 1}`));
+}
+
 function validateSources(result, payload) {
+  validateBlueprintShape(result, payload);
   const abilityIds = new Set((payload.abilityIndex || []).map(ability => Number(ability.id)));
   const hooks = new Map();
   const conditions = new Map();
@@ -540,18 +820,6 @@ function validateSources(result, payload) {
     }
   }
   const blueprint = result.blueprint;
-  if (!blueprint || typeof blueprint !== "object") {
-    throw new Error("The model did not return an ability blueprint");
-  }
-  const componentCount =
-    (blueprint.includes?.length || 0)
-    + (blueprint.mechanics?.length || 0)
-    + (blueprint.componentRules?.length || 0)
-    + (blueprint.rules?.length || 0)
-    + (blueprint.modifiers?.length || 0);
-  if (componentCount === 0) {
-    throw new Error("The model returned an empty ability blueprint");
-  }
   for (const id of blueprint.includes || []) {
     if (!abilityIds.has(Number(id))) {
       throw new Error(`The model referenced unknown ability #${id}`);
@@ -623,7 +891,37 @@ function validateSources(result, payload) {
 }
 
 function modelPrompt(payload) {
-  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; all runtime component references belong in componentRules. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Copy each runtime source identity exactly from componentCandidates. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, add parameterOverrides using only parameters marked editable, their exact path, and the advertised value type/range/options. Move parameters must use an id from RELEVANT MOVES. A reference to the holder in a trigger describes the ability owner, not the move target. Leave optional targeting booleans unset unless the request explicitly specifies a target; damaging scripted moves normally target an opponent. Chance is a percentage from 1 to 100 and should be 100 unless the request explicitly asks for a chance. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT MOVES:\n${JSON.stringify(payload.moveIndex || [])}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
+  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one JSON object and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, or unsupported mechanics. Build one Ability Studio blueprint matching OUTPUT JSON SCHEMA. Before returning, verify that the blueprint has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
+
+Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
+
+Copy every runtime source identity exactly from FULL RUNTIME COMPONENT CATALOG. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, use parameterOverrides with only parameters marked editable, their exact path, and the advertised value type/range. A parameter optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+
+CURRENT DRAFT (optional reference only):
+${JSON.stringify(payload.currentBlueprint || null)}
+
+PRIMITIVE CATALOG:
+${JSON.stringify(payload.primitiveCatalog)}
+
+FULL ABILITY INDEX:
+${JSON.stringify(payload.abilityIndex)}
+
+FULL MOVE CATALOG:
+${JSON.stringify(payload.moveIndex || [])}
+
+COMPONENT OPTION SETS:
+${JSON.stringify(payload.componentOptionSets || [])}
+
+FULL RUNTIME COMPONENT CATALOG:
+${JSON.stringify(payload.componentCandidates)}
+
+VALID OUTPUT EXAMPLES:
+${JSON.stringify(blueprintExamples)}
+
+FINAL REQUEST TO IMPLEMENT:
+${payload.prompt}
+
+Return exactly one non-empty JSON blueprint for that request. Use only catalog values and source identities.`;
 }
 
 function promptRequestsSelfTarget(prompt) {
@@ -875,12 +1173,22 @@ async function runNimModel(model, body, payload) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        ...body,
-        model,
-        ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
-      }),
-      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify(
+        model === "deepseek-ai/deepseek-v4-flash-0731"
+          ? {
+              ...body,
+              model,
+              max_tokens: 12_000,
+              chat_template_kwargs: { thinking: true, reasoning_effort: "high" },
+            }
+          : {
+              ...body,
+              model,
+              guided_json: outputSchema,
+              ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
+            },
+      ),
+      signal: AbortSignal.timeout(120_000),
     });
   } catch {
     throw new Error("The backup model timed out");
@@ -919,7 +1227,6 @@ async function runNim(payload, emit) {
     temperature: 0.1,
     max_tokens: 6000,
     stream: false,
-    guided_json: outputSchema,
   };
   let lastError = new Error("The ability builder is temporarily unavailable");
   for (const [modelIndex, model] of models.entries()) {
@@ -944,6 +1251,17 @@ function validateGeneratePayload(payload) {
   }
   if (!Array.isArray(payload.abilityIndex) || !Array.isArray(payload.componentCandidates)) {
     throw Object.assign(new Error("Ability catalog context is missing"), { status: 400 });
+  }
+  if (!Array.isArray(payload.componentOptionSets)) {
+    payload.componentOptionSets = [];
+  }
+  if (
+    payload.abilityIndex.length > 3000
+    || payload.componentCandidates.length > 3000
+    || payload.componentOptionSets.length > 100
+    || (Array.isArray(payload.moveIndex) && payload.moveIndex.length > 5000)
+  ) {
+    throw Object.assign(new Error("Ability catalog context is too large"), { status: 413 });
   }
   payload.prompt = payload.prompt.trim();
   payload.requestId = typeof payload.requestId === "string" ? payload.requestId : randomUUID();
