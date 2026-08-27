@@ -1942,11 +1942,17 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
         Accept: "application/json",
       },
       body: JSON.stringify(
-        model === "deepseek-ai/deepseek-v4-flash-0731" || model === "moonshotai/kimi-k3"
+        model === "deepseek-ai/deepseek-v4-flash-0731"
+          || model === "moonshotai/kimi-k3"
+          || model === "nvidia/nemotron-3-super-120b-a12b"
           ? {
               ...body,
               model,
-              ...(model === "deepseek-ai/deepseek-v4-flash-0731" ? { chat_template_kwargs: { thinking: false } } : {}),
+              ...(model === "deepseek-ai/deepseek-v4-flash-0731"
+                ? { chat_template_kwargs: { thinking: false } }
+                : model.startsWith("nvidia/nemotron-3-")
+                  ? { chat_template_kwargs: { enable_thinking: false } }
+                  : {}),
             }
           : {
               ...body,

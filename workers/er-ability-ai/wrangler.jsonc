@@ -9,7 +9,7 @@
     "CODEX_MODEL": "gpt-5.6-luna",
     "CODEX_EFFORT": "medium",
     "CODEX_AUTH_BOOTSTRAP_VERSION": "2026-08-26-1",
-    "ABILITY_AI_RUNTIME_VERSION": "2026-08-28-14",
+    "ABILITY_AI_RUNTIME_VERSION": "2026-08-28-15",
     "NVIDIA_NIM_MODEL": "moonshotai/kimi-k3",
     "NVIDIA_NIM_FALLBACK_MODEL": "nvidia/nemotron-3-super-120b-a12b"
   },
