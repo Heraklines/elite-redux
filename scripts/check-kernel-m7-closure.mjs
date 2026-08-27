@@ -31,9 +31,46 @@ const run = readJson("rust/fixtures/m7/run-behavior-unit-manifest-v1.json");
 const scenarios = readJson("rust/fixtures/m7/scenario-catalog-v1.json");
 const ai = readJson("rust/fixtures/m7/ai-policy-catalog-v1.json");
 const gaps = readJson("rust/fixtures/m7/m7-gap-clusters-v1.json");
+const implementation = readJson("rust/fixtures/m7/m7-behavior-implementation-v1.json");
+if (
+  implementation.schema_version !== 1
+  || implementation.oracle_sha !== run.oracle_sha
+  || implementation.implementation_count !== implementation.implementations.length
+) {
+  fail("implementation manifest identity or count mismatch");
+}
+const implementationIds = new Set();
+for (const entry of implementation.implementations) {
+  if (
+    implementationIds.has(entry.behavior_unit)
+    || !["COMPILED", "BESPOKE_IMPLEMENTED", "SEMANTICALLY_INERT"].includes(entry.status)
+    || typeof entry.rust_symbol !== "string"
+    || entry.rust_symbol.length === 0
+    || entry.proof?.kind !== "RUST_TEST"
+    || !existsSync(resolve(ROOT, entry.proof.path))
+    || typeof entry.proof.test !== "string"
+    || entry.proof.test.length === 0
+  ) {
+    fail(`invalid implementation evidence for ${entry.behavior_unit}`);
+  }
+  implementationIds.add(entry.behavior_unit);
+}
+const knownRequired = new Set(
+  run.behaviors
+    .filter(behavior => behavior.implementation_status === "REQUIRES_M7")
+    .map(behavior => behavior.id),
+);
+for (const id of implementationIds) {
+  if (!knownRequired.has(id)) {
+    fail(`implementation evidence references non-M7 behavior ${id}`);
+  }
+}
 
 function unresolved(catalog) {
-  return catalog.behaviors.filter(behavior => behavior.implementation_status === "REQUIRES_M7");
+  return catalog.behaviors.filter(behavior =>
+    behavior.implementation_status === "REQUIRES_M7"
+    && !implementationIds.has(behavior.id),
+  );
 }
 
 const requiredCampaigns = [
@@ -42,12 +79,16 @@ const requiredCampaigns = [
   "rust/crates/er-testkit/tests/m7_full_run_differential.rs",
   "rust/crates/er-testkit/tests/m7_randomized_campaigns.rs",
 ];
+const unresolvedGapIds = gaps.clusters
+  .flatMap(cluster => cluster.behavior_units)
+  .filter(id => !implementationIds.has(id));
 const report = {
   schema_version: 1,
+  implemented_behaviors: implementationIds.size,
   run_unresolved: unresolved(run).length,
   scenario_unresolved: unresolved(scenarios).length,
   ai_unresolved: unresolved(ai).length,
-  clustered_gaps: gaps.gap_count,
+  clustered_gaps: unresolvedGapIds.length,
   missing_campaigns: requiredCampaigns.filter(path => !existsSync(resolve(ROOT, path))),
   final_qualification_manifest: existsSync(resolve(ROOT, "rust/fixtures/m7/m7-final-qualification.json")),
 };

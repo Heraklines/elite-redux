@@ -21,6 +21,9 @@ pub struct GameModeDefinitionV1 {
     pub terminal_wave: Option<u32>,
     pub route: RouteNodeId,
     pub allows_coop: bool,
+    pub branching_routes: bool,
+    pub sprint_structure: bool,
+    pub finale_routing_start_wave: Option<u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -28,8 +31,17 @@ pub struct GameModeDefinitionV1 {
 pub struct BiomeDefinitionV1 {
     pub id: BiomeId,
     pub key: String,
+    pub travel_allowed: bool,
     pub encounters: Vec<WeightedEncounterV1>,
     pub exits: Vec<WeightedRouteV1>,
+    pub routing_exits: Vec<BiomeRouteLinkV1>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BiomeRouteLinkV1 {
+    pub route: RouteNodeId,
+    pub inclusion_denominator: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -148,6 +160,9 @@ impl WorldContentPackV1 {
             if mode.key.is_empty()
                 || mode.first_wave == 0
                 || mode.terminal_wave.is_some_and(|end| end < mode.first_wave)
+                || mode.finale_routing_start_wave.is_some_and(|start| {
+                    start < mode.first_wave || mode.terminal_wave.is_some_and(|end| start > end)
+                })
                 || !routes.contains(&mode.route)
             {
                 return Err(WorldContentError::Definition);
@@ -157,6 +172,12 @@ impl WorldContentPackV1 {
             if biome.key.is_empty()
                 || !weighted_encounters_valid(&biome.encounters, &encounters)
                 || !weighted_routes_valid(&biome.exits, &routes)
+                || biome.routing_exits.iter().any(|link| {
+                    !routes.contains(&link.route)
+                        || link
+                            .inclusion_denominator
+                            .is_some_and(|denominator| denominator == 0)
+                })
             {
                 return Err(WorldContentError::Definition);
             }

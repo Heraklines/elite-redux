@@ -226,6 +226,22 @@ pub struct RunModifierInstanceV2 {
     pub mechanics: MechanicStateStoreV2,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RouteRevealSourceV1 {
+    Base,
+    Upgrade,
+    Event,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingRouteNodeV1 {
+    pub biome: BiomeId,
+    pub revealed: bool,
+    pub source: RouteRevealSourceV1,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldStateV1 {
@@ -235,6 +251,15 @@ pub struct WorldStateV1 {
     pub visited_routes: Vec<RouteNodeId>,
     pub encounter_sequence: SafeU53,
     pub mode_counters: BTreeMap<String, SafeU53>,
+    pub previous_biome: Option<BiomeId>,
+    pub recent_biomes: Vec<BiomeId>,
+    pub pending_nodes: Vec<PendingRouteNodeV1>,
+    pub pending_nodes_ready: bool,
+    pub event_revealed_biomes: Vec<BiomeId>,
+    pub biome_length: Option<u16>,
+    pub biome_start_wave: WaveIndex,
+    pub leave_biome_now: bool,
+    pub overstay_anchor_wave: Option<WaveIndex>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -390,6 +415,8 @@ pub enum M7StateError {
     BattleWave,
     #[error("run outcome and complete control disagree")]
     OutcomeControl,
+    #[error("world state is invalid: {0}")]
+    World(&'static str),
 }
 
 impl PokemonStateV5 {
@@ -534,6 +561,7 @@ impl RunStateV3 {
             self.world.schema_version,
             WORLD_STATE_SCHEMA_VERSION_V1,
         )?;
+        validate_world(&self.world, self.wave)?;
         if let Some(scenario) = &self.scenario {
             require_schema(
                 "ScenarioRuntimeStateV1",
@@ -655,6 +683,58 @@ fn validate_modifiers(modifiers: &[RunModifierInstanceV2]) -> Result<(), M7State
             .validate()
             .map_err(|_| M7StateError::ModifierEntry)?;
         previous = Some(modifier.id);
+    }
+    Ok(())
+}
+
+fn validate_world(world: &WorldStateV1, wave: WaveIndex) -> Result<(), M7StateError> {
+    if world.recent_biomes.len() > 8 {
+        return Err(M7StateError::World(
+            "recent biome history exceeds eight entries",
+        ));
+    }
+    if world.biome_length == Some(0) || world.biome_start_wave.get() > wave.get() {
+        return Err(M7StateError::World("biome extent is invalid"));
+    }
+    if world
+        .pending_nodes
+        .iter()
+        .map(|node| node.biome)
+        .collect::<BTreeSet<_>>()
+        .len()
+        != world.pending_nodes.len()
+    {
+        return Err(M7StateError::World("pending route biomes are duplicated"));
+    }
+    if world
+        .event_revealed_biomes
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .len()
+        != world.event_revealed_biomes.len()
+    {
+        return Err(M7StateError::World("event-revealed biomes are duplicated"));
+    }
+    if world.event_revealed_biomes.iter().any(|biome| {
+        *biome == world.biome
+            || world
+                .recent_biomes
+                .iter()
+                .rev()
+                .take(2)
+                .any(|recent| recent == biome)
+    }) {
+        return Err(M7StateError::World(
+            "event-revealed biome violates the no-loopback window",
+        ));
+    }
+    if world.overstay_anchor_wave.is_some_and(|anchor| {
+        anchor.get() < world.biome_start_wave.get() || anchor.get() > wave.get()
+    }) {
+        return Err(M7StateError::World(
+            "overstay anchor is outside the current biome",
+        ));
     }
     Ok(())
 }

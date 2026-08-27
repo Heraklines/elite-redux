@@ -46,7 +46,8 @@ use er_state::m7_state::{
     GAME_STATE_SCHEMA_VERSION_V5, GameStateV5, INVENTORY_STATE_SCHEMA_VERSION_V1, InventoryEntryV1,
     InventoryStateV1, POKEMON_STATE_SCHEMA_VERSION_V5, PROFILE_STATE_SCHEMA_VERSION_V1,
     PokemonStateV5, ProfileStateV1, ProfileStatistics, ProgressionQueueV2, QuestStateV1,
-    RUN_STATE_SCHEMA_VERSION_V3, RunStateV3, WORLD_STATE_SCHEMA_VERSION_V1, WorldStateV1,
+    RUN_STATE_SCHEMA_VERSION_V3, RouteRevealSourceV1, RunStateV3, WORLD_STATE_SCHEMA_VERSION_V1,
+    WorldStateV1,
 };
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
@@ -76,11 +77,16 @@ use er_types::{
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
 };
-use er_world::runtime::advance_wave;
+use er_world::runtime::{
+    AuditedWorldRng, WorldRuntimeError, advance_wave, biome_end_rule, biome_should_end,
+    map_upgrade_tier, mark_biome_stay, mark_leave_biome, plan_biome_structure, record_biome_entry,
+    reveal_next_pending_node, roll_next_biome_nodes, should_raise_crossroads,
+    visible_route_node_count,
+};
 use er_world::{
-    BiomeDefinitionV1, EncounterDefinitionV1, EncounterKindV1, GameModeDefinitionV1,
-    PokemonBuildV1, RouteDefinitionV1, WORLD_CONTENT_PACK_SCHEMA_VERSION_V1, WeightedEncounterV1,
-    WeightedRouteV1, WorldContentPackV1,
+    BiomeDefinitionV1, BiomeRouteLinkV1, EncounterDefinitionV1, EncounterKindV1,
+    GameModeDefinitionV1, PokemonBuildV1, RouteDefinitionV1, WORLD_CONTENT_PACK_SCHEMA_VERSION_V1,
+    WeightedEncounterV1, WeightedRouteV1, WorldContentPackV1,
 };
 
 const ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
@@ -206,26 +212,95 @@ fn world_pack() -> WorldContentPackV1 {
             terminal_wave: Some(200),
             route: RouteNodeId::new(safe(1)),
             allows_coop: true,
+            branching_routes: true,
+            sprint_structure: false,
+            finale_routing_start_wave: Some(170),
         }],
-        biomes: vec![BiomeDefinitionV1 {
-            id: BiomeId::new(safe(1)),
-            key: "plains".to_owned(),
-            encounters: vec![WeightedEncounterV1 {
-                encounter: EncounterId::new(safe(1)),
-                weight: 1,
-            }],
-            exits: vec![WeightedRouteV1 {
-                route: RouteNodeId::new(safe(1)),
-                weight: 1,
-            }],
-        }],
-        routes: vec![RouteDefinitionV1 {
-            id: RouteNodeId::new(safe(1)),
-            biome: BiomeId::new(safe(1)),
-            next: Vec::new(),
-            minimum_wave: 1,
-            maximum_wave: Some(200),
-        }],
+        biomes: vec![
+            BiomeDefinitionV1 {
+                id: BiomeId::new(safe(1)),
+                key: "plains".to_owned(),
+                travel_allowed: true,
+                encounters: vec![WeightedEncounterV1 {
+                    encounter: EncounterId::new(safe(1)),
+                    weight: 1,
+                }],
+                exits: vec![WeightedRouteV1 {
+                    route: RouteNodeId::new(safe(2)),
+                    weight: 1,
+                }],
+                routing_exits: vec![BiomeRouteLinkV1 {
+                    route: RouteNodeId::new(safe(2)),
+                    inclusion_denominator: None,
+                }],
+            },
+            BiomeDefinitionV1 {
+                id: BiomeId::new(safe(2)),
+                key: "forest".to_owned(),
+                travel_allowed: true,
+                encounters: vec![WeightedEncounterV1 {
+                    encounter: EncounterId::new(safe(1)),
+                    weight: 1,
+                }],
+                exits: vec![WeightedRouteV1 {
+                    route: RouteNodeId::new(safe(3)),
+                    weight: 1,
+                }],
+                routing_exits: vec![BiomeRouteLinkV1 {
+                    route: RouteNodeId::new(safe(3)),
+                    inclusion_denominator: None,
+                }],
+            },
+            BiomeDefinitionV1 {
+                id: BiomeId::new(safe(3)),
+                key: "cave".to_owned(),
+                travel_allowed: true,
+                encounters: vec![WeightedEncounterV1 {
+                    encounter: EncounterId::new(safe(1)),
+                    weight: 1,
+                }],
+                exits: vec![WeightedRouteV1 {
+                    route: RouteNodeId::new(safe(1)),
+                    weight: 1,
+                }],
+                routing_exits: vec![BiomeRouteLinkV1 {
+                    route: RouteNodeId::new(safe(1)),
+                    inclusion_denominator: None,
+                }],
+            },
+        ],
+        routes: vec![
+            RouteDefinitionV1 {
+                id: RouteNodeId::new(safe(1)),
+                biome: BiomeId::new(safe(1)),
+                next: vec![WeightedRouteV1 {
+                    route: RouteNodeId::new(safe(2)),
+                    weight: 1,
+                }],
+                minimum_wave: 1,
+                maximum_wave: Some(200),
+            },
+            RouteDefinitionV1 {
+                id: RouteNodeId::new(safe(2)),
+                biome: BiomeId::new(safe(2)),
+                next: vec![WeightedRouteV1 {
+                    route: RouteNodeId::new(safe(3)),
+                    weight: 1,
+                }],
+                minimum_wave: 1,
+                maximum_wave: Some(200),
+            },
+            RouteDefinitionV1 {
+                id: RouteNodeId::new(safe(3)),
+                biome: BiomeId::new(safe(3)),
+                next: vec![WeightedRouteV1 {
+                    route: RouteNodeId::new(safe(1)),
+                    weight: 1,
+                }],
+                minimum_wave: 1,
+                maximum_wave: Some(200),
+            },
+        ],
         encounters: vec![EncounterDefinitionV1 {
             id: EncounterId::new(safe(1)),
             key: "wild-one".to_owned(),
@@ -380,6 +455,15 @@ fn game_state(content: &PreparedGameContentV1) -> TestResult<GameStateV5> {
                 visited_routes: vec![RouteNodeId::new(safe(1))],
                 encounter_sequence: safe(0),
                 mode_counters: BTreeMap::new(),
+                previous_biome: None,
+                recent_biomes: Vec::new(),
+                pending_nodes: Vec::new(),
+                pending_nodes_ready: false,
+                event_revealed_biomes: Vec::new(),
+                biome_length: Some(1),
+                biome_start_wave: WaveIndex::new(safe(1))?,
+                leave_biome_now: false,
+                overstay_anchor_wave: None,
             },
             scenario: None,
             quests: QuestStateV1::default(),
@@ -535,6 +619,29 @@ impl AuditedCaptureRng for CaptureZero {
     }
 }
 
+struct ScriptedWorldRng {
+    draws: Vec<u64>,
+    next: usize,
+}
+
+impl ScriptedWorldRng {
+    fn new(draws: Vec<u64>) -> Self {
+        Self { draws, next: 0 }
+    }
+}
+
+impl AuditedWorldRng for ScriptedWorldRng {
+    fn draw_weighted(&mut self, _upper_exclusive: u64) -> Result<u64, WorldRuntimeError> {
+        let draw = self
+            .draws
+            .get(self.next)
+            .copied()
+            .ok_or(WorldRuntimeError::Weight)?;
+        self.next += 1;
+        Ok(draw)
+    }
+}
+
 #[test]
 fn capture_consumes_ball_and_moves_enemy_into_party() -> TestResult {
     let content = prepared_content()?;
@@ -565,6 +672,96 @@ fn capture_consumes_ball_and_moves_enemy_into_party() -> TestResult {
             .as_ref()
             .is_some_and(|battle| battle.enemy_party.is_empty())
     );
+    Ok(())
+}
+
+#[test]
+fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
+    let content = prepared_content()?;
+    let state = game_state(&content)?;
+    let mut route_rng = ScriptedWorldRng::new(vec![49]);
+    let routed = roll_next_biome_nodes(&state, &content.world, 1, &mut route_rng)?;
+    assert_eq!(routed.draws.len(), 1);
+    let world = &routed
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("missing run")?
+        .world;
+    assert!(world.pending_nodes_ready);
+    assert_eq!(world.pending_nodes.len(), 2);
+    assert_eq!(world.pending_nodes[0].biome, BiomeId::new(safe(2)));
+    assert!(world.pending_nodes[0].revealed);
+    assert_eq!(world.pending_nodes[0].source, RouteRevealSourceV1::Base);
+    assert_eq!(world.pending_nodes[1].biome, BiomeId::new(safe(3)));
+    assert!(!world.pending_nodes[1].revealed);
+    assert_eq!(world.pending_nodes[1].source, RouteRevealSourceV1::Base);
+
+    let (revealed_state, revealed) = reveal_next_pending_node(&routed.after_state)?;
+    assert!(revealed);
+    assert_eq!(
+        revealed_state
+            .active_run
+            .as_ref()
+            .ok_or("missing run")?
+            .world
+            .pending_nodes[1]
+            .source,
+        RouteRevealSourceV1::Event
+    );
+    let entered = record_biome_entry(
+        &revealed_state,
+        BiomeId::new(safe(2)),
+        RouteNodeId::new(safe(2)),
+    )?;
+    let entered_world = &entered.active_run.as_ref().ok_or("missing run")?.world;
+    assert_eq!(entered_world.previous_biome, Some(BiomeId::new(safe(1))));
+    assert_eq!(entered_world.recent_biomes, vec![BiomeId::new(safe(1))]);
+    assert!(!entered_world.pending_nodes_ready);
+    assert!(entered_world.pending_nodes.is_empty());
+
+    let mut length_rng = ScriptedWorldRng::new(vec![0, 18]);
+    let planned = plan_biome_structure(&entered, &content.world, &mut length_rng)?;
+    assert_eq!(planned.draws.len(), 2);
+    assert_eq!(
+        planned
+            .after_state
+            .active_run
+            .as_ref()
+            .ok_or("missing run")?
+            .world
+            .biome_length,
+        Some(25)
+    );
+    assert_eq!(map_upgrade_tier(0), 0);
+    assert_eq!(map_upgrade_tier(9), 3);
+    assert_eq!(visible_route_node_count(4, 1, 1), 7);
+    let mut overstay = planned.after_state;
+    overstay.active_run.as_mut().ok_or("missing run")?.wave = WaveIndex::new(safe(10))?;
+    overstay.validate()?;
+    let mode = content
+        .world
+        .mode(GameModeId::new(safe(1)))
+        .ok_or("missing mode")?;
+    let run = overstay.active_run.as_ref().ok_or("missing run")?;
+    assert!(should_raise_crossroads(&run.world, run.wave, mode)?);
+    assert_eq!(
+        biome_end_rule(&run.world, WaveIndex::new(safe(25))?, mode)?,
+        Some(true)
+    );
+    let overstay = mark_biome_stay(&overstay, &content.world)?;
+    assert_eq!(
+        overstay
+            .active_run
+            .as_ref()
+            .ok_or("missing run")?
+            .world
+            .overstay_anchor_wave,
+        Some(WaveIndex::new(safe(10))?)
+    );
+    let leaving = mark_leave_biome(&overstay)?;
+    let run = leaving.active_run.as_ref().ok_or("missing run")?;
+    assert!(biome_should_end(&run.world, run.wave)?);
     Ok(())
 }
 

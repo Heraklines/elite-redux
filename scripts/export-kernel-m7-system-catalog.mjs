@@ -333,11 +333,34 @@ function isBehaviorDeclaration(node, kind) {
 
 function domainFor(path, symbol, owner) {
   if (
+    path === "src/data/elite-redux/er-biome-routing.ts"
+    && symbol === "erBiomeCrossroadsVerb"
+  ) {
+    return "PRESENTATION";
+  }
+  if (
     /(?:battle-anims|effects-display|effect-flyout|er-biome-backgrounds|er-shiny-lab-effects|er-shiny-lab-fx|er-trainer-fx|reward-rate-visuals)\.ts$/u.test(
       path,
     )
   ) {
     return "PRESENTATION";
+  }
+  if (
+    /^(?:src\/configs\/inputs\/config-handler\.ts|src\/data\/elite-redux\/er-boot-diagnostics\.ts|src\/data\/elite-redux\/er-bug-report\.ts|src\/data\/elite-redux\/showdown\/(?:showdown-matchmaking|tournament-client|showdown-escrow-client)\.ts|src\/inputs-controller\.ts|src\/touch-controls\.ts)$/u.test(
+      path,
+    )
+  ) {
+    return "PLATFORM";
+  }
+  if (
+    /^(?:src\/data\/biome-bgm-loop-points\.ts|src\/init\/init-biome-bgm-loop-points\.ts|src\/system\/settings\/settings-language\.ts|src\/tutorial\.ts|src\/utils\/strings\.ts)$/u.test(
+      path,
+    )
+  ) {
+    return "PRESENTATION";
+  }
+  if (path === "src/turn-command-manager.ts") {
+    return "BATTLE";
   }
   if (
     /^(?:src\/battle\.ts|src\/data\/abilities\/|src\/data\/battler-tags\.ts|src\/data\/elite-redux\/abilities\/|src\/data\/elite-redux\/ability-upgrades\/attrs\/|src\/data\/elite-redux\/archetypes\/|src\/data\/elite-redux\/move-archetype-dispatcher\.ts|src\/data\/moves\/|src\/data\/positional-tags\/)/u.test(

@@ -108,6 +108,7 @@ const files = [
   ["platform_boundary_manifest_sha256", "rust/fixtures/m7/platform-boundary-manifest-v1.json"],
   ["gap_cluster_manifest_sha256", "rust/fixtures/m7/m7-gap-clusters-v1.json"],
   ["oracle_witness_plan_sha256", "rust/fixtures/m7/m7-oracle-witness-plan-v1.json"],
+  ["behavior_implementation_manifest_sha256", "rust/fixtures/m7/m7-behavior-implementation-v1.json"],
   ["performance_security_audit_sha256", "rust/fixtures/m7/performance-security-audit-v1.json"],
   ["legacy_bridge_audit_sha256", "rust/fixtures/m7/legacy-bridge-audit-v1.json"],
   ["m6_catalog_drift_sha256", "rust/fixtures/m7/m6-catalog-drift-v1.json"],
@@ -208,6 +209,33 @@ for (const id of clusteredGapIds) {
   }
 }
 assertEqual(runGapIds.size, clusteredGapIds.length, "complete gap classification");
+
+const implementations = readJson("rust/fixtures/m7/m7-behavior-implementation-v1.json");
+assertEqual(
+  implementations.implementation_count,
+  required(contract, "implemented_behavior_count"),
+  "implemented behavior count",
+);
+assertEqual(
+  implementations.implementations.length,
+  implementations.implementation_count,
+  "implementation evidence length",
+);
+const implementedIds = new Set();
+for (const entry of implementations.implementations) {
+  if (
+    !runGapIds.has(entry.behavior_unit)
+    || implementedIds.has(entry.behavior_unit)
+    || !["COMPILED", "BESPOKE_IMPLEMENTED", "SEMANTICALLY_INERT"].includes(entry.status)
+    || typeof entry.rust_symbol !== "string"
+    || entry.rust_symbol.length === 0
+    || entry.proof?.kind !== "RUST_TEST"
+    || !existsSync(resolve(ROOT, entry.proof.path))
+  ) {
+    fail(`invalid implementation evidence ${entry.behavior_unit}`);
+  }
+  implementedIds.add(entry.behavior_unit);
+}
 
 const witnesses = readJson("rust/fixtures/m7/m7-oracle-witness-plan-v1.json");
 assertEqual(witnesses.witness_count, required(contract, "oracle_witness_count"), "oracle witness count");
