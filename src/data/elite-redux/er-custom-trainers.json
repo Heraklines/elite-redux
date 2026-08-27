@@ -5350,5 +5350,289 @@
     ],
     "trainerClass": "MORTY",
     "weight": 100
+  },
+  "TRAINER_70032": {
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70032,
+    "maxWave": 110,
+    "minWave": 95,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "PROTECT",
+          "CURSE",
+          "ROCK_SMASH",
+          "SHADOW_PUNCH"
+        ],
+        "species": 979,
+        "vitamins": {
+          "atk": 3,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "RAIN_DANCE",
+          "ENCORE",
+          "STORM_THROW",
+          "TORRENT_FIST"
+        ],
+        "species": 62,
+        "vitamins": {
+          "def": 1,
+          "spd": 2,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BLACK_BELT"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "THUNDER_PUNCH",
+          "FAKE_OUT",
+          "DIZZY_PUNCH",
+          "MEDITATE"
+        ],
+        "species": 10490,
+        "vitamins": {
+          "atk": 2,
+          "spd": 2
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BLACK_BELT"
+          },
+          {
+            "count": 1,
+            "item": "GANLON_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "MULTI_LENS"
+          },
+          {
+            "count": 1,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "PSYCHO_BOOST",
+          "SKY_UPPERCUT",
+          "ENTRAINMENT",
+          "POISON_JAB"
+        ],
+        "shiny": {
+          "around": "cursedaura",
+          "name": "disaster"
+        },
+        "species": 10082,
+        "vitamins": {
+          "atk": 2,
+          "def": 1,
+          "hp": 1,
+          "spatk": 1,
+          "spd": 2,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "POWER_UP_PUNCH",
+          "FIRE_PUNCH",
+          "ROCK_THROW",
+          "METEOR_MASH"
+        ],
+        "species": 68,
+        "vitamins": {
+          "atk": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "RLA",
+          "AURA_SPHERE",
+          "RLA",
+          "RLNA"
+        ],
+        "species": 10717,
+        "vitamins": {
+          "atk": 1,
+          "spd": 1
+        }
+      }
+    ],
+    "trainerClass": "CHUCK",
+    "weight": 100
+  },
+  "TRAINER_70033": {
+    "battleType": "double",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70033,
+    "maxWave": 120,
+    "minWave": 110,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "ZAP_CANNON",
+          "SHOCK_WAVE",
+          "TRI_ATTACK",
+          "MIRROR_SHOT"
+        ],
+        "species": 462,
+        "vitamins": {
+          "def": 2,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "IRON_FANGS",
+          "TECTONIC_FANGS",
+          "JAGGED_FANGS",
+          "COIL"
+        ],
+        "species": 10109,
+        "vitamins": {
+          "def": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "THUNDER_WAVE",
+          "FLASH_CANNON",
+          "STEALTH_ROCK",
+          "CONFUSION"
+        ],
+        "species": 437,
+        "vitamins": {
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "CALM_MIND",
+          "FLASH_CANNON",
+          "WATER_PLEDGE",
+          "TWIN_BEAM"
+        ],
+        "species": 437,
+        "vitamins": {
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "SPIKY_SHIELD",
+          "HARD_PRESS",
+          "INGRAIN",
+          "NEEDLE_ARM"
+        ],
+        "species": 598,
+        "vitamins": {
+          "def": 2,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SILK_SCARF"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RLA",
+          "RLNA",
+          "EXPLOSION",
+          "HARD_PRESS"
+        ],
+        "shiny": {
+          "around": "fireworks"
+        },
+        "species": 379,
+        "vitamins": {
+          "atk": 2,
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      }
+    ],
+    "trainerClass": "JASMINE",
+    "weight": 100
   }
 }
