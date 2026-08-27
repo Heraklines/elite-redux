@@ -12,21 +12,120 @@ const requireFrom = process.env.M7_TYPESCRIPT_ROOT
 const ts = requireFrom("typescript");
 
 const DOMAIN_RULES = [
-  ["PLATFORM", /(?:^|\/)(?:account|auth|cloud|network|online|plugins|service-worker|system|telemetry|web)(?:\/|\.|-)/u],
-  ["CONTROL", /(?:control|input|menu|ui-handler|ui-navigation)/u],
-  ["SAVE_REPLAY_PROFILE", /(?:save|replay|profile|session|persistent|storage|dex-data|game-stats)/u],
-  ["CAPTURE_PARTY", /(?:capture|pokeball|poke-ball|party|pokemon-storage|release-pokemon)/u],
+  ["M6_PROTOCOL", ["coop", "authority", "protocol"]],
+  [
+    "PLATFORM",
+    [
+      "account",
+      "api",
+      "cookies",
+      "dev",
+      "director",
+      "fetch",
+      "llm",
+      "auth",
+      "cloud",
+      "network",
+      "online",
+      "plugin",
+      "plugins",
+      "service-worker",
+      "telemetry",
+      "notifications",
+      "test-suite",
+      "tools",
+      "webrtc",
+      "indexeddb",
+    ],
+  ],
+  [
+    "PRESENTATION",
+    [
+      "animation",
+      "audio",
+      "camera",
+      "message",
+      "phase",
+      "phases",
+      "render",
+      "renderer",
+      "scene",
+      "scenes",
+      "shader",
+      "sound",
+      "sprite",
+      "sprites",
+      "ui",
+    ],
+  ],
+  ["SAVE_REPLAY_PROFILE", ["save", "saves", "replay", "profile", "session", "storage", "dex-data", "game-stats"]],
+  ["CAPTURE_PARTY", ["capture", "pokeball", "poke-ball", "party", "pokemon-storage", "release-pokemon"]],
   [
     "PROGRESSION",
-    /(?:evol|fusion|level|experience|exp-|growth|nature|friendship|learnset|move-reminder|tm-|form-change)/u,
+    [
+      "evolution",
+      "evolutions",
+      "evolve",
+      "fusion",
+      "level",
+      "experience",
+      "growth",
+      "nature",
+      "friendship",
+      "learnset",
+      "move-reminder",
+      "tm",
+      "form-change",
+    ],
   ],
-  ["INVENTORY_ECONOMY", /(?:modifier|item|reward|shop|market|money|voucher|relic|reroll)/u],
-  ["SCENARIO", /(?:mystery|scenario|scripted-event|encounter-event)/u],
-  ["QUEST_FACTION", /(?:quest|faction|domain|notoriety|standing)/u],
-  ["AI_MODES", /(?:ai|showdown|trainer|boss|game-mode|challenge|daily|endless)/u],
-  ["WORLD", /(?:biome|arena|encounter|route|wave|world|map|spawn)/u],
-  ["PRESENTATION", /(?:animation|audio|camera|message|phase|scene|sound|sprite|text-display|transition)/u],
-  ["BATTLE", /(?:ability|battle|battler|damage|field|move|pokemon|status|terrain|weather)/u],
+  [
+    "INVENTORY_ECONOMY",
+    [
+      "modifier",
+      "modifiers",
+      "item",
+      "items",
+      "reward",
+      "rewards",
+      "shop",
+      "market",
+      "money",
+      "voucher",
+      "relic",
+      "reroll",
+    ],
+  ],
+  ["SCENARIO", ["mystery", "scenario", "scenarios", "scripted-event", "encounter-event"]],
+  ["QUEST_FACTION", ["quest", "quests", "faction", "factions", "domain", "domains", "notoriety", "standing"]],
+  [
+    "AI_MODES",
+    ["ai", "moody", "ghost", "showdown", "trainer", "trainers", "boss", "game-mode", "challenge", "daily", "endless"],
+  ],
+  ["WORLD", ["biome", "biomes", "encounter", "encounters", "route", "routes", "wave", "waves", "world", "spawn"]],
+  [
+    "BATTLE",
+    [
+      "ability",
+      "abilities",
+      "arena",
+      "archetype",
+      "archetypes",
+      "battle",
+      "battler",
+      "damage",
+      "field",
+      "move",
+      "moves",
+      "pokemon",
+      "positional",
+      "status",
+      "tag",
+      "tags",
+      "terrain",
+      "weather",
+    ],
+  ],
+  ["CONTROL", ["command", "control", "controls", "input", "inputs", "menu", "menus", "navigation"]],
 ];
 const CANONICAL_DOMAINS = new Set([
   "CONTROL",
@@ -230,9 +329,10 @@ function isBehaviorDeclaration(node, kind) {
 }
 
 function domainFor(path, symbol, owner) {
-  const evidence = `${path} ${symbol} ${owner ?? ""}`.toLowerCase();
-  for (const [domain, pattern] of DOMAIN_RULES) {
-    if (pattern.test(evidence)) {
+  const evidence = `${path} ${symbol} ${owner ?? ""}`.replace(/([a-z0-9])([A-Z])/gu, "$1 $2").toLowerCase();
+  const tokens = new Set(evidence.split(/[^a-z0-9]+/gu).filter(Boolean));
+  for (const [domain, names] of DOMAIN_RULES) {
+    if (names.some(name => tokens.has(name))) {
       return domain;
     }
   }
@@ -247,6 +347,9 @@ function implementationStatus(domain) {
     return "PRESENTATION_ONLY";
   }
   if (domain === "BATTLE") {
+    return "M6_IMPLEMENTED";
+  }
+  if (domain === "M6_PROTOCOL") {
     return "M6_IMPLEMENTED";
   }
   return "REQUIRES_M7";

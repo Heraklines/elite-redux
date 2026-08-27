@@ -128,6 +128,7 @@ const gameIds = uniqueIds(game.behaviors, "game behavior catalog");
 const expectedDomains = new Map([
   ["AI_MODES", "ai_behavior_count"],
   ["BATTLE", "battle_behavior_count"],
+  ["M6_PROTOCOL", "m6_protocol_behavior_count"],
   ["CAPTURE_PARTY", "capture_party_behavior_count"],
   ["CONTROL", "control_behavior_count"],
   ["INVENTORY_ECONOMY", "inventory_economy_behavior_count"],
