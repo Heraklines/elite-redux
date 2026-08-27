@@ -378,7 +378,7 @@ function stripNulls(value) {
   return result;
 }
 
-function extractJson(text) {
+function extractJson(text, source = "primary model", fallback = true) {
   const trimmed = text
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
@@ -394,10 +394,44 @@ function extractJson(text) {
       } catch {}
     }
     const detail = trimmed.length === 0 ? "the response was empty" : "the response was not valid JSON";
-    throw Object.assign(new Error(`The primary model could not produce a valid ability blueprint: ${detail}`), {
-      fallback: true,
+    throw Object.assign(new Error(`The ${source} could not produce a valid ability blueprint: ${detail}`), {
+      fallback,
     });
   }
+}
+
+function messageContentText(content) {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  return content
+    .map(part => {
+      if (typeof part === "string") {
+        return part;
+      }
+      if (typeof part?.text === "string") {
+        return part.text;
+      }
+      if (typeof part?.content === "string") {
+        return part.content;
+      }
+      return "";
+    })
+    .join("");
+}
+
+function completedTurnText(turn) {
+  const items = Array.isArray(turn?.items) ? turn.items : [];
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index];
+    if (item?.type === "agentMessage" && typeof item.text === "string" && item.text.trim()) {
+      return item.text;
+    }
+  }
+  return "";
 }
 
 function sourceKey(source) {
@@ -617,6 +651,11 @@ async function runCodex(payload, emit) {
       finalText += params.delta;
     } else if (message.method === "item/completed" && params.item?.type === "agentMessage" && params.item.text) {
       finalText = params.item.text;
+    } else if (message.method === "rawResponseItem/completed" && params.item?.role === "assistant") {
+      const text = messageContentText(params.item.content);
+      if (text.trim()) {
+        finalText = text;
+      }
     } else if (message.method === "thread/tokenUsage/updated") {
       emit({ type: "usage", usage: params.tokenUsage || params.usage || params });
     } else if (message.method === "error") {
@@ -645,7 +684,7 @@ async function runCodex(payload, emit) {
     turnId = started.turn.id;
     activeTurn = { requestId: payload.requestId, threadId, turnId };
     try {
-      await Promise.race([
+      const finishedTurn = await Promise.race([
         done,
         new Promise((_, reject) =>
           setTimeout(
@@ -654,6 +693,10 @@ async function runCodex(payload, emit) {
           ),
         ),
       ]);
+      const completedText = completedTurnText(finishedTurn);
+      if (completedText.trim()) {
+        finalText = completedText;
+      }
     } catch (error) {
       await rpc.request("turn/interrupt", { threadId, turnId }).catch(() => {});
       throw error;
@@ -690,7 +733,7 @@ async function runNim(payload, emit) {
     headers: {
       Authorization: `Bearer ${nimKey}`,
       "Content-Type": "application/json",
-      Accept: "text/event-stream",
+      Accept: "application/json",
     },
     body: JSON.stringify({
       model: nimModel,
@@ -704,36 +747,15 @@ async function runNim(payload, emit) {
       ],
       temperature: 0.1,
       max_tokens: 6000,
-      stream: true,
+      stream: false,
     }),
   });
-  if (!response.ok || !response.body) {
+  if (!response.ok) {
     throw new Error(`The ability builder could not complete the request (${response.status})`);
   }
-  const reader = response.body.getReader();
-  const textDecoder = new TextDecoder();
-  let buffer = "";
-  let content = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    buffer += textDecoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      const data = line.trim().replace(/^data:\s*/, "");
-      if (!data || data === "[DONE]") {
-        continue;
-      }
-      try {
-        const event = JSON.parse(data);
-        content += event.choices?.[0]?.delta?.content || "";
-      } catch {}
-    }
-  }
-  const result = stripNulls(extractJson(content.replace(/<think>[\s\S]*?<\/think>/gi, "")));
+  const body = await response.json();
+  const content = messageContentText(body?.choices?.[0]?.message?.content).replace(/<think>[\s\S]*?<\/think>/gi, "");
+  const result = stripNulls(extractJson(content, "fallback model", false));
   validateSources(result, payload);
   return result;
 }
