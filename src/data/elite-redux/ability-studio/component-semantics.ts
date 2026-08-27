@@ -17,11 +17,26 @@ import {
   AbilityStudioSourceAbilityAbAttr,
   abilityStudioRuntimeClassChain,
 } from "./runtime-components";
+import {
+  type AbilityStudioRuntimeParameterDefinition,
+  type AbilityStudioRuntimeParameterValue,
+  abilityStudioRuntimeParameterEntries,
+  isAbilityStudioRuntimeParameterValue,
+} from "./runtime-parameters";
 
 export interface AbilityStudioSemanticParameter {
   readonly key: string;
+  readonly path: string;
   readonly label: string;
   readonly value: string;
+  readonly rawValue?: AbilityStudioRuntimeParameterValue;
+  readonly control: AbilityStudioRuntimeParameterDefinition["control"];
+  readonly editable: boolean;
+  readonly optional?: boolean;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+  readonly options?: AbilityStudioRuntimeParameterDefinition["options"];
 }
 
 export interface AbilityStudioComponentSemantics {
@@ -30,16 +45,6 @@ export interface AbilityStudioComponentSemantics {
   readonly scope: "primitive" | "package";
   readonly parameters: readonly AbilityStudioSemanticParameter[];
 }
-
-const OMITTED_PARAMETERS = new Set([
-  "showAbility",
-  "extraCondition",
-  "componentLabel",
-  "componentHookId",
-  "componentHookLabel",
-  "abilityStudioCapability",
-  "abilityStudioSourceAbilityId",
-]);
 
 const OPERATION_LABELS: Readonly<Record<string, string>> = {
   AbilityStudioRuntimeCapabilityAbAttr: "Direct runtime effect",
@@ -78,6 +83,9 @@ const OPERATION_LABELS: Readonly<Record<string, string>> = {
   PassiveRecoveryAbAttr: "Recover HP at the end of the turn",
   PostSummonScriptedMoveAbAttr: "Use a scripted move on entry",
   PostAttackScriptedMoveAbAttr: "Use a scripted move after attacking",
+  PostTurnScriptedMoveAbAttr: "Use a scripted move at the end of a turn",
+  PostItemLostScriptedMoveAbAttr: "Use a scripted move after losing an item",
+  OnOpponentStatRaiseScriptedMoveAbAttr: "Use a scripted move after an opponent raises a stat",
   NoFusionAbilityAbAttr: "Disable this effect while fused",
   NoTransformAbilityAbAttr: "Disable this effect while transformed",
   AbsorbantAbAttr: "Boost draining moves and apply Leech Seed",
@@ -247,13 +255,36 @@ function semanticValue(key: string, value: unknown, abilityName: string, attrTyp
 
 function semanticParameters(ability: Ability, attr: AbAttr): AbilityStudioSemanticParameter[] {
   const attrType = abilityStudioRuntimeClassChain(attr)[0];
-  return Object.entries(attr)
-    .filter(([key, value]) => !OMITTED_PARAMETERS.has(key) && value !== undefined)
-    .map(([key, value]) => ({
-      key,
-      label: parameterLabel(key),
-      value: semanticValue(key, value, ability.name, attrType),
-    }));
+  return abilityStudioRuntimeParameterEntries(attr, attrType).map(({ definition, value }) => {
+    const optionLabels = Array.isArray(value)
+      ? value
+          .map(item => definition.options?.find(option => option.value === item)?.label)
+          .filter((label): label is string => label !== undefined)
+      : [];
+    const optionLabel = definition.options?.find(option => option.value === value)?.label;
+    const parameter: AbilityStudioSemanticParameter = {
+      key: definition.path,
+      path: definition.path,
+      label: definition.label,
+      value:
+        value === undefined
+          ? "Optional; uses the source setting"
+          : optionLabels.length > 0
+            ? optionLabels.join(", ")
+            : (optionLabel ?? semanticValue(definition.path, value, ability.name, attrType)),
+      control: definition.control,
+      editable: definition.editable,
+      ...(definition.optional === undefined ? {} : { optional: definition.optional }),
+      ...(definition.min === undefined ? {} : { min: definition.min }),
+      ...(definition.max === undefined ? {} : { max: definition.max }),
+      ...(definition.step === undefined ? {} : { step: definition.step }),
+      ...(definition.options === undefined ? {} : { options: definition.options }),
+    };
+    if (isAbilityStudioRuntimeParameterValue(value)) {
+      return { ...parameter, rawValue: value };
+    }
+    return parameter;
+  });
 }
 
 export function describeAbilityStudioComponent(ability: Ability, attr: AbAttr): AbilityStudioComponentSemantics {

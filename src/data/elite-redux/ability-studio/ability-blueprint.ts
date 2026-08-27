@@ -9,6 +9,7 @@ import type {
   AbilityStudioRuntimeConditionReference,
   AbilityStudioRuntimeSource,
 } from "./runtime-components";
+import { isAbilityStudioRuntimeParameterValue } from "./runtime-parameters";
 
 export const ABILITY_STUDIO_SCHEMA_VERSION = 1;
 export const ABILITY_STUDIO_ID_MIN = 20000;
@@ -452,6 +453,19 @@ function validateRuntimeSource(value: unknown, path: string, errors: string[]): 
   ) {
     errors.push(`${path} is not a valid runtime component source`);
     return false;
+  }
+  if (value.parameterOverrides !== undefined) {
+    if (!isObject(value.parameterOverrides) || Object.keys(value.parameterOverrides).length > 32) {
+      errors.push(`${path}.parameterOverrides must contain at most 32 parameters`);
+    } else {
+      for (const [parameterPath, parameterValue] of Object.entries(value.parameterOverrides)) {
+        if (!/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*){0,3}$/.test(parameterPath)) {
+          errors.push(`${path}.parameterOverrides has invalid path ${parameterPath}`);
+        } else if (!isAbilityStudioRuntimeParameterValue(parameterValue)) {
+          errors.push(`${path}.parameterOverrides.${parameterPath} has an invalid value`);
+        }
+      }
+    }
   }
   return true;
 }

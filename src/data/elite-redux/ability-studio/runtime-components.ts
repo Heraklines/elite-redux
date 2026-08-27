@@ -15,6 +15,10 @@ import {
   activateAbilityStudioRuntimeComponent,
   restrictAbilityStudioRuntimeComponent,
 } from "./runtime-capabilities";
+import {
+  type AbilityStudioRuntimeParameterValue,
+  applyAbilityStudioRuntimeParameterOverrides,
+} from "./runtime-parameters";
 
 export type AbilityStudioRuntimeConditionKind = "ability" | "holder" | "event";
 
@@ -22,6 +26,7 @@ export interface AbilityStudioRuntimeSource {
   readonly abilityId: number;
   readonly attrIndex: number;
   readonly attrType: string;
+  readonly parameterOverrides?: Readonly<Record<string, AbilityStudioRuntimeParameterValue>>;
 }
 
 export interface AbilityStudioRuntimeConditionReference extends AbilityStudioRuntimeSource {
@@ -378,6 +383,12 @@ function cloneAttr(attr: AbAttr): AbAttr {
   return Object.assign(Object.create(Object.getPrototypeOf(attr)), attr) as AbAttr;
 }
 
+function cloneRuntimeSourceAttr(source: AbilityStudioRuntimeSource, attr: AbAttr): AbAttr {
+  const cloned = cloneAttr(attr);
+  applyAbilityStudioRuntimeParameterOverrides(cloned, source.attrType, source.parameterOverrides);
+  return cloned;
+}
+
 function isRuntimeSource(value: AbilityStudioRuntimeSource | AbilityStudioEffect): value is AbilityStudioRuntimeSource {
   return "abilityId" in value;
 }
@@ -388,8 +399,15 @@ function isRuntimeCondition(
   return "abilityId" in value;
 }
 
-function runtimeSourceKey(source: AbilityStudioRuntimeSource): string {
+function runtimeSourceBaseKey(source: AbilityStudioRuntimeSource): string {
   return `${source.abilityId}:${source.attrIndex}:${source.attrType}`;
+}
+
+function runtimeSourceInstanceKey(source: AbilityStudioRuntimeSource): string {
+  const overrides = Object.entries(source.parameterOverrides ?? {}).sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+  return `${runtimeSourceBaseKey(source)}:${JSON.stringify(overrides)}`;
 }
 
 type RuntimeRuleParams = AbAttrBaseParams & {
@@ -426,14 +444,31 @@ export function compileAbilityStudioRuntimeComponentRule(
   const helperAttrs: { before: AbAttr[]; after: AbAttr[] } = { before: [], after: [] };
   const consumedSignals: Array<(params: AbAttrBaseParams) => void> = [];
   const clonedSources = new Map<string, { ability: Ability; attr: AbAttr }>();
+  const effectOverrides = new Map(
+    rule.effects
+      .filter(isRuntimeSource)
+      .filter(source => source.parameterOverrides !== undefined)
+      .map(source => [runtimeSourceBaseKey(source), source.parameterOverrides]),
+  );
+  const configuredSource = (reference: AbilityStudioRuntimeSource): AbilityStudioRuntimeSource => {
+    const inherited = effectOverrides.get(runtimeSourceBaseKey(reference));
+    if (inherited === undefined) {
+      return reference;
+    }
+    return {
+      ...reference,
+      parameterOverrides: { ...inherited, ...reference.parameterOverrides },
+    };
+  };
   const resolveClonedSource = (reference: AbilityStudioRuntimeSource): { ability: Ability; attr: AbAttr } => {
-    const key = runtimeSourceKey(reference);
+    const configured = configuredSource(reference);
+    const key = runtimeSourceInstanceKey(configured);
     const existing = clonedSources.get(key);
     if (existing !== undefined) {
       return existing;
     }
-    const source = resolveAttr(reference, resolveAbility);
-    const cloned = { ability: source.ability, attr: cloneAttr(source.attr) };
+    const source = resolveAttr(configured, resolveAbility);
+    const cloned = { ability: source.ability, attr: cloneRuntimeSourceAttr(configured, source.attr) };
     clonedSources.set(key, cloned);
     return cloned;
   };
@@ -468,7 +503,7 @@ export function compileAbilityStudioRuntimeComponentRule(
       return (params: AbAttrBaseParams) => source.attr.canApply(params as never);
     }
     const satisfied = new WeakSet<object>();
-    const signal = cloneAttr(resolveAttr(reference, resolveAbility).attr) as AbAttr & {
+    const signal = cloneAttr(source.attr) as AbAttr & {
       apply: (params: AbAttrBaseParams) => void;
       getTriggerMessage: () => null;
     };
@@ -487,7 +522,7 @@ export function compileAbilityStudioRuntimeComponentRule(
     rule.conditions
       .filter(isRuntimeCondition)
       .filter(condition => condition.kind === "event")
-      .map(runtimeSourceKey),
+      .map(runtimeSourceBaseKey),
   );
   const effects = rule.effects.map(reference => {
     if (!isRuntimeSource(reference)) {
@@ -498,7 +533,7 @@ export function compileAbilityStudioRuntimeComponentRule(
     if (
       (capability instanceof AbilityStudioRuntimeCapabilityAbAttr
         || capability instanceof AbilityStudioSourceAbilityAbAttr)
-      && runtimeSourceKey(reference) !== runtimeSourceKey(rule.hook)
+      && runtimeSourceBaseKey(reference) !== runtimeSourceBaseKey(rule.hook)
     ) {
       capability.restrictToTriggeredActivation();
       helperAttrs.after.push(capability);
@@ -512,7 +547,7 @@ export function compileAbilityStudioRuntimeComponentRule(
     }
     if (
       abilityStudioRuntimeMethodOwner(source.attr, "apply") === "AbAttr"
-      && runtimeSourceKey(reference) !== runtimeSourceKey(rule.hook)
+      && runtimeSourceBaseKey(reference) !== runtimeSourceBaseKey(rule.hook)
     ) {
       const directCapability = source.attr;
       restrictAbilityStudioRuntimeComponent(directCapability);
@@ -547,13 +582,13 @@ export function compileAbilityStudioRuntimeComponentRule(
     }
     return {
       attr: source.attr,
-      checkEligibility: !explicitEventGates.has(runtimeSourceKey(reference)),
+      checkEligibility: !explicitEventGates.has(runtimeSourceBaseKey(reference)),
     } as const;
   });
   const eligibleEffects = new WeakMap<AbAttrBaseParams, readonly boolean[]>();
   const resolveEligibleEffects = (params: AbAttrBaseParams): readonly boolean[] =>
     effects.map(effect => ("attr" in effect && effect.checkEligibility ? effect.attr.canApply(params as never) : true));
-  const carrier = cloneAttr(hookSource.attr) as AbAttr & {
+  const carrier = cloneRuntimeSourceAttr(configuredSource(rule.hook), hookSource.attr) as AbAttr & {
     apply: (params: AbAttrBaseParams) => void;
     canApply: (params: AbAttrBaseParams) => boolean;
     getCondition: () => null;
@@ -625,7 +660,7 @@ export function compileAbilityStudioRuntimeComponentRuleAttrs(
   }
   const progress = new WeakMap<object, number>();
   const signals = prerequisites.map((source, index) => {
-    const signal = cloneAttr(resolveAttr(source, resolveAbility).attr) as AbAttr & {
+    const signal = cloneRuntimeSourceAttr(source, resolveAttr(source, resolveAbility).attr) as AbAttr & {
       apply: (params: AbAttrBaseParams) => void;
       canApply: (params: AbAttrBaseParams) => boolean;
       getCondition: () => null;

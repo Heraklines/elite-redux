@@ -6663,6 +6663,7 @@ async function init() {
       window.erAbilityStudio.init({
         catalog: abilityPrimitivesData,
         abilities: ABILS_RICH,
+        moves: MOVES_RICH,
         mechanics: abilityMechanicsData,
         components: abilityComponentsData,
         blueprints: customAbilitiesLive,

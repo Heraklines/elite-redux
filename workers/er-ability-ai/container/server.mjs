@@ -6,6 +6,8 @@ import readline from "node:readline";
 
 const port = Number(process.env.PORT || 8080);
 const codexHome = process.env.CODEX_HOME || "/var/lib/ability-ai/codex";
+const codexBin = process.env.CODEX_BIN || "codex";
+const codexCwd = process.env.CODEX_CWD || "/srv/empty";
 const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
@@ -15,12 +17,30 @@ const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 let activeTurn = null;
 let generationBusy = false;
 
+const parameterValueSchema = {
+  anyOf: [
+    { type: "string" },
+    { type: "number" },
+    { type: "boolean" },
+    { type: "null" },
+    { type: "array", items: { type: "string" }, maxItems: 32 },
+    { type: "array", items: { type: "number" }, maxItems: 32 },
+    { type: "array", items: { type: "boolean" }, maxItems: 32 },
+  ],
+};
+
+const parameterOverridesSchema = {
+  type: "object",
+  additionalProperties: parameterValueSchema,
+};
+
 const sourceSchema = {
   type: "object",
   properties: {
     abilityId: { type: "integer", minimum: 1 },
     attrIndex: { type: "integer", minimum: 0 },
     attrType: { type: "string", minLength: 2, maxLength: 120 },
+    parameterOverrides: parameterOverridesSchema,
   },
   required: ["abilityId", "attrIndex", "attrType"],
   additionalProperties: false,
@@ -34,6 +54,7 @@ const conditionReferenceSchema = {
     attrType: { type: "string", minLength: 2, maxLength: 120 },
     kind: { type: "string", enum: ["ability", "holder", "event"] },
     conditionIndex: { type: ["integer", "null"], minimum: 0 },
+    parameterOverrides: parameterOverridesSchema,
   },
   required: ["abilityId", "attrIndex", "attrType", "kind", "conditionIndex"],
   additionalProperties: false,
@@ -241,8 +262,8 @@ class CodexRpc {
 
   async startProcess() {
     await mkdir(codexHome, { recursive: true });
-    this.child = spawn("codex", ["app-server"], {
-      cwd: "/srv/empty",
+    this.child = spawn(codexBin, ["app-server"], {
+      cwd: codexCwd,
       env: { ...process.env, CODEX_HOME: codexHome, HOME: process.env.HOME || "/var/lib/ability-ai" },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -263,6 +284,7 @@ class CodexRpc {
     });
     await this.request("initialize", {
       clientInfo: { name: "er_ability_studio", title: "ER Ability Studio", version: "1.0.0" },
+      capabilities: { experimentalApi: true },
     });
     this.notify("initialized", {});
   }
@@ -367,14 +389,95 @@ function extractJson(text) {
     const start = trimmed.indexOf("{");
     const end = trimmed.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      return JSON.parse(trimmed.slice(start, end + 1));
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1));
+      } catch {}
     }
-    throw new Error("The model did not return a valid ability blueprint");
+    const detail = trimmed.length === 0 ? "the response was empty" : "the response was not valid JSON";
+    throw Object.assign(new Error(`The primary model could not produce a valid ability blueprint: ${detail}`), {
+      fallback: true,
+    });
   }
 }
 
 function sourceKey(source) {
   return `${source.abilityId}:${source.attrIndex}:${source.attrType}`;
+}
+
+function validateParameterOverrides(source, parameters, payload, label) {
+  const overrides = source.parameterOverrides;
+  if (overrides === undefined) {
+    return;
+  }
+  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+    throw new Error(`${label} parameter overrides must be an object`);
+  }
+  if (Object.keys(overrides).length > 32) {
+    throw new Error(`${label} has too many parameter overrides`);
+  }
+  const definitions = new Map((parameters || []).map(parameter => [parameter.path || parameter.key, parameter]));
+  const moveIds = new Set((payload.moveIndex || []).map(move => Number(move.id)));
+  for (const [path, value] of Object.entries(overrides)) {
+    const parameter = definitions.get(path);
+    if (!parameter?.editable) {
+      throw new Error(`${label} cannot override ${path}`);
+    }
+    if (value === null) {
+      if (!parameter.optional) {
+        throw new Error(`${label} cannot clear ${path}`);
+      }
+      continue;
+    }
+    if (parameter.control === "move") {
+      if (!Number.isInteger(value) || !moveIds.has(value)) {
+        throw new Error(`${label}.${path} is not an available move id`);
+      }
+    } else if (parameter.control === "move-list") {
+      if (!Array.isArray(value) || value.some(item => !Number.isInteger(item) || !moveIds.has(item))) {
+        throw new Error(`${label}.${path} contains an unavailable move id`);
+      }
+    } else if (parameter.control === "number") {
+      if (
+        typeof value !== "number"
+        || !Number.isFinite(value)
+        || (parameter.min !== undefined && value < parameter.min)
+        || (parameter.max !== undefined && value > parameter.max)
+      ) {
+        throw new Error(`${label}.${path} is outside its valid range`);
+      }
+    } else if (parameter.control === "number-list") {
+      if (
+        !Array.isArray(value)
+        || value.length === 0
+        || value.some(
+          item =>
+            typeof item !== "number"
+            || !Number.isFinite(item)
+            || (parameter.min !== undefined && item < parameter.min)
+            || (parameter.max !== undefined && item > parameter.max),
+        )
+      ) {
+        throw new Error(`${label}.${path} contains an invalid number`);
+      }
+    } else if (parameter.control === "boolean") {
+      if (typeof value !== "boolean") {
+        throw new Error(`${label}.${path} must be boolean`);
+      }
+    } else if (parameter.control === "select") {
+      if (!(parameter.options || []).some(option => option.value === value)) {
+        throw new Error(`${label}.${path} is not an available option`);
+      }
+    } else if (parameter.control === "multi-select") {
+      if (
+        !Array.isArray(value)
+        || value.some(item => !(parameter.options || []).some(option => option.value === item))
+      ) {
+        throw new Error(`${label}.${path} contains an unavailable option`);
+      }
+    } else {
+      throw new Error(`${label}.${path} is not safely configurable`);
+    }
+  }
 }
 
 function validateSources(result, payload) {
@@ -384,15 +487,20 @@ function validateSources(result, payload) {
   const effects = new Map();
   for (const ability of payload.componentCandidates || []) {
     for (const rule of ability.rules || []) {
-      hooks.set(sourceKey(rule.source), rule.hook);
+      hooks.set(sourceKey(rule.source), { hook: rule.hook, parameters: rule.parameters });
       for (const condition of rule.conditions || []) {
         conditions.set(`${sourceKey(condition.source)}:${condition.kind}:${condition.source.conditionIndex ?? ""}`, {
           condition,
           hook: rule.hook,
+          parameters: rule.parameters,
         });
       }
       for (const effect of rule.effects || []) {
-        effects.set(sourceKey(effect.source), { effect, hook: rule.hook });
+        effects.set(sourceKey(effect.source), {
+          effect,
+          hook: rule.hook,
+          parameters: effect.parameters || rule.parameters,
+        });
       }
     }
   }
@@ -404,19 +512,25 @@ function validateSources(result, payload) {
   }
   for (const rule of blueprint.componentRules || []) {
     for (const hook of [...(rule.prerequisiteHooks || []), rule.hook]) {
-      if (!hooks.has(sourceKey(hook))) {
+      const candidate = hooks.get(sourceKey(hook));
+      if (!candidate) {
         throw new Error(`The model referenced an unavailable WHEN component (${sourceKey(hook)})`);
       }
+      validateParameterOverrides(hook, candidate.parameters, payload, `WHEN ${sourceKey(hook)}`);
     }
     for (const condition of rule.conditions || []) {
       if (!Number.isInteger(condition.abilityId)) {
         continue;
+      }
+      if (condition.kind !== "ability") {
+        condition.conditionIndex = undefined;
       }
       const key = `${sourceKey(condition)}:${condition.kind}:${condition.conditionIndex ?? ""}`;
       const candidate = conditions.get(key);
       if (!candidate) {
         throw new Error(`The model referenced an unavailable IF component (${key})`);
       }
+      validateParameterOverrides(condition, candidate.parameters, payload, `IF ${key}`);
     }
     for (const effect of rule.effects || []) {
       if (!Number.isInteger(effect.abilityId)) {
@@ -426,12 +540,13 @@ function validateSources(result, payload) {
       if (!candidate) {
         throw new Error(`The model referenced an unavailable DO component (${sourceKey(effect)})`);
       }
+      validateParameterOverrides(effect, candidate.parameters, payload, `DO ${sourceKey(effect)}`);
     }
   }
 }
 
 function modelPrompt(payload) {
-  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Every runtime component source object must be copied exactly from componentCandidates. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
+  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Copy each runtime source identity exactly from componentCandidates. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, add parameterOverrides using only parameters marked editable, their exact path, and the advertised value type/range/options. Move parameters must use an id from RELEVANT MOVES. Chance is a percentage from 1 to 100 and should be 100 unless the request explicitly asks for a chance. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT MOVES:\n${JSON.stringify(payload.moveIndex || [])}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
 }
 
 async function runCodex(payload, emit) {
@@ -447,7 +562,7 @@ async function runCodex(payload, emit) {
   emit({ type: "status", message: "Preparing the requested ability" });
   const threadResult = await rpc.request("thread/start", {
     model: codexModel,
-    cwd: "/srv/empty",
+    cwd: codexCwd,
     approvalPolicy: "never",
     sandbox: "read-only",
     serviceName: "er_ability_studio",

@@ -42,6 +42,9 @@
   let componentsBySource = new Map();
   let componentConditionsByKey = new Map();
   let componentEffectsByKey = new Map();
+  let moveCatalog = [];
+  let movesById = new Map();
+  let movesByName = new Map();
   let componentInsertTarget = null;
   let componentSearchView = { key: "", abilityLimit: 8, effectLimit: 32, partLimit: 80 };
   let studioDrag = null;
@@ -200,10 +203,48 @@
     return [...grouped.values()];
   }
 
+  function aiMoveContext(prompt) {
+    const normalizedPrompt = prompt.toLowerCase();
+    const terms = aiSearchTerms(prompt);
+    return moveCatalog
+      .map(move => {
+        const haystack = `${move.name} ${move.type || ""} ${move.category || ""}`.toLowerCase();
+        const score =
+          (normalizedPrompt.includes(String(move.name).toLowerCase()) ? 100 : 0)
+          + terms.reduce((total, term) => total + (haystack.includes(term) ? 3 : 0), 0);
+        return { move, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((left, right) => right.score - left.score || left.move.name.localeCompare(right.move.name))
+      .slice(0, 80)
+      .map(({ move }) => ({
+        id: move.id,
+        name: move.name,
+        type: move.type,
+        category: move.category,
+        power: move.power,
+      }));
+  }
+
   function cleanAiFilter(filter) {
     return Object.fromEntries(
       Object.entries(filter || {}).filter(([, value]) => value !== null && value !== undefined && value !== ""),
     );
+  }
+
+  function cleanAiRuntimeSource(source, part) {
+    if (!source || !Number.isInteger(Number(source.abilityId)) || !source.parameterOverrides) {
+      return;
+    }
+    for (const [path, value] of Object.entries(source.parameterOverrides)) {
+      const parameter = runtimeParameter(source, part, path);
+      if (parameter && Object.hasOwn(parameter, "rawValue") && eq(value, parameter.rawValue)) {
+        delete source.parameterOverrides[path];
+      }
+    }
+    if (Object.keys(source.parameterOverrides).length === 0) {
+      source.parameterOverrides = undefined;
+    }
   }
 
   function normalizeAiBlueprint(raw) {
@@ -230,10 +271,13 @@
       rule.conditions ||= [];
       rule.effects ||= [];
       rule.conditions.forEach(condition => {
-        if (condition.conditionIndex === null || condition.conditionIndex === undefined) {
+        if (condition.kind !== "ability" || condition.conditionIndex === null) {
           condition.conditionIndex = undefined;
         }
       });
+      [...rule.prerequisiteHooks, rule.hook].forEach(source => cleanAiRuntimeSource(source, "hook"));
+      rule.conditions.forEach(source => cleanAiRuntimeSource(source, "condition"));
+      rule.effects.forEach(source => cleanAiRuntimeSource(source, "effect"));
     });
     blueprint.rules.forEach((rule, index) => {
       rule.key ||= `rule-${index + 1}`;
@@ -319,6 +363,7 @@
             description: ability.description || ability.desc || "",
           })),
           componentCandidates: aiComponentContext(prompt),
+          moveIndex: aiMoveContext(prompt),
         },
         aiAbortController.signal,
       );
@@ -666,7 +711,7 @@
               }
               const definition = componentConditionsByKey.get(componentConditionKey(condition));
               const label = definition?.label || `${condition.attrType} condition`;
-              return `${conditionIndex > 0 ? conditionConnectorHtml(rule, "component", index) : ""}<span class="as-runtime-condition" draggable="true" data-as-drag-part="condition" data-as-drag-rule="${index}" data-as-drag-index="${conditionIndex}" data-as-drop-part="condition" data-as-drop-rule="${index}" data-as-drop-index="${conditionIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><b>${esc(label)}</b><small>${esc(condition.kind)}</small><button type="button" class="icon danger" title="Remove condition" aria-label="Remove ${esc(label)}" data-as-action="remove-component-condition" data-as-component-rule="${index}" data-as-component-condition="${conditionIndex}">×</button></span>`;
+              return `${conditionIndex > 0 ? conditionConnectorHtml(rule, "component", index) : ""}<div class="as-runtime-condition as-runtime-configurable" draggable="true" data-as-drag-part="condition" data-as-drag-rule="${index}" data-as-drag-index="${conditionIndex}" data-as-drop-part="condition" data-as-drop-rule="${index}" data-as-drop-index="${conditionIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-component-copy"><b>${esc(label)}</b><small>${esc(condition.kind)}</small>${runtimeParametersHtml(condition, "condition", index, conditionIndex)}</div><button type="button" class="icon danger" title="Remove condition" aria-label="Remove ${esc(label)}" data-as-action="remove-component-condition" data-as-component-rule="${index}" data-as-component-condition="${conditionIndex}">×</button></div>`;
             })
             .join("")
         : '<span class="as-always">Always</span>';
@@ -676,7 +721,7 @@
       }
       const definition = componentEffectsByKey.get(componentSourceKey(effect));
       const label = definition?.label || effect.attrType;
-      return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${index}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${index}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-effect"><b>${esc(label)}</b><small>${esc(effect.attrType)}</small></div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(label)}" data-as-action="remove-component-effect" data-as-component-rule="${index}" data-as-component-effect="${effectIndex}">×</button></div>`;
+      return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${index}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${index}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-effect as-runtime-configurable"><div class="as-runtime-component-copy"><b>${esc(label)}</b><small>${esc(effect.attrType)}</small>${runtimeParametersHtml(effect, "effect", index, effectIndex)}</div></div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(label)}" data-as-action="remove-component-effect" data-as-component-rule="${index}" data-as-component-effect="${effectIndex}">×</button></div>`;
     };
     const firstEffect = rule.effects[0] ? effectHtml(rule.effects[0], 0) : "";
     const laterEffects = rule.effects
@@ -906,8 +951,121 @@
     return `${source.abilityId}:${source.attrIndex}:${source.attrType}`;
   }
 
+  function componentInstanceKey(source) {
+    const overrides = Object.entries(source?.parameterOverrides || {}).sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+    return `${componentSourceKey(source)}:${JSON.stringify(overrides)}`;
+  }
+
   function componentConditionKey(reference) {
     return `${componentSourceKey(reference)}:${reference.kind}:${reference.conditionIndex ?? ""}`;
+  }
+
+  function runtimeParameters(reference, part) {
+    const rule = resolveComponent(reference);
+    if (!rule) {
+      return [];
+    }
+    if (part === "effect") {
+      return componentEffectsByKey.get(componentSourceKey(reference))?.parameters || rule.parameters || [];
+    }
+    return rule.parameters || [];
+  }
+
+  function runtimeParameter(reference, part, path) {
+    return runtimeParameters(reference, part).find(parameter => parameter.path === path || parameter.key === path);
+  }
+
+  function parameterValue(reference, parameter) {
+    const path = parameter.path || parameter.key;
+    return Object.hasOwn(reference.parameterOverrides || {}, path)
+      ? reference.parameterOverrides[path]
+      : parameter.rawValue;
+  }
+
+  function parameterOptionValue(value) {
+    return `${typeof value === "number" ? "n" : "s"}:${value}`;
+  }
+
+  function parseParameterOption(value) {
+    if (value.startsWith("n:")) {
+      return Number(value.slice(2));
+    }
+    return value.slice(2);
+  }
+
+  function moveLabel(id) {
+    const move = movesById.get(Number(id));
+    return move ? `${move.name} #${move.id}` : Number.isInteger(Number(id)) ? `Move #${id}` : "";
+  }
+
+  function parseMove(value) {
+    const normalized = String(value || "").trim();
+    const explicitId = normalized.match(/#(\d+)$/)?.[1] || (/^\d+$/.test(normalized) ? normalized : "");
+    if (explicitId && movesById.has(Number(explicitId))) {
+      return Number(explicitId);
+    }
+    return movesByName.get(normalized.toLowerCase())?.id;
+  }
+
+  function runtimeMoveDatalistHtml() {
+    return `<datalist id="as-runtime-moves">${moveCatalog
+      .map(move => `<option value="${esc(`${move.name} #${move.id}`)}"></option>`)
+      .join("")}</datalist>`;
+  }
+
+  function runtimeParameterControl(reference, parameter, part, ruleIndex, itemIndex) {
+    if (!parameter.editable || parameter.control === "fixed") {
+      return "";
+    }
+    const path = parameter.path || parameter.key;
+    const value = parameterValue(reference, parameter);
+    const overridden = Object.hasOwn(reference.parameterOverrides || {}, path);
+    const prefix = `data-as-runtime-parameter="${esc(path)}" data-as-runtime-part="${part}" data-as-component-rule="${ruleIndex}" data-as-runtime-index="${itemIndex}" data-as-runtime-control="${esc(parameter.control)}"`;
+    const sourceValue = parameter.rawValue === undefined ? "default" : parameter.value;
+    let control = "";
+    if (parameter.control === "move") {
+      control = `<input type="search" list="as-runtime-moves" value="${esc(value == null ? "" : moveLabel(value))}" placeholder="Search a move…" ${prefix}>`;
+    } else if (parameter.control === "move-list") {
+      const moveValues = Array.isArray(value) ? value.map(moveLabel).join("; ") : "";
+      control = `<input type="text" value="${esc(moveValues)}" placeholder="Move names or IDs, semicolon-separated" ${prefix}>`;
+    } else if (parameter.control === "number" || parameter.control === "number-list") {
+      const numberValue = Array.isArray(value) ? value.join(", ") : (value ?? "");
+      const limits =
+        parameter.control === "number"
+          ? `type="number"${parameter.min === undefined ? "" : ` min="${parameter.min}"`}${parameter.max === undefined ? "" : ` max="${parameter.max}"`}${parameter.step === undefined ? "" : ` step="${parameter.step}"`}`
+          : 'type="text"';
+      control = `<input ${limits} value="${esc(numberValue)}" placeholder="${esc(parameter.optional ? "None / move default" : sourceValue)}" ${prefix}>`;
+    } else if (parameter.control === "boolean") {
+      control = `<select ${prefix}><option value="__source__"${overridden ? "" : " selected"}>Source: ${esc(sourceValue)}</option><option value="true"${overridden && value === true ? " selected" : ""}>Yes</option><option value="false"${overridden && value === false ? " selected" : ""}>No</option></select>`;
+    } else if (parameter.control === "select") {
+      const choices = (parameter.options || [])
+        .map(choice => {
+          const token = parameterOptionValue(choice.value);
+          return `<option value="${esc(token)}"${overridden && value === choice.value ? " selected" : ""}>${esc(choice.label)}</option>`;
+        })
+        .join("");
+      control = `<select ${prefix}><option value="__source__"${overridden ? "" : " selected"}>Source: ${esc(sourceValue)}</option>${parameter.optional ? `<option value="__none__"${overridden && value === null ? " selected" : ""}>None</option>` : ""}${choices}</select>`;
+    } else if (parameter.control === "multi-select") {
+      const selected = new Set(Array.isArray(value) ? value.map(String) : []);
+      const choices = (parameter.options || [])
+        .map(
+          choice =>
+            `<option value="${esc(parameterOptionValue(choice.value))}"${selected.has(String(choice.value)) ? " selected" : ""}>${esc(choice.label)}</option>`,
+        )
+        .join("");
+      control = `<select multiple size="3" ${prefix}>${choices}</select>`;
+    }
+    return `<label class="as-runtime-parameter"><span>${esc(parameter.label)}</span><span class="as-runtime-parameter-control">${control}${overridden ? `<button type="button" class="icon" title="Restore source value" aria-label="Restore source value for ${esc(parameter.label)}" data-as-action="reset-runtime-parameter" ${prefix}>↺</button>` : ""}</span></label>`;
+  }
+
+  function runtimeParametersHtml(reference, part, ruleIndex, itemIndex) {
+    const controls = runtimeParameters(reference, part)
+      .map(parameter => runtimeParameterControl(reference, parameter, part, ruleIndex, itemIndex))
+      .filter(Boolean)
+      .join("");
+    return controls ? `<div class="as-runtime-parameters">${controls}</div>` : "";
   }
 
   function resolveComponent(reference) {
@@ -1172,6 +1330,15 @@
     });
   }
 
+  function componentEffectSemanticKey(candidate) {
+    const parameters = (candidate.effect.parameters || candidate.rule.parameters || []).map(parameter => [
+      parameter.path || parameter.key,
+      Object.hasOwn(parameter, "rawValue") ? parameter.rawValue : parameter.value,
+      parameter.control,
+    ]);
+    return `${candidate.effect.kind}:${candidate.effect.source.attrType}:${JSON.stringify(parameters)}`;
+  }
+
   function fanoutSection(title, matches, renderItem) {
     const limit = Math.max(16, Math.floor(componentSearchView.partLimit / 3));
     const visible = matches.slice(0, limit);
@@ -1216,14 +1383,30 @@
       return `<button type="button" data-as-action="choose-component-primitive-condition" data-as-value="${esc(primitive)}"><b>${esc(pretty(primitive))}</b><span>Configurable IF primitive</span><small>Independent condition</small></button>`;
     }
     const conditionIndex = condition.source.conditionIndex;
-    return `<button type="button" data-as-action="choose-component-condition" data-as-id="${condition.source.abilityId}" data-as-index="${condition.source.attrIndex}" data-as-type="${esc(condition.source.attrType)}" data-as-kind="${condition.kind}"${conditionIndex === undefined ? "" : ` data-as-condition-index="${conditionIndex}"`}${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(condition.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(compatible ? condition.summary || condition.sourceOwner : reason)}</small></button>`;
+    const parameters = componentParameterSummary(condition.parameters);
+    const details = compatible
+      ? [parameters, condition.summary || condition.sourceOwner].filter(Boolean).join(" · ")
+      : reason;
+    return `<button type="button" data-as-action="choose-component-condition" data-as-id="${condition.source.abilityId}" data-as-index="${condition.source.attrIndex}" data-as-type="${esc(condition.source.attrType)}" data-as-kind="${condition.kind}"${conditionIndex === undefined ? "" : ` data-as-condition-index="${conditionIndex}"`}${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(condition.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(details)}</small></button>`;
+  }
+
+  function componentParameterSummary(parameters = []) {
+    return parameters
+      .filter(parameter => parameter.control !== "fixed")
+      .slice(0, 5)
+      .map(parameter => `${parameter.label}: ${Object.hasOwn(parameter, "rawValue") ? parameter.value : "default"}`)
+      .join(" · ");
   }
 
   function componentEffectResultHtml({ ability, effect, primitive, compatible = true, reason = "" }) {
     if (primitive) {
       return `<button type="button" data-as-action="choose-component-primitive-effect" data-as-value="${esc(primitive)}"><b>${esc(pretty(primitive))}</b><span>Configurable DO / THEN primitive</span><small>Independent effect</small></button>`;
     }
-    return `<button type="button" data-as-action="choose-component-effect" data-as-id="${effect.source.abilityId}" data-as-index="${effect.source.attrIndex}" data-as-type="${esc(effect.source.attrType)}"${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(effect.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(compatible ? effect.summary || effect.sourceOwner : reason)}</small></button>`;
+    const parameters = componentParameterSummary(effect.parameters);
+    const details = compatible
+      ? [parameters, effect.summary || effect.sourceOwner].filter(Boolean).join(" · ")
+      : reason;
+    return `<button type="button" data-as-action="choose-component-effect" data-as-id="${effect.source.abilityId}" data-as-index="${effect.source.attrIndex}" data-as-type="${esc(effect.source.attrType)}"${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(effect.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(details)}</small></button>`;
   }
 
   function renderComponentPartSearch(input, results, entry, query) {
@@ -1319,19 +1502,18 @@
           query,
           [
             {
-              title: "Condition primitives",
-              matches: primitives.filter(({ primitive }) =>
-                searchMatches(`${pretty(primitive)} ${primitive}`.toLowerCase(), query),
-              ),
-            },
-            {
               title: "Condition names",
-              matches: candidates.filter(({ condition }) =>
-                searchMatches(
-                  `${condition.label} ${condition.kind} ${condition.sourceOwner} ${condition.source.attrType}`.toLowerCase(),
-                  query,
+              matches: [
+                ...primitives.filter(({ primitive }) =>
+                  searchMatches(`${pretty(primitive)} ${primitive}`.toLowerCase(), query),
                 ),
-              ),
+                ...candidates.filter(({ condition }) =>
+                  searchMatches(
+                    `${condition.label} ${condition.kind} ${condition.sourceOwner} ${condition.source.attrType}`.toLowerCase(),
+                    query,
+                  ),
+                ),
+              ],
             },
             {
               title: "Ability names",
@@ -1351,14 +1533,14 @@
         results.innerHTML = `<div class="as-part-screen"><header><b>ADD IF CONDITION (${primitives.length + candidates.length})</b><span>All reusable conditions; event gates can be observed across WHEN hooks</span></header>${matches.map(componentConditionResultHtml).join("")}${componentResultFooter("part", matches.length, primitives.length + candidates.length)}</div>`;
       }
     } else {
-      const selected = new Set(targetRule.effects.filter(isRuntimeComponent).map(componentSourceKey));
+      const selected = new Set(targetRule.effects.filter(isRuntimeComponent).map(componentInstanceKey));
       const candidates = uniqueMatches(
         componentCatalog.flatMap(ability =>
           ability.rules.flatMap(rule => rule.effects.map(effect => ({ ability, rule, effect }))),
         ),
-        ({ effect }) => componentSourceKey(effect.source),
+        componentEffectSemanticKey,
       )
-        .filter(({ effect }) => !selected.has(componentSourceKey(effect.source)))
+        .filter(({ effect }) => !selected.has(componentInstanceKey(effect.source)))
         .map(candidate => {
           const compatible = componentEffectSupports(targetRule, candidate.effect.source);
           const armed = compatible && !runtimeEffectSupports(targetHook, candidate.rule.hook);
@@ -1384,19 +1566,18 @@
           query,
           [
             {
-              title: "Effect primitives",
-              matches: primitives.filter(({ primitive }) =>
-                searchMatches(`${pretty(primitive)} ${primitive}`.toLowerCase(), query),
-              ),
-            },
-            {
               title: "Effect names",
-              matches: candidates.filter(({ effect }) =>
-                searchMatches(
-                  `${effect.label} ${effect.kind} ${effect.scope} ${effect.sourceOwner} ${effect.source.attrType} ${(effect.parameters || []).flatMap(parameter => [parameter.label, parameter.value]).join(" ")}`.toLowerCase(),
-                  query,
+              matches: [
+                ...primitives.filter(({ primitive }) =>
+                  searchMatches(`${pretty(primitive)} ${primitive}`.toLowerCase(), query),
                 ),
-              ),
+                ...candidates.filter(({ effect }) =>
+                  searchMatches(
+                    `${effect.label} ${effect.kind} ${effect.scope} ${effect.sourceOwner} ${effect.source.attrType} ${(effect.parameters || []).flatMap(parameter => [parameter.label, parameter.value]).join(" ")}`.toLowerCase(),
+                    query,
+                  ),
+                ),
+              ],
             },
             {
               title: "Ability names",
@@ -1500,6 +1681,60 @@
     });
   }
 
+  function validateRuntimeParameters(reference, part, label, errors) {
+    for (const [path, value] of Object.entries(reference.parameterOverrides || {})) {
+      const parameter = runtimeParameter(reference, part, path);
+      if (!parameter?.editable) {
+        errors.push(`${label}: parameter ${path} cannot be changed`);
+        continue;
+      }
+      if (value === null) {
+        if (!parameter.optional) {
+          errors.push(`${label}: parameter ${path} cannot be empty`);
+        }
+        continue;
+      }
+      if (parameter.control === "move" && (!Number.isInteger(value) || !movesById.has(value))) {
+        errors.push(`${label}: ${parameter.label} is not a valid move`);
+      } else if (
+        parameter.control === "move-list"
+        && (!Array.isArray(value) || value.some(item => !Number.isInteger(item) || !movesById.has(item)))
+      ) {
+        errors.push(`${label}: ${parameter.label} contains an invalid move`);
+      } else if (
+        parameter.control === "number"
+        && (typeof value !== "number"
+          || !Number.isFinite(value)
+          || (parameter.min !== undefined && value < parameter.min)
+          || (parameter.max !== undefined && value > parameter.max))
+      ) {
+        errors.push(`${label}: ${parameter.label} is outside its valid range`);
+      } else if (
+        parameter.control === "number-list"
+        && (!Array.isArray(value)
+          || value.length === 0
+          || value.some(
+            item =>
+              typeof item !== "number"
+              || !Number.isFinite(item)
+              || (parameter.min !== undefined && item < parameter.min)
+              || (parameter.max !== undefined && item > parameter.max),
+          ))
+      ) {
+        errors.push(`${label}: ${parameter.label} contains an invalid number`);
+      } else if (parameter.control === "boolean" && typeof value !== "boolean") {
+        errors.push(`${label}: ${parameter.label} must be Yes or No`);
+      } else if (parameter.control === "select" && !parameter.options?.some(option => option.value === value)) {
+        errors.push(`${label}: ${parameter.label} is invalid`);
+      } else if (
+        parameter.control === "multi-select"
+        && (!Array.isArray(value) || value.some(item => !parameter.options?.some(option => option.value === item)))
+      ) {
+        errors.push(`${label}: ${parameter.label} contains an invalid option`);
+      }
+    }
+  }
+
   function validateEntry(key, entry, allIds) {
     const errors = [];
     if (!/^[a-z0-9-]{2,48}$/.test(key)) {
@@ -1581,6 +1816,9 @@
       if (rule.effects.length === 0) {
         errors.push(`Component rule ${number}: add at least one effect`);
       }
+      [...prerequisiteHooks, rule.hook].forEach(source =>
+        validateRuntimeParameters(source, "hook", `Component rule ${number} WHEN`, errors),
+      );
       for (const condition of rule.conditions) {
         if (!isRuntimeComponent(condition)) {
           continue;
@@ -1588,6 +1826,7 @@
         if (!componentConditionsByKey.has(componentConditionKey(condition))) {
           errors.push(`Component rule ${number}: IF source does not exist`);
         }
+        validateRuntimeParameters(condition, "condition", `Component rule ${number} IF`, errors);
       }
       for (const effect of rule.effects) {
         if (!isRuntimeComponent(effect)) {
@@ -1596,6 +1835,7 @@
         if (!componentEffectsByKey.has(componentSourceKey(effect))) {
           errors.push(`Component rule ${number}: DO source does not exist`);
         }
+        validateRuntimeParameters(effect, "effect", `Component rule ${number} DO`, errors);
       }
     });
     const ruleKeys = new Set();
@@ -1724,6 +1964,7 @@
       }</div></aside>
       <main class="as-workspace" aria-label="Ability editor">${entry ? renderEntry(entry, errors) : '<div class="as-welcome"><h2>Create an ability</h2><p>Build it from existing ability packages, passive modifiers, and triggered effect chains.</p><button type="button" class="primary" data-as-action="new-ability">Create first ability</button></div>'}</main>
       <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant()}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
+      ${runtimeMoveDatalistHtml()}
     </div>`;
   }
 
@@ -1837,6 +2078,93 @@
     }
   }
 
+  function runtimeReferenceForElement(entry, element) {
+    const rule = entry.componentRules[Number(element.dataset.asComponentRule)];
+    if (!rule) {
+      return;
+    }
+    if (element.dataset.asRuntimePart === "condition") {
+      return rule.conditions[Number(element.dataset.asRuntimeIndex)];
+    }
+    if (element.dataset.asRuntimePart === "effect") {
+      return rule.effects[Number(element.dataset.asRuntimeIndex)];
+    }
+  }
+
+  function updateRuntimeParameter(reference, parameter, element) {
+    const path = parameter.path || parameter.key;
+    const control = parameter.control;
+    const inputValue = element.value;
+    if (inputValue === "__source__") {
+      delete reference.parameterOverrides?.[path];
+    } else {
+      let value;
+      if (control === "move") {
+        value = parseMove(inputValue);
+        if (value === undefined) {
+          if (inputValue.trim() !== "" || !parameter.optional) {
+            return false;
+          }
+          value = null;
+        }
+      } else if (control === "move-list") {
+        const labels = inputValue
+          .split(";")
+          .map(item => item.trim())
+          .filter(Boolean);
+        const moves = labels.map(parseMove);
+        if (moves.some(move => move === undefined)) {
+          return false;
+        }
+        value = moves.length > 0 ? moves : parameter.optional ? null : [];
+      } else if (control === "number") {
+        if (inputValue === "") {
+          if (!parameter.optional) {
+            return false;
+          }
+          value = null;
+        } else {
+          value = Number(inputValue);
+          if (!Number.isFinite(value)) {
+            return false;
+          }
+        }
+      } else if (control === "number-list") {
+        const tokens = inputValue
+          .split(",")
+          .map(item => item.trim())
+          .filter(Boolean);
+        const numbers = tokens.map(Number);
+        if (numbers.some(value => !Number.isFinite(value))) {
+          return false;
+        }
+        if (numbers.length === 0) {
+          if (!parameter.optional) {
+            return false;
+          }
+          value = null;
+        } else {
+          value = numbers;
+        }
+      } else if (control === "boolean") {
+        value = inputValue === "true";
+      } else if (control === "select") {
+        value = inputValue === "__none__" ? null : parseParameterOption(inputValue);
+      } else if (control === "multi-select") {
+        const values = [...element.selectedOptions].map(item => parseParameterOption(item.value));
+        value = values.length > 0 ? values : parameter.optional ? null : [];
+      } else {
+        return false;
+      }
+      reference.parameterOverrides ||= {};
+      reference.parameterOverrides[path] = value;
+    }
+    if (reference.parameterOverrides && Object.keys(reference.parameterOverrides).length === 0) {
+      reference.parameterOverrides = undefined;
+    }
+    return true;
+  }
+
   function handleInput(element) {
     if (element.hasAttribute("data-as-ai-prompt")) {
       aiState.prompt = element.value;
@@ -1869,6 +2197,14 @@
     let rerender = false;
     if (element.dataset.asField) {
       entry[element.dataset.asField] = element.value;
+    } else if (element.dataset.asRuntimeParameter) {
+      const reference = runtimeReferenceForElement(entry, element);
+      const parameter = reference
+        ? runtimeParameter(reference, element.dataset.asRuntimePart, element.dataset.asRuntimeParameter)
+        : undefined;
+      if (!reference || !parameter || !updateRuntimeParameter(reference, parameter, element)) {
+        return true;
+      }
     } else if (element.dataset.asFlag) {
       entry.flags ||= {};
       entry.flags[element.dataset.asFlag] = element.checked;
@@ -2013,7 +2349,7 @@
         !!effect
         && !targetRule.effects.some(
           (item, index) =>
-            componentSourceKey(item) === componentSourceKey(effect)
+            componentInstanceKey(item) === componentInstanceKey(effect)
             && (studioDrag.ruleIndex !== targetRuleIndex || studioDrag.index !== index),
         )
         && (!isRuntimeComponent(effect) || componentEffectSupports(targetRule, effect))
@@ -2200,6 +2536,14 @@
       selected = button.dataset.asKey;
     } else if (!entry) {
       return false;
+    } else if (action === "reset-runtime-parameter") {
+      const reference = runtimeReferenceForElement(entry, button);
+      if (reference?.parameterOverrides) {
+        delete reference.parameterOverrides[button.dataset.asRuntimeParameter];
+        if (Object.keys(reference.parameterOverrides).length === 0) {
+          reference.parameterOverrides = undefined;
+        }
+      }
     } else if (action === "duplicate") {
       const key = uniqueKey(`${entry.name}-copy`);
       state[key] = { ...clone(entry), id: nextId(), name: `${entry.name} Copy` };
@@ -2425,6 +2769,9 @@
   function init(options) {
     primitiveCatalog = options.catalog;
     baseAbilities = options.abilities || [];
+    moveCatalog = Array.isArray(options.moves) ? options.moves : [];
+    movesById = new Map(moveCatalog.map(move => [Number(move.id), move]));
+    movesByName = new Map(moveCatalog.map(move => [String(move.name).trim().toLowerCase(), move]));
     mechanicCatalog = Array.isArray(options.mechanics) ? options.mechanics : [];
     mechanicsByAbility = new Map(mechanicCatalog.map(ability => [ability.id, ability]));
     componentCatalog =

@@ -614,6 +614,57 @@
 .as-runtime-effect {
   justify-content: space-between;
 }
+.as-runtime-configurable {
+  align-items: flex-start;
+}
+.as-runtime-component-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+.as-runtime-component-copy > small {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.as-runtime-parameters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 7px;
+  width: 100%;
+  margin-top: 6px;
+}
+.as-runtime-parameter {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.as-runtime-parameter > span:first-child {
+  color: #9daabd;
+  font-size: 9px;
+  font-weight: 700;
+}
+.as-runtime-parameter-control {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+}
+.as-runtime-parameter-control > :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+.as-runtime-parameter-control > select[multiple] {
+  height: 68px;
+}
+.as-runtime-parameter-control > button {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+}
 .as-component-effect-row {
   grid-template-columns: 88px minmax(0, 1fr) auto;
 }

@@ -18,12 +18,13 @@
 import type { AbAttrBaseParams } from "#abilities/ab-attrs";
 import { PostItemLostAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { PokemonMove } from "#data/moves/pokemon-move";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 
 export interface PostItemLostScriptedMoveOptions {
   readonly moveId: MoveId;
+  readonly power?: number;
 }
 
 export class PostItemLostScriptedMoveAbAttr extends PostItemLostAbAttr {
@@ -51,7 +52,7 @@ export class PostItemLostScriptedMoveAbAttr extends PostItemLostAbAttr {
       "MovePhase",
       pokemon,
       [target],
-      new PokemonMove(this.opts.moveId),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power),
       MoveUseMode.INDIRECT,
     );
   }

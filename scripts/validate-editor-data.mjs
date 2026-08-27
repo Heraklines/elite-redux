@@ -67,6 +67,47 @@ function assertKnownIds(ids, known, context, allowZero = false) {
   }
 }
 
+const parameterControls = new Set([
+  "fixed",
+  "number",
+  "number-list",
+  "boolean",
+  "move",
+  "move-list",
+  "select",
+  "multi-select",
+  "text",
+]);
+
+function validSemanticParameter(parameter) {
+  if (
+    !parameter
+    || typeof parameter.key !== "string"
+    || typeof parameter.path !== "string"
+    || !/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*){0,3}$/.test(parameter.path)
+    || typeof parameter.label !== "string"
+    || typeof parameter.value !== "string"
+    || !parameterControls.has(parameter.control)
+    || typeof parameter.editable !== "boolean"
+    || typeof parameter.optional !== "boolean"
+    || parameter.path === "opts"
+  ) {
+    return false;
+  }
+  if (parameter.editable === (parameter.control === "fixed")) {
+    return false;
+  }
+  if (
+    ["select", "multi-select"].includes(parameter.control)
+    && (!Array.isArray(parameter.options)
+      || parameter.options.length === 0
+      || parameter.options.some(option => !option?.label || !["string", "number"].includes(typeof option.value)))
+  ) {
+    return false;
+  }
+  return true;
+}
+
 const starters = requireArray("species.json", 600);
 const allSpecies = requireArray("all-species.json", 1_500);
 const forms = requireArray("species-forms.json", 1);
@@ -185,6 +226,7 @@ for (const ability of abilityMechanics) {
       || typeof mechanic.summary !== "string"
       || !["primitive", "package"].includes(mechanic.scope)
       || !Array.isArray(mechanic.parameters)
+      || mechanic.parameters.some(parameter => !validSemanticParameter(parameter))
       || typeof mechanic.trigger !== "string"
       || typeof mechanic.conditioned !== "boolean"
     ) {
@@ -219,6 +261,7 @@ for (const ability of abilityComponents) {
       || !rule.summary
       || !["primitive", "package"].includes(rule.scope)
       || !Array.isArray(rule.parameters)
+      || rule.parameters.some(parameter => !validSemanticParameter(parameter))
       || !rule.source
       || !rule.hook?.id
       || !rule.hook?.label
@@ -236,6 +279,7 @@ for (const ability of abilityComponents) {
           || !effect.summary
           || !["primitive", "package"].includes(effect.scope)
           || !Array.isArray(effect.parameters)
+          || effect.parameters.some(parameter => !validSemanticParameter(parameter))
           || !effect.source,
       )
     ) {

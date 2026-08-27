@@ -35,8 +35,15 @@ import {
   AbilityStudioSourceAbilityAbAttr,
   installAbilityStudioSourceAbilityComponents,
 } from "#data/elite-redux/ability-studio/runtime-components";
+import {
+  abilityStudioRuntimeParameterEntries,
+  applyAbilityStudioRuntimeParameterOverrides,
+} from "#data/elite-redux/ability-studio/runtime-parameters";
+import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
+import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { initEditorAuthoredAbilities } from "#data/elite-redux/init-editor-authored-abilities";
 import { AbilityId } from "#enums/ability-id";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
@@ -65,6 +72,19 @@ class GuardedReusableEffectAbAttr extends PostAttackAbAttr {
 }
 
 class GenericRuntimeCapabilityAbAttr extends AbAttr {}
+
+class ParameterizedReusableEffectAbAttr extends PostAttackAbAttr {
+  constructor(
+    private readonly state: { total: number },
+    public amount: number,
+  ) {
+    super(undefined, false);
+  }
+
+  override apply(_params: PostMoveInteractionAbAttrParams): void {
+    this.state.total += this.amount;
+  }
+}
 
 const blueprint: AbilityStudioBlueprintV1 = {
   version: 1,
@@ -658,6 +678,83 @@ describe("Ability Studio", () => {
     expect(semantics.label).toBe("Multiply a calculated stat");
     expect(semantics.summary).toContain(source.description);
     expect(semantics.parameters.some(parameter => parameter.value === "ATK")).toBe(true);
+  });
+
+  it("exposes and applies typed scripted-move parameters", () => {
+    const attr = new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TACKLE });
+    const parameters = abilityStudioRuntimeParameterEntries(attr, "PostSummonScriptedMoveAbAttr");
+    expect(parameters.find(parameter => parameter.definition.path === "opts.moveId")?.definition.control).toBe("move");
+    expect(parameters.find(parameter => parameter.definition.path === "opts.power")?.definition.optional).toBe(true);
+    expect(parameters.some(parameter => parameter.definition.path === "opts")).toBe(false);
+    applyAbilityStudioRuntimeParameterOverrides(attr, "PostSummonScriptedMoveAbAttr", {
+      "opts.moveId": MoveId.FLAMETHROWER,
+      "opts.power": 60,
+    });
+    expect(attr.getMoveId()).toBe(MoveId.FLAMETHROWER);
+    expect(attr.getPower()).toBe(60);
+
+    const itemLostAttr = new PostItemLostScriptedMoveAbAttr({ moveId: MoveId.THIEF });
+    const itemLostParameters = abilityStudioRuntimeParameterEntries(itemLostAttr, "PostItemLostScriptedMoveAbAttr");
+    expect(itemLostParameters.find(parameter => parameter.definition.path === "opts.power")?.definition.optional).toBe(
+      true,
+    );
+    applyAbilityStudioRuntimeParameterOverrides(itemLostAttr, "PostItemLostScriptedMoveAbAttr", {
+      "opts.power": 40,
+    });
+    expect(
+      abilityStudioRuntimeParameterEntries(itemLostAttr, "PostItemLostScriptedMoveAbAttr").find(
+        parameter => parameter.definition.path === "opts.power",
+      )?.value,
+    ).toBe(40);
+  });
+
+  it("applies component parameter overrides without mutating the source ability", () => {
+    const state = { total: 0 };
+    const source = new AbBuilder(AbilityId.BLAZE, 3)
+      .attr(AbilityStudioPostAttackRuleAbAttr, blueprint.rules[0])
+      .attr(ParameterizedReusableEffectAbAttr, state, 1)
+      .build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "parameterized-effect",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostAttackRuleAbAttr" },
+          chance: 100,
+          conditions: [],
+          effects: [
+            {
+              abilityId: AbilityId.BLAZE,
+              attrIndex: 1,
+              attrType: "ParameterizedReusableEffectAbAttr",
+              parameterOverrides: { amount: 7 },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateAbilityStudioBlueprints({ parameterized: componentBlueprint }).errors).toEqual([]);
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    const attr = compiled.attrs.find(candidate => candidate instanceof AbilityStudioPostAttackRuleAbAttr);
+    expect(attr).toBeDefined();
+    attr?.apply({
+      pokemon: {},
+      opponent: {},
+      move: { category: MoveCategory.PHYSICAL },
+      simulated: false,
+    } as never);
+    expect(state.total).toBe(7);
+    const sourceAttr = source.attrs[1];
+    expect(sourceAttr).toBeInstanceOf(ParameterizedReusableEffectAbAttr);
+    if (!(sourceAttr instanceof ParameterizedReusableEffectAbAttr)) {
+      throw new Error("Expected parameterized source attribute");
+    }
+    expect(sourceAttr.amount).toBe(1);
   });
 
   it("registers an authored ability in the runtime ability table", () => {
