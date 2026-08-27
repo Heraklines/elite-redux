@@ -9,7 +9,9 @@ use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
 use er_protocol::{ProtocolRuntimeSnapshotV2, ScheduledTimer};
 use er_state::m7_state::GameStateV5;
-use er_types::{GameControlKindV2, MenuOptionId, RawInputEvent, SafeU53, TerminalState};
+use er_types::{
+    GameControlKindV2, MenuOptionId, OperationId, RawInputEvent, SafeU53, TerminalState,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -52,6 +54,13 @@ pub enum GameEffect {
     Selected {
         kind: GameControlKindV2,
         option: MenuOptionId,
+    },
+    ProposalReady {
+        kind: GameControlKindV2,
+        option: MenuOptionId,
+        operation_id: OperationId,
+        bytes: Vec<u8>,
+        digest: String,
     },
     Cancelled {
         kind: GameControlKindV2,
@@ -174,6 +183,19 @@ fn control_effect(effect: KernelControlEffectV6) -> GameEffect {
     match effect {
         KernelControlEffectV6::Navigated => GameEffect::Navigated,
         KernelControlEffectV6::Selected { kind, option } => GameEffect::Selected { kind, option },
+        KernelControlEffectV6::ProposalReady {
+            kind,
+            option,
+            operation_id,
+            bytes,
+            digest,
+        } => GameEffect::ProposalReady {
+            kind,
+            option,
+            operation_id,
+            bytes,
+            digest,
+        },
         KernelControlEffectV6::Cancelled { kind } => GameEffect::Cancelled { kind },
     }
 }

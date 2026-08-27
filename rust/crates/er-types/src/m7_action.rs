@@ -260,6 +260,23 @@ pub enum GameActionV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct GameProposalV1 {
+    pub schema_version: u32,
+    pub context: GameActionContextV1,
+    pub action: GameActionV1,
+}
+
+impl GameProposalV1 {
+    pub fn validate(&self) -> Result<(), GameActionError> {
+        if self.schema_version != GAME_ACTION_SCHEMA_VERSION_V1 {
+            return Err(GameActionError::SchemaVersion);
+        }
+        self.action.validate()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GameActionResultV1 {
     pub context: GameActionContextV1,
     pub accepted_action: GameActionV1,
@@ -269,6 +286,8 @@ pub struct GameActionResultV1 {
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum GameActionError {
+    #[error("game action schema version is unsupported")]
+    SchemaVersion,
     #[error("run program identity must be nonzero")]
     ZeroProgram,
     #[error("inventory discard count must be nonzero")]

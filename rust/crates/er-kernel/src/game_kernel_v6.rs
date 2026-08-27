@@ -4,18 +4,22 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use er_battle::m7_resolver::{BattlePresentationCueV5, TurnAuthorityContextV1};
+use er_canonical::{canonical_bytes, content_digest};
 use er_game::m7_content::PreparedGameContentV1;
 use er_game::m7_internal_event::{GameInternalEventQueueV1, GameInternalEventV1};
 use er_game::m7_material::{GameMaterialV5, MaterialApplyResultV5};
 use er_game::m7_runtime::{
     GameControlIntentV2, GameRuntimeSnapshotV5, GameRuntimeV5, GameRuntimeV5Error, PreparedTurnV5,
 };
-use er_protocol::{ProtocolRuntimeSnapshotV2, ScheduledTimer};
+use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2, ScheduledTimer};
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::ui_menu::NavigationDirection;
-use er_types::{GameControlKindV2, MenuOptionId, OperationId, SafeU53, TerminalState};
+use er_types::{
+    GAME_ACTION_SCHEMA_VERSION_V1, GameControlKindV2, GameProposalV1, MenuOptionId, OperationId,
+    SafeU53, TerminalState,
+};
 use thiserror::Error;
 
 use crate::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
@@ -29,6 +33,13 @@ pub enum KernelControlEffectV6 {
     Selected {
         kind: GameControlKindV2,
         option: MenuOptionId,
+    },
+    ProposalReady {
+        kind: GameControlKindV2,
+        option: MenuOptionId,
+        operation_id: OperationId,
+        bytes: Vec<u8>,
+        digest: String,
     },
     Cancelled {
         kind: GameControlKindV2,
@@ -274,6 +285,17 @@ impl GameKernelV6 {
     fn select_current_control(
         &mut self,
     ) -> Result<Option<KernelControlEffectV6>, GameKernelV6Error> {
+        if self
+            .protocol
+            .as_ref()
+            .is_some_and(|protocol| protocol.role == EndpointRole::Replica)
+        {
+            let intent = self
+                .runtime
+                .submit_control()
+                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
+            return prepare_proposal_effect(intent).map(Some);
+        }
         let mut staged = self.runtime.clone();
         let intent = staged
             .submit_control()
@@ -402,6 +424,40 @@ fn intent_effect(intent: GameControlIntentV2) -> KernelControlEffectV6 {
     }
 }
 
+fn prepare_proposal_effect(
+    intent: GameControlIntentV2,
+) -> Result<KernelControlEffectV6, GameKernelV6Error> {
+    let GameControlIntentV2::Selected {
+        kind,
+        option,
+        action,
+        context,
+    } = intent
+    else {
+        return Err(GameKernelV6Error::Transaction);
+    };
+    let operation_id = context.operation_id.clone();
+    let proposal = GameProposalV1 {
+        schema_version: GAME_ACTION_SCHEMA_VERSION_V1,
+        context,
+        action,
+    };
+    proposal
+        .validate()
+        .map_err(|_| GameKernelV6Error::Transaction)?;
+    let bytes = canonical_bytes(&proposal).map_err(|_| GameKernelV6Error::Transaction)?;
+    let digest = content_digest(&bytes)
+        .map(|value| format!("blake3-v1:{value}"))
+        .map_err(|_| GameKernelV6Error::Transaction)?;
+    Ok(KernelControlEffectV6::ProposalReady {
+        kind,
+        option,
+        operation_id,
+        bytes,
+        digest,
+    })
+}
+
 impl From<GameRuntimeV5Error> for GameKernelV6Error {
     fn from(error: GameRuntimeV5Error) -> Self {
         Self::StateOwner(error.to_string())
@@ -411,5 +467,52 @@ impl From<GameRuntimeV5Error> for GameKernelV6Error {
 impl From<SnapshotV6Error> for GameKernelV6Error {
     fn from(error: SnapshotV6Error) -> Self {
         Self::Snapshot(error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use er_types::battle_ids::MenuInstanceId;
+    use er_types::{
+        GameActionContextV1, GameActionV1, GameControlKindV2, GameProposalV1, MenuOptionId,
+        OperationId, RunExecutionContextV2, RunHook, RunProgramId, SafeU53, SeatId,
+    };
+
+    use super::{GameControlIntentV2, KernelControlEffectV6, prepare_proposal_effect};
+
+    #[test]
+    fn replica_proposal_effect_contains_canonical_typed_action_bytes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let operation_id = OperationId::new("m7/test/proposal")?;
+        let intent = GameControlIntentV2::Selected {
+            kind: GameControlKindV2::Reward,
+            option: MenuOptionId::new("reward/first")?,
+            action: GameActionV1::ExecuteRunProgram {
+                program: RunProgramId::new(SafeU53::new(1)?),
+                hook: RunHook::RewardSelected,
+                context: RunExecutionContextV2::default(),
+            },
+            context: GameActionContextV1 {
+                operation_id: operation_id.clone(),
+                authority_seat: SeatId::new(SafeU53::new(1)?),
+                authority_revision: SafeU53::new(2)?,
+                menu_instance: MenuInstanceId::new(SafeU53::new(3)?),
+            },
+        };
+        let effect = prepare_proposal_effect(intent)?;
+        let KernelControlEffectV6::ProposalReady {
+            operation_id: actual_operation,
+            bytes,
+            digest,
+            ..
+        } = effect
+        else {
+            return Err("expected proposal effect".into());
+        };
+        assert_eq!(actual_operation, operation_id);
+        let proposal: GameProposalV1 = serde_json::from_slice(&bytes)?;
+        proposal.validate()?;
+        assert!(digest.starts_with("blake3-v1:"));
+        Ok(())
     }
 }
