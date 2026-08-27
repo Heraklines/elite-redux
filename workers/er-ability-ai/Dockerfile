@@ -1,6 +1,6 @@
 FROM node:24-bookworm-slim
 
-RUN npm install --global @openai/codex@0.149.1
+RUN npm install --global @openai/codex@0.150.1
 
 WORKDIR /app
 COPY container/server.mjs /app/server.mjs

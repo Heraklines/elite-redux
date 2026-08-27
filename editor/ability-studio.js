@@ -181,7 +181,7 @@
     }
     matches.sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name));
     const grouped = new Map();
-    for (const { ability, rule } of matches.slice(0, 32)) {
+    for (const { ability, rule } of matches.slice(0, 16)) {
       if (!grouped.has(ability.id)) {
         grouped.set(ability.id, {
           id: ability.id,
@@ -222,7 +222,7 @@
       })
       .filter(({ score }) => score > 0)
       .sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name))
-      .slice(0, 80)
+      .slice(0, 48)
       .map(({ ability }) => ({
         id: ability.id,
         name: ability.name,
