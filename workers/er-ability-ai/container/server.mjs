@@ -13,6 +13,7 @@ const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
 const nimModel = process.env.NVIDIA_NIM_MODEL || "qwen/qwen3-coder-480b-a35b-instruct";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "meta/llama-3.3-70b-instruct";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 let activeTurn = null;
 let generationBusy = false;
@@ -689,7 +690,7 @@ async function runCodex(payload, emit) {
         new Promise((_, reject) =>
           setTimeout(
             () => reject(Object.assign(new Error("Ability generation timed out"), { fallback: true })),
-            45_000,
+            120_000,
           ),
         ),
       ]);
@@ -723,13 +724,50 @@ async function runCodex(payload, emit) {
   }
 }
 
+async function runNimModel(model, body, payload) {
+  let lastError = new Error("The ability builder is temporarily unavailable");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${nimKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ ...body, model }),
+    });
+    if (!response.ok) {
+      lastError = new Error(`The ability builder could not complete the request (${response.status})`);
+      if (response.status === 429 || response.status >= 500) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        continue;
+      }
+      throw lastError;
+    }
+    const resultBody = await response.json();
+    const content = messageContentText(resultBody?.choices?.[0]?.message?.content).replace(
+      /<think>[\s\S]*?<\/think>/gi,
+      "",
+    );
+    try {
+      const result = stripNulls(extractJson(content, "fallback model", false));
+      validateSources(result, payload);
+      return result;
+    } catch (error) {
+      lastError = error;
+      break;
+    }
+  }
+  throw lastError;
+}
+
 async function runNim(payload, emit) {
   if (!nimKey) {
     throw new Error("The ability builder is temporarily unavailable");
   }
   emit({ type: "status", message: "Retrying the request" });
-  const body = JSON.stringify({
-    model: nimModel,
+  const models = [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
+  const body = {
     messages: [
       {
         role: "system",
@@ -741,34 +779,19 @@ async function runNim(payload, emit) {
     temperature: 0.1,
     max_tokens: 6000,
     stream: false,
-  });
-  let response;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${nimKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body,
-    });
-    if (response.ok || (response.status !== 429 && response.status < 500)) {
-      break;
+  };
+  let lastError = new Error("The ability builder is temporarily unavailable");
+  for (const [modelIndex, model] of models.entries()) {
+    if (modelIndex > 0) {
+      emit({ type: "status", message: "Trying the backup model" });
     }
-    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+    try {
+      return await runNimModel(model, body, payload);
+    } catch (error) {
+      lastError = error;
+    }
   }
-  if (!response.ok) {
-    throw new Error(`The ability builder could not complete the request (${response.status})`);
-  }
-  const resultBody = await response.json();
-  const content = messageContentText(resultBody?.choices?.[0]?.message?.content).replace(
-    /<think>[\s\S]*?<\/think>/gi,
-    "",
-  );
-  const result = stripNulls(extractJson(content, "fallback model", false));
-  validateSources(result, payload);
-  return result;
+  throw lastError;
 }
 
 function validateGeneratePayload(payload) {
