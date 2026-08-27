@@ -1942,11 +1942,11 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
         Accept: "application/json",
       },
       body: JSON.stringify(
-        model === "deepseek-ai/deepseek-v4-flash-0731"
+        model === "deepseek-ai/deepseek-v4-flash-0731" || model === "moonshotai/kimi-k3"
           ? {
               ...body,
               model,
-              chat_template_kwargs: { thinking: false },
+              ...(model === "deepseek-ai/deepseek-v4-flash-0731" ? { chat_template_kwargs: { thinking: false } } : {}),
             }
           : {
               ...body,
