@@ -320,20 +320,53 @@ function componentSelectionSchemaForRole(searchContext, role) {
   return schema;
 }
 
-function assemblyPlanSchemaForSearch(searchContext) {
+function catalogEnum(values, extras = []) {
+  return [...new Set([null, ...extras, ...(values || [])])];
+}
+
+function primitiveSchemasForCatalog(catalog) {
+  const conditionSchema = structuredClone(simpleConditionSchema);
+  conditionSchema.properties.status.enum = catalogEnum(catalog.statuses, ["NONE"]);
+  conditionSchema.properties.weather.enum = catalogEnum(catalog.weathers);
+  conditionSchema.properties.terrain.enum = catalogEnum(catalog.terrains);
+  conditionSchema.properties.filter.properties.type.enum = catalogEnum(catalog.types);
+  conditionSchema.properties.filter.properties.category.enum = catalogEnum(catalog.categories);
+  conditionSchema.properties.filter.properties.flag.enum = catalogEnum(catalog.moveFlags);
+
+  const effectSchema = structuredClone(simpleEffectSchema);
+  effectSchema.properties.status.enum = catalogEnum(catalog.statuses, ["NONE", "ANY"]);
+  effectSchema.properties.weather.enum = catalogEnum(catalog.weathers);
+  effectSchema.properties.terrain.enum = catalogEnum(catalog.terrains);
+
+  const modifierSchemaForCatalog = structuredClone(modifierSchema);
+  modifierSchemaForCatalog.properties.stat.enum = catalogEnum(catalog.statMultiplierStats);
+  modifierSchemaForCatalog.properties.filter.properties.type.enum = catalogEnum(catalog.types);
+  modifierSchemaForCatalog.properties.filter.properties.category.enum = catalogEnum(catalog.categories);
+  modifierSchemaForCatalog.properties.filter.properties.flag.enum = catalogEnum(catalog.moveFlags);
+  return { conditionSchema, effectSchema, modifierSchema: modifierSchemaForCatalog };
+}
+
+function assemblyPlanSchemaForSearch(searchContext, catalog) {
   const schema = structuredClone(assemblyPlanSchema);
   const ruleProperties = schema.properties.draft.properties.componentRules.items.properties;
   const hookSchema = componentSelectionSchemaForRole(searchContext, "hook");
-  const conditionSchema = componentSelectionSchemaForRole(searchContext, "condition");
-  const effectSchema = componentSelectionSchemaForRole(searchContext, "effect");
+  const componentConditionSchema = componentSelectionSchemaForRole(searchContext, "condition");
+  const componentEffectSchema = componentSelectionSchemaForRole(searchContext, "effect");
+  const primitiveSchemas = primitiveSchemasForCatalog(catalog);
   ruleProperties.prerequisiteHooks.items = hookSchema;
   ruleProperties.hook = hookSchema;
   ruleProperties.conditions.items.anyOf =
-    conditionSchema.properties.componentId.enum.length > 0
-      ? [conditionSchema, simpleConditionSchema]
-      : [simpleConditionSchema];
+    componentConditionSchema.properties.componentId.enum.length > 0
+      ? [componentConditionSchema, primitiveSchemas.conditionSchema]
+      : [primitiveSchemas.conditionSchema];
   ruleProperties.effects.items.anyOf =
-    effectSchema.properties.componentId.enum.length > 0 ? [effectSchema, simpleEffectSchema] : [simpleEffectSchema];
+    componentEffectSchema.properties.componentId.enum.length > 0
+      ? [componentEffectSchema, primitiveSchemas.effectSchema]
+      : [primitiveSchemas.effectSchema];
+  const primitiveRuleProperties = schema.properties.draft.properties.rules.items.properties;
+  primitiveRuleProperties.conditions.items = primitiveSchemas.conditionSchema;
+  primitiveRuleProperties.effects.items = primitiveSchemas.effectSchema;
+  schema.properties.draft.properties.modifiers.items = primitiveSchemas.modifierSchema;
   return schema;
 }
 
@@ -1947,7 +1980,7 @@ async function runNim(payload, emit) {
     type: "status",
     message: `Building from ${searchContext.components.length} matched runtime mechanics`,
   });
-  const planSchema = assemblyPlanSchemaForSearch(searchContext);
+  const planSchema = assemblyPlanSchemaForSearch(searchContext, payload.primitiveCatalog || {});
   const systemContent =
     "Return only one compact JSON assembly plan matching the requested schema. Do not include markdown or hidden reasoning.";
   const userContent = modelPrompt(payload, searchContext, planSchema);
