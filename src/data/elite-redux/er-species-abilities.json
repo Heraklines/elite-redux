@@ -231,11 +231,13 @@
     ]
   },
   "SPECIES_IRON_EXO": {
-    "ability2": 262,
+    "ability1": 20002,
+    "ability2": 20002,
+    "hidden": 20002,
     "innates": [
       282,
-      5169,
-      5114
+      20003,
+      5163
     ]
   },
   "SPECIES_KANGASKHAN_MEGA": {
