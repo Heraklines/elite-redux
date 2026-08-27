@@ -24,6 +24,14 @@ pub struct GameModeDefinitionV1 {
     pub branching_routes: bool,
     pub sprint_structure: bool,
     pub finale_routing_start_wave: Option<u32>,
+    pub progression_scale: u32,
+    pub checkpoint_interval: u32,
+    pub major_checkpoint_interval: u32,
+    pub mystery_encounter_max_wave: u32,
+    pub mystery_encounter_target: u32,
+    pub early_move_power_cap_wave: u32,
+    pub gym_interval: u32,
+    pub story_source_waves: BTreeMap<u32, u32>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -163,6 +171,16 @@ impl WorldContentPackV1 {
                 || mode.finale_routing_start_wave.is_some_and(|start| {
                     start < mode.first_wave || mode.terminal_wave.is_some_and(|end| start > end)
                 })
+                || mode.progression_scale == 0
+                || mode.checkpoint_interval == 0
+                || mode.major_checkpoint_interval == 0
+                || mode.mystery_encounter_max_wave == 0
+                || mode.early_move_power_cap_wave < 2
+                || mode.gym_interval == 0
+                || mode
+                    .story_source_waves
+                    .iter()
+                    .any(|(wave, source)| *wave == 0 || *source == 0)
                 || !routes.contains(&mode.route)
             {
                 return Err(WorldContentError::Definition);

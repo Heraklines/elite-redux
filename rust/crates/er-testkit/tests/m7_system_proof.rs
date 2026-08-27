@@ -44,10 +44,10 @@ use er_state::field::{FieldSlotState, FieldState};
 use er_state::m7_state::{
     BATTLE_STATE_SCHEMA_VERSION_V5, BattleStateV5, DexState, EvolutionStateV1, FactionStateV1,
     GAME_STATE_SCHEMA_VERSION_V5, GameStateV5, INVENTORY_STATE_SCHEMA_VERSION_V1, InventoryEntryV1,
-    InventoryStateV1, POKEMON_STATE_SCHEMA_VERSION_V5, PROFILE_STATE_SCHEMA_VERSION_V1,
-    PokemonStateV5, ProfileStateV1, ProfileStatistics, ProgressionQueueV2, QuestStateV1,
-    RUN_STATE_SCHEMA_VERSION_V3, RouteRevealSourceV1, RunStateV3, WORLD_STATE_SCHEMA_VERSION_V1,
-    WorldStateV1,
+    InventoryStateV1, MapNodeKindV1, MapNodeStateV1, POKEMON_STATE_SCHEMA_VERSION_V5,
+    PROFILE_STATE_SCHEMA_VERSION_V1, PokemonStateV5, ProfileStateV1, ProfileStatistics,
+    ProgressionQueueV2, QuestStateV1, RUN_STATE_SCHEMA_VERSION_V3, RouteRevealSourceV1, RunStateV3,
+    WORLD_STATE_SCHEMA_VERSION_V1, WorldStateV1,
 };
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
@@ -78,9 +78,14 @@ use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
 };
 use er_world::runtime::{
-    AuditedWorldRng, WorldRuntimeError, advance_wave, biome_end_rule, biome_should_end,
-    map_upgrade_tier, mark_biome_stay, mark_leave_biome, plan_biome_structure, record_biome_entry,
-    reveal_next_pending_node, roll_next_biome_nodes, should_raise_crossroads,
+    AuditedWorldRng, NotorietyScaleV1, PacingRatioV1, WorldRuntimeError, add_treasure_fragments,
+    advance_wave, biome_end_rule, biome_should_end, chart_onward_routes, consume_carried_weather,
+    consume_map_travel_target, consume_treasure_fragments_for_reward, early_wave_move_power_ratio,
+    final_wave, is_chapter_start_wave, is_checkpoint_wave, is_major_checkpoint_wave,
+    map_upgrade_tier, mark_biome_stay, mark_leave_biome, notoriety_boss_chance_pct,
+    notoriety_bst_bonus, notoriety_trainer_chance_pct, plan_biome_structure, progression_wave,
+    record_biome_entry, reveal_next_pending_node, roll_next_biome_nodes,
+    set_any_biome_travel_target, set_carried_weather, should_raise_crossroads, story_source_wave,
     visible_route_node_count,
 };
 use er_world::{
@@ -215,6 +220,14 @@ fn world_pack() -> WorldContentPackV1 {
             branching_routes: true,
             sprint_structure: false,
             finale_routing_start_wave: Some(170),
+            progression_scale: 1,
+            checkpoint_interval: 10,
+            major_checkpoint_interval: 50,
+            mystery_encounter_max_wave: 180,
+            mystery_encounter_target: 24,
+            early_move_power_cap_wave: 30,
+            gym_interval: 30,
+            story_source_waves: BTreeMap::new(),
         }],
         biomes: vec![
             BiomeDefinitionV1 {
@@ -464,6 +477,12 @@ fn game_state(content: &PreparedGameContentV1) -> TestResult<GameStateV5> {
                 biome_start_wave: WaveIndex::new(safe(1))?,
                 leave_biome_now: false,
                 overstay_anchor_wave: None,
+                map_nodes: Vec::new(),
+                travel_target: None,
+                authoritative_travel: None,
+                treasure_fragments: 0,
+                carried_weather: None,
+                biome_history: vec![BiomeId::new(safe(1))],
             },
             scenario: None,
             quests: QuestStateV1::default(),
@@ -709,16 +728,63 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
             .source,
         RouteRevealSourceV1::Event
     );
-    let entered = record_biome_entry(
+    let landmark = MapNodeStateV1 {
+        biome: BiomeId::new(safe(3)),
+        label: "observatory".to_owned(),
+        kind: MapNodeKindV1::Landmark,
+    };
+    let (mapped, added) = chart_onward_routes(
         &revealed_state,
-        BiomeId::new(safe(2)),
-        RouteNodeId::new(safe(2)),
+        &content.world,
+        std::slice::from_ref(&landmark),
     )?;
+    assert_eq!(added, 2);
+    assert_eq!(
+        mapped
+            .active_run
+            .as_ref()
+            .ok_or("missing run")?
+            .world
+            .map_nodes
+            .len(),
+        2
+    );
+    let entered = record_biome_entry(&mapped, BiomeId::new(safe(2)), RouteNodeId::new(safe(2)))?;
     let entered_world = &entered.active_run.as_ref().ok_or("missing run")?.world;
     assert_eq!(entered_world.previous_biome, Some(BiomeId::new(safe(1))));
     assert_eq!(entered_world.recent_biomes, vec![BiomeId::new(safe(1))]);
     assert!(!entered_world.pending_nodes_ready);
     assert!(entered_world.pending_nodes.is_empty());
+    assert_eq!(
+        entered_world.biome_history,
+        vec![BiomeId::new(safe(1)), BiomeId::new(safe(2))]
+    );
+    assert_eq!(entered_world.map_nodes, vec![landmark]);
+
+    let mut travel_rng = ScriptedWorldRng::new(vec![1]);
+    let (targeted, target, audit) =
+        set_any_biome_travel_target(&entered, &content.world, &mut travel_rng)?;
+    assert_eq!(target, Some(BiomeId::new(safe(3))));
+    assert_eq!(audit.ok_or("missing travel audit")?.selected_ordinal, 1);
+    let (consumed, consumed_target) = consume_map_travel_target(&targeted)?;
+    assert_eq!(consumed_target, target);
+    let weather = WeatherKind::UnsupportedOracleCode(1);
+    let weather_state = set_carried_weather(&consumed, weather.clone())?;
+    let (weather_state, consumed_weather) = consume_carried_weather(&weather_state)?;
+    assert_eq!(consumed_weather, Some(weather));
+    let (fragment_state, total) = add_treasure_fragments(&weather_state, 4)?;
+    assert_eq!(total, 4);
+    let (entered, rewarded) = consume_treasure_fragments_for_reward(&fragment_state)?;
+    assert!(rewarded);
+    assert_eq!(
+        entered
+            .active_run
+            .as_ref()
+            .ok_or("missing run")?
+            .world
+            .treasure_fragments,
+        1
+    );
 
     let mut length_rng = ScriptedWorldRng::new(vec![0, 18]);
     let planned = plan_biome_structure(&entered, &content.world, &mut length_rng)?;
@@ -743,6 +809,26 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
         .world
         .mode(GameModeId::new(safe(1)))
         .ok_or("missing mode")?;
+    assert_eq!(final_wave(mode), Some(200));
+    assert_eq!(progression_wave(mode, 0)?, 1);
+    assert_eq!(
+        early_wave_move_power_ratio(mode, 1),
+        PacingRatioV1 {
+            numerator: 2,
+            denominator: 5,
+        }
+    );
+    assert_eq!(
+        early_wave_move_power_ratio(mode, 30),
+        PacingRatioV1 {
+            numerator: 1,
+            denominator: 1,
+        }
+    );
+    assert!(is_checkpoint_wave(mode, 10));
+    assert!(is_chapter_start_wave(mode, 11));
+    assert!(is_major_checkpoint_wave(mode, 50));
+    assert_eq!(story_source_wave(mode, 48), 48);
     let run = overstay.active_run.as_ref().ok_or("missing run")?;
     assert!(should_raise_crossroads(&run.world, run.wave, mode)?);
     assert_eq!(
@@ -758,6 +844,27 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
             .world
             .overstay_anchor_wave,
         Some(WaveIndex::new(safe(10))?)
+    );
+    let run = overstay.active_run.as_ref().ok_or("missing run")?;
+    let full_scale = NotorietyScaleV1 {
+        numerator: 1,
+        denominator: 1,
+    };
+    assert_eq!(
+        notoriety_bst_bonus(&run.world, WaveIndex::new(safe(11))?, mode, full_scale,)?,
+        10
+    );
+    assert_eq!(
+        notoriety_boss_chance_pct(&run.world, WaveIndex::new(safe(11))?, mode, full_scale,)?,
+        33
+    );
+    assert_eq!(
+        notoriety_bst_bonus(&run.world, WaveIndex::new(safe(20))?, mode, full_scale,)?,
+        100
+    );
+    assert_eq!(
+        notoriety_trainer_chance_pct(&run.world, WaveIndex::new(safe(20))?, mode, full_scale,)?,
+        90
     );
     let leaving = mark_leave_biome(&overstay)?;
     let run = leaving.active_run.as_ref().ok_or("missing run")?;

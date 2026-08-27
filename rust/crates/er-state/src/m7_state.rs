@@ -11,7 +11,7 @@ use er_types::battle_ids::{
 };
 use er_types::battle_model::{
     ArenaConditionState, BattleOutcome, FaintOccurrence, GlobalAbilitySuppressionState,
-    PokemonType, TerrainState, WeatherState,
+    PokemonType, TerrainState, WeatherKind, WeatherState,
 };
 use er_types::run_ids::{BiomeId, Experience, GameRunId, Money, RouteNodeId};
 use er_types::run_model::RunOutcome;
@@ -242,6 +242,28 @@ pub struct PendingRouteNodeV1 {
     pub source: RouteRevealSourceV1,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MapNodeKindV1 {
+    Biome,
+    Treasure,
+    Landmark,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MapNodeStateV1 {
+    pub biome: BiomeId,
+    pub label: String,
+    pub kind: MapNodeKindV1,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoritativeTravelClassificationV1 {
+    pub wave: WaveIndex,
+    pub target: Option<BiomeId>,
+}
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldStateV1 {
@@ -260,6 +282,12 @@ pub struct WorldStateV1 {
     pub biome_start_wave: WaveIndex,
     pub leave_biome_now: bool,
     pub overstay_anchor_wave: Option<WaveIndex>,
+    pub map_nodes: Vec<MapNodeStateV1>,
+    pub travel_target: Option<BiomeId>,
+    pub authoritative_travel: Option<AuthoritativeTravelClassificationV1>,
+    pub treasure_fragments: u32,
+    pub carried_weather: Option<WeatherKind>,
+    pub biome_history: Vec<BiomeId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -735,6 +763,15 @@ fn validate_world(world: &WorldStateV1, wave: WaveIndex) -> Result<(), M7StateEr
         return Err(M7StateError::World(
             "overstay anchor is outside the current biome",
         ));
+    }
+    if world.biome_history.len() > 40 {
+        return Err(M7StateError::World("biome history exceeds forty entries"));
+    }
+    let mut node_keys = BTreeSet::new();
+    for node in &world.map_nodes {
+        if node.label.is_empty() || !node_keys.insert((node.biome, node.label.as_str())) {
+            return Err(M7StateError::World("map nodes are empty or duplicated"));
+        }
     }
     Ok(())
 }

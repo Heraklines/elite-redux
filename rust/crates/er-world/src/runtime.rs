@@ -2,8 +2,12 @@
 
 use std::collections::BTreeSet;
 
-use er_state::m7_state::{GameStateV5, PendingRouteNodeV1, RouteRevealSourceV1, WorldStateV1};
+use er_state::m7_state::{
+    AuthoritativeTravelClassificationV1, GameStateV5, MapNodeKindV1, MapNodeStateV1,
+    PendingRouteNodeV1, RouteRevealSourceV1, WorldStateV1,
+};
 use er_types::battle_ids::WaveIndex;
+use er_types::battle_model::WeatherKind;
 use er_types::run_ids::{BiomeId, EncounterId, RouteNodeId};
 use er_types::run_model::RunOutcome;
 use er_types::{GameControlKindV2, SafeU53};
@@ -63,6 +67,20 @@ pub struct BiomeStructureTransitionV1 {
     pub draws: Vec<RouteGraphDrawAuditV1>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PacingRatioV1 {
+    pub numerator: u64,
+    pub denominator: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NotorietyScaleV1 {
+    pub numerator: u32,
+    pub denominator: u32,
+}
+
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum WorldRuntimeError {
     #[error("game state is invalid: {0}")]
@@ -85,6 +103,184 @@ const EXTRA_NODE_CHANCE: u64 = 50;
 const BIOME_LENGTH_MIN: u64 = 7;
 const BIOME_LENGTH_MAX: u64 = 25;
 
+pub fn final_wave(mode: &crate::GameModeDefinitionV1) -> Option<u32> {
+    mode.terminal_wave
+}
+
+pub fn progression_wave(
+    mode: &crate::GameModeDefinitionV1,
+    run_wave: u32,
+) -> Result<u32, WorldRuntimeError> {
+    run_wave
+        .max(1)
+        .checked_mul(mode.progression_scale)
+        .ok_or(WorldRuntimeError::Wave)
+}
+
+pub fn early_wave_move_power_ratio(
+    mode: &crate::GameModeDefinitionV1,
+    run_wave: u32,
+) -> PacingRatioV1 {
+    let cap = mode.early_move_power_cap_wave;
+    let wave = run_wave.max(1).min(cap);
+    if wave >= cap {
+        return PacingRatioV1 {
+            numerator: 1,
+            denominator: 1,
+        };
+    }
+    let span = u64::from(cap - 1);
+    let numerator = 2 * span + 3 * u64::from(wave - 1);
+    let denominator = 5 * span;
+    let divisor = greatest_common_divisor(numerator, denominator);
+    PacingRatioV1 {
+        numerator: numerator / divisor,
+        denominator: denominator / divisor,
+    }
+}
+
+pub fn is_checkpoint_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
+    wave > 0 && wave % mode.checkpoint_interval == 0
+}
+
+pub fn is_chapter_start_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
+    wave > 0 && (wave - 1) % mode.checkpoint_interval == 0
+}
+
+pub fn is_major_checkpoint_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
+    wave > 0 && wave % mode.major_checkpoint_interval == 0
+}
+
+pub fn story_source_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> u32 {
+    mode.story_source_waves.get(&wave).copied().unwrap_or(wave)
+}
+
+pub fn mystery_encounter_legal_waves(mode: &crate::GameModeDefinitionV1) -> (u32, u32) {
+    (1, mode.mystery_encounter_max_wave)
+}
+
+pub fn mystery_encounter_target(mode: &crate::GameModeDefinitionV1) -> u32 {
+    mode.mystery_encounter_target
+}
+
+pub fn greatest_common_divisor(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.max(1)
+}
+
+pub fn biome_overstay(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+) -> u64 {
+    if in_late_game_zone(mode, wave) {
+        return 0;
+    }
+    world.overstay_anchor_wave.map_or(0, |anchor| {
+        wave.get().get().saturating_sub(anchor.get().get())
+    })
+}
+
+pub fn has_notoriety(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+) -> bool {
+    biome_overstay(world, wave, mode) > 0
+}
+
+pub fn notoriety_bst_bonus(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+    scale: NotorietyScaleV1,
+) -> Result<u32, WorldRuntimeError> {
+    notoriety_scaled_ceiling(world, wave, mode, scale, 100)
+}
+
+pub fn notoriety_over_level(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+    scale: NotorietyScaleV1,
+) -> Result<u32, WorldRuntimeError> {
+    notoriety_scaled_ceiling(world, wave, mode, scale, 10)
+}
+
+pub fn notoriety_boss_chance_pct(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+    scale: NotorietyScaleV1,
+) -> Result<u32, WorldRuntimeError> {
+    let overstay = scaled_overstay(world, wave, mode, scale)?;
+    Ok(if overstay == 0 {
+        0
+    } else if overstay >= 100 {
+        100
+    } else if overstay >= 60 {
+        50
+    } else {
+        33
+    })
+}
+
+pub fn notoriety_trainer_chance_pct(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+    scale: NotorietyScaleV1,
+) -> Result<u32, WorldRuntimeError> {
+    let overstay = scaled_overstay(world, wave, mode, scale)?;
+    Ok(if overstay == 0 {
+        0
+    } else if overstay >= 100 {
+        90
+    } else if overstay >= 60 {
+        50
+    } else {
+        25
+    })
+}
+
+fn notoriety_scaled_ceiling(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+    scale: NotorietyScaleV1,
+    ceiling: u32,
+) -> Result<u32, WorldRuntimeError> {
+    let scaled_tenths = scaled_overstay(world, wave, mode, scale)?;
+    if scaled_tenths >= 100 {
+        return Ok(ceiling);
+    }
+    let numerator = u64::from(scaled_tenths)
+        .checked_mul(u64::from(ceiling))
+        .ok_or(WorldRuntimeError::Wave)?;
+    Ok(u32::try_from((numerator + 50) / 100).map_err(|_| WorldRuntimeError::Wave)?)
+}
+
+/// Returns scaled overstay in tenths of a wave so all thresholds remain exact integers.
+fn scaled_overstay(
+    world: &WorldStateV1,
+    wave: WaveIndex,
+    mode: &crate::GameModeDefinitionV1,
+    scale: NotorietyScaleV1,
+) -> Result<u32, WorldRuntimeError> {
+    if scale.denominator == 0 {
+        return Err(WorldRuntimeError::Weight);
+    }
+    let numerator = biome_overstay(world, wave, mode)
+        .checked_mul(u64::from(scale.numerator))
+        .and_then(|value| value.checked_mul(10))
+        .ok_or(WorldRuntimeError::Wave)?;
+    u32::try_from(numerator / u64::from(scale.denominator)).map_err(|_| WorldRuntimeError::Wave)
+}
+
 pub fn record_biome_entry(
     before: &GameStateV5,
     biome: BiomeId,
@@ -105,6 +301,16 @@ pub fn record_biome_entry(
     run.world.biome = biome;
     run.world.route = route;
     run.world.visited_routes.push(route);
+    if run.world.biome_history.last() != Some(&biome) {
+        run.world.biome_history.push(biome);
+        if run.world.biome_history.len() > 40 {
+            let remove = run.world.biome_history.len() - 40;
+            run.world.biome_history.drain(..remove);
+        }
+    }
+    run.world
+        .map_nodes
+        .retain(|node| node.kind != MapNodeKindV1::Biome);
     run.world.pending_nodes.clear();
     run.world.pending_nodes_ready = false;
     run.world.event_revealed_biomes.clear();
@@ -163,6 +369,222 @@ pub fn restore_routing_state(
     validate_after(after)
 }
 
+pub const TREASURE_FRAGMENTS_FOR_REWARD: u32 = 3;
+
+pub fn record_map_biome_visited(
+    before: &GameStateV5,
+    biome: BiomeId,
+) -> Result<GameStateV5, WorldRuntimeError> {
+    update_world(before, |world| {
+        if world.biome_history.last() != Some(&biome) {
+            world.biome_history.push(biome);
+            if world.biome_history.len() > 40 {
+                let remove = world.biome_history.len() - 40;
+                world.biome_history.drain(..remove);
+            }
+        }
+    })
+}
+
+pub fn clear_biome_map_nodes(before: &GameStateV5) -> Result<GameStateV5, WorldRuntimeError> {
+    update_world(before, |world| {
+        world
+            .map_nodes
+            .retain(|node| node.kind != MapNodeKindV1::Biome);
+    })
+}
+
+pub fn reveal_map_nodes(
+    before: &GameStateV5,
+    nodes: &[MapNodeStateV1],
+) -> Result<(GameStateV5, usize), WorldRuntimeError> {
+    let mut after = before.clone();
+    let world = world_mut(&mut after)?;
+    let mut added = 0;
+    for node in nodes {
+        if !world
+            .map_nodes
+            .iter()
+            .any(|existing| existing.biome == node.biome && existing.label == node.label)
+        {
+            world.map_nodes.push(node.clone());
+            added += 1;
+        }
+    }
+    Ok((validate_after(after)?, added))
+}
+
+pub fn set_map_travel_target(
+    before: &GameStateV5,
+    target: BiomeId,
+) -> Result<GameStateV5, WorldRuntimeError> {
+    update_world(before, |world| world.travel_target = Some(target))
+}
+
+pub fn set_authoritative_travel_classification(
+    before: &GameStateV5,
+    wave: WaveIndex,
+    target: Option<BiomeId>,
+) -> Result<GameStateV5, WorldRuntimeError> {
+    update_world(before, |world| {
+        world.authoritative_travel = Some(AuthoritativeTravelClassificationV1 { wave, target });
+    })
+}
+
+pub fn clear_map_travel_target(
+    before: &GameStateV5,
+    expected: BiomeId,
+) -> Result<(GameStateV5, bool), WorldRuntimeError> {
+    if before
+        .active_run
+        .as_ref()
+        .ok_or(WorldRuntimeError::Content)?
+        .world
+        .travel_target
+        != Some(expected)
+    {
+        return Ok((before.clone(), false));
+    }
+    Ok((
+        update_world(before, |world| world.travel_target = None)?,
+        true,
+    ))
+}
+
+pub fn consume_map_travel_target(
+    before: &GameStateV5,
+) -> Result<(GameStateV5, Option<BiomeId>), WorldRuntimeError> {
+    let mut after = before.clone();
+    let world = world_mut(&mut after)?;
+    let target = world.travel_target.take();
+    world.authoritative_travel = None;
+    Ok((validate_after(after)?, target))
+}
+
+pub fn set_carried_weather(
+    before: &GameStateV5,
+    weather: WeatherKind,
+) -> Result<GameStateV5, WorldRuntimeError> {
+    update_world(before, |world| world.carried_weather = Some(weather))
+}
+
+pub fn consume_carried_weather(
+    before: &GameStateV5,
+) -> Result<(GameStateV5, Option<WeatherKind>), WorldRuntimeError> {
+    let mut after = before.clone();
+    let weather = world_mut(&mut after)?.carried_weather.take();
+    Ok((validate_after(after)?, weather))
+}
+
+pub fn add_treasure_fragments(
+    before: &GameStateV5,
+    delta: i64,
+) -> Result<(GameStateV5, u32), WorldRuntimeError> {
+    let mut after = before.clone();
+    let world = world_mut(&mut after)?;
+    let total = i64::from(world.treasure_fragments)
+        .checked_add(delta)
+        .ok_or(WorldRuntimeError::Wave)?
+        .max(0);
+    world.treasure_fragments = u32::try_from(total).map_err(|_| WorldRuntimeError::Wave)?;
+    Ok((
+        validate_after(after)?,
+        u32::try_from(total).map_err(|_| WorldRuntimeError::Wave)?,
+    ))
+}
+
+pub fn consume_treasure_fragments_for_reward(
+    before: &GameStateV5,
+) -> Result<(GameStateV5, bool), WorldRuntimeError> {
+    let mut after = before.clone();
+    let world = world_mut(&mut after)?;
+    if world.treasure_fragments < TREASURE_FRAGMENTS_FOR_REWARD {
+        return Ok((before.clone(), false));
+    }
+    world.treasure_fragments -= TREASURE_FRAGMENTS_FOR_REWARD;
+    Ok((validate_after(after)?, true))
+}
+
+pub fn onward_biomes(
+    state: &GameStateV5,
+    content: &PreparedWorldContentV1,
+) -> Result<Vec<BiomeId>, WorldRuntimeError> {
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(WorldRuntimeError::Content)?;
+    let biome = content
+        .biome(run.world.biome)
+        .ok_or(WorldRuntimeError::Content)?;
+    biome
+        .routing_exits
+        .iter()
+        .map(|link| {
+            content
+                .route(link.route)
+                .map(|route| route.biome)
+                .ok_or(WorldRuntimeError::Content)
+        })
+        .collect()
+}
+
+pub fn chart_onward_routes(
+    before: &GameStateV5,
+    content: &PreparedWorldContentV1,
+    extra: &[MapNodeStateV1],
+) -> Result<(GameStateV5, usize), WorldRuntimeError> {
+    let (revealed, _) = reveal_all_pending_nodes(before)?;
+    let routes = onward_biomes(&revealed, content)?;
+    let mut nodes = Vec::with_capacity(routes.len() + extra.len());
+    for biome in routes {
+        let definition = content.biome(biome).ok_or(WorldRuntimeError::Content)?;
+        nodes.push(MapNodeStateV1 {
+            biome,
+            label: definition.key.clone(),
+            kind: MapNodeKindV1::Biome,
+        });
+    }
+    nodes.extend_from_slice(extra);
+    reveal_map_nodes(&revealed, &nodes)
+}
+
+pub fn set_any_biome_travel_target<R: AuditedWorldRng>(
+    before: &GameStateV5,
+    content: &PreparedWorldContentV1,
+    rng: &mut R,
+) -> Result<(GameStateV5, Option<BiomeId>, Option<WorldSelectionAuditV1>), WorldRuntimeError> {
+    let current = before
+        .active_run
+        .as_ref()
+        .ok_or(WorldRuntimeError::Content)?
+        .world
+        .biome;
+    let options: Vec<_> = content
+        .pack()
+        .biomes
+        .iter()
+        .filter(|biome| biome.travel_allowed && biome.id != current)
+        .map(|biome| biome.id)
+        .collect();
+    if options.is_empty() {
+        return Ok((before.clone(), None, None));
+    }
+    let draw = draw_checked(
+        rng,
+        u64::try_from(options.len()).map_err(|_| WorldRuntimeError::Weight)?,
+    )?;
+    let ordinal = usize::try_from(draw).map_err(|_| WorldRuntimeError::Weight)?;
+    let target = options[ordinal];
+    Ok((
+        set_map_travel_target(before, target)?,
+        Some(target),
+        Some(WorldSelectionAuditV1 {
+            total_weight: options.len() as u64,
+            draw,
+            selected_ordinal: ordinal,
+        }),
+    ))
+}
 pub fn reveal_all_pending_nodes(
     before: &GameStateV5,
 ) -> Result<(GameStateV5, usize), WorldRuntimeError> {

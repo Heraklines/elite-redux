@@ -14,6 +14,10 @@ const WORLD_PROOF = {
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
+const pacing = "src/data/elite-redux/er-run-pacing.ts";
+const notoriety = "src/data/elite-redux/er-biome-notoriety.ts";
+const mapEvents = "src/data/elite-redux/er-map-events.ts";
+const mapNodes = "src/data/elite-redux/er-map-nodes.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -60,6 +64,25 @@ const implemented = [
   [structure, 264, "getErLeaveBiomeNow", "er_state::m7_state::WorldStateV1::leave_biome_now"],
   [structure, 273, "erIsBiomeEnd", "er_world::runtime::biome_end_rule"],
   [structure, 292, "erShouldRaiseCrossroads", "er_world::runtime::should_raise_crossroads"],
+  [pacing, 97, "getErFinalWave", "er_world::runtime::final_wave"],
+  [pacing, 101, "getErProgressionWave", "er_world::runtime::progression_wave"],
+  [pacing, 106, "getErEarlyWaveMovePowerMultiplier", "er_world::runtime::early_wave_move_power_ratio"],
+  [pacing, 123, "isErCheckpointWave", "er_world::runtime::is_checkpoint_wave"],
+  [pacing, 127, "isErChapterStartWave", "er_world::runtime::is_chapter_start_wave"],
+  [pacing, 135, "isErMajorCheckpointWave", "er_world::runtime::is_major_checkpoint_wave"],
+  [pacing, 147, "getErFinaleRoutingStartWave", "er_world::GameModeDefinitionV1::finale_routing_start_wave"],
+  [pacing, 162, "getErStorySourceWave", "er_world::runtime::story_source_wave"],
+  [notoriety, 59, "erBiomeOverstay", "er_world::runtime::biome_overstay"],
+  [notoriety, 71, "erHasNotoriety", "er_world::runtime::has_notoriety"],
+  [notoriety, 83, "escalationOverstay", "er_world::runtime::scaled_overstay"],
+  [notoriety, 91, "notorietyRamp", "er_world::runtime::notoriety_scaled_ceiling"],
+  [notoriety, 102, "erNotorietyBstBonus", "er_world::runtime::notoriety_bst_bonus"],
+  [mapEvents, 22, "onwardBiomes", "er_world::runtime::onward_biomes"],
+  [mapEvents, 32, "chartOnwardRoutes", "er_world::runtime::chart_onward_routes"],
+  [mapEvents, 73, "setAnyBiomeTravelTarget", "er_world::runtime::set_any_biome_travel_target"],
+  [mapNodes, 79, "recordErBiomeVisited", "er_world::runtime::record_map_biome_visited"],
+  [mapNodes, 90, "getErBiomeHistory", "er_state::m7_state::WorldStateV1::biome_history"],
+  [mapNodes, 97, "clearErBiomeNodes", "er_world::runtime::clear_biome_map_nodes"],
 ];
 
 function fail(message) {

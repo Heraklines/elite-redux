@@ -339,6 +339,43 @@ function domainFor(path, symbol, owner) {
     return "PRESENTATION";
   }
   if (
+    (path === "src/field/arena.ts"
+      && ["bgTerrainColorRatioForBiome", "getBiomeKey", "getBiomeHasProps"].includes(symbol))
+    || (path === "src/utils/common.ts" && symbol === "getBiomeName")
+  ) {
+    return "PRESENTATION";
+  }
+  if (
+    (path === "src/field/arena.ts" && ["setBiomeWeather", "setBiomeTerrain"].includes(symbol))
+    || (path === "src/field/pokemon.ts"
+      && ["resetBattleAndWaveData", "resetWaveData"].includes(symbol))
+    || (path === "src/data/elite-redux/init-elite-redux-vanilla-rebalance.ts"
+      && owner === "ErBiomeChangeWeatherAbAttr")
+  ) {
+    return "BATTLE";
+  }
+  if (
+    path === "src/data/egg.ts"
+    && ["hatchWaves", "getEggTierDefaultHatchWaves"].includes(symbol)
+  ) {
+    return "PROGRESSION";
+  }
+  if (
+    (path === "src/data/elite-redux/er-achievement-tracker.ts"
+      && [
+        "checkTripleWaveFeats",
+        "erRecordAchievementWaveWon",
+        "erRecordAchievementShinyEncounter",
+      ].includes(symbol))
+    || (path === "src/data/elite-redux/er-social-achievement-tracker.ts"
+      && symbol === "evaluateTripleWaveWon")
+  ) {
+    return "RUN_META";
+  }
+  if (path === "src/data/elite-redux/er-biome-economy.ts") {
+    return "INVENTORY_ECONOMY";
+  }
+  if (
     /(?:battle-anims|effects-display|effect-flyout|er-biome-backgrounds|er-shiny-lab-effects|er-shiny-lab-fx|er-trainer-fx|reward-rate-visuals)\.ts$/u.test(
       path,
     )
