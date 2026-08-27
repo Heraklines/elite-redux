@@ -9,6 +9,8 @@ pub mod battle_ui;
 pub mod ids;
 pub mod input;
 pub mod m6;
+pub mod m7;
+pub mod m7_run_ir;
 pub mod mechanics;
 pub mod protocol;
 pub mod run_control;
@@ -23,6 +25,8 @@ pub use authority::*;
 pub use ids::*;
 pub use input::*;
 pub use m6::*;
+pub use m7::*;
+pub use m7_run_ir::*;
 pub use mechanics::*;
 pub use protocol::*;
 pub use run_control::{

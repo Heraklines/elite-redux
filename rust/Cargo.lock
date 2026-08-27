@@ -110,6 +110,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-ai"
+version = "0.1.0"
+dependencies = [
+ "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "er-battle"
 version = "0.1.0"
 dependencies = [
@@ -164,13 +173,17 @@ dependencies = [
 name = "er-game"
 version = "0.1.0"
 dependencies = [
+ "er-ai",
  "er-battle",
  "er-canonical",
  "er-content",
+ "er-progression",
  "er-rng",
  "er-run",
+ "er-scenario",
  "er-state",
  "er-types",
+ "er-world",
  "serde",
  "serde_json",
  "thiserror",
@@ -201,6 +214,15 @@ dependencies = [
  "er-types",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-progression"
+version = "0.1.0"
+dependencies = [
+ "er-types",
+ "serde",
  "thiserror",
 ]
 
@@ -239,6 +261,15 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-scenario"
+version = "0.1.0"
+dependencies = [
+ "er-types",
+ "serde",
  "thiserror",
 ]
 
@@ -326,6 +357,15 @@ dependencies = [
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",
+]
+
+[[package]]
+name = "er-world"
+version = "0.1.0"
+dependencies = [
+ "er-types",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

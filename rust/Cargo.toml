@@ -8,6 +8,10 @@ members = [
     "crates/er-content-compiler",
     "crates/er-state",
     "crates/er-run",
+    "crates/er-progression",
+    "crates/er-world",
+    "crates/er-ai",
+    "crates/er-scenario",
     "crates/er-battle",
     "crates/er-game",
     "crates/er-kernel",
@@ -24,7 +28,7 @@ rust-version = "1.97.1"
 version = "0.1.0"
 
 [workspace.dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 thiserror = "2.0"
 blake3 = "=1.8.6"

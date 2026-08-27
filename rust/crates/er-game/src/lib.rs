@@ -7,6 +7,9 @@ pub mod battle_start_v2;
 pub mod command_menu;
 pub mod internal_event;
 pub mod m6;
+pub mod m7_content;
+pub mod m7_material;
+pub mod m7_runtime;
 // The local adapter remains production source while its kernel integration
 // seam is staged; its contract tests include this source directly.
 #[allow(dead_code)]
