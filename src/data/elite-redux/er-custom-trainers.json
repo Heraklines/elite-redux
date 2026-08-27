@@ -4947,5 +4947,260 @@
     ],
     "trainerClass": "FALKNER",
     "weight": 100
+  },
+  "TRAINER_70029": {
+    "battleBgm": "battle_johto_gym",
+    "battleType": "triple",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70029,
+    "maxWave": 50,
+    "minWave": 30,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "ER_BUG_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FELL_STINGER",
+          "TOXIC_SPIKES",
+          "PIN_MISSILE",
+          "RLA"
+        ],
+        "species": 15,
+        "vitamins": {
+          "atk": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SILK_SCARF"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HEADBUTT",
+          "MACH_PUNCH",
+          "QUICK_ATTACK",
+          "BEETLE_BASH"
+        ],
+        "species": 166
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "ARM_THRUST",
+          "ROCK_BLAST",
+          "MEGAHORN",
+          "SHARPEN"
+        ],
+        "species": 214,
+        "vitamins": {
+          "atk": 2
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FURY_SWIPES",
+          "FURY_CUTTER",
+          "SACRED_SWORD",
+          "U_TURN"
+        ],
+        "species": 123,
+        "vitamins": {
+          "hp": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "STICKY_WEB",
+          "ICY_WIND",
+          "SKITTER_SMACK",
+          "ENDURE"
+        ],
+        "species": 872
+      }
+    ],
+    "trainerClass": "BUGSY",
+    "weight": 100
+  },
+  "TRAINER_70030": {
+    "battleBgm": "battle_johto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70030,
+    "maxWave": 70,
+    "minWave": 50,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "MOONBLAST",
+          "LIGHT_SCREEN",
+          "WISH",
+          "TELEPORT"
+        ],
+        "species": 35,
+        "vitamins": {
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "MILK_DRINK",
+              "EARTHQUAKE",
+              "CHARM",
+              "BODY_SLAM"
+            ],
+            "species": 241,
+            "vitamins": {
+              "hp": 3
+            },
+            "weight": 2
+          },
+          {
+            "abilitySlot": 0,
+            "fusion": {
+              "abilitySlot": 0,
+              "formIndex": 0,
+              "species": 10419
+            },
+            "level": null,
+            "moves": [
+              "MILK_DRINK",
+              "EARTHQUAKE",
+              "CLOSE_COMBAT",
+              "COUNTER"
+            ],
+            "shiny": {
+              "around": "hearts",
+              "name": "QT",
+              "palette": "bubblegum"
+            },
+            "species": 241,
+            "vitamins": {
+              "atk": 1,
+              "hp": 3,
+              "spd": 1
+            },
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "FLING",
+          "TAIL_SLAP",
+          "ARM_THRUST",
+          "ACROBATICS"
+        ],
+        "species": 424,
+        "vitamins": {
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 2,
+          "formIndex": 0,
+          "species": 113
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          }
+        ],
+        "insanity": {
+          "ability": 205
+        },
+        "level": null,
+        "moves": [
+          "DRAINING_KISS",
+          "BADDY_BAD",
+          "PROTECT",
+          "SOFT_BOILED"
+        ],
+        "shiny": {
+          "around": "petals",
+          "name": "Sir"
+        },
+        "species": 133,
+        "vitamins": {
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      }
+    ],
+    "trainerClass": "WHITNEY",
+    "weight": 100
   }
 }
