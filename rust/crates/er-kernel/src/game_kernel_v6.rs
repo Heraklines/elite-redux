@@ -11,7 +11,10 @@ use er_game::m7_material::{GameMaterialV5, MaterialApplyResultV5};
 use er_game::m7_runtime::{
     GameControlIntentV2, GameRuntimeSnapshotV5, GameRuntimeV5, GameRuntimeV5Error, PreparedTurnV5,
 };
-use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2, ScheduledTimer};
+use er_protocol::{
+    EndpointRole, ProposalAdmission, ProposalAdmissionLedger, ProposalAdmissionSnapshotBridge,
+    ProposalAdmissionSnapshotV2, ProposalIdentity, ProtocolRuntimeSnapshotV2, ScheduledTimer,
+};
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
@@ -348,6 +351,24 @@ impl GameKernelV6 {
         Ok(Some(intent_effect(intent)))
     }
 
+    pub fn admit_replica_proposal(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<ProposalAdmission, GameKernelV6Error> {
+        let protocol = self
+            .protocol
+            .as_mut()
+            .ok_or(GameKernelV6Error::Transaction)?;
+        if protocol.role != EndpointRole::Authority {
+            return Err(GameKernelV6Error::Transaction);
+        }
+        let snapshot = protocol
+            .proposal_admission
+            .as_mut()
+            .ok_or(GameKernelV6Error::Transaction)?;
+        admit_game_proposal(snapshot, bytes)
+    }
+
     fn navigate(
         &mut self,
         direction: NavigationDirection,
@@ -458,6 +479,34 @@ fn prepare_proposal_effect(
     })
 }
 
+fn admit_game_proposal(
+    snapshot: &mut ProposalAdmissionSnapshotV2,
+    bytes: &[u8],
+) -> Result<ProposalAdmission, GameKernelV6Error> {
+    let proposal: GameProposalV1 =
+        serde_json::from_slice(bytes).map_err(|_| GameKernelV6Error::Transaction)?;
+    proposal
+        .validate()
+        .map_err(|_| GameKernelV6Error::Transaction)?;
+    if canonical_bytes(&proposal).map_err(|_| GameKernelV6Error::Transaction)? != bytes {
+        return Err(GameKernelV6Error::Transaction);
+    }
+    let fingerprint = content_digest(&bytes)
+        .map(|value| format!("blake3-v1:{value}"))
+        .map_err(|_| GameKernelV6Error::Transaction)?;
+    let identity = ProposalIdentity {
+        operation_id: proposal.context.operation_id,
+        fingerprint,
+    };
+    let mut ledger = ProposalAdmissionLedger::from_snapshot_v2(snapshot.clone())
+        .map_err(|_| GameKernelV6Error::Transaction)?;
+    let result = ledger.admit(&identity);
+    *snapshot = ledger
+        .snapshot_v2()
+        .map_err(|_| GameKernelV6Error::Transaction)?;
+    Ok(result)
+}
+
 impl From<GameRuntimeV5Error> for GameKernelV6Error {
     fn from(error: GameRuntimeV5Error) -> Self {
         Self::StateOwner(error.to_string())
@@ -472,13 +521,16 @@ impl From<SnapshotV6Error> for GameKernelV6Error {
 
 #[cfg(test)]
 mod tests {
+    use er_protocol::{ProposalAdmission, ProposalAdmissionSnapshotV2};
     use er_types::battle_ids::MenuInstanceId;
     use er_types::{
         GameActionContextV1, GameActionV1, GameControlKindV2, GameProposalV1, MenuOptionId,
         OperationId, RunExecutionContextV2, RunHook, RunProgramId, SafeU53, SeatId,
     };
 
-    use super::{GameControlIntentV2, KernelControlEffectV6, prepare_proposal_effect};
+    use super::{
+        GameControlIntentV2, KernelControlEffectV6, admit_game_proposal, prepare_proposal_effect,
+    };
 
     #[test]
     fn replica_proposal_effect_contains_canonical_typed_action_bytes()
@@ -513,6 +565,30 @@ mod tests {
         let proposal: GameProposalV1 = serde_json::from_slice(&bytes)?;
         proposal.validate()?;
         assert!(digest.starts_with("blake3-v1:"));
+        let mut admission = ProposalAdmissionSnapshotV2 {
+            capacity: SafeU53::new(8)?,
+            fingerprints: Vec::new(),
+            disposed: false,
+        };
+        assert_eq!(
+            admit_game_proposal(&mut admission, &bytes)?,
+            ProposalAdmission::Admitted
+        );
+        assert_eq!(
+            admit_game_proposal(&mut admission, &bytes)?,
+            ProposalAdmission::Duplicate
+        );
+        let mut conflicting = proposal;
+        conflicting.action = GameActionV1::ExecuteRunProgram {
+            program: RunProgramId::new(SafeU53::new(2)?),
+            hook: RunHook::RewardSelected,
+            context: RunExecutionContextV2::default(),
+        };
+        let conflict_bytes = er_canonical::canonical_bytes(&conflicting)?;
+        assert_eq!(
+            admit_game_proposal(&mut admission, &conflict_bytes)?,
+            ProposalAdmission::Conflict
+        );
         Ok(())
     }
 }
