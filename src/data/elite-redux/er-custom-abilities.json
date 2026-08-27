@@ -48,28 +48,5 @@
     "name": "Ultra Recon Hunter",
     "rules": [],
     "version": 1
-  },
-  "paralyzecurseignorer": {
-    "componentRules": [],
-    "description": "Attacks always paralyze and apply Curse, ignoring all immunities.",
-    "flags": {
-      "bypassFaint": false,
-      "ignorable": false,
-      "uncopiable": false,
-      "unreplaceable": false,
-      "unsuppressable": false
-    },
-    "generation": 9,
-    "id": 20004,
-    "includes": [
-      5115,
-      5313,
-      103
-    ],
-    "mechanics": [],
-    "modifiers": [],
-    "name": "Extermination Vector",
-    "rules": [],
-    "version": 1
   }
 }
