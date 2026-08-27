@@ -6221,5 +6221,230 @@
     "trainerClass": "BLUE",
     "victoryDialogue": "I let you winout of pity!",
     "weight": 80
+  },
+  "TRAINER_70037": {
+    "battleBgm": "battle_legendary_ruinous",
+    "battleType": "triple",
+    "challenge": "none",
+    "defeatDialogue": "...",
+    "difficulties": [
+      "hell"
+    ],
+    "endless": true,
+    "id": 70037,
+    "introDialogue": "....",
+    "maxWave": 200,
+    "minWave": 190,
+    "name": "Ancient One Məˈlɛvələns",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "formIndex": 1,
+        "heldItems": [
+          {
+            "count": 3,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LIECHI_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SALAC_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "BERRY_POUCH"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "PRIMAL_BEAM",
+          "CLOSE_COMBAT",
+          "GLACIER_CRASH",
+          "KNOCK_OFF"
+        ],
+        "sanityOff": true,
+        "shiny": {
+          "name": "☠️ Ylem",
+          "palette": "antique",
+          "surface": "softshade"
+        },
+        "species": 486,
+        "vitamins": {
+          "atk": 2,
+          "def": 2,
+          "hp": 2,
+          "spatk": 2,
+          "spd": 1,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "DRAIN_BRAIN",
+          "PSYWAVE",
+          "AGILITY",
+          "LIGHT_SCREEN"
+        ],
+        "shiny": {
+          "name": "Cosmic Force",
+          "surface": "starmap"
+        },
+        "species": 10768,
+        "vitamins": {
+          "hp": 1,
+          "spatk": 3,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BELLY_DRUM",
+          "BATON_PASS",
+          "EXTREME_SPEED",
+          "REST"
+        ],
+        "sanityOff": true,
+        "shiny": {
+          "name": "Awakened",
+          "palette": "jade"
+        },
+        "species": 10756,
+        "vitamins": {
+          "def": 2,
+          "hp": 2,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "CHARCOAL"
+          },
+          {
+            "count": 1,
+            "item": "HARD_STONE"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "V_CREATE",
+          "PRECIPICE_BLADES",
+          "DRAGON_HAMMER",
+          "STONE_EDGE"
+        ],
+        "shiny": {
+          "name": "Continental",
+          "palette": "obsidian",
+          "surface": "marble"
+        },
+        "species": 10142,
+        "vitamins": {
+          "atk": 1,
+          "def": 1,
+          "hp": 1,
+          "spd": 2,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "formIndex": 1,
+        "level": null,
+        "moves": [
+          "STAR_CRASH",
+          "PSYCHOKINETIC_SLAM",
+          "SWORDS_DANCE",
+          "BANEFUL_BUNKER"
+        ],
+        "shiny": {
+          "around": "galaxyspiral",
+          "name": "OG",
+          "surface": "sparkle"
+        },
+        "species": 151,
+        "vitamins": {
+          "hp": 3,
+          "spatk": 1,
+          "spd": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLUE_FLARE",
+          "EXPANDING_FORCE",
+          "QUIVER_DANCE",
+          "PSYCHIC_TERRAIN"
+        ],
+        "shiny": {
+          "around": "goldenglow",
+          "name": "Victorious",
+          "palette": "popart"
+        },
+        "species": 10757,
+        "vitamins": {
+          "atk": 2,
+          "def": 2,
+          "hp": 2,
+          "spatk": 2,
+          "spd": 2,
+          "spdef": 2
+        }
+      }
+    ],
+    "trainerClass": "GHETSIS",
+    "trainerEffect": "shadowaura",
+    "victoryDialogue": "...",
+    "weight": 30
   }
 }
