@@ -562,6 +562,7 @@ async function sampleRunsFromServer(
       return [];
     }
     const data = await res.json();
+    applyGhostModerationRevision(data?.moderationRevision);
     return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isGhostPoolSnapshot) as GhostTeamSnapshot[];
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
@@ -588,6 +589,7 @@ async function fetchEndlessLineage(sourceRunId: string, count = 4): Promise<Ghos
       return [];
     }
     const data = await response.json();
+    applyGhostModerationRevision(data?.moderationRevision);
     return (Array.isArray(data) ? data : (data?.teams ?? []))
       .filter(isGhostPoolSnapshot)
       .filter(snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot));
@@ -639,6 +641,7 @@ export async function fetchDeadliestGhosts(
       return [];
     }
     const data = await res.json();
+    applyGhostModerationRevision(data?.moderationRevision);
     return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isGhostPoolSnapshot) as GhostTeamSnapshot[];
   } catch {
     return [];
@@ -702,7 +705,26 @@ function saveLocalGhostTeam(snapshot: GhostTeamSnapshot): void {
 }
 
 function sharedCacheKey(): string {
-  return `er-ghost-shared-cache-v1_${loggedInUser?.username ?? "guest"}`;
+  return `er-ghost-shared-cache-v2_${loggedInUser?.username ?? "guest"}`;
+}
+
+function sharedModerationRevisionKey(): string {
+  return `er-ghost-moderation-revision_${loggedInUser?.username ?? "guest"}`;
+}
+
+function applyGhostModerationRevision(value: unknown): void {
+  if (typeof value !== "string" || value.length === 0) {
+    return;
+  }
+  try {
+    const key = sharedModerationRevisionKey();
+    if (localStorage.getItem(key) !== value) {
+      localStorage.removeItem(sharedCacheKey());
+      localStorage.setItem(key, value);
+    }
+  } catch {
+    // Cache invalidation is best-effort; fresh server snapshots remain moderated.
+  }
 }
 
 function loadSharedGhostCache(): GhostTeamSnapshot[] {
@@ -716,7 +738,8 @@ function loadSharedGhostCache(): GhostTeamSnapshot[] {
 
 function saveSharedGhostCache(snapshots: GhostTeamSnapshot[]): void {
   try {
-    const merged = [...loadSharedGhostCache(), ...snapshots];
+    // Fresh server snapshots win over stale copies with the same run/team.
+    const merged = [...snapshots, ...loadSharedGhostCache()];
     const seenIds = new Set<string>();
     const seenTeams = new Set<string>();
     const unique: GhostTeamSnapshot[] = [];
@@ -732,7 +755,7 @@ function saveSharedGhostCache(snapshots: GhostTeamSnapshot[]): void {
       seenTeams.add(fingerprint);
       unique.push(snapshot);
     }
-    localStorage.setItem(sharedCacheKey(), JSON.stringify(unique.slice(-SHARED_CACHE_CAP)));
+    localStorage.setItem(sharedCacheKey(), JSON.stringify(unique.slice(0, SHARED_CACHE_CAP)));
   } catch {
     // Cache persistence is optional; a full/quota-disabled store must not block play.
   }
