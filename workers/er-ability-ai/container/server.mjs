@@ -944,6 +944,14 @@ function blueprintMoveIds(result, payload) {
 }
 
 function validatePromptRequirements(result, payload) {
+  const prompt = normalizedSearchText(payload.prompt);
+  for (const abilityId of result.blueprint.includes || []) {
+    const ability = payload.abilityIndex.find(candidate => Number(candidate.id) === Number(abilityId));
+    const name = normalizedSearchText(ability?.name);
+    if (!name || !prompt.includes(name)) {
+      throw new Error(`Generated draft included unrelated ability ${ability?.name || abilityId}`);
+    }
+  }
   const requiredMoves = requestedMoveIds(payload);
   if (requiredMoves.length === 0) {
     return;
@@ -1033,6 +1041,8 @@ function modelPrompt(payload) {
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
 
 The server searched the complete runtime catalog before this request and expanded the strongest matching components below. Copy every runtime source identity exactly from REQUEST-MATCHED COMPONENTS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+
+Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If REQUEST-MATCHED COMPONENTS lists a requested move, use a runtime component whose editable parameter control is "move" or "move-list" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter. Never add an included ability unless the user explicitly names that complete ability.
 
 FULL ABILITY INDEX row = [abilityId, name].
 FULL MOVE CATALOG row = [moveId, name]. Requested moves are expanded with type, category, and normal power in REQUEST-MATCHED COMPONENTS.
