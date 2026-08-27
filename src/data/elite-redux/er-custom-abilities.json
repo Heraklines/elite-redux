@@ -1,4 +1,22 @@
 {
+  "new-ability": {
+    "componentRules": [],
+    "description": "Arcane Force + Psychic Surge (cannot be replaced)",
+    "flags": {
+      "unreplaceable": true
+    },
+    "generation": 9,
+    "id": 20000,
+    "includes": [
+      5224,
+      227
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Psychic Supremacy",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
