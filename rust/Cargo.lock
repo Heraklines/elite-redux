@@ -151,6 +151,7 @@ dependencies = [
 name = "er-ai"
 version = "0.1.0"
 dependencies = [
+ "er-content",
  "er-types",
  "serde",
  "thiserror",
@@ -325,6 +326,7 @@ dependencies = [
 name = "er-scenario"
 version = "0.1.0"
 dependencies = [
+ "er-state",
  "er-types",
  "serde",
  "thiserror",
@@ -425,6 +427,7 @@ dependencies = [
 name = "er-world"
 version = "0.1.0"
 dependencies = [
+ "er-state",
  "er-types",
  "serde",
  "thiserror",

@@ -1,4 +1,5 @@
 //! Closed deterministic M7 scenario graphs.
+pub mod runtime;
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;

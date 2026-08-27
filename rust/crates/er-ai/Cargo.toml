@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+er-content = { path = "../er-content" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 thiserror.workspace = true
