@@ -15,7 +15,11 @@ use er_env::{EnvironmentKernelComponentsV1, GameEffect, GameEnvironment};
 use er_game::m7_content::{
     GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V1, GameBehaviorClassificationV1, GameContentBundleV1,
     META_CONTENT_PACK_SCHEMA_VERSION_V1, MetaContentPackV1, PreparedGameContentV1,
-    RUN_CONTENT_PACK_SCHEMA_VERSION_V3, RunContentPackV3,
+    RunContentPackV3,
+};
+use er_game::m7_material::{
+    GameActionMaterialKindV1, GameActionMaterialV1, GameMaterialV5, MaterialApplyResultV5,
+    apply_game_material_v5,
 };
 use er_game::m7_progression_control::capture_control;
 use er_game::m7_run_executor::{RunExecutionContextV1, execute_run_hook_v1};
@@ -65,14 +69,13 @@ use er_types::run_ids::{
     BiomeId, EncounterId, Experience, GameRunId, GrowthRateId, Money, NatureId, RouteNodeId,
 };
 use er_types::run_model::RunOutcome;
-use er_types::ui::CancelPolicy;
-use er_types::ui_menu::{LogicalMenu, LogicalMenuOption};
 use er_types::{
-    AiPolicyId, BattleContentPackHashV3, CatalogHash, GameBehaviorStatus, GameBehaviorUnitId,
-    GameContentBundleHash, GameControlKindV2, GameControlPlanV2, InputFocus, InventoryItemId,
+    AiPolicyId, BattleContentPackHashV3, CatalogHash, GameActionContextV1, GameActionV1,
+    GameBehaviorStatus, GameBehaviorUnitId, GameContentBundleHash, GameControlKindV2,
+    GameControlPlanV2, GameMenuCancelV2, GameMenuOptionV2, GameMenuV2, InputFocus, InventoryItemId,
     MenuOptionId, OperationId, OracleSha, PhysicalKey, RawInputEvent, RunCondition, RunConditionId,
-    RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget, RunProgramId, RunProgramV1,
-    SafeU53, ScenarioId, ScenarioNodeId, SeatId,
+    RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget,
+    RunProgramId, RunProgramV1, SafeU53, ScenarioId, ScenarioNodeId, SeatId,
 };
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
@@ -384,13 +387,11 @@ fn ai_pack() -> AiPolicyPackV1 {
 
 fn prepared_content() -> TestResult<Arc<PreparedGameContentV1>> {
     let battle = Arc::new(battle_pack()?);
-    let run = Arc::new(RunContentPackV3 {
-        schema_version: RUN_CONTENT_PACK_SCHEMA_VERSION_V3,
-        oracle_sha: OracleSha::parse(ORACLE)?,
-        battle_content_hash: battle.content_hash.clone(),
-        content_hash: catalog('7'),
-        programs: vec![run_program()],
-    });
+    let run = Arc::new(RunContentPackV3::new(
+        OracleSha::parse(ORACLE)?,
+        battle.content_hash.clone(),
+        vec![run_program()],
+    )?);
     let meta = Arc::new(MetaContentPackV1 {
         schema_version: META_CONTENT_PACK_SCHEMA_VERSION_V1,
         oracle_sha: OracleSha::parse(ORACLE)?,
@@ -440,7 +441,9 @@ fn game_state(content: &PreparedGameContentV1) -> TestResult<GameStateV5> {
         MenuInstanceId::new(safe(1)),
         safe(1),
         SeatId::new(safe(1)),
-        &["poke-ball".to_owned()],
+        OperationId::new("m7/system/capture")?,
+        PokemonId::new(safe(2)),
+        &[(InventoryItemId::new(safe(1)), "poke-ball".to_owned())],
     )?;
     let state = GameStateV5 {
         schema_version: GAME_STATE_SCHEMA_VERSION_V5,
@@ -921,6 +924,46 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         Some(true)
     );
 
+    let action = GameActionV1::ExecuteRunProgram {
+        program: RunProgramId::new(safe(1)),
+        hook: RunHook::RunStarted,
+        context: RunExecutionContextV2::default(),
+    };
+    let action_material = GameActionMaterialV1::new(
+        GameActionContextV1 {
+            operation_id: OperationId::new("m7/run/system-proof")?,
+            authority_seat: SeatId::new(safe(1)),
+            authority_revision: safe(1),
+            menu_instance: MenuInstanceId::new(safe(1)),
+        },
+        &content,
+        &state,
+        action,
+        Vec::new(),
+        Vec::new(),
+        transition.after_state.clone(),
+        Vec::new(),
+    )?;
+    let game_material =
+        GameMaterialV5::from_action(GameActionMaterialKindV1::RunAction, action_material);
+    let game_bytes = game_material.canonical_bytes()?;
+    let mut game_host = state.clone();
+    let mut game_replica = state.clone();
+    assert_eq!(
+        apply_game_material_v5(&mut game_host, &content, &game_bytes)?,
+        MaterialApplyResultV5::Applied
+    );
+    assert_eq!(
+        apply_game_material_v5(&mut game_replica, &content, &game_bytes)?,
+        MaterialApplyResultV5::Applied
+    );
+    assert_eq!(game_host, transition.after_state);
+    assert_eq!(game_host, game_replica);
+    assert_eq!(
+        apply_game_material_v5(&mut game_replica, &content, &game_bytes)?,
+        MaterialApplyResultV5::Duplicate
+    );
+
     let material = LifecycleMaterialV1::new(
         OperationId::new("m7/lifecycle/system-proof")?,
         SeatId::new(safe(1)),
@@ -964,6 +1007,11 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
 
     let mut environment_state = state.clone();
     let program_option = MenuOptionId::new("program/1")?;
+    let action = GameActionV1::ExecuteRunProgram {
+        program: RunProgramId::new(safe(1)),
+        hook: RunHook::RunStarted,
+        context: RunExecutionContextV2::default(),
+    };
     let run = environment_state
         .active_run
         .as_mut()
@@ -973,14 +1021,26 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         revision: safe(2),
         kind: GameControlKindV2::ModeSelect,
         owner_seat: Some(SeatId::new(safe(1))),
-        menu: Some(LogicalMenu::new(
+        action_context: Some(GameActionContextV1 {
+            operation_id: OperationId::new("m7/system/run-start")?,
+            authority_seat: SeatId::new(safe(1)),
+            authority_revision: safe(2),
+            menu_instance: MenuInstanceId::new(safe(2)),
+        }),
+        menu: Some(GameMenuV2::new(
             MenuInstanceId::new(safe(2)),
             SeatId::new(safe(1)),
             "m7/program-control",
             program_option.clone(),
-            vec![LogicalMenuOption::new(program_option.clone(), true, None)?],
+            vec![GameMenuOptionV2::new(
+                program_option,
+                true,
+                true,
+                action,
+                None,
+            )?],
             Vec::new(),
-            CancelPolicy::Disabled,
+            GameMenuCancelV2::Disabled,
         )?),
         actionable: true,
     };
@@ -1044,17 +1104,18 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
     environment.raw_input(RawInputEvent::KeyUp {
         code: PhysicalKey::Space,
     })?;
-    assert!(matches!(
+    let before_retry = environment.snapshot().game_state;
+    assert!(
         environment
             .raw_input(RawInputEvent::KeyDown {
                 code: PhysicalKey::Space,
                 printable: true,
                 browser_repeat: false,
                 focus: InputFocus::Game,
-            })?
-            .as_slice(),
-        [GameEffect::Selected { .. }]
-    ));
+            })
+            .is_err()
+    );
+    assert_eq!(environment.snapshot().game_state, before_retry);
 
     let mut runtime = GameRuntimeV5::new(environment_state, content)?;
     assert!(matches!(

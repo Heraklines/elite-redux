@@ -9,13 +9,17 @@ use er_rng::audit::RngDraw;
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
 use er_types::battle_model::{BattleOutcome, ResolvedAction};
-use er_types::{GameContentIdentity, GameControlKindV2, OperationId, SafeU53, SeatId};
+use er_types::{
+    GameActionContextV1, GameActionV1, GameContentIdentity, GameControlKindV2, OperationId,
+    SafeU53, SeatId,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::m7_content::PreparedGameContentV1;
 
 pub const BATTLE_TURN_MATERIAL_SCHEMA_VERSION_V5: u32 = 5;
+pub const GAME_MATERIAL_SCHEMA_VERSION_V5: u32 = 5;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -58,6 +62,8 @@ pub enum MaterialV5Error {
     InvalidState(String),
     #[error("material commands are invalid: {0}")]
     Commands(String),
+    #[error("material accepted action is invalid: {0}")]
+    Action(String),
     #[error("material outcome or next control differs from after-state")]
     Frontier,
     #[error("canonical material encoding failed: {0}")]
@@ -177,8 +183,276 @@ pub fn apply_serialized_turn_material_v5(
     apply_turn_material_v5(live, content, &material)
 }
 
-fn mechanical_digest(state: &GameStateV5) -> Result<String, MaterialV5Error> {
+pub fn mechanical_digest(state: &GameStateV5) -> Result<String, MaterialV5Error> {
     let digest =
         content_digest(state).map_err(|error| MaterialV5Error::Canonical(error.to_string()))?;
     Ok(format!("blake3-v1:{digest}"))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GameMutationDomainV1 {
+    Run,
+    Progression,
+    Capture,
+    Party,
+    World,
+    Scenario,
+    Terminal,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GameMutationEvidenceV1 {
+    pub ordinal: u32,
+    pub domain: GameMutationDomainV1,
+    pub before_digest: String,
+    pub after_digest: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
+pub enum GamePresentationCueV1 {
+    Battle { cue: BattlePresentationCueV5 },
+    Run { key: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GameActionMaterialV1 {
+    pub schema_version: u32,
+    pub context: GameActionContextV1,
+    pub content_identity: GameContentIdentity,
+    pub before_digest: String,
+    pub after_digest: String,
+    pub accepted_action: GameActionV1,
+    pub mutations: Vec<GameMutationEvidenceV1>,
+    pub rng_audit: Vec<RngDraw>,
+    pub after_state: GameStateV5,
+    pub next_control: GameControlKindV2,
+    pub presentation: Vec<GamePresentationCueV1>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GameActionMaterialKindV1 {
+    RunAction,
+    Progression,
+    Capture,
+    Party,
+    World,
+    Scenario,
+    Terminal,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "kind",
+    content = "material"
+)]
+pub enum GameMaterialV5 {
+    BattleTurn(BattleTurnMaterialV5),
+    RunAction(GameActionMaterialV1),
+    Progression(GameActionMaterialV1),
+    Capture(GameActionMaterialV1),
+    Party(GameActionMaterialV1),
+    World(GameActionMaterialV1),
+    Scenario(GameActionMaterialV1),
+    Terminal(GameActionMaterialV1),
+}
+
+impl GameActionMaterialV1 {
+    pub fn new(
+        context: GameActionContextV1,
+        content: &PreparedGameContentV1,
+        before: &GameStateV5,
+        accepted_action: GameActionV1,
+        mutations: Vec<GameMutationEvidenceV1>,
+        rng_audit: Vec<RngDraw>,
+        after_state: GameStateV5,
+        presentation: Vec<GamePresentationCueV1>,
+    ) -> Result<Self, MaterialV5Error> {
+        let next_control = after_state
+            .active_run
+            .as_ref()
+            .map(|run| run.control.kind)
+            .ok_or(MaterialV5Error::Frontier)?;
+        let material = Self {
+            schema_version: GAME_MATERIAL_SCHEMA_VERSION_V5,
+            context,
+            content_identity: content.identity().clone(),
+            before_digest: mechanical_digest(before)?,
+            after_digest: mechanical_digest(&after_state)?,
+            accepted_action,
+            mutations,
+            rng_audit,
+            after_state,
+            next_control,
+            presentation,
+        };
+        material.validate(content)?;
+        Ok(material)
+    }
+
+    pub fn validate(&self, content: &PreparedGameContentV1) -> Result<(), MaterialV5Error> {
+        if self.schema_version != GAME_MATERIAL_SCHEMA_VERSION_V5 {
+            return Err(MaterialV5Error::SchemaVersion {
+                expected: GAME_MATERIAL_SCHEMA_VERSION_V5,
+                actual: self.schema_version,
+            });
+        }
+        self.accepted_action
+            .validate()
+            .map_err(|error| MaterialV5Error::Action(error.to_string()))?;
+        if &self.content_identity != content.identity()
+            || self.after_state.content_identity != self.content_identity
+        {
+            return Err(MaterialV5Error::ContentIdentity);
+        }
+        self.after_state
+            .validate()
+            .map_err(|error| MaterialV5Error::InvalidState(error.to_string()))?;
+        if mechanical_digest(&self.after_state)? != self.after_digest {
+            return Err(MaterialV5Error::AfterDigest);
+        }
+        if self
+            .after_state
+            .active_run
+            .as_ref()
+            .map(|run| run.control.kind)
+            != Some(self.next_control)
+        {
+            return Err(MaterialV5Error::Frontier);
+        }
+        Ok(())
+    }
+}
+
+impl GameMaterialV5 {
+    pub fn from_action(kind: GameActionMaterialKindV1, material: GameActionMaterialV1) -> Self {
+        match kind {
+            GameActionMaterialKindV1::RunAction => Self::RunAction(material),
+            GameActionMaterialKindV1::Progression => Self::Progression(material),
+            GameActionMaterialKindV1::Capture => Self::Capture(material),
+            GameActionMaterialKindV1::Party => Self::Party(material),
+            GameActionMaterialKindV1::World => Self::World(material),
+            GameActionMaterialKindV1::Scenario => Self::Scenario(material),
+            GameActionMaterialKindV1::Terminal => Self::Terminal(material),
+        }
+    }
+
+    pub fn operation_id(&self) -> &OperationId {
+        match self {
+            Self::BattleTurn(material) => &material.operation_id,
+            Self::RunAction(material)
+            | Self::Progression(material)
+            | Self::Capture(material)
+            | Self::Party(material)
+            | Self::World(material)
+            | Self::Scenario(material)
+            | Self::Terminal(material) => &material.context.operation_id,
+        }
+    }
+
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, MaterialV5Error> {
+        canonical_bytes(self).map_err(|error| MaterialV5Error::Canonical(error.to_string()))
+    }
+
+    pub fn decode_canonical(bytes: &[u8]) -> Result<Self, MaterialV5Error> {
+        let material: Self = serde_json::from_slice(bytes)
+            .map_err(|error| MaterialV5Error::Decode(error.to_string()))?;
+        if material.canonical_bytes()? != bytes {
+            return Err(MaterialV5Error::Canonical(
+                "input bytes are not the canonical encoding".to_owned(),
+            ));
+        }
+        Ok(material)
+    }
+
+    pub fn validate(&self, content: &PreparedGameContentV1) -> Result<(), MaterialV5Error> {
+        match self {
+            Self::BattleTurn(material) => material.validate(content),
+            Self::RunAction(material)
+            | Self::Progression(material)
+            | Self::Capture(material)
+            | Self::Party(material)
+            | Self::World(material)
+            | Self::Scenario(material)
+            | Self::Terminal(material) => material.validate(content),
+        }
+    }
+
+    pub fn before_digest(&self) -> &str {
+        match self {
+            Self::BattleTurn(material) => &material.before_digest,
+            Self::RunAction(material)
+            | Self::Progression(material)
+            | Self::Capture(material)
+            | Self::Party(material)
+            | Self::World(material)
+            | Self::Scenario(material)
+            | Self::Terminal(material) => &material.before_digest,
+        }
+    }
+
+    pub fn after_digest(&self) -> &str {
+        match self {
+            Self::BattleTurn(material) => &material.after_digest,
+            Self::RunAction(material)
+            | Self::Progression(material)
+            | Self::Capture(material)
+            | Self::Party(material)
+            | Self::World(material)
+            | Self::Scenario(material)
+            | Self::Terminal(material) => &material.after_digest,
+        }
+    }
+
+    pub fn after_state(&self) -> &GameStateV5 {
+        match self {
+            Self::BattleTurn(material) => &material.after_state,
+            Self::RunAction(material)
+            | Self::Progression(material)
+            | Self::Capture(material)
+            | Self::Party(material)
+            | Self::World(material)
+            | Self::Scenario(material)
+            | Self::Terminal(material) => &material.after_state,
+        }
+    }
+
+    pub fn battle_presentation(&self) -> Option<&[BattlePresentationCueV5]> {
+        match self {
+            Self::BattleTurn(material) => Some(&material.presentation),
+            Self::RunAction(_)
+            | Self::Progression(_)
+            | Self::Capture(_)
+            | Self::Party(_)
+            | Self::World(_)
+            | Self::Scenario(_)
+            | Self::Terminal(_) => None,
+        }
+    }
+}
+
+pub fn apply_game_material_v5(
+    live: &mut GameStateV5,
+    content: &PreparedGameContentV1,
+    bytes: &[u8],
+) -> Result<MaterialApplyResultV5, MaterialV5Error> {
+    let material = GameMaterialV5::decode_canonical(bytes)?;
+    material.validate(content)?;
+    let live_digest = mechanical_digest(live)?;
+    if live_digest == material.after_digest() {
+        return Ok(MaterialApplyResultV5::Duplicate);
+    }
+    if live_digest != material.before_digest() {
+        return Err(MaterialV5Error::BeforeDigest);
+    }
+    let staged = material.after_state().clone();
+    staged
+        .validate()
+        .map_err(|error| MaterialV5Error::InvalidState(error.to_string()))?;
+    *live = staged;
+    Ok(MaterialApplyResultV5::Applied)
 }

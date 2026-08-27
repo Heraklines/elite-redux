@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use er_battle::m7_resolver::{BattlePresentationCueV5, TurnAuthorityContextV1};
 use er_game::m7_content::PreparedGameContentV1;
-use er_game::m7_material::{BattleTurnMaterialV5, MaterialApplyResultV5};
+use er_game::m7_internal_event::{GameInternalEventQueueV1, GameInternalEventV1};
+use er_game::m7_material::{GameMaterialV5, MaterialApplyResultV5};
 use er_game::m7_runtime::{
     GameControlIntentV2, GameRuntimeSnapshotV5, GameRuntimeV5, GameRuntimeV5Error, PreparedTurnV5,
 };
@@ -95,10 +96,10 @@ impl GameKernelV6 {
             .map_err(|error| GameKernelV6Error::Snapshot(error.to_string()))?;
         let mut applied_materials = BTreeMap::new();
         for transaction in &snapshot.prepared_transactions {
-            let material = BattleTurnMaterialV5::decode_canonical(&transaction.material_bytes)
+            let material = GameMaterialV5::decode_canonical(&transaction.material_bytes)
                 .map_err(|_| GameKernelV6Error::Transaction)?;
-            if material.operation_id != transaction.operation_id
-                || material.before_digest != transaction.before_digest
+            if material.operation_id() != &transaction.operation_id
+                || material.before_digest() != transaction.before_digest
                 || applied_materials
                     .insert(
                         transaction.operation_id.clone(),
@@ -136,11 +137,11 @@ impl GameKernelV6 {
             .applied_materials
             .iter()
             .filter_map(|(operation_id, bytes)| {
-                BattleTurnMaterialV5::decode_canonical(bytes)
+                GameMaterialV5::decode_canonical(bytes)
                     .ok()
                     .map(|material| PreparedTransactionSnapshotV1 {
                         operation_id: operation_id.clone(),
-                        before_digest: material.before_digest,
+                        before_digest: material.before_digest().to_owned(),
                         material_bytes: bytes.clone(),
                     })
             })
@@ -239,12 +240,7 @@ impl GameKernelV6 {
             PhysicalKey::ArrowDown => self.navigate(NavigationDirection::Down),
             PhysicalKey::ArrowLeft => self.navigate(NavigationDirection::Left),
             PhysicalKey::ArrowRight => self.navigate(NavigationDirection::Right),
-            PhysicalKey::Enter | PhysicalKey::Space => self
-                .runtime
-                .select_control()
-                .map(intent_effect)
-                .map(Some)
-                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
+            PhysicalKey::Enter | PhysicalKey::Space => self.select_current_control(),
             PhysicalKey::Escape | PhysicalKey::Backspace => self
                 .runtime
                 .cancel_control()
@@ -264,12 +260,7 @@ impl GameKernelV6 {
             13 => self.navigate(NavigationDirection::Down),
             14 => self.navigate(NavigationDirection::Left),
             15 => self.navigate(NavigationDirection::Right),
-            0 => self
-                .runtime
-                .submit_control()
-                .map(intent_effect)
-                .map(Some)
-                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
+            0 => self.select_current_control(),
             1 => self
                 .runtime
                 .cancel_control()
@@ -278,6 +269,61 @@ impl GameKernelV6 {
                 .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
             _ => Ok(None),
         }
+    }
+
+    fn select_current_control(
+        &mut self,
+    ) -> Result<Option<KernelControlEffectV6>, GameKernelV6Error> {
+        let mut staged = self.runtime.clone();
+        let intent = staged
+            .submit_control()
+            .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
+        let mut queue =
+            GameInternalEventQueueV1::new(GameInternalEventV1::ControlSelected(intent.clone()));
+        let mut applied = false;
+        while let Some(event) = queue
+            .pop_front()
+            .map_err(|_| GameKernelV6Error::Transaction)?
+        {
+            match event {
+                GameInternalEventV1::ControlSelected(selected) => {
+                    let result = staged
+                        .execute_control_intent(&selected)
+                        .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
+                    queue.push_back(GameInternalEventV1::TransitionApplied(result));
+                }
+                GameInternalEventV1::TransitionApplied(result) => {
+                    queue.push_back(GameInternalEventV1::ControlInstalled {
+                        kind: result.next_control,
+                        revision: result.context.authority_revision,
+                    });
+                    applied = true;
+                }
+                GameInternalEventV1::ControlInstalled { kind, revision } => {
+                    let control = staged
+                        .state()
+                        .active_run
+                        .as_ref()
+                        .map(|run| &run.control)
+                        .ok_or(GameKernelV6Error::Transaction)?;
+                    if control.kind != kind || control.revision != revision {
+                        return Err(GameKernelV6Error::Transaction);
+                    }
+                }
+                GameInternalEventV1::ControlCancelled(_) => {
+                    return Err(GameKernelV6Error::Transaction);
+                }
+            }
+        }
+        queue
+            .validate_quiescent()
+            .map_err(|_| GameKernelV6Error::Transaction)?;
+        if !applied {
+            return Err(GameKernelV6Error::Transaction);
+        }
+        self.runtime = staged;
+        self.advance_replay_sequence()?;
+        Ok(Some(intent_effect(intent)))
     }
 
     fn navigate(
@@ -310,14 +356,18 @@ impl GameKernelV6 {
         &mut self,
         bytes: &[u8],
     ) -> Result<MaterialApplyResultV5, GameKernelV6Error> {
-        let material = BattleTurnMaterialV5::decode_canonical(bytes)
+        let material = GameMaterialV5::decode_canonical(bytes)
             .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
+        let presentation = material
+            .battle_presentation()
+            .map(<[BattlePresentationCueV5]>::to_vec)
+            .unwrap_or_default();
         let result = self
             .runtime
             .apply_material_bytes(bytes)
             .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         if result == MaterialApplyResultV5::Applied {
-            self.pending_presentations.extend(material.presentation);
+            self.pending_presentations.extend(presentation);
             self.advance_replay_sequence()?;
         }
         Ok(result)
@@ -345,10 +395,10 @@ impl GameKernelV6 {
 
 fn intent_effect(intent: GameControlIntentV2) -> KernelControlEffectV6 {
     match intent {
-        GameControlIntentV2::Selected { kind, option } => {
+        GameControlIntentV2::Selected { kind, option, .. } => {
             KernelControlEffectV6::Selected { kind, option }
         }
-        GameControlIntentV2::Cancelled { kind } => KernelControlEffectV6::Cancelled { kind },
+        GameControlIntentV2::Cancelled { kind, .. } => KernelControlEffectV6::Cancelled { kind },
     }
 }
 

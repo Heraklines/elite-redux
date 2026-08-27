@@ -1227,6 +1227,7 @@ pub fn advance_wave(
         run.outcome = RunOutcome::Victory;
         run.control.kind = GameControlKindV2::Complete;
         run.control.actionable = false;
+        run.control.action_context = None;
         run.control.menu = None;
     }
     after

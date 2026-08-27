@@ -51,8 +51,8 @@ pub enum RunExecutionError {
     Operation,
     #[error("run operation numeric calculation overflowed")]
     Overflow,
-    #[error("run operation requires a lifecycle implementation not owned by this executor")]
-    LifecycleOperation,
+    #[error("run operation was not rejected during content preparation")]
+    UnreachableOperation,
 }
 
 pub fn execute_run_hook_v1(
@@ -293,6 +293,7 @@ fn apply_operation(
                 .ok_or(RunExecutionError::Operation)?;
             run.control.kind = *control;
             run.control.actionable = false;
+            run.control.action_context = None;
             run.control.menu = None;
         }
         RunOperation::OpenScenario { scenario } => {
@@ -330,13 +331,14 @@ fn apply_operation(
             run.outcome = *outcome;
             run.control.kind = GameControlKindV2::Complete;
             run.control.actionable = false;
+            run.control.action_context = None;
             run.control.menu = None;
         }
         RunOperation::EmitPresentation { .. }
         | RunOperation::SetBiome { .. }
         | RunOperation::GenerateEncounter { .. }
-        | RunOperation::StartBattle { .. } => {}
-        RunOperation::GrantExperience { .. }
+        | RunOperation::StartBattle { .. }
+        | RunOperation::GrantExperience { .. }
         | RunOperation::SetLevel { .. }
         | RunOperation::HealPokemon { .. }
         | RunOperation::RevivePokemon { .. }
@@ -356,7 +358,7 @@ fn apply_operation(
         | RunOperation::ChangePersistentForm { .. }
         | RunOperation::TransferItem { .. } => {
             let _ = context;
-            return Err(RunExecutionError::LifecycleOperation);
+            return Err(RunExecutionError::UnreachableOperation);
         }
     }
     Ok(())

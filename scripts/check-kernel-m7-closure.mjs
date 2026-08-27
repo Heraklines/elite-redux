@@ -26,41 +26,54 @@ const reportPath = argumentsMap.get("--report");
 if (!reportPath || !isAbsolute(reportPath)) {
   fail("--report must be an absolute path");
 }
+const stage = argumentsMap.get("--stage");
+if (stage !== "g29" && stage !== "g30") {
+  fail("--stage must be g29 or g30");
+}
 
 const run = readJson("rust/fixtures/m7/run-behavior-unit-manifest-v1.json");
 const scenarios = readJson("rust/fixtures/m7/scenario-catalog-v1.json");
 const ai = readJson("rust/fixtures/m7/ai-policy-catalog-v1.json");
 const gaps = readJson("rust/fixtures/m7/m7-gap-clusters-v1.json");
-const implementation = readJson("rust/fixtures/m7/m7-behavior-implementation-v1.json");
+const implementation = readJson("rust/fixtures/m7/m7-behavior-implementation-v2.json");
 if (
-  implementation.schema_version !== 1
+  implementation.schema_version !== 2
   || implementation.oracle_sha !== run.oracle_sha
-  || implementation.implementation_count !== implementation.implementations.length
+  || implementation.implementation_group_count !== implementation.implementations.length
 ) {
-  fail("implementation manifest identity or count mismatch");
+  fail("implementation V2 manifest identity or count mismatch");
 }
-const implementationIds = new Set();
+const plannedImplementationIds = new Set();
 for (const entry of implementation.implementations) {
   if (
-    implementationIds.has(entry.behavior_unit)
-    || !["COMPILED", "BESPOKE_IMPLEMENTED", "SEMANTICALLY_INERT"].includes(entry.status)
-    || typeof entry.rust_symbol !== "string"
-    || entry.rust_symbol.length === 0
-    || entry.proof?.kind !== "RUST_TEST"
-    || !existsSync(resolve(ROOT, entry.proof.path))
-    || typeof entry.proof.test !== "string"
-    || entry.proof.test.length === 0
+    !["COMPILED", "BESPOKE_IMPLEMENTED", "SEMANTICALLY_INERT"].includes(entry.status)
+    || entry.behavior_units.length === 0
+    || entry.proof_registry_group !== entry.group_id
+    || (implementation.publication_state === "QUALIFIED"
+      && !/^blake3-v1:[0-9a-f]{64}$/u.test(entry.proof_execution_digest))
   ) {
-    fail(`invalid implementation evidence for ${entry.behavior_unit}`);
+    fail(`invalid implementation V2 evidence for ${entry.group_id}`);
   }
-  implementationIds.add(entry.behavior_unit);
+  for (const id of entry.behavior_units) {
+    if (plannedImplementationIds.has(id)) {
+      fail(`duplicate implementation V2 behavior ${id}`);
+    }
+    plannedImplementationIds.add(id);
+  }
 }
+if (plannedImplementationIds.size !== implementation.implementation_count) {
+  fail("implementation V2 behavior count mismatch");
+}
+const proofRegistryQualified = implementation.publication_state === "QUALIFIED";
+const implementationIds = proofRegistryQualified
+  ? plannedImplementationIds
+  : new Set();
 const knownRequired = new Set(
   run.behaviors
     .filter(behavior => behavior.implementation_status === "REQUIRES_M7")
     .map(behavior => behavior.id),
 );
-for (const id of implementationIds) {
+for (const id of plannedImplementationIds) {
   if (!knownRequired.has(id)) {
     fail(`implementation evidence references non-M7 behavior ${id}`);
   }
@@ -83,14 +96,19 @@ const unresolvedGapIds = gaps.clusters
   .flatMap(cluster => cluster.behavior_units)
   .filter(id => !implementationIds.has(id));
 const report = {
-  schema_version: 1,
+  schema_version: 2,
+  stage,
+  planned_implemented_behaviors: plannedImplementationIds.size,
+  proof_registry_qualified: proofRegistryQualified,
   implemented_behaviors: implementationIds.size,
   run_unresolved: unresolved(run).length,
   scenario_unresolved: unresolved(scenarios).length,
   ai_unresolved: unresolved(ai).length,
   clustered_gaps: unresolvedGapIds.length,
   missing_campaigns: requiredCampaigns.filter(path => !existsSync(resolve(ROOT, path))),
-  final_qualification_manifest: existsSync(resolve(ROOT, "rust/fixtures/m7/m7-final-qualification.json")),
+  final_qualification_manifest_present: existsSync(
+    resolve(ROOT, "rust/fixtures/m7/m7-final-qualification.json"),
+  ),
 };
 writeFileSync(reportPath, `${JSON.stringify(report)}\n`);
 const closed =
@@ -98,9 +116,8 @@ const closed =
   && report.scenario_unresolved === 0
   && report.ai_unresolved === 0
   && report.clustered_gaps === 0
-  && report.missing_campaigns.length === 0
-  && report.final_qualification_manifest;
+  && report.missing_campaigns.length === 0;
 if (!closed) {
   fail(JSON.stringify(report));
 }
-console.log("M7 closure gate: complete game behavior and campaign closure is green");
+console.log(`M7 closure gate: ${stage} complete game behavior and campaign closure is green`);

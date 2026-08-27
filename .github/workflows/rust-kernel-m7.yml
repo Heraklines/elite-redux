@@ -7,6 +7,8 @@ on:
     paths:
       - ".github/workflows/rust-kernel-m7.yml"
       - "rust/**"
+      - "scripts/*kernel-m7*"
+      - "test/kernel-fixtures/m7/**"
   workflow_dispatch:
 
 permissions:
@@ -219,6 +221,7 @@ jobs:
       - name: Require zero behavior gaps and complete campaigns
         run: |
           node scripts/check-kernel-m7-closure.mjs \
+            --stage g29 \
             --report "$RUNNER_TEMP/m7-closure-report.json"
       - uses: actions/upload-artifact@v6
         if: always()

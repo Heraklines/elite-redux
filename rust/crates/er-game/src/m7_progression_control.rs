@@ -1,9 +1,13 @@
 //! Stable raw-key logical menus for M7 lifecycle decisions.
 
-use er_types::battle_ids::MenuInstanceId;
-use er_types::ui::CancelPolicy;
-use er_types::ui_menu::{LogicalMenu, LogicalMenuOption, MenuNavigationEdge, NavigationDirection};
-use er_types::{GameControlKindV2, GameControlPlanV2, MenuOptionId, SafeU53, SeatId};
+use er_types::battle_ids::{MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId};
+use er_types::ui_menu::NavigationDirection;
+use er_types::{
+    CaptureActionV1, EvolutionActionV1, EvolutionId, FusionActionV1, GameActionContextV1,
+    GameActionV1, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2, GameMenuOptionV2,
+    GameMenuV2, InventoryItemId, MenuNavigationEdge, MenuOptionId, MoveLearningActionV1,
+    OperationId, PartyActionV1, SafeU53, SeatId,
+};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -12,7 +16,7 @@ pub enum ProgressionControlError {
     Empty,
     #[error("progression control identity is invalid: {0}")]
     Identity(String),
-    #[error("progression logical menu is invalid: {0}")]
+    #[error("progression game menu is invalid: {0}")]
     Menu(String),
 }
 
@@ -20,21 +24,39 @@ pub fn capture_control(
     instance: MenuInstanceId,
     revision: SafeU53,
     seat: SeatId,
-    ball_keys: &[String],
+    operation_id: OperationId,
+    target: PokemonId,
+    balls: &[(InventoryItemId, String)],
 ) -> Result<GameControlPlanV2, ProgressionControlError> {
-    let mut options: Vec<String> = ball_keys
+    let mut options: Vec<_> = balls
         .iter()
-        .map(|key| format!("capture/ball/{key}"))
+        .map(|(ball, key)| {
+            (
+                format!("capture/ball/{key}"),
+                GameActionV1::Capture {
+                    action: CaptureActionV1::Attempt {
+                        target,
+                        ball: *ball,
+                    },
+                },
+            )
+        })
         .collect();
-    options.push("capture/decline".to_owned());
+    options.push((
+        "capture/decline".to_owned(),
+        GameActionV1::Capture {
+            action: CaptureActionV1::Decline,
+        },
+    ));
     vertical_control(
         instance,
         revision,
         seat,
+        operation_id,
         GameControlKindV2::Capture,
         "m7/capture",
         &options,
-        CancelPolicy::Disabled,
+        GameMenuCancelV2::Disabled,
     )
 }
 
@@ -42,41 +64,91 @@ pub fn full_party_control(
     instance: MenuInstanceId,
     revision: SafeU53,
     seat: SeatId,
+    operation_id: OperationId,
+    pokemon: PokemonId,
     party_size: usize,
 ) -> Result<GameControlPlanV2, ProgressionControlError> {
-    let mut options: Vec<String> = (0..party_size)
-        .map(|index| format!("full-party/replace/{index}"))
-        .collect();
-    options.push("full-party/send-storage".to_owned());
+    let mut options = (0..party_size)
+        .map(|index| {
+            let numeric = u8::try_from(index)
+                .map_err(|error| ProgressionControlError::Identity(error.to_string()))?;
+            let slot = PartyIndex::new(numeric)
+                .map_err(|error| ProgressionControlError::Identity(error.to_string()))?;
+            Ok((
+                format!("full-party/replace/{index}"),
+                GameActionV1::Party {
+                    action: PartyActionV1::ChooseFullPartyDestination {
+                        pokemon,
+                        replace: Some(slot),
+                    },
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>, ProgressionControlError>>()?;
+    options.push((
+        "full-party/send-storage".to_owned(),
+        GameActionV1::Party {
+            action: PartyActionV1::ChooseFullPartyDestination {
+                pokemon,
+                replace: None,
+            },
+        },
+    ));
     vertical_control(
         instance,
         revision,
         seat,
+        operation_id,
         GameControlKindV2::FullParty,
         "m7/full-party",
         &options,
-        CancelPolicy::Disabled,
+        GameMenuCancelV2::Disabled,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn move_learn_control(
     instance: MenuInstanceId,
     revision: SafeU53,
     seat: SeatId,
+    operation_id: OperationId,
+    pokemon: PokemonId,
+    move_id: MoveId,
     occupied_slots: usize,
 ) -> Result<GameControlPlanV2, ProgressionControlError> {
-    let mut options: Vec<String> = (0..occupied_slots)
-        .map(|index| format!("move-learn/replace/{index}"))
-        .collect();
-    options.push("move-learn/refuse".to_owned());
+    let mut options = (0..occupied_slots)
+        .map(|index| {
+            let numeric = u8::try_from(index)
+                .map_err(|error| ProgressionControlError::Identity(error.to_string()))?;
+            let slot = MoveSlotIndex::new(numeric)
+                .map_err(|error| ProgressionControlError::Identity(error.to_string()))?;
+            Ok((
+                format!("move-learn/replace/{index}"),
+                GameActionV1::MoveLearning {
+                    action: MoveLearningActionV1::Replace {
+                        pokemon,
+                        move_id,
+                        slot,
+                    },
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>, ProgressionControlError>>()?;
+    options.push((
+        "move-learn/refuse".to_owned(),
+        GameActionV1::MoveLearning {
+            action: MoveLearningActionV1::Refuse { pokemon, move_id },
+        },
+    ));
     vertical_control(
         instance,
         revision,
         seat,
+        operation_id,
         GameControlKindV2::MoveLearn,
         "m7/move-learn",
         &options,
-        CancelPolicy::Disabled,
+        GameMenuCancelV2::Disabled,
     )
 }
 
@@ -84,20 +156,45 @@ pub fn evolution_control(
     instance: MenuInstanceId,
     revision: SafeU53,
     seat: SeatId,
-    branches: usize,
+    operation_id: OperationId,
+    pokemon: PokemonId,
+    evolutions: &[EvolutionId],
 ) -> Result<GameControlPlanV2, ProgressionControlError> {
-    let mut options: Vec<String> = (0..branches)
-        .map(|index| format!("evolution/branch/{index}"))
+    let mut options: Vec<_> = evolutions
+        .iter()
+        .enumerate()
+        .map(|(index, evolution)| {
+            (
+                format!("evolution/branch/{index}"),
+                GameActionV1::Evolution {
+                    action: EvolutionActionV1::Complete {
+                        pokemon,
+                        evolution: *evolution,
+                    },
+                },
+            )
+        })
         .collect();
-    options.push("evolution/cancel".to_owned());
+    if let Some(evolution) = evolutions.first() {
+        options.push((
+            "evolution/cancel".to_owned(),
+            GameActionV1::Evolution {
+                action: EvolutionActionV1::Cancel {
+                    pokemon,
+                    evolution: *evolution,
+                },
+            },
+        ));
+    }
     vertical_control(
         instance,
         revision,
         seat,
+        operation_id,
         GameControlKindV2::Evolution,
         "m7/evolution",
         &options,
-        CancelPolicy::Disabled,
+        GameMenuCancelV2::Disabled,
     )
 }
 
@@ -105,49 +202,68 @@ pub fn fusion_control(
     instance: MenuInstanceId,
     revision: SafeU53,
     seat: SeatId,
-    partner_count: usize,
+    operation_id: OperationId,
+    primary: PokemonId,
+    partners: &[PokemonId],
 ) -> Result<GameControlPlanV2, ProgressionControlError> {
-    let options: Vec<String> = (0..partner_count)
-        .map(|index| format!("fusion/partner/{index}"))
+    let options: Vec<_> = partners
+        .iter()
+        .enumerate()
+        .map(|(index, partner)| {
+            (
+                format!("fusion/partner/{index}"),
+                GameActionV1::Fusion {
+                    action: FusionActionV1::Fuse {
+                        primary,
+                        partner: *partner,
+                    },
+                },
+            )
+        })
         .collect();
     vertical_control(
         instance,
         revision,
         seat,
+        operation_id,
         GameControlKindV2::Fusion,
         "m7/fusion",
         &options,
-        CancelPolicy::Back,
+        GameMenuCancelV2::Back {
+            action: Box::new(GameActionV1::Fusion {
+                action: FusionActionV1::Cancel,
+            }),
+        },
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn vertical_control(
     instance: MenuInstanceId,
     revision: SafeU53,
     seat: SeatId,
+    operation_id: OperationId,
     kind: GameControlKindV2,
     control_id: &str,
-    keys: &[String],
-    cancel: CancelPolicy,
+    entries: &[(String, GameActionV1)],
+    cancel: GameMenuCancelV2,
 ) -> Result<GameControlPlanV2, ProgressionControlError> {
-    if keys.is_empty() {
+    if entries.is_empty() {
         return Err(ProgressionControlError::Empty);
     }
-    let ids: Vec<MenuOptionId> = keys
+    let options = entries
         .iter()
-        .map(|key| {
-            MenuOptionId::new(key.clone())
-                .map_err(|error| ProgressionControlError::Identity(error.to_string()))
-        })
-        .collect::<Result<_, _>>()?;
-    let options = ids
-        .iter()
-        .cloned()
-        .map(|id| {
-            LogicalMenuOption::new(id, true, None)
+        .map(|(key, action)| {
+            let id = MenuOptionId::new(key.clone())
+                .map_err(|error| ProgressionControlError::Identity(error.to_string()))?;
+            GameMenuOptionV2::new(id, true, true, action.clone(), None)
                 .map_err(|error| ProgressionControlError::Menu(error.to_string()))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let ids: Vec<_> = options
+        .iter()
+        .map(|option| option.option_id.clone())
+        .collect();
     let mut edges = Vec::with_capacity(ids.len() * 2);
     for (index, id) in ids.iter().enumerate() {
         let previous = if index == 0 { ids.len() - 1 } else { index - 1 };
@@ -163,7 +279,7 @@ fn vertical_control(
             ids[next].clone(),
         ));
     }
-    let menu = LogicalMenu::new(
+    let menu = GameMenuV2::new(
         instance,
         seat,
         control_id,
@@ -178,6 +294,12 @@ fn vertical_control(
         revision,
         kind,
         owner_seat: Some(seat),
+        action_context: Some(GameActionContextV1 {
+            operation_id,
+            authority_seat: seat,
+            authority_revision: revision,
+            menu_instance: instance,
+        }),
         menu: Some(menu),
         actionable: true,
     };
@@ -188,8 +310,11 @@ fn vertical_control(
 
 #[cfg(test)]
 mod tests {
-    use er_types::battle_ids::MenuInstanceId;
-    use er_types::{GameControlKindV2, SafeU53, SeatId};
+    use er_types::battle_ids::{MenuInstanceId, PokemonId};
+    use er_types::{
+        CaptureActionV1, GameActionV1, GameControlKindV2, InventoryItemId, OperationId, SafeU53,
+        SeatId,
+    };
 
     use super::capture_control;
 
@@ -199,7 +324,18 @@ mod tests {
             MenuInstanceId::new(SafeU53::new(1).expect("menu")),
             SafeU53::new(7).expect("revision"),
             SeatId::new(SafeU53::new(1).expect("seat")),
-            &["poke-ball".to_owned(), "great-ball".to_owned()],
+            OperationId::new("m7/test/capture").expect("operation"),
+            PokemonId::new(SafeU53::new(9).expect("pokemon")),
+            &[
+                (
+                    InventoryItemId::new(SafeU53::new(1).expect("ball")),
+                    "poke-ball".to_owned(),
+                ),
+                (
+                    InventoryItemId::new(SafeU53::new(2).expect("ball")),
+                    "great-ball".to_owned(),
+                ),
+            ],
         )
         .expect("capture control");
         assert_eq!(plan.kind, GameControlKindV2::Capture);
@@ -207,5 +343,11 @@ mod tests {
         assert_eq!(menu.options.len(), 3);
         assert_eq!(menu.navigation.len(), 6);
         assert!(menu.control_id.contains("capture"));
+        assert!(matches!(
+            menu.options[0].action,
+            GameActionV1::Capture {
+                action: CaptureActionV1::Attempt { .. }
+            }
+        ));
     }
 }

@@ -109,6 +109,9 @@ const files = [
   ["gap_cluster_manifest_sha256", "rust/fixtures/m7/m7-gap-clusters-v1.json"],
   ["oracle_witness_plan_sha256", "rust/fixtures/m7/m7-oracle-witness-plan-v1.json"],
   ["behavior_implementation_manifest_sha256", "rust/fixtures/m7/m7-behavior-implementation-v1.json"],
+  ["semantic_group_manifest_sha256", "rust/fixtures/m7/m7-semantic-groups-v1.json"],
+  ["domain_closure_manifest_sha256", "rust/fixtures/m7/m7-domain-closure-v1.json"],
+  ["behavior_implementation_manifest_v2_sha256", "rust/fixtures/m7/m7-behavior-implementation-v2.json"],
   ["performance_security_audit_sha256", "rust/fixtures/m7/performance-security-audit-v1.json"],
   ["legacy_bridge_audit_sha256", "rust/fixtures/m7/legacy-bridge-audit-v1.json"],
   ["m6_catalog_drift_sha256", "rust/fixtures/m7/m6-catalog-drift-v1.json"],
@@ -156,6 +159,7 @@ for (const [domain, key] of expectedDomains) {
 const run = readJson("rust/fixtures/m7/run-behavior-unit-manifest-v1.json");
 assertEqual(run.behavior_count, required(contract, "run_behavior_count"), "run behavior count");
 assertEqual(run.behaviors.length, run.behavior_count, "run behavior length");
+const runIds = new Set(run.behaviors.map(unit => unit.id));
 for (const unit of run.behaviors) {
   if (!gameIds.has(unit.id)) {
     fail(`run behavior ${unit.id} is absent from game catalog`);
@@ -236,6 +240,106 @@ for (const entry of implementations.implementations) {
   }
   implementedIds.add(entry.behavior_unit);
 }
+
+const semanticGroups = readJson("rust/fixtures/m7/m7-semantic-groups-v1.json");
+assertEqual(semanticGroups.behavior_count, run.behavior_count, "semantic behavior count");
+assertEqual(
+  semanticGroups.group_count,
+  required(contract, "semantic_group_count"),
+  "semantic group count",
+);
+assertEqual(semanticGroups.groups.length, semanticGroups.group_count, "semantic group length");
+const semanticGroupIds = new Set();
+const semanticBehaviorIds = new Set();
+for (const group of semanticGroups.groups) {
+  if (
+    typeof group.group_id !== "string"
+    || !/^m7g-[0-9a-f]{64}$/u.test(group.group_id)
+    || semanticGroupIds.has(group.group_id)
+    || group.root_behaviors.length === 0
+  ) {
+    fail(`invalid semantic group ${group.group_id}`);
+  }
+  semanticGroupIds.add(group.group_id);
+  const members = [...group.root_behaviors, ...group.helper_behaviors];
+  if (new Set(members).size !== members.length) {
+    fail(`semantic group ${group.group_id} contains duplicate behavior IDs`);
+  }
+  for (const id of members) {
+    const unit = run.behaviors.find(candidate => candidate.id === id);
+    if (!unit || unit.domain !== group.domain || semanticBehaviorIds.has(id)) {
+      fail(`semantic group ${group.group_id} has invalid behavior ${id}`);
+    }
+    semanticBehaviorIds.add(id);
+  }
+}
+for (const group of semanticGroups.groups) {
+  if (group.dependencies.some(dependency => !semanticGroupIds.has(dependency))) {
+    fail(`semantic group ${group.group_id} has an unknown dependency`);
+  }
+}
+assertEqual(semanticBehaviorIds.size, runIds.size, "semantic group behavior union");
+for (const id of runIds) {
+  if (!semanticBehaviorIds.has(id)) {
+    fail(`run behavior ${id} is absent from semantic groups`);
+  }
+}
+
+const domainClosure = readJson("rust/fixtures/m7/m7-domain-closure-v1.json");
+assertEqual(
+  domainClosure.required_behavior_count,
+  run.behavior_count,
+  "domain closure required count",
+);
+assertEqual(
+  domainClosure.implemented_behavior_count,
+  implementations.implementation_count,
+  "domain closure implemented count",
+);
+assertEqual(
+  domainClosure.unresolved_behavior_count,
+  run.behavior_count - implementations.implementation_count,
+  "domain closure unresolved count",
+);
+assertEqual(
+  domainClosure.domains.reduce((sum, domain) => sum + domain.required_behaviors, 0),
+  run.behavior_count,
+  "domain closure partition",
+);
+
+const implementationV2 = readJson("rust/fixtures/m7/m7-behavior-implementation-v2.json");
+assertEqual(implementationV2.schema_version, 2, "implementation V2 schema");
+assertEqual(
+  implementationV2.implementation_group_count,
+  required(contract, "implementation_group_count"),
+  "implementation V2 group count",
+);
+assertEqual(
+  implementationV2.implementation_count,
+  implementations.implementation_count,
+  "implementation V2 behavior count",
+);
+const implementationV2Ids = new Set();
+for (const entry of implementationV2.implementations) {
+  if (
+    !semanticGroupIds.has(entry.group_id)
+    || entry.proof_registry_group !== entry.group_id
+    || entry.behavior_units.length === 0
+  ) {
+    fail(`invalid implementation V2 group ${entry.group_id}`);
+  }
+  for (const id of entry.behavior_units) {
+    if (!implementedIds.has(id) || implementationV2Ids.has(id)) {
+      fail(`invalid implementation V2 behavior ${id}`);
+    }
+    implementationV2Ids.add(id);
+  }
+}
+assertEqual(
+  implementationV2Ids.size,
+  implementations.implementation_count,
+  "implementation V2 behavior union",
+);
 
 const witnesses = readJson("rust/fixtures/m7/m7-oracle-witness-plan-v1.json");
 assertEqual(witnesses.witness_count, required(contract, "oracle_witness_count"), "oracle witness count");

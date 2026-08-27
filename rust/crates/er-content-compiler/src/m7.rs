@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use er_game::m7_content::{
     GameBehaviorClassificationV1, META_CONTENT_PACK_SCHEMA_VERSION_V1, MetaContentPackV1,
-    RUN_CONTENT_PACK_SCHEMA_VERSION_V3, RunContentPackV3,
+    RunContentPackV3,
 };
 use er_types::{
     BattleContentPackHashV3, CatalogHash, GameBehaviorStatus, GameBehaviorUnitId, OracleSha,
@@ -61,7 +61,6 @@ pub enum SourceImplementationStatusV1 {
 pub struct GameSystemCompileRequestV1 {
     pub catalog: GameSystemCatalogDocumentV1,
     pub battle_content_hash: BattleContentPackHashV3,
-    pub run_content_hash: CatalogHash,
     pub meta_content_hash: CatalogHash,
     pub programs: Vec<RunProgramV1>,
     pub bespoke_behaviors: BTreeSet<GameBehaviorUnitId>,
@@ -100,7 +99,6 @@ pub fn compile_game_system_v1(
     let GameSystemCompileRequestV1 {
         catalog,
         battle_content_hash,
-        run_content_hash,
         meta_content_hash,
         programs,
         bespoke_behaviors,
@@ -171,21 +169,14 @@ pub fn compile_game_system_v1(
             status,
         });
     }
-    let run = RunContentPackV3 {
-        schema_version: RUN_CONTENT_PACK_SCHEMA_VERSION_V3,
-        oracle_sha: catalog.oracle_sha.clone(),
-        battle_content_hash,
-        content_hash: run_content_hash,
-        programs,
-    };
+    let run = RunContentPackV3::new(catalog.oracle_sha.clone(), battle_content_hash, programs)
+        .map_err(|error| GameSystemCompileError::Output(error.to_string()))?;
     let meta = MetaContentPackV1 {
         schema_version: META_CONTENT_PACK_SCHEMA_VERSION_V1,
         oracle_sha: catalog.oracle_sha,
         content_hash: meta_content_hash,
         classifications,
     };
-    run.validate()
-        .map_err(|error| GameSystemCompileError::Output(error.to_string()))?;
     meta.validate()
         .map_err(|error| GameSystemCompileError::Output(error.to_string()))?;
     Ok(CompiledGameSystemV1 { run, meta })
@@ -218,7 +209,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use er_types::{
-        BattleContentPackHashV3, CatalogHash, GameBehaviorUnitId, OracleSha, RunCondition,
+        BattleContentPackHashV3, BiomeId, CatalogHash, GameBehaviorUnitId, OracleSha, RunCondition,
         RunConditionId, RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget,
         RunProgramId, RunProgramV1, SafeU53,
     };
@@ -298,7 +289,7 @@ mod tests {
                 "b".repeat(64)
             ))
             .expect("battle hash"),
-            run_content_hash: CatalogHash::parse("c".repeat(64)).expect("run hash"),
+
             meta_content_hash: CatalogHash::parse("d".repeat(64)).expect("meta hash"),
             programs: vec![program(first)],
             bespoke_behaviors: BTreeSet::new(),
@@ -322,5 +313,17 @@ mod tests {
             source(missing.clone()),
         ]));
         assert_eq!(error, Err(GameSystemCompileError::Unclassified(missing)));
+    }
+
+    #[test]
+    fn unowned_domain_operation_is_rejected_during_preparation() {
+        let mut input = request(vec![source(behavior('a'))]);
+        input.programs[0].operations = vec![RunOperation::SetBiome {
+            biome: BiomeId::new(SafeU53::new(1).expect("biome")),
+        }];
+        assert!(matches!(
+            compile_game_system_v1(input),
+            Err(GameSystemCompileError::Output(_))
+        ));
     }
 }

@@ -4,19 +4,22 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use er_battle::m7_resolver::{BattleTransitionV5, BattleV5Error, TurnAuthorityContextV1};
+use er_canonical::content_digest;
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
-use er_types::ui::CancelPolicy;
 use er_types::ui_menu::NavigationDirection;
 use er_types::{
-    GameContentIdentity, GameControlKindV2, MenuOptionId, OperationId, RunHook, RunProgramId,
+    GameActionContextV1, GameActionResultV1, GameActionV1, GameContentIdentity, GameControlKindV2,
+    GameMenuCancelV2, MenuOptionId, OperationId,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::m7_content::PreparedGameContentV1;
 use crate::m7_material::{
-    BattleTurnMaterialV5, MaterialApplyResultV5, MaterialV5Error, apply_serialized_turn_material_v5,
+    BattleTurnMaterialV5, GameActionMaterialKindV1, GameActionMaterialV1, GameMaterialV5,
+    GameMutationDomainV1, GameMutationEvidenceV1, MaterialApplyResultV5, MaterialV5Error,
+    apply_game_material_v5, mechanical_digest,
 };
 use crate::m7_run_executor::{
     RunExecutionContextV1, RunExecutionError, execute_run_program_hook_v1,
@@ -41,9 +44,13 @@ pub enum GameControlIntentV2 {
     Selected {
         kind: GameControlKindV2,
         option: MenuOptionId,
+        action: GameActionV1,
+        context: GameActionContextV1,
     },
     Cancelled {
         kind: GameControlKindV2,
+        action: GameActionV1,
+        context: GameActionContextV1,
     },
 }
 
@@ -98,9 +105,9 @@ impl GameRuntimeV5 {
         }
         validate_state(&snapshot.state, &content)?;
         for (operation, bytes) in &snapshot.applied_materials {
-            let material = BattleTurnMaterialV5::decode_canonical(bytes)
+            let material = GameMaterialV5::decode_canonical(bytes)
                 .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
-            if &material.operation_id != operation {
+            if material.operation_id() != operation {
                 return Err(GameRuntimeV5Error::OperationCollision);
             }
         }
@@ -163,41 +170,120 @@ impl GameRuntimeV5 {
             .menu
             .as_ref()
             .ok_or(GameRuntimeV5Error::Control)?;
-        if !run.control.actionable
-            || !menu
-                .options
-                .iter()
-                .any(|option| option.option_id == menu.selected_option_id && option.enabled)
-        {
-            return Err(GameRuntimeV5Error::Control);
-        }
+        let action = menu
+            .selected_action()
+            .cloned()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        let context = run
+            .control
+            .action_context
+            .clone()
+            .ok_or(GameRuntimeV5Error::Control)?;
         Ok(GameControlIntentV2::Selected {
             kind: run.control.kind,
             option: menu.selected_option_id.clone(),
+            action,
+            context,
         })
     }
 
-    /// Applies one selected logical option inside the canonical runtime.
+    /// Applies one selected typed action inside the canonical runtime.
     ///
-    /// Content-driven run controls encode a typed `RunProgramId` as `program/{id}`. The kernel
-    /// invokes this method after raw-key reduction; adapters never receive a causal intent.
+    /// The kernel invokes this method after raw-key reduction; adapters observe only the stable
+    /// option identity and never decode or choose canonical semantics.
     pub fn select_control(&mut self) -> Result<GameControlIntentV2, GameRuntimeV5Error> {
         let intent = self.submit_control()?;
-        let GameControlIntentV2::Selected { kind, option } = &intent else {
+        self.execute_control_intent(&intent)?;
+        Ok(intent)
+    }
+
+    pub fn execute_control_intent(
+        &mut self,
+        intent: &GameControlIntentV2,
+    ) -> Result<GameActionResultV1, GameRuntimeV5Error> {
+        if &self.submit_control()? != intent {
+            return Err(GameRuntimeV5Error::ControlAction);
+        }
+        let GameControlIntentV2::Selected {
+            action,
+            context: action_context,
+            ..
+        } = intent
+        else {
             return Err(GameRuntimeV5Error::ControlAction);
         };
-        let program_id = program_option(option).ok_or(GameRuntimeV5Error::ControlAction)?;
-        let hook = control_hook(*kind).ok_or(GameRuntimeV5Error::ControlAction)?;
+        let GameActionV1::ExecuteRunProgram {
+            program,
+            hook,
+            context,
+        } = action
+        else {
+            return Err(GameRuntimeV5Error::ControlAction);
+        };
         let transition = execute_run_program_hook_v1(
             &self.state,
             &self.content,
-            program_id,
-            hook,
-            RunExecutionContextV1::default(),
+            *program,
+            *hook,
+            RunExecutionContextV1 {
+                pokemon: context.pokemon,
+                scenario_target: context.scenario_target,
+            },
         )
         .map_err(|error| GameRuntimeV5Error::RunExecution(error.to_string()))?;
-        self.state = transition.after_state;
-        Ok(intent)
+        let candidate = transition.after_state.clone();
+        let before_digest = mechanical_digest(&self.state)
+            .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
+        let after_digest = mechanical_digest(&candidate)
+            .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
+        let mutations = transition
+            .evidence
+            .iter()
+            .map(|entry| GameMutationEvidenceV1 {
+                ordinal: entry.operation_ordinal,
+                domain: GameMutationDomainV1::Run,
+                before_digest: before_digest.clone(),
+                after_digest: after_digest.clone(),
+            })
+            .collect();
+        let action_material = GameActionMaterialV1::new(
+            action_context.clone(),
+            &self.content,
+            &self.state,
+            action.clone(),
+            mutations,
+            Vec::new(),
+            candidate.clone(),
+            Vec::new(),
+        )
+        .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
+        let bytes =
+            GameMaterialV5::from_action(GameActionMaterialKindV1::RunAction, action_material)
+                .canonical_bytes()
+                .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
+        self.apply_material_bytes(&bytes)?;
+        if self.state != candidate {
+            return Err(GameRuntimeV5Error::CandidateMismatch);
+        }
+        let material_digest = content_digest(&bytes)
+            .map(|digest| format!("blake3-v1:{digest}"))
+            .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
+        let next_control = self
+            .state
+            .active_run
+            .as_ref()
+            .map(|run| run.control.kind)
+            .ok_or(GameRuntimeV5Error::Control)?;
+        let result = GameActionResultV1 {
+            context: action_context.clone(),
+            accepted_action: action.clone(),
+            material_digest,
+            next_control,
+        };
+        result
+            .validate()
+            .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
+        Ok(result)
     }
 
     pub fn cancel_control(&self) -> Result<GameControlIntentV2, GameRuntimeV5Error> {
@@ -211,18 +297,38 @@ impl GameRuntimeV5 {
             .menu
             .as_ref()
             .ok_or(GameRuntimeV5Error::Control)?;
-        if !run.control.actionable || matches!(menu.cancel, CancelPolicy::Disabled) {
+        if !run.control.actionable {
             return Err(GameRuntimeV5Error::Control);
         }
+        let context = run
+            .control
+            .action_context
+            .clone()
+            .ok_or(GameRuntimeV5Error::Control)?;
         match &menu.cancel {
-            CancelPolicy::Select(option) => Ok(GameControlIntentV2::Selected {
-                kind: run.control.kind,
-                option: option.clone(),
-            }),
-            CancelPolicy::Close | CancelPolicy::Back => Ok(GameControlIntentV2::Cancelled {
-                kind: run.control.kind,
-            }),
-            CancelPolicy::Disabled => Err(GameRuntimeV5Error::Control),
+            GameMenuCancelV2::Select { option_id } => {
+                let option = menu
+                    .options
+                    .iter()
+                    .find(|option| {
+                        option.option_id == *option_id && option.visible && option.enabled
+                    })
+                    .ok_or(GameRuntimeV5Error::Control)?;
+                Ok(GameControlIntentV2::Selected {
+                    kind: run.control.kind,
+                    option: option_id.clone(),
+                    action: option.action.clone(),
+                    context,
+                })
+            }
+            GameMenuCancelV2::Back { action } | GameMenuCancelV2::Close { action } => {
+                Ok(GameControlIntentV2::Cancelled {
+                    kind: run.control.kind,
+                    action: (**action).clone(),
+                    context,
+                })
+            }
+            GameMenuCancelV2::Disabled => Err(GameRuntimeV5Error::Control),
         }
     }
 
@@ -246,7 +352,7 @@ impl GameRuntimeV5 {
             &self.content,
             transition,
         );
-        let bytes = material
+        let bytes = GameMaterialV5::BattleTurn(material.clone())
             .canonical_bytes()
             .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
         Ok(PreparedTurnV5 {
@@ -274,52 +380,20 @@ impl GameRuntimeV5 {
         &mut self,
         bytes: &[u8],
     ) -> Result<MaterialApplyResultV5, GameRuntimeV5Error> {
-        let material = BattleTurnMaterialV5::decode_canonical(bytes)
+        let material = GameMaterialV5::decode_canonical(bytes)
             .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
-        if let Some(previous) = self.applied_materials.get(&material.operation_id) {
+        let operation_id = material.operation_id().clone();
+        if let Some(previous) = self.applied_materials.get(&operation_id) {
             if previous != bytes {
                 return Err(GameRuntimeV5Error::OperationCollision);
             }
         }
-        let result = apply_serialized_turn_material_v5(&mut self.state, &self.content, bytes)
+        let result = apply_game_material_v5(&mut self.state, &self.content, bytes)
             .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
         self.applied_materials
-            .entry(material.operation_id)
+            .entry(operation_id)
             .or_insert_with(|| bytes.to_vec());
         Ok(result)
-    }
-}
-
-fn program_option(option: &MenuOptionId) -> Option<RunProgramId> {
-    let value = option.as_str().strip_prefix("program/")?;
-    let numeric = value.parse::<u64>().ok()?;
-    RunProgramId::try_from_u64(numeric).ok()
-}
-
-fn control_hook(kind: GameControlKindV2) -> Option<RunHook> {
-    match kind {
-        GameControlKindV2::Title
-        | GameControlKindV2::ModeSelect
-        | GameControlKindV2::StarterSelect => Some(RunHook::RunStarted),
-        GameControlKindV2::Reward | GameControlKindV2::Market => Some(RunHook::RewardSelected),
-        GameControlKindV2::Scenario => Some(RunHook::ScenarioChoiceCommitted),
-        GameControlKindV2::Quest => Some(RunHook::QuestAdvanced),
-        GameControlKindV2::Faction => Some(RunHook::FactionStandingChanged),
-        GameControlKindV2::Biome | GameControlKindV2::Route => Some(RunHook::BiomeExited),
-        GameControlKindV2::BattleCommand
-        | GameControlKindV2::BattleMove
-        | GameControlKindV2::BattleTarget
-        | GameControlKindV2::BattleSwitch
-        | GameControlKindV2::BattleReplacement
-        | GameControlKindV2::Capture
-        | GameControlKindV2::FullParty
-        | GameControlKindV2::Progression
-        | GameControlKindV2::MoveLearn
-        | GameControlKindV2::Evolution
-        | GameControlKindV2::Fusion
-        | GameControlKindV2::Save
-        | GameControlKindV2::Waiting
-        | GameControlKindV2::Complete => None,
     }
 }
 

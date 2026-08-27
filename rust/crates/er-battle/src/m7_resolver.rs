@@ -282,6 +282,7 @@ pub fn resolve_turn_v5(
     };
     run.control.kind = next_control;
     run.control.actionable = false;
+    run.control.action_context = None;
     run.control.menu = None;
     run.run_rng = rng.run_state();
     after

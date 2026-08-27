@@ -1,6 +1,6 @@
 //! Complete immutable M7 game-content bundle and prepared indexes.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use er_ai::{AiPolicyPackV1, PreparedAiPolicyContentV1};
@@ -11,7 +11,8 @@ use er_progression::{PreparedProgressionContentV1, ProgressionContentPackV1};
 use er_scenario::{PreparedScenarioContentV1, ScenarioContentPackV1};
 use er_types::{
     BattleContentPackHashV3, CatalogHash, GameBehaviorStatus, GameBehaviorUnitId,
-    GameContentBundleHash, GameContentIdentity, OracleSha, RunProgramId, RunProgramV1,
+    GameContentBundleHash, GameContentIdentity, OracleSha, RunOperation, RunProgramId,
+    RunProgramV1,
 };
 use er_world::{PreparedWorldContentV1, WorldContentPackV1};
 use serde::{Deserialize, Serialize};
@@ -120,6 +121,14 @@ pub enum GameContentError {
 }
 
 #[derive(Serialize)]
+struct RunContentHashView<'a> {
+    schema_version: u32,
+    oracle_sha: &'a OracleSha,
+    battle_content_hash: &'a BattleContentPackHashV3,
+    programs: &'a [RunProgramV1],
+}
+
+#[derive(Serialize)]
 struct GameContentHashView<'a> {
     schema_version: u32,
     oracle_sha: &'a OracleSha,
@@ -133,6 +142,23 @@ struct GameContentHashView<'a> {
 }
 
 impl RunContentPackV3 {
+    pub fn new(
+        oracle_sha: OracleSha,
+        battle_content_hash: BattleContentPackHashV3,
+        programs: Vec<RunProgramV1>,
+    ) -> Result<Self, GameContentError> {
+        let content_hash = compute_run_content_hash(&oracle_sha, &battle_content_hash, &programs)?;
+        let value = Self {
+            schema_version: RUN_CONTENT_PACK_SCHEMA_VERSION_V3,
+            oracle_sha,
+            battle_content_hash,
+            content_hash,
+            programs,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
     pub fn validate(&self) -> Result<(), GameContentError> {
         require_schema(
             "RunContentPackV3",
@@ -144,14 +170,81 @@ impl RunContentPackV3 {
                 .programs
                 .windows(2)
                 .any(|pair| pair[0].id >= pair[1].id)
-            || self
-                .programs
-                .iter()
-                .any(|program| program.validate().is_err())
+            || self.programs.iter().any(|program| {
+                program.validate().is_err()
+                    || program
+                        .operations
+                        .iter()
+                        .any(|operation| !run_operation_executable_v1(operation))
+            })
         {
             return Err(GameContentError::RunProgramClosure);
         }
+        if self.recompute_hash()? != self.content_hash {
+            return Err(GameContentError::HashMismatch);
+        }
         Ok(())
+    }
+    pub fn recompute_hash(&self) -> Result<CatalogHash, GameContentError> {
+        compute_run_content_hash(&self.oracle_sha, &self.battle_content_hash, &self.programs)
+    }
+}
+
+fn compute_run_content_hash(
+    oracle_sha: &OracleSha,
+    battle_content_hash: &BattleContentPackHashV3,
+    programs: &[RunProgramV1],
+) -> Result<CatalogHash, GameContentError> {
+    let view = RunContentHashView {
+        schema_version: RUN_CONTENT_PACK_SCHEMA_VERSION_V3,
+        oracle_sha,
+        battle_content_hash,
+        programs,
+    };
+    let digest =
+        content_digest(&view).map_err(|error| GameContentError::Canonical(error.to_string()))?;
+    CatalogHash::parse(digest).map_err(|error| GameContentError::Canonical(error.to_string()))
+}
+
+fn run_operation_executable_v1(operation: &RunOperation) -> bool {
+    match operation {
+        RunOperation::AddMoney { .. }
+        | RunOperation::RemoveMoney { .. }
+        | RunOperation::AddModifier { .. }
+        | RunOperation::RemoveModifier { .. }
+        | RunOperation::AddItem { .. }
+        | RunOperation::RemoveItem { .. }
+        | RunOperation::SetRunFlag { .. }
+        | RunOperation::SetProfileFlag { .. }
+        | RunOperation::AdvanceQuest { .. }
+        | RunOperation::ChangeFactionStanding { .. }
+        | RunOperation::OpenControl { .. }
+        | RunOperation::OpenScenario { .. }
+        | RunOperation::CompleteScenario { .. }
+        | RunOperation::EnterTerminal { .. } => true,
+        RunOperation::GrantExperience { .. }
+        | RunOperation::SetLevel { .. }
+        | RunOperation::HealPokemon { .. }
+        | RunOperation::RevivePokemon { .. }
+        | RunOperation::ChangeStatus { .. }
+        | RunOperation::AddMove { .. }
+        | RunOperation::RemoveMove { .. }
+        | RunOperation::ReplaceMove { .. }
+        | RunOperation::ChangeAbility { .. }
+        | RunOperation::ChangeNature { .. }
+        | RunOperation::CapturePokemon { .. }
+        | RunOperation::AddPokemonToParty { .. }
+        | RunOperation::SendPokemonToStorage { .. }
+        | RunOperation::ReleasePokemon { .. }
+        | RunOperation::EvolvePokemon { .. }
+        | RunOperation::FusePokemon { .. }
+        | RunOperation::UnfusePokemon { .. }
+        | RunOperation::ChangePersistentForm { .. }
+        | RunOperation::TransferItem { .. }
+        | RunOperation::SetBiome { .. }
+        | RunOperation::GenerateEncounter { .. }
+        | RunOperation::StartBattle { .. }
+        | RunOperation::EmitPresentation { .. } => false,
     }
 }
 
@@ -208,18 +301,18 @@ impl GameContentBundleV1 {
         if self.run.battle_content_hash != self.battle.content_hash {
             return Err(GameContentError::BattleIdentity);
         }
-        let classifications: BTreeSet<_> = self
+        let classifications: BTreeMap<_, _> = self
             .meta
             .classifications
             .iter()
-            .map(|entry| entry.behavior.clone())
+            .map(|entry| (entry.behavior.clone(), entry.status))
             .collect();
-        if self
-            .run
-            .programs
-            .iter()
-            .any(|program| !classifications.contains(&program.source))
-        {
+        if self.run.programs.iter().any(|program| {
+            !matches!(
+                classifications.get(&program.source),
+                Some(GameBehaviorStatus::Compiled | GameBehaviorStatus::BespokeImplemented)
+            )
+        }) {
             return Err(GameContentError::ClassificationClosure);
         }
         if self.recompute_hash()? != self.content_hash {

@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    BattleContentPackHashV3, CatalogHash, LogicalMenu, OracleSha, SafeU53, SafeU53Error, SeatId,
+    BattleContentPackHashV3, CatalogHash, GameActionContextV1, GameMenuV2, OracleSha, SafeU53,
+    SafeU53Error, SeatId,
 };
 
 macro_rules! safe_u53_id {
@@ -215,7 +216,8 @@ pub struct GameControlPlanV2 {
     pub revision: SafeU53,
     pub kind: GameControlKindV2,
     pub owner_seat: Option<SeatId>,
-    pub menu: Option<LogicalMenu>,
+    pub action_context: Option<GameActionContextV1>,
+    pub menu: Option<GameMenuV2>,
     pub actionable: bool,
 }
 
@@ -236,6 +238,24 @@ impl GameControlPlanV2 {
         if self.actionable && self.menu.is_none() {
             return Err(GameControlPlanV2Error::ActionableWithoutMenu);
         }
+        if self.actionable {
+            let context = self
+                .action_context
+                .as_ref()
+                .ok_or(GameControlPlanV2Error::ActionableWithoutContext)?;
+            let menu = self
+                .menu
+                .as_ref()
+                .ok_or(GameControlPlanV2Error::ActionableWithoutMenu)?;
+            if context.authority_seat != menu.owner_seat
+                || context.authority_revision != self.revision
+                || context.menu_instance != menu.instance_id
+            {
+                return Err(GameControlPlanV2Error::ContextMismatch);
+            }
+        } else if self.action_context.is_some() {
+            return Err(GameControlPlanV2Error::NonActionableContext);
+        }
         if matches!(
             self.kind,
             GameControlKindV2::Waiting | GameControlKindV2::Complete
@@ -251,12 +271,18 @@ impl GameControlPlanV2 {
 pub enum GameControlPlanV2Error {
     #[error("GameControlPlanV2 schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
-    #[error("logical menu is invalid: {0}")]
-    Menu(crate::ui_menu::LogicalMenuError),
+    #[error("game menu is invalid: {0}")]
+    Menu(crate::m7_menu::GameMenuError),
     #[error("logical menu owner does not match control owner")]
     MenuOwner,
     #[error("an actionable control requires a logical menu")]
     ActionableWithoutMenu,
+    #[error("an actionable control requires an action context")]
+    ActionableWithoutContext,
+    #[error("control action context differs from menu owner, revision, or instance")]
+    ContextMismatch,
+    #[error("a non-actionable control cannot retain an action context")]
+    NonActionableContext,
     #[error("waiting and complete controls cannot be actionable")]
     NonInteractiveActionable,
 }
