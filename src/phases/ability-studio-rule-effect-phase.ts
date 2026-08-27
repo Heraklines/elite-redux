@@ -20,7 +20,12 @@ function resolveTargets(target: AbilityStudioTarget, context: AbilityStudioRuleC
     case "holder":
       return [context.holder];
     case "other":
-      return context.other === undefined ? [] : [context.other];
+      return context.other === undefined
+        ? context.holder
+            .getOpponents()
+            .filter(pokemon => !pokemon.isFainted())
+            .slice(0, 1)
+        : [context.other];
     case "holder-side":
       return [context.holder, ...context.holder.getAllies()].filter(pokemon => !pokemon.isFainted());
     case "opposing-side":

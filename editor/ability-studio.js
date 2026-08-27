@@ -606,6 +606,42 @@
     return `<article class="as-rule-card as-reference-card" aria-label="Included ability ${esc(abilityName(id))}"><header><span class="as-rule-number" aria-hidden="true">${number}</span><span class="as-builder-label include">INCLUDE EXISTING ABILITY</span><button type="button" class="icon danger as-reference-remove" title="Remove included ability" aria-label="Remove ${esc(abilityName(id))}" data-as-action="remove-include" data-as-id="${id}">×</button></header><div class="as-reference-value"><b>${esc(abilityName(id))}</b><span>#${id}</span></div></article>`;
   }
 
+  function componentPrimitiveConditionHtml(condition, ruleIndex, conditionIndex) {
+    const prefix = `data-as-component-rule="${ruleIndex}" data-as-component-condition="${conditionIndex}"`;
+    let fields = "";
+    if (condition.kind === "holder-hp") {
+      fields = `<div class="as-inline-fields"><label><span>Min HP %</span><input type="number" min="0" max="100" value="${condition.minPercent ?? ""}" data-as-component-condition-field="minPercent" ${prefix}></label><label><span>Max HP %</span><input type="number" min="0" max="100" value="${condition.maxPercent ?? ""}" data-as-component-condition-field="maxPercent" ${prefix}></label></div>`;
+    } else if (condition.kind === "holder-status" || condition.kind === "other-status") {
+      fields = `<label><span>Status</span><select data-as-component-condition-field="status" ${prefix}>${option("NONE", condition.status, "No status")}${selectOptions(primitiveCatalog.statuses, condition.status)}</select></label>`;
+    } else if (condition.kind === "weather") {
+      fields = `<label><span>Weather</span><select data-as-component-condition-field="weather" ${prefix}>${selectOptions(primitiveCatalog.weathers, condition.weather)}</select></label>`;
+    } else if (condition.kind === "terrain") {
+      fields = `<label><span>Terrain</span><select data-as-component-condition-field="terrain" ${prefix}>${selectOptions(primitiveCatalog.terrains, condition.terrain)}</select></label>`;
+    } else {
+      fields = moveFilterHtml(condition.filter || {}, prefix);
+    }
+    return `<div class="as-condition-block as-runtime-condition" draggable="true" data-as-drag-part="condition" data-as-drag-rule="${ruleIndex}" data-as-drag-index="${conditionIndex}" data-as-drop-part="condition" data-as-drop-rule="${ruleIndex}" data-as-drop-index="${conditionIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><select class="as-kind-select" data-as-component-condition-kind aria-label="Condition type" ${prefix}>${selectOptions(primitiveCatalog.conditionKinds, condition.kind)}</select>${fields}<button type="button" class="icon danger" title="Remove condition" aria-label="Remove ${esc(pretty(condition.kind))}" data-as-action="remove-component-condition" ${prefix}>×</button></div>`;
+  }
+
+  function componentPrimitiveEffectHtml(effect, ruleIndex, effectIndex) {
+    const prefix = `data-as-component-rule="${ruleIndex}" data-as-component-effect="${effectIndex}"`;
+    let fields = "";
+    if (effect.kind === "stat-stage") {
+      fields = `<div class="as-inline-fields"><label><span>Target</span><select data-as-component-effect-field="target" ${prefix}>${selectOptions(primitiveCatalog.targets, effect.target)}</select></label><label><span>Stat</span><select data-as-component-effect-field="stat" ${prefix}>${selectOptions(primitiveCatalog.stats, effect.stat)}</select></label><label><span>Stages</span><input type="number" min="-6" max="6" value="${effect.stages}" data-as-component-effect-field="stages" ${prefix}></label></div>`;
+    } else if (effect.kind === "status") {
+      fields = `<div class="as-inline-fields"><label><span>Target</span><select data-as-component-effect-field="target" ${prefix}>${selectOptions(primitiveCatalog.targets, effect.target)}</select></label><label><span>Status</span><select data-as-component-effect-field="status" ${prefix}>${selectOptions(primitiveCatalog.statuses, effect.status)}</select></label></div>`;
+    } else if (effect.kind === "heal-percent") {
+      fields = `<div class="as-inline-fields"><label><span>Target</span><select data-as-component-effect-field="target" ${prefix}>${selectOptions(primitiveCatalog.targets, effect.target)}</select></label><label><span>Max HP %</span><input type="number" min="1" max="100" value="${effect.percent}" data-as-component-effect-field="percent" ${prefix}></label></div>`;
+    } else if (effect.kind === "cure-status") {
+      fields = `<div class="as-inline-fields"><label><span>Target</span><select data-as-component-effect-field="target" ${prefix}>${selectOptions(primitiveCatalog.targets, effect.target)}</select></label><label><span>Status</span><select data-as-component-effect-field="status" ${prefix}>${option("ANY", effect.status, "Any status")}${selectOptions(primitiveCatalog.statuses, effect.status)}</select></label></div>`;
+    } else if (effect.kind === "set-weather") {
+      fields = `<label><span>Weather</span><select data-as-component-effect-field="weather" ${prefix}>${selectOptions(primitiveCatalog.weathers, effect.weather)}</select></label>`;
+    } else {
+      fields = `<label><span>Terrain</span><select data-as-component-effect-field="terrain" ${prefix}>${selectOptions(primitiveCatalog.terrains, effect.terrain)}</select></label>`;
+    }
+    return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${ruleIndex}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${ruleIndex}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-effect-block"><select class="as-kind-select" data-as-component-effect-kind aria-label="Effect type" ${prefix}>${selectOptions(primitiveCatalog.effectKinds, effect.kind)}</select>${fields}</div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(pretty(effect.kind))}" data-as-action="remove-component-effect" ${prefix}>×</button></div>`;
+  }
+
   function componentRuleHtml(rule, index, number) {
     const sourceRule = resolveComponent(rule.hook);
     const trigger = sourceRule?.hook.label || rule.hook.attrType;
@@ -625,6 +661,9 @@
       rule.conditions.length > 0
         ? rule.conditions
             .map((condition, conditionIndex) => {
+              if (!isRuntimeComponent(condition)) {
+                return `${conditionIndex > 0 ? conditionConnectorHtml(rule, "component", index) : ""}${componentPrimitiveConditionHtml(condition, index, conditionIndex)}`;
+              }
               const definition = componentConditionsByKey.get(componentConditionKey(condition));
               const label = definition?.label || `${condition.attrType} condition`;
               return `${conditionIndex > 0 ? conditionConnectorHtml(rule, "component", index) : ""}<span class="as-runtime-condition" draggable="true" data-as-drag-part="condition" data-as-drag-rule="${index}" data-as-drag-index="${conditionIndex}" data-as-drop-part="condition" data-as-drop-rule="${index}" data-as-drop-index="${conditionIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><b>${esc(label)}</b><small>${esc(condition.kind)}</small><button type="button" class="icon danger" title="Remove condition" aria-label="Remove ${esc(label)}" data-as-action="remove-component-condition" data-as-component-rule="${index}" data-as-component-condition="${conditionIndex}">×</button></span>`;
@@ -632,6 +671,9 @@
             .join("")
         : '<span class="as-always">Always</span>';
     const effectHtml = (effect, effectIndex) => {
+      if (!isRuntimeComponent(effect)) {
+        return componentPrimitiveEffectHtml(effect, index, effectIndex);
+      }
       const definition = componentEffectsByKey.get(componentSourceKey(effect));
       const label = definition?.label || effect.attrType;
       return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${index}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${index}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-effect"><b>${esc(label)}</b><small>${esc(effect.attrType)}</small></div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(label)}" data-as-action="remove-component-effect" data-as-component-rule="${index}" data-as-component-effect="${effectIndex}">×</button></div>`;
@@ -815,14 +857,19 @@
         const conditionText =
           rule.conditions.length > 0
             ? rule.conditions
-                .map(
-                  condition =>
-                    componentConditionsByKey.get(componentConditionKey(condition))?.label || condition.attrType,
+                .map(condition =>
+                  isRuntimeComponent(condition)
+                    ? componentConditionsByKey.get(componentConditionKey(condition))?.label || condition.attrType
+                    : conditionSummary(condition),
                 )
                 .join(joiner)
             : "always";
         const effectText = rule.effects
-          .map(effect => componentEffectsByKey.get(componentSourceKey(effect))?.label || effect.attrType)
+          .map(effect =>
+            isRuntimeComponent(effect)
+              ? componentEffectsByKey.get(componentSourceKey(effect))?.label || effect.attrType
+              : effectSummary(effect),
+          )
           .join(", then ");
         const triggerText = [prerequisiteText, source?.hook.label || rule.hook.attrType]
           .filter(Boolean)
@@ -853,6 +900,9 @@
   }
 
   function componentSourceKey(source) {
+    if (!source || !Number.isInteger(Number(source.abilityId))) {
+      return `primitive:${JSON.stringify(source)}`;
+    }
     return `${source.abilityId}:${source.attrIndex}:${source.attrType}`;
   }
 
@@ -861,7 +911,37 @@
   }
 
   function resolveComponent(reference) {
+    if (!reference || !Number.isInteger(Number(reference.abilityId))) {
+      return;
+    }
     return componentsBySource.get(componentSourceKey(reference));
+  }
+
+  function runtimeHookSupports(targetHook, sourceHook) {
+    if (!targetHook || !sourceHook) {
+      return false;
+    }
+    const available = new Set(targetHook.context || []);
+    return (sourceHook.context || []).every(value => available.has(value));
+  }
+
+  function runtimeEffectSupports(targetHook, sourceHook) {
+    if (!targetHook || !sourceHook) {
+      return false;
+    }
+    const available = new Set(targetHook.context || []);
+    return (sourceHook.effectContext || sourceHook.context || []).every(value => available.has(value));
+  }
+
+  function componentEffectSupports(targetRule, effectSource) {
+    const targetHook = resolveComponent(targetRule?.hook)?.hook;
+    const sourceRule = resolveComponent(effectSource);
+    const effect = componentEffectsByKey.get(componentSourceKey(effectSource));
+    return !!targetHook && !!sourceRule && !!effect;
+  }
+
+  function isRuntimeComponent(value) {
+    return !!value && Number.isInteger(Number(value.abilityId));
   }
 
   function nextComponentRuleKey(entry) {
@@ -1131,13 +1211,19 @@
     return `<button type="button" role="option" data-as-action="choose-component-hook" data-as-id="${rule.hook.source.abilityId}" data-as-index="${rule.hook.source.attrIndex}" data-as-type="${esc(rule.hook.source.attrType)}"><b>${esc(rule.hook.label)}</b><span>${count} existing mechanic${count === 1 ? "" : "s"}</span><small>${esc(names.join(" · "))}</small></button>`;
   }
 
-  function componentConditionResultHtml({ ability, condition }) {
+  function componentConditionResultHtml({ ability, condition, primitive, compatible = true, reason = "" }) {
+    if (primitive) {
+      return `<button type="button" data-as-action="choose-component-primitive-condition" data-as-value="${esc(primitive)}"><b>${esc(pretty(primitive))}</b><span>Configurable IF primitive</span><small>Independent condition</small></button>`;
+    }
     const conditionIndex = condition.source.conditionIndex;
-    return `<button type="button" data-as-action="choose-component-condition" data-as-id="${condition.source.abilityId}" data-as-index="${condition.source.attrIndex}" data-as-type="${esc(condition.source.attrType)}" data-as-kind="${condition.kind}"${conditionIndex === undefined ? "" : ` data-as-condition-index="${conditionIndex}"`}><b>${esc(condition.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(condition.summary || condition.sourceOwner)}</small></button>`;
+    return `<button type="button" data-as-action="choose-component-condition" data-as-id="${condition.source.abilityId}" data-as-index="${condition.source.attrIndex}" data-as-type="${esc(condition.source.attrType)}" data-as-kind="${condition.kind}"${conditionIndex === undefined ? "" : ` data-as-condition-index="${conditionIndex}"`}${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(condition.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(compatible ? condition.summary || condition.sourceOwner : reason)}</small></button>`;
   }
 
-  function componentEffectResultHtml({ ability, effect }) {
-    return `<button type="button" data-as-action="choose-component-effect" data-as-id="${effect.source.abilityId}" data-as-index="${effect.source.attrIndex}" data-as-type="${esc(effect.source.attrType)}"><b>${esc(effect.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(effect.summary || effect.sourceOwner)}</small></button>`;
+  function componentEffectResultHtml({ ability, effect, primitive, compatible = true, reason = "" }) {
+    if (primitive) {
+      return `<button type="button" data-as-action="choose-component-primitive-effect" data-as-value="${esc(primitive)}"><b>${esc(pretty(primitive))}</b><span>Configurable DO / THEN primitive</span><small>Independent effect</small></button>`;
+    }
+    return `<button type="button" data-as-action="choose-component-effect" data-as-id="${effect.source.abilityId}" data-as-index="${effect.source.attrIndex}" data-as-type="${esc(effect.source.attrType)}"${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(effect.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(compatible ? effect.summary || effect.sourceOwner : reason)}</small></button>`;
   }
 
   function renderComponentPartSearch(input, results, entry, query) {
@@ -1201,6 +1287,7 @@
     if (componentInsertTarget.kind === "condition") {
       const selected = new Set(
         targetRule.conditions
+          .filter(isRuntimeComponent)
           .map(reference => componentConditionsByKey.get(componentConditionKey(reference))?.id)
           .filter(Boolean),
       );
@@ -1209,15 +1296,34 @@
           .flatMap(ability =>
             ability.rules.flatMap(rule => rule.conditions.map(condition => ({ ability, rule, condition }))),
           )
-          .filter(({ rule, condition }) => condition.kind !== "event" || rule.hook.id === targetHook.id)
           .filter(({ condition }) => !selected.has(condition.id)),
         ({ condition }) => condition.id,
-      );
+      ).map(candidate => {
+        const observed = candidate.condition.kind === "event" && !runtimeHookSupports(targetHook, candidate.rule.hook);
+        return {
+          ...candidate,
+          condition: observed
+            ? {
+                ...candidate.condition,
+                summary: `Observed when "${candidate.rule.hook.label}" occurs, then used as an IF gate for this rule. ${candidate.condition.summary}`,
+              }
+            : candidate.condition,
+          compatible: true,
+          reason: "",
+        };
+      });
+      const primitives = primitiveCatalog.conditionKinds.map(primitive => ({ primitive }));
       if (query) {
         results.innerHTML = fanoutHtml(
           `ADD IF CONDITION · ${targetHook.label}`,
           query,
           [
+            {
+              title: "Condition primitives",
+              matches: primitives.filter(({ primitive }) =>
+                searchMatches(`${pretty(primitive)} ${primitive}`.toLowerCase(), query),
+              ),
+            },
             {
               title: "Condition names",
               matches: candidates.filter(({ condition }) =>
@@ -1241,24 +1347,48 @@
           componentConditionResultHtml,
         );
       } else {
-        const matches = candidates.slice(0, componentSearchView.partLimit);
-        results.innerHTML = `<div class="as-part-screen"><header><b>ADD IF CONDITION (${candidates.length})</b><span>Compatible with ${esc(targetHook.label)}</span></header>${matches.map(componentConditionResultHtml).join("")}${componentResultFooter("part", matches.length, candidates.length)}</div>`;
+        const matches = [...primitives, ...candidates].slice(0, componentSearchView.partLimit);
+        results.innerHTML = `<div class="as-part-screen"><header><b>ADD IF CONDITION (${primitives.length + candidates.length})</b><span>All reusable conditions; event gates can be observed across WHEN hooks</span></header>${matches.map(componentConditionResultHtml).join("")}${componentResultFooter("part", matches.length, primitives.length + candidates.length)}</div>`;
       }
     } else {
-      const selected = new Set(targetRule.effects.map(componentSourceKey));
+      const selected = new Set(targetRule.effects.filter(isRuntimeComponent).map(componentSourceKey));
       const candidates = uniqueMatches(
         componentCatalog.flatMap(ability =>
-          ability.rules
-            .filter(rule => rule.hook.id === targetHook.id)
-            .flatMap(rule => rule.effects.map(effect => ({ ability, rule, effect }))),
+          ability.rules.flatMap(rule => rule.effects.map(effect => ({ ability, rule, effect }))),
         ),
         ({ effect }) => componentSourceKey(effect.source),
-      ).filter(({ effect }) => !selected.has(componentSourceKey(effect.source)));
+      )
+        .filter(({ effect }) => !selected.has(componentSourceKey(effect.source)))
+        .map(candidate => {
+          const compatible = componentEffectSupports(targetRule, candidate.effect.source);
+          const armed = compatible && !runtimeEffectSupports(targetHook, candidate.rule.hook);
+          const persistentCapability = candidate.effect.kind === "capability";
+          return {
+            ...candidate,
+            effect: armed
+              ? {
+                  ...candidate.effect,
+                  summary: persistentCapability
+                    ? `Activated by "${targetHook.label}" for the rest of the battle. ${candidate.effect.summary}`
+                    : `Armed by "${targetHook.label}", then consumed the next time "${candidate.rule.hook.label}" occurs. ${candidate.effect.summary}`,
+                }
+              : candidate.effect,
+            compatible,
+            reason: "",
+          };
+        });
+      const primitives = primitiveCatalog.effectKinds.map(primitive => ({ primitive }));
       if (query) {
         results.innerHTML = fanoutHtml(
           `ADD DO / THEN EFFECT · ${targetHook.label}`,
           query,
           [
+            {
+              title: "Effect primitives",
+              matches: primitives.filter(({ primitive }) =>
+                searchMatches(`${pretty(primitive)} ${primitive}`.toLowerCase(), query),
+              ),
+            },
             {
               title: "Effect names",
               matches: candidates.filter(({ effect }) =>
@@ -1282,8 +1412,8 @@
           componentEffectResultHtml,
         );
       } else {
-        const matches = candidates.slice(0, componentSearchView.partLimit);
-        results.innerHTML = `<div class="as-part-screen"><header><b>ADD DO / THEN EFFECT (${candidates.length})</b><span>Compatible with ${esc(targetHook.label)}</span></header>${matches.map(componentEffectResultHtml).join("")}${componentResultFooter("part", matches.length, candidates.length)}</div>`;
+        const matches = [...primitives, ...candidates].slice(0, componentSearchView.partLimit);
+        results.innerHTML = `<div class="as-part-screen"><header><b>ADD DO / THEN EFFECT (${primitives.length + candidates.length})</b><span>All reusable effects; hook-bound actions are armed for their next native event</span></header>${matches.map(componentEffectResultHtml).join("")}${componentResultFooter("part", matches.length, primitives.length + candidates.length)}</div>`;
       }
     }
     showComponentResults(input, results, !!query);
@@ -1444,7 +1574,7 @@
         }
         prerequisiteIds.add(prerequisiteRule?.hook.id);
       }
-      const sources = [...prerequisiteHooks, rule.hook, ...rule.conditions, ...rule.effects];
+      const sources = [...prerequisiteHooks, rule.hook, ...rule.conditions, ...rule.effects].filter(isRuntimeComponent);
       if (sources.some(source => source.abilityId === entry.id)) {
         errors.push(`Component rule ${number}: cannot reference itself`);
       }
@@ -1452,18 +1582,19 @@
         errors.push(`Component rule ${number}: add at least one effect`);
       }
       for (const condition of rule.conditions) {
+        if (!isRuntimeComponent(condition)) {
+          continue;
+        }
         if (!componentConditionsByKey.has(componentConditionKey(condition))) {
           errors.push(`Component rule ${number}: IF source does not exist`);
-        } else if (condition.kind === "event" && resolveComponent(condition)?.hook.id !== hook.hook.id) {
-          errors.push(`Component rule ${number}: IF source is incompatible with ${hook.hook.label}`);
         }
       }
       for (const effect of rule.effects) {
-        const effectRule = resolveComponent(effect);
+        if (!isRuntimeComponent(effect)) {
+          continue;
+        }
         if (!componentEffectsByKey.has(componentSourceKey(effect))) {
           errors.push(`Component rule ${number}: DO source does not exist`);
-        } else if (effectRule?.hook.id !== hook.hook.id) {
-          errors.push(`Component rule ${number}: DO source is incompatible with ${hook.hook.label}`);
         }
       }
     });
@@ -1532,8 +1663,8 @@
         ...entry.mechanics.map(reference => reference.abilityId),
         ...entry.componentRules.flatMap(rule => [
           rule.hook.abilityId,
-          ...rule.conditions.map(condition => condition.abilityId),
-          ...rule.effects.map(effect => effect.abilityId),
+          ...rule.conditions.filter(isRuntimeComponent).map(condition => condition.abilityId),
+          ...rule.effects.filter(isRuntimeComponent).map(effect => effect.abilityId),
         ]),
       ].forEach(id => {
         const included = byId.get(id);
@@ -1651,8 +1782,13 @@
         entry.componentRules.every(
           rule =>
             !!resolveComponent(rule.hook)
-            && rule.conditions.every(condition => componentConditionsByKey.has(componentConditionKey(condition)))
-            && rule.effects.every(effect => componentEffectsByKey.has(componentSourceKey(effect))),
+            && rule.conditions.every(
+              condition =>
+                !isRuntimeComponent(condition) || componentConditionsByKey.has(componentConditionKey(condition)),
+            )
+            && rule.effects.every(
+              effect => !isRuntimeComponent(effect) || componentEffectsByKey.has(componentSourceKey(effect)),
+            ),
         ),
         "Component hook, IF, and DO references resolve",
       ],
@@ -1739,6 +1875,32 @@
     } else if (element.dataset.asComponentRuleField) {
       const rule = entry.componentRules[Number(element.dataset.asComponentRule)];
       rule[element.dataset.asComponentRuleField] = Number(element.value);
+    } else if (element.hasAttribute("data-as-component-condition-kind")) {
+      const rule = entry.componentRules[Number(element.dataset.asComponentRule)];
+      rule.conditions[Number(element.dataset.asComponentCondition)] = defaultCondition(element.value);
+      rerender = true;
+    } else if (element.dataset.asComponentConditionField) {
+      const condition =
+        entry.componentRules[Number(element.dataset.asComponentRule)].conditions[
+          Number(element.dataset.asComponentCondition)
+        ];
+      const field = element.dataset.asComponentConditionField;
+      if (element.value === "" && (field === "minPercent" || field === "maxPercent")) {
+        delete condition[field];
+      } else {
+        condition[field] = field === "minPercent" || field === "maxPercent" ? Number(element.value) : element.value;
+      }
+    } else if (element.hasAttribute("data-as-component-effect-kind")) {
+      const rule = entry.componentRules[Number(element.dataset.asComponentRule)];
+      rule.effects[Number(element.dataset.asComponentEffect)] = defaultEffect(element.value, "on-entry");
+      rerender = true;
+    } else if (element.dataset.asComponentEffectField) {
+      const effect =
+        entry.componentRules[Number(element.dataset.asComponentRule)].effects[
+          Number(element.dataset.asComponentEffect)
+        ];
+      const field = element.dataset.asComponentEffectField;
+      effect[field] = ["stages", "percent"].includes(field) ? Number(element.value) : element.value;
     } else if (element.dataset.asRuleField) {
       const rule = entry.rules[Number(element.dataset.asRule)];
       rule[element.dataset.asRuleField] =
@@ -1773,11 +1935,14 @@
       modifier[field] = ["amount", "multiplier"].includes(field) ? Number(element.value) : element.value;
     } else if (element.dataset.asFilter) {
       const ruleIndex = element.dataset.asRule;
+      const componentRuleIndex = element.dataset.asComponentRule;
       const modifierIndex = element.dataset.asModifier;
       const owner =
-        ruleIndex === undefined
-          ? entry.modifiers[Number(modifierIndex)]
-          : entry.rules[Number(ruleIndex)].conditions[Number(element.dataset.asCondition)];
+        componentRuleIndex === undefined
+          ? ruleIndex === undefined
+            ? entry.modifiers[Number(modifierIndex)]
+            : entry.rules[Number(ruleIndex)].conditions[Number(element.dataset.asCondition)]
+          : entry.componentRules[Number(componentRuleIndex)].conditions[Number(element.dataset.asComponentCondition)];
       owner.filter ||= {};
       updateFilter(owner.filter, element.dataset.asFilter, element.value);
     } else {
@@ -1828,7 +1993,10 @@
     }
     if (part === "condition" && studioDrag.part === "condition") {
       const condition = sourceRule.conditions[studioDrag.index];
-      const definition = condition && componentConditionsByKey.get(componentConditionKey(condition));
+      const definition =
+        condition && isRuntimeComponent(condition)
+          ? componentConditionsByKey.get(componentConditionKey(condition))
+          : undefined;
       return (
         !!condition
         && !targetRule.conditions.some(
@@ -1836,8 +2004,7 @@
             componentConditionKey(item) === componentConditionKey(condition)
             && (studioDrag.ruleIndex !== targetRuleIndex || studioDrag.index !== index),
         )
-        && (definition?.kind !== "event"
-          || resolveComponent(condition)?.hook.id === resolveComponent(targetRule.hook)?.hook.id)
+        && (!isRuntimeComponent(condition) || !!definition)
       );
     }
     if (part === "effect" && studioDrag.part === "effect") {
@@ -1849,7 +2016,7 @@
             componentSourceKey(item) === componentSourceKey(effect)
             && (studioDrag.ruleIndex !== targetRuleIndex || studioDrag.index !== index),
         )
-        && resolveComponent(effect)?.hook.id === resolveComponent(targetRule.hook)?.hook.id
+        && (!isRuntimeComponent(effect) || componentEffectSupports(targetRule, effect))
       );
     }
     return false;
@@ -2123,6 +2290,12 @@
         }
       }
       componentInsertTarget = null;
+    } else if (action === "choose-component-primitive-condition") {
+      const rule = entry.componentRules[componentInsertTarget?.ruleIndex];
+      if (rule) {
+        rule.conditions.push(defaultCondition(button.dataset.asValue));
+      }
+      componentInsertTarget = null;
     } else if (action === "choose-component-effect") {
       const rule = entry.componentRules[componentInsertTarget?.ruleIndex];
       if (rule) {
@@ -2134,6 +2307,12 @@
         if (!rule.effects.some(effect => componentSourceKey(effect) === componentSourceKey(reference))) {
           rule.effects.push(reference);
         }
+      }
+      componentInsertTarget = null;
+    } else if (action === "choose-component-primitive-effect") {
+      const rule = entry.componentRules[componentInsertTarget?.ruleIndex];
+      if (rule) {
+        rule.effects.push(defaultEffect(button.dataset.asValue, "on-entry"));
       }
       componentInsertTarget = null;
     } else if (action === "choose-component-ability") {

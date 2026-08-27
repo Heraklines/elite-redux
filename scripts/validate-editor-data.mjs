@@ -224,6 +224,7 @@ for (const ability of abilityComponents) {
       || !rule.hook?.label
       || rule.hook?.contract !== rule.hook?.id
       || !Array.isArray(rule.hook?.context)
+      || !Array.isArray(rule.hook?.effectContext)
       || !["event", "calculation"].includes(rule.hook?.mode)
       || !Array.isArray(rule.conditions)
       || !Array.isArray(rule.effects)

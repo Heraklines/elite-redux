@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { StatMultiplierAbAttr } from "#abilities/ab-attrs";
+import {
+  AbAttr,
+  PostAttackAbAttr,
+  type PostMoveInteractionAbAttrParams,
+  StatMultiplierAbAttr,
+} from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import {
@@ -16,11 +21,13 @@ import { describeAbilityStudioComponent } from "#data/elite-redux/ability-studio
 import {
   AbilityStudioPostAttackRuleAbAttr,
   AbilityStudioPostSummonRuleAbAttr,
+  AbilityStudioPostTurnRuleAbAttr,
 } from "#data/elite-redux/ability-studio/rule-ab-attrs";
 import {
   ABILITY_STUDIO_RUNTIME_CAPABILITIES,
   abilityStudioAbilityHasCapability,
   abilityStudioAbilityReferencesSource,
+  abilityStudioRuntimeComponentIsActive,
 } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS,
@@ -30,8 +37,34 @@ import {
 } from "#data/elite-redux/ability-studio/runtime-components";
 import { initEditorAuthoredAbilities } from "#data/elite-redux/init-editor-authored-abilities";
 import { AbilityId } from "#enums/ability-id";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
-import { describe, expect, it } from "vitest";
+import { GameManager } from "#test/framework/game-manager";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Phaser from "phaser";
+import { beforeAll, describe, expect, it } from "vitest";
+
+class GuardedReusableEffectAbAttr extends PostAttackAbAttr {
+  private readonly state: { allowed: boolean; checks: number; applications: number };
+
+  constructor(state: { allowed: boolean; checks: number; applications: number }) {
+    super(() => true, true);
+    this.state = state;
+  }
+
+  override canApply(_params: PostMoveInteractionAbAttrParams): boolean {
+    this.state.checks++;
+    return this.state.allowed;
+  }
+
+  override apply(_params: PostMoveInteractionAbAttrParams): void {
+    this.state.applications++;
+  }
+}
+
+class GenericRuntimeCapabilityAbAttr extends AbAttr {}
 
 const blueprint: AbilityStudioBlueprintV1 = {
   version: 1,
@@ -175,6 +208,102 @@ describe("Ability Studio", () => {
     expect(compiled.attrs[0].getCondition()).toBeNull();
   });
 
+  it("mixes configurable primitive conditions and effects with an extracted runtime trigger", () => {
+    const source = new AbBuilder(AbilityId.BLAZE, 3)
+      .attr(AbilityStudioPostAttackRuleAbAttr, blueprint.rules[0])
+      .build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "configurable-runtime-rule",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostAttackRuleAbAttr" },
+          chance: 100,
+          conditions: [{ kind: "holder-hp", maxPercent: 50 }],
+          effects: [{ kind: "stat-stage", target: "holder", stat: "SPD", stages: 2 }],
+        },
+      ],
+    };
+    expect(validateAbilityStudioBlueprints({ configurable: componentBlueprint }).errors).toEqual([]);
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    const attr = compiled.attrs[0] as AbilityStudioPostAttackRuleAbAttr;
+    const pokemon = { getHpRatio: () => 0.5, randBattleSeedInt: () => 0 };
+    expect(attr.canApply({ pokemon, simulated: true } as never)).toBe(true);
+    pokemon.getHpRatio = () => 0.75;
+    expect(attr.canApply({ pokemon, simulated: true } as never)).toBe(false);
+  });
+
+  it("reuses a holder-only effect under a different compatible trigger", () => {
+    const source = new AbBuilder(AbilityId.BLAZE, 3)
+      .attr(AbilityStudioPostAttackRuleAbAttr, blueprint.rules[0])
+      .attr(AbilityStudioPostTurnRuleAbAttr, {
+        key: "turn-speed",
+        trigger: "end-turn",
+        chance: 100,
+        conditions: [],
+        effects: [{ kind: "stat-stage", target: "holder", stat: "SPD", stages: 1 }],
+      })
+      .build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "attack-then-speed",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostAttackRuleAbAttr" },
+          chance: 100,
+          conditions: [],
+          effects: [{ abilityId: AbilityId.BLAZE, attrIndex: 1, attrType: "AbilityStudioPostTurnRuleAbAttr" }],
+        },
+      ],
+    };
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    expect(compiled.attrs).toHaveLength(1);
+    expect(compiled.attrs[0]).toBeInstanceOf(AbilityStudioPostAttackRuleAbAttr);
+  });
+
+  it("preserves an extracted effect's runtime eligibility gate", () => {
+    const state = { allowed: false, checks: 0, applications: 0 };
+    const sourceBuilder = new AbBuilder(AbilityId.BLAZE, 3).attr(AbilityStudioPostAttackRuleAbAttr, blueprint.rules[0]);
+    sourceBuilder.attrs.push(new GuardedReusableEffectAbAttr(state));
+    const source = sourceBuilder.build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "guarded-reused-effect",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostAttackRuleAbAttr" },
+          chance: 100,
+          conditions: [],
+          effects: [{ abilityId: AbilityId.BLAZE, attrIndex: 1, attrType: "GuardedReusableEffectAbAttr" }],
+        },
+      ],
+    };
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    const attr = compiled.attrs[0] as AbilityStudioPostAttackRuleAbAttr;
+    const params = { pokemon: { randBattleSeedInt: () => 0 } } as unknown as PostMoveInteractionAbAttrParams;
+    expect(attr.canApply(params)).toBe(false);
+    expect(state).toEqual({ allowed: false, checks: 1, applications: 0 });
+    state.allowed = true;
+    expect(attr.canApply(params)).toBe(true);
+    attr.apply(params);
+    expect(state).toEqual({ allowed: true, checks: 2, applications: 1 });
+  });
+
   it("requires ordered prerequisite hooks before a component rule can fire", () => {
     const source = new AbBuilder(AbilityId.BLAZE, 3)
       .attr(AbilityStudioPostSummonRuleAbAttr, {
@@ -262,10 +391,18 @@ describe("Ability Studio", () => {
     const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
       id === AbilityId.BLAZE ? source : undefined,
     );
-    expect(compiled.attrs[0].canApply({ pokemon: {}, simulated: true } as never)).toBe(true);
+    expect(
+      compiled.attrs[0].canApply({
+        pokemon: {},
+        simulated: true,
+        move: {},
+        stat: Stat.ATK,
+        statVal: { value: 1 },
+      } as never),
+    ).toBe(true);
   });
 
-  it("rejects an effect from an incompatible runtime hook", () => {
+  it("arms an effect across different runtime hooks", () => {
     const source = new AbBuilder(AbilityId.BLAZE, 3)
       .attr(StatMultiplierAbAttr, Stat.ATK, 1.1)
       .attr(AbilityStudioPostAttackRuleAbAttr, blueprint.rules[0])
@@ -277,7 +414,7 @@ describe("Ability Studio", () => {
       rules: [],
       componentRules: [
         {
-          key: "invalid-hook",
+          key: "cross-hook",
           hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "StatMultiplierAbAttr" },
           chance: 100,
           conditions: [],
@@ -285,9 +422,58 @@ describe("Ability Studio", () => {
         },
       ],
     };
-    expect(() =>
-      compileAbilityStudioBlueprint(componentBlueprint, id => (id === AbilityId.BLAZE ? source : undefined)),
-    ).toThrow("is incompatible with hook StatMultiplierAbAttr");
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    expect(compiled.attrs).toHaveLength(2);
+    const pokemon = { battleData: {} };
+    expect(compiled.attrs[1].getCondition()?.(pokemon as never)).toBe(false);
+    compiled.attrs[0].apply({ pokemon, simulated: false } as never);
+    expect(compiled.attrs[1].getCondition()?.(pokemon as never)).toBe(true);
+  });
+
+  it("observes an event IF gate across different runtime hooks", () => {
+    const state = { allowed: true, checks: 0, applications: 0 };
+    const sourceBuilder = new AbBuilder(AbilityId.BLAZE, 3).attr(AbilityStudioPostSummonRuleAbAttr, {
+      key: "entry",
+      trigger: "on-entry",
+      chance: 100,
+      conditions: [],
+      effects: [{ kind: "stat-stage", target: "holder", stat: "ATK", stages: 1 }],
+    });
+    sourceBuilder.attrs.push(new GuardedReusableEffectAbAttr(state));
+    const source = sourceBuilder.build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "observed-gate",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostSummonRuleAbAttr" },
+          chance: 100,
+          conditions: [
+            {
+              abilityId: AbilityId.BLAZE,
+              attrIndex: 1,
+              attrType: "GuardedReusableEffectAbAttr",
+              kind: "event",
+            },
+          ],
+          effects: [{ kind: "stat-stage", target: "holder", stat: "SPD", stages: 1 }],
+        },
+      ],
+    };
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    expect(compiled.attrs).toHaveLength(2);
+    const params = { pokemon: { battleData: {}, randBattleSeedInt: () => 0 }, simulated: false };
+    expect(compiled.attrs[1].canApply(params as never)).toBe(false);
+    expect(compiled.attrs[0].canApply(params as never)).toBe(true);
+    compiled.attrs[0].apply(params as never);
+    expect(compiled.attrs[1].canApply(params as never)).toBe(true);
   });
 
   it("compiles a direct runtime capability as an independently reusable component", () => {
@@ -332,6 +518,100 @@ describe("Ability Studio", () => {
     expect(abilityStudioAbilityHasCapability(compiled, ABILITY_STUDIO_RUNTIME_CAPABILITIES.CHLOROPLAST_SUN_MOVES)).toBe(
       true,
     );
+  });
+
+  it("activates a direct runtime capability from another hook", () => {
+    const source = new AbBuilder(AbilityId.BLAZE, 3)
+      .attr(AbilityStudioPostSummonRuleAbAttr, {
+        key: "entry",
+        trigger: "on-entry",
+        chance: 100,
+        conditions: [],
+        effects: [{ kind: "stat-stage", target: "holder", stat: "ATK", stages: 1 }],
+      })
+      .attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.CHLOROPLAST_SUN_MOVES,
+        "Make sun-sensitive moves act as if used in sun",
+        "sun-sensitive-move-calculation",
+        "When using a sun-sensitive move",
+      )
+      .build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "activate-sun-sensitive-moves",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostSummonRuleAbAttr" },
+          chance: 100,
+          conditions: [],
+          effects: [
+            {
+              abilityId: AbilityId.BLAZE,
+              attrIndex: 1,
+              attrType: "AbilityStudioRuntimeCapabilityAbAttr",
+            },
+          ],
+        },
+      ],
+    };
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    const pokemon = { battleData: {} };
+    expect(
+      abilityStudioAbilityHasCapability(
+        compiled,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.CHLOROPLAST_SUN_MOVES,
+        pokemon as never,
+      ),
+    ).toBe(false);
+    compiled.attrs[0].apply({ pokemon, simulated: false } as never);
+    expect(
+      abilityStudioAbilityHasCapability(
+        compiled,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.CHLOROPLAST_SUN_MOVES,
+        pokemon as never,
+      ),
+    ).toBe(true);
+  });
+
+  it("activates any direct runtime package from another hook", () => {
+    const source = new AbBuilder(AbilityId.BLAZE, 3)
+      .attr(AbilityStudioPostSummonRuleAbAttr, {
+        key: "entry",
+        trigger: "on-entry",
+        chance: 100,
+        conditions: [],
+        effects: [{ kind: "stat-stage", target: "holder", stat: "ATK", stages: 1 }],
+      })
+      .attr(GenericRuntimeCapabilityAbAttr)
+      .build();
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        {
+          key: "activate-generic-package",
+          hook: { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "AbilityStudioPostSummonRuleAbAttr" },
+          chance: 100,
+          conditions: [],
+          effects: [{ abilityId: AbilityId.BLAZE, attrIndex: 1, attrType: "GenericRuntimeCapabilityAbAttr" }],
+        },
+      ],
+    };
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    const pokemon = { battleData: {} };
+    expect(abilityStudioRuntimeComponentIsActive(compiled.attrs[1], pokemon as never)).toBe(false);
+    compiled.attrs[0].apply({ pokemon, simulated: false } as never);
+    expect(abilityStudioRuntimeComponentIsActive(compiled.attrs[1], pokemon as never)).toBe(true);
   });
 
   it("exposes direct source-ability checks as an independently reusable component", () => {
@@ -397,5 +677,52 @@ describe("Ability Studio", () => {
         mutableAbilities[blueprint.id] = existing;
       }
     }
+  });
+
+  describe("JSON-authored combat composition", () => {
+    let phaserGame: Phaser.Game;
+
+    beforeAll(() => {
+      phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    });
+
+    it("runs a cross-hook composition through a real battle", async () => {
+      const fixture = JSON.parse(
+        readFileSync(resolve(process.cwd(), "test/fixtures/elite-redux/ability-studio/entry-momentum.json"), "utf8"),
+      ) as unknown;
+      const validation = validateAbilityStudioBlueprints({ "entry-momentum": fixture });
+      expect(validation.errors).toEqual([]);
+      const authored = validation.blueprints["entry-momentum"];
+      const compiled = compileAbilityStudioBlueprint(authored, id => allAbilities[id]);
+      const mutableAbilities = allAbilities as Ability[];
+      const existing = allAbilities[authored.id];
+      mutableAbilities[authored.id] = compiled;
+
+      try {
+        const game = new GameManager(phaserGame);
+        game.override
+          .battleStyle("single")
+          .ability(authored.id as AbilityId)
+          .moveset(MoveId.SPLASH)
+          .enemySpecies(SpeciesId.SHUCKLE)
+          .enemyAbility(AbilityId.BALL_FETCH)
+          .enemyMoveset(MoveId.SPLASH);
+        await game.classicMode.startBattle(SpeciesId.FEEBAS);
+
+        const player = game.field.getPlayerPokemon();
+        expect(player.getAbility().name).toBe("Entry Momentum");
+        expect(player.getStatStage(Stat.SPD)).toBe(1);
+
+        game.move.select(MoveId.SPLASH);
+        await game.toNextTurn();
+        expect(player.getStatStage(Stat.SPD)).toBe(1);
+      } finally {
+        if (existing === undefined) {
+          delete mutableAbilities[authored.id];
+        } else {
+          mutableAbilities[authored.id] = existing;
+        }
+      }
+    });
   });
 });

@@ -1,5 +1,6 @@
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
+import { abilityStudioRuntimeComponentIsActive } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   canApplyErEndlessAvalancheTrigger,
   recordErEndlessAvalancheTrigger,
@@ -106,7 +107,7 @@ function applySingleAbAttrs<T extends AbAttrString>(
   if (passive && ability.id === pokemon.getAbility().id) {
     return;
   }
-  const attrs = ability.getAttrs(attrType);
+  const attrs = ability.getAttrs(attrType).filter(attr => abilityStudioRuntimeComponentIsActive(attr, pokemon));
 
   for (const attr of attrs) {
     if (!attrFilter(attr)) {

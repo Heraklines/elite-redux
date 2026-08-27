@@ -62,7 +62,10 @@ function matchesStatus(pokemon: Pokemon | undefined, status: string): boolean {
   return pokemon.status?.effect === StatusEffect[status as keyof typeof StatusEffect];
 }
 
-function matchesCondition(condition: AbilityStudioCondition, context: AbilityStudioRuleContext): boolean {
+export function matchesAbilityStudioCondition(
+  condition: AbilityStudioCondition,
+  context: AbilityStudioRuleContext,
+): boolean {
   switch (condition.kind) {
     case "holder-hp": {
       const percent = context.holder.getHpRatio(true) * 100;
@@ -74,7 +77,10 @@ function matchesCondition(condition: AbilityStudioCondition, context: AbilityStu
     case "holder-status":
       return matchesStatus(context.holder, condition.status);
     case "other-status":
-      return matchesStatus(context.other, condition.status);
+      return matchesStatus(
+        context.other ?? context.holder.getOpponents().find(pokemon => !pokemon.isFainted()),
+        condition.status,
+      );
     case "weather":
       return globalScene.arena.weatherType === WeatherType[condition.weather];
     case "terrain":
@@ -87,19 +93,22 @@ function matchesCondition(condition: AbilityStudioCondition, context: AbilityStu
   }
 }
 
-function applyRuleEffects(rule: AbilityStudioRule, context: AbilityStudioRuleContext): void {
+export function applyAbilityStudioEffects(
+  effects: AbilityStudioRule["effects"],
+  context: AbilityStudioRuleContext,
+): void {
   if (context.simulated) {
     return;
   }
-  globalScene.phaseManager.unshiftNew("AbilityStudioRuleEffectPhase", rule.effects, context);
+  globalScene.phaseManager.unshiftNew("AbilityStudioRuleEffectPhase", effects, context);
 }
 
 function canApplyRule(rule: AbilityStudioRule, context: AbilityStudioRuleContext): boolean {
   return (
     (rule.conditions.length === 0
       || (rule.conditionLogic === "any"
-        ? rule.conditions.some(condition => matchesCondition(condition, context))
-        : rule.conditions.every(condition => matchesCondition(condition, context))))
+        ? rule.conditions.some(condition => matchesAbilityStudioCondition(condition, context))
+        : rule.conditions.every(condition => matchesAbilityStudioCondition(condition, context))))
     && (context.simulated || rule.chance >= 100 || context.holder.randBattleSeedInt(100) < rule.chance)
   );
 }
@@ -114,7 +123,7 @@ export class AbilityStudioPostSummonRuleAbAttr extends PostSummonAbAttr {
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    applyRuleEffects(this.rule, { holder: pokemon, simulated: !!simulated });
+    applyAbilityStudioEffects(this.rule.effects, { holder: pokemon, simulated: !!simulated });
   }
 }
 
@@ -137,7 +146,7 @@ export class AbilityStudioPostAttackRuleAbAttr extends PostAttackAbAttr {
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
-    applyRuleEffects(this.rule, {
+    applyAbilityStudioEffects(this.rule.effects, {
       holder: params.pokemon,
       other: params.opponent,
       move: params.move,
@@ -167,7 +176,7 @@ export class AbilityStudioPostDefendRuleAbAttr extends PostDefendAbAttr {
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
-    applyRuleEffects(this.rule, {
+    applyAbilityStudioEffects(this.rule.effects, {
       holder: params.pokemon,
       other: params.opponent,
       move: params.move,
@@ -195,7 +204,7 @@ export class AbilityStudioPostKnockOutRuleAbAttr extends PostKnockOutAbAttr {
   }
 
   override apply(params: PostKnockOutAbAttrParams): void {
-    applyRuleEffects(this.rule, {
+    applyAbilityStudioEffects(this.rule.effects, {
       holder: params.pokemon,
       other: params.victim,
       simulated: !!params.simulated,
@@ -213,7 +222,7 @@ export class AbilityStudioPostTurnRuleAbAttr extends PostTurnAbAttr {
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    applyRuleEffects(this.rule, { holder: pokemon, simulated: !!simulated });
+    applyAbilityStudioEffects(this.rule.effects, { holder: pokemon, simulated: !!simulated });
   }
 }
 
@@ -233,7 +242,7 @@ export class AbilityStudioPostFaintRuleAbAttr extends PostFaintAbAttr {
   }
 
   override apply(params: PostFaintAbAttrParams): void {
-    applyRuleEffects(this.rule, {
+    applyAbilityStudioEffects(this.rule.effects, {
       holder: params.pokemon,
       other: params.attacker,
       move: params.move,

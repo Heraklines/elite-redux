@@ -108,6 +108,7 @@ import {
   type AbilityStudioRuntimeCapability,
   abilityStudioAbilityHasCapability,
   abilityStudioAbilityReferencesSource,
+  abilityStudioRuntimeComponentIsActive,
 } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   isAbilityIdSuppressed,
@@ -3349,7 +3350,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public getAbilityAttrs<T extends AbAttrString>(attrType: T, canApply = true, ignoreOverride = false): AbAttrMap[T][] {
     const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
-    return sources.flatMap(source => source.ability.getAttrs(attrType));
+    return sources.flatMap(source =>
+      source.ability.getAttrs(attrType).filter(attr => abilityStudioRuntimeComponentIsActive(attr, this)),
+    );
   }
 
   /**
@@ -3365,7 +3368,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Dragon moves hit Fairies. All such sites must route through this.
    */
   public getAllActiveAbilityAttrs(): readonly AbAttrMap[AbAttrString][] {
-    return this.getActiveAbilitySources().flatMap(source => source.ability.attrs);
+    return this.getActiveAbilitySources().flatMap(source =>
+      source.ability.attrs.filter(attr => abilityStudioRuntimeComponentIsActive(attr, this)),
+    );
   }
 
   public isEndlessAvalancheAbility(abilityId: AbilityId): boolean {
@@ -3602,7 +3607,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (ability.id === AbilityId.STANCE_CHANGE) {
       return true;
     }
-    return Pokemon.FORM_CHANGE_DRIVER_ATTRS.some(attr => ability.hasAttr(attr));
+    return Pokemon.FORM_CHANGE_DRIVER_ATTRS.some(attr =>
+      ability.getAttrs(attr).some(component => abilityStudioRuntimeComponentIsActive(component, this)),
+    );
   }
 
   /**
@@ -3739,7 +3746,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         }
       }
     }
-    if (this.isFusion() && ability.hasAttr("NoFusionAbilityAbAttr")) {
+    if (
+      this.isFusion()
+      && ability.getAttrs("NoFusionAbilityAbAttr").some(attr => abilityStudioRuntimeComponentIsActive(attr, this))
+    ) {
       return false;
     }
     // Suppression / transformation checks are ignored during moveset generation
@@ -3771,7 +3781,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ) {
       return false;
     }
-    if (this.isTransformed() && ability.hasAttr("NoTransformAbilityAbAttr")) {
+    if (
+      this.isTransformed()
+      && ability.getAttrs("NoTransformAbilityAbAttr").some(attr => abilityStudioRuntimeComponentIsActive(attr, this))
+    ) {
       return false;
     }
     const arena = globalScene?.arena;
@@ -3782,9 +3795,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
     const suppressAbilitiesTag = arena.getTag(ArenaTagType.NEUTRALIZING_GAS) as SuppressAbilitiesTag;
-    const suppressOffField = ability.hasAttr("PreSummonAbAttr");
+    const suppressOffField = ability
+      .getAttrs("PreSummonAbAttr")
+      .some(attr => abilityStudioRuntimeComponentIsActive(attr, this));
     if ((this.isOnField() || suppressOffField) && suppressAbilitiesTag && !suppressAbilitiesTag.beingRemoved) {
-      const thisAbilitySuppressing = ability.hasAttr("PreLeaveFieldRemoveSuppressAbilitiesSourceAbAttr");
+      const thisAbilitySuppressing = ability
+        .getAttrs("PreLeaveFieldRemoveSuppressAbilitiesSourceAbAttr")
+        .some(attr => abilityStudioRuntimeComponentIsActive(attr, this));
       const hasSuppressingAbility = this.hasAbilityWithAttr("PreLeaveFieldRemoveSuppressAbilitiesSourceAbAttr", false);
       // Neutralizing gas is up - suppress abilities unless they are unsuppressable or this pokemon is responsible for the gas
       // (Balance decided that the other ability of a neutralizing gas pokemon should not be neutralized)
@@ -3831,7 +3848,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public hasAbility(ability: AbilityId, canApply = true, ignoreOverride = false): boolean {
     const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
     return sources.some(
-      source => source.ability.id === ability || abilityStudioAbilityReferencesSource(source.ability, ability),
+      source => source.ability.id === ability || abilityStudioAbilityReferencesSource(source.ability, ability, this),
     );
   }
 
@@ -3841,7 +3858,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ignoreOverride = false,
   ): boolean {
     const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
-    return sources.some(source => abilityStudioAbilityHasCapability(source.ability, capability));
+    return sources.some(source => abilityStudioAbilityHasCapability(source.ability, capability, this));
   }
 
   /**
@@ -3901,7 +3918,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public hasAbilityWithAttr(attrType: AbAttrString, canApply = true, ignoreOverride = false): boolean {
     const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
-    return sources.some(source => source.ability.hasAttr(attrType));
+    return sources.some(source =>
+      source.ability.getAttrs(attrType).some(attr => abilityStudioRuntimeComponentIsActive(attr, this)),
+    );
   }
 
   /**
@@ -3913,7 +3932,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   private hasActiveMentalPollution(): boolean {
     const source = this.collectAbilitySources(false, false).find(candidate =>
-      candidate.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
+      candidate.ability
+        .getAttrs("SuppressFieldAbilitiesWhenEnragedAbAttr")
+        .some(attr => abilityStudioRuntimeComponentIsActive(attr, this)),
     );
     return source
       ? this.canApplyAbilitySource(source.ability, source.passive, source.passiveSlot ?? 0, false, true)
@@ -8813,7 +8834,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const source = donor
         .getActiveAbilitySources()
         .find(entry =>
-          abilityStudioAbilityHasCapability(entry.ability, ABILITY_STUDIO_RUNTIME_CAPABILITIES.SYMBIOSIS_ITEM_TRANSFER),
+          abilityStudioAbilityHasCapability(
+            entry.ability,
+            ABILITY_STUDIO_RUNTIME_CAPABILITIES.SYMBIOSIS_ITEM_TRANSFER,
+            donor,
+          ),
         );
       if (!source) {
         continue;

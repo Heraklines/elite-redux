@@ -1,4 +1,5 @@
 import type { Ability } from "#abilities/ability";
+import type { Pokemon } from "#field/pokemon";
 
 export const ABILITY_STUDIO_RUNTIME_CAPABILITIES = {
   ACCELERATE_CHARGE_SKIP: "accelerate-charge-skip",
@@ -25,15 +26,46 @@ export const ABILITY_STUDIO_RUNTIME_CAPABILITIES = {
 export type AbilityStudioRuntimeCapability =
   (typeof ABILITY_STUDIO_RUNTIME_CAPABILITIES)[keyof typeof ABILITY_STUDIO_RUNTIME_CAPABILITIES];
 
+const runtimeComponentActivations = new WeakMap<object, WeakSet<object>>();
+
+export function restrictAbilityStudioRuntimeComponent(attr: object): void {
+  runtimeComponentActivations.set(attr, new WeakSet<object>());
+}
+
+export function activateAbilityStudioRuntimeComponent(attr: object, pokemon: Pokemon): void {
+  runtimeComponentActivations.get(attr)?.add(pokemon.battleData);
+}
+
+export function abilityStudioRuntimeComponentIsActive(attr: object, pokemon?: Pokemon): boolean {
+  const activations = runtimeComponentActivations.get(attr);
+  if (activations !== undefined && (pokemon === undefined || !activations.has(pokemon.battleData))) {
+    return false;
+  }
+  return !("isActiveFor" in attr) || (typeof attr.isActiveFor === "function" && attr.isActiveFor(pokemon) === true);
+}
+
 export function abilityStudioAbilityHasCapability(
   ability: Ability,
   capability: AbilityStudioRuntimeCapability,
+  pokemon?: Pokemon,
 ): boolean {
-  return ability.attrs.some(attr => "abilityStudioCapability" in attr && attr.abilityStudioCapability === capability);
+  return ability.attrs.some(
+    attr =>
+      "abilityStudioCapability" in attr
+      && attr.abilityStudioCapability === capability
+      && abilityStudioRuntimeComponentIsActive(attr, pokemon),
+  );
 }
 
-export function abilityStudioAbilityReferencesSource(ability: Ability, sourceAbilityId: number): boolean {
+export function abilityStudioAbilityReferencesSource(
+  ability: Ability,
+  sourceAbilityId: number,
+  pokemon?: Pokemon,
+): boolean {
   return ability.attrs.some(
-    attr => "abilityStudioSourceAbilityId" in attr && attr.abilityStudioSourceAbilityId === sourceAbilityId,
+    attr =>
+      "abilityStudioSourceAbilityId" in attr
+      && attr.abilityStudioSourceAbilityId === sourceAbilityId
+      && abilityStudioRuntimeComponentIsActive(attr, pokemon),
   );
 }

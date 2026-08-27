@@ -132,8 +132,8 @@ export function compileAbilityStudioBlueprint(
     (blueprint.componentRules ?? []).flatMap(rule => [
       ...(rule.prerequisiteHooks ?? []).map(hook => hook.abilityId),
       rule.hook.abilityId,
-      ...rule.conditions.map(condition => condition.abilityId),
-      ...rule.effects.map(effect => effect.abilityId),
+      ...rule.conditions.flatMap(condition => ("abilityId" in condition ? [condition.abilityId] : [])),
+      ...rule.effects.flatMap(effect => ("abilityId" in effect ? [effect.abilityId] : [])),
     ]),
   );
   const componentAbilities = [...componentAbilityIds].map(id => {

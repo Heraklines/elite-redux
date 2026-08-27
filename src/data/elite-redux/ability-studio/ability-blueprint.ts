@@ -508,14 +508,24 @@ function validateRuntimeComponentRule(
   if (!Array.isArray(value.conditions) || value.conditions.length > 16) {
     errors.push(`${path}.conditions must contain at most 16 entries`);
   } else {
-    value.conditions.forEach((condition, index) =>
-      validateRuntimeConditionReference(condition, `${path}.conditions[${index}]`, errors),
-    );
+    value.conditions.forEach((condition, index) => {
+      if (isObject(condition) && "abilityId" in condition) {
+        validateRuntimeConditionReference(condition, `${path}.conditions[${index}]`, errors);
+      } else {
+        validateCondition(condition, `${path}.conditions[${index}]`, errors);
+      }
+    });
   }
   if (!Array.isArray(value.effects) || value.effects.length === 0 || value.effects.length > 8) {
     errors.push(`${path}.effects must contain 1-8 entries`);
   } else {
-    value.effects.forEach((effect, index) => validateRuntimeSource(effect, `${path}.effects[${index}]`, errors));
+    value.effects.forEach((effect, index) => {
+      if (isObject(effect) && "abilityId" in effect) {
+        validateRuntimeSource(effect, `${path}.effects[${index}]`, errors);
+      } else {
+        validateEffect(effect, `${path}.effects[${index}]`, "after-attack", errors);
+      }
+    });
   }
   return errors.length === 0;
 }
@@ -599,7 +609,7 @@ function validateBlueprint(value: unknown, path: string, errors: string[]): valu
             ...(Array.isArray(rule.effects) ? rule.effects : []),
           ]
         : [];
-      if (sources.some(source => isObject(source) && source.abilityId === value.id)) {
+      if (sources.some(source => isObject(source) && "abilityId" in source && source.abilityId === value.id)) {
         errors.push(`${path}.componentRules cannot reference the same ability`);
       }
     });

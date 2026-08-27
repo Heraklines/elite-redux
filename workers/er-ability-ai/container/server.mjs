@@ -120,8 +120,17 @@ const outputSchema = {
               hook: sourceSchema,
               chance: { type: "number", minimum: 1, maximum: 100 },
               conditionLogic: { type: "string", enum: ["all", "any"] },
-              conditions: { type: "array", items: conditionReferenceSchema, maxItems: 16 },
-              effects: { type: "array", items: sourceSchema, minItems: 1, maxItems: 8 },
+              conditions: {
+                type: "array",
+                items: { anyOf: [conditionReferenceSchema, simpleConditionSchema] },
+                maxItems: 16,
+              },
+              effects: {
+                type: "array",
+                items: { anyOf: [sourceSchema, simpleEffectSchema] },
+                minItems: 1,
+                maxItems: 8,
+              },
             },
             required: ["key", "prerequisiteHooks", "hook", "chance", "conditionLogic", "conditions", "effects"],
             additionalProperties: false,
@@ -370,17 +379,20 @@ function sourceKey(source) {
 
 function validateSources(result, payload) {
   const abilityIds = new Set((payload.abilityIndex || []).map(ability => Number(ability.id)));
-  const hooks = new Set();
-  const conditions = new Set();
-  const effects = new Set();
+  const hooks = new Map();
+  const conditions = new Map();
+  const effects = new Map();
   for (const ability of payload.componentCandidates || []) {
     for (const rule of ability.rules || []) {
-      hooks.add(sourceKey(rule.source));
+      hooks.set(sourceKey(rule.source), rule.hook);
       for (const condition of rule.conditions || []) {
-        conditions.add(`${sourceKey(condition.source)}:${condition.kind}:${condition.source.conditionIndex ?? ""}`);
+        conditions.set(`${sourceKey(condition.source)}:${condition.kind}:${condition.source.conditionIndex ?? ""}`, {
+          condition,
+          hook: rule.hook,
+        });
       }
       for (const effect of rule.effects || []) {
-        effects.add(sourceKey(effect.source));
+        effects.set(sourceKey(effect.source), { effect, hook: rule.hook });
       }
     }
   }
@@ -397,13 +409,21 @@ function validateSources(result, payload) {
       }
     }
     for (const condition of rule.conditions || []) {
+      if (!Number.isInteger(condition.abilityId)) {
+        continue;
+      }
       const key = `${sourceKey(condition)}:${condition.kind}:${condition.conditionIndex ?? ""}`;
-      if (!conditions.has(key)) {
+      const candidate = conditions.get(key);
+      if (!candidate) {
         throw new Error(`The model referenced an unavailable IF component (${key})`);
       }
     }
     for (const effect of rule.effects || []) {
-      if (!effects.has(sourceKey(effect))) {
+      if (!Number.isInteger(effect.abilityId)) {
+        continue;
+      }
+      const candidate = effects.get(sourceKey(effect));
+      if (!candidate) {
         throw new Error(`The model referenced an unavailable DO component (${sourceKey(effect)})`);
       }
     }
@@ -411,7 +431,7 @@ function validateSources(result, payload) {
 }
 
 function modelPrompt(payload) {
-  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Prefer componentRules when a supplied runtime component expresses the requested behavior exactly. Use includes only when the user explicitly wants the whole existing ability. Use simple rules and modifiers only from the primitive catalog. Every component source object must be copied exactly from componentCandidates. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
+  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Every runtime component source object must be copied exactly from componentCandidates. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
 }
 
 async function runCodex(payload, emit) {

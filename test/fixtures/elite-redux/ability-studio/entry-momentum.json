@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "id": 20002,
+  "name": "Entry Momentum",
+  "description": "Entering battle immediately raises Speed once.",
+  "generation": 9,
+  "includes": [],
+  "modifiers": [],
+  "rules": [],
+  "componentRules": [
+    {
+      "key": "entry-raises-speed",
+      "hook": {
+        "abilityId": 22,
+        "attrIndex": 0,
+        "attrType": "PostSummonStatStageChangeAbAttr"
+      },
+      "chance": 100,
+      "conditions": [],
+      "effects": [
+        {
+          "abilityId": 3,
+          "attrIndex": 0,
+          "attrType": "SpeedBoostAbAttr"
+        }
+      ]
+    }
+  ]
+}

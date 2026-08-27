@@ -26,6 +26,8 @@ import {
   abilityStudioRuntimeCapabilityHookLabel,
   abilityStudioRuntimeClassChain,
   abilityStudioRuntimeConfiguration,
+  abilityStudioRuntimeEffectHookContext,
+  abilityStudioRuntimeHookContext,
   abilityStudioRuntimeHookId,
   abilityStudioRuntimeMethodOwner,
   compileAbilityStudioRuntimeComponentRule,
@@ -126,46 +128,6 @@ function mechanicHook(
     label: `During ${mechanicLabel(chain[0])}`,
     mode: "calculation",
   };
-}
-
-const COMPONENT_HOOK_CONTEXTS: Readonly<Record<string, readonly string[]>> = {
-  PostBattleInitAbAttr: ["holder", "battle initialization"],
-  PreDefendAbAttr: ["holder", "attacker", "move", "incoming damage", "simulation state"],
-  PostDefendAbAttr: ["holder", "attacker", "move", "damage dealt", "hit result", "simulation state"],
-  PostStatStageChangeAbAttr: ["holder", "changed stats", "stage delta", "source", "simulation state"],
-  PostAllyStatStageChangeAbAttr: ["holder", "ally", "changed stats", "stage delta", "simulation state"],
-  PreAttackAbAttr: ["holder", "target", "move", "move calculation", "simulation state"],
-  PostAttackAbAttr: ["holder", "target", "move", "damage dealt", "hit result", "simulation state"],
-  PostSetStatusAbAttr: ["holder", "status", "source", "simulation state"],
-  PostVictoryAbAttr: ["holder", "defeated Pokemon", "simulation state"],
-  PostKnockOutAbAttr: ["holder", "defeated Pokemon", "simulation state"],
-  PostSummonAbAttr: ["holder", "entry state", "simulation state"],
-  PreSwitchOutAbAttr: ["holder", "switch state", "simulation state"],
-  PreLeaveFieldAbAttr: ["holder", "field-leave state", "simulation state"],
-  PreStatStageChangeAbAttr: ["holder", "changed stats", "stage delta", "source", "cancellation state"],
-  PreSetStatusAbAttr: ["holder", "status", "source", "cancellation state"],
-  PreApplyBattlerTagAbAttr: ["holder", "volatile effect", "source", "cancellation state"],
-  PostWakeUpAbAttr: ["holder", "wake-up state"],
-  PreWeatherDamageAbAttr: ["holder", "weather", "cancellation state"],
-  PreWeatherEffectAbAttr: ["holder", "weather", "cancellation state"],
-  PostWeatherChangeAbAttr: ["holder", "weather", "simulation state"],
-  PostWeatherLapseAbAttr: ["holder", "weather", "simulation state"],
-  PostTerrainChangeAbAttr: ["holder", "terrain", "simulation state"],
-  PostTurnAbAttr: ["holder", "turn-end state", "simulation state"],
-  PostBiomeChangeAbAttr: ["holder", "biome", "simulation state"],
-  PostMoveUsedAbAttr: ["holder", "move user", "move", "targets", "simulation state"],
-  PostItemLostAbAttr: ["holder", "opponent", "lost-item state"],
-  PostBattleAbAttr: ["holder", "victory state"],
-  PostFaintAbAttr: ["holder", "attacker", "move", "simulation state"],
-  PreSummonAbAttr: ["holder", "pre-entry state"],
-  RedirectMoveAbAttr: ["holder", "move user", "move", "targets", "redirection state"],
-  FlinchEffectAbAttr: ["holder", "flinch state", "simulation state"],
-  CancelInteractionAbAttr: ["holder", "cancellation state"],
-  "source-ability-runtime-check": ["holder", "direct engine check"],
-};
-
-function componentHookContext(hookId: string): readonly string[] {
-  return COMPONENT_HOOK_CONTEXTS[hookId] ?? ["holder", "runtime calculation value"];
 }
 
 function componentConditionKind(value: string): "ability" | "holder" | "event" {
@@ -620,7 +582,8 @@ describe("tools — dump editor SPA data", () => {
             hook: {
               ...hook,
               contract: hook.id,
-              context: componentHookContext(hook.id),
+              context: abilityStudioRuntimeHookContext(hook.id),
+              effectContext: abilityStudioRuntimeEffectHookContext(hook.id),
               source,
             },
             conditions,
@@ -678,6 +641,7 @@ describe("tools — dump editor SPA data", () => {
           || !Array.isArray(rule.parameters)
           || rule.hook.contract !== rule.hook.id
           || !Array.isArray(rule.hook.context)
+          || !Array.isArray(rule.hook.effectContext)
           || rule.conditions.some(condition => !condition.summary)
           || rule.effects.some(effect => !effect.summary),
       ),
