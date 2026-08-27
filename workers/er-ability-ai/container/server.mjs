@@ -1194,7 +1194,10 @@ async function runNimModel(model, body, payload) {
     throw new Error("The backup model timed out");
   }
   if (!response.ok) {
-    throw new Error(`The ability builder could not complete the request (${response.status})`);
+    const providerError = (await response.text().catch(() => "")).replace(/\s+/g, " ").trim().slice(0, 1000);
+    throw new Error(
+      `The ability builder could not complete the request (${response.status})${providerError ? `: ${providerError}` : ""}`,
+    );
   }
   const resultBody = await response.json();
   const content = messageContentText(resultBody?.choices?.[0]?.message?.content).replace(
@@ -1236,6 +1239,7 @@ async function runNim(payload, emit) {
     try {
       return await runNimModel(model, body, payload);
     } catch (error) {
+      console.error(JSON.stringify({ event: "ability-model-failed", model, message: error.message || String(error) }));
       lastError = error;
     }
   }
