@@ -1,0 +1,36 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:c873610767f340d8329340112a2e052bf8db548f:run-33085997386.1
+url:      https://elite-redux-staging.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0
+platform: Win32
+screen:   2560x1440 @1x  devmem:?
+boot:     boot-start@0ms -> loading-complete@8385ms -> title-shown@13333ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     B0jFrI4ZN1nWaBogzgf6G95i
+party:    
+
+----- DESCRIPTION -----
+amarkov - Wave 85, Ghost fight causing complete game freeze wont progress
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:c873610767f340d8329340112a2e052bf8db548f:run-33085997386.1","source":"github","sha":"c873610767f340d8329340112a2e052bf8db548f","workflow":{"provider":"github-actions","runId":"33085997386","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[17:25:13.042] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:25:13.645] LOG: [ER] build {"version":1,"id":"github:c873610767f340d8329340112a2e052bf8db548f:run-33085997386.1","source":"github","sha":"c873610767f340d8329340112a2e052bf8db548f","workflow":{"provider":"github-actions","runId":"33085997386","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[17:25:13.676] LOG: [dev-tools] loaded — 12 picker scenarios + Send Logs button
+[17:25:20.568] DEBUG: Destroying loading scene
+[17:25:20.568] DEBUG: Destroyed loading scene
+[17:25:20.808] LOG: Seed: B0jFrI4ZN1nWaBogzgf6G95i
+[17:25:20.808] LOG: Wave Seed: B0jFrI4ZN1nWaBogzgf6G95i 0
+[17:25:22.797] LOG: %cStart Phase LoginPhase color:green;
+[17:25:23.456] LOG: Client Session: 20PC1ZkSavFhWgNbtDpTldVdsgHzIa7G
+[17:25:25.420] DEBUG: Using cached system data
+[17:25:25.504] LOG: %cStart Phase TitlePhase color:green;
+[17:25:25.505] LOG: Getting Session Slot id: %d 1
+[17:25:25.925] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
