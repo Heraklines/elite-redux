@@ -553,25 +553,24 @@ mod tests {
     };
 
     #[test]
-    fn replica_proposal_effect_contains_canonical_typed_action_bytes()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let operation_id = OperationId::new("m7/test/proposal")?;
+    fn replica_proposal_effect_contains_canonical_typed_action_bytes() {
+        let operation_id = OperationId::new("m7/test/proposal").expect("operation");
         let intent = GameControlIntentV2::Selected {
             kind: GameControlKindV2::Reward,
-            option: MenuOptionId::new("reward/first")?,
+            option: MenuOptionId::new("reward/first").expect("option"),
             action: GameActionV1::ExecuteRunProgram {
-                program: RunProgramId::new(SafeU53::new(1)?),
+                program: RunProgramId::new(SafeU53::new(1).expect("program")),
                 hook: RunHook::RewardSelected,
                 context: RunExecutionContextV2::default(),
             },
             context: GameActionContextV1 {
                 operation_id: operation_id.clone(),
-                authority_seat: SeatId::new(SafeU53::new(1)?),
-                authority_revision: SafeU53::new(2)?,
-                menu_instance: MenuInstanceId::new(SafeU53::new(3)?),
+                authority_seat: SeatId::new(SafeU53::new(1).expect("seat")),
+                authority_revision: SafeU53::new(2).expect("revision"),
+                menu_instance: MenuInstanceId::new(SafeU53::new(3).expect("menu")),
             },
         };
-        let effect = prepare_proposal_effect(intent)?;
+        let effect = prepare_proposal_effect(intent).expect("proposal effect");
         let KernelControlEffectV6::ProposalReady {
             operation_id: actual_operation,
             bytes,
@@ -579,36 +578,36 @@ mod tests {
             ..
         } = effect
         else {
-            return Err("expected proposal effect".into());
+            assert!(false, "expected proposal effect");
+            return;
         };
         assert_eq!(actual_operation, operation_id);
-        let proposal: GameProposalV1 = serde_json::from_slice(&bytes)?;
-        proposal.validate()?;
+        let proposal: GameProposalV1 = serde_json::from_slice(&bytes).expect("canonical proposal");
+        proposal.validate().expect("valid proposal");
         assert!(digest.starts_with("blake3-v1:"));
         let mut admission = ProposalAdmissionSnapshotV2 {
-            capacity: SafeU53::new(8)?,
+            capacity: SafeU53::new(8).expect("capacity"),
             fingerprints: Vec::new(),
             disposed: false,
         };
         assert_eq!(
-            admit_game_proposal(&mut admission, &bytes)?,
+            admit_game_proposal(&mut admission, &bytes).expect("admitted proposal"),
             ProposalAdmission::Admitted
         );
         assert_eq!(
-            admit_game_proposal(&mut admission, &bytes)?,
+            admit_game_proposal(&mut admission, &bytes).expect("duplicate proposal"),
             ProposalAdmission::Duplicate
         );
         let mut conflicting = proposal;
         conflicting.action = GameActionV1::ExecuteRunProgram {
-            program: RunProgramId::new(SafeU53::new(2)?),
+            program: RunProgramId::new(SafeU53::new(2).expect("program")),
             hook: RunHook::RewardSelected,
             context: RunExecutionContextV2::default(),
         };
-        let conflict_bytes = er_canonical::canonical_bytes(&conflicting)?;
+        let conflict_bytes = er_canonical::canonical_bytes(&conflicting).expect("conflict bytes");
         assert_eq!(
-            admit_game_proposal(&mut admission, &conflict_bytes)?,
+            admit_game_proposal(&mut admission, &conflict_bytes).expect("conflict result"),
             ProposalAdmission::Conflict
         );
-        Ok(())
     }
 }

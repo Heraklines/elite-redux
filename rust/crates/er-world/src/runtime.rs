@@ -147,9 +147,9 @@ pub fn is_wave_final(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
 }
 
 pub fn legend_min_wave(base_stat_total: u32) -> u32 {
-    let delta = base_stat_total.saturating_sub(540);
-    let rounded_quarters = delta.saturating_add(2) / 4;
-    55_u32.saturating_add(rounded_quarters).clamp(55, 90)
+    let delta = u64::from(base_stat_total).checked_sub(540).unwrap_or(0);
+    let rounded_quarters = (delta + 2) / 4;
+    u32::try_from((55 + rounded_quarters).clamp(55, 90)).unwrap_or(90)
 }
 
 pub fn progression_wave(
@@ -226,7 +226,10 @@ pub fn biome_overstay(
         return 0;
     }
     world.overstay_anchor_wave.map_or(0, |anchor| {
-        wave.get().get().saturating_sub(anchor.get().get())
+        wave.get()
+            .get()
+            .checked_sub(anchor.get().get())
+            .unwrap_or(0)
     })
 }
 
@@ -589,8 +592,9 @@ pub fn fairy_luck_waves_left(world: &WorldStateV1, current_wave: WaveIndex) -> u
         expiry
             .get()
             .get()
-            .saturating_sub(current_wave.get().get())
-            .saturating_add(1)
+            .checked_sub(current_wave.get().get())
+            .and_then(|remaining| remaining.checked_add(1))
+            .unwrap_or(0)
     })
 }
 
@@ -841,7 +845,7 @@ pub fn plan_biome_structure<R: AuditedWorldRng>(
         if mode.sprint_structure {
             if finale_start.is_none_or(|finale| start < finale) {
                 let finale = finale_start.ok_or(WorldRuntimeError::Content)?;
-                let maximum_stints = ((finale.saturating_sub(start)) / 5).clamp(1, 3);
+                let maximum_stints = ((finale - start) / 5).clamp(1, 3);
                 let draw = draw_checked(rng, 100)?;
                 draws.push(RouteGraphDrawAuditV1 {
                     reason: RouteGraphDrawReasonV1::BiomeLength,
@@ -859,7 +863,10 @@ pub fn plan_biome_structure<R: AuditedWorldRng>(
                 length = Some(u16::try_from(stints * 5).map_err(|_| WorldRuntimeError::Wave)?);
             }
         } else if finale_start.is_none_or(|finale| {
-            start < finale && start.saturating_add(BIOME_LENGTH_MAX as u32 - 1) < finale
+            start < finale
+                && start
+                    .checked_add(BIOME_LENGTH_MAX as u32 - 1)
+                    .is_some_and(|end| end < finale)
         }) {
             let first = draw_checked(rng, BIOME_LENGTH_MAX - BIOME_LENGTH_MIN + 1)?;
             let second = draw_checked(rng, BIOME_LENGTH_MAX - BIOME_LENGTH_MIN + 1)?;
@@ -949,26 +956,31 @@ pub fn mark_leave_biome(before: &GameStateV5) -> Result<GameStateV5, WorldRuntim
 pub const MAP_MAX_UPGRADE_TIER: u32 = 3;
 
 pub fn map_upgrade_tier(total_map_stacks: u32) -> u32 {
-    total_map_stacks.saturating_sub(1).min(MAP_MAX_UPGRADE_TIER)
+    if total_map_stacks == 0 {
+        0
+    } else {
+        (total_map_stacks - 1).min(MAP_MAX_UPGRADE_TIER)
+    }
 }
 
 pub fn visible_route_node_count(
     total_map_stacks: u32,
     relic_extra_nodes: u32,
     ability_extra_nodes: u32,
-) -> usize {
-    usize::try_from(
-        2_u32
-            .saturating_add(map_upgrade_tier(total_map_stacks))
-            .saturating_add(relic_extra_nodes)
-            .saturating_add(ability_extra_nodes)
-            .max(1),
-    )
-    .unwrap_or(usize::MAX)
+) -> Result<usize, WorldRuntimeError> {
+    let total = 2_u64
+        .checked_add(u64::from(map_upgrade_tier(total_map_stacks)))
+        .and_then(|value| value.checked_add(u64::from(relic_extra_nodes)))
+        .and_then(|value| value.checked_add(u64::from(ability_extra_nodes)))
+        .ok_or(WorldRuntimeError::Wave)?;
+    usize::try_from(total.max(1)).map_err(|_| WorldRuntimeError::Wave)
 }
 
 pub fn biome_just_entered_after_wave(world: &WorldStateV1, wave: WaveIndex) -> bool {
-    world.biome_start_wave.get().get() == wave.get().get().saturating_add(1)
+    wave.get()
+        .get()
+        .checked_add(1)
+        .is_some_and(|next| world.biome_start_wave.get().get() == next)
 }
 
 pub fn biome_end_rule(

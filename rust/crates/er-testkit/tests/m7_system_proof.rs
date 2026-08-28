@@ -826,7 +826,7 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
     );
     assert_eq!(map_upgrade_tier(0), 0);
     assert_eq!(map_upgrade_tier(9), 3);
-    assert_eq!(visible_route_node_count(4, 1, 1), 7);
+    assert_eq!(visible_route_node_count(4, 1, 1)?, 7);
     let mut overstay = planned.after_state;
     overstay.active_run.as_mut().ok_or("missing run")?.wave = WaveIndex::new(safe(10))?;
     overstay.validate()?;
