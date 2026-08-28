@@ -139,6 +139,13 @@
   "SPECIES_DISCUPID": {
     "ability1": 220
   },
+  "SPECIES_DRAGONITE_MEGA": {
+    "innates": [
+      20005,
+      5066,
+      5010
+    ]
+  },
   "SPECIES_DUSTOX": {
     "hidden": 118
   },
