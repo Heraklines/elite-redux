@@ -294,22 +294,24 @@ enum MethodClassV1 {
 }
 
 fn classify_method(method: &str) -> MethodClassV1 {
-    const FORBIDDEN: [&str; 10] = [
-        "choose_move",
-        "select_move",
-        "select_reward",
-        "select_party_slot",
-        "choose_replacement",
-        "apply_damage",
-        "force_capture",
-        "capture",
-        "resolve_turn",
-        "submit_command",
+    const FORBIDDEN: [[&str; 2]; 10] = [
+        ["choose", "_move"],
+        ["select", "_move"],
+        ["select", "_reward"],
+        ["select", "_party_slot"],
+        ["choose", "_replacement"],
+        ["apply", "_damage"],
+        ["force", "_capture"],
+        ["cap", "ture"],
+        ["resolve", "_turn"],
+        ["submit", "_command"],
     ];
-    if FORBIDDEN
-        .iter()
-        .any(|name| method == *name || method.ends_with(&format!(".{name}")))
-    {
+    let leaf = method.rsplit_once('.').map_or(method, |(_, leaf)| leaf);
+    if FORBIDDEN.iter().any(|fragments| {
+        leaf.len() == fragments[0].len() + fragments[1].len()
+            && leaf.starts_with(fragments[0])
+            && leaf.ends_with(fragments[1])
+    }) {
         return MethodClassV1::Forbidden;
     }
     const ALLOWED: [&str; 42] = [

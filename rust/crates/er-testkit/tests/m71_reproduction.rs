@@ -269,6 +269,49 @@ fn checkpoint_seek_and_branch_comparison_are_deterministic() -> Result<(), Box<d
     Ok(())
 }
 
+#[test]
+fn session_diff_localizes_first_divergent_state_subtree() -> Result<(), Box<dyn Error>> {
+    let root = StatePathV1(vec![StatePathSegmentV1::Battle]);
+    let hp = StatePathV1(vec![
+        StatePathSegmentV1::Battle,
+        StatePathSegmentV1::Pokemon("player-1".to_owned()),
+        StatePathSegmentV1::FieldName("hp".to_owned()),
+    ]);
+    let tree = |hp_digest: &str| DiagnosticDigestTreeV1 {
+        mechanical_digest: hp_digest.to_owned(),
+        diagnostic_root: format!("root-{hp_digest}"),
+        level: DiagnosticDigestLevelV1::Leaf,
+        maximum_nodes: 4,
+        nodes: vec![
+            DigestNodeV1 {
+                path: root.clone(),
+                digest: format!("root-{hp_digest}"),
+                children: vec![hp.clone()],
+            },
+            DigestNodeV1 {
+                path: hp.clone(),
+                digest: hp_digest.to_owned(),
+                children: Vec::new(),
+            },
+        ],
+        truncated: false,
+    };
+    let left = vec![replay_evidence(1, 1, None)];
+    let right = vec![replay_evidence(1, 2, None)];
+    let difference = diff_sessions(
+        &left,
+        &right,
+        Some(&tree("hp-left")),
+        Some(&tree("hp-right")),
+        8,
+        8,
+    )?;
+    assert_eq!(difference.first_divergent_sequence, Some(1));
+    assert_eq!(difference.first_divergent_path, Some(hp));
+    assert!(!difference.mechanically_identical);
+    Ok(())
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 enum TestEvent {
     Required,

@@ -189,3 +189,61 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G32 mechanical foundation"
+
+  m71-reproduction:
+    name: M7.1 capsule replay diff minimize JSONL
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-reproduction-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run exact reproduction and agent contracts
+        working-directory: rust
+        run: cargo test -p er-testkit --test m71_reproduction
+
+  m71-reproduction-wasm:
+    name: M7.1 reproduction boundary Wasm check
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check reproduction and agent crates for Wasm
+        working-directory: rust
+        run: cargo check --target wasm32-unknown-unknown -p er-repro -p er-agent-protocol
+
+  m71-g33-aggregate:
+    name: M7.1 G33 reproduction aggregate
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    needs:
+      - m71-g32-aggregate
+      - m71-reproduction
+      - m71-reproduction-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G33 reproduction and agent gate"
