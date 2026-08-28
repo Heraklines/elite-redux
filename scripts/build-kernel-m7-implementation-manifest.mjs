@@ -154,16 +154,16 @@ const implemented = [
   [replayRecorder, 242, "map[0]", "er_save::oracle_replay::OracleReplayRecorderV2::trace", SAVE_RECORDER_PROOF],
   [replaySingle, 75, "captureSinglePlayerEndState", "er_save::oracle_replay::capture_single_player_end_state_v2", SAVE_SINGLE_PROOF],
   [replaySingle, 79, "map[0]", "er_save::oracle_replay::capture_single_player_end_state_v2", SAVE_SINGLE_PROOF],
-  [replaySingle, 98, "maybeBeginSinglePlayerReplayRecording", "er_save::oracle_replay::begin_single_player_recording_v2", SAVE_SINGLE_PROOF],
-  [replaySingle, 117, "map[0]", "er_save::oracle_replay::begin_single_player_recording_v2", SAVE_SINGLE_PROOF],
-  [replaySingle, 118, "currentWave", "er_save::oracle_replay::record_single_player_interaction_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 98, "maybeBeginSinglePlayerReplayRecording", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::maybe_begin", SAVE_SINGLE_PROOF],
+  [replaySingle, 117, "map[0]", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::maybe_begin", SAVE_SINGLE_PROOF],
+  [replaySingle, 118, "currentWave", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::record_interaction", SAVE_SINGLE_PROOF],
   [replaySingle, 134, "captureReplayCheckpoint", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
   [replaySingle, 138, "map[0]", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
   [replaySingle, 139, "map[0]", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
-  [replaySingle, 153, "maybeCaptureReplayCheckpoint", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 153, "maybeCaptureReplayCheckpoint", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::maybe_capture_checkpoint", SAVE_SINGLE_PROOF],
   [replaySingle, 165, "playerCommandToReplayKind", "er_save::oracle_replay::player_command_to_replay_kind_v2", SAVE_SINGLE_PROOF],
-  [replaySingle, 191, "recordSinglePlayerCommand", "er_save::oracle_replay::record_single_player_command_v2", SAVE_SINGLE_PROOF],
-  [replaySingle, 233, "recordSinglePlayerInteraction", "er_save::oracle_replay::record_single_player_interaction_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 191, "recordSinglePlayerCommand", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::record_command", SAVE_SINGLE_PROOF],
+  [replaySingle, 233, "recordSinglePlayerInteraction", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::record_interaction", SAVE_SINGLE_PROOF],
 ];
 
 function fail(message) {

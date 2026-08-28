@@ -49,11 +49,32 @@ pub struct OracleReplayPokemonV2 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OracleReplayModifierArgumentV2 {
+    Bool(bool),
+    Integer(i64),
+    String(String),
+    Integers(Vec<i64>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OracleReplayModifierV2 {
+    pub player: bool,
+    pub type_id: String,
+    pub type_pregen_args: Vec<OracleReplayModifierArgumentV2>,
+    pub args: Vec<OracleReplayModifierArgumentV2>,
+    pub stack_count: i64,
+    pub class_name: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OracleReplayCheckpointV2 {
     pub wave: i64,
     pub seed: String,
     pub party: Vec<OracleReplayPokemonV2>,
+    pub modifiers: Vec<OracleReplayModifierV2>,
     pub money: i64,
     pub pokeball_counts: Vec<(String, i64)>,
 }
@@ -337,6 +358,7 @@ pub fn capture_replay_checkpoint_v2(
     wave: i64,
     seed: String,
     party: Vec<OracleReplayPokemonV2>,
+    modifiers: Vec<OracleReplayModifierV2>,
     money: i64,
     pokeball_counts: Vec<(String, i64)>,
 ) -> OracleReplayCheckpointV2 {
@@ -344,50 +366,105 @@ pub fn capture_replay_checkpoint_v2(
         wave,
         seed,
         party,
+        modifiers,
         money,
         pokeball_counts,
     }
 }
 
-pub fn begin_single_player_recording_v2(
-    recorder: &mut OracleReplayRecorderV2,
-    trace: OracleReplayTraceV2,
-) {
-    recorder.begin(trace);
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SinglePlayerReplayRuntimeV2 {
+    recording_seed: Option<String>,
+    interaction_seq: i64,
 }
 
-pub fn record_single_player_command_v2(
-    recorder: &mut OracleReplayRecorderV2,
-    wave: i64,
-    turn: i64,
-    slot_field_index: i64,
-    command: OraclePlayerCommandV2,
-) {
-    recorder.record_command(OracleReplayEventV2::Command {
-        wave,
-        turn,
-        slot_field_index,
-        command: player_command_to_replay_kind_v2(command),
-    });
-}
+impl SinglePlayerReplayRuntimeV2 {
+    pub fn maybe_begin(
+        &mut self,
+        recorder: &mut OracleReplayRecorderV2,
+        is_coop: bool,
+        is_classic: bool,
+        trace: OracleReplayTraceV2,
+    ) -> bool {
+        if is_coop || !is_classic {
+            return false;
+        }
+        if recorder.is_recording() && self.recording_seed.as_ref() == Some(&trace.seed) {
+            return false;
+        }
+        self.recording_seed = Some(trace.seed.clone());
+        self.interaction_seq = 0;
+        recorder.begin(trace);
+        true
+    }
 
-pub fn record_single_player_interaction_v2(
-    recorder: &mut OracleReplayRecorderV2,
-    wave: i64,
-    seq: i64,
-    kind: String,
-    choice: i64,
-    data: Option<Vec<i64>>,
-) {
-    recorder.record_interaction(
-        wave,
-        OracleReplayEventV2::Interaction {
-            seq,
-            kind,
-            choice,
-            data,
-        },
-    );
+    pub fn maybe_capture_checkpoint(
+        &self,
+        recorder: &mut OracleReplayRecorderV2,
+        checkpoint: Option<OracleReplayCheckpointV2>,
+    ) -> bool {
+        if !recorder.is_recording() {
+            return false;
+        }
+        let Some(checkpoint) = checkpoint else {
+            return false;
+        };
+        recorder.record_checkpoint(checkpoint);
+        true
+    }
+
+    pub fn record_command(
+        &self,
+        recorder: &mut OracleReplayRecorderV2,
+        is_coop: bool,
+        wave: i64,
+        turn: i64,
+        slot_field_index: i64,
+        command: Option<OraclePlayerCommandV2>,
+    ) -> bool {
+        if is_coop || !recorder.is_recording() {
+            return false;
+        }
+        let Some(command) = command else {
+            return false;
+        };
+        recorder.record_command(OracleReplayEventV2::Command {
+            wave,
+            turn,
+            slot_field_index,
+            command: player_command_to_replay_kind_v2(command),
+        });
+        true
+    }
+
+    pub fn record_interaction(
+        &mut self,
+        recorder: &mut OracleReplayRecorderV2,
+        is_coop: bool,
+        current_wave: i64,
+        kind: String,
+        choice: i64,
+        data: Option<Vec<i64>>,
+    ) -> bool {
+        if is_coop || !recorder.is_recording() {
+            return false;
+        }
+        let seq = self.interaction_seq;
+        let Some(next_seq) = seq.checked_add(1) else {
+            return false;
+        };
+        recorder.record_interaction(
+            current_wave,
+            OracleReplayEventV2::Interaction {
+                seq,
+                kind,
+                choice,
+                data,
+            },
+        );
+        self.interaction_seq = next_seq;
+        true
+    }
 }
 
 #[cfg(test)]
@@ -478,6 +555,7 @@ mod tests {
             3,
             "checkpoint".to_owned(),
             vec![pokemon()],
+            Vec::new(),
             200,
             vec![("poke-ball".to_owned(), 2)],
         );
@@ -489,16 +567,30 @@ mod tests {
             vec![pokemon()],
             Vec::new(),
             Some(end),
-            Some(checkpoint),
+            None,
         );
         let mut recorder = OracleReplayRecorderV2::default();
-        begin_single_player_recording_v2(&mut recorder, trace);
-        record_single_player_command_v2(&mut recorder, 3, 0, 0, OraclePlayerCommandV2::Run);
-        record_single_player_interaction_v2(&mut recorder, 3, 0, "reward".to_owned(), 1, None);
+        let mut runtime = SinglePlayerReplayRuntimeV2::default();
+        assert!(!runtime.maybe_begin(&mut recorder, true, true, trace.clone()));
+        assert!(runtime.maybe_begin(&mut recorder, false, true, trace.clone()));
+        assert!(!runtime.maybe_begin(&mut recorder, false, true, trace));
+        assert!(runtime.maybe_capture_checkpoint(&mut recorder, Some(checkpoint)));
+        assert!(runtime.record_command(
+            &mut recorder,
+            false,
+            3,
+            0,
+            0,
+            Some(OraclePlayerCommandV2::Run),
+        ));
+        assert!(!runtime.record_command(&mut recorder, true, 3, 0, 0, None));
+        assert!(runtime.record_interaction(&mut recorder, false, 3, "reward".to_owned(), 1, None,));
+        assert!(!runtime.record_interaction(&mut recorder, true, 3, "reward".to_owned(), 2, None,));
         let recorded = recorder.trace().expect("trace");
         assert_eq!(recorded.events.len(), 2);
         assert!(recorded.events[0].is_command());
         assert!(recorded.events[1].is_interaction());
         assert_eq!(recorded.end_state.expect("end").wave_index, 12);
+        assert_eq!(recorded.checkpoint.expect("checkpoint").modifiers.len(), 0);
     }
 }
