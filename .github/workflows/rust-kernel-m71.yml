@@ -98,3 +98,94 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G31 contract freeze"
+
+  m71-g30-byte-parity:
+    name: M7.1 G30 mechanical byte parity
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m71-g30-parity.mjs
+
+  m71-foundation:
+    name: M7.1 identity observation causal snapshot foundation
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run developer-plane foundation contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m71_foundation
+          cargo test -p er-testkit --test m7_system_proof
+          cargo test -p er-testkit --test m7_behavior_proofs
+
+  m71-native-wasm:
+    name: M7.1 native Wasm type parity
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check portable developer-plane boundary crates
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo check -p er-dev-types -p er-model -p er-render-model
+          cargo check --target wasm32-unknown-unknown -p er-dev-types -p er-model -p er-render-model
+
+  m71-m0-m7-regression:
+    name: M7.1 M0-M7 regression
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run complete Rust regression
+        working-directory: rust
+        run: cargo test --workspace --all-targets
+
+  m71-g32-aggregate:
+    name: M7.1 G32 foundation aggregate
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g32' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    needs:
+      - m71-g31-aggregate
+      - m71-g30-byte-parity
+      - m71-foundation
+      - m71-native-wasm
+      - m71-m0-m7-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G32 mechanical foundation"
