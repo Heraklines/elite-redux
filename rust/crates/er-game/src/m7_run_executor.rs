@@ -1,15 +1,15 @@
 //! Atomic execution of closed RunProgramV1 operations.
 
 use er_state::m7_state::{
-    GameStateV5, InventoryEntryV1, RunModifierInstanceV2, SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
-    ScenarioRuntimeStateV1,
+    GameStateV5, InventoryEntryV1, RunModifierInstanceV2, RunStateV3,
+    SCENARIO_RUNTIME_SCHEMA_VERSION_V1, ScenarioRuntimeStateV1, StoredPokemonV1,
 };
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_types::battle_ids::PokemonId;
 use er_types::run_ids::Money;
 use er_types::{
     GameControlKindV2, RunCondition, RunConditionId, RunHook, RunOperation, RunProgramId,
-    RunProgramV1, RunSelector, RunSelectorId, RunValue, RunValueId, SafeU53,
+    RunProgramV1, RunSelector, RunSelectorId, RunValue, RunValueId, SafeU53, StorageSlotId,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -268,6 +268,76 @@ fn dispatch_operation(
         RunOperation::SetProfileFlag { flag, value } => {
             state.profile.flags.insert(*flag, *value);
         }
+        RunOperation::SetBiome { biome } => {
+            state
+                .active_run
+                .as_mut()
+                .ok_or(RunExecutionError::Operation)?
+                .world
+                .biome = *biome;
+        }
+        RunOperation::HealPokemon { target, amount } => {
+            let pokemon = select(program, *target, state, context)?;
+            let amount = u32::try_from(unsigned_value(program, *amount)?)
+                .map_err(|_| RunExecutionError::Overflow)?;
+            let run = state
+                .active_run
+                .as_mut()
+                .ok_or(RunExecutionError::Operation)?;
+            for id in pokemon {
+                let target = persistent_pokemon_mut(run, id).ok_or(RunExecutionError::Operation)?;
+                target.hp = target
+                    .hp
+                    .checked_add(amount)
+                    .unwrap_or(target.max_hp)
+                    .min(target.max_hp);
+                target.fainted = target.hp == 0;
+            }
+        }
+        RunOperation::SetLevel { target, level } => {
+            if *level == 0 {
+                return Err(RunExecutionError::Operation);
+            }
+            let pokemon = select(program, *target, state, context)?;
+            let run = state
+                .active_run
+                .as_mut()
+                .ok_or(RunExecutionError::Operation)?;
+            for id in pokemon {
+                persistent_pokemon_mut(run, id)
+                    .ok_or(RunExecutionError::Operation)?
+                    .level = *level;
+            }
+        }
+        RunOperation::SendPokemonToStorage { target } => {
+            let pokemon = select(program, *target, state, context)?;
+            let run = state
+                .active_run
+                .as_mut()
+                .ok_or(RunExecutionError::Operation)?;
+            for id in pokemon {
+                let index = run
+                    .party
+                    .iter()
+                    .position(|candidate| candidate.id == id)
+                    .ok_or(RunExecutionError::Operation)?;
+                let stored = run.party.remove(index);
+                let next_slot = run
+                    .storage
+                    .iter()
+                    .map(|entry| entry.slot.get().get())
+                    .max()
+                    .map_or(0, |value| value.checked_add(1).unwrap_or(u64::MAX));
+                let slot = StorageSlotId::new(
+                    SafeU53::new(next_slot).map_err(|_| RunExecutionError::Overflow)?,
+                );
+                run.storage.push(StoredPokemonV1 {
+                    slot,
+                    pokemon: stored,
+                });
+                run.storage.sort_by_key(|entry| entry.slot);
+            }
+        }
         RunOperation::AdvanceQuest { quest, amount } => {
             let amount = unsigned_value(program, *amount)?;
             let run = state
@@ -350,12 +420,9 @@ fn dispatch_operation(
             run.control.menu = None;
         }
         RunOperation::EmitPresentation { .. }
-        | RunOperation::SetBiome { .. }
         | RunOperation::GenerateEncounter { .. }
         | RunOperation::StartBattle { .. }
         | RunOperation::GrantExperience { .. }
-        | RunOperation::SetLevel { .. }
-        | RunOperation::HealPokemon { .. }
         | RunOperation::RevivePokemon { .. }
         | RunOperation::ChangeStatus { .. }
         | RunOperation::AddMove { .. }
@@ -365,7 +432,6 @@ fn dispatch_operation(
         | RunOperation::ChangeNature { .. }
         | RunOperation::CapturePokemon { .. }
         | RunOperation::AddPokemonToParty { .. }
-        | RunOperation::SendPokemonToStorage { .. }
         | RunOperation::ReleasePokemon { .. }
         | RunOperation::EvolvePokemon { .. }
         | RunOperation::FusePokemon { .. }
@@ -494,6 +560,19 @@ fn remove_item(
         run.inventory.entries.remove(index);
     }
     Ok(())
+}
+
+fn persistent_pokemon_mut(
+    run: &mut RunStateV3,
+    id: PokemonId,
+) -> Option<&mut er_state::m7_state::PokemonStateV5> {
+    if let Some(index) = run.party.iter().position(|pokemon| pokemon.id == id) {
+        return run.party.get_mut(index);
+    }
+    run.storage
+        .iter_mut()
+        .find(|stored| stored.pokemon.id == id)
+        .map(|stored| &mut stored.pokemon)
 }
 
 fn select(

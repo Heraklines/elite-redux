@@ -74,10 +74,11 @@ use er_types::{
     GameActionContextV1, GameActionV1, GameBehaviorStatus, GameBehaviorUnitId,
     GameContentBundleHash, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
     GameMenuOptionV2, GameMenuV2, InputFocus, InventoryItemId, MenuOptionId, OperationId,
-    OracleSha, PartyActionV1, PhysicalKey, ProgressionActionV1, RawInputEvent, RunCondition,
-    RunConditionId, RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding, RunOperation,
-    RunProgramBudget, RunProgramId, RunProgramV1, SafeU53, ScenarioGameActionV1, ScenarioId,
-    ScenarioNodeId, SeatId, TerminalActionV1, WorldActionV1,
+    OracleSha, PartyActionV1, PhysicalKey, ProfileFlagId, ProgressionActionV1, RawInputEvent,
+    RunCondition, RunConditionId, RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding,
+    RunOperation, RunProgramBudget, RunProgramId, RunProgramV1, RunSelector, RunSelectorId,
+    RunValue, RunValueId, SafeU53, ScenarioGameActionV1, ScenarioId, ScenarioNodeId, SeatId,
+    TerminalActionV1, WorldActionV1,
 };
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
@@ -119,6 +120,10 @@ fn behavior() -> GameBehaviorUnitId {
     GameBehaviorUnitId::parse("a".repeat(64)).expect("behavior ID")
 }
 
+fn foundation_behavior() -> GameBehaviorUnitId {
+    GameBehaviorUnitId::parse("b".repeat(64)).expect("foundation behavior ID")
+}
+
 fn run_program() -> RunProgramV1 {
     RunProgramV1 {
         schema_version: 1,
@@ -142,6 +147,58 @@ fn run_program() -> RunProgramV1 {
             selector_nodes: 0,
             value_nodes: 0,
             operations: 1,
+            emitted_presentations: 0,
+        },
+    }
+}
+
+fn foundation_journey_program() -> RunProgramV1 {
+    RunProgramV1 {
+        schema_version: 1,
+        id: RunProgramId::new(safe(2)),
+        source: foundation_behavior(),
+        hooks: vec![RunHookBinding {
+            hook: RunHook::RewardSelected,
+            condition: RunConditionId(0),
+            first_operation: 0,
+            operation_count: 7,
+        }],
+        conditions: vec![RunCondition::Always],
+        selectors: vec![RunSelector::Pokemon(PokemonId::new(safe(1)))],
+        values: vec![RunValue::Unsigned(5)],
+        operations: vec![
+            RunOperation::SetBiome {
+                biome: BiomeId::new(safe(2)),
+            },
+            RunOperation::SetProfileFlag {
+                flag: ProfileFlagId::new(safe(1)),
+                value: true,
+            },
+            RunOperation::HealPokemon {
+                target: RunSelectorId(0),
+                amount: RunValueId(0),
+            },
+            RunOperation::SetLevel {
+                target: RunSelectorId(0),
+                level: 6,
+            },
+            RunOperation::SendPokemonToStorage {
+                target: RunSelectorId(0),
+            },
+            RunOperation::AddItem {
+                item: InventoryItemId::new(safe(1)),
+                count: 1,
+            },
+            RunOperation::SetRunFlag {
+                flag: RunFlagId::new(safe(2)),
+                value: true,
+            },
+        ],
+        budget: RunProgramBudget {
+            condition_nodes: 1,
+            selector_nodes: 1,
+            value_nodes: 1,
+            operations: 7,
             emitted_presentations: 0,
         },
     }
@@ -421,16 +478,22 @@ fn prepared_content() -> TestResult<Arc<PreparedGameContentV1>> {
     let run = Arc::new(RunContentPackV3::new(
         OracleSha::parse(ORACLE)?,
         battle.content_hash.clone(),
-        vec![run_program()],
+        vec![run_program(), foundation_journey_program()],
     )?);
     let meta = Arc::new(MetaContentPackV1 {
         schema_version: META_CONTENT_PACK_SCHEMA_VERSION_V1,
         oracle_sha: OracleSha::parse(ORACLE)?,
         content_hash: catalog('8'),
-        classifications: vec![GameBehaviorClassificationV1 {
-            behavior: behavior(),
-            status: GameBehaviorStatus::Compiled,
-        }],
+        classifications: vec![
+            GameBehaviorClassificationV1 {
+                behavior: behavior(),
+                status: GameBehaviorStatus::Compiled,
+            },
+            GameBehaviorClassificationV1 {
+                behavior: foundation_behavior(),
+                status: GameBehaviorStatus::Compiled,
+            },
+        ],
     });
     let mut bundle = GameContentBundleV1 {
         schema_version: GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V1,
@@ -1271,6 +1334,111 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
             .copied(),
         Some(true)
     );
+    Ok(())
+}
+
+#[test]
+fn continuous_foundation_raw_key_journey_crosses_world_save_party_and_progression() -> TestResult {
+    let content = prepared_content()?;
+    let mut state = game_state(&content)?;
+    let mut pokemon = pokemon_state(1, Some(SeatId::new(safe(1))))?;
+    pokemon.hp = 10;
+    let option = MenuOptionId::new("foundation/continue")?;
+    let run = state.active_run.as_mut().ok_or("missing active run")?;
+    run.party.push(pokemon);
+    run.control = GameControlPlanV2 {
+        schema_version: er_types::GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
+        revision: safe(3),
+        kind: GameControlKindV2::Reward,
+        owner_seat: Some(SeatId::new(safe(1))),
+        action_context: Some(GameActionContextV1 {
+            operation_id: OperationId::new("m7/foundation/journey")?,
+            authority_seat: SeatId::new(safe(1)),
+            authority_revision: safe(3),
+            menu_instance: MenuInstanceId::new(safe(3)),
+        }),
+        menu: Some(GameMenuV2::new(
+            MenuInstanceId::new(safe(3)),
+            SeatId::new(safe(1)),
+            "m7/foundation",
+            option.clone(),
+            vec![GameMenuOptionV2::new(
+                option,
+                true,
+                true,
+                GameActionV1::ExecuteRunProgram {
+                    program: RunProgramId::new(safe(2)),
+                    hook: RunHook::RewardSelected,
+                    context: RunExecutionContextV2 {
+                        pokemon: Some(PokemonId::new(safe(1))),
+                        scenario_target: None,
+                    },
+                },
+                None,
+            )?],
+            Vec::new(),
+            GameMenuCancelV2::Disabled,
+        )?),
+        actionable: true,
+    };
+    state.validate()?;
+    let mut environment = GameEnvironment::new_run(
+        state,
+        content,
+        EnvironmentKernelComponentsV1 {
+            input_router: InputRouterSnapshotV2 {
+                focus: InputFocus::Game,
+                pressed: Vec::new(),
+                suppressed_printable_keys: Vec::new(),
+                held_buttons: Vec::new(),
+                locks: Vec::new(),
+                repeats: Vec::new(),
+                disposed: false,
+            },
+            scheduler: KernelSchedulerSnapshotV2 {
+                next_timer_id: None,
+                timers: Vec::new(),
+                pauses: Vec::new(),
+                disposed: false,
+            },
+            protocol: None,
+            replay_sequence: SafeU53::ZERO,
+            terminal: None,
+        },
+    )?;
+    assert!(matches!(
+        environment
+            .raw_input(RawInputEvent::KeyDown {
+                code: PhysicalKey::Space,
+                printable: true,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            })?
+            .as_slice(),
+        [GameEffect::Selected { .. }]
+    ));
+    let snapshot = environment.snapshot();
+    assert_eq!(snapshot.replay_sequence, safe(1));
+    assert_eq!(
+        snapshot
+            .game_state
+            .profile
+            .flags
+            .get(&ProfileFlagId::new(safe(1))),
+        Some(&true)
+    );
+    let run = snapshot
+        .game_state
+        .active_run
+        .as_ref()
+        .ok_or("missing run")?;
+    assert_eq!(run.world.biome, BiomeId::new(safe(2)));
+    assert!(run.party.is_empty());
+    assert_eq!(run.storage.len(), 1);
+    assert_eq!(run.storage[0].pokemon.level, 6);
+    assert_eq!(run.storage[0].pokemon.hp, 15);
+    assert_eq!(run.inventory.entries[0].count, 2);
+    assert_eq!(run.flags.get(&RunFlagId::new(safe(2))), Some(&true));
     Ok(())
 }
 
