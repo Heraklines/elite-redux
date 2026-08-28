@@ -1,0 +1,15 @@
+[package]
+name = "er-batch"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-dev-types = { path = "../er-dev-types" }
+er-devplane = { path = "../er-devplane" }
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

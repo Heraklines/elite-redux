@@ -1,0 +1,18 @@
+[package]
+name = "er-devplane"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-dev-types = { path = "../er-dev-types" }
+er-env = { path = "../er-env" }
+er-model = { path = "../er-model" }
+er-render-model = { path = "../er-render-model" }
+er-sim = { path = "../er-sim" }
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

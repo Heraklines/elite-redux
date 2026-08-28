@@ -148,6 +148,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-agent-protocol"
+version = "0.1.0"
+dependencies = [
+ "er-batch",
+ "er-dev-types",
+ "er-devplane",
+ "er-repro",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "er-ai"
 version = "0.1.0"
 dependencies = [
@@ -155,6 +168,16 @@ dependencies = [
  "er-content",
  "er-state",
  "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "er-batch"
+version = "0.1.0"
+dependencies = [
+ "er-dev-types",
+ "er-devplane",
  "serde",
  "thiserror",
 ]
@@ -228,6 +251,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-dev-types"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "er-canonical",
+ "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "er-devplane"
+version = "0.1.0"
+dependencies = [
+ "er-dev-types",
+ "er-env",
+ "er-model",
+ "er-render-model",
+ "er-sim",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "er-env"
 version = "0.1.0"
 dependencies = [
@@ -262,6 +309,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-impact"
+version = "0.1.0"
+dependencies = [
+ "er-dev-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "er-kernel"
 version = "0.1.0"
 dependencies = [
@@ -290,6 +346,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-model"
+version = "0.1.0"
+dependencies = [
+ "er-dev-types",
+ "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "er-progression"
 version = "0.1.0"
 dependencies = [
@@ -311,6 +377,27 @@ dependencies = [
  "er-types",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-render-model"
+version = "0.1.0"
+dependencies = [
+ "er-dev-types",
+ "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "er-repro"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-dev-types",
+ "er-devplane",
+ "serde",
  "thiserror",
 ]
 

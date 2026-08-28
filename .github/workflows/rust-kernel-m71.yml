@@ -1,0 +1,99 @@
+name: Rust Kernel M7.1 Developer Plane
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m7-devplane-g31
+      - arch/rust-kernel-m7-devplane-g32
+      - arch/rust-kernel-m7-devplane-g33
+      - arch/rust-kernel-m7-devplane-g34
+    paths:
+      - ".github/workflows/rust-kernel-m71.yml"
+      - "rust/**"
+      - "scripts/*kernel-m71*"
+      - "docs/plans/rust-kernel/m71-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m71-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  m71-m7-final-attestation:
+    name: M7.1 M7 final attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/fixtures/m71/
+            /rust/contracts/m71-contract.toml
+            /scripts/check-kernel-m71-contract.mjs
+            /rust/Cargo.toml
+            /rust/crates/
+            /docs/plans/rust-kernel/
+          submodules: false
+      - run: node scripts/check-kernel-m71-contract.mjs
+
+  m71-contract-freeze:
+    name: M7.1 contract and dependency freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: node scripts/check-kernel-m71-contract.mjs
+      - name: Reject upstream developer-plane dependencies
+        run: |
+          set -euo pipefail
+          for crate in er-state er-battle er-run er-game er-kernel er-protocol er-mechanics; do
+            if grep -E 'er-(dev-types|devplane|repro|agent-protocol|model|render-model|impact|batch)' "rust/crates/$crate/Cargo.toml"; then
+              printf 'forbidden developer-plane dependency in %s\n' "$crate" >&2
+              exit 1
+            fi
+          done
+
+  m71-format:
+    name: M7.1 format and workspace check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-bootstrap-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Check formatting and all developer-plane crates
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p er-dev-types -p er-model -p er-render-model -p er-impact \
+            -p er-devplane -p er-repro -p er-batch -p er-agent-protocol
+
+  m71-g31-aggregate:
+    name: M7.1 G31 contract aggregate
+    needs:
+      - m71-m7-final-attestation
+      - m71-contract-freeze
+      - m71-format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G31 contract freeze"
