@@ -84,20 +84,23 @@ use er_wasm::m7_parity::{
 };
 use er_world::runtime::{
     AuditedWorldRng, NotorietyScaleV1, PacingRatioV1, WorldRuntimeError, add_treasure_fragments,
-    advance_wave, biome_end_rule, biome_should_end, chart_onward_routes, consume_carried_weather,
-    consume_map_travel_target, consume_treasure_fragments_for_reward, early_wave_move_power_ratio,
-    fairy_luck_waves_left, final_wave, grant_fairy_luck, is_chapter_start_wave, is_checkpoint_wave,
-    is_major_checkpoint_wave, is_wave_final, legend_min_wave, map_upgrade_tier, mark_biome_stay,
-    mark_leave_biome, notoriety_boss_chance_pct, notoriety_bst_bonus, notoriety_trainer_chance_pct,
+    advance_wave, biome_end_rule, biome_event_rate, biome_forced_terrain, biome_forced_weather,
+    biome_should_end, biome_skip_fallback, biome_wave_skip_chance, chart_onward_routes,
+    consume_carried_weather, consume_map_travel_target, consume_treasure_fragments_for_reward,
+    early_wave_move_power_ratio, fairy_luck_waves_left, final_wave, grant_fairy_luck,
+    is_chapter_start_wave, is_checkpoint_wave, is_major_checkpoint_wave, is_wave_final,
+    legend_min_wave, map_upgrade_tier, mark_biome_stay, mark_leave_biome,
+    notoriety_boss_chance_pct, notoriety_bst_bonus, notoriety_trainer_chance_pct,
     plan_biome_structure, progression_wave, record_biome_entry, reveal_next_pending_node,
     roll_next_biome_nodes, set_any_biome_travel_target, set_carried_weather,
     should_raise_crossroads, starting_biome, story_source_wave, temporary_fairy_luck,
     visible_route_node_count, wave_for_difficulty,
 };
 use er_world::{
-    BiomeDefinitionV1, BiomeRouteLinkV1, EncounterDefinitionV1, EncounterKindV1,
-    GameModeDefinitionV1, PokemonBuildV1, RouteDefinitionV1, TerminalWavePolicyV1,
-    WORLD_CONTENT_PACK_SCHEMA_VERSION_V1, WeightedEncounterV1, WeightedRouteV1, WorldContentPackV1,
+    BiomeBattleRuleV1, BiomeDefinitionV1, BiomeEncounterProfileV1, BiomeRouteLinkV1,
+    BiomeSkipFallbackV1, EncounterDefinitionV1, EncounterKindV1, GameModeDefinitionV1,
+    PokemonBuildV1, RouteDefinitionV1, TerminalWavePolicyV1, WORLD_CONTENT_PACK_SCHEMA_VERSION_V1,
+    WeightedEncounterV1, WeightedRouteV1, WorldContentPackV1, WorldRatioV1,
 };
 
 const ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
@@ -255,6 +258,28 @@ fn world_pack() -> WorldContentPackV1 {
                     route: RouteNodeId::new(safe(2)),
                     inclusion_denominator: None,
                 }],
+                encounter_profile: Some(BiomeEncounterProfileV1 {
+                    event_rate: WorldRatioV1 {
+                        numerator: 7,
+                        denominator: 10,
+                    },
+                    trainer_rate: WorldRatioV1 {
+                        numerator: 1,
+                        denominator: 1,
+                    },
+                    boss_chance_pct: 25,
+                    boss_every_wave: false,
+                    boss_bars: None,
+                    skip_chance_pct: 40,
+                    skip_fallback: Some(BiomeSkipFallbackV1 {
+                        event_weight: 60,
+                        boss_weight: 40,
+                    }),
+                }),
+                battle_rule: Some(BiomeBattleRuleV1 {
+                    forced_weather: Some(WeatherKind::UnsupportedOracleCode(1)),
+                    forced_terrain: Some(TerrainKind::UnsupportedOracleCode(1)),
+                }),
             },
             BiomeDefinitionV1 {
                 id: BiomeId::new(safe(2)),
@@ -272,6 +297,8 @@ fn world_pack() -> WorldContentPackV1 {
                     route: RouteNodeId::new(safe(3)),
                     inclusion_denominator: None,
                 }],
+                encounter_profile: None,
+                battle_rule: None,
             },
             BiomeDefinitionV1 {
                 id: BiomeId::new(safe(3)),
@@ -289,6 +316,8 @@ fn world_pack() -> WorldContentPackV1 {
                     route: RouteNodeId::new(safe(1)),
                     inclusion_denominator: None,
                 }],
+                encounter_profile: None,
+                battle_rule: None,
             },
         ],
         routes: vec![
@@ -709,6 +738,32 @@ fn capture_consumes_ball_and_moves_enemy_into_party() -> TestResult {
 fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
     let content = prepared_content()?;
     let state = game_state(&content)?;
+    assert_eq!(
+        biome_event_rate(&content.world, BiomeId::new(safe(1))),
+        WorldRatioV1 {
+            numerator: 7,
+            denominator: 10,
+        }
+    );
+    assert_eq!(
+        biome_wave_skip_chance(&content.world, BiomeId::new(safe(1))),
+        40
+    );
+    assert_eq!(
+        biome_skip_fallback(&content.world, BiomeId::new(safe(1))),
+        Some(BiomeSkipFallbackV1 {
+            event_weight: 60,
+            boss_weight: 40,
+        })
+    );
+    assert_eq!(
+        biome_forced_weather(&content.world, BiomeId::new(safe(1))),
+        Some(WeatherKind::UnsupportedOracleCode(1))
+    );
+    assert_eq!(
+        biome_forced_terrain(&content.world, BiomeId::new(safe(1))),
+        Some(TerrainKind::UnsupportedOracleCode(1))
+    );
     let mut route_rng = ScriptedWorldRng::new(vec![49]);
     let routed = roll_next_biome_nodes(&state, &content.world, 1, &mut route_rng)?;
     assert_eq!(routed.draws.len(), 1);

@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
+use er_types::battle_model::{TerrainKind, WeatherKind};
 use er_types::run_ids::{BiomeId, EncounterId, RouteNodeId};
 use er_types::{CatalogHash, InventoryItemId, OracleSha, SafeU53};
 use serde::{Deserialize, Serialize};
@@ -45,6 +46,39 @@ pub struct GameModeDefinitionV1 {
     pub story_source_waves: BTreeMap<u32, u32>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorldRatioV1 {
+    pub numerator: u32,
+    pub denominator: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BiomeSkipFallbackV1 {
+    pub event_weight: u32,
+    pub boss_weight: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BiomeEncounterProfileV1 {
+    pub event_rate: WorldRatioV1,
+    pub trainer_rate: WorldRatioV1,
+    pub boss_chance_pct: u8,
+    pub boss_every_wave: bool,
+    pub boss_bars: Option<(u8, u8)>,
+    pub skip_chance_pct: u8,
+    pub skip_fallback: Option<BiomeSkipFallbackV1>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BiomeBattleRuleV1 {
+    pub forced_weather: Option<WeatherKind>,
+    pub forced_terrain: Option<TerrainKind>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BiomeDefinitionV1 {
@@ -54,6 +88,8 @@ pub struct BiomeDefinitionV1 {
     pub encounters: Vec<WeightedEncounterV1>,
     pub exits: Vec<WeightedRouteV1>,
     pub routing_exits: Vec<BiomeRouteLinkV1>,
+    pub encounter_profile: Option<BiomeEncounterProfileV1>,
+    pub battle_rule: Option<BiomeBattleRuleV1>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -218,6 +254,18 @@ impl WorldContentPackV1 {
                         || link
                             .inclusion_denominator
                             .is_some_and(|denominator| denominator == 0)
+                })
+                || biome.encounter_profile.as_ref().is_some_and(|profile| {
+                    profile.event_rate.denominator == 0
+                        || profile.trainer_rate.denominator == 0
+                        || profile.boss_chance_pct > 100
+                        || profile.skip_chance_pct > 100
+                        || profile
+                            .boss_bars
+                            .is_some_and(|(minimum, maximum)| minimum == 0 || minimum > maximum)
+                        || profile.skip_fallback.is_some_and(|fallback| {
+                            fallback.event_weight == 0 && fallback.boss_weight == 0
+                        })
                 })
             {
                 return Err(WorldContentError::Definition);

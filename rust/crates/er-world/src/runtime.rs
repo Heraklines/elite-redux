@@ -103,6 +103,55 @@ const EXTRA_NODE_CHANCE: u64 = 50;
 const BIOME_LENGTH_MIN: u64 = 7;
 const BIOME_LENGTH_MAX: u64 = 25;
 
+pub fn biome_encounter_profile(
+    content: &PreparedWorldContentV1,
+    biome: BiomeId,
+) -> Option<&crate::BiomeEncounterProfileV1> {
+    content.biome(biome)?.encounter_profile.as_ref()
+}
+
+pub fn biome_event_rate(content: &PreparedWorldContentV1, biome: BiomeId) -> crate::WorldRatioV1 {
+    biome_encounter_profile(content, biome).map_or(
+        crate::WorldRatioV1 {
+            numerator: 1,
+            denominator: 1,
+        },
+        |profile| profile.event_rate,
+    )
+}
+
+pub fn biome_wave_skip_chance(content: &PreparedWorldContentV1, biome: BiomeId) -> u8 {
+    biome_encounter_profile(content, biome).map_or(0, |profile| profile.skip_chance_pct)
+}
+
+pub fn biome_skip_fallback(
+    content: &PreparedWorldContentV1,
+    biome: BiomeId,
+) -> Option<crate::BiomeSkipFallbackV1> {
+    biome_encounter_profile(content, biome).and_then(|profile| profile.skip_fallback)
+}
+
+pub fn biome_battle_rule(
+    content: &PreparedWorldContentV1,
+    biome: BiomeId,
+) -> Option<&crate::BiomeBattleRuleV1> {
+    content.biome(biome)?.battle_rule.as_ref()
+}
+
+pub fn biome_forced_weather(
+    content: &PreparedWorldContentV1,
+    biome: BiomeId,
+) -> Option<er_types::battle_model::WeatherKind> {
+    biome_battle_rule(content, biome).and_then(|rule| rule.forced_weather.clone())
+}
+
+pub fn biome_forced_terrain(
+    content: &PreparedWorldContentV1,
+    biome: BiomeId,
+) -> Option<er_types::battle_model::TerrainKind> {
+    biome_battle_rule(content, biome).and_then(|rule| rule.forced_terrain.clone())
+}
+
 pub fn final_wave(mode: &crate::GameModeDefinitionV1) -> Option<u32> {
     mode.terminal_wave
 }
