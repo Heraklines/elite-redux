@@ -26,6 +26,11 @@ const SAVE_RECORDER_PROOF = {
   path: "rust/crates/er-save/src/oracle_replay.rs",
   test: "replay_recorder_is_idempotent_and_wave_bounded",
 };
+const SAVE_SINGLE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/oracle_replay.rs",
+  test: "single_player_capture_helpers_preserve_command_and_state",
+};
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -43,6 +48,7 @@ const biomeDepths = "src/init/init-biome-depths.ts";
 const biomeRegistry = "src/init/init-biomes.ts";
 const replayTrace = "src/data/elite-redux/replay-trace.ts";
 const replayRecorder = "src/data/elite-redux/replay-recorder.ts";
+const replaySingle = "src/data/elite-redux/replay-single-recording.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -146,6 +152,18 @@ const implemented = [
   [replayRecorder, 206, "recordReplayInteraction", "er_save::oracle_replay::OracleReplayRecorderV2::record_interaction", SAVE_RECORDER_PROOF],
   [replayRecorder, 223, "getReplayTrace", "er_save::oracle_replay::OracleReplayRecorderV2::trace", SAVE_RECORDER_PROOF],
   [replayRecorder, 242, "map[0]", "er_save::oracle_replay::OracleReplayRecorderV2::trace", SAVE_RECORDER_PROOF],
+  [replaySingle, 75, "captureSinglePlayerEndState", "er_save::oracle_replay::capture_single_player_end_state_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 79, "map[0]", "er_save::oracle_replay::capture_single_player_end_state_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 98, "maybeBeginSinglePlayerReplayRecording", "er_save::oracle_replay::begin_single_player_recording_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 117, "map[0]", "er_save::oracle_replay::begin_single_player_recording_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 118, "currentWave", "er_save::oracle_replay::record_single_player_interaction_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 134, "captureReplayCheckpoint", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 138, "map[0]", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 139, "map[0]", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 153, "maybeCaptureReplayCheckpoint", "er_save::oracle_replay::capture_replay_checkpoint_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 165, "playerCommandToReplayKind", "er_save::oracle_replay::player_command_to_replay_kind_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 191, "recordSinglePlayerCommand", "er_save::oracle_replay::record_single_player_command_v2", SAVE_SINGLE_PROOF],
+  [replaySingle, 233, "recordSinglePlayerInteraction", "er_save::oracle_replay::record_single_player_interaction_v2", SAVE_SINGLE_PROOF],
 ];
 
 function fail(message) {

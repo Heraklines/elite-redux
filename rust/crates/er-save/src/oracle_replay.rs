@@ -289,6 +289,107 @@ impl OracleReplayRecorderV2 {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OraclePlayerCommandV2 {
+    Move {
+        move_index: i64,
+        target: Option<i64>,
+    },
+    Switch {
+        party_index: i64,
+    },
+    Ball {
+        ball_index: i64,
+    },
+    Run,
+}
+
+pub fn player_command_to_replay_kind_v2(
+    command: OraclePlayerCommandV2,
+) -> OracleReplayCommandKindV2 {
+    match command {
+        OraclePlayerCommandV2::Move { move_index, target } => {
+            OracleReplayCommandKindV2::Move { move_index, target }
+        }
+        OraclePlayerCommandV2::Switch { party_index } => {
+            OracleReplayCommandKindV2::Switch { party_index }
+        }
+        OraclePlayerCommandV2::Ball { ball_index } => {
+            OracleReplayCommandKindV2::Ball { ball_index }
+        }
+        OraclePlayerCommandV2::Run => OracleReplayCommandKindV2::Run,
+    }
+}
+
+pub fn capture_single_player_end_state_v2(
+    wave_index: i64,
+    money: i64,
+    party: Vec<OracleReplayPokemonV2>,
+) -> OracleReplayEndStateV2 {
+    OracleReplayEndStateV2 {
+        wave_index,
+        money,
+        party,
+    }
+}
+
+pub fn capture_replay_checkpoint_v2(
+    wave: i64,
+    seed: String,
+    party: Vec<OracleReplayPokemonV2>,
+    money: i64,
+    pokeball_counts: Vec<(String, i64)>,
+) -> OracleReplayCheckpointV2 {
+    OracleReplayCheckpointV2 {
+        wave,
+        seed,
+        party,
+        money,
+        pokeball_counts,
+    }
+}
+
+pub fn begin_single_player_recording_v2(
+    recorder: &mut OracleReplayRecorderV2,
+    trace: OracleReplayTraceV2,
+) {
+    recorder.begin(trace);
+}
+
+pub fn record_single_player_command_v2(
+    recorder: &mut OracleReplayRecorderV2,
+    wave: i64,
+    turn: i64,
+    slot_field_index: i64,
+    command: OraclePlayerCommandV2,
+) {
+    recorder.record_command(OracleReplayEventV2::Command {
+        wave,
+        turn,
+        slot_field_index,
+        command: player_command_to_replay_kind_v2(command),
+    });
+}
+
+pub fn record_single_player_interaction_v2(
+    recorder: &mut OracleReplayRecorderV2,
+    wave: i64,
+    seq: i64,
+    kind: String,
+    choice: i64,
+    data: Option<Vec<i64>>,
+) {
+    recorder.record_interaction(
+        wave,
+        OracleReplayEventV2::Interaction {
+            seq,
+            kind,
+            choice,
+            data,
+        },
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -368,5 +469,36 @@ mod tests {
         assert_eq!(*wave, 3);
         recorder.clear();
         assert!(!recorder.is_recording());
+    }
+
+    #[test]
+    fn single_player_capture_helpers_preserve_command_and_state() {
+        let end = capture_single_player_end_state_v2(12, 500, vec![pokemon()]);
+        let checkpoint = capture_replay_checkpoint_v2(
+            3,
+            "checkpoint".to_owned(),
+            vec![pokemon()],
+            200,
+            vec![("poke-ball".to_owned(), 2)],
+        );
+        let trace = make_oracle_replay_trace_v2(
+            "seed".to_owned(),
+            0,
+            None,
+            None,
+            vec![pokemon()],
+            Vec::new(),
+            Some(end),
+            Some(checkpoint),
+        );
+        let mut recorder = OracleReplayRecorderV2::default();
+        begin_single_player_recording_v2(&mut recorder, trace);
+        record_single_player_command_v2(&mut recorder, 3, 0, 0, OraclePlayerCommandV2::Run);
+        record_single_player_interaction_v2(&mut recorder, 3, 0, "reward".to_owned(), 1, None);
+        let recorded = recorder.trace().expect("trace");
+        assert_eq!(recorded.events.len(), 2);
+        assert!(recorded.events[0].is_command());
+        assert!(recorded.events[1].is_interaction());
+        assert_eq!(recorded.end_state.expect("end").wave_index, 12);
     }
 }
