@@ -55,6 +55,21 @@ pub enum RunExecutionError {
     UnreachableOperation,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct RunOperationDispatcherV1;
+
+impl RunOperationDispatcherV1 {
+    fn execute(
+        program: &RunProgramV1,
+        operation: &RunOperation,
+        state: &mut GameStateV5,
+        context: &RunExecutionContextV1,
+        content: &PreparedGameContentV1,
+    ) -> Result<(), RunExecutionError> {
+        dispatch_operation(program, operation, state, context, content)
+    }
+}
+
 pub fn execute_run_hook_v1(
     before: &GameStateV5,
     content: &PreparedGameContentV1,
@@ -119,7 +134,7 @@ fn execute_program_bindings(
             .get(start..end)
             .ok_or(RunExecutionError::Reference)?;
         for (offset, operation) in operations.iter().enumerate() {
-            apply_operation(program, operation, after, context, content)?;
+            RunOperationDispatcherV1::execute(program, operation, after, context, content)?;
             evidence.push(RunOperationEvidenceV1 {
                 program: program.id,
                 source: program.source.clone(),
@@ -193,7 +208,7 @@ fn evaluate_condition(
     }
 }
 
-fn apply_operation(
+fn dispatch_operation(
     program: &RunProgramV1,
     operation: &RunOperation,
     state: &mut GameStateV5,

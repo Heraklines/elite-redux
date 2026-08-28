@@ -245,6 +245,63 @@ pub enum RunOperation {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RunOperationOwnerV1 {
+    RunCore,
+    InventoryEconomy,
+    Progression,
+    CaptureParty,
+    World,
+    Scenario,
+    Presentation,
+}
+
+impl RunOperation {
+    pub const fn owner(&self) -> RunOperationOwnerV1 {
+        match self {
+            Self::AddMoney { .. }
+            | Self::RemoveMoney { .. }
+            | Self::SetRunFlag { .. }
+            | Self::SetProfileFlag { .. }
+            | Self::AdvanceQuest { .. }
+            | Self::ChangeFactionStanding { .. }
+            | Self::OpenControl { .. }
+            | Self::EnterTerminal { .. } => RunOperationOwnerV1::RunCore,
+            Self::AddModifier { .. }
+            | Self::RemoveModifier { .. }
+            | Self::AddItem { .. }
+            | Self::RemoveItem { .. } => RunOperationOwnerV1::InventoryEconomy,
+            Self::GrantExperience { .. }
+            | Self::SetLevel { .. }
+            | Self::HealPokemon { .. }
+            | Self::RevivePokemon { .. }
+            | Self::ChangeStatus { .. }
+            | Self::AddMove { .. }
+            | Self::RemoveMove { .. }
+            | Self::ReplaceMove { .. }
+            | Self::ChangeAbility { .. }
+            | Self::ChangeNature { .. }
+            | Self::EvolvePokemon { .. }
+            | Self::FusePokemon { .. }
+            | Self::UnfusePokemon { .. }
+            | Self::ChangePersistentForm { .. } => RunOperationOwnerV1::Progression,
+            Self::CapturePokemon { .. }
+            | Self::AddPokemonToParty { .. }
+            | Self::SendPokemonToStorage { .. }
+            | Self::ReleasePokemon { .. }
+            | Self::TransferItem { .. } => RunOperationOwnerV1::CaptureParty,
+            Self::SetBiome { .. } | Self::GenerateEncounter { .. } | Self::StartBattle { .. } => {
+                RunOperationOwnerV1::World
+            }
+            Self::OpenScenario { .. } | Self::CompleteScenario { .. } => {
+                RunOperationOwnerV1::Scenario
+            }
+            Self::EmitPresentation { .. } => RunOperationOwnerV1::Presentation,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RunProgramBudget {

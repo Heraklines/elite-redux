@@ -11,8 +11,8 @@ use er_progression::{PreparedProgressionContentV1, ProgressionContentPackV1};
 use er_scenario::{PreparedScenarioContentV1, ScenarioContentPackV1};
 use er_types::{
     BattleContentPackHashV3, CatalogHash, GameBehaviorStatus, GameBehaviorUnitId,
-    GameContentBundleHash, GameContentIdentity, OracleSha, RunOperation, RunProgramId,
-    RunProgramV1,
+    GameContentBundleHash, GameContentIdentity, OracleSha, RunOperation, RunOperationOwnerV1,
+    RunProgramId, RunProgramV1,
 };
 use er_world::{PreparedWorldContentV1, WorldContentPackV1};
 use serde::{Deserialize, Serialize};
@@ -207,45 +207,12 @@ fn compute_run_content_hash(
 }
 
 fn run_operation_executable_v1(operation: &RunOperation) -> bool {
-    match operation {
-        RunOperation::AddMoney { .. }
-        | RunOperation::RemoveMoney { .. }
-        | RunOperation::AddModifier { .. }
-        | RunOperation::RemoveModifier { .. }
-        | RunOperation::AddItem { .. }
-        | RunOperation::RemoveItem { .. }
-        | RunOperation::SetRunFlag { .. }
-        | RunOperation::SetProfileFlag { .. }
-        | RunOperation::AdvanceQuest { .. }
-        | RunOperation::ChangeFactionStanding { .. }
-        | RunOperation::OpenControl { .. }
-        | RunOperation::OpenScenario { .. }
-        | RunOperation::CompleteScenario { .. }
-        | RunOperation::EnterTerminal { .. } => true,
-        RunOperation::GrantExperience { .. }
-        | RunOperation::SetLevel { .. }
-        | RunOperation::HealPokemon { .. }
-        | RunOperation::RevivePokemon { .. }
-        | RunOperation::ChangeStatus { .. }
-        | RunOperation::AddMove { .. }
-        | RunOperation::RemoveMove { .. }
-        | RunOperation::ReplaceMove { .. }
-        | RunOperation::ChangeAbility { .. }
-        | RunOperation::ChangeNature { .. }
-        | RunOperation::CapturePokemon { .. }
-        | RunOperation::AddPokemonToParty { .. }
-        | RunOperation::SendPokemonToStorage { .. }
-        | RunOperation::ReleasePokemon { .. }
-        | RunOperation::EvolvePokemon { .. }
-        | RunOperation::FusePokemon { .. }
-        | RunOperation::UnfusePokemon { .. }
-        | RunOperation::ChangePersistentForm { .. }
-        | RunOperation::TransferItem { .. }
-        | RunOperation::SetBiome { .. }
-        | RunOperation::GenerateEncounter { .. }
-        | RunOperation::StartBattle { .. }
-        | RunOperation::EmitPresentation { .. } => false,
-    }
+    matches!(
+        operation.owner(),
+        RunOperationOwnerV1::RunCore
+            | RunOperationOwnerV1::InventoryEconomy
+            | RunOperationOwnerV1::Scenario
+    )
 }
 
 impl MetaContentPackV1 {
