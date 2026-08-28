@@ -185,7 +185,9 @@
     "flags": {},
     "generation": 9,
     "id": 20006,
-    "includes": [],
+    "includes": [
+      20005
+    ],
     "mechanics": [],
     "modifiers": [],
     "name": "Malicious Empathy",
