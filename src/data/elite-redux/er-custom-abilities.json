@@ -116,43 +116,19 @@
     "version": 1
   },
   "new-ability-6": {
-    "componentRules": [
-      {
-        "chance": 100,
-        "conditionLogic": "all",
-        "conditions": [
-          {
-            "kind": "holder-hp",
-            "maxPercent": 35
-          }
-        ],
-        "effects": [
-          {
-            "abilityId": 194,
-            "attrIndex": 0,
-            "attrType": "PostDamageForceSwitchAbAttr",
-            "parameterOverrides": {
-              "hpRatio": 0.35
-            }
-          }
-        ],
-        "hook": {
-          "abilityId": 5417,
-          "attrIndex": 0,
-          "attrType": "PassiveRecoveryAbAttr"
-        },
-        "key": "component-1",
-        "prerequisiteHooks": []
-      }
-    ],
-    "description": "used as part of another ability",
+    "componentRules": [],
+    "description": "Battle Armor + Galvanize + Thundercall",
     "flags": {},
     "generation": 9,
     "id": 20005,
-    "includes": [],
+    "includes": [
+      4,
+      206,
+      5126
+    ],
     "mechanics": [],
     "modifiers": [],
-    "name": "35% hp emergency",
+    "name": "Thunder Gods Vessel",
     "rules": [],
     "version": 1
   },
