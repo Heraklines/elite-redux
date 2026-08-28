@@ -187,6 +187,19 @@ jobs:
         run: |
           set -o pipefail
           cargo test --workspace --all-targets 2>&1 | tee "$RUNNER_TEMP/m0-m6-regression.log"
+      - name: Publish regression failure summary
+        if: failure()
+        run: |
+          {
+            printf '%s\n' '### M0-M6 regression failure tail' '```text'
+            tail -n 160 "$RUNNER_TEMP/m0-m6-regression.log"
+            printf '%s\n' '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          grep -E -- '^(---- |failures:|test result:|error: test failed|error\\[)' \
+            "$RUNNER_TEMP/m0-m6-regression.log" \
+            | while IFS= read -r line; do
+                printf '::error title=M0-M6 regression::%s\n' "$line"
+              done
       - uses: actions/upload-artifact@v6
         if: failure()
         with:
