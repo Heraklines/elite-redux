@@ -352,6 +352,16 @@ function domainFor(path, symbol, owner) {
     return "PLATFORM";
   }
   if (
+    path === "src/timed-event-manager.ts"
+    && [
+      "getShinyEncounterMultiplier",
+      "getEventEncounters",
+      "getAllValidEventEncounters",
+    ].includes(symbol)
+  ) {
+    return "PLATFORM";
+  }
+  if (
     path === "src/data/elite-redux/er-training-cache.ts"
     && symbol === "recordErTrainingCacheWave"
   ) {
