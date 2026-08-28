@@ -178,6 +178,7 @@ version = "0.1.0"
 dependencies = [
  "er-dev-types",
  "er-devplane",
+ "er-types",
  "serde",
  "thiserror",
 ]
@@ -265,11 +266,16 @@ dependencies = [
 name = "er-devplane"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "er-canonical",
+ "er-content",
  "er-dev-types",
  "er-env",
+ "er-kernel",
  "er-model",
  "er-render-model",
  "er-sim",
+ "er-types",
  "serde",
  "thiserror",
 ]
@@ -491,16 +497,22 @@ name = "er-testkit"
 version = "0.1.0"
 dependencies = [
  "er-ai",
+ "er-batch",
  "er-battle",
  "er-canonical",
  "er-content",
  "er-content-compiler",
+ "er-dev-types",
+ "er-devplane",
  "er-env",
  "er-game",
+ "er-impact",
  "er-kernel",
  "er-mechanics",
+ "er-model",
  "er-progression",
  "er-protocol",
+ "er-render-model",
  "er-rng",
  "er-run",
  "er-save",

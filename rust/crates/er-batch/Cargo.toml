@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 er-dev-types = { path = "../er-dev-types" }
 er-devplane = { path = "../er-devplane" }
+er-types = { path = "../er-types" }
 serde.workspace = true
 thiserror.workspace = true
 

@@ -1,4 +1,19 @@
 //! Shared, gameplay-independent M7.1 developer-plane contracts.
+pub mod causal;
+pub mod digest;
+pub mod identity;
+pub mod observation;
+pub mod performance;
+pub mod snapshot_v7;
+pub mod trace_v7;
+
+pub use causal::*;
+pub use digest::*;
+pub use identity::*;
+pub use observation::*;
+pub use performance::*;
+pub use snapshot_v7::*;
+pub use trace_v7::*;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +25,7 @@ pub const DIAGNOSTIC_DIGEST_VERSION_V1: u32 = 1;
 pub const RESTORABLE_SNAPSHOT_VERSION_V7: u32 = 7;
 pub const KERNEL_TRACE_VERSION_V7: u32 = 7;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
 pub enum KnownOrUnknownV1<T> {
     Known(T),
