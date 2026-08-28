@@ -124,6 +124,10 @@ fn foundation_behavior() -> GameBehaviorUnitId {
     GameBehaviorUnitId::parse("b".repeat(64)).expect("foundation behavior ID")
 }
 
+fn terminal_behavior() -> GameBehaviorUnitId {
+    GameBehaviorUnitId::parse("c".repeat(64)).expect("terminal behavior ID")
+}
+
 fn run_program() -> RunProgramV1 {
     RunProgramV1 {
         schema_version: 1,
@@ -199,6 +203,33 @@ fn foundation_journey_program() -> RunProgramV1 {
             selector_nodes: 1,
             value_nodes: 1,
             operations: 7,
+            emitted_presentations: 0,
+        },
+    }
+}
+
+fn terminal_journey_program() -> RunProgramV1 {
+    RunProgramV1 {
+        schema_version: 1,
+        id: RunProgramId::new(safe(3)),
+        source: terminal_behavior(),
+        hooks: vec![RunHookBinding {
+            hook: RunHook::ProfileLoaded,
+            condition: RunConditionId(0),
+            first_operation: 0,
+            operation_count: 1,
+        }],
+        conditions: vec![RunCondition::Always],
+        selectors: Vec::new(),
+        values: Vec::new(),
+        operations: vec![RunOperation::EnterTerminal {
+            outcome: RunOutcome::Victory,
+        }],
+        budget: RunProgramBudget {
+            condition_nodes: 1,
+            selector_nodes: 0,
+            value_nodes: 0,
+            operations: 1,
             emitted_presentations: 0,
         },
     }
@@ -478,7 +509,11 @@ fn prepared_content() -> TestResult<Arc<PreparedGameContentV1>> {
     let run = Arc::new(RunContentPackV3::new(
         OracleSha::parse(ORACLE)?,
         battle.content_hash.clone(),
-        vec![run_program(), foundation_journey_program()],
+        vec![
+            run_program(),
+            foundation_journey_program(),
+            terminal_journey_program(),
+        ],
     )?);
     let meta = Arc::new(MetaContentPackV1 {
         schema_version: META_CONTENT_PACK_SCHEMA_VERSION_V1,
@@ -491,6 +526,10 @@ fn prepared_content() -> TestResult<Arc<PreparedGameContentV1>> {
             },
             GameBehaviorClassificationV1 {
                 behavior: foundation_behavior(),
+                status: GameBehaviorStatus::Compiled,
+            },
+            GameBehaviorClassificationV1 {
+                behavior: terminal_behavior(),
                 status: GameBehaviorStatus::Compiled,
             },
         ],
@@ -1439,6 +1478,90 @@ fn continuous_foundation_raw_key_journey_crosses_world_save_party_and_progressio
     assert_eq!(run.storage[0].pokemon.hp, 15);
     assert_eq!(run.inventory.entries[0].count, 2);
     assert_eq!(run.flags.get(&RunFlagId::new(safe(2))), Some(&true));
+    Ok(())
+}
+
+#[test]
+fn raw_key_mode_select_reaches_shared_terminal() -> TestResult {
+    let content = prepared_content()?;
+    let mut state = game_state(&content)?;
+    let option = MenuOptionId::new("mode/classic")?;
+    let run = state.active_run.as_mut().ok_or("missing active run")?;
+    run.control = GameControlPlanV2 {
+        schema_version: er_types::GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
+        revision: safe(4),
+        kind: GameControlKindV2::ModeSelect,
+        owner_seat: Some(SeatId::new(safe(1))),
+        action_context: Some(GameActionContextV1 {
+            operation_id: OperationId::new("m7/title/classic")?,
+            authority_seat: SeatId::new(safe(1)),
+            authority_revision: safe(4),
+            menu_instance: MenuInstanceId::new(safe(4)),
+        }),
+        menu: Some(GameMenuV2::new(
+            MenuInstanceId::new(safe(4)),
+            SeatId::new(safe(1)),
+            "m7/title",
+            option.clone(),
+            vec![GameMenuOptionV2::new(
+                option,
+                true,
+                true,
+                GameActionV1::ExecuteRunProgram {
+                    program: RunProgramId::new(safe(3)),
+                    hook: RunHook::ProfileLoaded,
+                    context: RunExecutionContextV2::default(),
+                },
+                None,
+            )?],
+            Vec::new(),
+            GameMenuCancelV2::Disabled,
+        )?),
+        actionable: true,
+    };
+    state.validate()?;
+    let mut environment = GameEnvironment::new_run(
+        state,
+        content,
+        EnvironmentKernelComponentsV1 {
+            input_router: InputRouterSnapshotV2 {
+                focus: InputFocus::Game,
+                pressed: Vec::new(),
+                suppressed_printable_keys: Vec::new(),
+                held_buttons: Vec::new(),
+                locks: Vec::new(),
+                repeats: Vec::new(),
+                disposed: false,
+            },
+            scheduler: KernelSchedulerSnapshotV2 {
+                next_timer_id: None,
+                timers: Vec::new(),
+                pauses: Vec::new(),
+                disposed: false,
+            },
+            protocol: None,
+            replay_sequence: SafeU53::ZERO,
+            terminal: None,
+        },
+    )?;
+    environment.raw_input(RawInputEvent::KeyDown {
+        code: PhysicalKey::Space,
+        printable: true,
+        browser_repeat: false,
+        focus: InputFocus::Game,
+    })?;
+    let observation = environment.observe()?;
+    assert!(observation.terminal);
+    assert_eq!(observation.control, Some(GameControlKindV2::Complete));
+    assert_eq!(
+        environment
+            .snapshot()
+            .game_state
+            .active_run
+            .as_ref()
+            .map(|run| run.outcome),
+        Some(RunOutcome::Victory)
+    );
     Ok(())
 }
 

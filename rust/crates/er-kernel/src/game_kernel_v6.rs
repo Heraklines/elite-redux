@@ -18,6 +18,7 @@ use er_protocol::{
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
+use er_types::run_model::RunOutcome;
 use er_types::ui_menu::NavigationDirection;
 use er_types::{
     GAME_ACTION_SCHEMA_VERSION_V1, GameControlKindV2, GameProposalV1, MenuOptionId, OperationId,
@@ -84,7 +85,7 @@ impl GameKernelV6 {
     ) -> Result<Self, GameKernelV6Error> {
         let runtime = GameRuntimeV5::new(state, content)
             .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
-        let kernel = Self {
+        let mut kernel = Self {
             runtime,
             input_router,
             pressed_keys: BTreeSet::new(),
@@ -94,6 +95,7 @@ impl GameKernelV6 {
             replay_sequence,
             terminal,
         };
+        kernel.synchronize_terminal();
         kernel
             .snapshot()
             .validate()
@@ -133,7 +135,7 @@ impl GameKernelV6 {
             content,
         )
         .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
-        Ok(Self {
+        let mut kernel = Self {
             runtime,
             input_router: snapshot.input_router,
             pressed_keys: snapshot.pressed_keys,
@@ -142,7 +144,9 @@ impl GameKernelV6 {
             pending_presentations: snapshot.pending_presentations,
             replay_sequence: snapshot.replay_sequence,
             terminal: snapshot.terminal,
-        })
+        };
+        kernel.synchronize_terminal();
+        Ok(kernel)
     }
 
     pub fn snapshot(&self) -> RestorableKernelSnapshotV6 {
@@ -367,6 +371,7 @@ impl GameKernelV6 {
             return Err(GameKernelV6Error::Transaction);
         }
         self.runtime = staged;
+        self.synchronize_terminal();
         self.advance_replay_sequence()?;
         Ok(Some(intent_effect(intent)))
     }
@@ -411,6 +416,7 @@ impl GameKernelV6 {
             .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         self.pending_presentations
             .extend(prepared.material.presentation.clone());
+        self.synchronize_terminal();
         self.advance_replay_sequence()?;
         Ok(prepared)
     }
@@ -432,6 +438,7 @@ impl GameKernelV6 {
         if result == MaterialApplyResultV5::Applied {
             self.pending_presentations.extend(presentation);
             self.advance_replay_sequence()?;
+            self.synchronize_terminal();
         }
         Ok(result)
     }
@@ -445,6 +452,24 @@ impl GameKernelV6 {
             .ok_or(GameKernelV6Error::Transaction)?;
         self.replay_sequence = next;
         Ok(())
+    }
+
+    fn synchronize_terminal(&mut self) {
+        if self.terminal.is_some() {
+            return;
+        }
+        let Some(run) = self.runtime.state().active_run.as_ref() else {
+            return;
+        };
+        let reason = match run.outcome {
+            RunOutcome::InProgress => return,
+            RunOutcome::Victory => "VICTORY",
+            RunOutcome::Defeat => "DEFEAT",
+        };
+        self.terminal = Some(TerminalState {
+            terminal_id: format!("run/{}/terminal", run.run_id),
+            reason: reason.to_owned(),
+        });
     }
 
     pub fn pending_presentations(&self) -> &[BattlePresentationCueV5] {

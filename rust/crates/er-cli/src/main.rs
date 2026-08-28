@@ -256,3 +256,43 @@ fn write_line(value: &str) -> Result<(), Box<dyn Error>> {
     stdout.flush()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terminal_commands_map_only_to_physical_keys() {
+        assert_eq!(terminal_key("w").expect("up"), PhysicalKey::ArrowUp);
+        assert_eq!(terminal_key("s").expect("down"), PhysicalKey::ArrowDown);
+        assert_eq!(terminal_key("a").expect("left"), PhysicalKey::ArrowLeft);
+        assert_eq!(terminal_key("d").expect("right"), PhysicalKey::ArrowRight);
+        assert_eq!(terminal_key("space").expect("space"), PhysicalKey::Space);
+        assert_eq!(terminal_key("escape").expect("escape"), PhysicalKey::Escape);
+        assert!(terminal_key("select-reward").is_err());
+        assert!(terminal_key("resolve-turn").is_err());
+    }
+
+    #[test]
+    fn cli_options_reject_duplicates_and_unpaired_values() {
+        let options = parse_options(
+            ["--content", "content.json", "--state", "state.json"]
+                .into_iter()
+                .map(str::to_owned),
+        )
+        .expect("options");
+        assert_eq!(
+            options.get("content").map(String::as_str),
+            Some("content.json")
+        );
+        assert!(parse_options(["--content"].into_iter().map(str::to_owned)).is_err());
+        assert!(
+            parse_options(
+                ["--content", "a", "--content", "b"]
+                    .into_iter()
+                    .map(str::to_owned),
+            )
+            .is_err()
+        );
+    }
+}
