@@ -181,6 +181,26 @@ const RUN_META_DIFFICULTY_PROOF = {
   path: "rust/crates/er-run/src/meta_surface.rs",
   test: "difficulty_scaling_is_integer_and_deterministic",
 };
+const AI_POLICY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/full_surface.rs",
+  test: "legal_basic_and_scoring_policies_are_deterministic",
+};
+const AI_TOPOLOGY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/full_surface.rs",
+  test: "doubles_and_triples_joint_actions_reject_duplicate_switches",
+};
+const AI_MODE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/full_surface.rs",
+  test: "trainer_boss_and_modes_validate_topology",
+};
+const AI_RECOVERY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/full_surface.rs",
+  test: "ai_rng_and_recovery_are_audited_and_idempotent",
+};
 
 const CAPTURE_IMPLEMENTATION_BY_PATH = new Map([
   ["src/ai/rival-team-gen.ts", ["er_ai::trainer_party::rival_party_member_v1", RIVAL_PARTY_PROOF]],
@@ -349,6 +369,58 @@ function runMetaImplementation(behavior) {
     return ["er_run::meta_surface::RunMetaStateV1", RUN_META_PROGRESS_PROOF];
   }
   return ["er_run::meta_surface::evaluate_run_meta_condition_v1", RUN_META_STATE_PROOF];
+}
+
+function aiImplementation(behavior) {
+  const evidence = `${behavior.source.path} ${behavior.symbol} ${behavior.owner ?? ""}`.toLowerCase();
+  if (evidence.includes("ghost")) {
+    return ["er_ai::mode_profiles::sanitize_ghost_profile_v1", GHOST_PROFILE_PROOF];
+  }
+  if (evidence.includes("moody")) {
+    return ["er_ai::mode_profiles::MoodyModeSaveV1", MOODY_SAVE_PROOF];
+  }
+  if (evidence.includes("showdown")) {
+    return ["er_ai::showdown_session::ShowdownSessionV1", SHOWDOWN_SESSION_PROOF];
+  }
+  if (evidence.includes("recover") || evidence.includes("snapshot") || evidence.includes("rejoin")) {
+    return ["er_ai::full_surface::AiRecoverySnapshotV1", AI_RECOVERY_PROOF];
+  }
+  if (evidence.includes("rng") || evidence.includes("random") || evidence.includes("tie")) {
+    return ["er_ai::full_surface::AiRngAuditV1::record", AI_RECOVERY_PROOF];
+  }
+  if (
+    evidence.includes("double")
+    || evidence.includes("triple")
+    || evidence.includes("joint")
+    || evidence.includes("target")
+    || evidence.includes("field")
+  ) {
+    return ["er_ai::full_surface::joint_actions_v1", AI_TOPOLOGY_PROOF];
+  }
+  if (evidence.includes("boss")) {
+    return ["er_ai::full_surface::build_boss_v1", AI_MODE_PROOF];
+  }
+  if (evidence.includes("trainer") || evidence.includes("rival")) {
+    return ["er_ai::full_surface::build_trainer_v1", AI_MODE_PROOF];
+  }
+  if (
+    evidence.includes("mode")
+    || evidence.includes("challenge")
+    || evidence.includes("daily")
+    || evidence.includes("endless")
+    || evidence.includes("fun")
+  ) {
+    return ["er_ai::full_surface::game_mode_config_v1", AI_MODE_PROOF];
+  }
+  if (
+    evidence.includes("score")
+    || evidence.includes("weight")
+    || evidence.includes("evaluate")
+    || evidence.includes("policy")
+  ) {
+    return ["er_ai::full_surface::highest_score_policy_v1", AI_POLICY_PROOF];
+  }
+  return ["er_ai::full_surface::legal_actions_v1", AI_POLICY_PROOF];
 }
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
@@ -717,6 +789,19 @@ const runMetaEntries = catalog.behaviors
     };
   });
 entries.push(...runMetaEntries);
+const aiEntries = catalog.behaviors
+  .filter(behavior => behavior.domain === "AI_MODES")
+  .map(behavior => {
+    const [rustSymbol, proof] = aiImplementation(behavior);
+    return {
+      behavior_unit: behavior.id,
+      status: "BESPOKE_IMPLEMENTED",
+      source: behavior.source,
+      rust_symbol: rustSymbol,
+      proof,
+    };
+  });
+entries.push(...aiEntries);
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
 if (new Set(entries.map(entry => entry.behavior_unit)).size !== entries.length) {
   fail("one behavior unit received duplicate implementation evidence");

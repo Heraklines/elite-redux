@@ -1,4 +1,5 @@
 //! Deterministic canonical M7 battle policies.
+pub mod full_surface;
 pub mod mode_profiles;
 pub mod party_snapshots;
 pub mod showdown;
