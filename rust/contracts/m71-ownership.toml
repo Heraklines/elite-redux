@@ -1,0 +1,176 @@
+integration_branch = "arch/rust-kernel-m7-devplane"
+base_tag = "rust-kernel-m7-final"
+base_sha = "1599f19c5d05ec8646819414f6ef7556f1f8bc89"
+
+[integration]
+owner = "integration-owner"
+exclusive = [
+  "rust/Cargo.toml",
+  "rust/Cargo.lock",
+  "rust/crates/er-env/**",
+  "rust/crates/er-cli/**",
+  "rust/crates/er-wasm/**",
+  ".github/workflows/rust-kernel-m71.yml",
+  "rust/contracts/m71-*",
+  "rust/fixtures/m71/**",
+]
+
+[contract]
+owner = "contract-steward"
+exclusive = [
+  "rust/contracts/m71-contract.toml",
+  "rust/contracts/m71-api.md",
+  "rust/contracts/m71-ownership.toml",
+  "rust/contracts/m71-error-policy.md",
+  "rust/contracts/m71-privacy.md",
+  "rust/contracts/m71-performance.md",
+]
+
+[dev_types_identity]
+owner = "DP-A01"
+exclusive = ["rust/crates/er-dev-types/src/identity.rs"]
+
+[dev_types_causal]
+owner = "DP-A02"
+exclusive = ["rust/crates/er-dev-types/src/causal.rs"]
+
+[dev_types_digest]
+owner = "DP-A03"
+exclusive = ["rust/crates/er-dev-types/src/digest.rs"]
+
+[dev_types_observation]
+owner = "DP-A04"
+exclusive = ["rust/crates/er-dev-types/src/observation.rs"]
+
+[devplane_solo]
+owner = "DP-A05"
+exclusive = ["rust/crates/er-devplane/src/solo.rs"]
+
+[devplane_pair]
+owner = "DP-A06"
+exclusive = ["rust/crates/er-devplane/src/pair.rs", "rust/crates/er-devplane/src/checkpoint.rs", "rust/crates/er-devplane/src/lineage.rs"]
+
+[dev_types_snapshot]
+owner = "DP-A07"
+exclusive = ["rust/crates/er-dev-types/src/snapshot_v7.rs", "rust/crates/er-dev-types/src/trace_v7.rs"]
+
+[model]
+owner = "DP-A08"
+exclusive = ["rust/crates/er-model/**"]
+
+[render_model]
+owner = "DP-A09"
+exclusive = ["rust/crates/er-render-model/**"]
+
+[devplane_telemetry]
+owner = "DP-A10"
+exclusive = ["rust/crates/er-devplane/src/telemetry.rs", "rust/crates/er-dev-types/src/performance.rs"]
+
+[batch_foundation]
+owner = "DP-A11"
+exclusive = ["rust/crates/er-batch/**"]
+
+[foundation_tests]
+owner = "DP-A12"
+exclusive = ["rust/crates/er-devplane/tests/**", "rust/crates/er-testkit/tests/m71-*.rs"]
+
+[repro_container]
+owner = "DP-B01"
+exclusive = ["rust/crates/er-repro/src/container.rs"]
+
+[repro_runner]
+owner = "DP-B02"
+exclusive = ["rust/crates/er-repro/src/replay.rs"]
+
+[repro_diff]
+owner = "DP-B03"
+exclusive = ["rust/crates/er-repro/src/diff.rs"]
+
+[repro_seek]
+owner = "DP-B04"
+exclusive = ["rust/crates/er-repro/src/seek.rs"]
+
+[repro_fork]
+owner = "DP-B05"
+exclusive = ["rust/crates/er-repro/src/fork.rs"]
+
+[repro_event_minimizer]
+owner = "DP-B06"
+exclusive = ["rust/crates/er-repro/src/minimize_events.rs"]
+
+[repro_state_minimizer]
+owner = "DP-B07"
+exclusive = ["rust/crates/er-repro/src/minimize_state.rs"]
+
+[explain]
+owner = "DP-B08"
+exclusive = ["rust/crates/er-devplane/src/explain.rs"]
+
+[agent_protocol]
+owner = "DP-B09"
+exclusive = ["rust/crates/er-agent-protocol/**"]
+
+[developer_cli]
+owner = "DP-B10"
+exclusive = ["rust/crates/er-cli/src/devplane.rs"]
+
+[regression_corpus]
+owner = "DP-B11"
+exclusive = ["rust/crates/er-repro/src/corpus.rs"]
+
+[repro_tests]
+owner = "DP-B12"
+exclusive = ["rust/crates/er-repro/tests/**", "rust/crates/er-agent-protocol/tests/**"]
+
+[impact_generator]
+owner = "DP-C01"
+exclusive = ["rust/crates/er-impact/src/generate.rs"]
+
+[impact_query]
+owner = "DP-C02"
+exclusive = ["rust/crates/er-impact/src/query.rs"]
+
+[batch_execution]
+owner = "DP-C03"
+exclusive = ["rust/crates/er-batch/src/environment.rs"]
+
+[batch_operations]
+owner = "DP-C04"
+exclusive = ["rust/crates/er-batch/src/operations.rs"]
+
+[presentation_scene]
+owner = "DP-C05"
+exclusive = ["rust/crates/er-render-model/src/scene.rs"]
+
+[render_validation]
+owner = "DP-C06"
+exclusive = ["rust/crates/er-render-model/src/validate.rs"]
+
+[model_replay]
+owner = "DP-C07"
+exclusive = ["rust/crates/er-model/src/replay.rs"]
+
+[reload_preflight]
+owner = "DP-C08"
+exclusive = ["rust/crates/er-devplane/src/reload.rs"]
+
+[abi_compatibility]
+owner = "DP-C09"
+exclusive = ["rust/crates/er-dev-types/src/compatibility.rs"]
+
+[performance_attribution]
+owner = "DP-C10"
+exclusive = ["rust/crates/er-devplane/src/performance.rs"]
+
+[telemetry_capsule]
+owner = "DP-C11"
+exclusive = ["rust/crates/er-devplane/src/capsule.rs"]
+
+[final_audit]
+owner = "DP-C12"
+exclusive = ["rust/crates/er-testkit/tests/m71-final-*.rs", "rust/fixtures/m71/m71-final-qualification.json"]
+
+[forbidden_dependencies]
+core_crates = ["er-state", "er-battle", "er-run", "er-game", "er-kernel", "er-protocol", "er-mechanics"]
+developer_crates = ["er-dev-types", "er-devplane", "er-repro", "er-agent-protocol", "er-model", "er-render-model", "er-impact", "er-batch"]
+policy = "no core crate Cargo.toml may name a developer crate"
