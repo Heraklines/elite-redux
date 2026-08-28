@@ -1,5 +1,8 @@
 //! Versioned canonical M7 save and replay schemas.
+pub mod mode_save;
 pub mod oracle_replay;
+pub mod profile;
+pub mod session;
 
 use er_canonical::canonical_bytes;
 use er_state::m7_state::{GAME_STATE_SCHEMA_VERSION_V5, GameStateV5, ProfileStateV1, RunStateV3};

@@ -31,6 +31,31 @@ const SAVE_SINGLE_PROOF = {
   path: "rust/crates/er-save/src/oracle_replay.rs",
   test: "single_player_capture_helpers_preserve_command_and_state",
 };
+const SAVE_PROFILE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/profile.rs",
+  test: "profile_preferences_filter_and_history_bound_match_oracle",
+};
+const SAVE_LEADERBOARD_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/profile.rs",
+  test: "leaderboard_stats_are_non_negative_and_relics_unique",
+};
+const SAVE_SESSION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/session.rs",
+  test: "session_persistence_is_bounded_leased_and_exact_delete_safe",
+};
+const SAVE_IMPORT_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/session.rs",
+  test: "imports_and_coop_participants_fail_closed",
+};
+const SAVE_MODE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/mode_save.rs",
+  test: "mode_save_projections_clone_without_aliasing_or_hidden_state",
+};
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -49,6 +74,16 @@ const biomeRegistry = "src/init/init-biomes.ts";
 const replayTrace = "src/data/elite-redux/replay-trace.ts";
 const replayRecorder = "src/data/elite-redux/replay-recorder.ts";
 const replaySingle = "src/data/elite-redux/replay-single-recording.ts";
+const dataUtils = "src/utils/data.ts";
+const leaderboardStats = "src/system/leaderboard-save-stats.ts";
+const gameData = "src/system/game-data.ts";
+const communityChallenges = "src/data/elite-redux/er-community-challenges.ts";
+const endlessContinuation = "src/data/elite-redux/er-endless-continuation.ts";
+const enemyAi = "src/data/elite-redux/er-enemy-ai.ts";
+const legacyEndless = "src/data/elite-redux/er-legacy-endless-save.ts";
+const runBuffs = "src/data/elite-redux/er-run-buffs.ts";
+const shinyLabConfig = "src/data/elite-redux/er-shiny-lab-config.ts";
+const trainingCache = "src/data/elite-redux/er-training-cache.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -164,6 +199,59 @@ const implemented = [
   [replaySingle, 165, "playerCommandToReplayKind", "er_save::oracle_replay::player_command_to_replay_kind_v2", SAVE_SINGLE_PROOF],
   [replaySingle, 191, "recordSinglePlayerCommand", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::record_command", SAVE_SINGLE_PROOF],
   [replaySingle, 233, "recordSinglePlayerInteraction", "er_save::oracle_replay::SinglePlayerReplayRuntimeV2::record_interaction", SAVE_SINGLE_PROOF],
+  [dataUtils, 155, "saveStarterPreferences", "er_save::profile::ProfilePersistenceV1::save_starter_preferences", SAVE_PROFILE_PROOF],
+  [dataUtils, 197, "saveLastTeam", "er_save::profile::ProfilePersistenceV1::save_last_team", SAVE_PROFILE_PROOF],
+  [dataUtils, 234, "saveLastChallenges", "er_save::profile::ProfilePersistenceV1::save_last_challenges", SAVE_PROFILE_PROOF],
+  [dataUtils, 306, "saveLastFunModeConfig", "er_save::profile::ProfilePersistenceV1::save_last_fun_mode", SAVE_PROFILE_PROOF],
+  [leaderboardStats, 11, "nonNegativeInteger", "er_save::profile::non_negative_integer_v1", SAVE_LEADERBOARD_PROOF],
+  [leaderboardStats, 16, "buildLeaderboardSaveStats", "er_save::profile::build_leaderboard_save_stats_v1", SAVE_LEADERBOARD_PROOF],
+  [leaderboardStats, 24, "filter[0]", "er_save::profile::build_leaderboard_save_stats_v1", SAVE_LEADERBOARD_PROOF],
+  [leaderboardStats, 49, "filter[0]", "er_save::profile::build_leaderboard_save_stats_v1", SAVE_LEADERBOARD_PROOF],
+  [gameData, 666, "getSystemSaveData", "er_save::session::SessionPersistenceRuntimeV1::get_system_save_data", SAVE_SESSION_PROOF],
+  [gameData, 725, "getFunDebugBaselineSaveData", "er_save::session::SessionPersistenceRuntimeV1::get_system_save_data", SAVE_SESSION_PROOF],
+  [gameData, 824, "saveShowdownTeamPreset", "er_save::session::SessionPersistenceRuntimeV1::save_showdown_team_preset", SAVE_PROFILE_PROOF],
+  [gameData, 904, "warnLocalStorageFull", "er_save::session::SessionPersistenceRuntimeV1::warn_local_storage_full", SAVE_SESSION_PROOF],
+  [gameData, 944, "saveSystem", "er_save::session::SessionPersistenceRuntimeV1::save_system", SAVE_SESSION_PROOF],
+  [gameData, 1085, "findImportableLocalSaveBundle", "er_save::session::SessionPersistenceRuntimeV1::find_importable_local_save_bundle", SAVE_IMPORT_PROOF],
+  [gameData, 1122, "findImportableLocalSessionSaves", "er_save::session::SessionPersistenceRuntimeV1::find_importable_local_session_saves", SAVE_IMPORT_PROOF],
+  [gameData, 1147, "decryptImportableLocalSave", "er_save::session::SessionPersistenceRuntimeV1::decrypt_importable_local_save", SAVE_IMPORT_PROOF],
+  [gameData, 1170, "findImportableLocalSave", "er_save::session::SessionPersistenceRuntimeV1::find_importable_local_save", SAVE_IMPORT_PROOF],
+  [gameData, 1210, "importSystemSaveString", "er_save::session::SessionPersistenceRuntimeV1::import_system_save_string", SAVE_IMPORT_PROOF],
+  [gameData, 1216, "importLocalSaveBundle", "er_save::session::SessionPersistenceRuntimeV1::import_local_save_bundle", SAVE_IMPORT_PROOF],
+  [gameData, 1624, "saveRunHistory", "er_save::profile::ProfilePersistenceV1::save_run_history", SAVE_PROFILE_PROOF],
+  [gameData, 1760, "saveSetting", "er_save::profile::ProfilePersistenceV1::save_setting", SAVE_PROFILE_PROOF],
+  [gameData, 1783, "saveMappingConfigs", "er_save::profile::ProfilePersistenceV1::save_mapping_config", SAVE_PROFILE_PROOF],
+  [gameData, 1847, "saveControlSetting", "er_save::profile::ProfilePersistenceV1::save_control_setting", SAVE_PROFILE_PROOF],
+  [gameData, 1935, "saveTutorialFlag", "er_save::profile::ProfilePersistenceV1::save_tutorial_flag", SAVE_PROFILE_PROOF],
+  [gameData, 1974, "saveSeenDialogue", "er_save::profile::ProfilePersistenceV1::save_seen_dialogue", SAVE_PROFILE_PROOF],
+  [gameData, 2002, "getSessionSaveData", "er_save::session::SessionPersistenceRuntimeV1::get_session", SAVE_SESSION_PROOF],
+  [gameData, 2115, "getSession", "er_save::session::SessionPersistenceRuntimeV1::get_session", SAVE_SESSION_PROOF],
+  [gameData, 2519, "renameSession", "er_save::session::SessionPersistenceRuntimeV1::rename_session", SAVE_SESSION_PROOF],
+  [gameData, 2603, "loadSession", "er_save::session::SessionPersistenceRuntimeV1::load_session", SAVE_IMPORT_PROOF],
+  [gameData, 3121, "deleteSessionBounded", "er_save::session::SessionPersistenceRuntimeV1::delete_session_bounded", SAVE_SESSION_PROOF],
+  [gameData, 3130, "updateSessionBounded", "er_save::session::SessionPersistenceRuntimeV1::update_session_bounded", SAVE_SESSION_PROOF],
+  [gameData, 3140, "clearSessionBounded", "er_save::session::SessionPersistenceRuntimeV1::clear_session_bounded", SAVE_SESSION_PROOF],
+  [gameData, 3589, "withSessionPersistenceLease", "er_save::session::SessionPersistenceRuntimeV1::with_session_persistence_lease", SAVE_SESSION_PROOF],
+  [gameData, 460, "trySetLocalStorageItem", "er_save::session::SessionPersistenceRuntimeV1::try_set_local_storage_item", SAVE_SESSION_PROOF],
+  [gameData, 4776, "assessImportOverLocalSession", "er_save::session::SessionPersistenceRuntimeV1::assess_import_over_local_session", SAVE_IMPORT_PROOF],
+  [gameData, 5071, "classifySessionJsonForExactDelete", "er_save::session::SessionPersistenceRuntimeV1::classify_session_json_for_exact_delete", SAVE_SESSION_PROOF],
+  [gameData, 5193, "initSessionFromData", "er_save::session::SessionPersistenceRuntimeV1::init_session_from_data", SAVE_IMPORT_PROOF],
+  [gameData, 5490, "deleteSession", "er_save::session::SessionPersistenceRuntimeV1::delete_session_bounded", SAVE_SESSION_PROOF],
+  [gameData, 5602, "tryClearSession", "er_save::session::SessionPersistenceRuntimeV1::clear_session_bounded", SAVE_SESSION_PROOF],
+  [gameData, 5735, "parseSessionData", "er_save::session::SessionPersistenceRuntimeV1::parse_session_data", SAVE_IMPORT_PROOF],
+  [gameData, 5853, "saveAll", "er_save::session::SessionPersistenceRuntimeV1::save_all", SAVE_SESSION_PROOF],
+  [gameData, 5887, "saveAllImpl", "er_save::session::SessionPersistenceRuntimeV1::save_all", SAVE_SESSION_PROOF],
+  [communityChallenges, 1074, "saveLocalDraft", "er_save::mode_save::save_community_challenge_draft_v1", SAVE_MODE_PROOF],
+  [endlessContinuation, 254, "getErEndlessSaveData", "er_save::mode_save::endless_save_data_v1", SAVE_MODE_PROOF],
+  [enemyAi, 220, "getErAiProfile", "er_save::mode_save::enemy_ai_profile_v1", SAVE_MODE_PROOF],
+  [fairyLuck, 68, "getErFairyLuckSave", "er_save::mode_save::fairy_luck_save_v1", SAVE_MODE_PROOF],
+  [legacyEndless, 11, "isRetiredStandaloneEndlessSave", "er_save::mode_save::retired_standalone_endless_save_v1", SAVE_MODE_PROOF],
+  [mapNodes, 249, "getErMapSaveData", "er_save::mode_save::map_save_data_v1", SAVE_MODE_PROOF],
+  [runBuffs, 119, "getErRunBuffSaveData", "er_save::mode_save::run_buff_save_data_v1", SAVE_MODE_PROOF],
+  [pacing, 93, "getErRunPacingProfile", "er_save::mode_save::run_pacing_profile_v1", SAVE_MODE_PROOF],
+  [shinyLabConfig, 41, "ensureShinyLabSave", "er_save::mode_save::ensure_shiny_lab_save_v1", SAVE_MODE_PROOF],
+  [shinyLabConfig, 45, "saveSystem", "er_save::mode_save::save_shiny_lab_system_v1", SAVE_MODE_PROOF],
+  [trainingCache, 37, "getErTrainingCacheSaveData", "er_save::mode_save::training_cache_save_data_v1", SAVE_MODE_PROOF],
 ];
 
 function fail(message) {
