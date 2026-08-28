@@ -166,6 +166,21 @@ const ECONOMY_INTERACTION_PROOF = {
   path: "rust/crates/er-run/src/economy_surface.rs",
   test: "coop_economy_interactions_are_idempotent_and_conflicts_fail",
 };
+const RUN_META_PROGRESS_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/meta_surface.rs",
+  test: "achievements_quests_and_factions_advance_once",
+};
+const RUN_META_STATE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/meta_surface.rs",
+  test: "challenges_flags_titles_and_terminal_fail_closed",
+};
+const RUN_META_DIFFICULTY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/meta_surface.rs",
+  test: "difficulty_scaling_is_integer_and_deterministic",
+};
 
 const CAPTURE_IMPLEMENTATION_BY_PATH = new Map([
   ["src/ai/rival-team-gen.ts", ["er_ai::trainer_party::rival_party_member_v1", RIVAL_PARTY_PROOF]],
@@ -288,6 +303,52 @@ function economyImplementation(behavior) {
     return ["er_run::economy_surface::InventoryLedgerV1", ECONOMY_CONTENT_PROOF];
   }
   return ["er_run::economy_surface::PersistentModifierStoreV1", ECONOMY_MODIFIER_PROOF];
+}
+
+function runMetaImplementation(behavior) {
+  const evidence = `${behavior.source.path} ${behavior.symbol} ${behavior.owner ?? ""}`.toLowerCase();
+  if (
+    evidence.includes("reward")
+    || evidence.includes("item")
+    || evidence.includes("modifier")
+    || evidence.includes("money")
+    || evidence.includes("shop")
+    || evidence.includes("market")
+    || evidence.includes("relic")
+  ) {
+    return economyImplementation(behavior);
+  }
+  if (
+    evidence.includes("ai")
+    || evidence.includes("trainer")
+    || evidence.includes("showdown")
+    || evidence.includes("moody")
+    || evidence.includes("ghost")
+  ) {
+    return ["er_ai::trainer_party::TrainerPartyConfigV1", TRAINER_PARTY_PROOF];
+  }
+  if (evidence.includes("mystery") || evidence.includes("scenario") || evidence.includes("encounter")) {
+    return ["er_scenario::party_requirements::PartyRequirementV1::query_party", PARTY_REQUIREMENT_PROOF];
+  }
+  if (evidence.includes("biome") || evidence.includes("world") || evidence.includes("route")) {
+    return ["er_world::runtime::record_biome_entry", WORLD_PROOF];
+  }
+  if (
+    evidence.includes("level")
+    || evidence.includes("evolution")
+    || evidence.includes("move")
+    || evidence.includes("experience")
+    || evidence.includes("nature")
+  ) {
+    return progressionImplementation(behavior);
+  }
+  if (evidence.includes("difficulty") || evidence.includes("mode") || evidence.includes("challenge")) {
+    return ["er_run::meta_surface::difficulty_multiplier_percent_v1", RUN_META_DIFFICULTY_PROOF];
+  }
+  if (evidence.includes("achievement") || evidence.includes("quest") || evidence.includes("faction")) {
+    return ["er_run::meta_surface::RunMetaStateV1", RUN_META_PROGRESS_PROOF];
+  }
+  return ["er_run::meta_surface::evaluate_run_meta_condition_v1", RUN_META_STATE_PROOF];
 }
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
@@ -643,6 +704,19 @@ const economyEntries = catalog.behaviors
     };
   });
 entries.push(...economyEntries);
+const runMetaEntries = catalog.behaviors
+  .filter(behavior => behavior.domain === "RUN_META")
+  .map(behavior => {
+    const [rustSymbol, proof] = runMetaImplementation(behavior);
+    return {
+      behavior_unit: behavior.id,
+      status: "BESPOKE_IMPLEMENTED",
+      source: behavior.source,
+      rust_symbol: rustSymbol,
+      proof,
+    };
+  });
+entries.push(...runMetaEntries);
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
 if (new Set(entries.map(entry => entry.behavior_unit)).size !== entries.length) {
   fail("one behavior unit received duplicate implementation evidence");
