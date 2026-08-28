@@ -822,7 +822,10 @@ function validateRuntimeComponentRule(value: unknown, path: string, ownId: numbe
   return null;
 }
 
-export function validateCustomAbilitiesDelta(delta: unknown): ValidationResult {
+export function validateCustomAbilitiesDelta(
+  delta: unknown,
+  options: { allowMissingCustomReferences?: boolean } = {},
+): ValidationResult {
   if (!isPlainObject(delta)) {
     return { ok: false, error: "delta must be an object" };
   }
@@ -1026,7 +1029,12 @@ export function validateCustomAbilitiesDelta(delta: unknown): ValidationResult {
       ]) ?? []),
     ];
     for (const referencedId of referencedIds) {
-      if (referencedId >= 20000 && referencedId <= 29999 && !abilities.has(referencedId)) {
+      if (
+        !options.allowMissingCustomReferences
+        && referencedId >= 20000
+        && referencedId <= 29999
+        && !abilities.has(referencedId)
+      ) {
         return { ok: false, error: `ability ${id}: referenced custom ability ${referencedId} does not exist` };
       }
     }
@@ -1747,7 +1755,10 @@ async function handleSave(body: SaveBody, env: Env): Promise<Response> {
   if (!isPlainObject(body.delta) || Object.keys(body.delta).length === 0) {
     return json({ ok: false, error: "delta must be a non-empty object" }, 400, env);
   }
-  const validated = target.validate(body.delta);
+  const validated =
+    body.file === "custom-abilities"
+      ? validateCustomAbilitiesDelta(body.delta, { allowMissingCustomReferences: true })
+      : target.validate(body.delta);
   if (!validated.ok) {
     return json({ ok: false, error: validated.error }, 400, env);
   }

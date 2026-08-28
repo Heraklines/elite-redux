@@ -51,6 +51,9 @@
   let community = false;
   let callbacks = {};
   let aiEndpoint = "";
+  let loadSavedBlueprints = null;
+  let savedBlueprintRefresh = null;
+  let savedBlueprintRefreshAt = 0;
   let aiAbortController = null;
   let aiRefreshTimer = null;
   let aiState = {
@@ -1192,7 +1195,61 @@
     };
   }
 
-  function renderIncludeSearch(input) {
+  function prepareLoadedBlueprint(entry) {
+    entry.mechanics ||= [];
+    entry.componentRules ||= [];
+    entry.rules ||= [];
+    entry.modifiers ||= [];
+    entry.rules.forEach(rule => {
+      rule.conditionLogic ||= "all";
+    });
+    entry.componentRules.forEach(rule => {
+      rule.conditionLogic ||= "all";
+      rule.prerequisiteHooks ||= [];
+    });
+    return entry;
+  }
+
+  async function refreshSavedBlueprints(force = false) {
+    if (!loadSavedBlueprints) {
+      return false;
+    }
+    if (savedBlueprintRefresh) {
+      return savedBlueprintRefresh;
+    }
+    if (!force && Date.now() - savedBlueprintRefreshAt < 5000) {
+      return false;
+    }
+    savedBlueprintRefreshAt = Date.now();
+    savedBlueprintRefresh = Promise.resolve(loadSavedBlueprints())
+      .then(source => {
+        if (!source || typeof source !== "object" || Array.isArray(source)) {
+          return false;
+        }
+        let changed = false;
+        for (const [key, value] of Object.entries(source)) {
+          if (Object.hasOwn(state, key) || !value || typeof value !== "object" || Array.isArray(value)) {
+            continue;
+          }
+          const entry = prepareLoadedBlueprint(clone(value));
+          state[key] = entry;
+          baseline[key] = clone(entry);
+          changed = true;
+        }
+        if (changed) {
+          callbacks.onCatalogChange?.(getCustomCatalog());
+          callbacks.onChange?.();
+        }
+        return changed;
+      })
+      .catch(() => false)
+      .finally(() => {
+        savedBlueprintRefresh = null;
+      });
+    return savedBlueprintRefresh;
+  }
+
+  function renderIncludeSearch(input, refreshed = false) {
     closeOtherSearches(input);
     const entry = currentEntry();
     const results = input.closest(".as-include-search")?.querySelector(".as-include-results");
@@ -1218,6 +1275,13 @@
         : '<div class="as-include-empty">No matching abilities</div>';
     results.hidden = false;
     input.setAttribute("aria-expanded", "true");
+    if (!refreshed) {
+      void refreshSavedBlueprints().then(changed => {
+        if (changed && input.isConnected && input.getAttribute("aria-expanded") === "true") {
+          renderIncludeSearch(input, true);
+        }
+      });
+    }
   }
 
   function closeIncludeSearch() {
@@ -2916,6 +2980,9 @@
     community = !!options.community;
     callbacks = options.callbacks || {};
     aiEndpoint = String(options.aiEndpoint || "").replace(/\/$/, "");
+    loadSavedBlueprints = typeof options.loadSavedBlueprints === "function" ? options.loadSavedBlueprints : null;
+    savedBlueprintRefresh = null;
+    savedBlueprintRefreshAt = 0;
     aiAbortController?.abort();
     aiAbortController = null;
     aiState = {
@@ -2930,15 +2997,7 @@
     state = clone(source);
     for (const entry of Object.values(state)) {
       if (entry) {
-        entry.mechanics ||= [];
-        entry.componentRules ||= [];
-        entry.rules.forEach(rule => {
-          rule.conditionLogic ||= "all";
-        });
-        entry.componentRules.forEach(rule => {
-          rule.conditionLogic ||= "all";
-          rule.prerequisiteHooks ||= [];
-        });
+        prepareLoadedBlueprint(entry);
       }
     }
     baseline = clone(state);
@@ -2974,5 +3033,6 @@
     },
     getCustomCatalog,
     getAbilityCatalog,
+    refreshSavedBlueprints,
   };
 })();

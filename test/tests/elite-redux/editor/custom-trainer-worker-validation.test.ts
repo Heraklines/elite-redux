@@ -66,4 +66,25 @@ describe("custom ability Worker validation", () => {
       error: "threshold-exit.componentRules[0].conditions[0].maxPercent: must be 0-100",
     });
   });
+
+  it("accepts a save delta that references an ability already present in the saved file", () => {
+    const savedPackage = {
+      ...componentAbility({ kind: "holder-hp", maxPercent: 35 }),
+      id: 20008,
+      name: "Saved Package",
+    };
+    const referencingAbility = {
+      ...componentAbility({ kind: "holder-hp", maxPercent: 35 }),
+      id: 20009,
+      name: "Package User",
+      includes: [20008],
+    };
+
+    expect(
+      validateCustomAbilitiesDelta({ "package-user": referencingAbility }, { allowMissingCustomReferences: true }),
+    ).toEqual({ ok: true });
+    expect(validateCustomAbilitiesDelta({ "saved-package": savedPackage, "package-user": referencingAbility })).toEqual(
+      { ok: true },
+    );
+  });
 });

@@ -6668,6 +6668,7 @@ async function init() {
         components: abilityComponentsData,
         blueprints: customAbilitiesLive,
         aiEndpoint: ABILITY_AI_URL,
+        loadSavedBlueprints: () => fetchJson(`${LIVE_BASE}/er-custom-abilities.json?t=${Date.now()}`, {}),
         community: communityMode?.enabled,
         callbacks: {
           onChange: refreshChrome,
