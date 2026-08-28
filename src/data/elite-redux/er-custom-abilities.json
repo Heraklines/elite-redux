@@ -169,5 +169,21 @@
     "name": "Malicious Empathy",
     "rules": [],
     "version": 1
+  },
+  "new-ability-8": {
+    "componentRules": [],
+    "description": "Pixilate + Soul-Heart",
+    "flags": {},
+    "generation": 9,
+    "id": 20007,
+    "includes": [
+      182,
+      220
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Fae Heart",
+    "rules": [],
+    "version": 1
   }
 }
