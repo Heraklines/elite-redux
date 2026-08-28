@@ -1,0 +1,2061 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:bcdb80e9be0864886b905feb1e77b67115d9bef6:run-33145399427.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 OPR/134.0.0.0
+platform: Win32
+screen:   1536x864 @1.25x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@71761ms -> title-shown@76152ms
+lastSess: ok (reached title)
+mode:     4  wave:33
+seed:     wSI26BaULfHhvubKncWAsgyn
+party:    Abyssand(L56 200hp f0), Sharpedo(L56 177hp f0), Skulberus(L56 195hp f0), Burmy(L56 144hp f0), Ditto(L56 190hp f0), Hypno(L56 189hp f0)
+enemy:    Dewgong(L56), Lapras(L56), Rotom Mow(L56)
+
+----- COMMENT -----
+Sparkling Aria is meant to only hit the opponents
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:bcdb80e9be0864886b905feb1e77b67115d9bef6:run-33145399427.1","source":"github","sha":"bcdb80e9be0864886b905feb1e77b67115d9bef6","workflow":{"provider":"github-actions","runId":"33145399427","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[16:37:22.031] LOG: Applied X Speed 
+[16:37:22.031] LOG: Applied X Speed 
+[16:37:22.031] LOG: Applied X Speed 
+[16:37:22.031] LOG: Applied X Speed 
+[16:37:22.032] LOG: Applied X Speed 
+[16:37:22.032] LOG: Applied X Speed 
+[16:37:22.032] LOG: Applied X Speed 
+[16:37:22.033] LOG: Applied X Speed 
+[16:37:22.033] LOG: Applied X Speed 
+[16:37:22.033] LOG: Applied X Speed 
+[16:37:22.033] LOG: Applied X Speed 
+[16:37:22.033] LOG: Applied X Speed 
+[16:37:22.034] LOG: Applied X Speed 
+[16:37:22.034] LOG: Applied X Speed 
+[16:37:22.034] LOG: Applied X Speed 
+[16:37:22.034] LOG: Applied X Speed 
+[16:37:22.034] LOG: Applied X Speed 
+[16:37:22.035] LOG: Applied X Speed 
+[16:37:22.035] LOG: Applied X Speed 
+[16:37:22.035] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.036] LOG: Applied X Speed 
+[16:37:22.037] LOG: Applied X Speed 
+[16:37:22.037] LOG: Applied X Speed 
+[16:37:22.038] LOG: Applied X Speed 
+[16:37:22.038] LOG: Applied X Speed 
+[16:37:22.039] LOG: Applied X Speed 
+[16:37:22.039] LOG: Applied X Speed 
+[16:37:22.039] LOG: Applied X Speed 
+[16:37:22.039] LOG: Applied X Speed 
+[16:37:22.039] LOG: Applied X Speed 
+[16:37:22.040] LOG: Applied X Speed 
+[16:37:22.040] LOG: Applied X Speed 
+[16:37:22.041] LOG: Applied X Speed 
+[16:37:22.041] LOG: Applied X Speed 
+[16:37:22.042] LOG: Applied X Speed 
+[16:37:22.043] LOG: Applied X Speed 
+[16:37:22.043] LOG: Applied X Speed 
+[16:37:22.043] LOG: Applied X Speed 
+[16:37:22.043] LOG: Applied X Speed 
+[16:37:22.043] LOG: Applied X Speed 
+[16:37:22.044] LOG: Applied X Speed 
+[16:37:22.044] LOG: Applied X Speed 
+[16:37:22.044] LOG: Applied X Speed 
+[16:37:22.044] LOG: Applied X Speed 
+[16:37:22.044] LOG: Applied X Speed 
+[16:37:22.045] LOG: %cStart Phase MovePhase color:green;
+[16:37:22.045] LOG: %cUser: Abyssand
+Move: MAT_BLOCK
+Use Mode: NORMAL color:orchid
+[16:37:22.046] LOG: Applied X Speed 
+[16:37:22.046] LOG: Applied X Speed 
+[16:37:22.046] LOG: Applied X Speed 
+[16:37:22.046] LOG: Applied X Speed 
+[16:37:22.047] LOG: Applied X Speed 
+[16:37:22.047] LOG: Applied X Speed 
+[16:37:22.047] LOG: Applied X Speed 
+[16:37:22.047] LOG: Applied X Speed 
+[16:37:22.047] LOG: Applied X Speed 
+[16:37:22.047] LOG: Applied X Speed 
+[16:37:22.049] LOG: Applied X Speed 
+[16:37:22.049] LOG: Applied X Speed 
+[16:37:22.049] LOG: Applied X Speed 
+[16:37:22.049] LOG: Applied X Speed 
+[16:37:22.050] LOG: Applied X Speed 
+[16:37:22.050] LOG: Applied X Speed 
+[16:37:22.050] LOG: Applied X Speed 
+[16:37:22.050] LOG: Applied X Speed 
+[16:37:22.051] LOG: Applied X Speed 
+[16:37:22.051] LOG: Applied X Speed 
+[16:37:22.052] LOG: Applied X Speed 
+[16:37:22.052] LOG: Applied X Speed 
+[16:37:22.053] LOG: %cStart Phase MessagePhase color:green;
+[16:37:22.106] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.117] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:37:22.361] LOG: %cStart Phase MessagePhase color:green;
+[16:37:22.649] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:22.660] LOG: Applied X Speed 
+[16:37:22.673] LOG: Applied X Speed 
+[16:37:22.686] LOG: Applied X Speed 
+[16:37:22.692] LOG: Applied X Speed 
+[16:37:22.714] LOG: Applied X Speed 
+[16:37:22.726] LOG: Applied X Speed 
+[16:37:22.747] LOG: %cStart Phase MovePhase color:green;
+[16:37:22.747] LOG: %cUser: Sharpedo
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[16:37:22.767] LOG: Applied X Speed 
+[16:37:22.779] LOG: Applied X Speed 
+[16:37:22.784] LOG: Applied X Speed 
+[16:37:22.790] LOG: Applied X Speed 
+[16:37:22.801] LOG: Applied X Speed 
+[16:37:22.812] LOG: Applied X Speed 
+[16:37:22.818] LOG: Applied X Speed 
+[16:37:22.824] LOG: Applied X Speed 
+[16:37:22.835] LOG: Applied X Speed 
+[16:37:22.850] LOG: Applied X Speed 
+[16:37:22.894] LOG: Applied X Speed 
+[16:37:22.904] LOG: Applied X Speed 
+[16:37:22.915] LOG: Applied X Speed 
+[16:37:22.925] LOG: Applied X Speed 
+[16:37:22.936] LOG: Applied X Speed 
+[16:37:22.941] LOG: Applied X Speed 
+[16:37:22.953] LOG: Applied X Speed 
+[16:37:22.963] LOG: Applied X Speed 
+[16:37:22.974] LOG: Applied X Speed 
+[16:37:22.995] LOG: Applied X Speed 
+[16:37:23.006] LOG: Applied X Speed 
+[16:37:23.028] LOG: Applied X Speed 
+[16:37:23.050] LOG: Applied X Speed 
+[16:37:23.060] LOG: Applied X Speed 
+[16:37:23.065] LOG: Applied X Speed 
+[16:37:23.070] LOG: Applied X Speed 
+[16:37:23.081] LOG: Applied X Speed 
+[16:37:23.091] LOG: Applied X Speed 
+[16:37:23.096] LOG: Applied X Speed 
+[16:37:23.101] LOG: Applied X Speed 
+[16:37:23.112] LOG: Applied X Speed 
+[16:37:23.125] LOG: Applied X Speed 
+[16:37:23.173] LOG: Applied X Speed 
+[16:37:23.183] LOG: Applied X Speed 
+[16:37:23.193] LOG: Applied X Speed 
+[16:37:23.205] LOG: Applied X Speed 
+[16:37:23.215] LOG: Applied X Speed 
+[16:37:23.220] LOG: Applied X Speed 
+[16:37:23.230] LOG: Applied X Speed 
+[16:37:23.240] LOG: Applied X Speed 
+[16:37:23.249] LOG: Applied X Speed 
+[16:37:23.269] LOG: Applied X Speed 
+[16:37:23.280] LOG: Applied X Speed 
+[16:37:23.299] LOG: Applied X Speed 
+[16:37:23.301] LOG: %cStart Phase MessagePhase color:green;
+[16:37:23.417] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:37:23.427] LOG: Applied Multi Lens 
+[16:37:23.749] LOG: Applied Scope Lens 
+[16:37:23.754] LOG: crit stage: +1
+[16:37:23.769] LOG: Applied Mystic Water 
+[16:37:23.778] LOG: Applied X Attack 
+[16:37:23.789] LOG: Move: Fishious Rend | Base damage: 265.66680412371136 | Power: 265 | Source attack: 208 | Target defense: 97
+[16:37:23.790] LOG: Applied Multi Lens 
+[16:37:23.860] LOG: Move: Fishious Rend | Attack damage: 280
+[16:37:23.880] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:37:24.003] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:37:24.039] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:37:24.207] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:37:24.245] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:37:24.266] LOG: %cStart Phase MessagePhase color:green;
+[16:37:24.482] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:24.528] LOG: Applied X Speed 
+[16:37:24.541] LOG: Applied X Speed 
+[16:37:24.554] LOG: Applied X Speed 
+[16:37:24.595] LOG: Applied X Speed 
+[16:37:24.614] LOG: %cStart Phase MovePhase color:green;
+[16:37:24.614] LOG: %cUser: Electrode
+Move: EXPLOSION
+Use Mode: FOLLOW_UP color:orchid
+[16:37:24.637] LOG: Applied X Speed 
+[16:37:24.649] LOG: Applied X Speed 
+[16:37:24.655] LOG: Applied X Speed 
+[16:37:24.661] LOG: Applied X Speed 
+[16:37:24.672] LOG: Applied X Speed 
+[16:37:24.683] LOG: Applied X Speed 
+[16:37:24.689] LOG: Applied X Speed 
+[16:37:24.695] LOG: Applied X Speed 
+[16:37:24.707] LOG: Applied X Speed 
+[16:37:24.721] LOG: Applied X Speed 
+[16:37:24.768] LOG: Applied X Speed 
+[16:37:24.778] LOG: Applied X Speed 
+[16:37:24.789] LOG: Applied X Speed 
+[16:37:24.800] LOG: Applied X Speed 
+[16:37:24.810] LOG: Applied X Speed 
+[16:37:24.815] LOG: Applied X Speed 
+[16:37:24.825] LOG: Applied X Speed 
+[16:37:24.835] LOG: Applied X Speed 
+[16:37:24.845] LOG: Applied X Speed 
+[16:37:24.866] LOG: Applied X Speed 
+[16:37:24.877] LOG: Applied X Speed 
+[16:37:24.897] LOG: Applied X Speed 
+[16:37:24.898] LOG: %cStart Phase MessagePhase color:green;
+[16:37:25.018] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:37:26.041] LOG: crit stage: +0
+[16:37:26.074] LOG: Move: Explosion | Base damage: 72.8 | Power: 100 | Source attack: 129 | Target defense: 86
+[16:37:26.089] LOG: Move: Explosion | Attack damage: 53
+[16:37:26.202] LOG: %cStart Phase MessagePhase color:green;
+[16:37:26.320] LOG: %cStart Phase MessagePhase color:green;
+[16:37:26.572] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:37:26.602] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:37:26.603] LOG: %cStart Phase FaintPhase color:green;
+[16:37:26.613] LOG: Applied X Speed 
+[16:37:26.624] LOG: Applied X Speed 
+[16:37:26.636] LOG: Applied X Speed 
+[16:37:26.643] LOG: Applied X Speed 
+[16:37:26.649] LOG: Applied X Speed 
+[16:37:26.661] LOG: Applied X Speed 
+[16:37:26.667] LOG: Applied X Speed 
+[16:37:26.677] LOG: Applied X Speed 
+[16:37:26.694] LOG: Applied X Speed 
+[16:37:26.700] LOG: Applied X Speed 
+[16:37:26.712] LOG: Applied X Speed 
+[16:37:26.722] LOG: Applied X Speed 
+[16:37:26.732] LOG: Applied X Speed 
+[16:37:26.752] LOG: Applied X Speed 
+[16:37:26.761] LOG: Applied X Speed 
+[16:37:26.781] LOG: Applied X Speed 
+[16:37:28.549] LOG: Applied X Speed 
+[16:37:28.564] LOG: Applied X Speed 
+[16:37:28.576] LOG: Applied X Speed 
+[16:37:28.583] LOG: Applied X Speed 
+[16:37:28.589] LOG: Applied X Speed 
+[16:37:28.601] LOG: Applied X Speed 
+[16:37:28.607] LOG: Applied X Speed 
+[16:37:28.618] LOG: Applied X Speed 
+[16:37:28.635] LOG: Applied X Speed 
+[16:37:28.641] LOG: Applied X Speed 
+[16:37:28.651] LOG: Applied X Speed 
+[16:37:28.662] LOG: Applied X Speed 
+[16:37:28.672] LOG: Applied X Speed 
+[16:37:28.691] LOG: Applied X Speed 
+[16:37:28.701] LOG: Applied X Speed 
+[16:37:28.720] LOG: Applied X Speed 
+[16:37:28.721] LOG: %cStart Phase MessagePhase color:green;
+[16:37:29.048] LOG: %cStart Phase VictoryPhase color:green;
+[16:37:29.049] LOG: Applied Soothe Bell 
+[16:37:29.052] LOG: Applied Soothe Bell 
+[16:37:29.053] LOG: Applied Soothe Bell 
+[16:37:29.053] LOG: %cStart Phase ExpPhase color:green;
+[16:37:29.053] LOG: Applied Super EXP. Charm 
+[16:37:29.053] LOG: Applied EXP. Charm 
+[16:37:29.447] LOG: %cStart Phase LevelUpPhase color:green;
+[16:37:29.448] LOG: Applied Calcium 
+[16:37:29.449] LOG: %cStart Phase ExpPhase color:green;
+[16:37:29.449] LOG: Applied Super EXP. Charm 
+[16:37:29.449] LOG: Applied EXP. Charm 
+[16:37:29.788] LOG: %cStart Phase LevelUpPhase color:green;
+[16:37:29.791] LOG: Applied HP Up 
+[16:37:29.791] LOG: Applied Zinc 
+[16:37:29.791] LOG: Applied Iron 
+[16:37:29.791] LOG: Applied Protein 
+[16:37:29.792] LOG: Applied Carbos 
+[16:37:29.794] LOG: Applied Soul Dew 
+[16:37:29.795] LOG: Applied Soul Dew 
+[16:37:29.796] LOG: %cStart Phase ExpPhase color:green;
+[16:37:29.796] LOG: Applied Super EXP. Charm 
+[16:37:29.796] LOG: Applied EXP. Charm 
+[16:37:30.051] LOG: %cStart Phase LevelUpPhase color:green;
+[16:37:30.053] LOG: Applied Protein 
+[16:37:30.054] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:37:30.054] LOG: Applied Super EXP. Charm 
+[16:37:30.054] LOG: Applied EXP. Charm 
+[16:37:30.054] LOG: %cStart Phase LevelUpPhase color:green;
+[16:37:30.054] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:37:30.055] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:37:30.055] LOG: Applied Super EXP. Charm 
+[16:37:30.055] LOG: Applied EXP. Charm 
+[16:37:30.055] LOG: %cStart Phase LevelUpPhase color:green;
+[16:37:30.055] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:37:30.056] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:37:30.056] LOG: Applied Super EXP. Charm 
+[16:37:30.056] LOG: Applied EXP. Charm 
+[16:37:30.058] LOG: %cStart Phase LevelUpPhase color:green;
+[16:37:30.058] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:37:30.058] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:30.076] LOG: Applied X Speed 
+[16:37:30.087] LOG: Applied X Speed 
+[16:37:30.111] LOG: Applied X Speed 
+[16:37:30.117] LOG: %cStart Phase MovePhase color:green;
+[16:37:30.117] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:30.132] LOG: Applied X Speed 
+[16:37:30.142] LOG: Applied X Speed 
+[16:37:30.150] LOG: %cStart Phase MovePhase color:green;
+[16:37:30.150] LOG: %cUser: Skulberus
+Move: RIP_AND_TEAR
+Use Mode: NORMAL color:orchid
+[16:37:30.159] LOG: Applied X Speed 
+[16:37:30.171] LOG: Applied X Speed 
+[16:37:30.180] LOG: Applied X Speed 
+[16:37:30.186] LOG: Applied X Speed 
+[16:37:30.191] LOG: Applied X Speed 
+[16:37:30.200] LOG: Applied X Speed 
+[16:37:30.206] LOG: Applied X Speed 
+[16:37:30.214] LOG: Applied X Speed 
+[16:37:30.229] LOG: Applied X Speed 
+[16:37:30.234] LOG: Applied X Speed 
+[16:37:30.244] LOG: Applied X Speed 
+[16:37:30.253] LOG: Applied X Speed 
+[16:37:30.261] LOG: Applied X Speed 
+[16:37:30.279] LOG: Applied X Speed 
+[16:37:30.288] LOG: Applied X Speed 
+[16:37:30.306] LOG: Applied X Speed 
+[16:37:30.319] LOG: Applied X Speed 
+[16:37:30.329] LOG: Applied X Speed 
+[16:37:30.338] LOG: Applied X Speed 
+[16:37:30.342] LOG: Applied X Speed 
+[16:37:30.347] LOG: Applied X Speed 
+[16:37:30.356] LOG: Applied X Speed 
+[16:37:30.361] LOG: Applied X Speed 
+[16:37:30.370] LOG: Applied X Speed 
+[16:37:30.383] LOG: Applied X Speed 
+[16:37:30.388] LOG: Applied X Speed 
+[16:37:30.397] LOG: Applied X Speed 
+[16:37:30.406] LOG: Applied X Speed 
+[16:37:30.415] LOG: Applied X Speed 
+[16:37:30.432] LOG: Applied X Speed 
+[16:37:30.442] LOG: Applied X Speed 
+[16:37:30.460] LOG: Applied X Speed 
+[16:37:30.461] LOG: %cStart Phase MessagePhase color:green;
+[16:37:30.553] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:37:30.582] LOG: Applied Wide Lens 
+[16:37:30.774] LOG: crit stage: +0
+[16:37:30.796] LOG: Applied X Attack 
+[16:37:30.805] LOG: Move: Rip and Tear | Base damage: 151.88387096774193 | Power: 132 | Source attack: 220 | Target defense: 93
+[16:37:30.822] LOG: Move: Rip and Tear | Attack damage: 104
+[16:37:30.882] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:37:30.902] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:37:31.069] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:37:31.256] LOG: %cStart Phase MessagePhase color:green;
+[16:37:31.449] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:37:31.485] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:37:31.653] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:37:31.653] LOG: %cStart Phase MessagePhase color:green;
+[16:37:31.852] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:37:31.887] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:31.900] LOG: %cStart Phase MovePhase color:green;
+[16:37:31.900] LOG: %cUser: Dodrio
+Move: DRILL_RUN
+Use Mode: NORMAL color:orchid
+[16:37:31.904] LOG: %cStart Phase MessagePhase color:green;
+[16:37:32.084] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:32.086] LOG: %cStart Phase MovePhase color:green;
+[16:37:32.086] LOG: %cUser: Beniccino
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[16:37:32.097] LOG: Applied X Speed 
+[16:37:32.109] LOG: Applied X Speed 
+[16:37:32.115] LOG: Applied X Speed 
+[16:37:32.121] LOG: Applied X Speed 
+[16:37:32.127] LOG: Applied X Speed 
+[16:37:32.132] LOG: Applied X Speed 
+[16:37:32.138] LOG: Applied X Speed 
+[16:37:32.144] LOG: Applied X Speed 
+[16:37:32.159] LOG: Applied X Speed 
+[16:37:32.171] LOG: Applied X Speed 
+[16:37:32.182] LOG: Applied X Speed 
+[16:37:32.187] LOG: Applied X Speed 
+[16:37:32.193] LOG: Applied X Speed 
+[16:37:32.198] LOG: Applied X Speed 
+[16:37:32.212] LOG: Applied X Speed 
+[16:37:32.223] LOG: Applied X Speed 
+[16:37:32.233] LOG: Applied X Speed 
+[16:37:32.239] LOG: Applied X Speed 
+[16:37:32.244] LOG: Applied X Speed 
+[16:37:32.249] LOG: Applied X Speed 
+[16:37:32.263] LOG: Applied X Speed 
+[16:37:32.277] LOG: Applied X Speed 
+[16:37:32.287] LOG: Applied X Speed 
+[16:37:32.292] LOG: Applied X Speed 
+[16:37:32.297] LOG: Applied X Speed 
+[16:37:32.302] LOG: Applied X Speed 
+[16:37:32.307] LOG: Applied X Speed 
+[16:37:32.312] LOG: Applied X Speed 
+[16:37:32.317] LOG: Applied X Speed 
+[16:37:32.333] LOG: Applied X Speed 
+[16:37:32.344] LOG: Applied X Speed 
+[16:37:32.355] LOG: Applied X Speed 
+[16:37:32.360] LOG: Applied X Speed 
+[16:37:32.365] LOG: Applied X Speed 
+[16:37:32.371] LOG: Applied X Speed 
+[16:37:32.383] LOG: Applied X Speed 
+[16:37:32.392] LOG: Applied X Speed 
+[16:37:32.401] LOG: Applied X Speed 
+[16:37:32.406] LOG: Applied X Speed 
+[16:37:32.410] LOG: Applied X Speed 
+[16:37:32.415] LOG: Applied X Speed 
+[16:37:32.429] LOG: Applied X Speed 
+[16:37:32.430] LOG: %cStart Phase MessagePhase color:green;
+[16:37:32.550] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:37:32.560] LOG: %cStart Phase MessagePhase color:green;
+[16:37:32.807] LOG: %cStart Phase MoveEndPhase color:green;
+[16:37:32.809] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:37:32.809] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:37:32.809] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:37:32.809] LOG: %cStart Phase BerryPhase color:green;
+[16:37:32.817] LOG: Applied X Speed 
+[16:37:32.829] LOG: Applied X Speed 
+[16:37:32.835] LOG: Applied X Speed 
+[16:37:32.841] LOG: Applied X Speed 
+[16:37:32.847] LOG: Applied X Speed 
+[16:37:32.853] LOG: Applied X Speed 
+[16:37:32.860] LOG: Applied X Speed 
+[16:37:32.867] LOG: Applied X Speed 
+[16:37:32.883] LOG: Applied X Speed 
+[16:37:32.893] LOG: Applied X Speed 
+[16:37:32.907] LOG: Applied X Speed 
+[16:37:32.912] LOG: Applied X Speed 
+[16:37:32.917] LOG: Applied X Speed 
+[16:37:32.923] LOG: Applied X Speed 
+[16:37:32.937] LOG: Applied X Speed 
+[16:37:32.947] LOG: Applied X Speed 
+[16:37:32.957] LOG: Applied X Speed 
+[16:37:32.963] LOG: Applied X Speed 
+[16:37:32.968] LOG: Applied X Speed 
+[16:37:32.973] LOG: Applied X Speed 
+[16:37:32.988] LOG: Applied X Speed 
+[16:37:32.989] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:37:32.995] LOG: Applied X Speed 
+[16:37:33.004] LOG: Applied X Speed 
+[16:37:33.009] LOG: Applied X Speed 
+[16:37:33.014] LOG: Applied X Speed 
+[16:37:33.019] LOG: Applied X Speed 
+[16:37:33.024] LOG: Applied X Speed 
+[16:37:33.029] LOG: Applied X Speed 
+[16:37:33.034] LOG: Applied X Speed 
+[16:37:33.047] LOG: Applied X Speed 
+[16:37:33.056] LOG: Applied X Speed 
+[16:37:33.065] LOG: Applied X Speed 
+[16:37:33.069] LOG: Applied X Speed 
+[16:37:33.074] LOG: Applied X Speed 
+[16:37:33.079] LOG: Applied X Speed 
+[16:37:33.092] LOG: Applied X Speed 
+[16:37:33.101] LOG: Applied X Speed 
+[16:37:33.109] LOG: Applied X Speed 
+[16:37:33.114] LOG: Applied X Speed 
+[16:37:33.119] LOG: Applied X Speed 
+[16:37:33.124] LOG: Applied X Speed 
+[16:37:33.138] LOG: Applied X Speed 
+[16:37:33.138] LOG: %cStart Phase TurnEndPhase color:green;
+[16:37:33.146] LOG: Applied X Speed 
+[16:37:33.155] LOG: Applied X Speed 
+[16:37:33.164] LOG: Applied X Speed 
+[16:37:33.168] LOG: Applied X Speed 
+[16:37:33.185] LOG: Applied X Speed 
+[16:37:33.195] LOG: Applied X Speed 
+[16:37:33.199] LOG: Applied X Speed 
+[16:37:33.205] LOG: Battle Seed: wjJJaQw8U2vuQ3JQ
+[16:37:33.218] LOG: Applied X Speed 
+[16:37:33.226] LOG: Applied X Speed 
+[16:37:33.231] LOG: Applied X Speed 
+[16:37:33.236] LOG: Applied X Speed 
+[16:37:33.245] LOG: Applied X Speed 
+[16:37:33.261] LOG: Applied X Speed 
+[16:37:33.266] LOG: Applied X Speed 
+[16:37:33.277] LOG: Applied X Speed 
+[16:37:33.288] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:37:33.454] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:37:33.641] LOG: Applied X Speed 
+[16:37:33.648] LOG: Applied X Speed 
+[16:37:33.654] LOG: Applied X Speed 
+[16:37:33.659] LOG: Applied X Speed 
+[16:37:33.665] LOG: Applied X Speed 
+[16:37:33.670] LOG: Applied X Speed 
+[16:37:33.677] LOG: Applied X Speed 
+[16:37:33.683] LOG: Applied X Speed 
+[16:37:33.691] LOG: %cStart Phase MessagePhase color:green;
+[16:37:33.872] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:37:34.067] LOG: %cStart Phase MessagePhase color:green;
+[16:37:34.278] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:37:34.312] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:37:34.314] LOG: %cStart Phase TurnInitPhase color:green;
+[16:37:34.315] LOG: %cStart Phase CommandPhase color:green;
+[16:37:40.053] LOG: crit stage: +0
+[16:37:40.067] LOG: Applied X Attack 
+[16:37:40.094] LOG: Applied X Speed 
+[16:37:40.689] LOG: Applied Scope Lens 
+[16:37:40.693] LOG: crit stage: +1
+[16:37:40.703] LOG: Applied X Attack 
+[16:37:40.729] LOG: Applied X Speed 
+[16:37:40.884] LOG: crit stage: +0
+[16:37:40.894] LOG: Applied X Attack 
+[16:37:40.918] LOG: Applied X Speed 
+[16:37:41.050] LOG: crit stage: +0
+[16:37:41.235] LOG: crit stage: +0
+[16:37:47.621] LOG: Move: BITTER_MALICE Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Abyssand
+[16:37:47.623] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:37:48.153] LOG: %cStart Phase CommandPhase color:green;
+[16:37:49.891] LOG: Move: RIP_AND_TEAR Move targets: {"targets":[4,5,0,2],"multiple":false} 
+Player Pokemon: Sharpedo
+[16:37:49.893] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:37:53.410] LOG: %cStart Phase CommandPhase color:green;
+[16:37:55.019] LOG: Move: AXE_KICK Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Skulberus
+[16:37:55.021] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:37:57.065] LOG: %cStart Phase CommandPhase color:green;
+[16:37:58.916] LOG: Move: AXE_KICK Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Skulberus
+[16:37:58.918] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:37:59.379] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:37:59.382] LOG: Applied X Speed 
+[16:37:59.382] LOG: Applied X Speed 
+[16:37:59.383] LOG: Applied X Speed 
+[16:37:59.383] LOG: Applied X Speed 
+[16:37:59.383] LOG: Applied X Speed 
+[16:37:59.383] LOG: Applied X Speed 
+[16:37:59.383] LOG: Applied X Speed 
+[16:37:59.383] LOG: Applied X Speed 
+[16:37:59.386] LOG: Applied X Speed 
+[16:37:59.387] LOG: Applied X Speed 
+[16:37:59.387] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.388] LOG: Applied X Speed 
+[16:37:59.389] LOG: Applied X Speed 
+[16:37:59.389] LOG: Applied X Speed 
+[16:37:59.389] LOG: Applied X Speed 
+[16:37:59.389] LOG: Applied X Speed 
+[16:37:59.389] LOG: Applied X Speed 
+[16:37:59.389] LOG: Applied X Speed 
+[16:37:59.391] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.392] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.393] LOG: Applied X Speed 
+[16:37:59.395] LOG: Applied X Speed 
+[16:37:59.395] LOG: Applied X Speed 
+[16:37:59.395] LOG: Applied X Speed 
+[16:37:59.395] LOG: Applied X Speed 
+[16:37:59.396] LOG: Applied X Speed 
+[16:37:59.396] LOG: Applied X Speed 
+[16:37:59.396] LOG: Applied X Speed 
+[16:37:59.396] LOG: Applied X Speed 
+[16:37:59.397] LOG: Applied X Speed 
+[16:37:59.397] LOG: Applied X Speed 
+[16:37:59.397] LOG: Applied X Speed 
+[16:37:59.397] LOG: Applied X Speed 
+[16:37:59.398] LOG: Applied X Speed 
+[16:37:59.398] LOG: Applied X Speed 
+[16:37:59.398] LOG: Applied X Speed 
+[16:37:59.399] LOG: Applied X Speed 
+[16:37:59.399] LOG: Applied X Speed 
+[16:37:59.399] LOG: Applied X Speed 
+[16:37:59.400] LOG: Applied X Speed 
+[16:37:59.400] LOG: Applied X Speed 
+[16:37:59.400] LOG: Applied X Speed 
+[16:37:59.400] LOG: Applied X Speed 
+[16:37:59.401] LOG: Applied X Speed 
+[16:37:59.401] LOG: Applied X Speed 
+[16:37:59.401] LOG: Applied X Speed 
+[16:37:59.401] LOG: Applied X Speed 
+[16:37:59.401] LOG: Applied X Speed 
+[16:37:59.401] LOG: Applied X Speed 
+[16:37:59.402] LOG: Applied X Speed 
+[16:37:59.402] LOG: Applied X Speed 
+[16:37:59.403] LOG: Applied X Speed 
+[16:37:59.403] LOG: Applied X Speed 
+[16:37:59.403] LOG: Applied X Speed 
+[16:37:59.404] LOG: Applied X Speed 
+[16:37:59.404] LOG: Applied X Speed 
+[16:37:59.404] LOG: Applied X Speed 
+[16:37:59.404] LOG: Applied X Speed 
+[16:37:59.405] LOG: Applied X Speed 
+[16:37:59.405] LOG: Applied X Speed 
+[16:37:59.405] LOG: Applied X Speed 
+[16:37:59.405] LOG: Applied X Speed 
+[16:37:59.405] LOG: Applied X Speed 
+[16:37:59.406] LOG: Applied X Speed 
+[16:37:59.406] LOG: Applied X Speed 
+[16:37:59.406] LOG: Applied X Speed 
+[16:37:59.416] LOG: Applied X Speed 
+[16:37:59.417] LOG: Applied X Speed 
+[16:37:59.417] LOG: Applied X Speed 
+[16:37:59.417] LOG: Applied X Speed 
+[16:37:59.417] LOG: Applied X Speed 
+[16:37:59.418] LOG: Applied X Speed 
+[16:37:59.418] LOG: Applied X Speed 
+[16:37:59.418] LOG: Applied X Speed 
+[16:37:59.418] LOG: Applied X Speed 
+[16:37:59.419] LOG: Applied X Speed 
+[16:37:59.419] LOG: Applied X Speed 
+[16:37:59.419] LOG: Applied X Speed 
+[16:37:59.419] LOG: Applied X Speed 
+[16:37:59.419] LOG: Applied X Speed 
+[16:37:59.419] LOG: Applied X Speed 
+[16:37:59.420] LOG: Applied X Speed 
+[16:37:59.423] LOG: Applied X Speed 
+[16:37:59.424] LOG: Applied Mystic Water 
+[16:37:59.424] LOG: Applied X Attack 
+[16:37:59.424] LOG: Applied Multi Lens 
+[16:37:59.425] LOG: Applied X Attack 
+[16:37:59.425] LOG: Applied Multi Lens 
+[16:37:59.426] LOG: Applied Mystic Water 
+[16:37:59.427] LOG: Applied X Attack 
+[16:37:59.427] LOG: Applied Multi Lens 
+[16:37:59.427] LOG: Applied X Speed 
+[16:37:59.428] LOG: Applied X Attack 
+[16:37:59.429] LOG: Applied X Attack 
+[16:37:59.431] LOG: Applied X Attack 
+[16:37:59.434] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.435] LOG: Applied X Speed 
+[16:37:59.444] LOG: Applied X Speed 
+[16:37:59.444] LOG: Applied X Speed 
+[16:37:59.444] LOG: Applied X Speed 
+[16:37:59.444] LOG: Applied X Speed 
+[16:37:59.444] LOG: Applied X Speed 
+[16:37:59.445] LOG: Applied X Speed 
+[16:37:59.445] LOG: Applied X Speed 
+[16:37:59.445] LOG: Applied X Speed 
+[16:37:59.445] LOG: Applied X Speed 
+[16:37:59.445] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.446] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.447] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.448] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.449] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.450] LOG: Applied X Speed 
+[16:37:59.453] LOG: Applied X Speed 
+[16:37:59.453] LOG: Applied X Speed 
+[16:37:59.453] LOG: Applied X Speed 
+[16:37:59.453] LOG: Applied X Speed 
+[16:37:59.453] LOG: Applied X Speed 
+[16:37:59.453] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.454] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.455] LOG: Applied X Speed 
+[16:37:59.456] LOG: Applied X Speed 
+[16:37:59.456] LOG: Applied X Speed 
+[16:37:59.456] LOG: Applied X Speed 
+[16:37:59.456] LOG: Applied X Speed 
+[16:37:59.459] LOG: Applied X Speed 
+[16:37:59.459] LOG: Applied Mystic Water 
+[16:37:59.460] LOG: Applied X Attack 
+[16:37:59.460] LOG: Applied Multi Lens 
+[16:37:59.461] LOG: Applied X Attack 
+[16:37:59.461] LOG: Applied Multi Lens 
+[16:37:59.462] LOG: Applied Mystic Water 
+[16:37:59.462] LOG: Applied X Attack 
+[16:37:59.463] LOG: Applied Multi Lens 
+[16:37:59.463] LOG: Applied X Speed 
+[16:37:59.464] LOG: Applied X Attack 
+[16:37:59.465] LOG: Applied X Attack 
+[16:37:59.466] LOG: Applied X Attack 
+[16:37:59.470] LOG: %cStart Phase TurnStartPhase color:green;
+[16:37:59.470] LOG: Applied X Speed 
+[16:37:59.470] LOG: Applied X Speed 
+[16:37:59.471] LOG: Applied X Speed 
+[16:37:59.471] LOG: Applied X Speed 
+[16:37:59.471] LOG: Applied X Speed 
+[16:37:59.471] LOG: Applied X Speed 
+[16:37:59.471] LOG: Applied X Speed 
+[16:37:59.472] LOG: Applied X Speed 
+[16:37:59.472] LOG: Applied X Speed 
+[16:37:59.472] LOG: Applied X Speed 
+[16:37:59.472] LOG: Applied X Speed 
+[16:37:59.472] LOG: Applied X Speed 
+[16:37:59.472] LOG: Applied X Speed 
+[16:37:59.473] LOG: Applied X Speed 
+[16:37:59.473] LOG: Applied X Speed 
+[16:37:59.473] LOG: Applied X Speed 
+[16:37:59.473] LOG: Applied X Speed 
+[16:37:59.474] LOG: Applied X Speed 
+[16:37:59.474] LOG: Applied X Speed 
+[16:37:59.474] LOG: Applied X Speed 
+[16:37:59.474] LOG: Applied X Speed 
+[16:37:59.474] LOG: Applied X Speed 
+[16:37:59.475] LOG: Applied X Speed 
+[16:37:59.476] LOG: Applied X Speed 
+[16:37:59.476] LOG: Applied X Speed 
+[16:37:59.476] LOG: Applied X Speed 
+[16:37:59.476] LOG: Applied X Speed 
+[16:37:59.477] LOG: Applied X Speed 
+[16:37:59.477] LOG: Applied X Speed 
+[16:37:59.478] LOG: Applied X Speed 
+[16:37:59.478] LOG: Applied X Speed 
+[16:37:59.479] LOG: Applied X Speed 
+[16:37:59.479] LOG: Applied X Speed 
+[16:37:59.479] LOG: Applied X Speed 
+[16:37:59.479] LOG: Applied X Speed 
+[16:37:59.479] LOG: Applied X Speed 
+[16:37:59.480] LOG: Applied X Speed 
+[16:37:59.480] LOG: %cStart Phase MovePhase color:green;
+[16:37:59.480] LOG: %cUser: Beniccino
+Move: AQUA_JET
+Use Mode: NORMAL color:orchid
+[16:37:59.481] LOG: Applied X Speed 
+[16:37:59.481] LOG: Applied X Speed 
+[16:37:59.481] LOG: Applied X Speed 
+[16:37:59.481] LOG: Applied X Speed 
+[16:37:59.482] LOG: Applied X Speed 
+[16:37:59.482] LOG: Applied X Speed 
+[16:37:59.482] LOG: Applied X Speed 
+[16:37:59.483] LOG: Applied X Speed 
+[16:37:59.483] LOG: Applied X Speed 
+[16:37:59.483] LOG: Applied X Speed 
+[16:37:59.483] LOG: Applied X Speed 
+[16:37:59.483] LOG: Applied X Speed 
+[16:37:59.484] LOG: Applied X Speed 
+[16:37:59.484] LOG: Applied X Speed 
+[16:37:59.485] LOG: Applied X Speed 
+[16:37:59.488] LOG: Applied X Speed 
+[16:37:59.488] LOG: Applied X Speed 
+[16:37:59.489] LOG: Applied X Speed 
+[16:37:59.489] LOG: Applied X Speed 
+[16:37:59.489] LOG: Applied X Speed 
+[16:37:59.489] LOG: Applied X Speed 
+[16:37:59.489] LOG: Applied X Speed 
+[16:37:59.490] LOG: Applied X Speed 
+[16:37:59.490] LOG: Applied X Speed 
+[16:37:59.491] LOG: Applied X Speed 
+[16:37:59.491] LOG: Applied X Speed 
+[16:37:59.491] LOG: Applied X Speed 
+[16:37:59.492] LOG: Applied X Speed 
+[16:37:59.492] LOG: Applied X Speed 
+[16:37:59.492] LOG: Applied X Speed 
+[16:37:59.493] LOG: %cStart Phase MessagePhase color:green;
+[16:37:59.554] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:37:59.770] LOG: crit stage: +0
+[16:37:59.798] LOG: Move: Aqua Jet | Base damage: 45.29813333333333 | Power: 40 | Source attack: 172 | Target defense: 75
+[16:37:59.812] LOG: Move: Aqua Jet | Attack damage: 21
+[16:37:59.824] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:37:59.846] LOG: %cStart Phase MessagePhase color:green;
+[16:38:00.024] LOG: %cStart Phase MoveEndPhase color:green;
+[16:38:00.033] LOG: Applied X Speed 
+[16:38:00.040] LOG: Applied X Speed 
+[16:38:00.046] LOG: Applied X Speed 
+[16:38:00.051] LOG: Applied X Speed 
+[16:38:00.062] LOG: Applied X Speed 
+[16:38:00.072] LOG: Applied X Speed 
+[16:38:00.082] LOG: Applied X Speed 
+[16:38:00.089] LOG: %cStart Phase MovePhase color:green;
+[16:38:00.089] LOG: %cUser: Sharpedo
+Move: RIP_AND_TEAR
+Use Mode: NORMAL color:orchid
+[16:38:00.098] LOG: Applied X Speed 
+[16:38:00.108] LOG: Applied X Speed 
+[16:38:00.117] LOG: Applied X Speed 
+[16:38:00.122] LOG: Applied X Speed 
+[16:38:00.141] LOG: Applied X Speed 
+[16:38:00.150] LOG: Applied X Speed 
+[16:38:00.155] LOG: Applied X Speed 
+[16:38:00.173] LOG: Applied X Speed 
+[16:38:00.189] LOG: Applied X Speed 
+[16:38:00.194] LOG: Applied X Speed 
+[16:38:00.200] LOG: Applied X Speed 
+[16:38:00.211] LOG: Applied X Speed 
+[16:38:00.227] LOG: Applied X Speed 
+[16:38:00.233] LOG: Applied X Speed 
+[16:38:00.242] LOG: Applied X Speed 
+[16:38:00.262] LOG: Applied X Speed 
+[16:38:00.271] LOG: Applied X Speed 
+[16:38:00.280] LOG: Applied X Speed 
+[16:38:00.286] LOG: Applied X Speed 
+[16:38:00.303] LOG: Applied X Speed 
+[16:38:00.315] LOG: Applied X Speed 
+[16:38:00.321] LOG: Applied X Speed 
+[16:38:00.340] LOG: Applied X Speed 
+[16:38:00.350] LOG: Applied X Speed 
+[16:38:00.356] LOG: Applied X Speed 
+[16:38:00.361] LOG: Applied X Speed 
+[16:38:00.370] LOG: Applied X Speed 
+[16:38:00.384] LOG: Applied X Speed 
+[16:38:00.389] LOG: Applied X Speed 
+[16:38:00.399] LOG: Applied X Speed 
+[16:38:00.404] LOG: %cStart Phase MessagePhase color:green;
+[16:38:00.516] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:38:00.525] LOG: Applied Multi Lens 
+[16:38:00.726] LOG: Applied Scope Lens 
+[16:38:00.731] LOG: crit stage: +1
+[16:38:00.753] LOG: Applied X Attack 
+[16:38:00.761] LOG: Move: Rip and Tear | Base damage: 87.20827586206897 | Power: 143 | Source attack: 216 | Target defense: 174
+[16:38:00.763] LOG: Applied Multi Lens 
+[16:38:00.777] LOG: Move: Rip and Tear | Attack damage: 196
+[16:38:00.790] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:00.903] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:00.932] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:38:00.943] LOG: %cStart Phase MessagePhase color:green;
+[16:38:01.154] LOG: %cStart Phase MessagePhase color:green;
+[16:38:01.343] LOG: %cStart Phase FaintPhase color:green;
+[16:38:01.350] LOG: Applied X Speed 
+[16:38:01.356] LOG: Applied X Speed 
+[16:38:01.364] LOG: Applied X Speed 
+[16:38:01.372] LOG: Applied X Speed 
+[16:38:01.377] LOG: Applied X Speed 
+[16:38:01.381] LOG: Applied X Speed 
+[16:38:01.386] LOG: Applied X Speed 
+[16:38:01.394] LOG: Applied X Speed 
+[16:38:01.399] LOG: Applied X Speed 
+[16:38:01.408] LOG: Applied X Speed 
+[16:38:01.412] LOG: Applied X Speed 
+[16:38:01.421] LOG: Applied X Speed 
+[16:38:02.922] LOG: Applied X Speed 
+[16:38:02.929] LOG: Applied X Speed 
+[16:38:02.942] LOG: Applied X Speed 
+[16:38:02.952] LOG: Applied X Speed 
+[16:38:02.957] LOG: Applied X Speed 
+[16:38:02.962] LOG: Applied X Speed 
+[16:38:02.967] LOG: Applied X Speed 
+[16:38:02.975] LOG: Applied X Speed 
+[16:38:02.979] LOG: Applied X Speed 
+[16:38:02.988] LOG: Applied X Speed 
+[16:38:02.992] LOG: Applied X Speed 
+[16:38:03.000] LOG: Applied X Speed 
+[16:38:03.005] LOG: %cStart Phase MessagePhase color:green;
+[16:38:04.672] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:04.832] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:38:04.962] LOG: %cStart Phase MessagePhase color:green;
+[16:38:05.199] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:05.229] LOG: %cStart Phase VictoryPhase color:green;
+[16:38:05.230] LOG: Applied Soothe Bell 
+[16:38:05.232] LOG: Applied Soothe Bell 
+[16:38:05.233] LOG: Applied Soothe Bell 
+[16:38:05.233] LOG: %cStart Phase ExpPhase color:green;
+[16:38:05.233] LOG: Applied Super EXP. Charm 
+[16:38:05.233] LOG: Applied EXP. Charm 
+[16:38:05.432] LOG: 174533 188172 175616
+[16:38:05.504] LOG: %cStart Phase LevelUpPhase color:green;
+[16:38:05.505] LOG: Applied Calcium 
+[16:38:05.506] LOG: %cStart Phase ExpPhase color:green;
+[16:38:05.506] LOG: Applied Super EXP. Charm 
+[16:38:05.506] LOG: Applied EXP. Charm 
+[16:38:05.686] LOG: 183518 197157 189884
+[16:38:05.753] LOG: %cStart Phase LevelUpPhase color:green;
+[16:38:05.756] LOG: Applied HP Up 
+[16:38:05.756] LOG: Applied Zinc 
+[16:38:05.756] LOG: Applied Iron 
+[16:38:05.756] LOG: Applied Protein 
+[16:38:05.756] LOG: Applied Carbos 
+[16:38:05.758] LOG: Applied Soul Dew 
+[16:38:05.760] LOG: Applied Soul Dew 
+[16:38:05.760] LOG: %cStart Phase ExpPhase color:green;
+[16:38:05.760] LOG: Applied Super EXP. Charm 
+[16:38:05.760] LOG: Applied EXP. Charm 
+[16:38:05.934] LOG: 174533 188172 175616
+[16:38:06.004] LOG: %cStart Phase LevelUpPhase color:green;
+[16:38:06.005] LOG: Applied Protein 
+[16:38:06.006] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[16:38:08.534] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:38:08.534] LOG: Applied Super EXP. Charm 
+[16:38:08.534] LOG: Applied EXP. Charm 
+[16:38:08.534] LOG: 174533 188172 175616
+[16:38:08.535] LOG: %cStart Phase LevelUpPhase color:green;
+[16:38:08.536] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:38:08.536] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:38:08.536] LOG: Applied Super EXP. Charm 
+[16:38:08.536] LOG: Applied EXP. Charm 
+[16:38:08.537] LOG: 174533 188172 175616
+[16:38:08.537] LOG: %cStart Phase LevelUpPhase color:green;
+[16:38:08.538] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:38:08.539] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:38:08.539] LOG: Applied Super EXP. Charm 
+[16:38:08.539] LOG: Applied EXP. Charm 
+[16:38:08.540] LOG: 174533 188172 175616
+[16:38:08.540] LOG: %cStart Phase LevelUpPhase color:green;
+[16:38:08.541] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:38:08.541] LOG: %cStart Phase MoveEndPhase color:green;
+[16:38:08.548] LOG: Applied X Speed 
+[16:38:08.559] LOG: Applied X Speed 
+[16:38:08.566] LOG: Applied X Speed 
+[16:38:08.571] LOG: %cStart Phase MovePhase color:green;
+[16:38:08.572] LOG: %cStart Phase MoveEndPhase color:green;
+[16:38:08.576] LOG: Applied X Speed 
+[16:38:08.582] LOG: Applied X Speed 
+[16:38:08.583] LOG: %cStart Phase MovePhase color:green;
+[16:38:08.583] LOG: %cUser: Skulberus
+Move: AXE_KICK
+Use Mode: NORMAL color:orchid
+[16:38:08.591] LOG: Applied X Speed 
+[16:38:08.596] LOG: Applied X Speed 
+[16:38:08.603] LOG: Applied X Speed 
+[16:38:08.611] LOG: Applied X Speed 
+[16:38:08.616] LOG: Applied X Speed 
+[16:38:08.620] LOG: Applied X Speed 
+[16:38:08.624] LOG: Applied X Speed 
+[16:38:08.632] LOG: Applied X Speed 
+[16:38:08.636] LOG: Applied X Speed 
+[16:38:08.645] LOG: Applied X Speed 
+[16:38:08.651] LOG: Applied X Speed 
+[16:38:08.658] LOG: Applied X Speed 
+[16:38:08.671] LOG: Applied X Speed 
+[16:38:08.676] LOG: Applied X Speed 
+[16:38:08.683] LOG: Applied X Speed 
+[16:38:08.691] LOG: Applied X Speed 
+[16:38:08.695] LOG: Applied X Speed 
+[16:38:08.699] LOG: Applied X Speed 
+[16:38:08.703] LOG: Applied X Speed 
+[16:38:08.712] LOG: Applied X Speed 
+[16:38:08.716] LOG: Applied X Speed 
+[16:38:08.724] LOG: Applied X Speed 
+[16:38:08.728] LOG: Applied X Speed 
+[16:38:08.736] LOG: Applied X Speed 
+[16:38:08.740] LOG: %cStart Phase MessagePhase color:green;
+[16:38:08.821] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:38:08.839] LOG: Applied Wide Lens 
+[16:38:09.021] LOG: crit stage: +0
+[16:38:09.045] LOG: Applied X Attack 
+[16:38:09.053] LOG: Move: Axe Kick | Base damage: 172.01290322580644 | Power: 144 | Source attack: 225 | Target defense: 93
+[16:38:09.065] LOG: Move: Axe Kick | Attack damage: 110
+[16:38:09.076] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:38:09.088] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:09.251] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:38:09.252] LOG: %cStart Phase MessagePhase color:green;
+[16:38:09.434] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:09.462] LOG: %cStart Phase FaintPhase color:green;
+[16:38:09.468] LOG: Applied X Speed 
+[16:38:09.474] LOG: Applied X Speed 
+[16:38:09.478] LOG: Applied X Speed 
+[16:38:09.484] LOG: Applied X Speed 
+[16:38:09.488] LOG: Applied X Speed 
+[16:38:09.492] LOG: Applied X Speed 
+[16:38:09.497] LOG: Applied X Speed 
+[16:38:09.500] LOG: Applied X Speed 
+[16:38:09.566] LOG: Applied X Speed 
+[16:38:09.572] LOG: Applied X Speed 
+[16:38:09.576] LOG: Applied X Speed 
+[16:38:09.580] LOG: Applied X Speed 
+[16:38:09.584] LOG: Applied X Speed 
+[16:38:09.588] LOG: Applied X Speed 
+[16:38:09.592] LOG: Applied X Speed 
+[16:38:09.596] LOG: Applied X Speed 
+[16:38:09.597] LOG: %cStart Phase MessagePhase color:green;
+[16:38:09.650] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:09.812] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:38:10.005] LOG: %cStart Phase MessagePhase color:green;
+[16:38:10.191] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:10.223] LOG: %cStart Phase VictoryPhase color:green;
+[16:38:10.224] LOG: Applied Soothe Bell 
+[16:38:10.225] LOG: Applied Soothe Bell 
+[16:38:10.227] LOG: Applied Soothe Bell 
+[16:38:10.228] LOG: %cStart Phase MoveEndPhase color:green;
+[16:38:10.228] LOG: %cStart Phase TurnInitPhase color:green;
+[16:38:10.228] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:38:10.228] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:38:10.228] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:38:10.228] LOG: %cStart Phase BerryPhase color:green;
+[16:38:10.234] LOG: Applied X Speed 
+[16:38:10.240] LOG: Applied X Speed 
+[16:38:10.246] LOG: Applied X Speed 
+[16:38:10.251] LOG: Applied X Speed 
+[16:38:10.255] LOG: Applied X Speed 
+[16:38:10.259] LOG: Applied X Speed 
+[16:38:10.266] LOG: Applied X Speed 
+[16:38:10.270] LOG: Applied X Speed 
+[16:38:10.272] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:38:10.276] LOG: Applied X Speed 
+[16:38:10.281] LOG: Applied X Speed 
+[16:38:10.284] LOG: Applied X Speed 
+[16:38:10.288] LOG: Applied X Speed 
+[16:38:10.292] LOG: Applied X Speed 
+[16:38:10.296] LOG: Applied X Speed 
+[16:38:10.299] LOG: Applied X Speed 
+[16:38:10.303] LOG: Applied X Speed 
+[16:38:10.303] LOG: %cStart Phase TurnEndPhase color:green;
+[16:38:10.309] LOG: Applied X Speed 
+[16:38:10.313] LOG: Applied X Speed 
+[16:38:10.317] LOG: Applied X Speed 
+[16:38:10.321] LOG: Applied X Speed 
+[16:38:10.325] LOG: Applied X Speed 
+[16:38:10.328] LOG: Applied X Speed 
+[16:38:10.333] LOG: Applied X Speed 
+[16:38:10.337] LOG: Applied X Speed 
+[16:38:10.339] LOG: %cStart Phase BattleEndPhase color:green;
+[16:38:10.341] LOG: Battle Score: 521 (2 Turns x0.92)
+[16:38:10.341] LOG: Total Score: 11933
+[16:38:10.346] LOG: Applied Amulet Coin 
+[16:38:10.348] LOG: Applied Calcium 
+[16:38:10.351] LOG: Applied HP Up 
+[16:38:10.351] LOG: Applied Zinc 
+[16:38:10.351] LOG: Applied Iron 
+[16:38:10.351] LOG: Applied Protein 
+[16:38:10.351] LOG: Applied Carbos 
+[16:38:10.352] LOG: Applied Soul Dew 
+[16:38:10.353] LOG: Applied Soul Dew 
+[16:38:10.354] LOG: Applied Protein 
+[16:38:10.371] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:10.371] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:10.371] LOG: %cStart Phase MessagePhase color:green;
+[16:38:10.492] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[16:38:10.493] LOG: Localized grunt name: Rocket Grunt
+[16:38:10.493] LOG: Localized grunt name: Rocket Grunt
+[16:38:11.010] LOG: Dialogue saved as seen: dialogue:rocketGrunt.victory.5
+[16:38:11.010] LOG: %cStart Phase MoneyRewardPhase color:green;
+[16:38:11.010] LOG: Applied Amulet Coin 
+[16:38:11.332] LOG: %cStart Phase ModifierRewardPhase color:green;
+[16:38:11.585] LOG: %cStart Phase EggLapsePhase color:green;
+[16:38:11.585] LOG: %cStart Phase EggLapsePhase color:green;
+[16:38:11.585] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:38:11.586] LOG: Wave Seed: siRVbulhkwa 32
+[16:38:11.594] LOG: Applied X Speed 
+[16:38:11.599] LOG: Applied X Speed 
+[16:38:11.604] LOG: Applied X Speed 
+[16:38:11.609] LOG: Applied X Speed 
+[16:38:11.615] LOG: Applied X Speed 
+[16:38:11.618] LOG: Applied X Speed 
+[16:38:11.623] LOG: Applied X Speed 
+[16:38:11.627] LOG: Applied X Speed 
+[16:38:11.634] LOG: Applied X Speed 
+[16:38:11.637] LOG: Applied X Speed 
+[16:38:11.641] LOG: Applied X Speed 
+[16:38:11.645] LOG: Applied X Speed 
+[16:38:11.649] LOG: Applied X Speed 
+[16:38:11.653] LOG: Applied X Speed 
+[16:38:11.657] LOG: Applied X Speed 
+[16:38:11.661] LOG: Applied X Speed 
+[16:38:11.667] LOG: Applied X Speed 
+[16:38:11.671] LOG: Applied X Speed 
+[16:38:11.674] LOG: Applied X Speed 
+[16:38:11.678] LOG: Applied X Speed 
+[16:38:11.681] LOG: Applied X Speed 
+[16:38:11.685] LOG: Applied X Speed 
+[16:38:11.689] LOG: Applied X Speed 
+[16:38:11.692] LOG: Applied X Speed 
+[16:38:11.697] LOG: Applied X Speed 
+[16:38:11.700] LOG: Applied X Speed 
+[16:38:11.703] LOG: Applied X Speed 
+[16:38:11.707] LOG: Applied X Speed 
+[16:38:11.710] LOG: Applied X Speed 
+[16:38:11.714] LOG: Applied X Speed 
+[16:38:11.718] LOG: Applied X Speed 
+[16:38:11.721] LOG: Applied X Speed 
+[16:38:11.726] LOG: Applied X Speed 
+[16:38:11.729] LOG: Applied X Speed 
+[16:38:11.732] LOG: Applied X Speed 
+[16:38:11.735] LOG: Applied X Speed 
+[16:38:11.739] LOG: Applied X Speed 
+[16:38:11.742] LOG: Applied X Speed 
+[16:38:11.746] LOG: Applied X Speed 
+[16:38:11.749] LOG: Applied X Speed 
+[16:38:11.754] LOG: Applied X Speed 
+[16:38:11.757] LOG: Applied X Speed 
+[16:38:11.761] LOG: Applied X Speed 
+[16:38:11.764] LOG: Applied X Speed 
+[16:38:11.767] LOG: Applied X Speed 
+[16:38:11.771] LOG: Applied X Speed 
+[16:38:11.774] LOG: Applied X Speed 
+[16:38:11.778] LOG: Applied X Speed 
+[16:38:11.782] LOG: Applied X Speed 
+[16:38:11.786] LOG: Applied X Speed 
+[16:38:11.789] LOG: Applied X Speed 
+[16:38:11.792] LOG: Applied X Speed 
+[16:38:11.796] LOG: Applied X Speed 
+[16:38:11.800] LOG: Applied X Speed 
+[16:38:11.803] LOG: Applied X Speed 
+[16:38:11.807] LOG: Applied X Speed 
+[16:38:11.812] LOG: Applied X Speed 
+[16:38:11.816] LOG: Applied X Speed 
+[16:38:11.819] LOG: Applied X Speed 
+[16:38:11.823] LOG: Applied X Speed 
+[16:38:11.826] LOG: Applied X Speed 
+[16:38:11.830] LOG: Applied X Speed 
+[16:38:11.834] LOG: Applied X Speed 
+[16:38:11.837] LOG: Applied X Speed 
+[16:38:11.843] LOG: Applied X Speed 
+[16:38:11.846] LOG: Applied X Speed 
+[16:38:11.849] LOG: Applied X Speed 
+[16:38:11.853] LOG: Applied X Speed 
+[16:38:11.856] LOG: Applied X Speed 
+[16:38:11.860] LOG: Applied X Speed 
+[16:38:11.864] LOG: Applied X Speed 
+[16:38:11.867] LOG: Applied X Speed 
+[16:38:11.872] LOG: Applied X Speed 
+[16:38:11.875] LOG: Applied X Speed 
+[16:38:11.878] LOG: Applied X Speed 
+[16:38:11.881] LOG: Applied X Speed 
+[16:38:11.885] LOG: Applied X Speed 
+[16:38:11.888] LOG: Applied X Speed 
+[16:38:11.892] LOG: Applied X Speed 
+[16:38:11.895] LOG: Applied X Speed 
+[16:38:11.901] LOG: Applied X Speed 
+[16:38:11.905] LOG: Applied X Speed 
+[16:38:11.908] LOG: Applied X Speed 
+[16:38:11.912] LOG: Applied X Speed 
+[16:38:11.915] LOG: Applied X Speed 
+[16:38:11.919] LOG: Applied X Speed 
+[16:38:11.923] LOG: Applied X Speed 
+[16:38:11.927] LOG: Applied X Speed 
+[16:38:11.933] LOG: Applied X Speed 
+[16:38:11.936] LOG: Applied X Speed 
+[16:38:11.940] LOG: Applied X Speed 
+[16:38:11.943] LOG: Applied X Speed 
+[16:38:11.948] LOG: Applied X Speed 
+[16:38:11.951] LOG: Applied X Speed 
+[16:38:11.956] LOG: Applied X Speed 
+[16:38:11.959] LOG: Applied X Speed 
+[16:38:11.961] LOG: Applied Golden Poké Ball 
+[16:38:15.912] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 97_3
+[16:38:15.912] LOG: Hypno's variant icon does not exist. Replacing with default.
+[16:38:16.866] LOG: Applied Calcium 
+[16:38:16.872] LOG: Applied HP Up 
+[16:38:16.872] LOG: Applied Zinc 
+[16:38:16.872] LOG: Applied Iron 
+[16:38:16.872] LOG: Applied Protein 
+[16:38:16.872] LOG: Applied Carbos 
+[16:38:16.874] LOG: Applied Soul Dew 
+[16:38:16.877] LOG: Applied Soul Dew 
+[16:38:16.880] LOG: Applied Protein 
+[16:38:18.545] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 97_3
+[16:38:18.545] LOG: Hypno's variant icon does not exist. Replacing with default.
+[16:38:19.591] LOG: Applied Calcium 
+[16:38:19.597] LOG: Applied HP Up 
+[16:38:19.597] LOG: Applied Zinc 
+[16:38:19.598] LOG: Applied Iron 
+[16:38:19.598] LOG: Applied Protein 
+[16:38:19.598] LOG: Applied Carbos 
+[16:38:19.602] LOG: Applied Soul Dew 
+[16:38:19.604] LOG: Applied Soul Dew 
+[16:38:19.607] LOG: Applied Protein 
+[16:38:19.641] LOG: %cStart Phase NewBattlePhase color:green;
+[16:38:19.641] LOG: Wave Seed: tjSWcvmilxb 33
+[16:38:19.649] LOG: Applied X Speed 
+[16:38:19.655] LOG: Applied X Speed 
+[16:38:19.661] LOG: Applied X Speed 
+[16:38:19.666] LOG: Applied X Speed 
+[16:38:19.672] LOG: Applied X Speed 
+[16:38:19.678] LOG: Applied X Speed 
+[16:38:19.688] LOG: Applied X Speed 
+[16:38:19.692] LOG: Applied X Speed 
+[16:38:19.703] LOG: %cStart Phase MessagePhase color:green;
+[16:38:19.855] LOG: Applied X Speed 
+[16:38:19.861] LOG: Applied X Speed 
+[16:38:19.866] LOG: Applied X Speed 
+[16:38:19.870] LOG: Applied X Speed 
+[16:38:19.874] LOG: Applied X Speed 
+[16:38:19.878] LOG: Applied X Speed 
+[16:38:19.878] LOG: %cStart Phase ReturnPhase color:green;
+[16:38:19.916] LOG: Applied X Speed 
+[16:38:19.921] LOG: Applied X Speed 
+[16:38:19.925] LOG: Applied X Speed 
+[16:38:19.929] LOG: Applied X Speed 
+[16:38:19.932] LOG: Applied X Speed 
+[16:38:19.936] LOG: Applied X Speed 
+[16:38:19.939] LOG: Applied X Speed 
+[16:38:19.942] LOG: Applied X Speed 
+[16:38:19.986] LOG: Applied X Speed 
+[16:38:19.990] LOG: Applied X Speed 
+[16:38:19.990] LOG: %cStart Phase ReturnPhase color:green;
+[16:38:20.025] LOG: Applied X Speed 
+[16:38:20.028] LOG: Applied X Speed 
+[16:38:20.032] LOG: Applied X Speed 
+[16:38:20.034] LOG: Applied X Speed 
+[16:38:20.037] LOG: Applied X Speed 
+[16:38:20.040] LOG: Applied X Speed 
+[16:38:20.043] LOG: Applied X Speed 
+[16:38:20.045] LOG: Applied X Speed 
+[16:38:20.093] LOG: %cStart Phase ReturnPhase color:green;
+[16:38:20.128] LOG: Applied X Speed 
+[16:38:20.132] LOG: Applied X Speed 
+[16:38:20.137] LOG: Applied X Speed 
+[16:38:20.139] LOG: Applied X Speed 
+[16:38:20.142] LOG: Applied X Speed 
+[16:38:20.144] LOG: Applied X Speed 
+[16:38:20.146] LOG: Applied X Speed 
+[16:38:20.149] LOG: Applied X Speed 
+[16:38:20.204] LOG: %cStart Phase ShowTrainerPhase color:green;
+[16:38:20.308] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:38:20.332] LOG: Pokemon: Foe Dewgong | Species ID: 87 | Level: 56 | Nature: Adamant (+Atk/-SpAtk)
+[16:38:20.332] LOG: Stats (IVs): HP: 180 (31), Atk: 121 (31), Def: 87 (31), Spatk: 145 (31), Spdef: 124 (31), Spd: 105 (31)
+[16:38:20.332] LOG: Ability: Ice Scales | Passive Ability: Thick Fat 
+[16:38:20.332] LOG: Moveset: ["Play Rough","Ice Shard","Triple Axel","Drill Run"]
+[16:38:20.343] LOG: Pokemon: Foe Lapras | Species ID: 131 | Level: 56 | Nature: Modest (+SpAtk/-Atk)
+[16:38:20.344] LOG: Stats (IVs): HP: 216 (31), Atk: 117 (31), Def: 101 (31), Spatk: 115 (31), Spdef: 125 (31), Spd: 65 (31)
+[16:38:20.344] LOG: Ability: Permafrost | Passive Ability: Serene Grace 
+[16:38:20.344] LOG: Moveset: ["Sparkling Aria","Heal Bell","Thunderbolt","Blizzard"]
+[16:38:20.353] LOG: Pokemon: Foe Rotom Mow | Species ID: 10239 | Level: 56 | Nature: Modest (+SpAtk/-Atk)
+[16:38:20.353] LOG: Stats (IVs): HP: 124 (31), Atk: 91 (31), Def: 138 (31), Spatk: 135 (31), Spdef: 146 (31), Spd: 97 (31)
+[16:38:20.353] LOG: Ability: Teravolt | Passive Ability: Levitate 
+[16:38:20.353] LOG: Moveset: ["Chilling Water","Sheer Cold","Blizzard","Aeroblast"]
+[16:38:24.185] LOG: Battle Seed: 25mqTEekRMXmiZGu
+[16:38:24.187] LOG: Applied Calcium (enemy)
+[16:38:24.187] LOG: Applied Carbos (enemy)
+[16:38:24.187] LOG: Applied Calcium (enemy)
+[16:38:24.188] LOG: Applied Carbos (enemy)
+[16:38:24.188] LOG: Applied HP Up (enemy)
+[16:38:24.188] LOG: Applied Protein (enemy)
+[16:38:24.188] LOG: Applied Zinc (enemy)
+[16:38:24.188] LOG: Applied Carbos (enemy)
+[16:38:24.188] LOG: Applied Protein (enemy)
+[16:38:24.189] LOG: Applied Calcium (enemy)
+[16:38:24.189] LOG: Applied Carbos (enemy)
+[16:38:24.189] LOG: Applied HP Up (enemy)
+[16:38:24.189] LOG: Applied Protein (enemy)
+[16:38:24.189] LOG: Applied Zinc (enemy)
+[16:38:24.192] LOG: Applied HP Up (enemy)
+[16:38:24.193] LOG: Applied Calcium (enemy)
+[16:38:24.193] LOG: Generated AI funcs
+[16:38:24.328] DEBUG: Session data saved to slot 0!
+[16:38:24.329] LOG: Applied Carbos (enemy)
+[16:38:24.329] LOG: Applied Protein (enemy)
+[16:38:24.330] LOG: Applied Calcium (enemy)
+[16:38:24.330] LOG: Applied Carbos (enemy)
+[16:38:24.330] LOG: Applied HP Up (enemy)
+[16:38:24.330] LOG: Applied Protein (enemy)
+[16:38:24.330] LOG: Applied Zinc (enemy)
+[16:38:24.331] LOG: Applied HP Up (enemy)
+[16:38:24.331] LOG: Applied Calcium (enemy)
+[16:38:24.332] LOG: Wave Seed: tjSWcvmilxb 33
+[16:38:24.537] LOG: Team Rocket Admin Petrel
+[16:38:24.941] LOG: Dialogue saved as seen: dialogue:petrel.encounter.2
+[16:38:24.977] LOG: Team Rocket Admin Petrel
+[16:38:25.680] LOG: %cStart Phase SummonPhase color:green;
+[16:38:25.680] LOG: Petrel
+[16:38:25.816] LOG: Applied Carbos (enemy)
+[16:38:25.816] LOG: Applied Protein (enemy)
+[16:38:25.817] LOG: Applied Calcium (enemy)
+[16:38:25.817] LOG: Applied Carbos (enemy)
+[16:38:25.817] LOG: Applied HP Up (enemy)
+[16:38:25.817] LOG: Applied Protein (enemy)
+[16:38:25.817] LOG: Applied Zinc (enemy)
+[16:38:25.818] LOG: Applied HP Up (enemy)
+[16:38:25.818] LOG: Applied Calcium (enemy)
+[16:38:25.945] LOG: %cStart Phase SummonPhase color:green;
+[16:38:25.946] LOG: Petrel
+[16:38:26.092] LOG: Applied Carbos (enemy)
+[16:38:26.092] LOG: Applied Protein (enemy)
+[16:38:26.094] LOG: Applied Calcium (enemy)
+[16:38:26.095] LOG: Applied Carbos (enemy)
+[16:38:26.095] LOG: Applied HP Up (enemy)
+[16:38:26.095] LOG: Applied Protein (enemy)
+[16:38:26.095] LOG: Applied Zinc (enemy)
+[16:38:26.096] LOG: Applied HP Up (enemy)
+[16:38:26.096] LOG: Applied Calcium (enemy)
+[16:38:26.099] WARN: Missing animation: pkmn__er__lapras_mega
+[16:38:26.099] WARN: Missing animation: pkmn__er__lapras_mega
+[16:38:26.214] LOG: %cStart Phase SummonPhase color:green;
+[16:38:26.214] LOG: Petrel
+[16:38:26.365] LOG: Applied Carbos (enemy)
+[16:38:26.365] LOG: Applied Protein (enemy)
+[16:38:26.368] LOG: Applied Calcium (enemy)
+[16:38:26.368] LOG: Applied Carbos (enemy)
+[16:38:26.368] LOG: Applied HP Up (enemy)
+[16:38:26.368] LOG: Applied Protein (enemy)
+[16:38:26.368] LOG: Applied Zinc (enemy)
+[16:38:26.368] LOG: Applied HP Up (enemy)
+[16:38:26.369] LOG: Applied Calcium (enemy)
+[16:38:26.499] LOG: %cStart Phase SummonPhase color:green;
+[16:38:26.652] LOG: Applied Calcium 
+[16:38:26.655] LOG: Applied HP Up 
+[16:38:26.655] LOG: Applied Zinc 
+[16:38:26.655] LOG: Applied Iron 
+[16:38:26.655] LOG: Applied Protein 
+[16:38:26.655] LOG: Applied Carbos 
+[16:38:26.657] LOG: Applied Soul Dew 
+[16:38:26.658] LOG: Applied Soul Dew 
+[16:38:26.659] LOG: Applied Protein 
+[16:38:26.776] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:38:26.881] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:38:26.888] LOG: %cStart Phase SummonPhase color:green;
+[16:38:27.028] LOG: Applied Calcium 
+[16:38:27.031] LOG: Applied HP Up 
+[16:38:27.031] LOG: Applied Zinc 
+[16:38:27.031] LOG: Applied Iron 
+[16:38:27.031] LOG: Applied Protein 
+[16:38:27.031] LOG: Applied Carbos 
+[16:38:27.032] LOG: Applied Soul Dew 
+[16:38:27.033] LOG: Applied Soul Dew 
+[16:38:27.034] LOG: Applied Protein 
+[16:38:27.151] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:38:27.260] LOG: %cStart Phase SummonPhase color:green;
+[16:38:27.414] LOG: Applied Calcium 
+[16:38:27.417] LOG: Applied HP Up 
+[16:38:27.417] LOG: Applied Zinc 
+[16:38:27.417] LOG: Applied Iron 
+[16:38:27.417] LOG: Applied Protein 
+[16:38:27.417] LOG: Applied Carbos 
+[16:38:27.421] LOG: Applied Soul Dew 
+[16:38:27.422] LOG: Applied Soul Dew 
+[16:38:27.423] LOG: Applied Protein 
+[16:38:27.528] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:38:27.627] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:38:27.642] LOG: Applied X Speed 
+[16:38:27.646] LOG: Applied X Speed 
+[16:38:27.656] LOG: Applied X Speed 
+[16:38:27.661] LOG: Applied X Speed 
+[16:38:27.666] LOG: Applied X Speed 
+[16:38:27.676] LOG: Applied X Speed 
+[16:38:27.682] LOG: Applied X Speed 
+[16:38:27.691] LOG: Applied X Speed 
+[16:38:27.710] LOG: Applied X Speed 
+[16:38:27.719] LOG: Applied X Speed 
+[16:38:27.747] LOG: Applied X Speed 
+[16:38:27.747] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:27.747] LOG: Ran PSP for: Sharpedo
+[16:38:27.752] LOG: Applied X Speed 
+[16:38:27.757] LOG: Applied X Speed 
+[16:38:27.762] LOG: Applied X Speed 
+[16:38:27.768] LOG: Applied X Speed 
+[16:38:27.774] LOG: Applied X Speed 
+[16:38:27.779] LOG: Applied X Speed 
+[16:38:27.785] LOG: Applied X Speed 
+[16:38:27.790] LOG: Applied X Speed 
+[16:38:27.800] LOG: Applied X Speed 
+[16:38:27.839] LOG: Applied X Speed 
+[16:38:27.844] LOG: Applied X Speed 
+[16:38:27.848] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:27.848] LOG: Ran PSP for: Skulberus
+[16:38:27.853] LOG: Applied X Speed 
+[16:38:27.859] LOG: Applied X Speed 
+[16:38:27.864] LOG: Applied X Speed 
+[16:38:27.868] LOG: Applied X Speed 
+[16:38:27.873] LOG: Applied X Speed 
+[16:38:27.878] LOG: Applied X Speed 
+[16:38:27.885] LOG: Applied X Speed 
+[16:38:27.889] LOG: Applied X Speed 
+[16:38:27.934] LOG: Applied X Speed 
+[16:38:27.938] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:27.938] LOG: Ran PSP for: Dewgong
+[16:38:28.010] LOG: Applied X Speed 
+[16:38:28.015] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:28.015] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:28.186] LOG: %cStart Phase MovePhase color:green;
+[16:38:28.186] LOG: %cUser: Dewgong
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[16:38:28.198] LOG: Applied X Speed 
+[16:38:28.203] LOG: Applied X Speed 
+[16:38:28.212] LOG: Applied X Speed 
+[16:38:28.217] LOG: Applied X Speed 
+[16:38:28.222] LOG: Applied X Speed 
+[16:38:28.231] LOG: Applied X Speed 
+[16:38:28.236] LOG: Applied X Speed 
+[16:38:28.245] LOG: Applied X Speed 
+[16:38:28.264] LOG: Applied X Speed 
+[16:38:28.273] LOG: Applied X Speed 
+[16:38:28.298] LOG: Applied X Speed 
+[16:38:28.304] LOG: Applied X Speed 
+[16:38:28.344] LOG: Applied X Speed 
+[16:38:28.349] LOG: Applied X Speed 
+[16:38:28.385] LOG: Applied X Speed 
+[16:38:28.399] LOG: Applied X Speed 
+[16:38:28.409] LOG: Applied X Speed 
+[16:38:28.427] LOG: Applied X Speed 
+[16:38:28.434] LOG: %cStart Phase MessagePhase color:green;
+[16:38:28.554] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:38:28.594] LOG: %cStart Phase MessagePhase color:green;
+[16:38:28.839] LOG: %cStart Phase MoveEndPhase color:green;
+[16:38:28.840] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:28.907] LOG: Applied X Speed 
+[16:38:28.912] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:28.914] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:29.085] LOG: %cStart Phase MessagePhase color:green;
+[16:38:29.408] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:29.452] LOG: Applied X Speed 
+[16:38:29.461] LOG: Applied X Speed 
+[16:38:29.470] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:29.470] LOG: Ran PSP for: Rotom Mow
+[16:38:29.511] LOG: Applied X Speed 
+[16:38:29.521] LOG: Applied X Speed 
+[16:38:29.530] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:29.530] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:29.700] LOG: %cStart Phase MessagePhase color:green;
+[16:38:29.957] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:29.985] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:38:30.145] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:38:30.188] LOG: Applied X Speed 
+[16:38:30.200] LOG: Applied X Speed 
+[16:38:30.211] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:30.221] LOG: Applied X Speed 
+[16:38:30.221] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:30.221] LOG: Ran PSP for: Mega Lapras
+[16:38:30.253] LOG: %cStart Phase PostSummonPhase color:green;
+[16:38:30.253] LOG: Ran PSP for: Abyssand
+[16:38:30.258] LOG: Applied X Speed 
+[16:38:30.264] LOG: Applied X Speed 
+[16:38:30.270] LOG: Applied X Speed 
+[16:38:30.275] LOG: Applied X Speed 
+[16:38:30.280] LOG: Applied X Speed 
+[16:38:30.285] LOG: Applied X Speed 
+[16:38:30.292] LOG: Applied X Speed 
+[16:38:30.297] LOG: Applied X Speed 
+[16:38:30.302] LOG: %cStart Phase TurnInitPhase color:green;
+[16:38:30.303] LOG: %cStart Phase CommandPhase color:green;
+[16:38:53.990] LOG: Move: MAT_BLOCK Move targets: {"targets":[0,1,2],"multiple":true} 
+Player Pokemon: Abyssand
+[16:38:53.992] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:38:54.456] LOG: %cStart Phase CommandPhase color:green;
+[16:38:56.486] LOG: Move: FISHIOUS_REND Move targets: {"targets":[3,4,5,0,2],"multiple":false} 
+Player Pokemon: Sharpedo
+[16:38:56.488] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:38:57.629] LOG: %cStart Phase CommandPhase color:green;
+[16:39:00.318] LOG: Move: CLOSE_COMBAT Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Skulberus
+[16:39:00.320] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:39:00.882] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:39:00.886] LOG: Applied X Speed 
+[16:39:00.886] LOG: Applied X Speed 
+[16:39:00.886] LOG: Applied X Speed 
+[16:39:00.886] LOG: Applied X Speed 
+[16:39:00.886] LOG: Applied X Speed 
+[16:39:00.887] LOG: Applied X Speed 
+[16:39:00.887] LOG: Applied X Speed 
+[16:39:00.887] LOG: Applied X Speed 
+[16:39:00.901] LOG: Applied X Speed 
+[16:39:00.906] LOG: Applied X Speed 
+[16:39:00.907] LOG: Applied Mystic Water 
+[16:39:00.908] LOG: Applied Multi Lens 
+[16:39:00.910] LOG: Applied Multi Lens 
+[16:39:00.912] LOG: Applied Mystic Water 
+[16:39:00.913] LOG: Applied Multi Lens 
+[16:39:00.914] LOG: Applied X Speed 
+[16:39:00.924] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:39:00.924] LOG: Applied X Speed 
+[16:39:00.924] LOG: Applied X Speed 
+[16:39:00.924] LOG: Applied X Speed 
+[16:39:00.925] LOG: Applied X Speed 
+[16:39:00.925] LOG: Applied X Speed 
+[16:39:00.925] LOG: Applied X Speed 
+[16:39:00.925] LOG: Applied X Speed 
+[16:39:00.925] LOG: Applied X Speed 
+[16:39:00.936] LOG: Applied X Speed 
+[16:39:00.936] LOG: Applied X Speed 
+[16:39:00.936] LOG: Applied X Speed 
+[16:39:00.936] LOG: Applied X Speed 
+[16:39:00.936] LOG: Applied X Speed 
+[16:39:00.936] LOG: Applied X Speed 
+[16:39:00.937] LOG: Applied X Speed 
+[16:39:00.937] LOG: Applied X Speed 
+[16:39:00.937] LOG: Applied X Speed 
+[16:39:00.937] LOG: Applied X Speed 
+[16:39:00.937] LOG: Applied X Speed 
+[16:39:00.937] LOG: Applied X Speed 
+[16:39:00.938] LOG: Applied X Speed 
+[16:39:00.938] LOG: Applied X Speed 
+[16:39:00.938] LOG: Applied X Speed 
+[16:39:00.938] LOG: Applied X Speed 
+[16:39:00.938] LOG: Applied X Speed 
+[16:39:00.939] LOG: Applied X Speed 
+[16:39:00.939] LOG: Applied X Speed 
+[16:39:00.939] LOG: Applied X Speed 
+[16:39:00.939] LOG: Applied X Speed 
+[16:39:00.939] LOG: Applied X Speed 
+[16:39:00.939] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.940] LOG: Applied X Speed 
+[16:39:00.941] LOG: Applied X Speed 
+[16:39:00.941] LOG: Applied X Speed 
+[16:39:00.941] LOG: Applied X Speed 
+[16:39:00.941] LOG: Applied X Speed 
+[16:39:00.941] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.942] LOG: Applied X Speed 
+[16:39:00.943] LOG: Applied X Speed 
+[16:39:00.943] LOG: Applied X Speed 
+[16:39:00.943] LOG: Applied X Speed 
+[16:39:00.943] LOG: Applied X Speed 
+[16:39:00.943] LOG: Applied X Speed 
+[16:39:00.943] LOG: Applied X Speed 
+[16:39:00.953] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:39:00.961] LOG: Applied X Speed 
+[16:39:00.961] LOG: Applied X Speed 
+[16:39:00.961] LOG: Applied X Speed 
+[16:39:00.961] LOG: Applied X Speed 
+[16:39:00.961] LOG: Applied X Speed 
+[16:39:00.961] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.962] LOG: Applied X Speed 
+[16:39:00.963] LOG: Applied X Speed 
+[16:39:00.963] LOG: Applied X Speed 
+[16:39:00.963] LOG: Applied X Speed 
+[16:39:00.963] LOG: Applied X Speed 
+[16:39:00.963] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.964] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.965] LOG: Applied X Speed 
+[16:39:00.967] LOG: Applied X Speed 
+[16:39:00.967] LOG: Applied X Speed 
+[16:39:00.967] LOG: Applied X Speed 
+[16:39:00.967] LOG: Applied X Speed 
+[16:39:00.968] LOG: Applied X Speed 
+[16:39:00.968] LOG: Applied X Speed 
+[16:39:00.968] LOG: Applied X Speed 
+[16:39:00.968] LOG: Applied X Speed 
+[16:39:00.968] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.969] LOG: Applied X Speed 
+[16:39:00.971] LOG: %cStart Phase TurnStartPhase color:green;
+[16:39:00.971] LOG: Applied X Speed 
+[16:39:00.971] LOG: Applied X Speed 
+[16:39:00.971] LOG: Applied X Speed 
+[16:39:00.972] LOG: Applied X Speed 
+[16:39:00.972] LOG: Applied X Speed 
+[16:39:00.972] LOG: Applied X Speed 
+[16:39:00.972] LOG: Applied X Speed 
+[16:39:00.972] LOG: Applied X Speed 
+[16:39:00.973] LOG: Applied X Speed 
+[16:39:00.973] LOG: Applied X Speed 
+[16:39:00.973] LOG: Applied X Speed 
+[16:39:00.974] LOG: Applied X Speed 
+[16:39:00.974] LOG: Applied X Speed 
+[16:39:00.975] LOG: Applied X Speed 
+[16:39:00.975] LOG: Applied X Speed 
+[16:39:00.975] LOG: Applied X Speed 
+[16:39:00.976] LOG: Applied X Speed 
+[16:39:00.976] LOG: Applied X Speed 
+[16:39:00.976] LOG: Applied X Speed 
+[16:39:00.976] LOG: Applied X Speed 
+[16:39:00.977] LOG: Applied X Speed 
+[16:39:00.977] LOG: Applied X Speed 
+[16:39:00.977] LOG: Applied X Speed 
+[16:39:00.977] LOG: Applied X Speed 
+[16:39:00.977] LOG: Applied X Speed 
+[16:39:00.977] LOG: Applied X Speed 
+[16:39:00.978] LOG: Applied X Speed 
+[16:39:00.978] LOG: Applied X Speed 
+[16:39:00.978] LOG: Applied X Speed 
+[16:39:00.979] LOG: Applied X Speed 
+[16:39:00.980] LOG: Applied X Speed 
+[16:39:00.980] LOG: Applied X Speed 
+[16:39:00.982] LOG: Applied X Speed 
+[16:39:00.982] LOG: Applied X Speed 
+[16:39:00.982] LOG: Applied X Speed 
+[16:39:00.983] LOG: Applied X Speed 
+[16:39:00.984] LOG: Applied X Speed 
+[16:39:00.984] LOG: Applied X Speed 
+[16:39:00.984] LOG: Applied X Speed 
+[16:39:00.984] LOG: Applied X Speed 
+[16:39:00.984] LOG: Applied X Speed 
+[16:39:00.985] LOG: Applied X Speed 
+[16:39:00.985] LOG: Applied X Speed 
+[16:39:00.985] LOG: Applied X Speed 
+[16:39:00.985] LOG: Applied X Speed 
+[16:39:00.985] LOG: Applied X Speed 
+[16:39:00.986] LOG: Applied X Speed 
+[16:39:00.986] LOG: %cStart Phase MovePhase color:green;
+[16:39:00.986] LOG: %cUser: Abyssand
+Move: MAT_BLOCK
+Use Mode: NORMAL color:orchid
+[16:39:00.988] LOG: Applied X Speed 
+[16:39:00.988] LOG: Applied X Speed 
+[16:39:00.988] LOG: Applied X Speed 
+[16:39:00.988] LOG: Applied X Speed 
+[16:39:00.988] LOG: Applied X Speed 
+[16:39:00.989] LOG: Applied X Speed 
+[16:39:00.989] LOG: Applied X Speed 
+[16:39:00.989] LOG: Applied X Speed 
+[16:39:00.989] LOG: Applied X Speed 
+[16:39:00.989] LOG: Applied X Speed 
+[16:39:00.990] LOG: Applied X Speed 
+[16:39:00.991] LOG: Applied X Speed 
+[16:39:00.991] LOG: Applied X Speed 
+[16:39:00.992] LOG: Applied X Speed 
+[16:39:00.993] LOG: Applied X Speed 
+[16:39:00.993] LOG: Applied X Speed 
+[16:39:00.993] LOG: Applied X Speed 
+[16:39:00.994] LOG: Applied X Speed 
+[16:39:00.995] LOG: %cStart Phase MessagePhase color:green;
+[16:39:01.047] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.058] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[16:39:01.280] LOG: %cStart Phase MessagePhase color:green;
+[16:39:01.557] LOG: %cStart Phase MoveEndPhase color:green;
+[16:39:01.568] LOG: Applied X Speed 
+[16:39:01.590] LOG: Applied X Speed 
+[16:39:01.601] LOG: Applied X Speed 
+[16:39:01.611] LOG: Applied X Speed 
+[16:39:01.617] LOG: Applied X Speed 
+[16:39:01.635] LOG: %cStart Phase MovePhase color:green;
+[16:39:01.635] LOG: %cUser: Sharpedo
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[16:39:01.653] LOG: Applied X Speed 
+[16:39:01.662] LOG: Applied X Speed 
+[16:39:01.674] LOG: Applied X Speed 
+[16:39:01.680] LOG: Applied X Speed 
+[16:39:01.689] LOG: Applied X Speed 
+[16:39:01.703] LOG: Applied X Speed 
+[16:39:01.709] LOG: Applied X Speed 
+[16:39:01.722] LOG: Applied X Speed 
+[16:39:01.741] LOG: Applied X Speed 
+[16:39:01.750] LOG: Applied X Speed 
+[16:39:01.778] LOG: Applied X Speed 
+[16:39:01.783] LOG: Applied X Speed 
+[16:39:01.823] LOG: Applied X Speed 
+[16:39:01.828] LOG: Applied X Speed 
+[16:39:01.864] LOG: Applied X Speed 
+[16:39:01.877] LOG: Applied X Speed 
+[16:39:01.886] LOG: Applied X Speed 
+[16:39:01.905] LOG: Applied X Speed 
+[16:39:01.922] LOG: Applied X Speed 
+[16:39:01.927] LOG: Applied X Speed 
+[16:39:01.937] LOG: Applied X Speed 
+[16:39:01.942] LOG: Applied X Speed 
+[16:39:01.947] LOG: Applied X Speed 
+[16:39:01.956] LOG: Applied X Speed 
+[16:39:01.961] LOG: Applied X Speed 
+[16:39:01.970] LOG: Applied X Speed 
+[16:39:01.986] LOG: Applied X Speed 
+[16:39:01.995] LOG: Applied X Speed 
+[16:39:02.020] LOG: Applied X Speed 
+[16:39:02.026] LOG: Applied X Speed 
+[16:39:02.065] LOG: Applied X Speed 
+[16:39:02.070] LOG: Applied X Speed 
+[16:39:02.106] LOG: Applied X Speed 
+[16:39:02.120] LOG: Applied X Speed 
+[16:39:02.128] LOG: Applied X Speed 
+[16:39:02.145] LOG: Applied X Speed 
+[16:39:02.146] LOG: %cStart Phase MessagePhase color:green;
+[16:39:02.275] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:02.282] LOG: Applied Multi Lens 
+[16:39:02.578] LOG: Applied Scope Lens 
+[16:39:02.584] LOG: crit stage: +1
+[16:39:02.600] LOG: Applied Mystic Water 
+[16:39:02.619] LOG: Move: Fishious Rend | Base damage: 165.21075862068966 | Power: 265 | Source attack: 183 | Target defense: 145
+[16:39:02.621] LOG: Applied Multi Lens 
+[16:39:02.636] LOG: Move: Fishious Rend | Attack damage: 147
+[16:39:02.655] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:39:02.772] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:39:02.807] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:39:02.827] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:03.129] LOG: Applied Scope Lens 
+[16:39:03.134] LOG: crit stage: +1
+[16:39:03.151] LOG: Applied Mystic Water 
+[16:39:03.169] LOG: Move: Fishious Rend | Base damage: 165.21075862068966 | Power: 265 | Source attack: 183 | Target defense: 145
+[16:39:03.171] LOG: Applied Multi Lens 
+[16:39:03.186] LOG: Move: Fishious Rend | Attack damage: 11
+[16:39:03.203] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:39:03.226] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:03.525] LOG: Applied Scope Lens 
+[16:39:03.532] LOG: crit stage: +1
+[16:39:03.549] LOG: Applied Mystic Water 
+[16:39:03.569] LOG: Move: Fishious Rend | Base damage: 165.21075862068966 | Power: 265 | Source attack: 183 | Target defense: 145
+[16:39:03.588] LOG: Move: Fishious Rend | Attack damage: 46
+[16:39:03.614] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:39:03.638] LOG: %cStart Phase MessagePhase color:green;
+[16:39:03.796] LOG: %cStart Phase MessagePhase color:green;
+[16:39:03.993] LOG: %cStart Phase MoveEndPhase color:green;
+[16:39:04.003] LOG: Applied X Speed 
+[16:39:04.032] LOG: Applied X Speed 
+[16:39:04.053] LOG: %cStart Phase MovePhase color:green;
+[16:39:04.053] LOG: %cUser: Skulberus
+Move: CLOSE_COMBAT
+Use Mode: NORMAL color:orchid
+[16:39:04.068] LOG: Applied X Speed 
+[16:39:04.074] LOG: Applied X Speed 
+[16:39:04.088] LOG: Applied X Speed 
+[16:39:04.095] LOG: Applied X Speed 
+[16:39:04.103] LOG: Applied X Speed 
+[16:39:04.116] LOG: Applied X Speed 
+[16:39:04.127] LOG: Applied X Speed 
+[16:39:04.137] LOG: Applied X Speed 
+[16:39:04.163] LOG: Applied X Speed 
+[16:39:04.175] LOG: Applied X Speed 
+[16:39:04.204] LOG: Applied X Speed 
+[16:39:04.210] LOG: Applied X Speed 
+[16:39:04.256] LOG: Applied X Speed 
+[16:39:04.261] LOG: Applied X Speed 
+[16:39:04.303] LOG: Applied X Speed 
+[16:39:04.318] LOG: Applied X Speed 
+[16:39:04.333] LOG: Applied X Speed 
+[16:39:04.355] LOG: Applied X Speed 
+[16:39:04.374] LOG: Applied X Speed 
+[16:39:04.380] LOG: Applied X Speed 
+[16:39:04.390] LOG: Applied X Speed 
+[16:39:04.395] LOG: Applied X Speed 
+[16:39:04.401] LOG: Applied X Speed 
+[16:39:04.410] LOG: Applied X Speed 
+[16:39:04.419] LOG: Applied X Speed 
+[16:39:04.428] LOG: Applied X Speed 
+[16:39:04.449] LOG: Applied X Speed 
+[16:39:04.461] LOG: Applied X Speed 
+[16:39:04.490] LOG: Applied X Speed 
+[16:39:04.498] LOG: Applied X Speed 
+[16:39:04.545] LOG: Applied X Speed 
+[16:39:04.551] LOG: Applied X Speed 
+[16:39:04.603] LOG: Applied X Speed 
+[16:39:04.618] LOG: Applied X Speed 
+[16:39:04.631] LOG: Applied X Speed 
+[16:39:04.650] LOG: Applied X Speed 
+[16:39:04.651] LOG: %cStart Phase MessagePhase color:green;
+[16:39:04.764] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:04.820] LOG: Applied Wide Lens 
+[16:39:05.256] LOG: crit stage: +0
+[16:39:05.291] LOG: Move: Close Combat | Base damage: 95.03616901408449 | Power: 144 | Source attack: 188 | Target defense: 142
+[16:39:05.310] LOG: Move: Close Combat | Attack damage: 84
+[16:39:05.332] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:39:05.357] LOG: %cStart Phase MessagePhase color:green;
+[16:39:05.504] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:39:05.504] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:39:05.708] LOG: %cStart Phase MessagePhase color:green;
+[16:39:05.900] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:39:06.097] LOG: %cStart Phase MessagePhase color:green;
+[16:39:06.280] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:39:06.447] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:39:06.447] LOG: %cStart Phase MessagePhase color:green;
+[16:39:06.642] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:39:06.676] LOG: %cStart Phase MoveEndPhase color:green;
+[16:39:06.712] LOG: %cStart Phase MovePhase color:green;
+[16:39:06.712] LOG: %cUser: Dewgong
+Move: DRILL_RUN
+Use Mode: NORMAL color:orchid
+[16:39:06.726] LOG: Applied X Speed 
+[16:39:06.732] LOG: Applied X Speed 
+[16:39:06.742] LOG: Applied X Speed 
+[16:39:06.748] LOG: Applied X Speed 
+[16:39:06.753] LOG: Applied X Speed 
+[16:39:06.763] LOG: Applied X Speed 
+[16:39:06.769] LOG: Applied X Speed 
+[16:39:06.780] LOG: Applied X Speed 
+[16:39:06.801] LOG: Applied X Speed 
+[16:39:06.810] LOG: Applied X Speed 
+[16:39:06.838] LOG: Applied X Speed 
+[16:39:06.845] LOG: Applied X Speed 
+[16:39:06.884] LOG: Applied X Speed 
+[16:39:06.890] LOG: Applied X Speed 
+[16:39:06.925] LOG: Applied X Speed 
+[16:39:06.938] LOG: Applied X Speed 
+[16:39:06.947] LOG: Applied X Speed 
+[16:39:06.964] LOG: Applied X Speed 
+[16:39:06.982] LOG: Applied X Speed 
+[16:39:06.987] LOG: Applied X Speed 
+[16:39:06.997] LOG: Applied X Speed 
+[16:39:07.002] LOG: Applied X Speed 
+[16:39:07.007] LOG: Applied X Speed 
+[16:39:07.016] LOG: Applied X Speed 
+[16:39:07.026] LOG: Applied X Speed 
+[16:39:07.037] LOG: Applied X Speed 
+[16:39:07.056] LOG: Applied X Speed 
+[16:39:07.065] LOG: Applied X Speed 
+[16:39:07.091] LOG: Applied X Speed 
+[16:39:07.097] LOG: Applied X Speed 
+[16:39:07.135] LOG: Applied X Speed 
+[16:39:07.139] LOG: Applied X Speed 
+[16:39:07.174] LOG: Applied X Speed 
+[16:39:07.187] LOG: Applied X Speed 
+[16:39:07.196] LOG: Applied X Speed 
+[16:39:07.214] LOG: Applied X Speed 
+[16:39:07.215] LOG: %cStart Phase MessagePhase color:green;
+[16:39:07.332] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:07.342] LOG: %cStart Phase MessagePhase color:green;
+[16:39:07.583] LOG: %cStart Phase MoveEndPhase color:green;
+[16:39:07.598] LOG: %cStart Phase MovePhase color:green;
+[16:39:07.598] LOG: %cUser: Rotom Mow
+Move: SHEER_COLD
+Use Mode: NORMAL color:orchid
+[16:39:07.612] LOG: Applied X Speed 
+[16:39:07.617] LOG: Applied X Speed 
+[16:39:07.627] LOG: Applied X Speed 
+[16:39:07.632] LOG: Applied X Speed 
+[16:39:07.638] LOG: Applied X Speed 
+[16:39:07.648] LOG: Applied X Speed 
+[16:39:07.653] LOG: Applied X Speed 
+[16:39:07.663] LOG: Applied X Speed 
+[16:39:07.680] LOG: Applied X Speed 
+[16:39:07.690] LOG: Applied X Speed 
+[16:39:07.714] LOG: Applied X Speed 
+[16:39:07.721] LOG: Applied X Speed 
+[16:39:07.756] LOG: Applied X Speed 
+[16:39:07.761] LOG: Applied X Speed 
+[16:39:07.791] LOG: Applied X Speed 
+[16:39:07.804] LOG: Applied X Speed 
+[16:39:07.812] LOG: Applied X Speed 
+[16:39:07.828] LOG: Applied X Speed 
+[16:39:07.845] LOG: Applied X Speed 
+[16:39:07.849] LOG: Applied X Speed 
+[16:39:07.857] LOG: Applied X Speed 
+[16:39:07.861] LOG: Applied X Speed 
+[16:39:07.866] LOG: Applied X Speed 
+[16:39:07.874] LOG: Applied X Speed 
+[16:39:07.879] LOG: Applied X Speed 
+[16:39:07.886] LOG: Applied X Speed 
+[16:39:07.902] LOG: Applied X Speed 
+[16:39:07.910] LOG: Applied X Speed 
+[16:39:07.931] LOG: Applied X Speed 
+[16:39:07.937] LOG: Applied X Speed 
+[16:39:07.973] LOG: Applied X Speed 
+[16:39:07.978] LOG: Applied X Speed 
+[16:39:08.013] LOG: Applied X Speed 
+[16:39:08.026] LOG: Applied X Speed 
+[16:39:08.034] LOG: Applied X Speed 
+[16:39:08.049] LOG: Applied X Speed 
+[16:39:08.050] LOG: %cStart Phase MessagePhase color:green;
+[16:39:08.167] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:08.176] LOG: %cStart Phase MessagePhase color:green;
+[16:39:08.432] LOG: %cStart Phase MoveEndPhase color:green;
+[16:39:08.434] LOG: %cStart Phase MovePhase color:green;
+[16:39:08.434] LOG: %cUser: Mega Lapras
+Move: SPARKLING_ARIA
+Use Mode: NORMAL color:orchid
+[16:39:08.460] LOG: Applied X Speed 
+[16:39:08.466] LOG: Applied X Speed 
+[16:39:08.477] LOG: Applied X Speed 
+[16:39:08.483] LOG: Applied X Speed 
+[16:39:08.488] LOG: Applied X Speed 
+[16:39:08.499] LOG: Applied X Speed 
+[16:39:08.505] LOG: Applied X Speed 
+[16:39:08.516] LOG: Applied X Speed 
+[16:39:08.537] LOG: Applied X Speed 
+[16:39:08.547] LOG: Applied X Speed 
+[16:39:08.575] LOG: Applied X Speed 
+[16:39:08.581] LOG: Applied X Speed 
+[16:39:08.623] LOG: Applied X Speed 
+[16:39:08.628] LOG: Applied X Speed 
+[16:39:08.665] LOG: Applied X Speed 
+[16:39:08.678] LOG: Applied X Speed 
+[16:39:08.687] LOG: Applied X Speed 
+[16:39:08.705] LOG: Applied X Speed 
+[16:39:08.706] LOG: %cStart Phase MessagePhase color:green;
+[16:39:08.848] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:39:09.421] LOG: crit stage: +0
+[16:39:09.458] LOG: Move: Sparkling Aria | Base damage: 118.6625 | Power: 120 | Source attack: 255 | Target defense: 128
+[16:39:09.475] LOG: Move: Sparkling Aria | Attack damage: 57
+[16:39:09.490] LOG: crit stage: +0
+[16:39:09.515] LOG: Move: Sparkling Aria | Base damage: 107.16056338028169 | Power: 120 | Source attack: 255 | Target defense: 142
+[16:39:09.528] LOG: Move: Sparkling Aria | Attack damage: 120
+[16:39:09.536] LOG: %cStart Phase MessagePhase color:green;
+[16:39:09.691] LOG: %cStart Phase MessagePhase color:green;
+[16:39:09.961] LOG: %cStart Phase MessagePhase color:green;
+[16:39:10.226] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:39:10.255] LOG: %cStart Phase MessagePhase color:green;
+[16:39:10.458] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:39:10.477] LOG: %cStart Phase MessagePhase color:green;
+[16:39:10.689] LOG: %cStart Phase FaintPhase color:green;
+[16:39:10.698] LOG: Applied X Speed 
+[16:39:10.704] LOG: Applied X Speed 
+[16:39:10.714] LOG: Applied X Speed 
+[16:39:10.724] LOG: Applied X Speed 
+[16:39:10.729] LOG: Applied X Speed 
+[16:39:10.734] LOG: Applied X Speed 
+[16:39:10.739] LOG: Applied X Speed 
+[16:39:10.748] LOG: Applied X Speed 
+[16:39:10.753] LOG: Applied X Speed 
+[16:39:10.762] LOG: Applied X Speed 
+[16:39:10.776] LOG: Applied X Speed 
+[16:39:10.797] LOG: Applied X Speed 
+[16:39:10.801] LOG: Applied X Speed 
+[16:39:10.815] LOG: Applied X Speed 
+[16:39:10.823] LOG: Applied X Speed 
+[16:39:10.840] LOG: Applied X Speed 
+[16:39:10.900] LOG: Applied X Speed 
+[16:39:10.906] LOG: Applied X Speed 
+[16:39:10.916] LOG: Applied X Speed 
+[16:39:10.924] LOG: Applied X Speed 
+[16:39:10.929] LOG: Applied X Speed 
+[16:39:10.934] LOG: Applied X Speed 
+[16:39:10.939] LOG: Applied X Speed 
+[16:39:10.949] LOG: Applied X Speed 
+[16:39:10.955] LOG: Applied X Speed 
+[16:39:10.963] LOG: Applied X Speed 
+[16:39:10.975] LOG: Applied X Speed 
+[16:39:10.995] LOG: Applied X Speed 
+[16:39:11.000] LOG: Applied X Speed 
+[16:39:11.012] LOG: Applied X Speed 
+[16:39:11.020] LOG: Applied X Speed 
+[16:39:11.035] LOG: Applied X Speed 
+[16:39:11.036] LOG: %cStart Phase MessagePhase color:green;
+[16:39:11.906] LOG: %cStart Phase VictoryPhase color:green;
+[16:39:11.907] LOG: Applied Soothe Bell 
+[16:39:11.909] LOG: Applied Soothe Bell 
+[16:39:11.910] LOG: Applied Soothe Bell 
+[16:39:11.910] LOG: %cStart Phase MoveEndPhase color:green;
+[16:39:11.915] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:39:11.916] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:39:11.916] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:39:11.916] LOG: %cStart Phase BerryPhase color:green;
+[16:39:11.922] LOG: Applied X Speed 
+[16:39:11.928] LOG: Applied X Speed 
+[16:39:11.938] LOG: Applied X Speed 
+[16:39:11.952] LOG: Applied X Speed 
+[16:39:11.961] LOG: Applied X Speed 
+[16:39:11.966] LOG: Applied X Speed 
+[16:39:11.971] LOG: Applied X Speed 
+[16:39:11.980] LOG: Applied X Speed 
+[16:39:11.986] LOG: Applied X Speed 
+[16:39:11.995] LOG: Applied X Speed 
+[16:39:12.011] LOG: Applied X Speed 
+[16:39:12.033] LOG: Applied X Speed 
+[16:39:12.038] LOG: Applied X Speed 
+[16:39:12.053] LOG: Applied X Speed 
+[16:39:12.063] LOG: Applied X Speed 
+[16:39:12.085] LOG: Applied X Speed 
+[16:39:12.086] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:39:12.090] LOG: Applied X Speed 
+[16:39:12.096] LOG: Applied X Speed 
+[16:39:12.105] LOG: Applied X Speed 
+[16:39:12.115] LOG: Applied X Speed 
+[16:39:12.121] LOG: Applied X Speed 
+[16:39:12.125] LOG: Applied X Speed 
+[16:39:12.130] LOG: Applied X Speed 
+[16:39:12.138] LOG: Applied X Speed 
+[16:39:12.143] LOG: Applied X Speed 
+[16:39:12.152] LOG: Applied X Speed 
+[16:39:12.168] LOG: Applied X Speed 
+[16:39:12.193] LOG: Applied X Speed 
+[16:39:12.198] LOG: Applied X Speed 
+[16:39:12.213] LOG: Applied X Speed 
+[16:39:12.222] LOG: Applied X Speed 
+[16:39:12.241] LOG: Applied X Speed 
+[16:39:12.242] LOG: %cStart Phase TurnEndPhase color:green;
+[16:39:12.248] LOG: Applied X Speed 
+[16:39:12.254] LOG: Applied X Speed 
+[16:39:12.263] LOG: Applied X Speed 
+[16:39:12.273] LOG: Applied X Speed 
+[16:39:12.278] LOG: Applied X Speed 
+[16:39:12.283] LOG: Applied X Speed 
+[16:39:12.289] LOG: Applied X Speed 
+[16:39:12.298] LOG: Applied X Speed 
+[16:39:12.303] LOG: Applied X Speed 
+[16:39:12.312] LOG: Applied X Speed 
+[16:39:12.322] LOG: Battle Seed: 25mqTEekRMXmiZGu
+[16:39:12.323] LOG: Applied Carbos (enemy)
+[16:39:12.323] LOG: Applied Protein (enemy)
+[16:39:12.324] LOG: Applied Calcium (enemy)
+[16:39:12.324] LOG: Applied Carbos (enemy)
+[16:39:12.324] LOG: Applied HP Up (enemy)
+[16:39:12.324] LOG: Applied Protein (enemy)
+[16:39:12.324] LOG: Applied Zinc (enemy)
+[16:39:12.324] LOG: Applied HP Up (enemy)
+[16:39:12.324] LOG: Applied Calcium (enemy)
+[16:39:12.326] LOG: Applied Calcium 
+[16:39:12.329] LOG: Applied HP Up 
+[16:39:12.329] LOG: Applied Zinc 
+[16:39:12.329] LOG: Applied Iron 
+[16:39:12.329] LOG: Applied Protein 
+[16:39:12.329] LOG: Applied Carbos 
+[16:39:12.331] LOG: Applied Soul Dew 
+[16:39:12.332] LOG: Applied Soul Dew 
+[16:39:12.333] LOG: Applied Protein 
+[16:39:12.345] LOG: Applied Mini Black Hole 
+[16:39:12.350] LOG: Applied X Speed 
+[16:39:12.362] LOG: Applied X Speed 
+[16:39:12.375] LOG: Applied X Speed 
+[16:39:12.379] LOG: Applied X Speed 
+[16:39:12.384] LOG: Applied X Speed 
+[16:39:12.392] LOG: Applied X Speed 
+[16:39:12.406] LOG: Applied X Speed 
+[16:39:12.414] LOG: Applied X Speed 
+[16:39:12.426] LOG: Applied X Speed 
+[16:39:12.434] LOG: %cStart Phase MessagePhase color:green;
+[16:39:12.770] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:39:12.922] LOG: %cStart Phase MessagePhase color:green;
+[16:39:13.151] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:39:13.313] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:39:13.449] LOG: %cStart Phase MessagePhase color:green;
+[16:39:13.715] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:39:13.748] LOG: %cStart Phase TurnInitPhase color:green;
+[16:39:13.748] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"wSI26BaULfHhvubKncWAsgyn","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":1825658134,"player":true,"species":318,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":24,"exp":14947,"levelExp":0,"gender":0,"hp":64,"stats":[101,91,46,79,46,91],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":755,"ppUsed":3,"ppUp":3},{"moveId":242,"ppUsed":0,"ppUp":0},{"moveId":453,"ppUsed":1,"ppUp":0},{"moveId":792,"ppUsed":0,"ppUp":0}],"status":null,"friendship":251,"metLevel":5,"metBiome":-1,"metSpecies":318,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[10],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":792,"targets":[0],"result":1,"useMode":1},{"move":453,"targets":[4],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[1],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2518985732,"player":true,"species":769,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":24,"exp":13824,"levelExp":0,"gender":0,"hp":48,"stats":[106,55,93,78,62,37],"ivs":[30,31,29,30,30,31],"nature":5,"moveset":[{"moveId":841,"ppUsed":1,"ppUp":0},{"moveId":730,"ppUsed":2,"ppUp":0},{"moveId":850,"ppUsed":0,"ppUp":0},{"moveId":815,"ppUsed":0,"ppUp":0}],"status":null,"friendship":242,"metLevel":5,"metBiome":-1,"metSpecies":769,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[4],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":815,"targets":[3],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[5474,74,22],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":654926737,"player":true,"species":262,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":24,"exp":13824,"levelExp":0,"gender":0,"hp":30,"stats":[96,72,59,47,53,65],"ivs":[31,31,31,31,31,30],"nature":13,"moveset":[{"moveId":5115,"ppUsed":0,"ppUp":1},{"moveId":370,"ppUsed":1,"ppUp":0},{"moveId":853,"ppUsed":0,"ppUp":0},{"moveId":837,"ppUsed":0,"ppUp":0}],"status":{"effect":1,"toxicTurnCount":3,"sleepTurnsRemaining":0},"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":261,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":16,"isTerastallized":false,"stellarTypesBoosted":[16],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[1,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":5115,"targets":[5],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":5122,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[3],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":649820330,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":19,"exp":7904,"levelExp":1045,"gender":1,"hp":55,"stats":[86,29,53,52,53,41],"ivs":[30,31,31,30,31,31],"nature":10,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":94,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,1,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[118],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":552,"targets":[3],"result":1,"useMode":1},{"move":552,"targets":[4],"result":1,"useMode":1},{"move":552,"targets":[5],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1872966827,"player":true,"species":132,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":19,"exp":7499,"levelExp":640,"gender":-1,"hp":71,"stats":[113,50,45,45,45,40],"ivs":[31,30,31,30,31,31],"nature":2,"moveset":[{"moveId":144,"ppUsed":0,"ppUp":0},{"moveId":286,"ppUsed":0,"ppUp":0},{"moveId":166,"ppUsed":0,"ppUp":0},{"moveId":118,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":132,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1274885827,"player":true,"species":96,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":20,"exp":8144,"levelExp":144,"gender":0,"hp":64,"stats":[112,61,59,88,88,57],"ivs":[31,30,31,31,31,31],"nature":0,"moveset":[{"moveId":737,"ppUsed":0,"ppUp":0},{"moveId":668,"ppUsed":0,"ppUp":0},{"moveId":464,"ppUsed":0,"ppUp":0},{"moveId":855,"ppUsed":0,"ppUp":0}],"status":null,"friendship":142,"metLevel":5,"metBiome":-1,"metSpecies":96,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[15,5474],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":259,"targets":[3],"result":1,"useMode":3},{"move":855,"targets":[5],"result":1,"useMode":1},{"move":855,"targets":[4],"result":1,"useMode":1},{"move":737,"targets":[5],"result":3,"useMode":1},{"move":855,"targets":[5],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":24,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":24,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":24,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":24,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":24,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":24,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":24,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"interaction","seq":38,"kind":"reward","choice":3},{"type":"interaction","seq":39,"kind":"reward","choice":3},{"type":"command","wave":25,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":25,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":25,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":25,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":25,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":25,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":25,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":25,"turn":3,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":25,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":25,"turn":3,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":25,"turn":3,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":25,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":25,"turn":4,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":25,"turn":4,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":40,"kind":"reward","choice":1},{"type":"interaction","seq":41,"kind":"crossroads","choice":1},{"type":"interaction","seq":42,"kind":"biome","choice":30},{"type":"command","wave":26,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":26,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":26,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":26,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":26,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":26,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":26,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":43,"kind":"reroll","choice":-2},{"type":"interaction","seq":44,"kind":"reward","choice":0},{"type":"interaction","seq":45,"kind":"reward","choice":4},{"type":"command","wave":27,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":3}},{"type":"command","wave":27,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":27,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":27,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":27,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":27,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":46,"kind":"reroll","choice":-2},{"type":"interaction","seq":47,"kind":"reward","choice":2},{"type":"interaction","seq":48,"kind":"reward","choice":4},{"type":"command","wave":28,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":28,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":28,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":49,"kind":"learnMove","choice":1,"data":[561]},{"type":"interaction","seq":50,"kind":"learnMove","choice":4},{"type":"interaction","seq":51,"kind":"learnMove","choice":4},{"type":"interaction","seq":52,"kind":"learnMove","choice":4},{"type":"command","wave":28,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3}},{"type":"command","wave":28,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":28,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"interaction","seq":53,"kind":"reward","choice":0},{"type":"interaction","seq":54,"kind":"reroll","choice":-2},{"type":"interaction","seq":55,"kind":"reward","choice":3},{"type":"command","wave":29,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":5}},{"type":"command","wave":29,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":29,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":29,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":29,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":29,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":3,"target":2}},{"type":"interaction","seq":56,"kind":"reward","choice":5},{"type":"interaction","seq":57,"kind":"reroll","choice":-2},{"type":"interaction","seq":58,"kind":"reward","choice":3},{"type":"interaction","seq":59,"kind":"reward","choice":3},{"type":"interaction","seq":60,"kind":"reward","choice":3},{"type":"command","wave":30,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":30,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":0}},{"type":"command","wave":30,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":30,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":30,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":30,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":30,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"interaction","seq":61,"kind":"reward","choice":1},{"type":"command","wave":31,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":0}},{"type":"command","wave":31,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":31,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1}},{"type":"interaction","seq":62,"kind":"learnMove","choice":4},{"type":"interaction","seq":63,"kind":"learnMove","choice":1,"data":[5115]},{"type":"interaction","seq":64,"kind":"learnMove","choice":4},{"type":"interaction","seq":65,"kind":"learnMove","choice":4},{"type":"command","wave":31,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":0}},{"type":"command","wave":31,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":31,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1}},{"type":"interaction","seq":66,"kind":"reward","choice":3},{"type":"interaction","seq":67,"kind":"reroll","choice":-2},{"type":"interaction","seq":68,"kind":"reward","choice":3},{"type":"command","wave":32,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":0}},{"type":"command","wave":32,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":32,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":32,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":32,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":32,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":32,"turn":2,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":2}},{"type":"interaction","seq":69,"kind":"learnMove","choice":4},{"type":"interaction","seq":70,"kind":"reward","choice":3},{"type":"interaction","seq":71,"kind":"reward","choice":1},{"type":"command","wave":33,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":0}},{"type":"command","wave":33,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":33,"turn":1,"slotFieldIndex":2,"command":{"kind":"move","moveIndex":1}}],"endState":{"waveIndex":33,"money":14494,"party":[{"species":10074,"level":56,"hp":200,"maxHp":200},{"species":319,"level":56,"hp":177,"maxHp":177},{"species":10035,"level":56,"hp":195,"maxHp":195},{"species":412,"level":56,"hp":144,"maxHp":144},{"species":132,"level":56,"hp":190,"maxHp":190},{"species":97,"level":56,"hp":189,"maxHp":189}]},"checkpoint":{"wave":24,"seed":"wSI26BaULfHhvubKncWAsgyn","party":[{"id":2518985732,"player":true,"species":770,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":38,"exp":54872,"levelExp":0,"gender":0,"hp":97,"stats":[200,74,116,187,150,72],"ivs":[30,31,29,30,30,31],"nature":5,"moveset":[{"moveId":841,"ppUsed":0,"ppUp":0},{"moveId":730,"ppUsed":0,"ppUp":0},{"moveId":850,"ppUsed":0,"ppUp":0},{"moveId":815,"ppUsed":2,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":769,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":7,"isTerastallized":false,"stellarTypesBoosted":[7],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":841,"targets":[3],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[5474,74,22],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1825658134,"player":true,"species":319,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":38,"exp":59330,"levelExp":0,"gender":0,"hp":123,"stats":[177,183,77,120,87,182],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":755,"ppUsed":4,"ppUp":3},{"moveId":242,"ppUsed":0,"ppUp":0},{"moveId":453,"ppUsed":1,"ppUp":0},{"moveId":792,"ppUsed":2,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":318,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[10,16],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":755,"targets":[5],"result":1,"useMode":1},{"move":242,"targets":[4],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":654926737,"player":true,"species":262,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":38,"exp":54872,"levelExp":0,"gender":0,"hp":99,"stats":[195,188,123,80,111,165],"ivs":[31,31,31,31,31,30],"nature":13,"moveset":[{"moveId":5115,"ppUsed":3,"ppUp":1},{"moveId":370,"ppUsed":2,"ppUp":0},{"moveId":853,"ppUsed":1,"ppUp":0},{"moveId":837,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":261,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":16,"isTerastallized":false,"stellarTypesBoosted":[16],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":5115,"targets":[4],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":5122,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[3],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":649820330,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":38,"exp":54872,"levelExp":0,"gender":1,"hp":101,"stats":[144,48,89,87,89,69],"ivs":[30,31,31,30,31,31],"nature":10,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":112,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":3,"pauseEvolutions":true,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,1,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[118],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":552,"targets":[3],"result":1,"useMode":1},{"move":552,"targets":[4],"result":1,"useMode":1},{"move":552,"targets":[5],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1872966827,"player":true,"species":132,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":38,"exp":54872,"levelExp":0,"gender":-1,"hp":132,"stats":[190,83,76,75,76,68],"ivs":[31,30,31,30,31,31],"nature":2,"moveset":[{"moveId":144,"ppUsed":0,"ppUp":0},{"moveId":286,"ppUsed":0,"ppUp":0},{"moveId":166,"ppUsed":0,"ppUp":0},{"moveId":118,"ppUsed":0,"ppUp":0}],"status":null,"friendship":62,"metLevel":5,"metBiome":-1,"metSpecies":132,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[3,-1,0,-1,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[5165,5122,153],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"speciesForm":{"id":262,"formIdx":0},"ability":153,"passiveAbilities":[5122,275,198],"gender":0,"stats":[0,72,59,47,53,65],"moveset":[{"moveId":5115,"ppUsed":1,"ppUp":0,"maxPpOverride":5},{"moveId":370,"ppUsed":0,"ppUp":0,"maxPpOverride":5},{"moveId":853,"ppUsed":0,"ppUp":0,"maxPpOverride":5},{"moveId":837,"ppUsed":0,"ppUp":0,"maxPpOverride":5}],"types":[16],"berriesEatenLast":[],"moveHistory":[{"move":144,"targets":[2],"result":1,"useMode":1},{"move":5115,"targets":[3],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"summonDataSpeciesFormIndex":0,"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1274885827,"player":true,"species":97,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":38,"exp":54872,"levelExp":0,"gender":0,"hp":131,"stats":[189,103,100,151,151,97],"ivs":[31,30,31,31,31,31],"nature":0,"moveset":[{"moveId":138,"ppUsed":0,"ppUp":0},{"moveId":689,"ppUsed":0,"ppUp":0},{"moveId":464,"ppUsed":0,"ppUp":0},{"moveId":855,"ppUsed":0,"ppUp":0}],"status":null,"friendship":172,"metLevel":5,"metBiome":-1,"metSpecies":96,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[15],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":259,"targets":[3],"result":2,"useMode":3},{"move":464,"targets":[3,4],"result":1,"useMode":1}]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":4,"className":"MapModifier"},{"player":true,"typeId":"ER_COPPER_ROD","args":[1825658134,"copperRod",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":3,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":5,"className":"ExpShareModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[0],"args":[1825658134,0],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[4],"args":[1825658134,4],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":4,"className":"ExpBoosterModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[654926737],"stackCount":2,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"GRIP_CLAW","args":[1825658134,10],"stackCount":1,"className":"ContactHeldItemTransferChanceModifier"},{"player":true,"typeId":"SCOPE_LENS","args":[1825658134,1],"stackCount":1,"className":"CritBoosterModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[2],"args":[1825658134,2],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"WIDE_LENS","args":[654926737,5],"stackCount":2,"className":"PokemonMoveAccuracyBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[1825658134,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[0],"args":[654926737,0],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"ER_CHILI_SAMPLE","args":[1825658134,"chiliSample",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"MULTI_LENS","args":[1825658134],"stackCount":1,"className":"PokemonMultiHitModifier"},{"player":true,"typeId":"KINGS_ROCK","args":[1825658134],"stackCount":1,"className":"FlinchChanceModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[1825658134],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[1825658134,1],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"RARE_SPECIES_STAT_BOOSTER","typePregenArgs":["METAL_POWDER"],"args":[1872966827,[2],2,[132]],"stackCount":1,"className":"SpeciesStatBoosterModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[2518985732],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[654926737,1],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"FOCUS_BAND","args":[1825658134],"stackCount":1,"className":"SurviveDamageModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[1825658134,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[654926737,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"DIRE_HIT","args":[5,3],"stackCount":1,"className":"TempCritBoosterModifier"},{"player":true,"typeId":"TEMP_STAT_STAGE_BOOSTER","typePregenArgs":[2],"args":[2,5,3],"stackCount":1,"className":"TempStatStageBoosterModifier"},{"player":true,"typeId":"SOUL_DEW","args":[1825658134],"stackCount":1,"className":"PokemonNatureWeightModifier"},{"player":true,"typeId":"TEMP_STAT_STAGE_BOOSTER","typePregenArgs":[5],"args":[5,5,5],"stackCount":1,"className":"TempStatStageBoosterModifier"}],"money":5010,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":1}}}
