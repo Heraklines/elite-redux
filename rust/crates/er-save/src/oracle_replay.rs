@@ -1,4 +1,5 @@
 //! Exact structural replay-trace vocabulary from the pinned M7 TypeScript oracle.
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -163,6 +164,131 @@ pub fn make_oracle_replay_trace_v2(
     }
 }
 
+pub const REPLAY_RECORDER_WAVE_WINDOW: i64 = 10;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BufferedReplayEventV2 {
+    wave: i64,
+    event: OracleReplayEventV2,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OracleReplayRecorderV2 {
+    header: Option<OracleReplayTraceV2>,
+    buffer: Vec<BufferedReplayEventV2>,
+    highest_wave: i64,
+    checkpoints: BTreeMap<i64, OracleReplayCheckpointV2>,
+}
+
+impl Default for OracleReplayRecorderV2 {
+    fn default() -> Self {
+        Self {
+            header: None,
+            buffer: Vec::new(),
+            highest_wave: 0,
+            checkpoints: BTreeMap::new(),
+        }
+    }
+}
+
+impl OracleReplayRecorderV2 {
+    pub fn is_recording(&self) -> bool {
+        self.header.is_some()
+    }
+
+    pub fn begin(&mut self, header: OracleReplayTraceV2) {
+        if self
+            .header
+            .as_ref()
+            .is_some_and(|current| current.seed == header.seed)
+        {
+            return;
+        }
+        self.header = Some(header);
+        self.buffer.clear();
+        self.highest_wave = 0;
+        self.checkpoints.clear();
+    }
+
+    pub fn clear(&mut self) {
+        self.header = None;
+        self.buffer.clear();
+        self.highest_wave = 0;
+        self.checkpoints.clear();
+    }
+
+    pub fn record_checkpoint(&mut self, checkpoint: OracleReplayCheckpointV2) {
+        if self.header.is_none() {
+            return;
+        }
+        self.highest_wave = self.highest_wave.max(checkpoint.wave);
+        self.checkpoints
+            .entry(checkpoint.wave)
+            .or_insert(checkpoint);
+        self.prune_old_waves();
+    }
+
+    pub fn record_command(&mut self, event: OracleReplayEventV2) {
+        let OracleReplayEventV2::Command { wave, .. } = event else {
+            return;
+        };
+        if self.header.is_none() {
+            return;
+        }
+        self.highest_wave = self.highest_wave.max(wave);
+        self.buffer.push(BufferedReplayEventV2 { wave, event });
+        self.prune_old_waves();
+    }
+
+    pub fn record_interaction(&mut self, wave: i64, event: OracleReplayEventV2) {
+        if self.header.is_none() || !event.is_interaction() {
+            return;
+        }
+        self.highest_wave = self.highest_wave.max(wave);
+        self.buffer.push(BufferedReplayEventV2 { wave, event });
+        self.prune_old_waves();
+    }
+
+    pub fn trace(&self) -> Option<OracleReplayTraceV2> {
+        let mut trace = self.header.clone()?;
+        trace.events = self
+            .buffer
+            .iter()
+            .map(|entry| entry.event.clone())
+            .collect();
+        trace.checkpoint = self.window_start_checkpoint().cloned();
+        Some(trace)
+    }
+
+    fn prune_old_waves(&mut self) {
+        let Some(cutoff) = self
+            .highest_wave
+            .checked_sub(REPLAY_RECORDER_WAVE_WINDOW)
+            .and_then(|value| value.checked_add(1))
+        else {
+            return;
+        };
+        if cutoff <= 0 {
+            return;
+        }
+        self.buffer.retain(|entry| entry.wave >= cutoff);
+        self.checkpoints.retain(|wave, _| *wave >= cutoff);
+    }
+
+    fn window_start_checkpoint(&self) -> Option<&OracleReplayCheckpointV2> {
+        let window_start = self
+            .buffer
+            .iter()
+            .map(|entry| entry.wave)
+            .min()
+            .unwrap_or(self.highest_wave);
+        self.checkpoints
+            .range(..=window_start)
+            .next_back()
+            .map(|(_, checkpoint)| checkpoint)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +333,40 @@ mod tests {
         );
         assert_eq!(trace.version, REPLAY_TRACE_VERSION_V2);
         assert!(validate_oracle_replay_trace_v2(&trace).ok);
+    }
+
+    #[test]
+    fn replay_recorder_is_idempotent_and_wave_bounded() {
+        let header = make_oracle_replay_trace_v2(
+            "seed".to_owned(),
+            0,
+            None,
+            None,
+            vec![pokemon()],
+            Vec::new(),
+            None,
+            None,
+        );
+        let mut recorder = OracleReplayRecorderV2::default();
+        recorder.begin(header.clone());
+        recorder.begin(header);
+        assert!(recorder.is_recording());
+        for wave in 1..=12 {
+            recorder.record_command(OracleReplayEventV2::Command {
+                wave,
+                turn: 0,
+                slot_field_index: 0,
+                command: OracleReplayCommandKindV2::Run,
+            });
+        }
+        let trace = recorder.trace().expect("trace");
+        assert_eq!(trace.events.len(), 10);
+        let OracleReplayEventV2::Command { wave, .. } = &trace.events[0] else {
+            assert!(false, "command");
+            return;
+        };
+        assert_eq!(*wave, 3);
+        recorder.clear();
+        assert!(!recorder.is_recording());
     }
 }

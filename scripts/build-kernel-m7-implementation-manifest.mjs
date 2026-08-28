@@ -21,6 +21,11 @@ const SAVE_REPLAY_PROOF = {
   path: "rust/crates/er-save/src/oracle_replay.rs",
   test: "replay_trace_guards_and_validation_match_oracle_contract",
 };
+const SAVE_RECORDER_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/oracle_replay.rs",
+  test: "replay_recorder_is_idempotent_and_wave_bounded",
+};
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -37,6 +42,7 @@ const battleFrequency = "src/data/elite-redux/er-battle-frequency.ts";
 const biomeDepths = "src/init/init-biome-depths.ts";
 const biomeRegistry = "src/init/init-biomes.ts";
 const replayTrace = "src/data/elite-redux/replay-trace.ts";
+const replayRecorder = "src/data/elite-redux/replay-recorder.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -128,6 +134,18 @@ const implemented = [
   [replayTrace, 282, "forEach[0]", "er_save::oracle_replay::validate_oracle_replay_trace_v2", SAVE_REPLAY_PROOF],
   [replayTrace, 318, "isValidCommandKind", "er_save::oracle_replay::OracleReplayCommandKindV2::structurally_valid", SAVE_REPLAY_PROOF],
   [replayTrace, 338, "makeReplayTrace", "er_save::oracle_replay::make_oracle_replay_trace_v2", SAVE_REPLAY_PROOF],
+  [replayRecorder, 99, "isReplayRecording", "er_save::oracle_replay::OracleReplayRecorderV2::is_recording", SAVE_RECORDER_PROOF],
+  [replayRecorder, 110, "beginReplayRecording", "er_save::oracle_replay::OracleReplayRecorderV2::begin", SAVE_RECORDER_PROOF],
+  [replayRecorder, 121, "clearReplayRecording", "er_save::oracle_replay::OracleReplayRecorderV2::clear", SAVE_RECORDER_PROOF],
+  [replayRecorder, 129, "pruneOldWaves", "er_save::oracle_replay::OracleReplayRecorderV2::prune_old_waves", SAVE_RECORDER_PROOF],
+  [replayRecorder, 134, "filter[0]", "er_save::oracle_replay::OracleReplayRecorderV2::prune_old_waves", SAVE_RECORDER_PROOF],
+  [replayRecorder, 149, "recordReplayCheckpoint", "er_save::oracle_replay::OracleReplayRecorderV2::record_checkpoint", SAVE_RECORDER_PROOF],
+  [replayRecorder, 168, "windowStartCheckpoint", "er_save::oracle_replay::OracleReplayRecorderV2::window_start_checkpoint", SAVE_RECORDER_PROOF],
+  [replayRecorder, 172, "map[0]", "er_save::oracle_replay::OracleReplayRecorderV2::window_start_checkpoint", SAVE_RECORDER_PROOF],
+  [replayRecorder, 189, "recordReplayCommand", "er_save::oracle_replay::OracleReplayRecorderV2::record_command", SAVE_RECORDER_PROOF],
+  [replayRecorder, 206, "recordReplayInteraction", "er_save::oracle_replay::OracleReplayRecorderV2::record_interaction", SAVE_RECORDER_PROOF],
+  [replayRecorder, 223, "getReplayTrace", "er_save::oracle_replay::OracleReplayRecorderV2::trace", SAVE_RECORDER_PROOF],
+  [replayRecorder, 242, "map[0]", "er_save::oracle_replay::OracleReplayRecorderV2::trace", SAVE_RECORDER_PROOF],
 ];
 
 function fail(message) {
