@@ -1,0 +1,340 @@
+{
+  "invariant": "no-park",
+  "seed": 20260828,
+  "wave": 2,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 1 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260828",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 1,
+    "guestInteractionCounter": 1,
+    "hostWave": 2,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 3737343686,
+        "battlerIndex": 0,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 213,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2646049613,
+        "battlerIndex": 1,
+        "speciesId": 445,
+        "speciesName": "Garchomp",
+        "hp": 235,
+        "maxHp": 235,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 2251449295,
+        "battlerIndex": 2,
+        "speciesId": 285,
+        "speciesName": "Shroomish",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 885,
+            "ppUsed": 0
+          },
+          {
+            "id": 78,
+            "ppUsed": 0
+          },
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 773471386,
+        "battlerIndex": 3,
+        "speciesId": 276,
+        "speciesName": "Taillow",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 458,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 1
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 1
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 3737343686,
+        "battlerIndex": -1,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 213,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2646049613,
+        "battlerIndex": -1,
+        "speciesId": 445,
+        "speciesName": "Garchomp",
+        "hp": 235,
+        "maxHp": 235,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 2251449295,
+        "battlerIndex": -1,
+        "speciesId": 285,
+        "speciesName": "Shroomish",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 885,
+            "ppUsed": 0
+          },
+          {
+            "id": 78,
+            "ppUsed": 0
+          },
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 773471386,
+        "battlerIndex": -1,
+        "speciesId": 276,
+        "speciesName": "Taillow",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 458,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 1
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 1
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260828 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1 turn 1: host SWITCH -> party[2]",
+    "wave 1: host slot move=85 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:14/14] playerHp=[149:213/213]",
+    "wave 1 turn 2: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=53 guest slot move=53",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[285:0/17,276:16/16] playerHp=[149:213/213,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2 turn 2: guest SWITCH -> party[5]"
+  ]
+}
