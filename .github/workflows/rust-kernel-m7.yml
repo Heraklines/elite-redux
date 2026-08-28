@@ -195,11 +195,8 @@ jobs:
             tail -n 160 "$RUNNER_TEMP/m0-m6-regression.log"
             printf '%s\n' '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          grep -E -- '^(---- |failures:|test result:|error: test failed|error\\[)' \
-            "$RUNNER_TEMP/m0-m6-regression.log" \
-            | while IFS= read -r line; do
-                printf '::error title=M0-M6 regression::%s\n' "$line"
-              done
+          encoded_tail="$(tail -n 120 "$RUNNER_TEMP/m0-m6-regression.log" | base64 -w0)"
+          printf '::error title=M0-M6 regression tail::base64:%s\n' "$encoded_tail"
       - uses: actions/upload-artifact@v6
         if: failure()
         with:
