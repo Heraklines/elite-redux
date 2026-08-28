@@ -195,6 +195,16 @@
       29
     ]
   },
+  "SPECIES_GARDEVOIR_MEGA": {
+    "ability1": 5625,
+    "ability2": 5625,
+    "hidden": 5625,
+    "innates": [
+      32,
+      98,
+      20007
+    ]
+  },
   "SPECIES_GRANBULL_MEGA": {
     "ability2": 62
   },
