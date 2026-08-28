@@ -22,7 +22,7 @@ use er_types::run_model::RunOutcome;
 use er_types::ui_menu::NavigationDirection;
 use er_types::{
     GAME_ACTION_SCHEMA_VERSION_V1, GameControlKindV2, GameProposalV1, MenuOptionId, OperationId,
-    SafeU53, TerminalState,
+    SafeU53, SeatId, TerminalState,
 };
 use thiserror::Error;
 
@@ -31,6 +31,19 @@ use crate::snapshot_v6::{
     PreparedTransactionSnapshotV1, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V6,
     RestorableKernelSnapshotV6, SnapshotV6Error,
 };
+
+use crate::battle_kernel::{
+    BattleInitializationError, initial_battle_protocol_snapshot_v2 as build_protocol_snapshot,
+};
+use crate::kernel::BattleProtocolConfig;
+
+/// Build a validated initial protocol owner snapshot for a headless M7 endpoint.
+pub fn initial_battle_protocol_snapshot_v2(
+    config: &BattleProtocolConfig,
+    local_seat: SeatId,
+) -> Result<ProtocolRuntimeSnapshotV2, BattleInitializationError> {
+    build_protocol_snapshot(config, local_seat)
+}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum KernelControlEffectV6 {
     Navigated,

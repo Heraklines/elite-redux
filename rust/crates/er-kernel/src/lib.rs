@@ -16,8 +16,9 @@ pub mod snapshot_v5;
 pub mod snapshot_v6;
 pub mod ui_reducer;
 
-pub use battle_kernel::{BattleInitializationError, initial_battle_protocol_snapshot_v2};
+pub use battle_kernel::BattleInitializationError;
 pub use er_game::runtime::{BattleGameConfig, BattleStartV1};
+pub use game_kernel_v6::initial_battle_protocol_snapshot_v2;
 pub use input_router::{InputRouteError, InputRouter};
 pub use kernel::{
     AuthorityResolutionPlan, BattleProtocolConfig, BattleProtocolRoleConfig, ControlMenuPlan,
