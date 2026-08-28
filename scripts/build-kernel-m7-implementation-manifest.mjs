@@ -56,6 +56,46 @@ const SAVE_MODE_PROOF = {
   path: "rust/crates/er-save/src/mode_save.rs",
   test: "mode_save_projections_clone_without_aliasing_or_hidden_state",
 };
+const SHOWDOWN_SESSION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/showdown_session.rs",
+  test: "showdown_negotiation_rejects_protocol_format_and_hash_drift",
+};
+const SHOWDOWN_STATE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/showdown_session.rs",
+  test: "pending_and_profile_set_state_is_idempotent",
+};
+const GHOST_PROFILE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/mode_profiles.rs",
+  test: "ghost_profile_sanitizes_lines_tokens_and_effects",
+};
+const MOODY_SAVE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/mode_profiles.rs",
+  test: "moody_sessions_sort_validate_reset_and_round_trip",
+};
+const TRAINING_SESSION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/training_session.rs",
+  test: "training_selection_iv_nature_and_ability_are_deterministic",
+};
+const MYSTERY_SAVE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/training_session.rs",
+  test: "training_removal_and_mystery_save_constructors_preserve_state",
+};
+const SAVE_MIGRATION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/session.rs",
+  test: "session_version_migration_orders_pinned_migrators_and_floors_money",
+};
+const SAVE_DECODE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/lib.rs",
+  test: "save_decode_error_preserves_cause",
+};
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -84,6 +124,21 @@ const legacyEndless = "src/data/elite-redux/er-legacy-endless-save.ts";
 const runBuffs = "src/data/elite-redux/er-run-buffs.ts";
 const shinyLabConfig = "src/data/elite-redux/er-shiny-lab-config.ts";
 const trainingCache = "src/data/elite-redux/er-training-cache.ts";
+const showdownBattleState = "src/data/elite-redux/showdown/showdown-battle-state.ts";
+const showdownSession = "src/data/elite-redux/showdown/showdown-session.ts";
+const showdownSideSwap = "src/data/elite-redux/showdown/showdown-side-swap.ts";
+const showdownSpeciesSets = "src/data/elite-redux/showdown/showdown-species-sets.ts";
+const showdownWinningSets = "src/data/elite-redux/showdown/showdown-winning-sets.ts";
+const ghostProfile = "src/data/elite-redux/er-ghost-profile.ts";
+const ghostTeams = "src/data/elite-redux/er-ghost-teams.ts";
+const moodyFormationGame = "src/data/elite-redux/moody/moody-formation-game-adapter.ts";
+const moodyRuntimeField = "src/data/elite-redux/moody/moody-runtime-field-adapter.ts";
+const moodyRuntimeFormation = "src/data/elite-redux/moody/moody-runtime-formation-adapter.ts";
+const moodyRuntimeLive = "src/data/elite-redux/moody/moody-runtime-live-adapter.ts";
+const moodyState = "src/data/elite-redux/moody/moody-state.ts";
+const trainingSession = "src/data/mystery-encounters/encounters/training-session-encounter.ts";
+const mysterySaveData = "src/data/mystery-encounters/mystery-encounter-save-data.ts";
+const versionMigration = "src/system/version-migration/version-converter.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -252,6 +307,77 @@ const implemented = [
   [shinyLabConfig, 41, "ensureShinyLabSave", "er_save::mode_save::ensure_shiny_lab_save_v1", SAVE_MODE_PROOF],
   [shinyLabConfig, 45, "saveSystem", "er_save::mode_save::save_shiny_lab_system_v1", SAVE_MODE_PROOF],
   [trainingCache, 37, "getErTrainingCacheSaveData", "er_save::mode_save::training_cache_save_data_v1", SAVE_MODE_PROOF],
+  [showdownBattleState, 109, "setPendingShowdownSession", "er_ai::showdown_session::PendingShowdownStateV1::set_pending_showdown_session", SHOWDOWN_STATE_PROOF],
+  [showdownBattleState, 117, "disposePendingShowdownSession", "er_ai::showdown_session::PendingShowdownStateV1::dispose_pending_showdown_session", SHOWDOWN_STATE_PROOF],
+  [showdownBattleState, 230, "getShowdownOpponentProfile", "er_ai::showdown_session::PendingShowdownStateV1::showdown_opponent_profile", SHOWDOWN_STATE_PROOF],
+  [showdownBattleState, 235, "getShowdownFieldOpponentProfile", "er_ai::showdown_session::PendingShowdownStateV1::showdown_field_opponent_profile", SHOWDOWN_STATE_PROOF],
+  [showdownSession, 93, "getShowdownPickWaitMs", "er_ai::showdown_session::showdown_pick_wait_ms_v1", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 118, "defaultSchedule", "er_ai::showdown_session::default_schedule_v1", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 128, "constructor", "er_ai::showdown_session::ShowdownNegotiationErrorV1", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 187, "isRootUnlocked", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 188, "isShinyUnlocked", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 189, "isAbilityUnlocked", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 190, "isNatureUnlocked", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 191, "isMoveLegal", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 192, "isSpeciesInLine", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 207, "showdownTeamHash", "er_ai::showdown_session::showdown_team_hash_v1", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 228, "anonymous", "er_ai::showdown_session::default_schedule_v1", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 266, "constructor", "er_ai::showdown_session::ShowdownSessionV1", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 286, "negotiate", "er_ai::showdown_session::ShowdownSessionV1::negotiate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 338, "resendHandshake", "er_ai::showdown_session::ShowdownSessionV1::resend_handshake", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 352, "dispose", "er_ai::showdown_session::ShowdownSessionV1::dispose", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 369, "ownFieldWidth", "er_ai::showdown_session::ShowdownSessionV1::own_field_width", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 388, "handle", "er_ai::showdown_session::ShowdownSessionV1::handle", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 423, "tryGate", "er_ai::showdown_session::ShowdownSessionV1::try_gate", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 507, "voidAndReject", "er_ai::showdown_session::ShowdownSessionV1::void_and_reject", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 513, "finishResolve", "er_ai::showdown_session::ShowdownSessionV1::finish_resolve", SHOWDOWN_SESSION_PROOF],
+  [showdownSession, 524, "finishReject", "er_ai::showdown_session::ShowdownSessionV1::finish_reject", SHOWDOWN_SESSION_PROOF],
+  [showdownSideSwap, 273, "swapSessionData", "er_ai::showdown_session::swap_showdown_session_data_v1", SHOWDOWN_STATE_PROOF],
+  [showdownSpeciesSets, 144, "saveSpeciesSets", "er_ai::showdown_session::ShowdownProfileSetsV1::save_species_sets", SHOWDOWN_STATE_PROOF],
+  [showdownSpeciesSets, 165, "saveNamedSpeciesSet", "er_ai::showdown_session::ShowdownProfileSetsV1::save_named_species_set", SHOWDOWN_STATE_PROOF],
+  [showdownWinningSets, 106, "saveWinningSets", "er_ai::showdown_session::ShowdownProfileSetsV1::save_winning_sets", SHOWDOWN_STATE_PROOF],
+  [ghostProfile, 73, "isGhostApproachEffect", "er_ai::mode_profiles::is_ghost_approach_effect_v1", GHOST_PROFILE_PROOF],
+  [ghostProfile, 132, "clampGhostFxTuning", "er_ai::mode_profiles::clamp_ghost_fx_tuning_v1", GHOST_PROFILE_PROOF],
+  [ghostProfile, 175, "resolveGhostDialogue", "er_ai::mode_profiles::resolve_ghost_dialogue_v1", GHOST_PROFILE_PROOF],
+  [ghostProfile, 187, "clampLine", "er_ai::mode_profiles::clamp_ghost_line_v1", GHOST_PROFILE_PROOF],
+  [ghostProfile, 192, "filter[0]", "er_ai::mode_profiles::clamp_ghost_line_v1", GHOST_PROFILE_PROOF],
+  [ghostProfile, 204, "sanitizeGhostProfile", "er_ai::mode_profiles::sanitize_ghost_profile_v1", GHOST_PROFILE_PROOF],
+  [ghostProfile, 274, "defaultGhostProfile", "er_ai::mode_profiles::default_ghost_profile_v1", GHOST_PROFILE_PROOF],
+  [ghostTeams, 694, "saveLocalGhostTeam", "er_ai::mode_profiles::GhostTeamStoreV1::save_local_ghost_team", GHOST_PROFILE_PROOF],
+  [ghostTeams, 717, "saveSharedGhostCache", "er_ai::mode_profiles::GhostTeamStoreV1::save_shared_ghost_cache", GHOST_PROFILE_PROOF],
+  [moodyFormationGame, 598, "reconcileSession", "er_ai::mode_profiles::MoodyModeSaveV1::reconcile_session", MOODY_SAVE_PROOF],
+  [moodyRuntimeField, 109, "attachMoodyRuntimeFieldSave", "er_ai::mode_profiles::MoodyModeSaveV1::attach_runtime_field", MOODY_SAVE_PROOF],
+  [moodyRuntimeField, 116, "extractMoodyRuntimeFieldSave", "er_ai::mode_profiles::MoodyModeSaveV1::extract_runtime_field", MOODY_SAVE_PROOF],
+  [moodyRuntimeFormation, 159, "createMoodyFormationRuntimeSession", "er_ai::mode_profiles::create_moody_formation_session_v1", MOODY_SAVE_PROOF],
+  [moodyRuntimeFormation, 172, "serializeMoodyFormationRuntimeSession", "er_ai::mode_profiles::serialize_moody_formation_session_v1", MOODY_SAVE_PROOF],
+  [moodyRuntimeFormation, 183, "hydrateMoodyFormationRuntimeSession", "er_ai::mode_profiles::hydrate_moody_formation_session_v1", MOODY_SAVE_PROOF],
+  [moodyRuntimeFormation, 211, "resetMoodyFormationRuntimeSession", "er_ai::mode_profiles::reset_moody_formation_session_v1", MOODY_SAVE_PROOF],
+  [moodyRuntimeLive, 543, "mutateSaveForCommand", "er_ai::mode_profiles::MoodyModeSaveV1::mutate_save_for_command", MOODY_SAVE_PROOF],
+  [moodyState, 124, "getMoodyModeSaveData", "er_ai::mode_profiles::MoodyModeSaveV1::get_save_data", MOODY_SAVE_PROOF],
+  [moodyState, 128, "setMoodyFormationRuntimeSaveData", "er_ai::mode_profiles::MoodyModeSaveV1::set_formation_runtime", MOODY_SAVE_PROOF],
+  [moodyState, 135, "setMoodyFormationEngineSaveData", "er_ai::mode_profiles::MoodyModeSaveV1::set_formation_engine", MOODY_SAVE_PROOF],
+  [moodyState, 141, "setMoodyRuntimeFieldSaveData", "er_ai::mode_profiles::MoodyModeSaveV1::set_runtime_field", MOODY_SAVE_PROOF],
+  [trainingSession, 40, "removePokemonForTraining", "er_scenario::training_session::remove_pokemon_for_training_v1", MYSTERY_SAVE_PROOF],
+  [trainingSession, 94, "onPokemonSelected", "er_scenario::training_session::select_training_pokemon_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 101, "selectableFilter", "er_scenario::training_session::training_pokemon_selectable_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 123, "forEach[0]", "er_scenario::training_session::non_maxed_iv_indexes_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 196, "onPokemonSelected", "er_scenario::training_session::nature_training_options_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 198, "map[0]", "er_scenario::training_session::nature_training_options_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 201, "handler", "er_scenario::training_session::choose_training_nature_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 216, "selectableFilter", "er_scenario::training_session::training_pokemon_selectable_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 270, "onPokemonSelected", "er_scenario::training_session::ability_training_options_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 278, "map[0]", "er_scenario::training_session::ability_training_options_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 281, "forEach[0]", "er_scenario::training_session::ability_training_options_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 282, "some[0]", "er_scenario::training_session::ability_training_options_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 285, "handler", "er_scenario::training_session::choose_training_ability_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 294, "onHover", "er_scenario::training_session::training_ability_description_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 306, "selectableFilter", "er_scenario::training_session::training_pokemon_selectable_v1", TRAINING_SESSION_PROOF],
+  [trainingSession, 385, "getEnemyConfig", "er_scenario::training_session::training_enemy_config_v1", MYSTERY_SAVE_PROOF],
+  [trainingSession, 390, "map[0]", "er_scenario::training_session::training_enemy_config_v1", MYSTERY_SAVE_PROOF],
+  [mysterySaveData, 11, "constructor", "er_scenario::training_session::SeenEncounterDataV1::new", MYSTERY_SAVE_PROOF],
+  [mysterySaveData, 29, "constructor", "er_scenario::training_session::MysteryEncounterSaveDataV1::new", MYSTERY_SAVE_PROOF],
+  [versionMigration, 134, "applySessionVersionMigration", "er_save::session::SessionPersistenceRuntimeV1::apply_session_version_migration", SAVE_MIGRATION_PROOF],
+  [dataUtils, 87, "constructor", "er_save::SaveDecodeErrorV1::new", SAVE_DECODE_PROOF],
 ];
 
 function fail(message) {

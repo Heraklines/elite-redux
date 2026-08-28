@@ -131,6 +131,20 @@ pub enum SaveStorageEffectV1 {
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[error("Save data could not be decoded: {cause}")]
+pub struct SaveDecodeErrorV1 {
+    pub cause: String,
+}
+
+impl SaveDecodeErrorV1 {
+    pub fn new(cause: impl std::fmt::Display) -> Self {
+        Self {
+            cause: cause.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum SaveError {
     #[error("save schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
@@ -352,7 +366,7 @@ mod tests {
         OracleSha, SafeU53,
     };
 
-    use super::{GameSaveV1, SaveError};
+    use super::{GameSaveV1, SaveDecodeErrorV1, SaveError};
 
     fn content_identity() -> GameContentIdentity {
         GameContentIdentity {
@@ -404,5 +418,15 @@ mod tests {
         let mut save = GameSaveV1::new(&identity, profile(), None).expect("save");
         save.profile.statistics.runs_started = SafeU53::new(1).expect("safe statistics counter");
         assert_eq!(save.validate(&identity), Err(SaveError::Checksum));
+    }
+
+    #[test]
+    fn save_decode_error_preserves_cause() {
+        let error = SaveDecodeErrorV1::new("Malformed UTF-8 data");
+        assert_eq!(error.cause, "Malformed UTF-8 data");
+        assert_eq!(
+            error.to_string(),
+            "Save data could not be decoded: Malformed UTF-8 data"
+        );
     }
 }

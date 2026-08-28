@@ -65,8 +65,16 @@ pub enum SessionPersistenceErrorV1 {
     ParticipantMismatch,
     #[error("storage capacity was exceeded")]
     Capacity,
+    #[error("session save version or numeric field is invalid")]
+    Version,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionMigrationResultV1 {
+    pub money: i64,
+    pub applied_migrator_versions: Vec<String>,
+}
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SessionPersistenceRuntimeV1 {
@@ -425,12 +433,27 @@ impl SessionPersistenceRuntimeV1 {
         &self,
         source_version: &str,
         latest_version: &str,
-        money: i64,
-    ) -> (i64, bool) {
-        if source_version >= latest_version {
-            return (money, false);
+        money: f64,
+    ) -> Result<SessionMigrationResultV1, SessionPersistenceErrorV1> {
+        let source = parse_semver_v1(source_version).ok_or(SessionPersistenceErrorV1::Version)?;
+        let latest = parse_semver_v1(latest_version).ok_or(SessionPersistenceErrorV1::Version)?;
+        if !money.is_finite() || money.floor() < i64::MIN as f64 || money.floor() > i64::MAX as f64
+        {
+            return Err(SessionPersistenceErrorV1::Version);
         }
-        (money, true)
+        let applied_migrator_versions = if source < latest {
+            [[1, 0, 4], [1, 0, 4], [1, 7, 0], [1, 9, 0], [1, 10, 0]]
+                .into_iter()
+                .filter(|version| *version > source && *version <= latest)
+                .map(|version| format!("{}.{}.{}", version[0], version[1], version[2]))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Ok(SessionMigrationResultV1 {
+            money: money.floor() as i64,
+            applied_migrator_versions,
+        })
     }
 
     pub fn exact_digest(bytes: &[u8]) -> String {
@@ -465,6 +488,16 @@ fn looks_like_json_object(bytes: &[u8]) -> bool {
 
 fn session_key(account: &str, slot: u8) -> String {
     format!("session_{slot}_{account}")
+}
+
+fn parse_semver_v1(value: &str) -> Option<[u32; 3]> {
+    let mut parts = value.split('.');
+    let parsed = [
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    ];
+    parts.next().is_none().then_some(parsed)
 }
 
 #[cfg(test)]
@@ -553,5 +586,22 @@ mod tests {
             .find_importable_local_save_bundle(&candidates)
             .expect("bundle");
         assert_eq!(bundle.sessions.len(), 1);
+    }
+
+    #[test]
+    fn session_version_migration_orders_pinned_migrators_and_floors_money() {
+        let runtime = SessionPersistenceRuntimeV1::new("alice".to_owned(), 4096).expect("runtime");
+        let migrated = runtime
+            .apply_session_version_migration("1.6.0", "1.11.19", 42.9)
+            .expect("migration");
+        assert_eq!(migrated.money, 42);
+        assert_eq!(
+            migrated.applied_migrator_versions,
+            vec!["1.7.0", "1.9.0", "1.10.0"]
+        );
+        let current = runtime
+            .apply_session_version_migration("1.11.19", "1.11.19", 7.0)
+            .expect("current");
+        assert!(current.applied_migrator_versions.is_empty());
     }
 }

@@ -151,6 +151,7 @@ dependencies = [
 name = "er-ai"
 version = "0.1.0"
 dependencies = [
+ "er-canonical",
  "er-content",
  "er-types",
  "serde",
