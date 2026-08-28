@@ -1,7 +1,9 @@
 //! Deterministic canonical M7 battle policies.
 pub mod mode_profiles;
+pub mod party_snapshots;
 pub mod showdown;
 pub mod showdown_session;
+pub mod trainer_party;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
+er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 thiserror.workspace = true

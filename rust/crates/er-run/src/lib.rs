@@ -2,6 +2,7 @@
 
 pub mod biome;
 pub mod capability;
+pub mod capture;
 pub mod content;
 pub mod encounter;
 pub mod encounter_plan;
@@ -20,6 +21,7 @@ pub mod transition;
 
 pub use biome::*;
 pub use capability::*;
+pub use capture::*;
 pub use content::*;
 pub use encounter_plan::*;
 pub use error::*;

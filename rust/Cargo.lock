@@ -153,6 +153,7 @@ version = "0.1.0"
 dependencies = [
  "er-canonical",
  "er-content",
+ "er-state",
  "er-types",
  "serde",
  "thiserror",

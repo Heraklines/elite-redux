@@ -96,6 +96,107 @@ const SAVE_DECODE_PROOF = {
   path: "rust/crates/er-save/src/lib.rs",
   test: "save_decode_error_preserves_cause",
 };
+const CAPTURE_MECHANICS_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/capture.rs",
+  test: "pokeball_identity_critical_chance_and_presentation_are_deterministic",
+};
+const CAPTURE_INVENTORY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/capture.rs",
+  test: "pokeball_inventory_is_bounded_and_consumed_once",
+};
+const TRAINER_PARTY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/trainer_party.rs",
+  test: "trainer_templates_and_party_selection_are_deterministic",
+};
+const RIVAL_PARTY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/trainer_party.rs",
+  test: "rival_traits_and_post_processing_are_stable",
+};
+const PARTY_REQUIREMENT_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/party_requirements.rs",
+  test: "party_requirements_query_exact_stable_ids",
+};
+const PARTY_TRANSITION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/party_requirements.rs",
+  test: "party_status_detach_and_restore_are_atomic",
+};
+const PARTY_SNAPSHOT_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/party_snapshots.rs",
+  test: "mode_party_snapshots_clone_and_capture_once",
+};
+const PARTY_COMPACTION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-ai/src/party_snapshots.rs",
+  test: "active_party_compaction_and_challenge_mutations_are_stable",
+};
+
+const CAPTURE_IMPLEMENTATION_BY_PATH = new Map([
+  ["src/ai/rival-team-gen.ts", ["er_ai::trainer_party::rival_party_member_v1", RIVAL_PARTY_PROOF]],
+  ["src/data/battle-format.ts", ["er_ai::party_snapshots::compact_eligible_party_into_active_slots_v1", PARTY_COMPACTION_PROOF]],
+  ["src/data/challenge.ts", ["er_ai::party_snapshots::PartyChallengeStateV1", PARTY_COMPACTION_PROOF]],
+  ["src/data/elite-redux/ai/combat-committed-action.ts", ["er_ai::trainer_party::capture_committed_combat_decision_v1", TRAINER_PARTY_PROOF]],
+  ["src/data/elite-redux/ai/combat-engine-adapter.ts", ["er_ai::trainer_party::self_party_v1", TRAINER_PARTY_PROOF]],
+  ["src/data/elite-redux/er-achievement-tracker.ts", ["er_ai::party_snapshots::player_party_snake_only_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/er-custom-trainers.ts", ["er_ai::trainer_party::resolve_custom_trainer_party_v1", TRAINER_PARTY_PROOF]],
+  ["src/data/elite-redux/er-fun-mode.ts", ["er_run::capture::should_grant_fun_capture_progress_v1", CAPTURE_INVENTORY_PROOF]],
+  ["src/data/elite-redux/er-ghost-teams.ts", ["er_ai::party_snapshots::capture_ghost_team_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/er-mineral-loot.ts", ["er_run::capture::party_line_mega_stones_v1", CAPTURE_INVENTORY_PROOF]],
+  ["src/data/elite-redux/er-trainer-runtime-hook.ts", ["er_ai::trainer_party::rival_party_size_for_type_v1", RIVAL_PARTY_PROOF]],
+  ["src/data/elite-redux/er-training-cache.ts", ["er_run::capture::locally_owned_party_v1", CAPTURE_INVENTORY_PROOF]],
+  ["src/data/elite-redux/init-elite-redux-trainers.ts", ["er_ai::trainer_party::resolve_party_member_v1", TRAINER_PARTY_PROOF]],
+  ["src/data/elite-redux/moody/moody-formation-game-adapter.ts", ["er_ai::party_snapshots::player_party_snapshot_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/moody/moody-runtime-field-adapter.ts", ["er_ai::party_snapshots::player_party_snapshot_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/moody/moody-runtime-field-engine.ts", ["er_ai::party_snapshots::moody_party_slot_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/moody/moody-runtime-formation-adapter.ts", ["er_ai::party_snapshots::build_moody_formation_party_snapshot_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/moody/moody-runtime-game-adapter.ts", ["er_ai::party_snapshots::capture_moody_turn_snapshot_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/showdown/showdown-enemy.ts", ["er_ai::party_snapshots::showdown_manifest_to_serialized_party_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/elite-redux/showdown/showdown-sync-command.ts", ["er_ai::party_snapshots::showdown_party_for_v1", PARTY_SNAPSHOT_PROOF]],
+  ["src/data/mystery-encounters/encounters/absolute-avarice-encounter.ts", ["er_scenario::party_requirements::give_party_reviver_seeds_v1", PARTY_TRANSITION_PROOF]],
+  ["src/data/mystery-encounters/encounters/cleansing-font-encounter.ts", ["er_scenario::party_requirements::find_cursed_party_member_v1", PARTY_REQUIREMENT_PROOF]],
+  ["src/data/mystery-encounters/encounters/frozen-in-time-encounter.ts", ["er_scenario::party_requirements::party_has_fire_source_v1", PARTY_REQUIREMENT_PROOF]],
+  ["src/data/mystery-encounters/encounters/reactor-meltdown-encounter.ts", ["er_scenario::party_requirements::burn_party_v1", PARTY_TRANSITION_PROOF]],
+  ["src/data/mystery-encounters/encounters/safari-zone-encounter.ts", ["er_scenario::party_requirements::throw_encounter_pokeball_v1", PARTY_TRANSITION_PROOF]],
+  ["src/data/mystery-encounters/encounters/the-expert-pokemon-breeder-encounter.ts", ["er_scenario::party_requirements::breeder_party_config_v1", PARTY_TRANSITION_PROOF]],
+  ["src/data/mystery-encounters/mystery-encounter-requirements.ts", ["er_scenario::party_requirements::PartyRequirementV1::query_party", PARTY_REQUIREMENT_PROOF]],
+  ["src/data/mystery-encounters/requirements/can-learn-move-requirement.ts", ["er_scenario::party_requirements::PartyRequirementV1::query_party", PARTY_REQUIREMENT_PROOF]],
+  ["src/data/mystery-encounters/utils/encounter-pokemon-utils.ts", ["er_scenario::party_requirements::encounter_add_to_party_v1", PARTY_TRANSITION_PROOF]],
+  ["src/data/pokeball.ts", ["er_run::capture::pokeball_bounce_plan_v1", CAPTURE_MECHANICS_PROOF]],
+  ["src/data/trainers/rival-party-config.ts", ["er_ai::trainer_party::post_process_rival_slot_v1", RIVAL_PARTY_PROOF]],
+  ["src/data/trainers/trainer-config.ts", ["er_ai::trainer_party::TrainerPartyConfigV1", TRAINER_PARTY_PROOF]],
+  ["src/data/trainers/trainer-party-template.ts", ["er_ai::trainer_party::TrainerPartyTemplateV1", TRAINER_PARTY_PROOF]],
+  ["src/field/pokemon.ts", ["er_run::capture::add_captured_pokemon_to_party_v1", CAPTURE_INVENTORY_PROOF]],
+  ["src/field/trainer.ts", ["er_ai::trainer_party::TrainerPartyConfigV1", TRAINER_PARTY_PROOF]],
+  ["src/modifier/init-modifier-pools.ts", ["er_run::capture::tactical_party_gate_v1", CAPTURE_INVENTORY_PROOF]],
+  ["src/modifier/modifier-type.ts", ["er_run::capture::PokeballInventoryV1", CAPTURE_INVENTORY_PROOF]],
+  ["src/modifier/modifier.ts", ["er_run::capture::PokeballInventoryV1::consume", CAPTURE_INVENTORY_PROOF]],
+  ["src/system/version-migration/versions/v1_9_0.ts", ["er_run::capture::migrate_party_v1_9_0", CAPTURE_INVENTORY_PROOF]],
+]);
+
+const CAPTURE_SYMBOL_OVERRIDES = new Map([
+  ["src/data/pokeball.ts:9:getPokeballAtlasKey", "er_run::capture::pokeball_atlas_key_v1"],
+  ["src/data/pokeball.ts:26:getPokeballName", "er_run::capture::pokeball_name_key_v1"],
+  ["src/data/pokeball.ts:51:getPokeballCatchMultiplier", "er_run::capture::pokeball_catch_multiplier_v1"],
+  ["src/data/pokeball.ts:70:getPokeballTintColor", "er_run::capture::pokeball_tint_v1"],
+  ["src/data/pokeball.ts:93:getCriticalCaptureChance", "er_run::capture::critical_capture_chance_v1"],
+  ["src/ai/rival-team-gen.ts:128:calcPartyTypings", "er_ai::trainer_party::calc_party_typings_v1"],
+  ["src/data/elite-redux/er-achievement-tracker.ts:479:enemyPartyHasBoss", "er_ai::party_snapshots::enemy_party_has_boss_v1"],
+  ["src/data/elite-redux/er-trainer-runtime-hook.ts:1116:enforceErEliteBstCurveForParty", "er_ai::trainer_party::enforce_elite_bst_curve_for_party_v1"],
+  ["src/data/elite-redux/er-ghost-teams.ts:992:captureRunStarterLines", "er_ai::party_snapshots::capture_run_starter_lines_v1"],
+  ["src/data/elite-redux/er-ghost-teams.ts:1013:captureRunChallenges", "er_ai::party_snapshots::capture_run_challenges_v1"],
+  ["src/data/elite-redux/er-ghost-teams.ts:1024:captureOpponent", "er_ai::party_snapshots::capture_opponent_v1"],
+  ["src/data/elite-redux/moody/moody-runtime-game-adapter.ts:1590:getMoodyCoordinatorPartyModifiers", "er_ai::party_snapshots::moody_coordinator_party_modifiers_v1"],
+  ["src/data/elite-redux/moody/moody-runtime-game-adapter.ts:2455:applyMoodyCoordinatorCapture", "er_ai::party_snapshots::apply_moody_coordinator_capture_v1"],
+  ["src/data/elite-redux/moody/moody-runtime-game-adapter.ts:2520:commitMoodyCoordinatorCaptureSuccess", "er_ai::party_snapshots::commit_moody_coordinator_capture_success_v1"],
+  ["src/data/mystery-encounters/encounters/the-expert-pokemon-breeder-encounter.ts:655:removePokemonFromPartyAndStoreHeldItems", "er_scenario::party_requirements::remove_party_pokemon_and_store_items_v1"],
+  ["src/data/mystery-encounters/encounters/the-expert-pokemon-breeder-encounter.ts:665:restorePartyAndHeldItems", "er_scenario::party_requirements::restore_party_and_held_items_v1"],
+]);
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -406,6 +507,24 @@ const entries = implemented.map(([path, line, symbol, rustSymbol, proof = WORLD_
     proof,
   };
 });
+const captureEntries = catalog.behaviors
+  .filter(behavior => behavior.domain === "CAPTURE_PARTY")
+  .map(behavior => {
+    const mapping = CAPTURE_IMPLEMENTATION_BY_PATH.get(behavior.source.path);
+    if (mapping == null) {
+      fail(`CAPTURE_PARTY behavior ${behavior.id} has no path implementation`);
+    }
+    const [defaultSymbol, proof] = mapping;
+    const key = `${behavior.source.path}:${behavior.source.line}:${behavior.symbol}`;
+    return {
+      behavior_unit: behavior.id,
+      status: "BESPOKE_IMPLEMENTED",
+      source: behavior.source,
+      rust_symbol: CAPTURE_SYMBOL_OVERRIDES.get(key) ?? defaultSymbol,
+      proof,
+    };
+  });
+entries.push(...captureEntries);
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
 if (new Set(entries.map(entry => entry.behavior_unit)).size !== entries.length) {
   fail("one behavior unit received duplicate implementation evidence");
