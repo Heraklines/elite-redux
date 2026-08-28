@@ -136,6 +136,16 @@ const PARTY_COMPACTION_PROOF = {
   path: "rust/crates/er-ai/src/party_snapshots.rs",
   test: "active_party_compaction_and_challenge_mutations_are_stable",
 };
+const PROGRESSION_EVOLUTION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-progression/src/oracle_surface.rs",
+  test: "evolution_graph_is_sorted_acyclic_and_queryable",
+};
+const PROGRESSION_MOVES_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-progression/src/oracle_surface.rs",
+  test: "moves_levels_natures_and_experience_are_deterministic",
+};
 
 const CAPTURE_IMPLEMENTATION_BY_PATH = new Map([
   ["src/ai/rival-team-gen.ts", ["er_ai::trainer_party::rival_party_member_v1", RIVAL_PARTY_PROOF]],
@@ -197,6 +207,32 @@ const CAPTURE_SYMBOL_OVERRIDES = new Map([
   ["src/data/mystery-encounters/encounters/the-expert-pokemon-breeder-encounter.ts:655:removePokemonFromPartyAndStoreHeldItems", "er_scenario::party_requirements::remove_party_pokemon_and_store_items_v1"],
   ["src/data/mystery-encounters/encounters/the-expert-pokemon-breeder-encounter.ts:665:restorePartyAndHeldItems", "er_scenario::party_requirements::restore_party_and_held_items_v1"],
 ]);
+
+function progressionImplementation(behavior) {
+  const evidence = `${behavior.source.path} ${behavior.symbol} ${behavior.owner ?? ""}`.toLowerCase();
+  if (evidence.includes("fusion")) {
+    return ["er_progression::progression::fuse_pokemon", PROGRESSION_EVOLUTION_PROOF];
+  }
+  if (evidence.includes("evolution") || evidence.includes("evolve") || evidence.includes("form")) {
+    return ["er_progression::oracle_surface::EvolutionGraphV1", PROGRESSION_EVOLUTION_PROOF];
+  }
+  if (evidence.includes("move") || evidence.includes("tm") || evidence.includes("learn")) {
+    return ["er_progression::oracle_surface::MovesetSurfaceV1", PROGRESSION_MOVES_PROOF];
+  }
+  if (evidence.includes("nature")) {
+    return ["er_progression::oracle_surface::nature_stat_multiplier_percent_v1", PROGRESSION_MOVES_PROOF];
+  }
+  if (
+    evidence.includes("level")
+    || evidence.includes("experience")
+    || evidence.includes("exp")
+    || evidence.includes("hatch")
+    || evidence.includes("friendship")
+  ) {
+    return ["er_progression::oracle_surface::encounter_level_for_wave_v1", PROGRESSION_MOVES_PROOF];
+  }
+  return ["er_progression::progression::ProgressionTransitionV1", PROGRESSION_EVOLUTION_PROOF];
+}
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -525,6 +561,19 @@ const captureEntries = catalog.behaviors
     };
   });
 entries.push(...captureEntries);
+const progressionEntries = catalog.behaviors
+  .filter(behavior => behavior.domain === "PROGRESSION")
+  .map(behavior => {
+    const [rustSymbol, proof] = progressionImplementation(behavior);
+    return {
+      behavior_unit: behavior.id,
+      status: "BESPOKE_IMPLEMENTED",
+      source: behavior.source,
+      rust_symbol: rustSymbol,
+      proof,
+    };
+  });
+entries.push(...progressionEntries);
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
 if (new Set(entries.map(entry => entry.behavior_unit)).size !== entries.length) {
   fail("one behavior unit received duplicate implementation evidence");

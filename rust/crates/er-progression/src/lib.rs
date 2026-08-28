@@ -1,6 +1,7 @@
 //! M7 Pokémon lifecycle and progression content.
 pub mod lifecycle;
 pub mod material;
+pub mod oracle_surface;
 pub mod progression;
 
 use std::collections::BTreeMap;
