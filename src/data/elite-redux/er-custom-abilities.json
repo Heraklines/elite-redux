@@ -155,5 +155,41 @@
     "name": "35% hp emergency",
     "rules": [],
     "version": 1
+  },
+  "new-ability-7": {
+    "componentRules": [
+      {
+        "chance": 100,
+        "conditionLogic": "all",
+        "conditions": [],
+        "effects": [
+          {
+            "abilityId": 5234,
+            "attrIndex": 0,
+            "attrType": "PostSummonScriptedMoveAbAttr",
+            "parameterOverrides": {
+              "opts.moveId": 220
+            }
+          }
+        ],
+        "hook": {
+          "abilityId": 76,
+          "attrIndex": 1,
+          "attrType": "PostSummonUnnamedMessageAbAttr"
+        },
+        "key": "component-1",
+        "prerequisiteHooks": []
+      }
+    ],
+    "description": "Use pain split upon entry, when this pokemons hp goes below 35% switch out.",
+    "flags": {},
+    "generation": 9,
+    "id": 20006,
+    "includes": [],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Malicious Empathy",
+    "rules": [],
+    "version": 1
   }
 }
