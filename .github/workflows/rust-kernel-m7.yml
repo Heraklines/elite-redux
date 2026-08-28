@@ -289,7 +289,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed foundation qualification"
+      - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed G27 typed causal qualification"
 
   m7-g30-aggregate:
     name: M7 G30 final aggregate
