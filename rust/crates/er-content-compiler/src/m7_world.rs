@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 use er_types::SafeU53;
 use er_types::battle_model::{TerrainKind, WeatherKind};
 use er_types::run_ids::BiomeId;
-use er_world::{BiomeBattleRuleV1, BiomeEncounterProfileV1, BiomeSkipFallbackV1, WorldRatioV1};
+use er_world::{
+    BiomeBattleRuleV1, BiomeEncounterProfileV1, BiomeSkipFallbackV1, RivalWaveV1, WorldRatioV1,
+};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -63,6 +65,7 @@ pub struct RivalPacingInputV1 {
 pub struct CompiledWorldBehaviorV1 {
     pub encounter_profiles: BTreeMap<BiomeId, BiomeEncounterProfileV1>,
     pub battle_rules: BTreeMap<BiomeId, BiomeBattleRuleV1>,
+    pub rival_sequences: BTreeMap<String, BTreeMap<String, Vec<RivalWaveV1>>>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -121,10 +124,49 @@ pub fn compile_world_behavior_v1(
             },
         );
     }
+    let rival_sequences = BTreeMap::from([
+        (
+            "normal".to_owned(),
+            compile_rival_pacing(&document.rival_waves.normal)?,
+        ),
+        (
+            "sprint".to_owned(),
+            compile_rival_pacing(&document.rival_waves.sprint)?,
+        ),
+    ]);
     Ok(CompiledWorldBehaviorV1 {
         encounter_profiles,
         battle_rules,
+        rival_sequences,
     })
+}
+
+fn compile_rival_pacing(
+    input: &RivalPacingInputV1,
+) -> Result<BTreeMap<String, Vec<RivalWaveV1>>, WorldOracleCompileError> {
+    let canonical: Vec<_> = input
+        .canonical
+        .iter()
+        .map(|entry| RivalWaveV1 {
+            wave: entry[0],
+            trainer_type: entry[1],
+            extra: false,
+        })
+        .collect();
+    let mut output = BTreeMap::from([("default".to_owned(), canonical.clone())]);
+    for (difficulty, extras) in &input.extra {
+        let mut sequence = canonical.clone();
+        for (wave, trainer_type) in extras {
+            sequence.push(RivalWaveV1 {
+                wave: wave.parse().map_err(|_| WorldOracleCompileError::Number)?,
+                trainer_type: *trainer_type,
+                extra: true,
+            });
+        }
+        sequence.sort_unstable_by_key(|entry| (entry.wave, entry.trainer_type, entry.extra));
+        output.insert(difficulty.clone(), sequence);
+    }
+    Ok(output)
 }
 
 fn parse_biome(value: &str) -> Result<BiomeId, WorldOracleCompileError> {
@@ -181,6 +223,7 @@ fn terrain(code: u16) -> TerrainKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use er_world::runtime::{extra_rival_type_for_wave, rival_wave_ordinal, rival_wave_sequence};
 
     const FIXTURE: &str = include_str!("../../../fixtures/m7/m7-world-oracle-v1.json");
 
@@ -194,5 +237,9 @@ mod tests {
             assert_ne!(profile.event_rate.denominator, 0);
             assert_ne!(profile.trainer_rate.denominator, 0);
         }
+        let hell = &compiled.rival_sequences["normal"]["hell"];
+        assert!(!rival_wave_sequence(hell).is_empty());
+        let extra = extra_rival_type_for_wave(hell, 16).expect("wave 16 extra rival");
+        assert!(rival_wave_ordinal(hell, 16, extra).is_some());
     }
 }

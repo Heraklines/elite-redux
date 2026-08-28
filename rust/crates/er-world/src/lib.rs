@@ -46,6 +46,14 @@ pub struct GameModeDefinitionV1 {
     pub story_source_waves: BTreeMap<u32, u32>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RivalWaveV1 {
+    pub wave: u32,
+    pub trainer_type: u32,
+    pub extra: bool,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldRatioV1 {

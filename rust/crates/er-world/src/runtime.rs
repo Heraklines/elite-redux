@@ -152,6 +152,32 @@ pub fn biome_forced_terrain(
     biome_battle_rule(content, biome).and_then(|rule| rule.forced_terrain.clone())
 }
 
+pub fn extra_rival_type_for_wave(sequence: &[crate::RivalWaveV1], wave: u32) -> Option<u32> {
+    sequence
+        .iter()
+        .find(|entry| entry.extra && entry.wave == wave)
+        .map(|entry| entry.trainer_type)
+}
+
+pub fn rival_wave_sequence(sequence: &[crate::RivalWaveV1]) -> &[crate::RivalWaveV1] {
+    sequence
+}
+
+pub fn rival_wave_ordinal(
+    sequence: &[crate::RivalWaveV1],
+    wave: u32,
+    trainer_type: u32,
+) -> Option<usize> {
+    sequence
+        .iter()
+        .position(|entry| entry.wave == wave && entry.trainer_type == trainer_type)
+        .or_else(|| {
+            sequence
+                .iter()
+                .position(|entry| !entry.extra && entry.trainer_type == trainer_type)
+        })
+}
+
 pub fn final_wave(mode: &crate::GameModeDefinitionV1) -> Option<u32> {
     mode.terminal_wave
 }
