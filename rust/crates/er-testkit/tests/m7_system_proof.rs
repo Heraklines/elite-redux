@@ -25,6 +25,9 @@ use er_game::m7_progression_control::capture_control;
 use er_game::m7_run_executor::{RunExecutionContextV1, execute_run_hook_v1};
 use er_game::m7_runtime::{GameControlIntentV2, GameRuntimeV5};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
+use er_kernel::{
+    BattleProtocolConfig, BattleProtocolRoleConfig, initial_battle_protocol_snapshot_v2,
+};
 use er_progression::lifecycle::{
     AuditedCaptureRng, CaptureDestinationV1, CaptureOutcomeV1, LifecycleError, attempt_capture,
 };
@@ -37,6 +40,7 @@ use er_progression::{
     PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V1, ProgressionContentPackV1,
     SpeciesProgressionDefinitionV1,
 };
+use er_protocol::{AuthorityReplicaConfig, ProposalLeaseConfig, RecoveryTransactionConfig};
 use er_rng::battle::RngRuntime;
 use er_save::GameSaveV1;
 use er_scenario::{
@@ -71,14 +75,15 @@ use er_types::run_ids::{
 use er_types::run_model::RunOutcome;
 use er_types::{
     AiPolicyId, BattleContentPackHashV3, BattleUiActionV1, CaptureActionV1, CatalogHash,
-    GameActionContextV1, GameActionV1, GameBehaviorStatus, GameBehaviorUnitId,
-    GameContentBundleHash, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
-    GameMenuOptionV2, GameMenuV2, InputFocus, InventoryItemId, MenuOptionId, OperationId,
-    OracleSha, PartyActionV1, PhysicalKey, ProfileFlagId, ProgressionActionV1, RawInputEvent,
-    RunCondition, RunConditionId, RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding,
-    RunOperation, RunProgramBudget, RunProgramId, RunProgramV1, RunSelector, RunSelectorId,
-    RunValue, RunValueId, SafeU53, ScenarioGameActionV1, ScenarioId, ScenarioNodeId, SeatId,
-    TerminalActionV1, WorldActionV1,
+    ConnectionGeneration, FrameContext, GameActionContextV1, GameActionV1, GameBehaviorStatus,
+    GameBehaviorUnitId, GameContentBundleHash, GameControlKindV2, GameControlPlanV2,
+    GameMenuCancelV2, GameMenuOptionV2, GameMenuV2, GameProposalV1, InputFocus, InventoryItemId,
+    MembershipRevision, MenuOptionId, OperationId, OracleSha, PartyActionV1, PhysicalKey,
+    ProfileFlagId, ProgressionActionV1, RawInputEvent, RunCondition, RunConditionId,
+    RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding, RunId, RunOperation,
+    RunProgramBudget, RunProgramId, RunProgramV1, RunSelector, RunSelectorId, RunValue, RunValueId,
+    SafeU53, ScenarioGameActionV1, ScenarioId, ScenarioNodeId, SeatId, SessionId, TerminalActionV1,
+    WorldActionV1,
 };
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
@@ -110,6 +115,45 @@ pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("safe fixture integer")
+}
+
+fn replica_protocol_snapshot() -> TestResult<er_protocol::ProtocolRuntimeSnapshotV2> {
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(1));
+    let context = FrameContext {
+        session_id: SessionId::new("m7-raw-replica-session")?,
+        run_id: RunId::new("m7-raw-replica-run")?,
+        session_epoch: safe(1),
+        seat_map_id: "m7-raw-replica-seat-map".to_owned(),
+        membership_revision: MembershipRevision::new(safe(1)),
+        sender_seat_id: guest,
+        authority_seat_id: host,
+        connection_generation: generation,
+    };
+    let config = BattleProtocolConfig {
+        role: BattleProtocolRoleConfig::Replica {
+            replica: AuthorityReplicaConfig {
+                receipt_context: context.clone(),
+                authority_seat_id: host,
+                authority_connection_generation: generation,
+            },
+            proposal_leases: ProposalLeaseConfig {
+                owner_prefix: "m7-raw-replica:proposal:".to_owned(),
+                retry_initial_ms: safe(1),
+                retry_maximum_ms: safe(64),
+                absolute_ceiling_ms: safe(1_200_000),
+            },
+            recovery: RecoveryTransactionConfig {
+                local_context: context,
+                request_timeout_ms: safe(300_000),
+                control_timeout_ms: safe(30_000),
+                pacing_ms: safe(16),
+                timer_owner_id: "m7-raw-replica:recovery".to_owned(),
+            },
+        },
+    };
+    Ok(initial_battle_protocol_snapshot_v2(&config, guest)?)
 }
 
 fn catalog(fill: char) -> CatalogHash {
@@ -1485,6 +1529,86 @@ pub fn continuous_foundation_raw_key_journey_crosses_world_save_party_and_progre
     assert_eq!(run.storage[0].pokemon.hp, 15);
     assert_eq!(run.inventory.entries[0].count, 2);
     assert_eq!(run.flags.get(&RunFlagId::new(safe(2))), Some(&true));
+    Ok(())
+}
+
+#[test]
+pub fn raw_key_replica_emits_proposal_without_local_mutation() -> TestResult {
+    let content = prepared_content()?;
+    let mut state = game_state(&content)?;
+    let option = MenuOptionId::new("replica/run-start")?;
+    let run = state.active_run.as_mut().ok_or("missing active run")?;
+    run.control = GameControlPlanV2 {
+        schema_version: er_types::GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
+        revision: safe(5),
+        kind: GameControlKindV2::ModeSelect,
+        owner_seat: Some(SeatId::new(safe(2))),
+        action_context: Some(GameActionContextV1 {
+            operation_id: OperationId::new("m7/replica/run-start")?,
+            authority_seat: SeatId::new(safe(2)),
+            authority_revision: safe(5),
+            menu_instance: MenuInstanceId::new(safe(5)),
+        }),
+        menu: Some(GameMenuV2::new(
+            MenuInstanceId::new(safe(5)),
+            SeatId::new(safe(2)),
+            "m7/replica",
+            option.clone(),
+            vec![GameMenuOptionV2::new(
+                option,
+                true,
+                true,
+                GameActionV1::ExecuteRunProgram {
+                    program: RunProgramId::new(safe(1)),
+                    hook: RunHook::RunStarted,
+                    context: RunExecutionContextV2::default(),
+                },
+                None,
+            )?],
+            Vec::new(),
+            GameMenuCancelV2::Disabled,
+        )?),
+        actionable: true,
+    };
+    state.validate()?;
+    let before = state.clone();
+    let mut environment = GameEnvironment::new_run(
+        state,
+        content,
+        EnvironmentKernelComponentsV1 {
+            input_router: InputRouterSnapshotV2 {
+                focus: InputFocus::Game,
+                pressed: Vec::new(),
+                suppressed_printable_keys: Vec::new(),
+                held_buttons: Vec::new(),
+                locks: Vec::new(),
+                repeats: Vec::new(),
+                disposed: false,
+            },
+            scheduler: KernelSchedulerSnapshotV2 {
+                next_timer_id: None,
+                timers: Vec::new(),
+                pauses: Vec::new(),
+                disposed: false,
+            },
+            protocol: Some(replica_protocol_snapshot()?),
+            replay_sequence: SafeU53::ZERO,
+            terminal: None,
+        },
+    )?;
+    let effects = environment.raw_input(RawInputEvent::KeyDown {
+        code: PhysicalKey::Space,
+        printable: true,
+        browser_repeat: false,
+        focus: InputFocus::Game,
+    })?;
+    let [GameEffect::ProposalReady { bytes, digest, .. }] = effects.as_slice() else {
+        return Err("replica raw input did not emit one proposal".into());
+    };
+    let proposal: GameProposalV1 = serde_json::from_slice(bytes)?;
+    proposal.validate()?;
+    assert!(digest.starts_with("blake3-v1:"));
+    assert_eq!(environment.snapshot().game_state, before);
     Ok(())
 }
 

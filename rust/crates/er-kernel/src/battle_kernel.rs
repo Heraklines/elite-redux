@@ -1331,6 +1331,21 @@ impl BattleProtocolState {
     }
 }
 
+/// Build the exact initial public protocol snapshot from a production battle protocol config.
+///
+/// M7 headless environments use this to construct authority/replica endpoints without
+/// synthesizing private owner fields or overriding the endpoint role in tests.
+pub fn initial_battle_protocol_snapshot_v2(
+    config: &BattleProtocolConfig,
+    local_seat: SeatId,
+) -> Result<ProtocolRuntimeSnapshotV2, BattleInitializationError> {
+    BattleProtocolState::new(config, local_seat)?
+        .snapshot_v2()
+        .map_err(|error| BattleInitializationError::Protocol {
+            reason: error.to_string(),
+        })
+}
+
 fn restore_authority_protocol(
     snapshot: ProtocolRuntimeSnapshotV2,
     scheduler: &mut KernelScheduler,
