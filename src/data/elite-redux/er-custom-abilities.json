@@ -114,5 +114,46 @@
     "name": "Exo Armor",
     "rules": [],
     "version": 1
+  },
+  "new-ability-6": {
+    "componentRules": [
+      {
+        "chance": 100,
+        "conditionLogic": "all",
+        "conditions": [
+          {
+            "kind": "holder-hp",
+            "maxPercent": 35
+          }
+        ],
+        "effects": [
+          {
+            "abilityId": 194,
+            "attrIndex": 0,
+            "attrType": "PostDamageForceSwitchAbAttr",
+            "parameterOverrides": {
+              "hpRatio": 0.35
+            }
+          }
+        ],
+        "hook": {
+          "abilityId": 5417,
+          "attrIndex": 0,
+          "attrType": "PassiveRecoveryAbAttr"
+        },
+        "key": "component-1",
+        "prerequisiteHooks": []
+      }
+    ],
+    "description": "used as part of another ability",
+    "flags": {},
+    "generation": 9,
+    "id": 20005,
+    "includes": [],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "35% hp emergency",
+    "rules": [],
+    "version": 1
   }
 }
