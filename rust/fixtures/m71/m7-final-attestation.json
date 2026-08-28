@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "milestone": "M7",
+  "tag": "rust-kernel-m7-final",
+  "commit_sha": "1599f19c5d05ec8646819414f6ef7556f1f8bc89",
+  "g30_run_id": 33191709410,
+  "g30_conclusion": "success",
+  "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "qualified_behavior_count": 6870,
+  "qualified_semantic_group_count": 3721,
+  "run_behavior_gaps": 0,
+  "scenario_behavior_gaps": 0,
+  "ai_behavior_gaps": 0,
+  "m71_base_policy": "M7 G30 bytes and behavior remain exact"
+}
