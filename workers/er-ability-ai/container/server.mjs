@@ -1944,7 +1944,7 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
       body: JSON.stringify(
         model === "deepseek-ai/deepseek-v4-flash-0731"
           || model === "moonshotai/kimi-k3"
-          || model === "nvidia/nemotron-3-super-120b-a12b"
+          || model.startsWith("nvidia/nemotron-3-")
           ? {
               ...body,
               model,
