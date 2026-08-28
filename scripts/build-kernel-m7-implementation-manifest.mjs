@@ -11,6 +11,11 @@ const WORLD_PROOF = {
   path: "rust/crates/er-testkit/tests/m7_system_proof.rs",
   test: "branching_routes_and_biome_structure_are_canonical_state",
 };
+const WORLD_ORACLE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-content-compiler/src/m7_world.rs",
+  test: "pinned_world_tables_compile_without_floats_in_output",
+};
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -21,6 +26,8 @@ const mapNodes = "src/data/elite-redux/er-map-nodes.ts";
 const fairyLuck = "src/data/elite-redux/er-fairy-luck.ts";
 const gameMode = "src/game-mode.ts";
 const arena = "src/field/arena.ts";
+const biomeEncounters = "src/data/elite-redux/er-biome-encounters.ts";
+const biomeRules = "src/data/elite-redux/er-biome-rules.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -91,6 +98,13 @@ const implemented = [
   [gameMode, 246, "getWaveForDifficulty", "er_world::runtime::wave_for_difficulty"],
   [gameMode, 452, "isWaveFinal", "er_world::runtime::is_wave_final"],
   [arena, 89, "erLegendMinWave", "er_world::runtime::legend_min_wave"],
+  [biomeEncounters, 105, "getErBiomeEncounter", "er_world::runtime::biome_encounter_profile", WORLD_ORACLE_PROOF],
+  [biomeEncounters, 110, "erBiomeEventRateMult", "er_world::runtime::biome_event_rate", WORLD_ORACLE_PROOF],
+  [biomeEncounters, 138, "erBiomeWaveSkipChance", "er_world::runtime::biome_wave_skip_chance", WORLD_ORACLE_PROOF],
+  [biomeEncounters, 144, "erBiomeSkipFallback", "er_world::runtime::biome_skip_fallback", WORLD_ORACLE_PROOF],
+  [biomeRules, 202, "getErBiomeRule", "er_world::runtime::biome_battle_rule", WORLD_ORACLE_PROOF],
+  [biomeRules, 207, "erBiomeForcedWeather", "er_world::runtime::biome_forced_weather", WORLD_ORACLE_PROOF],
+  [biomeRules, 212, "erBiomeForcedTerrain", "er_world::runtime::biome_forced_terrain", WORLD_ORACLE_PROOF],
 ];
 
 function fail(message) {
@@ -98,7 +112,7 @@ function fail(message) {
 }
 
 const catalog = JSON.parse(readFileSync(CATALOG, "utf8"));
-const entries = implemented.map(([path, line, symbol, rustSymbol]) => {
+const entries = implemented.map(([path, line, symbol, rustSymbol, proof = WORLD_PROOF]) => {
   const matches = catalog.behaviors.filter(behavior =>
     behavior.source.path === path
     && behavior.source.line === line
@@ -116,7 +130,7 @@ const entries = implemented.map(([path, line, symbol, rustSymbol]) => {
     status: "BESPOKE_IMPLEMENTED",
     source: behavior.source,
     rust_symbol: rustSymbol,
-    proof: WORLD_PROOF,
+    proof,
   };
 });
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
