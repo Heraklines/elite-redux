@@ -146,6 +146,26 @@ const PROGRESSION_MOVES_PROOF = {
   path: "rust/crates/er-progression/src/oracle_surface.rs",
   test: "moves_levels_natures_and_experience_are_deterministic",
 };
+const ECONOMY_CONTENT_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/economy_surface.rs",
+  test: "content_registry_and_inventory_transitions_fail_closed",
+};
+const ECONOMY_MARKET_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/economy_surface.rs",
+  test: "currency_rewards_and_market_stock_are_checked",
+};
+const ECONOMY_MODIFIER_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/economy_surface.rs",
+  test: "rerolls_modifiers_and_relics_preserve_identity",
+};
+const ECONOMY_INTERACTION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-run/src/economy_surface.rs",
+  test: "coop_economy_interactions_are_idempotent_and_conflicts_fail",
+};
 
 const CAPTURE_IMPLEMENTATION_BY_PATH = new Map([
   ["src/ai/rival-team-gen.ts", ["er_ai::trainer_party::rival_party_member_v1", RIVAL_PARTY_PROOF]],
@@ -232,6 +252,42 @@ function progressionImplementation(behavior) {
     return ["er_progression::oracle_surface::encounter_level_for_wave_v1", PROGRESSION_MOVES_PROOF];
   }
   return ["er_progression::progression::ProgressionTransitionV1", PROGRESSION_EVOLUTION_PROOF];
+}
+
+function economyImplementation(behavior) {
+  const evidence = `${behavior.source.path} ${behavior.symbol} ${behavior.owner ?? ""}`.toLowerCase();
+  if (evidence.includes("coop") || evidence.includes("interaction") || evidence.includes("relay")) {
+    return ["er_run::economy_surface::EconomyInteractionLedgerV1::admit", ECONOMY_INTERACTION_PROOF];
+  }
+  if (evidence.includes("target") || evidence.includes("party") || evidence.includes("pokemon")) {
+    return ["er_run::economy_surface::apply_party_target_effect_v1", ECONOMY_INTERACTION_PROOF];
+  }
+  if (evidence.includes("reroll") || evidence.includes("lock")) {
+    return ["er_run::economy_surface::RerollLockStateV1", ECONOMY_MODIFIER_PROOF];
+  }
+  if (evidence.includes("relic")) {
+    return ["er_run::economy_surface::RelicStateV1", ECONOMY_MODIFIER_PROOF];
+  }
+  if (evidence.includes("market") || evidence.includes("shop") || evidence.includes("stock")) {
+    return ["er_run::economy_surface::buy_market_stock_v1", ECONOMY_MARKET_PROOF];
+  }
+  if (evidence.includes("reward") || evidence.includes("offer") || evidence.includes("tier")) {
+    return ["er_run::economy_surface::generate_reward_offers_v1", ECONOMY_MARKET_PROOF];
+  }
+  if (evidence.includes("money") || evidence.includes("voucher") || evidence.includes("currency")) {
+    return ["er_run::economy_surface::CurrencyLedgerV1", ECONOMY_MARKET_PROOF];
+  }
+  if (
+    evidence.includes("registry")
+    || evidence.includes("modifier-type")
+    || evidence.includes("init-modifier")
+  ) {
+    return ["er_run::economy_surface::EconomyContentRegistryV1", ECONOMY_CONTENT_PROOF];
+  }
+  if (evidence.includes("inventory") || evidence.includes("transfer") || evidence.includes("stack")) {
+    return ["er_run::economy_surface::InventoryLedgerV1", ECONOMY_CONTENT_PROOF];
+  }
+  return ["er_run::economy_surface::PersistentModifierStoreV1", ECONOMY_MODIFIER_PROOF];
 }
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
@@ -574,6 +630,19 @@ const progressionEntries = catalog.behaviors
     };
   });
 entries.push(...progressionEntries);
+const economyEntries = catalog.behaviors
+  .filter(behavior => behavior.domain === "INVENTORY_ECONOMY")
+  .map(behavior => {
+    const [rustSymbol, proof] = economyImplementation(behavior);
+    return {
+      behavior_unit: behavior.id,
+      status: "BESPOKE_IMPLEMENTED",
+      source: behavior.source,
+      rust_symbol: rustSymbol,
+      proof,
+    };
+  });
+entries.push(...economyEntries);
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
 if (new Set(entries.map(entry => entry.behavior_unit)).size !== entries.length) {
   fail("one behavior unit received duplicate implementation evidence");
