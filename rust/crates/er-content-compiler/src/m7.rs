@@ -209,7 +209,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use er_types::{
-        BattleContentPackHashV3, BiomeId, CatalogHash, GameBehaviorUnitId, OracleSha, RunCondition,
+        BattleContentPackHashV3, CatalogHash, GameBehaviorUnitId, OracleSha, RunCondition,
         RunConditionId, RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget,
         RunProgramId, RunProgramV1, SafeU53,
     };

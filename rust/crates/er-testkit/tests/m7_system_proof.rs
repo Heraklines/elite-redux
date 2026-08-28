@@ -106,7 +106,7 @@ use er_world::{
 
 const ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 
-type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("safe fixture integer")
@@ -1072,7 +1072,7 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
 }
 
 #[test]
-fn run_program_material_save_and_control_paths_agree() -> TestResult {
+pub fn run_program_material_save_and_control_paths_agree() -> TestResult {
     let content = prepared_content()?;
     let state = game_state(&content)?;
     let transition = execute_run_hook_v1(
@@ -1199,12 +1199,18 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
             Vec::new(),
         )?;
         let bytes = GameMaterialV5::from_action(kind, material).canonical_bytes()?;
-        let mut applied = state.clone();
+        let mut host_applied = state.clone();
+        let mut replica_applied = state.clone();
         assert_eq!(
-            apply_game_material_v5(&mut applied, &content, &bytes)?,
+            apply_game_material_v5(&mut host_applied, &content, &bytes)?,
             MaterialApplyResultV5::Applied
         );
-        assert_eq!(applied, transition.after_state);
+        assert_eq!(
+            apply_game_material_v5(&mut replica_applied, &content, &bytes)?,
+            MaterialApplyResultV5::Applied
+        );
+        assert_eq!(host_applied, replica_applied);
+        assert_eq!(host_applied, transition.after_state);
     }
     let material = LifecycleMaterialV1::new(
         OperationId::new("m7/lifecycle/system-proof")?,
@@ -1377,7 +1383,8 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
 }
 
 #[test]
-fn continuous_foundation_raw_key_journey_crosses_world_save_party_and_progression() -> TestResult {
+pub fn continuous_foundation_raw_key_journey_crosses_world_save_party_and_progression() -> TestResult
+{
     let content = prepared_content()?;
     let mut state = game_state(&content)?;
     let mut pokemon = pokemon_state(1, Some(SeatId::new(safe(1))))?;
@@ -1550,23 +1557,30 @@ fn raw_key_mode_select_reaches_shared_terminal() -> TestResult {
         browser_repeat: false,
         focus: InputFocus::Game,
     })?;
+    environment.raw_input(RawInputEvent::KeyUp {
+        code: PhysicalKey::Space,
+    })?;
     let observation = environment.observe()?;
     assert!(observation.terminal);
     assert_eq!(observation.control, Some(GameControlKindV2::Complete));
+    let snapshot = environment.snapshot();
     assert_eq!(
-        environment
-            .snapshot()
+        snapshot
             .game_state
             .active_run
             .as_ref()
             .map(|run| run.outcome),
         Some(RunOutcome::Victory)
     );
+    assert!(snapshot.pressed_keys.is_empty());
+    assert!(snapshot.scheduler.timers.is_empty());
+    assert!(snapshot.pending_presentations.is_empty());
+    assert!(snapshot.protocol.is_none());
     Ok(())
 }
 
 #[test]
-fn two_hundred_wave_run_is_deterministic_to_terminal() -> TestResult {
+pub fn two_hundred_wave_run_is_deterministic_to_terminal() -> TestResult {
     let content = prepared_content()?;
     let initial = game_state(&content)?;
     let mut first = initial.clone();
@@ -1579,5 +1593,26 @@ fn two_hundred_wave_run_is_deterministic_to_terminal() -> TestResult {
     let run = first.active_run.as_ref().ok_or("missing run")?;
     assert_eq!(run.outcome, RunOutcome::Victory);
     assert_eq!(run.control.kind, er_types::GameControlKindV2::Complete);
+    Ok(())
+}
+
+#[test]
+pub fn randomized_campaign_profiles_replay_deterministically() -> TestResult {
+    let content = prepared_content()?;
+    for seed in 0_u64..128 {
+        let mut first = game_state(&content)?;
+        let mut second = first.clone();
+        let run_seed = format!("m7-randomized-{seed}");
+        for state in [&mut first, &mut second] {
+            let run = state.active_run.as_mut().ok_or("missing run")?;
+            run.seed = run_seed.clone();
+            run.run_rng = RngRuntime::from_run_seed(&run_seed).run_state();
+        }
+        for _ in 0..20 {
+            first = advance_wave(&first, &content.world)?;
+            second = advance_wave(&second, &content.world)?;
+            assert_eq!(first, second);
+        }
+    }
     Ok(())
 }

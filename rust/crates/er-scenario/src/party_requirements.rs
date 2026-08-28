@@ -67,7 +67,7 @@ impl PartyRequirementV1 {
                     Vec::new()
                 }
             }
-            Self::PartySize { minimum, maximum } => {
+            Self::PartySize { .. } => {
                 if self.meets_party_size(party.len()) {
                     party.iter().map(|pokemon| pokemon.id).collect()
                 } else {
