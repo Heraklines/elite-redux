@@ -16,6 +16,11 @@ const WORLD_ORACLE_PROOF = {
   path: "rust/crates/er-content-compiler/src/m7_world.rs",
   test: "pinned_world_tables_compile_without_floats_in_output",
 };
+const SAVE_REPLAY_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-save/src/oracle_replay.rs",
+  test: "replay_trace_guards_and_validation_match_oracle_contract",
+};
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
 const structure = "src/data/elite-redux/er-biome-structure.ts";
@@ -31,6 +36,7 @@ const biomeRules = "src/data/elite-redux/er-biome-rules.ts";
 const battleFrequency = "src/data/elite-redux/er-battle-frequency.ts";
 const biomeDepths = "src/init/init-biome-depths.ts";
 const biomeRegistry = "src/init/init-biomes.ts";
+const replayTrace = "src/data/elite-redux/replay-trace.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -116,6 +122,12 @@ const implemented = [
   [biomeDepths, 14, "reduce[0]", "er_world::runtime::initialize_biome_depths"],
   [biomeDepths, 19, "traverseBiome", "er_world::runtime::initialize_biome_depths"],
   [biomeRegistry, 39, "initBiomes", "er_content_compiler::m7_world::compile_world_behavior_v1", WORLD_ORACLE_PROOF],
+  [replayTrace, 247, "isReplayCommandEvent", "er_save::oracle_replay::OracleReplayEventV2::is_command", SAVE_REPLAY_PROOF],
+  [replayTrace, 252, "isReplayInteractionEvent", "er_save::oracle_replay::OracleReplayEventV2::is_interaction", SAVE_REPLAY_PROOF],
+  [replayTrace, 268, "validateReplayTrace", "er_save::oracle_replay::validate_oracle_replay_trace_v2", SAVE_REPLAY_PROOF],
+  [replayTrace, 282, "forEach[0]", "er_save::oracle_replay::validate_oracle_replay_trace_v2", SAVE_REPLAY_PROOF],
+  [replayTrace, 318, "isValidCommandKind", "er_save::oracle_replay::OracleReplayCommandKindV2::structurally_valid", SAVE_REPLAY_PROOF],
+  [replayTrace, 338, "makeReplayTrace", "er_save::oracle_replay::make_oracle_replay_trace_v2", SAVE_REPLAY_PROOF],
 ];
 
 function fail(message) {
