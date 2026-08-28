@@ -25,12 +25,14 @@ thiserror.workspace = true
 workspace = true
 
 [dev-dependencies]
+er-agent-protocol = { path = "../er-agent-protocol" }
 er-batch = { path = "../er-batch" }
 er-dev-types = { path = "../er-dev-types" }
 er-devplane = { path = "../er-devplane" }
 er-impact = { path = "../er-impact" }
 er-model = { path = "../er-model" }
 er-render-model = { path = "../er-render-model" }
+er-repro = { path = "../er-repro" }
 er-ai = { path = "../er-ai" }
 er-content-compiler = { path = "../er-content-compiler" }
 er-wasm = { path = "../er-wasm" }

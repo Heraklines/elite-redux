@@ -1,5 +1,19 @@
 //! Deterministic M7.1 reproduction capsule contracts.
 
+pub mod capsule;
+pub mod corpus;
+pub mod diff;
+pub mod explain;
+pub mod minimize;
+pub mod replay;
+
+pub use capsule::*;
+pub use corpus::*;
+pub use diff::*;
+pub use explain::*;
+pub use minimize::*;
+pub use replay::*;
+
 use serde::{Deserialize, Serialize};
 
 pub const REPRO_CAPSULE_VERSION_V1: u32 = 1;

@@ -8,10 +8,15 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use er_agent_protocol::{
+    AgentDispatchErrorV1, AgentDispatcherV1, AgentErrorCodeV1, AgentJsonlServerV1,
+    AgentProtocolLimitsV1,
+};
 use er_env::{EnvironmentKernelComponentsV1, GameEnvironment};
 use er_game::m7_content::{GameContentBundleV1, PreparedGameContentV1};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
+use er_repro::{CapsuleLimitsV1, ReproCapsuleV1};
 use er_save::{GameReplayV1, GameSaveV1};
 use er_state::m7_state::GameStateV5;
 use er_types::{InputFocus, PhysicalKey, RawInputEvent, SafeU53};
@@ -27,6 +32,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "validate-save" => validate_save(&options),
         "simulate" => simulate(&options),
         "inspect-content" => inspect_content(&options),
+        "agent" => agent_jsonl(&options),
+        "capsule-validate" => validate_capsule(&options),
         _ => Err(format!("unknown er-cli command {command}").into()),
     }
 }
@@ -142,6 +149,189 @@ fn inspect_content(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Err
         bundle.scenarios.graphs.len(),
         bundle.world.modes.len(),
     ))
+}
+
+fn agent_jsonl(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
+    if options.get("protocol").map(String::as_str) != Some("jsonl") {
+        return Err("agent requires --protocol jsonl".into());
+    }
+    let content = load_content(options)?;
+    let snapshot_path = option_path(options, "snapshot", "ER_M7_SNAPSHOT")?;
+    let snapshot: RestorableKernelSnapshotV6 = decode_file(&snapshot_path)?;
+    let environment = GameEnvironment::from_snapshot(snapshot, Arc::clone(&content))?;
+    let dispatcher = CliAgentDispatcher {
+        environment: Some(environment),
+        content,
+    };
+    let mut server = AgentJsonlServerV1::new(
+        dispatcher,
+        AgentProtocolLimitsV1 {
+            maximum_line_bytes: 1 << 20,
+            maximum_inline_result_bytes: 64 << 10,
+            maximum_artifact_bytes: 64 << 20,
+            maximum_artifacts: 256,
+            maximum_completed_request_ids: 16_384,
+        },
+    )?;
+    let stdin = io::stdin();
+    let mut reader = stdin.lock();
+    let stdout = io::stdout();
+    let mut writer = stdout.lock();
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        let read = reader.read_until(b'\n', &mut line)?;
+        if read == 0 {
+            break;
+        }
+        while line
+            .last()
+            .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
+        {
+            line.pop();
+        }
+        let response = server.process_line(&line)?;
+        writer.write_all(&response)?;
+        writer.flush()?;
+    }
+    Ok(())
+}
+
+fn validate_capsule(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
+    let path = option_path(options, "capsule", "ER_M71_CAPSULE")?;
+    let bytes = fs::read(path)?;
+    let capsule = ReproCapsuleV1::decode(&bytes, cli_capsule_limits())?;
+    write_line(&format!(
+        "valid capsule: mode={:?}, blobs={}, oracle={:?}",
+        capsule.manifest.mode,
+        capsule.blobs.len(),
+        capsule.manifest.failure_oracle
+    ))
+}
+
+fn cli_capsule_limits() -> CapsuleLimitsV1 {
+    CapsuleLimitsV1 {
+        maximum_manifest_bytes: 4 << 20,
+        maximum_blob_count: 4_096,
+        maximum_blob_bytes: 64 << 20,
+        maximum_total_stored_bytes: 256 << 20,
+        maximum_total_decompressed_bytes: 512 << 20,
+    }
+}
+
+#[derive(Debug)]
+struct CliAgentDispatcher {
+    environment: Option<GameEnvironment>,
+    content: Arc<PreparedGameContentV1>,
+}
+
+impl CliAgentDispatcher {
+    fn environment(&self) -> Result<&GameEnvironment, AgentDispatchErrorV1> {
+        self.environment
+            .as_ref()
+            .ok_or_else(|| AgentDispatchErrorV1 {
+                code: AgentErrorCodeV1::BackendError,
+                message: "session is closed".to_owned(),
+            })
+    }
+
+    fn environment_mut(&mut self) -> Result<&mut GameEnvironment, AgentDispatchErrorV1> {
+        self.environment
+            .as_mut()
+            .ok_or_else(|| AgentDispatchErrorV1 {
+                code: AgentErrorCodeV1::BackendError,
+                message: "session is closed".to_owned(),
+            })
+    }
+}
+
+impl AgentDispatcherV1 for CliAgentDispatcher {
+    fn dispatch(
+        &mut self,
+        method: &str,
+        params: &serde_json::Value,
+    ) -> Result<serde_json::Value, AgentDispatchErrorV1> {
+        match method {
+            "protocol.hello" => Ok(serde_json::json!({
+                "protocol_version": 1,
+                "topologies": ["SOLO"],
+                "input_boundary": "RAW_PHYSICAL_INPUT"
+            })),
+            "session.create" => Ok(serde_json::json!({ "topology": "SOLO" })),
+            "session.observe" | "session.state_delta" | "session.invariants" => {
+                let observation = self.environment()?.observe().map_err(cli_backend_error)?;
+                serde_json::to_value(observation).map_err(cli_backend_error)
+            }
+            "session.raw_input" => {
+                let input = decode_param::<RawInputEvent>(params, "input")?;
+                let effects = self
+                    .environment_mut()?
+                    .raw_input(input)
+                    .map_err(cli_backend_error)?;
+                let observation = self.environment()?.observe().map_err(cli_backend_error)?;
+                Ok(serde_json::json!({
+                    "effect_count": effects.len(),
+                    "observation": observation
+                }))
+            }
+            "session.advance_time" => {
+                let milliseconds = decode_param::<u64>(params, "milliseconds")?;
+                let duration = SafeU53::new(milliseconds).map_err(cli_backend_error)?;
+                let effects = self
+                    .environment_mut()?
+                    .advance_time(duration)
+                    .map_err(cli_backend_error)?;
+                let observation = self.environment()?.observe().map_err(cli_backend_error)?;
+                Ok(serde_json::json!({
+                    "effect_count": effects.len(),
+                    "observation": observation
+                }))
+            }
+            "session.snapshot" | "session.checkpoint" => {
+                serde_json::to_value(self.environment()?.snapshot()).map_err(cli_backend_error)
+            }
+            "session.restore" | "session.from_snapshot" => {
+                let snapshot = decode_param::<RestorableKernelSnapshotV6>(params, "snapshot")?;
+                let replacement =
+                    GameEnvironment::from_snapshot(snapshot, Arc::clone(&self.content))
+                        .map_err(cli_backend_error)?;
+                self.environment = Some(replacement);
+                Ok(serde_json::json!({ "restored": true }))
+            }
+            "session.close" => {
+                self.environment = None;
+                Ok(serde_json::json!({ "closed": true }))
+            }
+            _ => Err(AgentDispatchErrorV1 {
+                code: AgentErrorCodeV1::BackendError,
+                message: format!("method {method} requires a configured developer-plane backend"),
+            }),
+        }
+    }
+}
+
+fn decode_param<T: serde::de::DeserializeOwned>(
+    params: &serde_json::Value,
+    name: &str,
+) -> Result<T, AgentDispatchErrorV1> {
+    let value = params
+        .get(name)
+        .cloned()
+        .ok_or_else(|| AgentDispatchErrorV1 {
+            code: AgentErrorCodeV1::InvalidRequest,
+            message: format!("missing parameter {name}"),
+        })?;
+    serde_json::from_value(value).map_err(|error| AgentDispatchErrorV1 {
+        code: AgentErrorCodeV1::InvalidRequest,
+        message: error.to_string(),
+    })
+}
+
+fn cli_backend_error(error: impl ToString) -> AgentDispatchErrorV1 {
+    AgentDispatchErrorV1 {
+        code: AgentErrorCodeV1::BackendError,
+        message: error.to_string(),
+    }
 }
 
 fn load_content(
