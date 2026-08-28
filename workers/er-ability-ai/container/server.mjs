@@ -1931,7 +1931,7 @@ async function _runCodex(payload, emit) {
   }
 }
 
-async function requestNimJson(model, body, schema, source, timeoutMs) {
+async function requestNimJson(model, body, schema, source, timeoutMs, forceGuidedJson = false) {
   let response;
   try {
     response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
@@ -1944,7 +1944,7 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
       body: JSON.stringify(
         model === "deepseek-ai/deepseek-v4-flash-0731"
           || model === "moonshotai/kimi-k3"
-          || model.startsWith("nvidia/nemotron-3-")
+          || (model.startsWith("nvidia/nemotron-3-") && !forceGuidedJson)
           ? {
               ...body,
               model,
@@ -1999,7 +1999,8 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
 
 async function runNimModel(model, body, payload, searchContext, planSchema, emit) {
   const generationTimeout = model === "deepseek-ai/deepseek-v4-flash-0731" ? 25_000 : 60_000;
-  let plan = await requestNimJson(model, body, planSchema, "ability model", generationTimeout);
+  const forceGuidedJson = model === "nvidia/nemotron-3-nano-30b-a3b" && isPrimitiveStatRuleRequest(payload);
+  let plan = await requestNimJson(model, body, planSchema, "ability model", generationTimeout, forceGuidedJson);
   let result;
   try {
     result = expandAssemblyPlan(plan, searchContext);
@@ -2024,7 +2025,7 @@ async function runNimModel(model, body, payload, searchContext, planSchema, emit
       ],
       temperature: 0,
     };
-    plan = await requestNimJson(model, repairBody, planSchema, "ability repair model", 45_000);
+    plan = await requestNimJson(model, repairBody, planSchema, "ability repair model", 45_000, forceGuidedJson);
     result = expandAssemblyPlan(plan, searchContext);
     normalizePrimitiveAliases(result);
   }
