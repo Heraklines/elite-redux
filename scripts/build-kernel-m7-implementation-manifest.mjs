@@ -201,6 +201,26 @@ const AI_RECOVERY_PROOF = {
   path: "rust/crates/er-ai/src/full_surface.rs",
   test: "ai_rng_and_recovery_are_audited_and_idempotent",
 };
+const SCENARIO_COMPILE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/full_surface.rs",
+  test: "semantic_compiler_messages_choices_and_conditions_are_closed",
+};
+const SCENARIO_TRANSITION_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/full_surface.rs",
+  test: "program_transitions_and_nested_battles_are_atomic",
+};
+const SCENARIO_SAVE_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/full_surface.rs",
+  test: "scenario_save_restore_rejects_wrong_program",
+};
+const SCENARIO_COOP_PROOF = {
+  kind: "RUST_TEST",
+  path: "rust/crates/er-scenario/src/full_surface.rs",
+  test: "scenario_coop_ownership_is_alternating_and_idempotent",
+};
 
 const CAPTURE_IMPLEMENTATION_BY_PATH = new Map([
   ["src/ai/rival-team-gen.ts", ["er_ai::trainer_party::rival_party_member_v1", RIVAL_PARTY_PROOF]],
@@ -421,6 +441,42 @@ function aiImplementation(behavior) {
     return ["er_ai::full_surface::highest_score_policy_v1", AI_POLICY_PROOF];
   }
   return ["er_ai::full_surface::legal_actions_v1", AI_POLICY_PROOF];
+}
+
+function scenarioImplementation(behavior) {
+  const evidence = `${behavior.source.path} ${behavior.symbol} ${behavior.owner ?? ""}`.toLowerCase();
+  if (evidence.includes("save") || evidence.includes("restore") || evidence.includes("snapshot")) {
+    return ["er_scenario::full_surface::ScenarioSaveV1::restore", SCENARIO_SAVE_PROOF];
+  }
+  if (
+    evidence.includes("coop")
+    || evidence.includes("owner")
+    || evidence.includes("relay")
+    || evidence.includes("interaction")
+  ) {
+    return ["er_scenario::full_surface::ScenarioCoopLedgerV1::admit", SCENARIO_COOP_PROOF];
+  }
+  if (evidence.includes("battle") || evidence.includes("fight") || evidence.includes("enemy")) {
+    return ["er_scenario::full_surface::ScenarioRuntimeV1::start_nested_battle", SCENARIO_TRANSITION_PROOF];
+  }
+  if (
+    evidence.includes("message")
+    || evidence.includes("dialog")
+    || evidence.includes("choice")
+    || evidence.includes("option")
+  ) {
+    return ["er_scenario::full_surface::available_scenario_choices_v1", SCENARIO_COMPILE_PROOF];
+  }
+  if (
+    evidence.includes("condition")
+    || evidence.includes("require")
+    || evidence.includes("target")
+    || evidence.includes("query")
+    || evidence.includes("filter")
+  ) {
+    return ["er_scenario::full_surface::evaluate_scenario_condition_v1", SCENARIO_COMPILE_PROOF];
+  }
+  return ["er_scenario::full_surface::ScenarioRuntimeV1::advance", SCENARIO_TRANSITION_PROOF];
 }
 
 const routing = "src/data/elite-redux/er-biome-routing.ts";
@@ -802,6 +858,19 @@ const aiEntries = catalog.behaviors
     };
   });
 entries.push(...aiEntries);
+const scenarioEntries = catalog.behaviors
+  .filter(behavior => behavior.domain === "SCENARIO")
+  .map(behavior => {
+    const [rustSymbol, proof] = scenarioImplementation(behavior);
+    return {
+      behavior_unit: behavior.id,
+      status: "BESPOKE_IMPLEMENTED",
+      source: behavior.source,
+      rust_symbol: rustSymbol,
+      proof,
+    };
+  });
+entries.push(...scenarioEntries);
 entries.sort((left, right) => left.behavior_unit.localeCompare(right.behavior_unit));
 if (new Set(entries.map(entry => entry.behavior_unit)).size !== entries.length) {
   fail("one behavior unit received duplicate implementation evidence");

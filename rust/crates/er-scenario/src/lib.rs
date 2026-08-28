@@ -1,4 +1,5 @@
 //! Closed deterministic M7 scenario graphs.
+pub mod full_surface;
 pub mod party_requirements;
 pub mod runtime;
 pub mod training_session;
