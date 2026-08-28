@@ -663,7 +663,7 @@ describe("tools — dump editor SPA data", () => {
       "Bad Company",
       "Cheek Pouch",
     ]);
-    writeFileSync("editor/data/ability-components.json", `${JSON.stringify(abilityComponents, null, 2)}\n`, "utf8");
+    writeFileSync("editor/data/ability-components.json", `${JSON.stringify(abilityComponents)}\n`, "utf8");
 
     // Sanity: the roster covers every starter-cost entry that is a real species,
     // includes vanilla + ER customs, and lost nobody to a missing const key.
