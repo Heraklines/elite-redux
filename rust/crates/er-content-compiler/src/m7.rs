@@ -316,10 +316,10 @@ mod tests {
     }
 
     #[test]
-    fn unowned_domain_operation_is_rejected_during_preparation() {
+    fn unsupported_operation_is_rejected_during_preparation() {
         let mut input = request(vec![source(behavior('a'))]);
-        input.programs[0].operations = vec![RunOperation::SetBiome {
-            biome: BiomeId::new(SafeU53::new(1).expect("biome")),
+        input.programs[0].operations = vec![RunOperation::GenerateEncounter {
+            encounter: er_types::EncounterId::new(SafeU53::new(1).expect("encounter")),
         }];
         assert!(matches!(
             compile_game_system_v1(input),
