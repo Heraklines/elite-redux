@@ -56,6 +56,13 @@ pub struct RivalWaveV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct BiomeDepthV1 {
+    pub depth: u32,
+    pub chance_denominator: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorldRatioV1 {
     pub numerator: u32,
     pub denominator: u32,

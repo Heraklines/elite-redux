@@ -88,8 +88,8 @@ use er_world::runtime::{
     biome_should_end, biome_skip_fallback, biome_wave_skip_chance, chart_onward_routes,
     consume_carried_weather, consume_map_travel_target, consume_treasure_fragments_for_reward,
     early_wave_move_power_ratio, fairy_luck_waves_left, final_wave, grant_fairy_luck,
-    is_chapter_start_wave, is_checkpoint_wave, is_major_checkpoint_wave, is_wave_final,
-    legend_min_wave, map_upgrade_tier, mark_biome_stay, mark_leave_biome,
+    initialize_biome_depths, is_chapter_start_wave, is_checkpoint_wave, is_major_checkpoint_wave,
+    is_wave_final, legend_min_wave, map_upgrade_tier, mark_biome_stay, mark_leave_biome,
     notoriety_boss_chance_pct, notoriety_bst_bonus, notoriety_trainer_chance_pct,
     plan_biome_structure, progression_wave, record_biome_entry, reveal_next_pending_node,
     roll_next_biome_nodes, set_any_biome_travel_target, set_carried_weather,
@@ -764,6 +764,15 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
         biome_forced_terrain(&content.world, BiomeId::new(safe(1))),
         Some(TerrainKind::UnsupportedOracleCode(1))
     );
+    let mut depth_rng = ScriptedWorldRng::new(vec![0]);
+    let (depths, depth_draws) = initialize_biome_depths(
+        &content.world,
+        BiomeId::new(safe(1)),
+        BiomeId::new(safe(3)),
+        &mut depth_rng,
+    )?;
+    assert_eq!(depth_draws.len(), 1);
+    assert!(depths[&BiomeId::new(safe(3))].depth > depths[&BiomeId::new(safe(1))].depth);
     let mut route_rng = ScriptedWorldRng::new(vec![49]);
     let routed = roll_next_biome_nodes(&state, &content.world, 1, &mut route_rng)?;
     assert_eq!(routed.draws.len(), 1);

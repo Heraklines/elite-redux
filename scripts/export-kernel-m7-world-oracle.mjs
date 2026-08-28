@@ -148,6 +148,25 @@ function variable(path, name) {
   return evaluate(initializer, file);
 }
 
+function identifierArray(path, name) {
+  const file = source(path);
+  let values;
+  const visit = node => {
+    if (
+      ts.isVariableDeclaration(node)
+      && node.name.getText(file) === name
+      && node.initializer
+      && ts.isArrayLiteralExpression(node.initializer)
+    ) {
+      values = node.initializer.elements.map(element => element.getText(file));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  if (!values) fail(`missing identifier array ${name}`);
+  return values;
+}
+
 const encounters = variable(
   "src/data/elite-redux/er-biome-encounters.ts",
   "ER_BIOME_ENCOUNTERS",
@@ -181,6 +200,7 @@ const forcedBattleRules = Object.fromEntries(
     .filter(([, rule]) => rule.weather !== null || rule.terrain !== null),
 );
 
+const registeredBiomes = identifierArray("src/init/init-biomes.ts", "rawAllBiomes");
 
 const document = {
   schema_version: 1,
@@ -191,6 +211,7 @@ const document = {
     normal: { canonical: normalCanonicalRivals, extra: normalExtraRivals },
     sprint: { canonical: sprintCanonicalRivals, extra: sprintExtraRivals },
   },
+  registered_biomes: registeredBiomes,
 };
 writeFileSync(output, `${JSON.stringify(document)}\n`);
 console.log(`M7 world oracle: ${Object.keys(encounters).length} encounter profiles, ${Object.keys(rules).length} battle rules`);

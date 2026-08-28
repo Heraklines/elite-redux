@@ -1,6 +1,6 @@
 //! Deterministic M7 route, encounter, and wave selection.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use er_state::m7_state::{
     AuthoritativeTravelClassificationV1, GameStateV5, MapNodeKindV1, MapNodeStateV1,
@@ -41,6 +41,7 @@ pub struct WorldSelectionAuditV1 {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RouteGraphDrawReasonV1 {
     ConditionalBaseLink,
+    BiomeDepthFallback,
     UnexpectedBiome,
     BiomeLength,
 }
@@ -176,6 +177,106 @@ pub fn rival_wave_ordinal(
                 .iter()
                 .position(|entry| !entry.extra && entry.trainer_type == trainer_type)
         })
+}
+
+pub fn initialize_biome_depths<R: AuditedWorldRng>(
+    content: &PreparedWorldContentV1,
+    town: BiomeId,
+    end: BiomeId,
+    rng: &mut R,
+) -> Result<
+    (
+        BTreeMap<BiomeId, crate::BiomeDepthV1>,
+        Vec<RouteGraphDrawAuditV1>,
+    ),
+    WorldRuntimeError,
+> {
+    if content.biome(town).is_none() || content.biome(end).is_none() {
+        return Err(WorldRuntimeError::Content);
+    }
+    let candidates: Vec<_> = content
+        .pack()
+        .biomes
+        .iter()
+        .filter(|biome| biome.id != town && biome.id != end)
+        .map(|biome| biome.id)
+        .collect();
+    if candidates.is_empty() {
+        return Err(WorldRuntimeError::Content);
+    }
+    let mut depths = BTreeMap::from([(
+        town,
+        crate::BiomeDepthV1 {
+            depth: 0,
+            chance_denominator: 1,
+        },
+    )]);
+    let mut draws = Vec::new();
+    let mut stack = vec![(town, 0_u32)];
+    let budget = content
+        .pack()
+        .biomes
+        .len()
+        .checked_mul(content.pack().routes.len().max(1))
+        .and_then(|value| value.checked_mul(8))
+        .ok_or(WorldRuntimeError::Wave)?;
+    let mut processed = 0;
+    while let Some((mut biome, depth)) = stack.pop() {
+        processed += 1;
+        if processed > budget {
+            return Err(WorldRuntimeError::Content);
+        }
+        if biome == end {
+            let draw = draw_checked(
+                rng,
+                u64::try_from(candidates.len()).map_err(|_| WorldRuntimeError::Weight)?,
+            )?;
+            draws.push(RouteGraphDrawAuditV1 {
+                reason: RouteGraphDrawReasonV1::BiomeDepthFallback,
+                upper_exclusive: candidates.len() as u64,
+                result: draw,
+            });
+            biome = candidates[usize::try_from(draw).map_err(|_| WorldRuntimeError::Weight)?];
+        }
+        let definition = content.biome(biome).ok_or(WorldRuntimeError::Content)?;
+        for link in &definition.routing_exits {
+            let linked = content
+                .route(link.route)
+                .map(|route| route.biome)
+                .ok_or(WorldRuntimeError::Content)?;
+            let chance = link.inclusion_denominator.unwrap_or(1);
+            let next_depth = depth.checked_add(1).ok_or(WorldRuntimeError::Wave)?;
+            let replace = depths.get(&linked).is_none_or(|current| {
+                chance < current.chance_denominator
+                    || (chance == current.chance_denominator && next_depth < current.depth)
+            });
+            if replace {
+                depths.insert(
+                    linked,
+                    crate::BiomeDepthV1 {
+                        depth: next_depth,
+                        chance_denominator: chance,
+                    },
+                );
+                stack.push((linked, next_depth));
+            }
+        }
+    }
+    let maximum = depths
+        .values()
+        .map(|entry| entry.depth)
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(WorldRuntimeError::Wave)?;
+    depths.insert(
+        end,
+        crate::BiomeDepthV1 {
+            depth: maximum,
+            chance_denominator: 1,
+        },
+    );
+    Ok((depths, draws))
 }
 
 pub fn final_wave(mode: &crate::GameModeDefinitionV1) -> Option<u32> {

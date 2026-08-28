@@ -19,6 +19,7 @@ pub struct WorldOracleDocumentV1 {
     pub biome_encounters: BTreeMap<String, BiomeEncounterInputV1>,
     pub forced_battle_rules: BTreeMap<String, ForcedBattleRuleInputV1>,
     pub rival_waves: RivalWaveTablesInputV1,
+    pub registered_biomes: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -66,6 +67,7 @@ pub struct CompiledWorldBehaviorV1 {
     pub encounter_profiles: BTreeMap<BiomeId, BiomeEncounterProfileV1>,
     pub battle_rules: BTreeMap<BiomeId, BiomeBattleRuleV1>,
     pub rival_sequences: BTreeMap<String, BTreeMap<String, Vec<RivalWaveV1>>>,
+    pub registered_biomes: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -134,10 +136,23 @@ pub fn compile_world_behavior_v1(
             compile_rival_pacing(&document.rival_waves.sprint)?,
         ),
     ]);
+    if document.registered_biomes.is_empty()
+        || document
+            .registered_biomes
+            .iter()
+            .any(|name| name.is_empty())
+        || document
+            .registered_biomes
+            .windows(2)
+            .any(|pair| pair[0] == pair[1])
+    {
+        return Err(WorldOracleCompileError::Biome);
+    }
     Ok(CompiledWorldBehaviorV1 {
         encounter_profiles,
         battle_rules,
         rival_sequences,
+        registered_biomes: document.registered_biomes.clone(),
     })
 }
 
@@ -241,5 +256,6 @@ mod tests {
         assert!(!rival_wave_sequence(hell).is_empty());
         let extra = extra_rival_type_for_wave(hell, 16).expect("wave 16 extra rival");
         assert!(rival_wave_ordinal(hell, 16, extra).is_some());
+        assert_eq!(compiled.registered_biomes.len(), 35);
     }
 }

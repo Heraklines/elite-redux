@@ -29,6 +29,8 @@ const arena = "src/field/arena.ts";
 const biomeEncounters = "src/data/elite-redux/er-biome-encounters.ts";
 const biomeRules = "src/data/elite-redux/er-biome-rules.ts";
 const battleFrequency = "src/data/elite-redux/er-battle-frequency.ts";
+const biomeDepths = "src/init/init-biome-depths.ts";
+const biomeRegistry = "src/init/init-biomes.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -109,6 +111,11 @@ const implemented = [
   [battleFrequency, 116, "erExtraRivalTypeForWave", "er_world::runtime::extra_rival_type_for_wave", WORLD_ORACLE_PROOF],
   [battleFrequency, 124, "erRivalWaveSequence", "er_world::runtime::rival_wave_sequence", WORLD_ORACLE_PROOF],
   [battleFrequency, 137, "erRivalWaveOrdinal", "er_world::runtime::rival_wave_ordinal", WORLD_ORACLE_PROOF],
+  [biomeDepths, 7, "initBiomeDepths", "er_world::runtime::initialize_biome_depths"],
+  [biomeDepths, 13, "map[0]", "er_world::runtime::initialize_biome_depths"],
+  [biomeDepths, 14, "reduce[0]", "er_world::runtime::initialize_biome_depths"],
+  [biomeDepths, 19, "traverseBiome", "er_world::runtime::initialize_biome_depths"],
+  [biomeRegistry, 39, "initBiomes", "er_content_compiler::m7_world::compile_world_behavior_v1", WORLD_ORACLE_PROOF],
 ];
 
 function fail(message) {
