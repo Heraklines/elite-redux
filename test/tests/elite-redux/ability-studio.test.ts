@@ -39,14 +39,21 @@ import {
   abilityStudioRuntimeParameterEntries,
   applyAbilityStudioRuntimeParameterOverrides,
 } from "#data/elite-redux/ability-studio/runtime-parameters";
+import { ChanceStatusOnAttackAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { PostItemLostScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-item-lost-scripted-move";
 import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { initEditorAuthoredAbilities } from "#data/elite-redux/init-editor-authored-abilities";
+import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
+import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import { GameManager } from "#test/framework/game-manager";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -69,6 +76,45 @@ class GuardedReusableEffectAbAttr extends PostAttackAbAttr {
   override apply(_params: PostMoveInteractionAbAttrParams): void {
     this.state.applications++;
   }
+}
+
+class StructuredReusableEffectAbAttr extends AbAttr {
+  private readonly rules = [{ stat: Stat.ATK, stages: 1 }];
+  public readonly condition = () => true;
+
+  public getRules(): readonly { stat: Stat; stages: number }[] {
+    return this.rules;
+  }
+}
+
+class ParameterShapeReusableEffectAbAttr extends AbAttr {
+  public ability = AbilityId.BLAZE;
+  public statusMoveOnly = true;
+  public damageRatio = 8;
+  public turnCount = 0;
+  public reduction = 4;
+  public condition = null;
+  public message = "A configured message.";
+}
+
+class FlagMaskReusableEffectAbAttr extends AbAttr {
+  public filter = { flag: MoveFlags.PULSE_MOVE | MoveFlags.SLICING_MOVE };
+}
+
+class SetReusableEffectAbAttr extends AbAttr {
+  public effects = new Set([StatusEffect.BURN]);
+}
+
+class MapReusableEffectAbAttr extends AbAttr {
+  public terrainByType = new Map([[PokemonType.ELECTRIC, TerrainType.ELECTRIC]]);
+}
+
+class BattlerTagReusableEffectAbAttr extends AbAttr {
+  public tagType = BattlerTagType.CONFUSED;
+}
+
+class ArenaTagReusableEffectAbAttr extends AbAttr {
+  public tagType = ArenaTagType.TAILWIND;
 }
 
 class GenericRuntimeCapabilityAbAttr extends AbAttr {}
@@ -677,7 +723,129 @@ describe("Ability Studio", () => {
     const semantics = describeAbilityStudioComponent(source, source.attrs[0]);
     expect(semantics.label).toBe("Multiply a calculated stat");
     expect(semantics.summary).toContain(source.description);
+    expect(semantics.summary).toContain("Configured as");
     expect(semantics.parameters.some(parameter => parameter.value === "ATK")).toBe(true);
+  });
+
+  it("uses typed controls and valid ranges for reusable runtime parameters", () => {
+    const attr = new ParameterShapeReusableEffectAbAttr();
+    const parameters = abilityStudioRuntimeParameterEntries(attr, "ParameterShapeReusableEffectAbAttr");
+    expect(parameters.find(parameter => parameter.definition.path === "ability")?.definition.control).toBe("ability");
+    expect(parameters.find(parameter => parameter.definition.path === "statusMoveOnly")?.definition.control).toBe(
+      "boolean",
+    );
+    expect(parameters.find(parameter => parameter.definition.path === "damageRatio")?.definition).toMatchObject({
+      min: 1,
+      max: 999,
+    });
+    expect(parameters.find(parameter => parameter.definition.path === "turnCount")?.definition.min).toBe(0);
+    expect(parameters.find(parameter => parameter.definition.path === "reduction")?.definition).toMatchObject({
+      min: 0,
+      max: 99,
+    });
+    expect(parameters.find(parameter => parameter.definition.path === "message")?.definition.control).toBe("text");
+    expect(parameters.some(parameter => parameter.definition.path === "condition")).toBe(false);
+  });
+
+  it("round-trips combined move-flag masks through a multi-select", () => {
+    const attr = new FlagMaskReusableEffectAbAttr();
+    const parameters = abilityStudioRuntimeParameterEntries(attr, "HitMultiplierAbAttr");
+    expect(parameters.find(parameter => parameter.definition.path === "filter.flag")).toMatchObject({
+      definition: { control: "multi-select" },
+      value: [MoveFlags.PULSE_MOVE, MoveFlags.SLICING_MOVE],
+    });
+    applyAbilityStudioRuntimeParameterOverrides(attr, "HitMultiplierAbAttr", {
+      "filter.flag": [MoveFlags.PUNCHING_MOVE, MoveFlags.SLICING_MOVE],
+    });
+    expect(attr.filter.flag).toBe(MoveFlags.PUNCHING_MOVE | MoveFlags.SLICING_MOVE);
+  });
+
+  it("round-trips set and map configuration through typed fields", () => {
+    const setAttr = new SetReusableEffectAbAttr();
+    const setParameters = abilityStudioRuntimeParameterEntries(setAttr, "ConfusionOnStatusEffectAbAttr");
+    expect(setParameters.find(parameter => parameter.definition.path === "effects")).toMatchObject({
+      definition: { control: "multi-select" },
+      value: [StatusEffect.BURN],
+    });
+    applyAbilityStudioRuntimeParameterOverrides(setAttr, "ConfusionOnStatusEffectAbAttr", {
+      effects: [StatusEffect.PARALYSIS],
+    });
+    expect(setAttr.effects).toEqual(new Set([StatusEffect.PARALYSIS]));
+
+    const mapAttr = new MapReusableEffectAbAttr();
+    const mapParameters = abilityStudioRuntimeParameterEntries(mapAttr, "PostAttackSetTerrainByMoveTypeAbAttr");
+    expect(
+      mapParameters.find(parameter => parameter.definition.path === "terrainByType.0.key")?.definition.control,
+    ).toBe("select");
+    expect(
+      mapParameters.find(parameter => parameter.definition.path === "terrainByType.0.value")?.definition.control,
+    ).toBe("select");
+    applyAbilityStudioRuntimeParameterOverrides(mapAttr, "PostAttackSetTerrainByMoveTypeAbAttr", {
+      "terrainByType.0.key": PokemonType.GRASS,
+      "terrainByType.0.value": TerrainType.GRASSY,
+    });
+    expect(mapAttr.terrainByType).toEqual(new Map([[PokemonType.GRASS, TerrainType.GRASSY]]));
+  });
+
+  it("keeps battler-tag and arena-tag parameter domains separate", () => {
+    const battlerAttr = new BattlerTagReusableEffectAbAttr();
+    const battlerParameter = abilityStudioRuntimeParameterEntries(battlerAttr, "PostSummonAddBattlerTagAbAttr").find(
+      parameter => parameter.definition.path === "tagType",
+    );
+    expect(battlerParameter?.definition.options?.some(option => option.value === BattlerTagType.CONFUSED)).toBe(true);
+    expect(battlerParameter?.definition.options?.some(option => option.value === ArenaTagType.TAILWIND)).toBe(false);
+
+    const arenaAttr = new ArenaTagReusableEffectAbAttr();
+    const arenaParameter = abilityStudioRuntimeParameterEntries(arenaAttr, "PostSummonAddArenaTagAbAttr").find(
+      parameter => parameter.definition.path === "tagType",
+    );
+    expect(arenaParameter?.definition.options?.some(option => option.value === ArenaTagType.TAILWIND)).toBe(true);
+    expect(arenaParameter?.definition.options?.some(option => option.value === BattlerTagType.CONFUSED)).toBe(false);
+  });
+
+  it("parameterizes structured arrays without exposing callback implementation fields", () => {
+    const attr = new StructuredReusableEffectAbAttr();
+    const source = new AbBuilder(AbilityId.BLAZE, 3).build();
+    const semantics = describeAbilityStudioComponent(source, attr);
+    const parameters = abilityStudioRuntimeParameterEntries(attr, "StructuredReusableEffectAbAttr");
+    expect(semantics.summary).toContain("source-specific eligibility logic");
+    expect(semantics.sourceSpecific).toBe(true);
+    expect(parameters.map(parameter => parameter.definition.path)).toEqual(["rules.0.stat", "rules.0.stages"]);
+    expect(parameters.find(parameter => parameter.definition.path === "rules.0.stat")?.definition.control).toBe(
+      "select",
+    );
+    applyAbilityStudioRuntimeParameterOverrides(attr, "StructuredReusableEffectAbAttr", {
+      "rules.0.stat": Stat.SPD,
+      "rules.0.stages": 2,
+    });
+    expect(attr.getRules()).toEqual([{ stat: Stat.SPD, stages: 2 }]);
+  });
+
+  it("keeps mixed status and volatile-effect outcomes synchronized", () => {
+    const attr = new ChanceStatusOnAttackAbAttr({
+      chance: 30,
+      effects: [StatusEffect.BURN],
+      tags: [BattlerTagType.ER_FROSTBITE],
+    });
+    const parameters = abilityStudioRuntimeParameterEntries(attr, "ChanceStatusOnAttackAbAttr");
+    expect(parameters.find(parameter => parameter.definition.path === "effects")?.definition.control).toBe(
+      "multi-select",
+    );
+    expect(parameters.find(parameter => parameter.definition.path === "tags")?.value).toEqual([
+      BattlerTagType.ER_FROSTBITE,
+    ]);
+    expect(parameters.some(parameter => parameter.definition.path === "outcomes")).toBe(false);
+    applyAbilityStudioRuntimeParameterOverrides(attr, "ChanceStatusOnAttackAbAttr", {
+      effects: [StatusEffect.PARALYSIS],
+      tags: [BattlerTagType.CONFUSED],
+    });
+    const configured = attr as unknown as {
+      outcomes: readonly { kind: "status" | "tag"; value: StatusEffect | BattlerTagType }[];
+    };
+    expect(configured.outcomes).toEqual([
+      { kind: "status", value: StatusEffect.PARALYSIS },
+      { kind: "tag", value: BattlerTagType.CONFUSED },
+    ]);
   });
 
   it("exposes and applies typed scripted-move parameters", () => {
@@ -687,11 +855,10 @@ describe("Ability Studio", () => {
     expect(parameters.find(parameter => parameter.definition.path === "opts.power")?.definition.optional).toBe(true);
     expect(parameters.some(parameter => parameter.definition.path === "opts")).toBe(false);
     applyAbilityStudioRuntimeParameterOverrides(attr, "PostSummonScriptedMoveAbAttr", {
-      "opts.moveId": MoveId.FLAMETHROWER,
-      "opts.power": 60,
+      "opts.moveId": MoveId.PAIN_SPLIT,
     });
-    expect(attr.getMoveId()).toBe(MoveId.FLAMETHROWER);
-    expect(attr.getPower()).toBe(60);
+    expect(attr.getMoveId()).toBe(MoveId.PAIN_SPLIT);
+    expect(attr.getPower()).toBeUndefined();
 
     const itemLostAttr = new PostItemLostScriptedMoveAbAttr({ moveId: MoveId.THIEF });
     const itemLostParameters = abilityStudioRuntimeParameterEntries(itemLostAttr, "PostItemLostScriptedMoveAbAttr");

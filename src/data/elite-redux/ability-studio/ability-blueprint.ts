@@ -459,7 +459,7 @@ function validateRuntimeSource(value: unknown, path: string, errors: string[]): 
       errors.push(`${path}.parameterOverrides must contain at most 32 parameters`);
     } else {
       for (const [parameterPath, parameterValue] of Object.entries(value.parameterOverrides)) {
-        if (!/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*){0,3}$/.test(parameterPath)) {
+        if (!/^[A-Za-z][A-Za-z0-9]*(?:\.(?:[A-Za-z][A-Za-z0-9]*|\d+)){0,5}$/.test(parameterPath)) {
           errors.push(`${path}.parameterOverrides has invalid path ${parameterPath}`);
         } else if (!isAbilityStudioRuntimeParameterValue(parameterValue)) {
           errors.push(`${path}.parameterOverrides.${parameterPath} has an invalid value`);

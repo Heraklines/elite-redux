@@ -72,6 +72,7 @@ const parameterControls = new Set([
   "number",
   "number-list",
   "boolean",
+  "ability",
   "move",
   "move-list",
   "select",
@@ -84,7 +85,7 @@ function validSemanticParameter(parameter) {
     !parameter
     || typeof parameter.key !== "string"
     || typeof parameter.path !== "string"
-    || !/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*){0,3}$/.test(parameter.path)
+    || !/^[A-Za-z][A-Za-z0-9]*(?:\.(?:[A-Za-z][A-Za-z0-9]*|\d+)){0,5}$/.test(parameter.path)
     || typeof parameter.label !== "string"
     || typeof parameter.value !== "string"
     || !parameterControls.has(parameter.control)
@@ -106,6 +107,49 @@ function validSemanticParameter(parameter) {
     return false;
   }
   return true;
+}
+
+function validateParameterValue(parameter, context, abilityIds, moveIds) {
+  if (parameter.editable && !Object.hasOwn(parameter, "rawValue") && !parameter.optional) {
+    failures.push(`${context}: required editable parameter ${parameter.path} has no source value`);
+  }
+  if (/^Custom .* from /i.test(String(parameter.value))) {
+    failures.push(`${context}: callback implementation leaked into parameter ${parameter.path}`);
+  }
+  if (["outcomes", "hasTagOutcomes", "reductionAmount"].includes(parameter.path.split(".").at(-1))) {
+    failures.push(`${context}: derived parameter ${parameter.path} must not be independently editable`);
+  }
+  if (!Object.hasOwn(parameter, "rawValue") || parameter.rawValue === null) {
+    return;
+  }
+  const values = Array.isArray(parameter.rawValue) ? parameter.rawValue : [parameter.rawValue];
+  if (
+    ["select", "multi-select"].includes(parameter.control)
+    && values.some(value => !parameter.options.some(option => option.value === value))
+  ) {
+    failures.push(`${context}: ${parameter.path} has a source value outside its options`);
+  }
+  if (
+    ["number", "number-list"].includes(parameter.control)
+    && values.some(
+      value =>
+        typeof value !== "number"
+        || !Number.isFinite(value)
+        || (parameter.min !== undefined && value < parameter.min)
+        || (parameter.max !== undefined && value > parameter.max),
+    )
+  ) {
+    failures.push(`${context}: ${parameter.path} has a source value outside its numeric range`);
+  }
+  if (parameter.control === "ability" && values.some(value => !abilityIds.has(Number(value)))) {
+    failures.push(`${context}: ${parameter.path} references an unknown ability`);
+  }
+  if (
+    ["move", "move-list"].includes(parameter.control)
+    && values.some(value => Number(value) !== 0 && !moveIds.has(Number(value)))
+  ) {
+    failures.push(`${context}: ${parameter.path} references an unknown move`);
+  }
 }
 
 const starters = requireArray("species.json", 600);
@@ -241,6 +285,7 @@ if (mechanicCount < 1_000) {
 let componentRuleCount = 0;
 let componentPackageCount = 0;
 const componentsByAbility = new Map(abilityComponents.map(ability => [ability.id, ability]));
+const parameterControlsBySourcePath = new Map();
 for (const ability of abilityComponents) {
   if (!ability.name || typeof ability.description !== "string" || !Array.isArray(ability.rules)) {
     failures.push(`ability-components.json: incomplete ability ${ability.id}`);
@@ -284,6 +329,24 @@ for (const ability of abilityComponents) {
       )
     ) {
       failures.push(`ability-components.json: invalid component rule for ${ability.name}`);
+    }
+    const parameterPaths = new Set();
+    for (const parameter of rule.parameters) {
+      const context = `ability-components.json: ${ability.name} ${rule.source.attrType}`;
+      if (parameterPaths.has(parameter.path)) {
+        failures.push(`${context}: duplicate parameter path ${parameter.path}`);
+      }
+      parameterPaths.add(parameter.path);
+      validateParameterValue(parameter, context, abilityById, moveById);
+      const controlKey = `${rule.source.attrType}|${parameter.path}`;
+      const priorControl = parameterControlsBySourcePath.get(controlKey);
+      if (priorControl !== undefined && priorControl !== parameter.control) {
+        failures.push(`${context}: ${parameter.path} changes control from ${priorControl} to ${parameter.control}`);
+      }
+      parameterControlsBySourcePath.set(controlKey, parameter.control);
+    }
+    if (rule.effects.some(effect => typeof effect.sourceSpecific !== "boolean")) {
+      failures.push(`ability-components.json: ${ability.name} has an effect without source-specific metadata`);
     }
     if (rule.scope === "package") {
       componentPackageCount++;

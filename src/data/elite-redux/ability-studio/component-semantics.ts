@@ -43,6 +43,7 @@ export interface AbilityStudioComponentSemantics {
   readonly label: string;
   readonly summary: string;
   readonly scope: "primitive" | "package";
+  readonly sourceSpecific: boolean;
   readonly parameters: readonly AbilityStudioSemanticParameter[];
 }
 
@@ -97,11 +98,21 @@ const OPERATION_LABELS: Readonly<Record<string, string>> = {
   StabAddAbAttr: "Add same-type attack bonus for another type",
   StabBoostAbAttr: "Increase same-type attack bonus",
   StabSuppressAuraAbAttr: "Suppress an opposing same-type attack bonus aura",
+  AiMovegenMoveStatsAbAttr: "Adjust AI-generated move scoring",
+  ConditionalAlwaysHitAbAttr: "Make matching moves always hit",
+  ConditionalCritAbAttr: "Make matching moves critical hits",
+  EntryEffectAbAttr: "Apply an entry effect",
+  HitMultiplierAbAttr: "Change the number of hits",
+  HitMultiplierPowerAbAttr: "Change multi-hit move power",
+  OffensiveTypeChartOverrideAbAttr: "Override a type matchup",
+  PostSummonMessageAbAttr: "Show an entry message",
+  PreventItemUseAbAttr: "Prevent item use",
 };
 
 function words(value: string): string {
   return value
     .replace(/AbAttr$/, "")
+    .replace(/[_-]+/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
     .replace(/\bHp\b/g, "HP")
@@ -210,11 +221,16 @@ function semanticNumber(key: string, value: number, attrType: string): string {
   if (normalized === "stages" || normalized.endsWith("stages")) {
     return `${value > 0 ? "+" : ""}${value}`;
   }
-  if (normalized.includes("threshold") || normalized.endsWith("pct") || normalized.endsWith("ratio")) {
-    return value >= 0 && value <= 1 ? `${Number((value * 100).toFixed(2))}%` : String(value);
-  }
-  if (normalized === "healratio") {
+  if (normalized.endsWith("ratio") && value > 1) {
     return `1/${value} max HP`;
+  }
+  if (
+    normalized.includes("threshold")
+    || normalized.endsWith("pct")
+    || normalized.endsWith("ratio")
+    || normalized.endsWith("fraction")
+  ) {
+    return value >= 0 && value <= 1 ? `${Number((value * 100).toFixed(2))}%` : String(value);
   }
   return String(value);
 }
@@ -287,22 +303,81 @@ function semanticParameters(ability: Ability, attr: AbAttr): AbilityStudioSemant
   });
 }
 
+function semanticOperationLabel(type: string, parameters: readonly AbilityStudioSemanticParameter[]): string {
+  if (type === "EntryEffectAbAttr") {
+    const kind = parameters.find(parameter => parameter.path === "effect.kind")?.value;
+    return kind ? `On entry: ${parameterLabel(kind)}` : OPERATION_LABELS.EntryEffectAbAttr;
+  }
+  if (type === "OnFaintEffectAbAttr") {
+    const kind = parameters.find(parameter => parameter.path === "effect.kind")?.value;
+    return kind ? `On faint: ${parameterLabel(kind)}` : "Apply a fainting effect";
+  }
+  return operationLabel(type);
+}
+
+function semanticConfiguration(parameters: readonly AbilityStudioSemanticParameter[]): string {
+  const visible = parameters.filter(
+    parameter =>
+      parameter.value !== "Optional; uses the source setting"
+      && !["None", "No"].includes(parameter.value)
+      && !/^(Internal|Source|Runtime)\b/i.test(parameter.label),
+  );
+  if (visible.length === 0) {
+    return "";
+  }
+  const values = visible.slice(0, 10).map(parameter => `${parameter.label}: ${parameter.value}`);
+  if (visible.length > values.length) {
+    values.push(
+      `${visible.length - values.length} more configured value${visible.length - values.length === 1 ? "" : "s"}`,
+    );
+  }
+  return values.join("; ");
+}
+
+function hasSourceSpecificLogic(value: unknown): boolean {
+  return containsSourceSpecificLogic(value, new WeakSet<object>(), true);
+}
+
+function containsSourceSpecificLogic(value: unknown, seen: WeakSet<object>, allowInstance: boolean): boolean {
+  if (typeof value === "function") {
+    return true;
+  }
+  if (value === null || typeof value !== "object" || seen.has(value)) {
+    return false;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.some(item => containsSourceSpecificLogic(item, seen, false));
+  }
+  if (!allowInstance && Object.getPrototypeOf(value) !== Object.prototype) {
+    return false;
+  }
+  return Object.values(value).some(item => containsSourceSpecificLogic(item, seen, false));
+}
+
 export function describeAbilityStudioComponent(ability: Ability, attr: AbAttr): AbilityStudioComponentSemantics {
   const type = abilityStudioRuntimeClassChain(attr)[0];
   const parameters = semanticParameters(ability, attr);
+  const sourceSpecific = hasSourceSpecificLogic(attr);
   if (attr instanceof AbilityStudioSourceAbilityAbAttr) {
     return {
       label: `${ability.name} direct engine integration`,
       summary: `Reuse every direct engine check tied to ${ability.name}. ${ability.description}`,
       scope: "package",
+      sourceSpecific: true,
       parameters,
     };
   }
-  const label = attr instanceof AbilityStudioRuntimeCapabilityAbAttr ? attr.componentLabel : operationLabel(type);
+  const label =
+    attr instanceof AbilityStudioRuntimeCapabilityAbAttr
+      ? attr.componentLabel
+      : semanticOperationLabel(type, parameters);
+  const configuration = semanticConfiguration(parameters);
   return {
     label,
-    summary: `From ${ability.name}: ${ability.description}`,
+    summary: `${label}.${configuration ? ` Configured as ${configuration}.` : ""}${sourceSpecific ? " Keeps the source-specific eligibility logic." : ""} From ${ability.name}: ${ability.description}`,
     scope: "primitive",
+    sourceSpecific,
     parameters,
   };
 }

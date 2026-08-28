@@ -779,35 +779,50 @@ function validateRuntimeComponentRule(value: unknown, path: string, ownId: numbe
   }
   for (let index = 0; index < value.conditions.length; index++) {
     const condition = value.conditions[index];
-    const sourceError = validateRuntimeComponentSource(condition, `${path}.conditions[${index}]`, ownId);
-    if (sourceError) {
-      return sourceError;
-    }
-    if (!isPlainObject(condition) || !["ability", "holder", "event"].includes(condition.kind as string)) {
-      return `${path}.conditions[${index}].kind: invalid`;
-    }
-    if (
-      condition.kind === "ability"
-      && (!Number.isInteger(condition.conditionIndex)
-        || (condition.conditionIndex as number) < 0
-        || (condition.conditionIndex as number) > 63)
-    ) {
-      return `${path}.conditions[${index}].conditionIndex: invalid`;
+    if (isPlainObject(condition) && "abilityId" in condition) {
+      const sourceError = validateRuntimeComponentSource(condition, `${path}.conditions[${index}]`, ownId);
+      if (sourceError) {
+        return sourceError;
+      }
+      if (!["ability", "holder", "event"].includes(condition.kind as string)) {
+        return `${path}.conditions[${index}].kind: invalid`;
+      }
+      if (
+        condition.kind === "ability"
+        && (!Number.isInteger(condition.conditionIndex)
+          || (condition.conditionIndex as number) < 0
+          || (condition.conditionIndex as number) > 63)
+      ) {
+        return `${path}.conditions[${index}].conditionIndex: invalid`;
+      }
+    } else {
+      const conditionError = validateStudioCondition(condition, `${path}.conditions[${index}]`);
+      if (conditionError) {
+        return conditionError;
+      }
     }
   }
   if (!Array.isArray(value.effects) || value.effects.length === 0 || value.effects.length > 8) {
     return `${path}.effects: must contain 1-8 entries`;
   }
   for (let index = 0; index < value.effects.length; index++) {
-    const sourceError = validateRuntimeComponentSource(value.effects[index], `${path}.effects[${index}]`, ownId);
-    if (sourceError) {
-      return sourceError;
+    const effect = value.effects[index];
+    if (isPlainObject(effect) && "abilityId" in effect) {
+      const sourceError = validateRuntimeComponentSource(effect, `${path}.effects[${index}]`, ownId);
+      if (sourceError) {
+        return sourceError;
+      }
+    } else {
+      const effectError = validateStudioEffect(effect, "after-attack", `${path}.effects[${index}]`);
+      if (effectError) {
+        return effectError;
+      }
     }
   }
   return null;
 }
 
-function validateCustomAbilitiesDelta(delta: unknown): ValidationResult {
+export function validateCustomAbilitiesDelta(delta: unknown): ValidationResult {
   if (!isPlainObject(delta)) {
     return { ok: false, error: "delta must be an object" };
   }

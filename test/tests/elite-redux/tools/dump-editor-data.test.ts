@@ -126,7 +126,7 @@ function mechanicHook(
   }
   return {
     id,
-    label: `During ${mechanicLabel(chain[0])}`,
+    label: `While applying ${mechanicLabel(chain[0])}`,
     mode: "calculation",
   };
 }
@@ -506,6 +506,7 @@ describe("tools — dump editor SPA data", () => {
             label: semantics.label,
             summary: semantics.summary,
             scope: semantics.scope,
+            sourceSpecific: semantics.sourceSpecific,
             parameters: semantics.parameters,
             trigger: hook.label,
             conditioned: attr.getCondition() !== null || ability.conditions.length > 0,
@@ -594,6 +595,7 @@ describe("tools — dump editor SPA data", () => {
                 label,
                 summary: semantics.summary,
                 scope: semantics.scope,
+                sourceSpecific: semantics.sourceSpecific,
                 parameters: semantics.parameters,
                 kind: applyOwner === "AbAttr" ? "capability" : "effect",
                 sourceOwner: applyOwner,

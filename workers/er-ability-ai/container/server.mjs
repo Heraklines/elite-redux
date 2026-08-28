@@ -776,6 +776,7 @@ function validateParameterOverrides(source, parameters, payload, label) {
   }
   const definitions = new Map((parameters || []).map(parameter => [parameter.path || parameter.key, parameter]));
   const moveIds = new Set((payload.moveIndex || []).map(move => Number(move.id)));
+  const abilityIds = new Set((payload.abilityIndex || []).map(ability => Number(ability.id)));
   for (const [path, value] of Object.entries(overrides)) {
     const parameter = definitions.get(path);
     const options = parameter?.options || payload.componentOptionSets?.[parameter?.optionsRef] || [];
@@ -788,7 +789,11 @@ function validateParameterOverrides(source, parameters, payload, label) {
       }
       continue;
     }
-    if (parameter.control === "move") {
+    if (parameter.control === "ability") {
+      if (!Number.isInteger(value) || !abilityIds.has(value)) {
+        throw new Error(`${label}.${path} is not an available ability id`);
+      }
+    } else if (parameter.control === "move") {
       if (!Number.isInteger(value) || !moveIds.has(value)) {
         throw new Error(`${label}.${path} is not an available move id`);
       }
@@ -830,6 +835,10 @@ function validateParameterOverrides(source, parameters, payload, label) {
     } else if (parameter.control === "multi-select") {
       if (!Array.isArray(value) || value.some(item => !options.some(option => option.value === item))) {
         throw new Error(`${label}.${path} contains an unavailable option`);
+      }
+    } else if (parameter.control === "text") {
+      if (typeof value !== "string" || value.length > 500) {
+        throw new Error(`${label}.${path} must be text`);
       }
     } else {
       throw new Error(`${label}.${path} is not safely configurable`);
@@ -1665,13 +1674,10 @@ function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix catalog component selections with configurable primitive conditions and effects. Prefer primitive rules whenever PRIMITIVE CATALOG expresses the requested mechanic exactly. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher. Use includes only when the user explicitly wants the complete existing ability.
 
-The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId and selectableParts. A component is valid as a hook only when selectableParts.hook is true. A condition or effect partIndex must appear in selectableParts.conditionIndexes or selectableParts.effectIndexes for that role. For hooks set partIndex to null. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId and selectableParts. A component is valid as a hook only when selectableParts.hook is true. A condition or effect partIndex must appear in selectableParts.conditionIndexes or selectableParts.effectIndexes for that role. For hooks set partIndex to null. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Ability parameters must use an id from the ability matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
 Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
 ${isPrimitiveStatRuleRequest(payload) ? "This request is fully expressible as a primitive stat-stage rule. Leave componentRules empty and implement it only in draft.rules." : ""}
-
-CURRENT DRAFT (optional reference only):
-${JSON.stringify(payload.currentBlueprint || null)}
 
 PRIMITIVE CATALOG:
 ${JSON.stringify(payload.primitiveCatalog)}

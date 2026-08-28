@@ -1,5 +1,6 @@
 import type { AbAttr } from "#abilities/ab-attrs";
 import { TerrainType } from "#data/terrain";
+import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
@@ -33,6 +34,7 @@ export interface AbilityStudioRuntimeParameterDefinition {
     | "number"
     | "number-list"
     | "boolean"
+    | "ability"
     | "move"
     | "move-list"
     | "select"
@@ -54,6 +56,14 @@ export interface AbilityStudioRuntimeParameterEntry {
 const OMITTED_PARAMETERS = new Set([
   "showAbility",
   "extraCondition",
+  "onChange",
+  "outcomes",
+  "hasTagOutcomes",
+  "reductionAmount",
+  "oncePerBattleKey",
+  "erMetaKind",
+  "provenanceKey",
+  "i18nKey",
   "componentLabel",
   "componentHookId",
   "componentHookLabel",
@@ -66,7 +76,7 @@ const OMITTED_PARAMETERS = new Set([
 const INTERNAL_STATE_KEYS =
   /^(active|applied|cached|consumed|current|fired|last|pending|satisfied|state|triggered|used|warned)/i;
 
-const SCRIPTED_MOVE_PARAMETERS: Readonly<
+const PARAMETER_OVERRIDES: Readonly<
   Record<string, Readonly<Record<string, Partial<AbilityStudioRuntimeParameterDefinition>>>>
 > = {
   PostAttackScriptedMoveAbAttr: {
@@ -130,12 +140,197 @@ const SCRIPTED_MOVE_PARAMETERS: Readonly<
     "opts.moveId": { control: "move", editable: true },
     "opts.power": { control: "number", editable: true, optional: true, min: 0, max: 999, step: 1 },
   },
+  ChanceStatusOnAttackAbAttr: {
+    tags: {
+      control: "multi-select",
+      editable: true,
+      optional: true,
+      options: enumOptions(BattlerTagType),
+    },
+  },
+  ChanceStatusOnHitAbAttr: {
+    tags: {
+      control: "multi-select",
+      editable: true,
+      optional: true,
+      options: enumOptions(BattlerTagType),
+    },
+  },
+  PostAttackApplyBattlerTagAbAttr: {
+    effects: {
+      control: "multi-select",
+      editable: true,
+      options: enumOptions(BattlerTagType),
+    },
+  },
+  PostAttackChangeTargetTypeAbAttr: {
+    newType: {
+      control: "select",
+      editable: true,
+      options: [...enumOptions(PokemonType), { value: "moveType", label: "Move's current type" }],
+    },
+  },
+  PostFaintDeferredReviveAbAttr: {
+    requireTerrain: {
+      control: "multi-select",
+      editable: true,
+      optional: true,
+      options: enumOptions(TerrainType),
+    },
+    requireWeather: {
+      control: "multi-select",
+      editable: true,
+      optional: true,
+      options: enumOptions(WeatherType),
+    },
+  },
+  PostTurnDrainAbAttr: {
+    weather: {
+      control: "multi-select",
+      editable: true,
+      optional: true,
+      options: enumOptions(WeatherType),
+    },
+  },
+  PostTurnHurtNonTypedAbAttr: {
+    requiredWeathers: {
+      control: "multi-select",
+      editable: true,
+      optional: true,
+      options: enumOptions(WeatherType),
+    },
+  },
+  HitMultiplierAbAttr: {
+    "filter.flag": {
+      control: "multi-select",
+      editable: true,
+      options: moveFlagOptions(),
+    },
+  },
+  HitMultiplierPowerAbAttr: {
+    "powerFilter.flag": {
+      control: "multi-select",
+      editable: true,
+      options: moveFlagOptions(),
+    },
+  },
+  RepeatMovePowerBoostAbAttr: {
+    cap: {
+      control: "number",
+      editable: true,
+      optional: true,
+      min: 0,
+      max: 10,
+      step: 0.05,
+    },
+  },
+  ChanceBattlerTagOnAttackAbAttr: {
+    targetHasTag: {
+      control: "select",
+      editable: true,
+      optional: true,
+      options: enumOptions(BattlerTagType),
+    },
+  },
+  DefenseStatSwapOnFlagAbAttr: {
+    "opts.swap": {
+      control: "select",
+      editable: true,
+      options: literalOptions(["target-spdef-instead-of-def", "target-def-instead-of-spdef", "target-lower-defense"]),
+    },
+  },
+  EntryArenaTagOnFoeSideAbAttr: {
+    side: { control: "select", editable: true, options: literalOptions(["foe", "self"]) },
+    tag: { control: "select", editable: true, options: enumOptions(ArenaTagType) },
+  },
+  EntryEffectAbAttr: {
+    "effect.hazard": { control: "select", editable: true, options: enumOptions(ArenaTagType) },
+    "effect.side": { control: "select", editable: true, options: literalOptions(["foe", "self", "both"]) },
+    "effect.tag": { control: "select", editable: true, options: enumOptions(ArenaTagType) },
+  },
+  EntryTrapOnFoeSideAbAttr: {
+    side: { control: "select", editable: true, options: literalOptions(["foe", "self"]) },
+  },
+  LifestealOnHitAbAttr: {
+    "hitFilter.targetTag": {
+      control: "select",
+      editable: true,
+      optional: true,
+      options: enumOptions(BattlerTagType),
+    },
+  },
+  MoveFlagInjectionAbAttr: {
+    scope: {
+      control: "select",
+      editable: true,
+      options: literalOptions(["kicking-moves", "sound-moves", "dance-moves", "status-moves", "all-attacks"]),
+    },
+  },
+  PostAttackSetHazardByMoveTypeAbAttr: {
+    tagType: { control: "select", editable: true, options: enumOptions(ArenaTagType) },
+  },
+  PostDefendHpGatedStatStageChangeAbAttr: {
+    guardTag: {
+      control: "select",
+      editable: true,
+      optional: true,
+      options: enumOptions(BattlerTagType),
+    },
+  },
+  PostSummonAddArenaTagAbAttr: {
+    tagType: { control: "select", editable: true, options: enumOptions(ArenaTagType) },
+  },
+  PostSummonRemoveArenaTagAbAttr: {
+    sideMode: { control: "select", editable: true, options: literalOptions(["both", "own", "opponent"]) },
+  },
+  PostSummonRemoveBattlerTagAbAttr: {
+    immuneTags: { control: "multi-select", editable: true, options: enumOptions(BattlerTagType) },
+  },
+  SelfDamageOnAttackAbAttr: {
+    basis: { control: "select", editable: true, options: literalOptions(["maxHp", "damageDealt"]) },
+  },
+  SetArenaTagOnHitAbAttr: {
+    side: { control: "select", editable: true, options: literalOptions(["self", "attacker", "both"]) },
+    tagType: { control: "select", editable: true, options: enumOptions(ArenaTagType) },
+  },
+  SpeedBonusToStatAbAttr: {
+    "bonusFilter.contact": { control: "select", editable: true, options: literalOptions(["only", "non"]) },
+  },
+  StatChangeOnCategoryAttackAbAttr: {
+    target: { control: "select", editable: true, options: literalOptions(["self", "opponent"]) },
+  },
+  StatTriggerOnStatLoweredAbAttr: {
+    scope: { control: "select", editable: true, options: literalOptions(["self", "side"]) },
+  },
 };
 
 const PARAMETER_LABELS: Readonly<Record<string, string>> = {
   activateOnGain: "Also trigger when gained",
+  basis: "Self-damage basis",
+  "bonusFilter.contact": "Contact requirement",
+  "condition.kind": "Priority condition",
+  "conditionSpec.kind": "Recovery condition",
+  "damageCondition.kind": "Damage condition",
+  "effect.hazard": "Hazard",
+  "effect.kind": "Effect",
+  "effect.side": "Target side",
+  "effect.tag": "Field effect",
+  event: "Trigger",
+  "filterSpec.kind": "Damage filter",
+  "gate.kind": "Activation gate",
+  guardTag: "Suppress while holder has",
+  "hitFilter.targetTag": "Required target volatile effect",
+  immuneTags: "Removed volatile effects",
   moveId: "Move",
+  "outcome.kind": "Outcome",
   power: "Base power",
+  scope: "Affected scope",
+  side: "Target side",
+  sideMode: "Affected sides",
+  "source.kind": "Converted move source",
+  targetFormKey: "Target form",
+  targetHasTag: "Required target volatile effect",
+  "usage.kind": "Usage limit",
   "opts.moveId": "Move",
   "opts.power": "Base power",
   "opts.categoryFilter": "Trigger move category",
@@ -151,10 +346,34 @@ const PARAMETER_LABELS: Readonly<Record<string, string>> = {
   "opts.alwaysHit": "Always hit",
   "opts.maxUsesPerBattle": "Maximum uses per battle",
   "opts.nonReflectable": "Cannot be reflected",
+  chance: "Activation chance (%)",
+  contactExcluded: "Only non-contact moves",
+  contactRequired: "Require contact",
+  critRequired: "Require a critical hit",
+  damageFraction: "Max HP damage fraction",
+  damageRatio: "Max HP damage denominator (1 / value)",
+  damageMultiplier: "Incoming damage multiplier",
+  effects: "Status outcomes",
+  firstTurnChance: "First-turn chance (%)",
+  fraction: "Max HP fraction",
+  healFraction: "Max HP healing fraction",
+  healRatio: "Max HP healing denominator (1 / value)",
+  hpFraction: "Max HP fraction",
+  lowHpThreshold: "Low HP threshold",
+  requireTerrain: "Required terrains",
+  requireWeather: "Required weather",
+  requiredWeathers: "Required weather",
+  safeTypes: "Immune types",
+  tags: "Volatile-effect outcomes",
+  turnCount: "Duration (turns; 0 uses the source default)",
+  turns: "Duration (turns)",
+  ability: "Ability",
+  abilityId: "Ability",
 };
 
 function words(value: string): string {
   return value
+    .replace(/[_-]+/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
     .replace(/\bHp\b/g, "HP")
@@ -169,9 +388,11 @@ function parameterLabel(path: string): string {
   if (explicit !== undefined) {
     return explicit;
   }
-  const key = path.split(".").at(-1) ?? path;
+  const segments = path.split(".");
+  const key = segments.at(-1) ?? path;
   const label = words(key);
-  return label.length > 0 ? `${label[0].toUpperCase()}${label.slice(1)}` : label;
+  const numbered = /^\d+$/.test(segments.at(-2) ?? "") ? ` ${Number(segments.at(-2)) + 1}` : "";
+  return label.length > 0 ? `${label[0].toUpperCase()}${label.slice(1)}${numbered}` : label;
 }
 
 function enumOptions(enumObject: object): AbilityStudioRuntimeParameterOption[] {
@@ -183,9 +404,11 @@ function enumOptions(enumObject: object): AbilityStudioRuntimeParameterOption[] 
     .map(([label, value]) => ({ value, label: words(label) }));
 }
 
-function tagOptions(): AbilityStudioRuntimeParameterOption[] {
-  const options = [...enumOptions(BattlerTagType), ...enumOptions(ArenaTagType)];
-  return options.filter((option, index) => options.findIndex(candidate => candidate.value === option.value) === index);
+function literalOptions(values: readonly string[]): AbilityStudioRuntimeParameterOption[] {
+  return values.map(value => {
+    const label = words(value);
+    return { value, label: label.length > 0 ? `${label[0].toUpperCase()}${label.slice(1)}` : label };
+  });
 }
 
 function moveFlagOptions(): AbilityStudioRuntimeParameterOption[] {
@@ -199,11 +422,23 @@ function moveFlagOptions(): AbilityStudioRuntimeParameterOption[] {
 
 function enumDefinition(path: string, value: unknown): Partial<AbilityStudioRuntimeParameterDefinition> | undefined {
   const key = (path.split(".").at(-1) ?? path).toLowerCase();
+  const scalarOrList =
+    value === undefined || value === null || validScalar(value) || (Array.isArray(value) && value.every(validScalar));
+  if (!scalarOrList) {
+    return;
+  }
   const multiple =
     Array.isArray(value)
     || key.endsWith("ids")
     || key.endsWith("types")
     || key.endsWith("stats")
+    || key.endsWith("statuses")
+    || key.endsWith("effects")
+    || key.endsWith("tags")
+    || key.endsWith("flags")
+    || key.endsWith("categories")
+    || key.endsWith("weathers")
+    || key.endsWith("terrains")
     || key === "typefilter";
   const optionControl = multiple ? "multi-select" : "select";
   if (key.includes("moveid") || key === "move" || key === "moves") {
@@ -227,8 +462,15 @@ function enumDefinition(path: string, value: unknown): Partial<AbilityStudioRunt
   if (key.includes("arenatag")) {
     return { control: optionControl, editable: true, options: enumOptions(ArenaTagType) };
   }
-  if (key === "tag" || key === "tagtype" || key.endsWith("tagtypes")) {
-    return { control: optionControl, editable: true, options: tagOptions() };
+  if (
+    key === "tag"
+    || key === "tags"
+    || key === "tagtype"
+    || key.endsWith("tag")
+    || key.endsWith("tags")
+    || key.endsWith("tagtypes")
+  ) {
+    return { control: optionControl, editable: true, options: enumOptions(BattlerTagType) };
   }
   if (key.includes("status") || key.includes("immuneeffect") || key === "effects") {
     return { control: optionControl, editable: true, options: enumOptions(StatusEffect) };
@@ -245,13 +487,74 @@ function enumDefinition(path: string, value: unknown): Partial<AbilityStudioRunt
   return;
 }
 
+function dynamicParameterOverride(
+  attrType: string,
+  path: string,
+): Partial<AbilityStudioRuntimeParameterDefinition> | undefined {
+  const key = path.split(".").at(-1)?.toLowerCase();
+  if (key === "ability" || key === "abilityid" || key?.endsWith("hasability")) {
+    return { control: "ability", editable: true };
+  }
+  if (attrType === "PostSummonStackSetEffectsAbAttr" && /^opts\.tags\.\d+\.type$/.test(path)) {
+    return { control: "select", editable: true, options: enumOptions(ArenaTagType) };
+  }
+  if (attrType === "PostSummonStackSetEffectsAbAttr" && /^opts\.tags\.\d+\.side$/.test(path)) {
+    return { control: "select", editable: true, options: enumOptions(ArenaTagSide) };
+  }
+  if (attrType === "PostAttackSetTerrainByMoveTypeAbAttr" && /^terrainByType\.\d+\.key$/.test(path)) {
+    return {
+      label: parameterLabel(path).replace("Key", "Move type"),
+      control: "select",
+      editable: true,
+      options: enumOptions(PokemonType),
+    };
+  }
+  if (attrType === "PostAttackSetTerrainByMoveTypeAbAttr" && /^terrainByType\.\d+\.value$/.test(path)) {
+    return {
+      label: parameterLabel(path).replace("Value", "Terrain"),
+      control: "select",
+      editable: true,
+      options: enumOptions(TerrainType),
+    };
+  }
+  if (key === "message") {
+    return { control: "text", editable: true };
+  }
+  return;
+}
+
+function nullablePathIsConfigurable(path: string): boolean {
+  const key = (path.split(".").at(-1) ?? path).toLowerCase();
+  return (
+    enumDefinition(path, null) !== undefined
+    || key.includes("chance")
+    || key.endsWith("percent")
+    || key.endsWith("pct")
+    || key.includes("multiplier")
+    || key === "mult"
+    || key === "factor"
+    || key.includes("power")
+    || key.includes("priority")
+    || key.includes("stage")
+    || key === "amount"
+    || key === "reduction"
+    || key.includes("turn")
+    || key.includes("uses")
+    || key.includes("strikes")
+    || key === "count"
+    || key.includes("ratio")
+    || key.includes("fraction")
+    || key.includes("threshold")
+  );
+}
+
 function numberDefinition(path: string, value: number | undefined): Partial<AbilityStudioRuntimeParameterDefinition> {
   const key = (path.split(".").at(-1) ?? path).toLowerCase();
   if (key.includes("chance") || key.endsWith("percent") || key.endsWith("pct")) {
     return { control: "number", editable: true, min: 0, max: 100, step: 1 };
   }
   if (key.includes("multiplier") || key === "mult" || key === "factor") {
-    return { control: "number", editable: true, min: 0, max: 10, step: 0.05 };
+    return { control: "number", editable: true, min: value !== undefined && value < 0 ? -10 : 0, max: 10, step: 0.05 };
   }
   if (key.includes("power")) {
     return { control: "number", editable: true, min: 0, max: 999, step: 1 };
@@ -262,10 +565,20 @@ function numberDefinition(path: string, value: number | undefined): Partial<Abil
   if (key.includes("stage") || key === "amount") {
     return { control: "number", editable: true, min: -12, max: 12, step: 1 };
   }
-  if (key.includes("turn") || key.includes("uses") || key.includes("strikes") || key === "count") {
-    return { control: "number", editable: true, min: 1, max: 99, step: 1 };
+  if (key === "reduction") {
+    return { control: "number", editable: true, min: 0, max: 99, step: 1 };
   }
-  if (key.includes("ratio") && value !== undefined && value >= 0 && value <= 1) {
+  if (key.includes("turn") || key.includes("uses") || key.includes("strikes") || key === "count") {
+    return { control: "number", editable: true, min: 0, max: 99, step: 1 };
+  }
+  if (key.includes("ratio") && value !== undefined && value > 1) {
+    return { control: "number", editable: true, min: 1, max: 999, step: 1 };
+  }
+  if (
+    key.includes("ratio")
+    || key.includes("fraction")
+    || (key.includes("threshold") && (value === undefined || (value >= 0 && value <= 1)))
+  ) {
     return { control: "number", editable: true, min: 0, max: 1, step: 0.01 };
   }
   return {
@@ -278,22 +591,21 @@ function numberDefinition(path: string, value: number | undefined): Partial<Abil
 }
 
 function parameterDefinition(path: string, value: unknown, optional = false): AbilityStudioRuntimeParameterDefinition {
-  const fromEnum = enumDefinition(path, value);
   const definition =
-    fromEnum
-    ?? (typeof value === "boolean"
+    typeof value === "boolean"
       ? { control: "boolean" as const, editable: true }
-      : typeof value === "number" || value === undefined
-        ? numberDefinition(path, typeof value === "number" ? value : undefined)
-        : Array.isArray(value) && value.every(item => typeof item === "number")
-          ? { control: "number-list" as const, editable: true }
-          : { control: "fixed" as const, editable: false });
+      : (enumDefinition(path, value)
+        ?? ((typeof value === "number" && Number.isFinite(value)) || value === undefined || value === null
+          ? numberDefinition(path, typeof value === "number" ? value : undefined)
+          : Array.isArray(value) && value.every(item => typeof item === "number")
+            ? { control: "number-list" as const, editable: true }
+            : { control: "fixed" as const, editable: false }));
   return {
     path,
     label: parameterLabel(path),
     control: definition.control ?? "fixed",
     editable: definition.editable ?? false,
-    optional,
+    optional: optional || value === null,
     ...(definition.min === undefined ? {} : { min: definition.min }),
     ...(definition.max === undefined ? {} : { max: definition.max }),
     ...(definition.step === undefined ? {} : { step: definition.step }),
@@ -333,7 +645,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function collectEntries(value: unknown, path: string, entries: AbilityStudioRuntimeParameterEntry[]): void {
-  if (path.split(".").some(key => OMITTED_PARAMETERS.has(key) || INTERNAL_STATE_KEYS.test(key))) {
+  if (path === "key" || path.split(".").some(key => OMITTED_PARAMETERS.has(key) || INTERNAL_STATE_KEYS.test(key))) {
     return;
   }
   if (isPlainRecord(value)) {
@@ -342,7 +654,50 @@ function collectEntries(value: unknown, path: string, entries: AbilityStudioRunt
     }
     return;
   }
+  if (value instanceof Set) {
+    collectEntries([...value], path, entries);
+    return;
+  }
+  if (value instanceof Map) {
+    collectEntries(
+      [...value].map(([key, mappedValue]) => ({ key, value: mappedValue })),
+      path,
+      entries,
+    );
+    return;
+  }
+  if (Array.isArray(value) && value.length > 0 && value.every(isPlainRecord)) {
+    value.forEach((child, index) => collectEntries(child, `${path}.${index}`, entries));
+    return;
+  }
+  if (typeof value === "function") {
+    return;
+  }
+  if (value === null && !nullablePathIsConfigurable(path)) {
+    return;
+  }
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return;
+  }
   entries.push({ definition: parameterDefinition(path, value), value });
+}
+
+function virtualParameterValues(attr: AbAttr, attrType: string): Readonly<Record<string, unknown>> {
+  if (attrType !== "ChanceStatusOnAttackAbAttr" && attrType !== "ChanceStatusOnHitAbAttr") {
+    return {};
+  }
+  const record = attr as unknown as Record<string, unknown>;
+  const outcomes = Array.isArray(record.outcomes) ? record.outcomes : [];
+  return {
+    tags: outcomes
+      .filter(
+        (outcome): outcome is { kind: "tag"; value: string | number } =>
+          isPlainRecord(outcome)
+          && outcome.kind === "tag"
+          && (typeof outcome.value === "string" || typeof outcome.value === "number"),
+      )
+      .map(outcome => outcome.value),
+  };
 }
 
 export function abilityStudioRuntimeParameterEntries(
@@ -357,24 +712,45 @@ export function abilityStudioRuntimeParameterEntries(
     collectEntries(value, key, entries);
   }
   const knownPaths = new Set(entries.map(entry => entry.definition.path));
-  const scriptedParameters = SCRIPTED_MOVE_PARAMETERS[attrType] ?? {};
-  for (const [path, override] of Object.entries(scriptedParameters)) {
+  const parameterOverrides = PARAMETER_OVERRIDES[attrType] ?? {};
+  const virtualValues = virtualParameterValues(attr, attrType);
+  for (const [path, override] of Object.entries(parameterOverrides)) {
     if (!knownPaths.has(path)) {
+      const value = virtualValues[path];
       entries.push({
-        definition: mergeParameterDefinition(parameterDefinition(path, undefined, true), override),
-        value: undefined,
+        definition: mergeParameterDefinition(parameterDefinition(path, value, true), override),
+        value,
       });
     }
   }
   return entries.map(entry => {
-    const override = scriptedParameters[entry.definition.path];
+    const override =
+      parameterOverrides[entry.definition.path] ?? dynamicParameterOverride(attrType, entry.definition.path);
+    const value = normalizeParameterValue(attrType, entry.definition.path, entry.value);
     return override === undefined
-      ? entry
+      ? { ...entry, value }
       : {
           ...entry,
+          value,
           definition: mergeParameterDefinition(entry.definition, override),
         };
   });
+}
+
+function normalizeParameterValue(attrType: string, path: string, value: unknown): unknown {
+  if (attrType === "RepeatMovePowerBoostAbAttr" && path === "cap" && value === Number.POSITIVE_INFINITY) {
+    return;
+  }
+  if (
+    typeof value === "number"
+    && ((attrType === "HitMultiplierAbAttr" && path === "filter.flag")
+      || (attrType === "HitMultiplierPowerAbAttr" && path === "powerFilter.flag"))
+  ) {
+    return moveFlagOptions()
+      .filter(option => typeof option.value === "number" && (value & option.value) === option.value)
+      .map(option => option.value);
+  }
+  return value;
 }
 
 function validScalar(value: unknown): value is string | number | boolean {
@@ -401,6 +777,9 @@ function overrideIsValid(
   }
   if (definition.control === "boolean") {
     return typeof value === "boolean";
+  }
+  if (definition.control === "ability") {
+    return typeof value === "number" && Number.isInteger(value) && value > 0;
   }
   if (definition.control === "number") {
     return (
@@ -439,16 +818,18 @@ function overrideIsValid(
   return definition.control === "text" && typeof value === "string";
 }
 
-function setParameterPath(
-  target: Record<string, unknown>,
-  path: string,
-  value: AbilityStudioRuntimeParameterValue,
-): void {
+function setParameterPath(target: Record<string, unknown>, path: string, value: unknown): void {
   const segments = path.split(".");
   let current = target;
-  for (const segment of segments.slice(0, -1)) {
+  for (const [index, segment] of segments.slice(0, -1).entries()) {
     const source = current[segment];
-    const clone = isPlainRecord(source) ? { ...source } : {};
+    const clone: Record<string, unknown> = Array.isArray(source)
+      ? ([...source] as unknown as Record<string, unknown>)
+      : isPlainRecord(source)
+        ? { ...source }
+        : /^\d+$/.test(segments[index + 1] ?? "")
+          ? ([] as unknown as Record<string, unknown>)
+          : {};
     current[segment] = clone;
     current = clone;
   }
@@ -458,6 +839,98 @@ function setParameterPath(
   } else {
     current[key] = Array.isArray(value) ? [...value] : value;
   }
+}
+
+function synchronizeDerivedParameters(
+  attr: AbAttr,
+  attrType: string,
+  overrides: Readonly<Record<string, AbilityStudioRuntimeParameterValue>>,
+): void {
+  if (attrType !== "ChanceStatusOnAttackAbAttr" && attrType !== "ChanceStatusOnHitAbAttr") {
+    return;
+  }
+  const record = attr as unknown as Record<string, unknown>;
+  const existingOutcomes = Array.isArray(record.outcomes) ? record.outcomes : [];
+  const effects = Array.isArray(record.effects)
+    ? record.effects.filter((value): value is string | number => typeof value === "string" || typeof value === "number")
+    : [];
+  const tags = Object.hasOwn(overrides, "tags")
+    ? Array.isArray(record.tags)
+      ? record.tags.filter((value): value is string | number => typeof value === "string" || typeof value === "number")
+      : []
+    : existingOutcomes
+        .filter(
+          (outcome): outcome is { kind: "tag"; value: string | number } =>
+            isPlainRecord(outcome)
+            && outcome.kind === "tag"
+            && (typeof outcome.value === "string" || typeof outcome.value === "number"),
+        )
+        .map(outcome => outcome.value);
+  record.outcomes = [
+    ...effects.map(value => ({ kind: "status", value })),
+    ...tags.map(value => ({ kind: "tag", value })),
+  ];
+  if (attrType === "ChanceStatusOnHitAbAttr") {
+    record.hasTagOutcomes = tags.length > 0;
+  }
+}
+
+function denormalizeParameterValue(
+  attr: AbAttr,
+  attrType: string,
+  path: string,
+  value: AbilityStudioRuntimeParameterValue,
+): unknown {
+  if (
+    Array.isArray(value)
+    && ((attrType === "HitMultiplierAbAttr" && path === "filter.flag")
+      || (attrType === "HitMultiplierPowerAbAttr" && path === "powerFilter.flag"))
+  ) {
+    return value.reduce((mask, flag) => mask | Number(flag), 0);
+  }
+  const existing = (attr as unknown as Record<string, unknown>)[path];
+  if (existing instanceof Set && Array.isArray(value)) {
+    return new Set(value);
+  }
+  return value;
+}
+
+function applyMapParameterOverrides(
+  attr: AbAttr,
+  attrType: string,
+  overrides: Readonly<Record<string, AbilityStudioRuntimeParameterValue>>,
+): ReadonlySet<string> {
+  if (attrType !== "PostAttackSetTerrainByMoveTypeAbAttr") {
+    return new Set();
+  }
+  const paths = Object.keys(overrides).filter(path => /^terrainByType\.\d+\.(?:key|value)$/.test(path));
+  if (paths.length === 0) {
+    return new Set();
+  }
+  const record = attr as unknown as Record<string, unknown>;
+  const source = record.terrainByType;
+  if (!(source instanceof Map)) {
+    throw new Error(`invalid Ability Studio map source ${attrType}.terrainByType`);
+  }
+  const holder: Record<string, unknown> = {
+    terrainByType: [...source].map(([key, mappedValue]) => ({ key, value: mappedValue })),
+  };
+  for (const path of paths) {
+    setParameterPath(holder, path, overrides[path]);
+  }
+  const rows = holder.terrainByType;
+  if (!Array.isArray(rows)) {
+    throw new Error(`invalid Ability Studio map override ${attrType}.terrainByType`);
+  }
+  record.terrainByType = new Map(
+    rows.map(row => {
+      if (!isPlainRecord(row) || typeof row.key !== "number" || typeof row.value !== "number") {
+        throw new Error(`invalid Ability Studio map row ${attrType}.terrainByType`);
+      }
+      return [row.key, row.value];
+    }),
+  );
+  return new Set(paths);
 }
 
 export function applyAbilityStudioRuntimeParameterOverrides(
@@ -476,6 +949,17 @@ export function applyAbilityStudioRuntimeParameterOverrides(
     if (definition === undefined || !overrideIsValid(definition, value)) {
       throw new Error(`invalid Ability Studio parameter override ${attrType}.${path}`);
     }
-    setParameterPath(attr as unknown as Record<string, unknown>, path, value);
   }
+  const appliedMapPaths = applyMapParameterOverrides(attr, attrType, overrides);
+  for (const [path, value] of Object.entries(overrides)) {
+    if (appliedMapPaths.has(path)) {
+      continue;
+    }
+    setParameterPath(
+      attr as unknown as Record<string, unknown>,
+      path,
+      denormalizeParameterValue(attr, attrType, path, value),
+    );
+  }
+  synchronizeDerivedParameters(attr, attrType, overrides);
 }

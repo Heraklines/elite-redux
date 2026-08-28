@@ -392,7 +392,6 @@
         {
           requestId: aiState.requestId,
           prompt,
-          currentBlueprint: currentEntry() ? clone(currentEntry()) : null,
           primitiveCatalog,
           abilityIndex: aiAbilityContext(),
           componentCandidates,
@@ -1043,9 +1042,29 @@
     return movesByName.get(normalized.toLowerCase())?.id;
   }
 
+  function abilityLabel(id) {
+    const ability = componentsByAbility.get(Number(id));
+    return ability ? `${ability.name} #${ability.id}` : Number.isInteger(Number(id)) ? `Ability #${id}` : "";
+  }
+
+  function parseAbility(value) {
+    const normalized = String(value || "").trim();
+    const explicitId = normalized.match(/#(\d+)$/)?.[1] || (/^\d+$/.test(normalized) ? normalized : "");
+    if (explicitId && componentsByAbility.has(Number(explicitId))) {
+      return Number(explicitId);
+    }
+    return componentCatalog.find(ability => ability.name.toLowerCase() === normalized.toLowerCase())?.id;
+  }
+
   function runtimeMoveDatalistHtml() {
     return `<datalist id="as-runtime-moves">${moveCatalog
       .map(move => `<option value="${esc(`${move.name} #${move.id}`)}"></option>`)
+      .join("")}</datalist>`;
+  }
+
+  function runtimeAbilityDatalistHtml() {
+    return `<datalist id="as-runtime-abilities">${componentCatalog
+      .map(ability => `<option value="${esc(`${ability.name} #${ability.id}`)}"></option>`)
       .join("")}</datalist>`;
   }
 
@@ -1059,7 +1078,9 @@
     const prefix = `data-as-runtime-parameter="${esc(path)}" data-as-runtime-part="${part}" data-as-component-rule="${ruleIndex}" data-as-runtime-index="${itemIndex}" data-as-runtime-control="${esc(parameter.control)}"`;
     const sourceValue = parameter.rawValue === undefined ? "default" : parameter.value;
     let control = "";
-    if (parameter.control === "move") {
+    if (parameter.control === "ability") {
+      control = `<input type="search" list="as-runtime-abilities" value="${esc(value == null ? "" : abilityLabel(value))}" placeholder="Search an ability…" ${prefix}>`;
+    } else if (parameter.control === "move") {
       control = `<input type="search" list="as-runtime-moves" value="${esc(value == null ? "" : moveLabel(value))}" placeholder="Search a move…" ${prefix}>`;
     } else if (parameter.control === "move-list") {
       const moveValues = Array.isArray(value) ? value.map(moveLabel).join("; ") : "";
@@ -1090,6 +1111,8 @@
         )
         .join("");
       control = `<select multiple size="3" ${prefix}>${choices}</select>`;
+    } else if (parameter.control === "text") {
+      control = `<input type="text" value="${esc(value ?? "")}" ${prefix}>`;
     }
     return `<label class="as-runtime-parameter"><span>${esc(parameter.label)}</span><span class="as-runtime-parameter-control">${control}${overridden ? `<button type="button" class="icon" title="Restore source value" aria-label="Restore source value for ${esc(parameter.label)}" data-as-action="reset-runtime-parameter" ${prefix}>↺</button>` : ""}</span></label>`;
   }
@@ -1370,7 +1393,8 @@
       Object.hasOwn(parameter, "rawValue") ? parameter.rawValue : parameter.value,
       parameter.control,
     ]);
-    return `${candidate.effect.kind}:${candidate.effect.source.attrType}:${JSON.stringify(parameters)}`;
+    const source = candidate.effect.sourceSpecific ? componentSourceKey(candidate.effect.source) : "shared";
+    return `${candidate.effect.kind}:${candidate.effect.source.attrType}:${JSON.stringify(parameters)}:${source}`;
   }
 
   function fanoutSection(title, matches, renderItem) {
@@ -1728,7 +1752,9 @@
         }
         continue;
       }
-      if (parameter.control === "move" && (!Number.isInteger(value) || !movesById.has(value))) {
+      if (parameter.control === "ability" && (!Number.isInteger(value) || !componentsByAbility.has(value))) {
+        errors.push(`${label}: ${parameter.label} is not a valid ability`);
+      } else if (parameter.control === "move" && (!Number.isInteger(value) || !movesById.has(value))) {
         errors.push(`${label}: ${parameter.label} is not a valid move`);
       } else if (
         parameter.control === "move-list"
@@ -1758,6 +1784,8 @@
         errors.push(`${label}: ${parameter.label} contains an invalid number`);
       } else if (parameter.control === "boolean" && typeof value !== "boolean") {
         errors.push(`${label}: ${parameter.label} must be Yes or No`);
+      } else if (parameter.control === "text" && typeof value !== "string") {
+        errors.push(`${label}: ${parameter.label} must be text`);
       } else if (parameter.control === "select" && !parameter.options?.some(option => option.value === value)) {
         errors.push(`${label}: ${parameter.label} is invalid`);
       } else if (
@@ -1999,6 +2027,7 @@
       <main class="as-workspace" aria-label="Ability editor">${entry ? renderEntry(entry, errors) : '<div class="as-welcome"><h2>Create an ability</h2><p>Build it from existing ability packages, passive modifiers, and triggered effect chains.</p><button type="button" class="primary" data-as-action="new-ability">Create first ability</button></div>'}</main>
       <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant()}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
       ${runtimeMoveDatalistHtml()}
+      ${runtimeAbilityDatalistHtml()}
     </div>`;
   }
 
@@ -2133,7 +2162,15 @@
       delete reference.parameterOverrides?.[path];
     } else {
       let value;
-      if (control === "move") {
+      if (control === "ability") {
+        value = parseAbility(inputValue);
+        if (value === undefined) {
+          if (inputValue.trim() !== "" || !parameter.optional) {
+            return false;
+          }
+          value = null;
+        }
+      } else if (control === "move") {
         value = parseMove(inputValue);
         if (value === undefined) {
           if (inputValue.trim() !== "" || !parameter.optional) {
@@ -2187,6 +2224,8 @@
       } else if (control === "multi-select") {
         const values = [...element.selectedOptions].map(item => parseParameterOption(item.value));
         value = values.length > 0 ? values : parameter.optional ? null : [];
+      } else if (control === "text") {
+        value = inputValue;
       } else {
         return false;
       }
