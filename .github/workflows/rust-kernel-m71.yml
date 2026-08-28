@@ -33,9 +33,10 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /rust/fixtures/m71/
+            /rust/Cargo.toml
             /rust/contracts/m71-contract.toml
             /scripts/check-kernel-m71-contract.mjs
-            /rust/Cargo.toml
+            /rust/contracts/
             /rust/crates/
             /docs/plans/rust-kernel/
           submodules: false
