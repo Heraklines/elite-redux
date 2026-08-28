@@ -219,6 +219,7 @@ dependencies = [
  "er-game",
  "er-mechanics",
  "er-types",
+ "er-world",
  "serde",
  "serde_json",
  "thiserror",

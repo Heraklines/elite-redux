@@ -112,6 +112,7 @@ const files = [
   ["semantic_group_manifest_sha256", "rust/fixtures/m7/m7-semantic-groups-v1.json"],
   ["domain_closure_manifest_sha256", "rust/fixtures/m7/m7-domain-closure-v1.json"],
   ["behavior_implementation_manifest_v2_sha256", "rust/fixtures/m7/m7-behavior-implementation-v2.json"],
+  ["world_oracle_fixture_sha256", "rust/fixtures/m7/m7-world-oracle-v1.json"],
   ["performance_security_audit_sha256", "rust/fixtures/m7/performance-security-audit-v1.json"],
   ["legacy_bridge_audit_sha256", "rust/fixtures/m7/legacy-bridge-audit-v1.json"],
   ["m6_catalog_drift_sha256", "rust/fixtures/m7/m6-catalog-drift-v1.json"],
@@ -339,6 +340,20 @@ assertEqual(
   implementationV2Ids.size,
   implementations.implementation_count,
   "implementation V2 behavior union",
+);
+
+const worldOracle = readJson("rust/fixtures/m7/m7-world-oracle-v1.json");
+assertEqual(worldOracle.schema_version, 1, "world oracle schema");
+assertEqual(worldOracle.oracle_sha, selection.oracle_sha, "world oracle SHA");
+assertEqual(
+  Object.keys(worldOracle.biome_encounters).length,
+  required(contract, "world_oracle_encounter_profile_count"),
+  "world oracle encounter profile count",
+);
+assertEqual(
+  Object.keys(worldOracle.forced_battle_rules).length,
+  required(contract, "world_oracle_forced_rule_count"),
+  "world oracle forced rule count",
 );
 
 const witnesses = readJson("rust/fixtures/m7/m7-oracle-witness-plan-v1.json");
