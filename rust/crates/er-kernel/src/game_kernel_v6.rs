@@ -135,7 +135,7 @@ impl GameKernelV6 {
             content,
         )
         .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
-        let mut kernel = Self {
+        Ok(Self {
             runtime,
             input_router: snapshot.input_router,
             pressed_keys: snapshot.pressed_keys,
@@ -144,9 +144,7 @@ impl GameKernelV6 {
             pending_presentations: snapshot.pending_presentations,
             replay_sequence: snapshot.replay_sequence,
             terminal: snapshot.terminal,
-        };
-        kernel.synchronize_terminal();
-        Ok(kernel)
+        })
     }
 
     pub fn snapshot(&self) -> RestorableKernelSnapshotV6 {
