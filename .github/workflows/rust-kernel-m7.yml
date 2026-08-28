@@ -184,7 +184,16 @@ jobs:
             m7-foundation-${{ runner.os }}-${{ runner.arch }}-
       - name: Run complete historical Rust regression
         working-directory: rust
-        run: cargo test --workspace --all-targets
+        run: |
+          set -o pipefail
+          cargo test --workspace --all-targets 2>&1 | tee "$RUNNER_TEMP/m0-m6-regression.log"
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: m0-m6-regression-failure
+          path: ${{ runner.temp }}/m0-m6-regression.log
+          if-no-files-found: error
+          retention-days: 14
 
   m7-performance:
     name: M7 release headless performance proof
