@@ -1,5 +1,9 @@
 //! Backend-free M7.1 model request and recorded-response boundary.
 
+pub mod replay;
+
+pub use replay::*;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};

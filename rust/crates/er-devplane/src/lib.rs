@@ -1,8 +1,11 @@
 //! Deterministic M7.1 session orchestration downstream of the production game.
 
+pub mod capsule;
 pub mod checkpoint;
 pub mod lineage;
 pub mod pair;
+pub mod performance;
+pub mod reload;
 pub mod solo;
 pub mod telemetry;
 
@@ -11,10 +14,13 @@ use er_dev_types::{
 };
 use thiserror::Error;
 
+pub use capsule::*;
 pub use checkpoint::*;
 pub use er_sim::PairEndpoint;
 pub use lineage::*;
 pub use pair::*;
+pub use performance::*;
+pub use reload::*;
 pub use solo::*;
 pub use telemetry::*;
 pub type SoloSnapshotV6 = er_kernel::snapshot_v6::RestorableKernelSnapshotV6;

@@ -110,6 +110,14 @@ pub trait AgentDispatcherV1 {
     ) -> Result<serde_json::Value, AgentDispatchErrorV1>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentProtocolResourceSnapshotV1 {
+    pub completed_request_ids: usize,
+    pub retained_artifacts: usize,
+    pub retained_artifact_bytes: usize,
+}
+
 #[derive(Debug)]
 pub struct AgentJsonlServerV1<D> {
     dispatcher: D,
@@ -141,6 +149,20 @@ impl<D: AgentDispatcherV1> AgentJsonlServerV1<D> {
 
     pub fn artifact(&self, digest: &str) -> Option<&[u8]> {
         self.artifacts.get(digest).map(Vec::as_slice)
+    }
+
+    pub fn resource_snapshot(&self) -> AgentProtocolResourceSnapshotV1 {
+        AgentProtocolResourceSnapshotV1 {
+            completed_request_ids: self.completed_request_ids.len(),
+            retained_artifacts: self.artifacts.len(),
+            retained_artifact_bytes: self.artifact_bytes,
+        }
+    }
+
+    pub fn close(&mut self) {
+        self.completed_request_ids.clear();
+        self.artifacts.clear();
+        self.artifact_bytes = 0;
     }
 
     pub fn into_dispatcher(self) -> D {

@@ -1,5 +1,11 @@
 //! Semantic presentation and adapter-owned render diagnostics for M7.1.
 
+pub mod scene;
+pub mod validate;
+
+pub use scene::*;
+pub use validate::*;
+
 use std::collections::BTreeSet;
 
 use er_dev_types::{CausalAddressV1, CausalId, CausalNodeKindV1};

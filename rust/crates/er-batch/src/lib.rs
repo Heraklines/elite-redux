@@ -1,5 +1,11 @@
 //! Single-thread deterministic batch execution over production DeveloperSession.
 
+pub mod environment;
+pub mod operations;
+
+pub use environment::*;
+pub use operations::*;
+
 use std::collections::BTreeMap;
 
 use er_devplane::{
@@ -17,8 +23,8 @@ pub struct BatchEnvironmentIdV1(pub u64);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BatchSnapshotV1 {
-    Solo(SoloSnapshotV6),
-    Pair(PairSnapshotV2),
+    Solo(Box<SoloSnapshotV6>),
+    Pair(Box<PairSnapshotV2>),
 }
 
 #[derive(Debug, Error)]
@@ -129,11 +135,11 @@ impl BatchEnvironmentV1 {
                 let snapshot = match &session.machine {
                     SessionMachineV1::Solo(machine) => machine
                         .snapshot()
-                        .map(BatchSnapshotV1::Solo)
+                        .map(|snapshot| BatchSnapshotV1::Solo(Box::new(snapshot)))
                         .map_err(|error| error.to_string()),
                     SessionMachineV1::Pair(machine) => machine
                         .snapshot()
-                        .map(BatchSnapshotV1::Pair)
+                        .map(|snapshot| BatchSnapshotV1::Pair(Box::new(snapshot)))
                         .map_err(|error| error.to_string()),
                 };
                 (*id, snapshot)

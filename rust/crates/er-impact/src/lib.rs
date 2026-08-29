@@ -1,5 +1,11 @@
 //! Conservative source-to-test impact graph contracts.
 
+pub mod generate;
+pub mod query;
+
+pub use generate::*;
+pub use query::*;
+
 use serde::{Deserialize, Serialize};
 
 pub const IMPACT_GRAPH_VERSION_V1: u32 = 1;

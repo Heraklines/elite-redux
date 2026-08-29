@@ -1,5 +1,6 @@
 //! Shared, gameplay-independent M7.1 developer-plane contracts.
 pub mod causal;
+pub mod compatibility;
 pub mod digest;
 pub mod identity;
 pub mod observation;
@@ -8,6 +9,7 @@ pub mod snapshot_v7;
 pub mod trace_v7;
 
 pub use causal::*;
+pub use compatibility::*;
 pub use digest::*;
 pub use identity::*;
 pub use observation::*;

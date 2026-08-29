@@ -321,6 +321,8 @@ dependencies = [
 name = "er-impact"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "er-canonical",
  "er-dev-types",
  "serde",
  "thiserror",
@@ -358,6 +360,8 @@ dependencies = [
 name = "er-model"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "er-canonical",
  "er-dev-types",
  "er-types",
  "serde",
