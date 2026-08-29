@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "milestone": "M7.1",
+  "tag": "rust-kernel-m7-devplane-final",
+  "commit_sha": "79e3544029e422deb8389a12f8b75e7f0febfb3e",
+  "g34_run_id": 33224176335,
+  "g34_conclusion": "success",
+  "g34_job_count": 17,
+  "g34_non_successful_job_count": 0,
+  "m72_base_policy": "M7.1 G34 bytes and behavior remain exact"
+}
