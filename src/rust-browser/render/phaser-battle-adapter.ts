@@ -6,6 +6,7 @@ interface BattleCueDetailV1 {
   before?: number;
   after?: number;
 }
+type SpriteTweenConfigV1 = Omit<Phaser.Types.Tweens.TweenBuilderConfig, "targets" | "onComplete">;
 
 export class PhaserBattleAdapterV1 {
   readonly #scene: Phaser.Scene;
@@ -91,7 +92,7 @@ export class PhaserBattleAdapterV1 {
 
   #tween(
     target: Phaser.GameObjects.Sprite,
-    config: Phaser.Types.Tweens.TweenBuilderConfig,
+    config: SpriteTweenConfigV1,
     generation: number,
   ): Promise<PresentationSettlementOutcomeV1> {
     const { promise, resolve } = Promise.withResolvers<PresentationSettlementOutcomeV1>();

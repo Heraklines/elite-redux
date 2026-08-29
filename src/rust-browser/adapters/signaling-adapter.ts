@@ -58,14 +58,17 @@ export async function fetchAuthenticatedSignalingTicket(
   if (endpoint.origin !== allowedOrigin || endpoint.pathname.includes("/coop/") || !endpoint.pathname.includes("p33")) {
     throw new Error("only the authenticated P33 signaling route is allowed");
   }
-  const response = await fetch(endpoint, {
+  const request: RequestInit = {
     method: "POST",
     credentials: "include",
     cache: "no-store",
     headers: { "content-type": "application/json" },
     body: "{}",
-    signal,
-  });
+  };
+  if (signal != null) {
+    request.signal = signal;
+  }
+  const response = await fetch(endpoint, request);
   if (!response.ok) {
     throw new Error(`authenticated signaling ticket failed: ${response.status}`);
   }

@@ -65,7 +65,7 @@ export class CloudSaveAdapterV1 {
         "if-match": expectedRevision ?? "*",
         "x-er-release": this.#releaseIdentity,
       },
-      body: bytes,
+      body: Uint8Array.from(bytes).buffer,
       signal: this.#controller.signal,
     });
     if (response.status === 409 || response.status === 412) {

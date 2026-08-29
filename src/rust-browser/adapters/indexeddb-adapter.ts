@@ -17,7 +17,7 @@ export class ProductionIndexedDbAdapterV1 {
   readonly #release: string;
   readonly #storage: BrowserStorageAdapter;
   readonly #channel: BroadcastChannel;
-  readonly #onExternalRevision?: (key: string, revision: number) => void;
+  readonly #onExternalRevision: ((key: string, revision: number) => void) | undefined;
   #disposed = false;
 
   constructor(options: ProductionIndexedDbOptionsV1) {

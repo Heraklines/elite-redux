@@ -56,7 +56,7 @@ export class RustBrowserTransportAdapterV1 {
     ) {
       throw new Error("Rust browser network frame cannot be sent on this connection generation");
     }
-    this.#channel.send(bytes);
+    this.#channel.send(Uint8Array.from(bytes).buffer);
   }
 
   dispose(): void {
@@ -73,7 +73,7 @@ export class RustBrowserTransportAdapterV1 {
     if (channel == null || channel.readyState !== "open") {
       return;
     }
-    channel.send(encodeCompatibilityHandshake(this.#compatibility));
+    channel.send(Uint8Array.from(encodeCompatibilityHandshake(this.#compatibility)).buffer);
   };
 
   readonly #onMessage = (event: MessageEvent<unknown>): void => {
