@@ -1,0 +1,154 @@
+integration_branch = "arch/rust-kernel-m8-browser"
+browser_base_sha = "b2ed1a6eb050a18d5f335ec826e01b7b425ce311"
+rust_base_sha = "ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273"
+
+[integration_owner]
+exclusive = ["package.json", "pnpm-lock.yaml", "vite.config.ts", "index.html", "src/main.ts", "src/rust-browser/host/browser-runtime-selector.ts", ".github/workflows/rust-kernel-m8.yml", "deploy/**"]
+
+[m8a_abi]
+owner = "M8A-01"
+exclusive = ["rust/crates/er-web/src/contracts.rs", "schemas/browser/m8/**"]
+[m8a_host]
+owner = "M8A-02"
+exclusive = ["rust/crates/er-web/src/host.rs"]
+[m8a_worker]
+owner = "M8A-03"
+exclusive = ["src/rust-browser/worker/rust-kernel-worker.ts"]
+[m8a_bridge]
+owner = "M8A-04"
+exclusive = ["src/rust-browser/host/rust-browser-host.ts", "src/rust-browser/host/message-sequencer.ts"]
+[m8a_loader]
+owner = "M8A-05"
+exclusive = ["src/rust-browser/worker/rust-wasm-loader.ts", "scripts/build-kernel-m8-web.mjs"]
+[m8a_input]
+owner = "M8A-06"
+exclusive = ["src/rust-browser/adapters/input-adapter.ts"]
+[m8a_clock]
+owner = "M8A-07"
+exclusive = ["src/rust-browser/adapters/clock-adapter.ts", "src/rust-browser/adapters/lifecycle-adapter.ts"]
+[m8a_storage]
+owner = "M8A-08"
+exclusive = ["src/rust-browser/adapters/storage-adapter.ts"]
+[m8a_dom]
+owner = "M8A-09"
+exclusive = ["src/rust-browser/render/dom-reference-view.ts"]
+[m8a_presentation]
+owner = "M8A-10"
+exclusive = ["src/rust-browser/render/reference-presentation-view.ts"]
+[m8a_route]
+owner = "M8A-11"
+exclusive = ["src/rust-browser/routes/rust-local-entry.ts", "test/browser/rust-browser/rust-local.spec.ts"]
+[m8a_audit]
+owner = "M8A-12"
+exclusive = ["test/node/rust-browser/worker-abi.test.ts", "test/node/rust-browser/worker-security.test.ts"]
+
+[m8b_capture]
+owner = "M8B-01"
+exclusive = ["src/rust-browser/shadow/typescript-boundary-capture.ts"]
+[m8b_bootstrap]
+owner = "M8B-02"
+exclusive = ["src/rust-browser/shadow/shadow-bootstrap.ts"]
+[m8b_host]
+owner = "M8B-03"
+exclusive = ["src/rust-browser/shadow/rust-shadow-host.ts"]
+[m8b_projection]
+owner = "M8B-04"
+exclusive = ["src/rust-browser/shadow/common-projection.ts"]
+[m8b_mechanics]
+owner = "M8B-05"
+exclusive = ["src/rust-browser/shadow/mechanical-comparator.ts"]
+[m8b_control]
+owner = "M8B-06"
+exclusive = ["src/rust-browser/shadow/control-comparator.ts"]
+[m8b_presentation]
+owner = "M8B-07"
+exclusive = ["src/rust-browser/shadow/presentation-comparator.ts"]
+[m8b_save]
+owner = "M8B-08"
+exclusive = ["src/rust-browser/shadow/save-comparator.ts"]
+[m8b_divergence]
+owner = "M8B-09"
+exclusive = ["src/rust-browser/shadow/shadow-comparator.ts"]
+[m8b_repro]
+owner = "M8B-10"
+exclusive = ["src/rust-browser/shadow/dual-repro-exporter.ts"]
+[m8b_corpus]
+owner = "M8B-11"
+exclusive = ["test/node/rust-browser/shadow-corpus.test.ts", "rust/fixtures/m8/shadow/**"]
+[m8b_audit]
+owner = "M8B-12"
+exclusive = ["test/node/rust-browser/shadow-isolation.test.ts"]
+
+[m8c_transport]
+owner = "M8C-01"
+exclusive = ["src/rust-browser/adapters/transport-adapter.ts"]
+[m8c_signaling]
+owner = "M8C-02"
+exclusive = ["src/rust-browser/adapters/signaling-adapter.ts"]
+[m8c_rejoin]
+owner = "M8C-03"
+exclusive = ["src/rust-browser/adapters/connection-generation.ts"]
+[m8c_indexeddb]
+owner = "M8C-04"
+exclusive = ["src/rust-browser/adapters/indexeddb-adapter.ts"]
+[m8c_cloud]
+owner = "M8C-05"
+exclusive = ["src/rust-browser/adapters/cloud-save-adapter.ts"]
+[m8c_cache]
+owner = "M8C-06"
+exclusive = ["src/rust-browser/adapters/release-cache.ts"]
+[m8c_ui]
+owner = "M8C-07"
+exclusive = ["src/rust-browser/render/phaser-ui-adapter.ts"]
+[m8c_battle]
+owner = "M8C-08"
+exclusive = ["src/rust-browser/render/phaser-battle-adapter.ts"]
+[m8c_surfaces]
+owner = "M8C-09"
+exclusive = ["src/rust-browser/render/phaser-surface-adapter.ts"]
+[m8c_settlement]
+owner = "M8C-10"
+exclusive = ["src/rust-browser/render/presentation-settlement.ts"]
+[m8c_lifecycle]
+owner = "M8C-11"
+exclusive = ["src/rust-browser/adapters/mobile-input-adapter.ts"]
+[m8c_tests]
+owner = "M8C-12"
+exclusive = ["test/browser/rust-browser/adapters/**", "test/node/rust-browser/adapters/**"]
+
+[m8d_release]
+owner = "M8D-01"
+exclusive = ["src/rust-browser/contracts/browser-release-manifest.ts"]
+[m8d_bundle]
+owner = "M8D-02"
+exclusive = ["scripts/seal-kernel-m8-release.mjs"]
+[m8d_route]
+owner = "M8D-03"
+exclusive = ["src/rust-browser/routes/rust-staging-entry.ts"]
+[m8d_solo]
+owner = "M8D-04"
+exclusive = ["test/browser/rust-browser/full-solo.spec.ts"]
+[m8d_coop]
+owner = "M8D-05"
+exclusive = ["test/browser/rust-browser/full-coop.spec.ts"]
+[m8d_save]
+owner = "M8D-06"
+exclusive = ["test/browser/rust-browser/save-offline.spec.ts"]
+[m8d_cache]
+owner = "M8D-07"
+exclusive = ["test/browser/rust-browser/release-cache.spec.ts"]
+[m8d_matrix]
+owner = "M8D-08"
+exclusive = ["playwright.rust-browser.config.ts"]
+[m8d_mobile]
+owner = "M8D-09"
+exclusive = ["test/browser/rust-browser/mobile-profile.spec.ts"]
+[m8d_accessibility]
+owner = "M8D-10"
+exclusive = ["test/browser/rust-browser/input-accessibility.spec.ts"]
+[m8d_performance]
+owner = "M8D-11"
+exclusive = ["test/browser/rust-browser/performance.spec.ts"]
+[m8d_audit]
+owner = "M8D-12"
+exclusive = ["scripts/check-kernel-m8-contract.mjs", "rust/fixtures/m8/m8-final-qualification.json"]

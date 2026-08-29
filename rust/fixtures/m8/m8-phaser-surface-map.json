@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "browser_base_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
+  "surfaces": [
+    {"control":"TITLE","presenter":"rust-title-presenter","legacy_owner":"src/ui/handlers/title-ui-handler.ts"},
+    {"control":"MODE_SELECT","presenter":"rust-option-presenter","legacy_owner":"src/ui/handlers/abstract-option-select-ui-handler.ts"},
+    {"control":"STARTER_SELECT","presenter":"rust-starter-presenter","legacy_owner":"src/ui/handlers/starter-select-ui-handler.ts"},
+    {"control":"BATTLE_COMMAND","presenter":"rust-battle-menu-presenter","legacy_owner":"src/ui/handlers/command-ui-handler.ts"},
+    {"control":"BATTLE_MOVE","presenter":"rust-battle-menu-presenter","legacy_owner":"src/ui/handlers/fight-ui-handler.ts"},
+    {"control":"BATTLE_TARGET","presenter":"rust-target-presenter","legacy_owner":"src/ui/handlers/target-select-ui-handler.ts"},
+    {"control":"BATTLE_SWITCH","presenter":"rust-party-presenter","legacy_owner":"src/ui/handlers/party-ui-handler.ts"},
+    {"control":"BATTLE_REPLACEMENT","presenter":"rust-party-presenter","legacy_owner":"src/ui/handlers/party-ui-handler.ts"},
+    {"control":"CAPTURE","presenter":"rust-option-presenter","legacy_owner":"src/ui/handlers/ball-ui-handler.ts"},
+    {"control":"FULL_PARTY","presenter":"rust-party-presenter","legacy_owner":"src/ui/handlers/party-ui-handler.ts"},
+    {"control":"PROGRESSION","presenter":"rust-progression-presenter","legacy_owner":"src/ui/handlers/message-ui-handler.ts"},
+    {"control":"MOVE_LEARN","presenter":"rust-summary-presenter","legacy_owner":"src/ui/handlers/summary-ui-handler.ts"},
+    {"control":"EVOLUTION","presenter":"rust-progression-presenter","legacy_owner":"src/phases/evolution-phase.ts"},
+    {"control":"FUSION","presenter":"rust-party-presenter","legacy_owner":"src/ui/handlers/party-ui-handler.ts"},
+    {"control":"REWARD","presenter":"rust-reward-presenter","legacy_owner":"src/ui/handlers/modifier-select-ui-handler.ts"},
+    {"control":"MARKET","presenter":"rust-market-presenter","legacy_owner":"src/ui/handlers/modifier-select-ui-handler.ts"},
+    {"control":"SCENARIO","presenter":"rust-scenario-presenter","legacy_owner":"src/ui/handlers/option-select-ui-handler.ts"},
+    {"control":"QUEST","presenter":"rust-option-presenter","legacy_owner":"src/ui/handlers/option-select-ui-handler.ts"},
+    {"control":"FACTION","presenter":"rust-option-presenter","legacy_owner":"src/ui/handlers/option-select-ui-handler.ts"},
+    {"control":"BIOME","presenter":"rust-world-presenter","legacy_owner":"src/phases/select-biome-phase.ts"},
+    {"control":"ROUTE","presenter":"rust-world-presenter","legacy_owner":"src/ui/handlers/option-select-ui-handler.ts"},
+    {"control":"SAVE","presenter":"rust-save-presenter","legacy_owner":"src/ui/handlers/save-slot-select-ui-handler.ts"},
+    {"control":"WAITING","presenter":"rust-message-presenter","legacy_owner":"src/ui/handlers/message-ui-handler.ts"},
+    {"control":"COMPLETE","presenter":"rust-terminal-presenter","legacy_owner":"src/ui/handlers/message-ui-handler.ts"}
+  ],
+  "mechanical_ownership":"RUST_ONLY",
+  "presenter_ownership":"PHASER_VIEW_ONLY"
+}

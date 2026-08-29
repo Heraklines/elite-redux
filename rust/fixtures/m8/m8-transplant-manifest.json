@@ -4,13 +4,27 @@
   "rust_source_tag": "rust-kernel-m72-final",
   "rust_source_sha": "ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273",
   "digest_kind": "git-blob-sha1",
+  "mutable_imported_paths": [
+    "rust/Cargo.lock",
+    "rust/Cargo.toml"
+  ],
   "allowed_roots": [
     ".github/workflows/rust-kernel-*.yml",
     "docs/plans/rust-kernel/**",
     "rust/**",
+    "scripts/audit-kernel-*.mjs",
     "scripts/benchmark-kernel-*.mjs",
     "scripts/build-kernel-*.mjs",
-    "scripts/check-kernel-*.mjs"
+    "scripts/check-kernel-*.mjs",
+    "scripts/classify-kernel-*.mjs",
+    "scripts/diagnose-kernel-*.mjs",
+    "scripts/export-kernel-*.mjs",
+    "scripts/generate-kernel-*.mjs",
+    "scripts/prepare-kernel-*.mjs",
+    "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+    "test/kernel-fixtures/m4/export-helper-runner.test.ts",
+    "test/kernel-fixtures/m4/export-run-oracle.test.ts",
+    "test/kernel-fixtures/m4/export/**"
   ],
   "forbidden_roots": [
     "assets/**",
@@ -28,7 +42,7 @@
     "vite.config.*",
     "workers/**"
   ],
-  "file_count": 812,
+  "file_count": 839,
   "files": [
     {
       "path": ".github/workflows/rust-kernel-m4.yml",
@@ -4807,6 +4821,18 @@
       "digest": "2a21d24b5ba7985a96acce755c5b19414d34b79a"
     },
     {
+      "path": "scripts/audit-kernel-m7-architecture.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8adcfb9f0135ac6b406d761d9e10b7c98947e088"
+    },
+    {
+      "path": "scripts/audit-kernel-m7-legacy-paths.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1cff9abd622b4ce9f7d12b602031a2cb1c5f85a9"
+    },
+    {
       "path": "scripts/benchmark-kernel-baseline.mjs",
       "mode": "100644",
       "type": "blob",
@@ -4901,6 +4927,156 @@
       "mode": "100644",
       "type": "blob",
       "digest": "b6683a06dd8aa7b7f3f28664a498aa6ce5c2aeeb"
+    },
+    {
+      "path": "scripts/classify-kernel-m5-oracle-refresh.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e23c4fe104d2e301452087dfc465611ff78df30e"
+    },
+    {
+      "path": "scripts/classify-kernel-m6-catalog-drift.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "acc372b7850bc09fed7594a210ea0dc218cf4282"
+    },
+    {
+      "path": "scripts/classify-kernel-m7-semantic-drift.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "06937d031e87a3d14a766d4b89cc99ad026a74e2"
+    },
+    {
+      "path": "scripts/diagnose-kernel-m6-semantic-diff.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a980bf4775549e17d1d63c0deee93d7563a045e2"
+    },
+    {
+      "path": "scripts/export-kernel-fixtures.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e8589c79a2f96852611957cd735124e16c826144"
+    },
+    {
+      "path": "scripts/export-kernel-m3-oracle.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "346fd7d5586e394a9d4bf62e9c311ceb581a65fc"
+    },
+    {
+      "path": "scripts/export-kernel-m4-oracle.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "82ccb0fbf7db0d40677c26e27599c981ea5fddcf"
+    },
+    {
+      "path": "scripts/export-kernel-m5-source-catalog.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "475d954c95a8702c8adc3b2e8a3a72447020ad6b"
+    },
+    {
+      "path": "scripts/export-kernel-m6-semantic-catalog.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2302ba45d9fa86f61bf94a85a61ff61173689584"
+    },
+    {
+      "path": "scripts/export-kernel-m7-system-catalog.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "912e50333b26815fa4766bcef07e2128eea47617"
+    },
+    {
+      "path": "scripts/export-kernel-m7-world-oracle.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "530cc8027172f18f4ddc7ee1deac2414d8e0628a"
+    },
+    {
+      "path": "scripts/export-kernel-schema.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2c257187ac4f60edffa56b09bbbdd2c11fdf054c"
+    },
+    {
+      "path": "scripts/generate-kernel-m5-classification.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6b16a0ac4af1fdde79a5e439f2a515b5a96f5646"
+    },
+    {
+      "path": "scripts/prepare-kernel-m5-oracle-refresh.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8b4d8acccae6742f780e1f00d8dfa6251cd5684f"
+    },
+    {
+      "path": "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d703b626f6b09b13d571c6b62098ac88228f4b92"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export-helper-runner.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "63a2f33cca631e615abcee0c3131a26357255c8f"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export-run-oracle.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0e3154af8e94e42260abe8bf9d5b7fe7e09061c5"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/biome-encounter-capture.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "12740970097bd59536718b6a3b961a28287ea5c2"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/composed-capture.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a220473c22f70c12d9af21accaf36ef57b6fd553"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/migration-companion-capture.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4d1f743aca8a65f1c8533c0507c3645ecd783dcc"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/oracle-frontier.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3ec74f4ec8c8e41b29c11383d6cfcedf5afca319"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/progression-capture.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d946f351338b2b101b1bd3d5f0a3578d80c4d8af"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/reward-market-capture.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3b77de54be36bf8da28390cfb410303dc2760835"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/run-content-capture.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d98a97ac392d69dfe5e3b83dc3971ef9a48ade89"
+    },
+    {
+      "path": "test/kernel-fixtures/m4/export/starter-launch.ts",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a783cf66e505bef030a037e088b3381f36fce87a"
     }
   ]
 }

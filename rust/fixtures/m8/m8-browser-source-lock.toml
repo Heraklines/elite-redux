@@ -1,0 +1,10 @@
+browser_branch = "feat/elite-redux-port"
+browser_base_sha = "b2ed1a6eb050a18d5f335ec826e01b7b425ce311"
+browser_tree_sha = "fd47bc8ede40234ea83a01d2bed786d827de3336"
+rust_source_tag = "rust-kernel-m72-final"
+rust_source_sha = "ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273"
+rust_g38_run_id = 33236341480
+merge_base_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+oracle_sha = "b2ed1a6eb050a18d5f335ec826e01b7b425ce311"
+transplant_policy = "PATH_MANIFEST_ONLY_NO_MERGE_NO_REBASE"
+production_typescript_default = true

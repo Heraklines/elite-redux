@@ -1,0 +1,157 @@
+#!/usr/bin/env node
+
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const ROOT = resolve(import.meta.dirname, "..");
+const BROWSER_SHA = "b2ed1a6eb050a18d5f335ec826e01b7b425ce311";
+const RUST_SHA = "ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273";
+const RUST_TAG = "rust-kernel-m72-final";
+const fail = message => {
+  throw new Error(`M8 contract check: ${message}`);
+};
+const read = path => readFileSync(resolve(ROOT, path), "utf8");
+const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim();
+
+if (git("rev-parse", `${RUST_TAG}^{commit}`) !== RUST_SHA) {
+  fail("M7.2 tag mismatch");
+}
+if (git("rev-parse", `${BROWSER_SHA}^{commit}`) !== BROWSER_SHA) {
+  fail("browser base unavailable");
+}
+const sourceLock = read("rust/fixtures/m8/m8-browser-source-lock.toml");
+for (const value of [BROWSER_SHA, RUST_SHA, "33236341480", "PATH_MANIFEST_ONLY_NO_MERGE_NO_REBASE"]) {
+  if (!sourceLock.includes(value)) {
+    fail(`source lock omits ${value}`);
+  }
+}
+
+const transplant = JSON.parse(read("rust/fixtures/m8/m8-transplant-manifest.json"));
+if (
+  transplant.schema_version !== 1
+  || transplant.browser_base_sha !== BROWSER_SHA
+  || transplant.rust_source_sha !== RUST_SHA
+  || transplant.rust_source_tag !== RUST_TAG
+  || transplant.file_count !== transplant.files.length
+  || transplant.digest_kind !== "git-blob-sha1"
+) {
+  fail("transplant manifest identity mismatch");
+}
+const paths = transplant.files.map(entry => entry.path);
+if (
+  new Set(paths).size !== paths.length
+  || paths.some((path, index) => index > 0 && paths[index - 1].localeCompare(path) >= 0)
+) {
+  fail("transplant paths duplicate or unsorted");
+}
+const mutable = new Set(transplant.mutable_imported_paths);
+for (const entry of transplant.files) {
+  const expected = git("rev-parse", `${RUST_TAG}:${entry.path}`);
+  if (expected !== entry.digest) {
+    fail(`transplant source digest mismatch ${entry.path}`);
+  }
+  if (!mutable.has(entry.path)) {
+    const actual = git("hash-object", entry.path);
+    if (actual !== entry.digest) {
+      fail(`transplanted file drift ${entry.path}`);
+    }
+  }
+}
+
+const forbiddenBrowser = git(
+  "diff",
+  "--name-only",
+  BROWSER_SHA,
+  "--",
+  "package.json",
+  "pnpm-lock.yaml",
+  "vite.config.ts",
+  "index.html",
+  "index.css",
+  "workers",
+  "deploy",
+  "assets",
+  "editor",
+  "locales",
+)
+  .split(/\r?\n/u)
+  .filter(Boolean);
+if (forbiddenBrowser.length > 0) {
+  fail(`frozen browser paths changed: ${forbiddenBrowser.join(", ")}`);
+}
+const browserDiff = git("diff", "--name-only", BROWSER_SHA, "--", "src", "test").split(/\r?\n/u).filter(Boolean);
+const allowedBrowserAddition = path =>
+  path.startsWith("src/rust-browser/")
+  || path.startsWith("test/browser/rust-browser/")
+  || path.startsWith("test/node/rust-browser/")
+  || path === "test/kernel-fixtures/m3/export-battle-oracle.test.ts"
+  || path === "test/kernel-fixtures/m4/export-helper-runner.test.ts"
+  || path === "test/kernel-fixtures/m4/export-run-oracle.test.ts"
+  || path.startsWith("test/kernel-fixtures/m4/export/");
+const forbiddenBrowserDiff = browserDiff.filter(path => !allowedBrowserAddition(path));
+if (forbiddenBrowserDiff.length > 0) {
+  fail(`unapproved browser source change: ${forbiddenBrowserDiff.join(", ")}`);
+}
+
+const refresh = JSON.parse(read("rust/fixtures/m8/m8-content-refresh-report.json"));
+const drift = JSON.parse(read("rust/fixtures/m8/m8-oracle-drift-report.json"));
+if (
+  refresh.oracle_sha !== BROWSER_SHA
+  || refresh.unclassified_canonical_behavior_count !== 0
+  || refresh.unsupported_canonical_behavior_count !== 0
+  || refresh.pending_bespoke_behavior_count !== 0
+  || refresh.status !== "QUALIFIED_FOR_G39"
+  || drift.oracle_sha !== BROWSER_SHA
+  || drift.unclassified_path_count !== 0
+) {
+  fail("oracle refresh is not zero-gap");
+}
+
+const requiredContracts = [
+  "m8-api.md",
+  "m8-cache-release.md",
+  "m8-contract.toml",
+  "m8-error-policy.md",
+  "m8-ownership.toml",
+  "m8-performance.md",
+  "m8-phaser-adapter.md",
+  "m8-platform-adapters.md",
+  "m8-security.md",
+  "m8-shadow-parity.md",
+  "m8-worker-protocol.md",
+];
+for (const file of requiredContracts) {
+  if (read(`rust/contracts/${file}`).trim().length === 0) {
+    fail(`empty contract ${file}`);
+  }
+}
+const contract = read("rust/contracts/m8-contract.toml");
+for (const value of [
+  BROWSER_SHA,
+  RUST_SHA,
+  "CANONICAL_JSON_V1",
+  "exactly one canonical authority per execution mode",
+]) {
+  if (!contract.includes(value)) {
+    fail(`m8 contract omits ${value}`);
+  }
+}
+
+const workspace = read("rust/Cargo.toml");
+if (!workspace.includes('"crates/er-web"')) {
+  fail("er-web missing from workspace");
+}
+const webSource = [read("rust/crates/er-web/src/contracts.rs"), read("rust/crates/er-web/src/host.rs")].join("\n");
+for (const forbidden of ["choose_move", "select_reward", "apply_damage", "resolve_turn", "submit_command"]) {
+  if (webSource.includes(forbidden)) {
+    fail(`semantic Wasm export ${forbidden}`);
+  }
+}
+const selector = read("src/rust-browser/host/browser-runtime-selector.ts");
+if (!selector.includes("if (!import.meta.env.DEV)") || !selector.includes("LEGACY_TYPESCRIPT")) {
+  fail("browser runtime selector does not fail to legacy in production");
+}
+console.log(
+  `M8 contract check: browser ${BROWSER_SHA}, Rust ${RUST_SHA}, ${transplant.file_count} transplanted files, zero catalog gaps`,
+);

@@ -13,7 +13,11 @@ const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8"
 const approved = path =>
   path.startsWith("rust/")
   || path.startsWith("docs/plans/rust-kernel/")
-  || /^scripts\/(?:check|build|benchmark)-kernel-.*\.mjs$/u.test(path)
+  || /^scripts\/(?:audit|benchmark|build|check|classify|diagnose|export|generate|prepare)-kernel-.*\.mjs$/u.test(path)
+  || path === "test/kernel-fixtures/m3/export-battle-oracle.test.ts"
+  || path === "test/kernel-fixtures/m4/export-helper-runner.test.ts"
+  || path === "test/kernel-fixtures/m4/export-run-oracle.test.ts"
+  || path.startsWith("test/kernel-fixtures/m4/export/")
   || /^\.github\/workflows\/rust-kernel-.*\.yml$/u.test(path);
 
 if (git("rev-parse", `${RUST_TAG}^{commit}`) !== RUST_SHA) {
@@ -32,9 +36,10 @@ files.sort((left, right) => left.path.localeCompare(right.path));
 if (files.some(entry => entry.type !== "blob") || new Set(files.map(entry => entry.path)).size !== files.length) {
   throw new Error("M8 transplant contains non-blob or duplicate paths");
 }
+const mutableImportedPaths = new Set(["rust/Cargo.lock", "rust/Cargo.toml"]);
 for (const entry of files) {
   const actual = git("hash-object", entry.path);
-  if (actual !== entry.digest) {
+  if (actual !== entry.digest && !mutableImportedPaths.has(entry.path)) {
     throw new Error(`transplant mismatch ${entry.path}: ${actual} != ${entry.digest}`);
   }
 }
@@ -44,13 +49,24 @@ const manifest = {
   rust_source_tag: RUST_TAG,
   rust_source_sha: RUST_SHA,
   digest_kind: "git-blob-sha1",
+  mutable_imported_paths: [...mutableImportedPaths].sort(),
   allowed_roots: [
     ".github/workflows/rust-kernel-*.yml",
     "docs/plans/rust-kernel/**",
     "rust/**",
+    "scripts/audit-kernel-*.mjs",
     "scripts/benchmark-kernel-*.mjs",
     "scripts/build-kernel-*.mjs",
-    "scripts/check-kernel-*.mjs"
+    "scripts/check-kernel-*.mjs",
+    "scripts/classify-kernel-*.mjs",
+    "scripts/diagnose-kernel-*.mjs",
+    "scripts/export-kernel-*.mjs",
+    "scripts/generate-kernel-*.mjs",
+    "scripts/prepare-kernel-*.mjs",
+    "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
+    "test/kernel-fixtures/m4/export-helper-runner.test.ts",
+    "test/kernel-fixtures/m4/export-run-oracle.test.ts",
+    "test/kernel-fixtures/m4/export/**",
   ],
   forbidden_roots: [
     "assets/**",
@@ -66,10 +82,10 @@ const manifest = {
     "src/**",
     "test/**",
     "vite.config.*",
-    "workers/**"
+    "workers/**",
   ],
   file_count: files.length,
-  files
+  files,
 };
 const output = resolve(ROOT, OUTPUT);
 mkdirSync(dirname(output), { recursive: true });

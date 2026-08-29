@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "browser_base_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
+  "boundaries": [
+    {"kind":"BOOTSTRAP","typescript":"src/phases/title-phase.ts","rust":"RunBootstrapMachineV1"},
+    {"kind":"COMMAND_CONTROL","typescript":"src/data/elite-redux/coop/authority-v2/adapters/control-open.ts","rust":"GameControlPlanV2"},
+    {"kind":"TURN","typescript":"src/data/elite-redux/coop/authority-v2/adapters/turn-command.ts","rust":"GameMaterialV5"},
+    {"kind":"REPLACEMENT","typescript":"src/data/elite-redux/coop/authority-v2/adapters/faint-replacement.ts","rust":"GameMaterialV5"},
+    {"kind":"INTERACTION","typescript":"src/data/elite-redux/coop/authority-v2/adapters/interactions-reward.ts","rust":"GameMaterialV5"},
+    {"kind":"PROGRESSION","typescript":"src/data/elite-redux/coop/authority-v2/adapters/interactions-learn.ts","rust":"ProgressionQueueV2"},
+    {"kind":"WAVE","typescript":"src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts","rust":"GameMaterialV5"},
+    {"kind":"CAPTURE","typescript":"src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts","rust":"GameStateV5"},
+    {"kind":"SCENARIO","typescript":"src/data/elite-redux/coop/authority-v2/adapters/interactions-mystery.ts","rust":"ScenarioRuntimeStateV1"},
+    {"kind":"SAVE","typescript":"src/data/elite-redux/coop/coop-battle-engine.ts","rust":"GameSaveV1"},
+    {"kind":"PRESENTATION","typescript":"src/data/elite-redux/coop/authority-v2/control-ledger.ts","rust":"PresentationSceneV1"},
+    {"kind":"TERMINAL","typescript":"src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts","rust":"TerminalState"}
+  ],
+  "results":["EQUAL","PRESENTATION_ONLY_DIFFERENCE","PLATFORM_ONLY_DIFFERENCE","MECHANICAL_DIVERGENCE","UNSUPPORTED_COMPARISON"],
+  "shadow_side_effects_allowed": [],
+  "first_divergence_policy":"STOP_EXPORT_DEDUPLICATE"
+}

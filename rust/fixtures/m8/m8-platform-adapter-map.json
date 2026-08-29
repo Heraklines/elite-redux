@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "browser_base_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
+  "adapters": [
+    {"kind":"INPUT","source":"src/inputs-controller.ts","rust_request":"RAW_INPUT","authority":"RUST"},
+    {"kind":"TOUCH_POINTER","source":"src/touch-controls.ts","rust_request":"RAW_INPUT","authority":"RUST"},
+    {"kind":"CLOCK","source":"src/rust-browser/adapters/clock-adapter.ts","rust_request":"TIMER_WAKEUP","authority":"RUST"},
+    {"kind":"LIFECYCLE","source":"src/rust-browser/adapters/lifecycle-adapter.ts","rust_request":"LIFECYCLE","authority":"RUST"},
+    {"kind":"INDEXED_DB","source":"src/rust-browser/adapters/storage-adapter.ts","rust_effect":"STORAGE_REQUEST","payload":"OPAQUE_BYTES"},
+    {"kind":"CLOUD_SAVE","source":"src/api/session-savedata-api.ts","rust_effect":"STORAGE_REQUEST","payload":"OPAQUE_BYTES_CAS"},
+    {"kind":"WEBRTC","source":"src/data/elite-redux/coop/coop-webrtc-transport.ts","rust_effect":"SEND_NETWORK_FRAME","payload":"OPAQUE_BYTES"},
+    {"kind":"SIGNALING","source":"src/data/elite-redux/coop/coop-webrtc-connect.ts","policy":"P33_AUTHENTICATED_ONLY"},
+    {"kind":"AUDIO","source":"src/rust-browser/adapters/audio-adapter.ts","rust_effect":"AUDIO_CUE","authority":"PRESENTATION_ONLY"},
+    {"kind":"ASSET","source":"src/rust-browser/adapters/asset-adapter.ts","rust_effect":"ASSET_REQUEST","authority":"PRESENTATION_ONLY"},
+    {"kind":"SERVICE_WORKER","source":"src/rust-browser/adapters/release-cache.ts","policy":"ATOMIC_RELEASE_UNIT"}
+  ],
+  "legacy_coop_routes_allowed": false,
+  "direct_frame_max_bytes_required": true
+}

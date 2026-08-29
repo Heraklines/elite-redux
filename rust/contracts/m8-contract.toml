@@ -1,0 +1,46 @@
+m72_final_sha = "ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273"
+m72_final_tag = "rust-kernel-m72-final"
+m72_g38_run_id = 33236341480
+browser_base_sha = "b2ed1a6eb050a18d5f335ec826e01b7b425ce311"
+oracle_sha = "b2ed1a6eb050a18d5f335ec826e01b7b425ce311"
+
+transplant_manifest_version = 1
+browser_execution_mode_version = 1
+browser_kernel_abi_version = 1
+browser_worker_protocol_version = 1
+browser_command_envelope_version = 1
+browser_effect_envelope_version = 1
+shadow_bootstrap_version = 1
+shadow_projection_version = 1
+shadow_comparison_version = 1
+dual_repro_capsule_version = 1
+input_adapter_version = 1
+clock_adapter_version = 1
+lifecycle_adapter_version = 1
+storage_adapter_version = 1
+transport_adapter_version = 1
+phaser_ui_adapter_version = 1
+phaser_presentation_adapter_version = 1
+semantic_render_trace_version = 1
+browser_release_manifest_version = 1
+service_worker_cache_manifest_version = 1
+
+maximum_request_bytes = 1048576
+maximum_effect_batch_bytes = 8388608
+maximum_pending_requests = 256
+maximum_artifact_bytes = 1073741824
+maximum_network_frame_bytes = 1048576
+maximum_storage_bytes = 268435456
+maximum_presentation_events = 4096
+
+message_encoding = "CANONICAL_JSON_V1"
+worker_policy = "all kernel execution occurs off the browser main thread"
+authority_policy = "exactly one canonical authority per execution mode"
+shadow_policy = "shadow effects are quarantined and cannot reach platform adapters"
+timer_policy = "Rust owns deadlines; JavaScript only wakes the Rust scheduler"
+storage_policy = "browser stores opaque canonical bytes and never interprets game state"
+transport_policy = "browser transports opaque validated Rust protocol frames"
+presentation_policy = "Phaser renders semantic Rust events and reports explicit outcomes"
+cache_policy = "kernel content assets and adapters are one atomic release unit"
+mixed_peer_policy = "TypeScript and Rust authority peers may not pair"
+deployment_policy = "M8 may deploy private staging preview only; production default remains TypeScript"

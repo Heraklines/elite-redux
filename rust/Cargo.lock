@@ -599,6 +599,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-web"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-dev-types",
+ "er-env",
+ "er-game",
+ "er-repro",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "er-world"
 version = "0.1.0"
 dependencies = [
