@@ -155,3 +155,61 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed G36 instant-agent foundation"
+
+  m72-autonomous-loop:
+    name: M7.2 experiments explorer fingerprints bisect mutations
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-lab-g37' ||
+        github.ref_name == 'arch/rust-kernel-m7-lab-g38'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m72-autonomous-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run autonomous laboratory contracts
+        working-directory: rust
+        run: cargo test -p er-testkit --test m72_autonomous
+
+  m72-autonomous-wasm:
+    name: M7.2 autonomous loop Wasm parity
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-lab-g37' ||
+        github.ref_name == 'arch/rust-kernel-m7-lab-g38'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check autonomous laboratory for Wasm
+        working-directory: rust
+        run: cargo check --target wasm32-unknown-unknown -p er-lab
+
+  m72-g37-aggregate:
+    name: M7.2 G37 autonomous-loop aggregate
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-lab-g37' ||
+        github.ref_name == 'arch/rust-kernel-m7-lab-g38'
+      }}
+    needs:
+      - m72-g36-aggregate
+      - m72-autonomous-loop
+      - m72-autonomous-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed G37 autonomous development loop"
