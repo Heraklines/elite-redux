@@ -1,0 +1,42 @@
+integration_branch = "arch/rust-kernel-m8-hot-reload"
+base_tag = "rust-kernel-m8-final"
+base_sha = "8122fdd5863ee47b6c122d6e6fbb4228906b0b4f"
+
+[integration_owner]
+exclusive = ["rust/Cargo.toml", "rust/Cargo.lock", ".github/workflows/rust-kernel-m81-*.yml", "scripts/check-kernel-m81-contract.mjs", "rust/fixtures/m81/**"]
+
+[hr00_contract]
+owner = "M81-Contract"
+exclusive = ["rust/contracts/m81-*", "rust/contracts/m81-ownership.toml"]
+
+[hra_protocol_worker]
+owner = "M81-Native-Worker"
+exclusive = ["rust/crates/er-kernel-worker/**"]
+
+[hra_supervisor]
+owner = "M81-Native-Supervisor"
+exclusive = ["rust/crates/er-lab/src/kernel_reload/**", "rust/crates/er-lab/tests/kernel_reload_*.rs"]
+
+[hra_tooling]
+owner = "M81-Build-Tooling"
+exclusive = ["rust/crates/er-impact/src/kernel_reload.rs", "rust/crates/er-cli/src/kernel_reload.rs", "scripts/build-kernel-m81-worker.mjs"]
+
+[hrb_contracts]
+owner = "M81-Browser-Contracts"
+exclusive = ["src/rust-browser/hot-reload/contracts.ts", "src/rust-browser/contracts/browser-release-manifest.ts"]
+
+[hrb_worker]
+owner = "M81-Browser-Worker"
+exclusive = ["src/rust-browser/hot-reload/generation-worker-host.ts", "src/rust-browser/worker/rust-kernel-worker.ts"]
+
+[hrb_supervisor]
+owner = "M81-Browser-Supervisor"
+exclusive = ["src/rust-browser/hot-reload/transactional-reload.ts", "src/rust-browser/hot-reload/migration-registry.ts", "src/rust-browser/host/rust-browser-host.ts"]
+
+[hrb_cache_controls]
+owner = "M81-Browser-Cache"
+exclusive = ["src/rust-browser/hot-reload/artifact-loader.ts", "src/rust-browser/hot-reload/dev-controls.ts", "src/rust-browser/adapters/release-cache.ts"]
+
+[qualification]
+owner = "M81-Qualification"
+exclusive = ["test/node/rust-browser/hot-reload/**", "test/browser/rust-browser/hot-reload/**", "rust/crates/er-kernel-worker/tests/**", "rust/crates/er-lab/tests/kernel_reload_*.rs"]

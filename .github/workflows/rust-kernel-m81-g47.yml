@@ -1,0 +1,124 @@
+name: Rust Kernel M8.1 G47 Final Qualification
+
+on:
+  push:
+    branches: [arch/rust-kernel-m8-hot-reload]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m81-g47-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-kernel-m81-contract.mjs
+      - run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          src/rust-browser/hot-reload src/rust-browser/worker/rust-kernel-worker.ts
+          test/node/rust-browser/hot-reload test/browser/rust-browser/hot-reload
+          scripts/check-kernel-m81-contract.mjs
+
+  native-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m81-g47-native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-kernel-worker -p er-lab --all-targets --no-deps -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-kernel-worker -p er-lab
+
+  browser-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2022
+          --lib ES2022,DOM,WebWorker
+          src/rust-browser/hot-reload/contracts.ts
+          src/rust-browser/hot-reload/artifact-loader.ts
+          src/rust-browser/hot-reload/candidate-loader.ts
+          src/rust-browser/hot-reload/dev-controls.ts
+          src/rust-browser/hot-reload/generation-worker-host.ts
+          src/rust-browser/hot-reload/migration-registry.ts
+          src/rust-browser/hot-reload/transactional-reload.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          test/node/rust-browser/hot-reload/transactional-reload.test.ts
+          test/node/rust-browser/hot-reload/generation-worker-host.test.ts
+          test/browser/rust-browser/hot-reload/reload-soak.spec.ts
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/hot-reload/transactional-reload.test.ts
+          test/node/rust-browser/hot-reload/generation-worker-host.test.ts
+          --pool=forks --isolate --no-file-parallelism
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: >-
+          pnpm exec playwright test test/browser/rust-browser/hot-reload/reload-soak.spec.ts
+          --config playwright.rust-browser.config.ts --project chromium --workers=1
+
+  performance-resource:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-lab pair_switches_one_generation_and_thousand_swaps_leave_one_live_owner -- --exact
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/hot-reload/transactional-reload.test.ts
+          -t "performs one thousand swaps without retaining retired generations"
+          --pool=forks --isolate --no-file-parallelism
+
+  g47-aggregate:
+    name: M8.1 G47 immutable final qualification
+    needs: [contract-security, native-qualification, browser-qualification, performance-resource]
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M8.1 exact SHA $GITHUB_SHA passed G47 final qualification; production remains TypeScript"

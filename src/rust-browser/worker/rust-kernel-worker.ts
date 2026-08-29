@@ -13,7 +13,15 @@ interface WorkerTransferPortV1 {
   postMessage(message: ArrayBuffer, transfer: Transferable[]): void;
 }
 
-const transferPort = self as unknown as WorkerTransferPortV1;
+interface AttachGenerationPortV1 {
+  kind: "ATTACH_PORT_V1";
+  generation: number;
+  port: MessagePort;
+}
+
+const globalTransferPort = self as unknown as WorkerTransferPortV1;
+let transferPort: WorkerTransferPortV1 = globalTransferPort;
+let generationPort: MessagePort | null = null;
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
@@ -145,7 +153,7 @@ async function processBatch(buffer: ArrayBuffer): Promise<void> {
   }
 }
 
-self.onmessage = (event: MessageEvent<unknown>) => {
+function acceptProtocolMessage(event: MessageEvent<unknown>): void {
   if (
     !(event.data instanceof ArrayBuffer)
     || event.data.byteLength === 0
@@ -175,4 +183,31 @@ self.onmessage = (event: MessageEvent<unknown>) => {
     .finally(() => {
       pending -= 1;
     });
+}
+
+self.onmessage = (event: MessageEvent<unknown>) => {
+  const candidate = event.data as Partial<AttachGenerationPortV1> | null;
+  if (candidate?.kind === "ATTACH_PORT_V1") {
+    if (
+      generationPort != null
+      || host != null
+      || pending !== 0
+      || !Number.isSafeInteger(candidate.generation)
+      || (candidate.generation ?? -1) < 0
+      || !(candidate.port instanceof MessagePort)
+    ) {
+      postProtocolFault("INVALID_GENERATION_PORT", "generation port attachment is stale or invalid");
+      return;
+    }
+    generationPort = candidate.port;
+    transferPort = generationPort;
+    generationPort.onmessage = acceptProtocolMessage;
+    generationPort.start();
+    return;
+  }
+  if (generationPort != null) {
+    postProtocolFault("GENERATION_PORT_REQUIRED", "global worker channel is fenced after generation attachment");
+    return;
+  }
+  acceptProtocolMessage(event);
 };

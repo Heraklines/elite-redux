@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "base_tag": "rust-kernel-m8-final",
+  "base_sha": "8122fdd5863ee47b6c122d6e6fbb4228906b0b4f",
+  "integration_branch": "arch/rust-kernel-m8-hot-reload",
+  "final_tag": "rust-kernel-m81-final",
+  "gates": {
+    "G44": "CONTRACT_FREEZE",
+    "G45": "NATIVE_PROCESS_RELOAD",
+    "G46": "BROWSER_WORKER_RELOAD",
+    "G47": "IMMUTABLE_FINAL_QUALIFICATION"
+  },
+  "required_platforms": ["linux", "windows", "macos", "browser-chromium"],
+  "production_default": "LEGACY_TYPESCRIPT",
+  "deployment_authorized": false
+}

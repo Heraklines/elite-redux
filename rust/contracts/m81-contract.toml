@@ -1,0 +1,34 @@
+m8_final_sha = "8122fdd5863ee47b6c122d6e6fbb4228906b0b4f"
+m8_final_tag = "rust-kernel-m8-final"
+integration_branch = "arch/rust-kernel-m8-hot-reload"
+
+kernel_worker_abi_version = 1
+kernel_generation_identity_version = 1
+reload_transaction_version = 1
+reload_policy_version = 1
+snapshot_migration_registry_version = 1
+rollback_route_version = 1
+generation_artifact_manifest_version = 1
+browser_reload_protocol_version = 1
+generation_repro_capsule_version = 1
+
+maximum_worker_frame_bytes = 16777216
+maximum_snapshot_bytes = 8388608
+maximum_tail_events = 4096
+maximum_candidate_generations = 2
+maximum_rollback_generations = 1
+maximum_manifest_bytes = 65536
+maximum_migration_steps = 8
+maximum_candidate_startup_ms = 10000
+maximum_typical_reload_ms = 250
+maximum_swap_soak_iterations = 1000
+
+native_transport = "LENGTH_PREFIXED_CANONICAL_JSON_V1"
+browser_transport = "TRANSFERABLE_CANONICAL_JSON_ARRAYBUFFER_V1"
+generation_policy = "session-local monotonic generation plus immutable artifact identity"
+reload_policy = "validate, migrate, restore, replay, compare, then atomically switch"
+rollback_policy = "retain one validated predecessor until candidate acceptance window closes"
+process_policy = "native kernels execute in replaceable child processes; same-process dynamic libraries are forbidden"
+browser_policy = "candidate kernels execute in parallel dedicated Workers; page reload is forbidden"
+security_policy = "artifact hashes, ABI, schemas, bounds, and provenance are verified before execution"
+deployment_policy = "M8.1 is development infrastructure; production remains TypeScript unless separately authorized"

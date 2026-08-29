@@ -1,0 +1,48 @@
+name: Rust Kernel M8.1 G45 Native Reload
+
+on:
+  push:
+    branches: [arch/rust-kernel-m8-hot-reload]
+    paths:
+      - ".github/workflows/rust-kernel-m81-g45.yml"
+      - "rust/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m81-g45-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-worker:
+    name: Native process worker (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m81-g45-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - if: runner.os == 'Linux'
+        run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - if: runner.os == 'Linux'
+        run: cargo clippy --manifest-path rust/Cargo.toml -p er-kernel-worker -p er-lab --all-targets --no-deps -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-kernel-worker
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-lab --test kernel_reload_acceptance
+
+  g45-aggregate:
+    name: M8.1 G45 native reload qualification
+    needs: native-worker
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M8.1 exact SHA $GITHUB_SHA passed native process reload on Linux Windows and macOS"

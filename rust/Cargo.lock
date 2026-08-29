@@ -349,6 +349,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-kernel-worker"
+version = "0.1.0"
+dependencies = [
+ "er-env",
+ "er-game",
+ "er-kernel",
+ "er-types",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "er-lab"
 version = "0.1.0"
 dependencies = [
@@ -363,6 +377,7 @@ dependencies = [
  "er-game",
  "er-impact",
  "er-kernel",
+ "er-kernel-worker",
  "er-model",
  "er-render-model",
  "er-repro",
@@ -371,6 +386,7 @@ dependencies = [
  "er-types",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
 ]
 

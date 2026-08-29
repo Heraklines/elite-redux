@@ -1,0 +1,26 @@
+[package]
+name = "er-kernel-worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "er-kernel-worker"
+path = "src/main.rs"
+
+[dependencies]
+er-env = { path = "../er-env" }
+er-game = { path = "../er-game" }
+er-kernel = { path = "../er-kernel" }
+er-types = { path = "../er-types" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

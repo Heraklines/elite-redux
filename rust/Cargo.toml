@@ -23,6 +23,7 @@ members = [
     "crates/er-batch",
     "crates/er-agent-protocol",
     "crates/er-lab",
+    "crates/er-kernel-worker",
     "crates/er-web",
     "crates/er-cli",
     "crates/er-battle",

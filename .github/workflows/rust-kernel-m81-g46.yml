@@ -1,0 +1,89 @@
+name: Rust Kernel M8.1 G46 Browser Reload
+
+on:
+  push:
+    branches: [arch/rust-kernel-m8-hot-reload]
+    paths:
+      - ".github/workflows/rust-kernel-m81-g46.yml"
+      - "src/rust-browser/**"
+      - "test/node/rust-browser/hot-reload/**"
+      - "test/browser/rust-browser/hot-reload/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m81-g46-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  browser-static-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck M8.1 owned browser surfaces
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2022
+          --lib ES2022,DOM,WebWorker
+          src/rust-browser/hot-reload/contracts.ts
+          src/rust-browser/hot-reload/artifact-loader.ts
+          src/rust-browser/hot-reload/candidate-loader.ts
+          src/rust-browser/hot-reload/dev-controls.ts
+          src/rust-browser/hot-reload/generation-worker-host.ts
+          src/rust-browser/hot-reload/migration-registry.ts
+          src/rust-browser/hot-reload/transactional-reload.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          test/node/rust-browser/hot-reload/transactional-reload.test.ts
+          test/node/rust-browser/hot-reload/generation-worker-host.test.ts
+          test/browser/rust-browser/hot-reload/reload-soak.spec.ts
+      - run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          src/rust-browser/hot-reload src/rust-browser/worker/rust-kernel-worker.ts
+          test/node/rust-browser/hot-reload test/browser/rust-browser/hot-reload
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/hot-reload/transactional-reload.test.ts
+          test/node/rust-browser/hot-reload/generation-worker-host.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  browser-soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: >-
+          pnpm exec playwright test test/browser/rust-browser/hot-reload/reload-soak.spec.ts
+          --config playwright.rust-browser.config.ts --project chromium --workers=1
+
+  g46-aggregate:
+    name: M8.1 G46 browser reload qualification
+    needs: [browser-static-contracts, browser-soak]
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M8.1 exact SHA $GITHUB_SHA passed browser Worker reload and soak"

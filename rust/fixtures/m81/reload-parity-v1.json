@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "m8_base_sha": "8122fdd5863ee47b6c122d6e6fbb4228906b0b4f",
+  "worker_abi_version": 1,
+  "policies": [
+    "EXACT_PRESERVATION",
+    "DECLARED_SEMANTIC_CHANGE",
+    "MIGRATED_COMPATIBLE",
+    "INCOMPATIBLE_REJECT"
+  ],
+  "snapshot_schema": 6,
+  "optional_migration_target_schema": 7,
+  "maximum_tail_events": 4096,
+  "rollback_generations": 1,
+  "soak_swaps": 1000,
+  "typical_reload_ceiling_ms": 250,
+  "required_evidence": [
+    "MECHANICAL",
+    "KERNEL",
+    "PRESENTATION",
+    "EFFECTS",
+    "OBSERVATION",
+    "RESOURCE_LEDGER"
+  ]
+}
