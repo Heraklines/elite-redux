@@ -12,10 +12,11 @@ function waitUntil(predicate) { const { promise, resolve, reject } = Promise.wit
 async function offer() { pc?.close(); pc = new RTCPeerConnection(); const channel = pc.createDataChannel("rust", { ordered: true }); generation = adapter.attach(channel); await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc); return pc.localDescription.sdp; }
 async function answer(sdp) { pc?.close(); pc = new RTCPeerConnection(); pc.ondatachannel = event => { generation = adapter.attach(event.channel); }; await pc.setRemoteDescription({ type: "offer", sdp }); await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc); return pc.localDescription.sdp; }
 async function accept(sdp) { await pc.setRemoteDescription({ type: "answer", sdp }); }
+function rechannel() { const channel = pc.createDataChannel("rust-rejoin", { ordered: true }); generation = adapter.attach(channel); return generation; }
 async function connected() { await waitUntil(() => events.some(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected)); return generation; }
 async function frame() { await waitUntil(() => events.some(event => event.kind === "NETWORK_FRAME")); return events.findLast(event => event.kind === "NETWORK_FRAME").value.bytes; }
 async function failed() { await waitUntil(() => events.some(event => event.kind === "TRANSPORT_CHANGED" && !event.value.connected)); return true; }
-globalThis.__rtc = { offer, answer, accept, connected, failed, frame, send: bytes => adapter.send(generation, new Uint8Array(bytes)), sendGeneration: (value, bytes) => { try { adapter.send(value, new Uint8Array(bytes)); return true; } catch { return false; } }, clear: () => events.splice(0), close: () => { pc?.close(); adapter.dispose(); } };
+globalThis.__rtc = { offer, answer, accept, rechannel, connected, failed, frame, send: bytes => adapter.send(generation, new Uint8Array(bytes)), sendGeneration: (value, bytes) => { try { adapter.send(value, new Uint8Array(bytes)); return true; } catch { return false; } }, clear: () => events.splice(0), close: () => { pc?.close(); adapter.dispose(); } };
 </script></body></html>`;
 
 test.beforeAll(async () => {
@@ -77,7 +78,13 @@ test("two isolated browser contexts exchange and hot-rejoin Rust frames", async 
   await left.evaluate(() => globalThis.__rtc.send([7, 8]));
   await expect.poll(() => right.evaluate(() => globalThis.__rtc.frame())).toEqual([7, 8]);
   await Promise.all([left.evaluate(() => globalThis.__rtc.clear()), right.evaluate(() => globalThis.__rtc.clear())]);
-  const [secondGeneration] = await connect(left, right);
+  const secondGeneration = await left.evaluate(() => globalThis.__rtc.rechannel());
+  const [confirmedLeftGeneration, confirmedRightGeneration] = await Promise.all([
+    left.evaluate(() => globalThis.__rtc.connected()),
+    right.evaluate(() => globalThis.__rtc.connected()),
+  ]);
+  expect(confirmedLeftGeneration).toBe(secondGeneration);
+  expect(confirmedRightGeneration).toBe(secondGeneration);
   expect(secondGeneration).toBe(firstGeneration + 1);
   expect(await left.evaluate(old => globalThis.__rtc.sendGeneration(old, [1]), firstGeneration)).toBe(false);
   await left.evaluate(() => globalThis.__rtc.send([9]));
