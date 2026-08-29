@@ -36,11 +36,15 @@ function canonicalValue(value: unknown): string {
   throw new Error("browser protocol value is not canonical JSON");
 }
 
+export function encodeCanonicalJsonV1(value: unknown): Uint8Array {
+  return encoder.encode(canonicalValue(value));
+}
+
 export function encodeCanonicalBrowserBatch(envelopes: BrowserRequestEnvelopeV1[]): Uint8Array {
   if (envelopes.length === 0 || envelopes.length > MAXIMUM_BROWSER_BATCH_REQUESTS_V1) {
     throw new Error("browser request batch count is outside the frozen bounds");
   }
-  const bytes = encoder.encode(canonicalValue(envelopes));
+  const bytes = encodeCanonicalJsonV1(envelopes);
   if (bytes.byteLength > MAXIMUM_BROWSER_REQUEST_BYTES_V1) {
     throw new Error("browser request batch is oversized");
   }

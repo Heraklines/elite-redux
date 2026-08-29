@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "base_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+  "production_entry": "src/main.ts",
+  "current_default": "LEGACY_TYPESCRIPT",
+  "current_legacy_roots": [
+    "src/battle-scene.ts",
+    "src/game-manager.ts",
+    "src/phases",
+    "src/data/elite-redux/coop"
+  ],
+  "rust_authority_entries": [
+    "src/rust-browser/routes/rust-local-entry.ts",
+    "src/rust-browser/routes/rust-phaser-entry.ts",
+    "src/rust-browser/routes/rust-staging-entry.ts"
+  ],
+  "renderer_allowlist": [
+    "src/rust-browser/render/phaser-ui-adapter.ts",
+    "src/rust-browser/render/phaser-battle-adapter.ts",
+    "src/rust-browser/render/phaser-surface-adapter.ts",
+    "src/rust-browser/render/presentation-settlement.ts"
+  ],
+  "production_rust_banned_roots": [
+    "src/battle-scene.ts",
+    "src/game-manager.ts",
+    "src/phases",
+    "src/data/elite-redux/coop/coop-battle-sync.ts",
+    "src/data/elite-redux/coop/authority-v2"
+  ],
+  "required_entries": {
+    "bootstrap": "src/rust-browser/production/bootstrap.ts",
+    "rust": "src/rust-browser/production/rust-production-entry.ts",
+    "legacy": "src/rust-browser/production/legacy-transition-entry.ts"
+  },
+  "status": "BASELINE_LEGACY_NOT_YET_QUARANTINED"
+}

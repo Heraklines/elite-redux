@@ -1,0 +1,95 @@
+name: Rust Kernel M9 G48 Contract Freeze
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m9-g48-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract-stubs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-kernel-m9-contract.mjs
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production --all-targets --no-deps -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-production
+      - name: Typecheck frozen browser schemas
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2022
+          --lib ES2022,DOM,WebWorker
+          src/rust-browser/production/contracts.ts
+          src/rust-browser/production/signature-verifier.ts
+          src/rust-browser/production/release-manifest.ts
+      - run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          src/rust-browser/production scripts/check-kernel-m9-contract.mjs
+          rust/fixtures/m9
+
+  inherited-rust-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-g48-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - working-directory: rust
+        run: cargo test --workspace --all-targets
+
+  inherited-browser-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/worker-abi.test.ts
+          test/node/rust-browser/worker-security.test.ts
+          test/node/rust-browser/hot-reload/transactional-reload.test.ts
+          test/node/rust-browser/hot-reload/generation-worker-host.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  g48-aggregate:
+    name: M9 G48 production contract freeze
+    needs: [contract-stubs, inherited-rust-regression, inherited-browser-regression]
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed G48 contract freeze and inherited M8.1 regression"

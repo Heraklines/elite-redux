@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "m8_final_sha": "8122fdd5863ee47b6c122d6e6fbb4228906b0b4f",
+  "m81_final_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+  "m81_g47_run_id": 33271954731,
+  "browser": {
+    "cold_ready_ms": 316.0,
+    "warm_ready_median_ms": 236.1,
+    "input_p95_ms": 0.8,
+    "terminal_p95_ms": 12.4,
+    "shadow_overhead_percent": 5.76,
+    "active_workers_after_teardown": 0
+  },
+  "reload": {
+    "native_process_startup_p95_ms": 10.64,
+    "capture_to_active_p95_ceiling_ms": 250,
+    "route_switch_p95_ceiling_ms": 5,
+    "migration_restore_p95_ceiling_ms": 50,
+    "tail_replay_p95_ceiling_ms": 50,
+    "startup_timeout_ms": 10000
+  },
+  "m9_ceiling": {
+    "warm_worker_ready_ms": 750,
+    "cold_desktop_ready_ms": 3000,
+    "cold_mobile_ready_ms": 6000,
+    "desktop_input_p95_ms": 8,
+    "mobile_input_p95_ms": 20,
+    "main_thread_bridge_p95_ms": 3,
+    "long_tasks_over_50ms": 0,
+    "memory_regression_percent": 15,
+    "wasm_regression_percent": 15,
+    "policy_evaluation_ms": 20,
+    "save_migration_typical_ms": 1000,
+    "rollback_propagation_target_ms": 60000,
+    "mixed_release_executions": 0
+  }
+}

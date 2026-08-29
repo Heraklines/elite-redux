@@ -1,0 +1,58 @@
+m81_final_sha = "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b"
+m81_final_tag = "rust-kernel-m81-final"
+m81_g47_run_id = 33271954731
+m8_final_sha = "8122fdd5863ee47b6c122d6e6fbb4228906b0b4f"
+integration_branch = "arch/rust-kernel-m9-production"
+
+production_release_manifest_version = 2
+signed_manifest_envelope_version = 1
+production_authority_runtime_version = 1
+runtime_assignment_version = 1
+session_runtime_pin_version = 1
+production_generation_registry_version = 1
+rollout_policy_version = 1
+rollout_health_version = 1
+rollback_directive_version = 1
+production_save_envelope_version = 2
+save_migration_receipt_version = 1
+save_lease_version = 1
+platform_api_version_set_version = 1
+production_health_event_version = 1
+shadow_sampling_policy_version = 1
+service_worker_release_cache_version = 2
+production_artifact_set_version = 1
+
+signature_algorithm = "ED25519"
+signature_payload = "DOMAIN_SEPARATED_CANONICAL_JSON_V1"
+authority_protocol = "er-coop-47"
+
+maximum_release_manifest_bytes = 131072
+maximum_rollout_policy_bytes = 65536
+maximum_save_envelope_bytes = 268435456
+maximum_retained_complete_releases = 3
+maximum_active_release_pins = 64
+maximum_shadow_events = 10000
+maximum_telemetry_event_bytes = 16384
+maximum_failure_fingerprint_bytes = 1024
+
+worker_initialization_failure_basis_points = 20
+unrecoverable_kernel_fault_basis_points = 5
+valid_save_deterministic_migration_failures = 0
+cloud_save_regression_basis_points = 10
+coop_relative_regression_percent = 10
+coop_absolute_regression_basis_points = 25
+input_latency_regression_percent = 20
+crash_free_regression_basis_points = 10
+
+production_default_after_cutover = "RUST_PRODUCTION"
+legacy_policy = "transition and signed rollback only"
+authority_policy = "exactly one canonical authority"
+session_policy = "active sessions remain pinned to one immutable release"
+build_policy = "build once; promote identical bytes"
+asset_policy = "deploy qualified asset SHA; never resolve latest during promotion"
+save_policy = "copy-on-write migration with immutable legacy backup"
+rollback_policy = "previous Rust release first; legacy only by explicit directive"
+hot_reload_policy = "development and staging only; production sessions are pinned"
+peer_policy = "mixed authority peers forbidden"
+debug_policy = "developer and hot-reload APIs absent from production"
+telemetry_policy = "bounded health events by default; full capsules require consent or internal policy"

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "base_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+  "browser_worker_protocol": 1,
+  "authority_protocol": "er-coop-47",
+  "apis": {
+    "save": {
+      "version": 1,
+      "client": "src/api/session-savedata-api.ts",
+      "worker": "workers/er-save-api",
+      "conflict": "HTTP_409_OR_412_EXPLICIT"
+    },
+    "telemetry": {
+      "version": 1,
+      "client": "src/data/elite-redux/telemetry/telemetry-transport.ts",
+      "worker": "workers/er-telemetry"
+    },
+    "signaling": {
+      "version": 33,
+      "client": "src/data/elite-redux/coop/coop-webrtc-connect.ts",
+      "worker": "workers/er-coop-api"
+    },
+    "showdown": {
+      "version": 1,
+      "client": "src/data/elite-redux/showdown",
+      "worker": "workers/er-telemetry"
+    },
+    "achievement": {
+      "version": 1,
+      "client": "src/data/elite-redux/er-social-achievement-tracker.ts",
+      "worker": "workers/er-save-api"
+    }
+  },
+  "browser_only_credentials": [
+    "pokerogue_sessionId",
+    "account login token",
+    "co-op identity ticket",
+    "Cloudflare deployment credentials"
+  ],
+  "rust_allowed_inputs": [
+    "pseudonymous account identity",
+    "canonical profile bytes",
+    "save envelope bytes",
+    "typed entitlements",
+    "typed backend results"
+  ]
+}

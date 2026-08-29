@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "base_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+  "current_manifest": "src/rust-browser/contracts/browser-release-manifest.ts",
+  "current_sealer": "scripts/seal-kernel-m8-release.mjs",
+  "current_assembler": "scripts/assemble-cloudflare-dist.mjs",
+  "production_workflow": ".github/workflows/deploy-prod.yml",
+  "required_artifacts": [
+    "bootstrap_js",
+    "browser_js",
+    "worker_js",
+    "wasm",
+    "content",
+    "asset_manifest",
+    "service_worker"
+  ],
+  "current_mutable_deployment_inputs": [
+    "er-assets main HEAD",
+    "asset_host",
+    "collect_player_training_data",
+    "production worker source checkout"
+  ],
+  "required_identity_inputs": [
+    "integration_sha",
+    "qualified_asset_sha",
+    "content_hash",
+    "backend_api_versions",
+    "worker_protocol",
+    "authority_protocol",
+    "qualification_run"
+  ],
+  "build_policy": "BUILD_ONCE_PROMOTE_IDENTICAL_BYTES",
+  "promotion_rebuild_allowed": false,
+  "deployment_latest_resolution_allowed": false
+}

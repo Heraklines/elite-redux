@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "base_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+  "sources": [
+    {
+      "id": "typescript-envelope-v1",
+      "path": "rust/crates/er-save/src/lib.rs",
+      "migration": "migrate_typescript_save_v1",
+      "status": "SUPPORTED_IDEALIZED"
+    },
+    {
+      "id": "session-save-current",
+      "path": "src/@types/save-data.ts",
+      "status": "INVENTORIED_NOT_PRODUCTION_MIGRATED"
+    },
+    {
+      "id": "system-save-current",
+      "path": "src/@types/save-data.ts",
+      "status": "INVENTORIED_NOT_PRODUCTION_MIGRATED"
+    },
+    {
+      "id": "versioned-session-system-settings",
+      "path": "src/system/version-migration",
+      "status": "LEGACY_TYPESCRIPT_MIGRATORS"
+    },
+    {
+      "id": "retired-standalone-endless",
+      "path": "src/data/elite-redux/er-legacy-endless-save.ts",
+      "status": "EXPLICIT_UNSUPPORTED_PRESERVE_SOURCE"
+    },
+    {
+      "id": "m7-save-field-catalog",
+      "path": "rust/fixtures/m7/save-field-catalog-v1.json",
+      "status": "FIELD_INVENTORY"
+    },
+    {
+      "id": "m8-save-field-catalog",
+      "path": "rust/fixtures/m8/refresh/system/save-field-catalog-v1.json",
+      "status": "FIELD_INVENTORY"
+    }
+  ],
+  "required_result": "COPY_ON_WRITE_CANONICAL_RUST_ENVELOPE_V2",
+  "source_bytes_destroyed": false,
+  "known_gap_count": 4
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "base_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+  "current_handshake": [
+    "authority_runtime",
+    "authority_protocol",
+    "content_hash",
+    "material_schemas",
+    "browser_kernel_abi",
+    "save_schema",
+    "active_model_identity"
+  ],
+  "required_m9_handshake": [
+    "release_id",
+    "signed_compatibility_set",
+    "mechanical_identity",
+    "authority_runtime",
+    "authority_protocol",
+    "content_hash",
+    "material_schemas",
+    "browser_kernel_abi",
+    "save_schema",
+    "active_model_identity"
+  ],
+  "matchmaking_partition": [
+    "authority_runtime",
+    "authority_protocol",
+    "mechanical_identity",
+    "compatible_release_set"
+  ],
+  "reconnect_fences": [
+    "session_id",
+    "session_epoch",
+    "seat_map_id",
+    "membership_revision",
+    "connection_generation",
+    "release_id",
+    "kernel_generation"
+  ],
+  "mixed_typescript_rust_allowed": false,
+  "active_pair_upgrade_policy": "PIN_UNTIL_TERMINAL",
+  "known_gap": "release_id exists in browser generation identity but is not a current hot-reload admission comparison"
+}

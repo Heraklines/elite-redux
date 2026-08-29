@@ -1,0 +1,45 @@
+integration_branch = "arch/rust-kernel-m9-production"
+base_tag = "rust-kernel-m81-final"
+base_sha = "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b"
+
+[integration_owner]
+exclusive = ["package.json", "pnpm-lock.yaml", "vite.config.ts", "index.html", "src/main.ts", "src/rust-browser/host/browser-runtime-selector.ts", "deploy/**", ".github/workflows/*m9*", ".github/workflows/deploy-prod.yml"]
+
+[contract_steward]
+exclusive = ["rust/contracts/m9-*", "rust/fixtures/m9/**", "docs/plans/rust-kernel/m9-*"]
+
+[release_security]
+exclusive = ["rust/crates/er-production/src/release.rs", "src/rust-browser/production/release-manifest.ts", "src/rust-browser/production/signature-verifier.ts", "scripts/seal-kernel-m9-release.mjs"]
+
+[runtime_assignment]
+exclusive = ["rust/crates/er-production/src/assignment.rs", "src/rust-browser/production/runtime-assignment.ts", "src/rust-browser/production/session-pin.ts"]
+
+[generation_registry]
+exclusive = ["rust/crates/er-production/src/generation.rs", "src/rust-browser/production/generation-registry.ts"]
+
+[production_bootstrap]
+exclusive = ["src/rust-browser/production/bootstrap.ts", "src/rust-browser/production/rust-production-entry.ts", "src/rust-browser/production/legacy-transition-entry.ts"]
+
+[release_cache]
+exclusive = ["src/rust-browser/production/release-cache-v2.ts", "src/rust-browser/production/service-worker.ts", "src/rust-browser/worker/rust-wasm-loader.ts"]
+
+[save_migration]
+exclusive = ["rust/crates/er-production/src/save.rs", "rust/crates/er-save/**", "src/rust-browser/production/save-migration.ts", "src/rust-browser/adapters/cloud-save-adapter.ts"]
+
+[save_lease]
+exclusive = ["src/rust-browser/production/save-lease.ts", "src/rust-browser/adapters/indexeddb-adapter.ts", "src/rust-browser/adapters/storage-adapter.ts"]
+
+[platform_boundary]
+exclusive = ["rust/crates/er-production/src/platform.rs", "src/rust-browser/production/platform-context.ts"]
+
+[coop_release]
+exclusive = ["rust/crates/er-production/src/coop.rs", "src/rust-browser/production/coop-release.ts", "src/rust-browser/adapters/signaling-adapter.ts", "src/rust-browser/adapters/transport-adapter.ts"]
+
+[observability]
+exclusive = ["rust/crates/er-production/src/telemetry.rs", "src/rust-browser/production/health-event.ts", "workers/er-telemetry/src/m9-health.ts"]
+
+[rollout]
+exclusive = ["rust/crates/er-production/src/rollout.rs", "src/rust-browser/production/rollout.ts", "scripts/m9-rollout-policy.mjs"]
+
+[qualification]
+exclusive = ["test/node/rust-browser/production/**", "test/browser/rust-browser/production/**", "rust/crates/er-production/tests/**", "scripts/check-kernel-m9-contract.mjs"]

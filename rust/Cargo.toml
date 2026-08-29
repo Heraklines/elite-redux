@@ -24,6 +24,7 @@ members = [
     "crates/er-agent-protocol",
     "crates/er-lab",
     "crates/er-kernel-worker",
+    "crates/er-production",
     "crates/er-web",
     "crates/er-cli",
     "crates/er-battle",
@@ -47,6 +48,7 @@ serde_json = { version = "1.0", features = ["float_roundtrip"] }
 thiserror = "2.0"
 blake3 = "=1.8.6"
 sha2 = "0.10"
+ed25519-dalek = { version = "2.2", default-features = false, features = ["std"] }
 proptest = "1.6"
 wasm-bindgen-test = "0.3"
 wasm-bindgen = "0.2"
