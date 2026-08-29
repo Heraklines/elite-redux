@@ -7,7 +7,7 @@ export interface RustWasmHostV1 {
 }
 
 export interface RustWasmModuleV1 {
-  default(module: WebAssembly.Module): Promise<unknown>;
+  default(input: { module_or_path: WebAssembly.Module }): Promise<unknown>;
   BrowserKernelHostV1: {
     create(contentBytes: Uint8Array, initBytes: Uint8Array): RustWasmHostV1;
   };
@@ -52,6 +52,6 @@ export async function loadRustWasmModule(url: URL, expectedSha256: string): Prom
     throw new Error("Wasm glue does not expose the frozen browser ABI");
   }
   const typed = glue as RustWasmModuleV1;
-  await typed.default(module);
+  await typed.default({ module_or_path: module });
   return typed;
 }

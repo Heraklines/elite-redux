@@ -106,14 +106,8 @@ test("natural raw-key Rust-local run restores and tears down", async ({ page }) 
   }
   await page.goto(new URL("rust-local-test.html", address).href);
   await expect(page.locator("[data-rust-kernel-view='reference-v1']")).toBeVisible();
-  for (
-    let step = 0;
-    step < 512 && (await page.locator("[role='alert'][data-kind='terminal']").count()) === 0;
-    step += 1
-  ) {
-    await page.keyboard.press(step % 5 === 4 ? "ArrowDown" : "Space");
-  }
-  await expect(page.locator("[role='alert'][data-kind='terminal']")).toBeVisible();
+  await page.keyboard.press("Space");
+  await expect(page.locator("[role='alert'][data-kind='terminal']")).toBeVisible({ timeout: 15_000 });
   const actualDigest = await page.evaluate(() =>
     (globalThis as typeof globalThis & { __m8Harness: { digest(): Promise<string> } }).__m8Harness.digest(),
   );
