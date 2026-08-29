@@ -28,19 +28,15 @@ export async function verifyEd25519EnvelopeV1<T extends object>(options: {
     || key.revoked
     || key.public_key.length !== 32
     || !key.channels.includes(options.channel)
-    || options.releaseEpoch != null && options.releaseEpoch < key.minimum_release_epoch
+    || (options.releaseEpoch != null && options.releaseEpoch < key.minimum_release_epoch)
     || !boundedBytes(key.public_key)
     || !boundedBytes(options.signature)
   ) {
     throw new Error("signed production envelope key policy rejected the input");
   }
-  const publicKey = await crypto.subtle.importKey(
-    "raw",
-    Uint8Array.from(key.public_key),
-    { name: "Ed25519" },
-    false,
-    ["verify"],
-  );
+  const publicKey = await crypto.subtle.importKey("raw", Uint8Array.from(key.public_key), { name: "Ed25519" }, false, [
+    "verify",
+  ]);
   const domain = new TextEncoder().encode(`${options.domain}\0`);
   const payload = encodeCanonicalJsonV1(options.payload);
   const signed = new Uint8Array(domain.byteLength + payload.byteLength);

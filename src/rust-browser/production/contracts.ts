@@ -240,7 +240,10 @@ export interface RolloutRingV1 {
   eligibility: "CI_LOCAL" | "INTERNAL_ALLOWLIST" | "PREVIEW_ALLOWLIST" | "PUBLIC";
   minimum_sessions: number;
   minimum_duration_minutes: number;
-  required_health: Omit<ReleaseHealthSnapshotV1, "schema_version" | "observed_sessions" | "observed_minutes" | "hard_stop" | "hard_stop_fingerprint">;
+  required_health: Omit<
+    ReleaseHealthSnapshotV1,
+    "schema_version" | "observed_sessions" | "observed_minutes" | "hard_stop" | "hard_stop_fingerprint"
+  >;
 }
 
 export interface RolloutPolicyV1 {

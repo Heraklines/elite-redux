@@ -3,12 +3,7 @@
   "base_sha": "1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
   "production_entry": "src/main.ts",
   "current_default": "LEGACY_TYPESCRIPT",
-  "current_legacy_roots": [
-    "src/battle-scene.ts",
-    "src/game-manager.ts",
-    "src/phases",
-    "src/data/elite-redux/coop"
-  ],
+  "current_legacy_roots": ["src/battle-scene.ts", "src/game-manager.ts", "src/phases", "src/data/elite-redux/coop"],
   "rust_authority_entries": [
     "src/rust-browser/routes/rust-local-entry.ts",
     "src/rust-browser/routes/rust-phaser-entry.ts",

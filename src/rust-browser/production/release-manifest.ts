@@ -1,12 +1,5 @@
-import type {
-  ArtifactIdentityV1,
-  ProductionReleaseManifestV2,
-  SignedProductionManifestV1,
-} from "./contracts";
-import {
-  type TrustedBrowserReleaseKeyV1,
-  verifyEd25519EnvelopeV1,
-} from "./signature-verifier";
+import type { ArtifactIdentityV1, ProductionReleaseManifestV2, SignedProductionManifestV1 } from "./contracts";
+import { type TrustedBrowserReleaseKeyV1, verifyEd25519EnvelopeV1 } from "./signature-verifier";
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const GIT_SHA = /^[0-9a-f]{40}$/u;

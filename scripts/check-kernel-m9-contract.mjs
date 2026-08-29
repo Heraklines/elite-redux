@@ -40,8 +40,8 @@ for (const required of [
   M81_SHA,
   M81_TAG,
   M81_G47,
-  "production_default_after_cutover = \"RUST_PRODUCTION\"",
-  "signature_algorithm = \"ED25519\"",
+  'production_default_after_cutover = "RUST_PRODUCTION"',
+  'signature_algorithm = "ED25519"',
   "build once; promote identical bytes",
   "copy-on-write migration",
   "mixed authority peers forbidden",
@@ -69,9 +69,20 @@ for (const path of [
   }
 }
 const security = read("docs/plans/rust-kernel/m9-security-audit.md");
-for (const finding of ["M9-SEC-001", "M9-SEC-002", "M9-SEC-003", "M9-SEC-004", "M9-SEC-005", "M9-SEC-006", "M9-SEC-007", "M9-SEC-008"]) {
+for (const finding of [
+  "M9-SEC-001",
+  "M9-SEC-002",
+  "M9-SEC-003",
+  "M9-SEC-004",
+  "M9-SEC-005",
+  "M9-SEC-006",
+  "M9-SEC-007",
+  "M9-SEC-008",
+]) {
   if (!security.includes(finding)) {
     fail(`security audit omits ${finding}`);
   }
 }
-console.log(`M9 G48 contract freeze: M8.1 ${M81_SHA}, G47 ${M81_G47}, ${contracts.length} contracts, eight security blockers classified`);
+console.log(
+  `M9 G48 contract freeze: M8.1 ${M81_SHA}, G47 ${M81_G47}, ${contracts.length} contracts, eight security blockers classified`,
+);

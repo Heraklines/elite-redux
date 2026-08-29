@@ -22,12 +22,7 @@
     "save_schema",
     "active_model_identity"
   ],
-  "matchmaking_partition": [
-    "authority_runtime",
-    "authority_protocol",
-    "mechanical_identity",
-    "compatible_release_set"
-  ],
+  "matchmaking_partition": ["authority_runtime", "authority_protocol", "mechanical_identity", "compatible_release_set"],
   "reconnect_fences": [
     "session_id",
     "session_epoch",
