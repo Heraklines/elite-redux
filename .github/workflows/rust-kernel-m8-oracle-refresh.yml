@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: rust-kernel-m8-oracle-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   refresh:
     name: M8 ${{ matrix.fixture }} current-browser oracle
