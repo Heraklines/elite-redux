@@ -87,14 +87,16 @@ export class RustBrowserHost {
       return Promise.reject(error);
     }
     return new Promise<BrowserResponseEnvelopeV1[]>((resolve, reject) => {
-      const timeout = globalThis.setTimeout(() => {
-        const index = this.#pending.findIndex(batch => batch.requests === envelopes);
-        if (index >= 0) {
-          this.#pending.splice(index, 1);
-        }
-        reject(new Error("Rust worker response timed out"));
-        this.#fail(new Error("Rust worker response timeout terminated the session"));
-      }, this.#responseTimeoutMs);
+      const timeout = Number(
+        globalThis.setTimeout(() => {
+          const index = this.#pending.findIndex(batch => batch.requests === envelopes);
+          if (index >= 0) {
+            this.#pending.splice(index, 1);
+          }
+          reject(new Error("Rust worker response timed out"));
+          this.#fail(new Error("Rust worker response timeout terminated the session"));
+        }, this.#responseTimeoutMs),
+      );
       this.#pending.push({ requests: envelopes, resolve, reject, timeout });
       try {
         this.#worker.postMessage(bytes.buffer, [bytes.buffer]);

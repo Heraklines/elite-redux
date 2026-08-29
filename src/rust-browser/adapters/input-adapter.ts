@@ -7,7 +7,9 @@ export interface BrowserRawInputAdapterOptions {
   gamepadPollIntervalMs?: number;
 }
 
-const KNOWN_KEYS: Readonly<Record<string, PhysicalKeyV1["kind"]>> = {
+type KnownPhysicalKeyKindV1 = Exclude<PhysicalKeyV1["kind"], "UNKNOWN">;
+
+const KNOWN_KEYS: Readonly<Record<string, KnownPhysicalKeyKindV1>> = {
   ArrowUp: "ARROW_UP",
   ArrowDown: "ARROW_DOWN",
   ArrowLeft: "ARROW_LEFT",
