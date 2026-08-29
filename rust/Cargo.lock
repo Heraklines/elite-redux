@@ -533,6 +533,7 @@ dependencies = [
 name = "er-testkit"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "er-agent-protocol",
  "er-ai",
  "er-batch",

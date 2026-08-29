@@ -25,6 +25,7 @@ thiserror.workspace = true
 workspace = true
 
 [dev-dependencies]
+blake3.workspace = true
 er-agent-protocol = { path = "../er-agent-protocol" }
 er-batch = { path = "../er-batch" }
 er-dev-types = { path = "../er-dev-types" }

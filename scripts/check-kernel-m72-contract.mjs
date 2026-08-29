@@ -171,6 +171,27 @@ if (capsuleSource.lastIndexOf("maximum_total_decompressed_bytes") > capsuleSourc
   fail("capsule aggregate decompression bound is checked after decompression");
 }
 
+const workspaceMembers = source => [...source.matchAll(/"crates\/(er-[a-z0-9-]+)"/gu)]
+  .map(match => match[1]);
+const baseMembers = new Set(workspaceMembers(git("show", `${BASE_TAG}:rust/Cargo.toml`)));
+const currentMembers = workspaceMembers(read("rust/Cargo.toml"));
+const addedMembers = currentMembers.filter(member => !baseMembers.has(member));
+if (addedMembers.join(",") !== "er-lab") {
+  fail(`M7.2 crate budget differs from er-lab: ${addedMembers.join(",")}`);
+}
+
+const currentRuntimeSource = [
+  "rust/crates/er-game/src/m7_runtime.rs",
+  "rust/crates/er-game/src/m7_material.rs",
+  "rust/crates/er-kernel/src/game_kernel_v6.rs",
+  "rust/crates/er-env/src/lib.rs",
+].map(read).join("\n");
+for (const forbidden of architecture.forbidden_current_runtime_terms) {
+  if (currentRuntimeSource.includes(forbidden)) {
+    fail(`current runtime imports forbidden bridge ${forbidden}`);
+  }
+}
+
 const api = read("rust/contracts/m72-api.md");
 for (const requirement of [
   "Natural begins at Title",

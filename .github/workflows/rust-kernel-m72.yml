@@ -213,3 +213,95 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed G37 autonomous development loop"
+
+  m72-fast-iteration:
+    name: M7.2 incremental reload platform viewer security
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-lab-g38' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m72-final-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run fast-iteration and simplification contracts
+        working-directory: rust
+        run: cargo test -p er-testkit --test m72_final
+
+  m72-cross-platform:
+    name: M7.2 deterministic corpus (${{ matrix.os }})
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-lab-g38' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - windows-latest
+          - macos-14
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Run fixed cross-platform determinism proof
+        working-directory: rust
+        run: >-
+          cargo test -p er-testkit --test m72_final
+          fixed_platform_corpus_detects_first_divergence -- --exact
+
+  m72-performance:
+    name: M7.2 release-profile hard ceilings
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-lab-g38' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m72-release-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run release matrix throughput ceiling
+        working-directory: rust
+        run: >-
+          cargo test --release -p er-testkit --test m72_autonomous
+          ten_thousand_case_matrix_expands_within_agent_ceiling -- --exact
+
+  m72-final-audit:
+    name: M7.2 architecture security API bypass audit
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-lab-g38' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m72-contract.mjs
+      - name: Verify exact M7.1 base remains an ancestor
+        run: git merge-base --is-ancestor 79e3544029e422deb8389a12f8b75e7f0febfb3e HEAD
+
+  m72-g38-aggregate:
+    name: M7.2 G38 immutable qualification
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-lab-g38' }}
+    needs:
+      - m72-g37-aggregate
+      - m72-fast-iteration
+      - m72-cross-platform
+      - m72-performance
+      - m72-final-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed immutable G38 qualification"
