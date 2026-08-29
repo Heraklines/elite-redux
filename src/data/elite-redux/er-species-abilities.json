@@ -371,6 +371,13 @@
   "SPECIES_PHANTOWL": {
     "ability2": 5123
   },
+  "SPECIES_RELICANTH_MEGA": {
+    "innates": [
+      5064,
+      5459,
+      5056
+    ]
+  },
   "SPECIES_RIBOMBEE": {
     "hidden": 118
   },
