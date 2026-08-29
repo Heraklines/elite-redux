@@ -168,6 +168,11 @@ export class RustBrowserHost {
         throw new Error("Rust worker response is not a batch");
       }
       const responses = parsed as BrowserResponseEnvelopeV1[];
+      const protocolFault =
+        responses.length === 1 && responses[0]?.response.kind === "FAULT" ? responses[0].response.value : null;
+      if (protocolFault != null && responses[0]?.request_id === 0) {
+        throw new Error(`${protocolFault.code}: ${protocolFault.message}`);
+      }
       this.#sequencer.accept(pending.requests, responses);
       zeroizeRequests(pending.requests);
       pending.resolve(responses);

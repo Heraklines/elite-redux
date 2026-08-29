@@ -51,6 +51,7 @@ pub enum BrowserWebErrorV1 {
 #[derive(Debug)]
 pub struct BrowserKernelHostV1 {
     kernel: Option<GameKernelV6>,
+    protocol_role: Option<EndpointRole>,
     content_identity_bytes: Vec<u8>,
     initial_snapshot_bytes: Vec<u8>,
     accepted_sequence: SafeU53,
@@ -71,6 +72,7 @@ impl BrowserKernelHostV1 {
         );
         let snapshot: RestorableKernelSnapshotV6 = serde_json::from_slice(init_bytes)
             .map_err(|_| js_error(BrowserWebErrorV1::InvalidMessage))?;
+        let protocol_role = snapshot.protocol.as_ref().map(|protocol| protocol.role);
         let kernel = GameKernelV6::from_snapshot(snapshot, content.clone())
             .map_err(|error| js_error(BrowserWebErrorV1::Kernel(error.to_string())))?;
         let content_identity_bytes = canonical_bytes(content.identity())
@@ -79,6 +81,7 @@ impl BrowserKernelHostV1 {
             .map_err(|error| js_error(BrowserWebErrorV1::Canonical(error.to_string())))?;
         Ok(Self {
             kernel: Some(kernel),
+            protocol_role,
             content_identity_bytes,
             initial_snapshot_bytes,
             accepted_sequence: SafeU53::ZERO,
@@ -109,6 +112,16 @@ impl BrowserKernelHostV1 {
         self.retained.clear();
         self.content_identity_bytes.fill(0);
         self.initial_snapshot_bytes.fill(0);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl BrowserKernelHostV1 {
+    pub fn dispatch_batch_native(
+        &mut self,
+        request_bytes: &[u8],
+    ) -> Result<Vec<u8>, BrowserWebErrorV1> {
+        self.dispatch_batch_inner(request_bytes)
     }
 }
 
@@ -171,6 +184,7 @@ impl BrowserKernelHostV1 {
         for request in &requests {
             let response = process_request(
                 &mut staged_kernel,
+                self.protocol_role,
                 &self.content_identity_bytes,
                 &self.initial_snapshot_bytes,
                 &mut staged_wakeup,
@@ -224,6 +238,7 @@ impl BrowserKernelHostV1 {
 
 fn process_request(
     kernel: &mut GameKernelV6,
+    protocol_role: Option<EndpointRole>,
     content_identity_bytes: &[u8],
     initial_snapshot_bytes: &[u8],
     last_wakeup_micros: &mut SafeU53,
@@ -248,7 +263,7 @@ fn process_request(
             let control_effect = kernel
                 .raw_input(event.clone())
                 .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?;
-            let mut batch = effect_batch(kernel, envelope.sequence)?;
+            let mut batch = effect_batch(kernel, protocol_role, envelope.sequence)?;
             if let Some(KernelControlEffectV6::ProposalReady { bytes, .. }) = control_effect {
                 batch.effects.push(BrowserEffectV1::SendNetworkFrame {
                     generation: protocol_generation(kernel)?,
@@ -263,6 +278,7 @@ fn process_request(
                 .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?;
             Ok(BrowserResponseV1::Effects(effect_batch(
                 kernel,
+                protocol_role,
                 envelope.sequence,
             )?))
         }
@@ -282,6 +298,7 @@ fn process_request(
             *last_wakeup_micros = *monotonic_micros;
             Ok(BrowserResponseV1::Effects(effect_batch(
                 kernel,
+                protocol_role,
                 envelope.sequence,
             )?))
         }
@@ -311,6 +328,7 @@ fn process_request(
             }
             Ok(BrowserResponseV1::Effects(effect_batch(
                 kernel,
+                protocol_role,
                 envelope.sequence,
             )?))
         }
@@ -318,6 +336,7 @@ fn process_request(
             kernel.clear_presentations();
             Ok(BrowserResponseV1::Effects(effect_batch(
                 kernel,
+                protocol_role,
                 envelope.sequence,
             )?))
         }
@@ -338,6 +357,7 @@ fn process_request(
         | BrowserRequestV1::StorageResult { .. }
         | BrowserRequestV1::Lifecycle(_) => Ok(BrowserResponseV1::Effects(effect_batch(
             kernel,
+            protocol_role,
             envelope.sequence,
         )?)),
     }
@@ -345,6 +365,7 @@ fn process_request(
 
 fn effect_batch(
     kernel: &mut GameKernelV6,
+    protocol_role: Option<EndpointRole>,
     external_sequence: SafeU53,
 ) -> Result<BrowserEffectBatchV1, BrowserWebErrorV1> {
     let snapshot = kernel.snapshot();
@@ -371,11 +392,7 @@ fn effect_batch(
                 .map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))?,
         ));
     }
-    if snapshot
-        .protocol
-        .as_ref()
-        .is_some_and(|protocol| protocol.role == EndpointRole::Authority)
-    {
+    if protocol_role == Some(EndpointRole::Authority) {
         let generation = protocol_generation(kernel)?;
         for transaction in &snapshot.prepared_transactions {
             effects.push(BrowserEffectV1::SendNetworkFrame {

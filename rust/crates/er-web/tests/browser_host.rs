@@ -40,7 +40,7 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
     };
     let ready_bytes = er_canonical::canonical_bytes(&vec![initialize])?;
     let ready_encoded = host
-        .dispatch_batch(&ready_bytes)
+        .dispatch_batch_native(&ready_bytes)
         .map_err(|_| "native browser initialization dispatch failed")?;
     assert_eq!(
         host.dispatch_batch(&ready_bytes)
@@ -76,7 +76,7 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
     ];
     let raw_bytes = er_canonical::canonical_bytes(&raw)?;
     let raw_encoded = host
-        .dispatch_batch(&raw_bytes)
+        .dispatch_batch_native(&raw_bytes)
         .map_err(|_| "native browser raw-input dispatch failed")?;
     assert_eq!(
         host.dispatch_batch(&raw_bytes)
@@ -110,6 +110,18 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
         .map_err(|_| "authority browser host creation failed")?;
     let mut replica = BrowserKernelHostV1::create(CONTENT, REPLICA_SESSION)
         .map_err(|_| "replica browser host creation failed")?;
+    assert_eq!(
+        authority
+            .snapshot()
+            .map_err(|_| "authority initial snapshot failed")?,
+        AUTHORITY_SESSION
+    );
+    assert_eq!(
+        replica
+            .snapshot()
+            .map_err(|_| "replica initial snapshot failed")?,
+        REPLICA_SESSION
+    );
     for (host, session) in [
         (&mut authority, AUTHORITY_SESSION),
         (&mut replica, REPLICA_SESSION),
@@ -126,8 +138,7 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
             }),
         };
         let bytes = er_canonical::canonical_bytes(&vec![request])?;
-        host.dispatch_batch(&bytes)
-            .map_err(|_| "staging browser initialization failed")?;
+        host.dispatch_batch_native(&bytes)?;
     }
     let authority_requests = vec![
         BrowserRequestEnvelopeV1 {
@@ -152,7 +163,7 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
     ];
     let authority_responses: Vec<BrowserResponseEnvelopeV1> = serde_json::from_slice(
         &authority
-            .dispatch_batch(&er_canonical::canonical_bytes(&authority_requests)?)
+            .dispatch_batch_native(&er_canonical::canonical_bytes(&authority_requests)?)
             .map_err(|_| "authority raw input failed")?,
     )?;
     let materials = authority_responses
@@ -185,7 +196,7 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
         .collect::<TestResult<Vec<_>>>()?;
     let replica_responses: Vec<BrowserResponseEnvelopeV1> = serde_json::from_slice(
         &replica
-            .dispatch_batch(&er_canonical::canonical_bytes(&replica_requests)?)
+            .dispatch_batch_native(&er_canonical::canonical_bytes(&replica_requests)?)
             .map_err(|_| "replica material dispatch failed")?,
     )?;
     assert_eq!(

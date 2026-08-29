@@ -13,7 +13,7 @@ const fixture = resolve(fixtureRoot);
 let server: ViteDevServer;
 const html = `<!doctype html><html><body><script type="module">
 import { RustBrowserHost } from "/src/rust-browser/host/rust-browser-host.ts"; import { BrowserExecutionModeV1 } from "/src/rust-browser/contracts/browser-contracts.ts";
-const manifest = await (await fetch("/m8-assets/m8-web-assets.json")).json(); const identity = new Uint8Array(await (await fetch("/m8-assets/execution-identity.bin")).arrayBuffer()); const session = new Uint8Array(await (await fetch("/m8-assets/session-start.json")).arrayBuffer()); const ready = []; const input = [];
+const manifest = await (await fetch("/m8-assets/m8-web-assets.json")).json(); const identity = new Uint8Array(await (await fetch("/m8-assets/execution-identity.bin")).arrayBuffer()); const session = new Uint8Array(await (await fetch("/m8-assets/session-start.json")).arrayBuffer()); const ready = []; const input = []; const terminal = [];
 for (let sample = 0; sample < 20; sample += 1) {
   const worker = new URL("/src/rust-browser/worker/rust-kernel-worker.ts", location.href);
   worker.searchParams.set("wasm", "/m8-assets/er_web.wasm");
@@ -34,14 +34,34 @@ for (let sample = 0; sample < 20; sample += 1) {
     },
   });
   ready.push(performance.now() - readyStart);
-  await host.dispatch({ kind: "OBSERVE", value: { profile: "PERFORMANCE_WARMUP" } });
+  for (let warmup = 0; warmup < 3; warmup += 1) {
+    await host.dispatch({ kind: "OBSERVE", value: { profile: "PERFORMANCE_WARMUP" } });
+  }
+  await host.dispatchBatch([
+    {
+      kind: "RAW_INPUT",
+      value: {
+        kind: "KEY_DOWN",
+        data: {
+          code: { kind: "KEY_A" },
+          printable: true,
+          browser_repeat: false,
+          focus: "GAME",
+        },
+      },
+    },
+    {
+      kind: "RAW_INPUT",
+      value: { kind: "KEY_UP", data: { code: { kind: "KEY_A" } } },
+    },
+  ]);
   const inputStart = performance.now();
   await host.dispatch({
     kind: "RAW_INPUT",
     value: {
       kind: "KEY_DOWN",
       data: {
-        code: { kind: "SPACE" },
+        code: { kind: "KEY_A" },
         printable: true,
         browser_repeat: false,
         focus: "GAME",
@@ -51,11 +71,31 @@ for (let sample = 0; sample < 20; sample += 1) {
   input.push(performance.now() - inputStart);
   await host.dispatch({
     kind: "RAW_INPUT",
-    value: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } },
+    value: { kind: "KEY_UP", data: { code: { kind: "KEY_A" } } },
   });
+  const terminalStart = performance.now();
+  await host.dispatchBatch([
+    {
+      kind: "RAW_INPUT",
+      value: {
+        kind: "KEY_DOWN",
+        data: {
+          code: { kind: "SPACE" },
+          printable: true,
+          browser_repeat: false,
+          focus: "GAME",
+        },
+      },
+    },
+    {
+      kind: "RAW_INPUT",
+      value: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } },
+    },
+  ]);
+  terminal.push(performance.now() - terminalStart);
   await host.dispose();
 }
-ready.sort((a,b)=>a-b); input.sort((a,b)=>a-b); globalThis.__performanceResult = { cold_ready_ms: ready.at(-1), warm_ready_median_ms: ready[10], input_p95_ms: input[Math.ceil(input.length * 0.95) - 1], samples: 20, active_workers: 0, js_heap_bytes: performance.memory?.usedJSHeapSize ?? null };
+ready.sort((a,b)=>a-b); input.sort((a,b)=>a-b); terminal.sort((a,b)=>a-b); globalThis.__performanceResult = { cold_ready_ms: ready.at(-1), warm_ready_median_ms: ready[10], input_p95_ms: input[Math.ceil(input.length * 0.95) - 1], terminal_p95_ms: terminal[Math.ceil(terminal.length * 0.95) - 1], samples: 20, active_workers: 0, js_heap_bytes: performance.memory?.usedJSHeapSize ?? null };
 </script></body></html>`;
 
 test.beforeAll(async () => {
@@ -120,5 +160,6 @@ test("worker startup input and teardown stay within browser ceilings", async ({ 
   expect(metrics.cold_ready_ms).toBeLessThanOrEqual(3_000);
   expect(metrics.warm_ready_median_ms).toBeLessThanOrEqual(750);
   expect(metrics.input_p95_ms).toBeLessThanOrEqual(12);
+  expect(metrics.terminal_p95_ms).toBeLessThanOrEqual(100);
   expect(metrics.active_workers).toBe(0);
 });

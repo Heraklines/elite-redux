@@ -187,18 +187,26 @@ jobs:
           name: m8-final-web-${{ github.sha }}
           path: ${{ runner.temp }}/m8-web
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - name: Run complete browser matrix slice
+      - name: Run cross-browser Rust core matrix
         env:
           M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m8-web
         run: >-
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=${{ matrix.browser }}
-          test/browser/rust-browser/full-solo.spec.ts
-          test/browser/rust-browser/rust-staging-entry.spec.ts
-          test/browser/rust-browser/full-coop.spec.ts
+          test/browser/rust-browser/rust-local.spec.ts
           test/browser/rust-browser/save-offline.spec.ts
           test/browser/rust-browser/release-cache.spec.ts
           test/browser/rust-browser/input-accessibility.spec.ts
+      - name: Run Chromium production-fidelity Rust Phaser and co-op
+        if: matrix.browser == 'chromium'
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m8-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=chromium
+          test/browser/rust-browser/full-solo.spec.ts
+          test/browser/rust-browser/rust-staging-entry.spec.ts
+          test/browser/rust-browser/full-coop.spec.ts
           test/browser/rust-browser/adapters/phaser-adapter.spec.ts
           test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
       - uses: actions/upload-artifact@v6
