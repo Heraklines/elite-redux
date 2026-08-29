@@ -284,6 +284,16 @@
       5304
     ]
   },
+  "SPECIES_LUCARIO_MEGA": {
+    "ability1": 20008,
+    "ability2": 20008,
+    "hidden": 20008,
+    "innates": [
+      5102,
+      91,
+      5722
+    ]
+  },
   "SPECIES_LUMINOSITEON": {
     "ability1": 5232,
     "ability2": 168,
