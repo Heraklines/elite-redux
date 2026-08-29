@@ -2,7 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -42,6 +42,7 @@ run("cargo", [
 ]);
 const wasmInput = resolve(ROOT, "rust/target/wasm32-unknown-unknown/release/er_web.wasm");
 run("wasm-bindgen", [wasmInput, "--target", "web", "--out-dir", out, "--out-name", "er_web"]);
+renameSync(resolve(out, "er_web_bg.wasm"), resolve(out, "er_web.wasm"));
 copyFileSync(content, resolve(out, "content-pack.json"));
 copyFileSync(identity, resolve(out, "execution-identity.bin"));
 copyFileSync(session, resolve(out, "session-start.json"));
