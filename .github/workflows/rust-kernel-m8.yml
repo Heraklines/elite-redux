@@ -66,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo fmt --all -- --check
-          cargo clippy -p er-web --all-targets -- -D warnings
+          cargo clippy -p er-web --all-targets --no-deps -- -D warnings
       - name: Check browser host native and Wasm targets
         working-directory: rust
         run: |
@@ -81,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/cache@v5
         with:
           path: |
@@ -182,7 +182,19 @@ jobs:
           fi
           b3sum --version | grep -Fx 'b3sum 1.8.6'
       - run: pnpm install --frozen-lockfile
+      - name: Materialize current browser oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m8-browser-oracle" "$M8_BROWSER_SHA"
+          node scripts/prepare-kernel-m8-oracle-refresh.mjs \
+            --oracle-root "$RUNNER_TEMP/m8-browser-oracle" \
+            --oracle-sha "$M8_BROWSER_SHA"
+      - name: Install oracle dependencies
+        working-directory: ${{ runner.temp }}/m8-browser-oracle
+        run: pnpm install --frozen-lockfile
       - name: Export twice and compare committed current-browser fixture
+        working-directory: ${{ runner.temp }}/m8-browser-oracle
         env:
           LC_ALL: C
           LANG: C
@@ -201,7 +213,7 @@ jobs:
             M4_ORACLE_GAP_REPORT="$second/gaps.json" node scripts/export-kernel-m4-oracle.mjs --output-root "$second"
           fi
           diff -ru "$first" "$second"
-          diff -ru "rust/fixtures/m8/oracle/${{ matrix.fixture }}" "$first"
+          diff -ru "$GITHUB_WORKSPACE/rust/fixtures/m8/oracle/${{ matrix.fixture }}" "$first"
 
   g39-aggregate:
     name: M8 G39 immutable contract freeze
