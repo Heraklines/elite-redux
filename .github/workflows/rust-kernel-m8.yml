@@ -1,0 +1,217 @@
+name: Rust Kernel M8 G39 Contract Freeze
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m8-browser-g39
+    paths:
+      - ".github/workflows/rust-kernel-m8.yml"
+      - "docs/plans/rust-kernel/m8-*"
+      - "rust/**"
+      - "scripts/*kernel-m8*"
+      - "src/rust-browser/**"
+      - "test/kernel-fixtures/m3/**"
+      - "test/kernel-fixtures/m4/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m8-g39-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  M8_BROWSER_SHA: b2ed1a6eb050a18d5f335ec826e01b7b425ce311
+  M8_RUST_SHA: ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273
+
+jobs:
+  source-lock-contract:
+    name: M8 exact source lock transplant contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m8-contract.mjs
+      - name: Reproduce transplant manifest
+        run: |
+          set -euo pipefail
+          node scripts/generate-kernel-m8-transplant.mjs
+          git diff --exit-code -- rust/fixtures/m8/m8-transplant-manifest.json
+      - name: Prove frozen browser production roots
+        run: |
+          set -euo pipefail
+          test -z "$(git diff --name-only "$M8_BROWSER_SHA" -- package.json pnpm-lock.yaml vite.config.ts index.html index.css workers deploy assets editor locales)"
+
+  rust-static-wasm:
+    name: M8 Rust format clippy native Wasm stubs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m8-g39-static-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check formatting and clippy
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+      - name: Check browser host native and Wasm targets
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo check -p er-web
+          cargo check -p er-web --target wasm32-unknown-unknown
+
+  rust-regression:
+    name: M8 complete M0 through M7.2 regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m8-g39-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run complete inherited Rust workspace
+        working-directory: rust
+        run: cargo test --workspace --all-targets
+
+  browser-static-build:
+    name: M8 current browser owned static and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Reject TypeScript diagnostics in the M8 browser boundary
+        shell: bash
+        run: |
+          set +e
+          pnpm typecheck > m8-typecheck.log 2>&1
+          status=$?
+          set -e
+          diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' m8-typecheck.log || true)"
+          owned="$(grep -E '^src/rust-browser/[^()]+\([0-9]+,[0-9]+\): error TS' m8-typecheck.log || true)"
+          if [ -n "$owned" ]; then
+            printf '%s\n' "$owned"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ] && [ "$diagnostics" -eq 0 ]; then
+            cat m8-typecheck.log
+            echo "Repository typecheck failed without parseable diagnostics"
+            exit 1
+          fi
+          echo "M8 browser boundary is type-clean; frozen browser base reported $diagnostics unrelated diagnostics"
+      - name: Check M8 browser formatting and build unchanged default
+        run: |
+          set -euo pipefail
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched \
+            src/rust-browser \
+            scripts/check-kernel-m8-contract.mjs \
+            scripts/generate-kernel-m8-transplant.mjs \
+            scripts/prepare-kernel-m8-oracle-refresh.mjs \
+            scripts/refresh-kernel-m8-catalogs.mjs
+          pnpm build
+
+  current-browser-oracle:
+    name: M8 current browser ${{ matrix.fixture }} oracle closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [m3, m4]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Restore pinned BLAKE3 verifier
+        id: b3sum-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m8-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+      - name: Install pinned BLAKE3 verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+      - run: pnpm install --frozen-lockfile
+      - name: Export twice and compare committed current-browser fixture
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M5_ORACLE_REFRESH_SHA: ${{ env.M8_BROWSER_SHA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          first="$RUNNER_TEMP/m8-${{ matrix.fixture }}-first"
+          second="$RUNNER_TEMP/m8-${{ matrix.fixture }}-second"
+          if [[ "${{ matrix.fixture }}" == "m3" ]]; then
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$first"
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$second"
+          else
+            M4_ORACLE_GAP_REPORT="$first/gaps.json" node scripts/export-kernel-m4-oracle.mjs --output-root "$first"
+            M4_ORACLE_GAP_REPORT="$second/gaps.json" node scripts/export-kernel-m4-oracle.mjs --output-root "$second"
+          fi
+          diff -ru "$first" "$second"
+          diff -ru "rust/fixtures/m8/oracle/${{ matrix.fixture }}" "$first"
+
+  g39-aggregate:
+    name: M8 G39 immutable contract freeze
+    needs:
+      - source-lock-contract
+      - rust-static-wasm
+      - rust-regression
+      - browser-static-build
+      - current-browser-oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M8 exact SHA $GITHUB_SHA passed immutable G39 contract freeze"

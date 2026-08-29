@@ -44,6 +44,32 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Restore pinned BLAKE3 verifier
+        id: b3sum-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m8-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+      - name: Install pinned BLAKE3 verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+      - name: Save pinned BLAKE3 verifier
+        if: steps.b3sum-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m8-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
       - run: pnpm install --frozen-lockfile
       - name: Materialize current browser oracle
         shell: bash
