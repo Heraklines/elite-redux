@@ -108,6 +108,29 @@ if (
   fail("oracle refresh is not zero-gap");
 }
 
+const dynamicDrift = JSON.parse(read("rust/fixtures/m8/m8-dynamic-oracle-drift-report.json"));
+const oracleAttestation = JSON.parse(read("rust/fixtures/m8/m8-oracle-refresh-attestation.json"));
+if (
+  dynamicDrift.candidate_oracle_sha !== BROWSER_SHA
+  || dynamicDrift.m3.counts.SEMANTIC_CHANGE !== 39
+  || dynamicDrift.m3.counts.PROVENANCE_ONLY !== 1
+  || dynamicDrift.m3.files.length !== 40
+  || dynamicDrift.m4.counts.SEMANTIC_CHANGE !== 8
+  || dynamicDrift.m4.counts.PROVENANCE_ONLY !== 2
+  || dynamicDrift.m4.files.length !== 10
+  || refresh.dynamic_oracle_unclassified_count !== 0
+  || drift.dynamic_oracle_refresh?.unclassified_fixture_count !== 0
+  || oracleAttestation.browser_oracle_sha !== BROWSER_SHA
+  || oracleAttestation.workflow_run_id !== 33243667688
+  || oracleAttestation.unclassified_fixture_count !== 0
+  || oracleAttestation.artifacts.m3.archive_sha256
+    !== "882dcd4f82cd29f866b9d501d897fec7c06fb2ea8fb5d3d232ef931add011137"
+  || oracleAttestation.artifacts.m4.archive_sha256
+    !== "13bcde37a72cf2b56bcccf2cb28608ed2e2355f09148e57c446d46a680cfe9f3"
+) {
+  fail("dynamic M3/M4 oracle refresh is not fully classified");
+}
+
 const requiredContracts = [
   "m8-api.md",
   "m8-cache-release.md",
