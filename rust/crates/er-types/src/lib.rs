@@ -10,6 +10,7 @@ pub mod ids;
 pub mod input;
 pub mod m6;
 pub mod m7;
+pub mod m72_bootstrap;
 pub mod m7_action;
 pub mod m7_menu;
 pub mod m7_run_ir;
@@ -31,6 +32,7 @@ pub use m7::*;
 pub use m7_action::*;
 pub use m7_menu::*;
 pub use m7_run_ir::*;
+pub use m72_bootstrap::*;
 pub use mechanics::*;
 pub use protocol::*;
 pub use run_control::{

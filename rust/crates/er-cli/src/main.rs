@@ -1,5 +1,7 @@
 //! Terminal adapter for the M7 headless environment.
 
+mod m72;
+
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
@@ -20,6 +22,7 @@ use er_repro::{CapsuleLimitsV1, ReproCapsuleV1};
 use er_save::{GameReplayV1, GameSaveV1};
 use er_state::m7_state::GameStateV5;
 use er_types::{InputFocus, PhysicalKey, RawInputEvent, SafeU53};
+use m72::{BoundedLineStatusV1, read_bounded_file_v1, read_bounded_jsonl_line_v1};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut arguments = env::args().skip(1);
@@ -179,18 +182,11 @@ fn agent_jsonl(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>>
     let mut writer = stdout.lock();
     let mut line = Vec::new();
     loop {
-        line.clear();
-        let read = reader.read_until(b'\n', &mut line)?;
-        if read == 0 {
-            break;
-        }
-        while line
-            .last()
-            .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
-        {
-            line.pop();
-        }
-        let response = server.process_line(&line)?;
+        let response = match read_bounded_jsonl_line_v1(&mut reader, &mut line, 1 << 20)? {
+            BoundedLineStatusV1::Eof => break,
+            BoundedLineStatusV1::Oversized => server.process_oversized_line()?,
+            BoundedLineStatusV1::Line => server.process_line(&line)?,
+        };
         writer.write_all(&response)?;
         writer.flush()?;
     }
@@ -198,8 +194,9 @@ fn agent_jsonl(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>>
 }
 
 fn validate_capsule(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
-    let path = option_path(options, "capsule", "ER_M71_CAPSULE")?;
-    let bytes = fs::read(path)?;
+    let root = option_path(options, "artifact-root", "ER_M72_ARTIFACT_ROOT")?;
+    let relative = option_path(options, "capsule", "ER_M71_CAPSULE")?;
+    let bytes = read_bounded_file_v1(&root, &relative, 261 << 20)?;
     let capsule = ReproCapsuleV1::decode(&bytes, cli_capsule_limits())?;
     write_line(&format!(
         "valid capsule: mode={:?}, blobs={}, oracle={:?}",

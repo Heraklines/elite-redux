@@ -30,6 +30,7 @@ er-batch = { path = "../er-batch" }
 er-dev-types = { path = "../er-dev-types" }
 er-devplane = { path = "../er-devplane" }
 er-impact = { path = "../er-impact" }
+er-lab = { path = "../er-lab" }
 er-model = { path = "../er-model" }
 er-render-model = { path = "../er-render-model" }
 er-repro = { path = "../er-repro" }

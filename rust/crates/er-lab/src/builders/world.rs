@@ -1,0 +1,21 @@
+//! World, route, and biome stable frontier construction.
+
+use er_game::m7_content::PreparedGameContentV1;
+
+use super::{CanonicalConstructionResultV1, ScenarioDomainFactoryV1};
+use crate::scenario::WorldScenarioV1;
+
+pub fn build<F: ScenarioDomainFactoryV1>(
+    factory: &F,
+    specification: &WorldScenarioV1,
+    content: &PreparedGameContentV1,
+) -> Result<CanonicalConstructionResultV1, String> {
+    let result = factory.world(specification, content)?;
+    if !result.validation.state_valid
+        || !result.validation.control_valid
+        || !result.validation.stable_boundary
+    {
+        return Err("world constructor failed frontier validation".to_owned());
+    }
+    Ok(result)
+}

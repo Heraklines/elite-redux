@@ -1,21 +1,29 @@
 [package]
-name = "er-cli"
+name = "er-lab"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
 
 [dependencies]
+blake3.workspace = true
 er-agent-protocol = { path = "../er-agent-protocol" }
+er-batch = { path = "../er-batch" }
 er-canonical = { path = "../er-canonical" }
+er-content = { path = "../er-content" }
+er-dev-types = { path = "../er-dev-types" }
+er-devplane = { path = "../er-devplane" }
 er-env = { path = "../er-env" }
 er-game = { path = "../er-game" }
+er-impact = { path = "../er-impact" }
 er-kernel = { path = "../er-kernel" }
+er-model = { path = "../er-model" }
+er-render-model = { path = "../er-render-model" }
 er-repro = { path = "../er-repro" }
-er-save = { path = "../er-save" }
+er-sim = { path = "../er-sim" }
 er-state = { path = "../er-state" }
-serde.workspace = true
 er-types = { path = "../er-types" }
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 

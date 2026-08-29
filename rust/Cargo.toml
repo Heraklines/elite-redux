@@ -22,6 +22,7 @@ members = [
     "crates/er-repro",
     "crates/er-batch",
     "crates/er-agent-protocol",
+    "crates/er-lab",
     "crates/er-cli",
     "crates/er-battle",
     "crates/er-game",

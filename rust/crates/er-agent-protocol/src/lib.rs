@@ -1,5 +1,9 @@
 //! Bounded JSONL request/response server for agent-driven raw-input sessions.
 
+pub mod m72;
+
+pub use m72::*;
+
 use std::{collections::BTreeMap, panic::AssertUnwindSafe};
 
 use serde::{Deserialize, Serialize};
@@ -141,6 +145,18 @@ impl<D: AgentDispatcherV1> AgentJsonlServerV1<D> {
 
     pub fn process_line(&mut self, line: &[u8]) -> Result<Vec<u8>, AgentProtocolErrorV1> {
         let response = self.process_request(line);
+        let mut bytes = serde_json::to_vec(&response)
+            .map_err(|error| AgentProtocolErrorV1::Serialization(error.to_string()))?;
+        bytes.push(b'\n');
+        Ok(bytes)
+    }
+
+    pub fn process_oversized_line(&self) -> Result<Vec<u8>, AgentProtocolErrorV1> {
+        let response = error_response(
+            None,
+            AgentErrorCodeV1::RequestTooLarge,
+            "JSONL request exceeds byte limit",
+        );
         let mut bytes = serde_json::to_vec(&response)
             .map_err(|error| AgentProtocolErrorV1::Serialization(error.to_string()))?;
         bytes.push(b'\n');
@@ -380,7 +396,7 @@ fn classify_method(method: &str) -> MethodClassV1 {
         "render.validate",
         "platform.event",
     ];
-    if ALLOWED.contains(&method) {
+    if ALLOWED.contains(&method) || parse_lab_method_v1(method).is_some() {
         MethodClassV1::Allowed
     } else {
         MethodClassV1::Unknown

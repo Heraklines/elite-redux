@@ -7,6 +7,8 @@ pub mod battle_start_v2;
 pub mod command_menu;
 pub mod internal_event;
 pub mod m6;
+pub mod m72_bootstrap;
+pub mod m72_new_run_material;
 pub mod m7_content;
 pub mod m7_internal_event;
 pub mod m7_material;

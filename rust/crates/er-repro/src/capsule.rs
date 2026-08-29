@@ -344,12 +344,14 @@ impl ReproCapsuleV1 {
             decompressed_total = decompressed_total
                 .checked_add(reference.uncompressed_size)
                 .ok_or(CapsuleErrorV1::Size)?;
-            blob.decode(limits)?;
         }
         if stored_total > limits.maximum_total_stored_bytes
             || decompressed_total > limits.maximum_total_decompressed_bytes
         {
             return Err(CapsuleErrorV1::Size);
+        }
+        for blob in &self.blobs {
+            blob.decode(limits)?;
         }
         let initial = self.find_blob(&self.manifest.initial_snapshot_digest)?;
         let trace = self.find_blob(&self.manifest.trace_digest)?;
@@ -443,9 +445,14 @@ impl ReproCapsuleV1 {
         {
             return Err(CapsuleErrorV1::Manifest);
         }
-        let manifest: ReproCapsuleManifestV1 =
-            serde_json::from_slice(cursor.take(manifest_len)?)
-                .map_err(|error| CapsuleErrorV1::Json(error.to_string()))?;
+        let manifest_bytes = cursor.take(manifest_len)?;
+        let manifest: ReproCapsuleManifestV1 = serde_json::from_slice(manifest_bytes)
+            .map_err(|error| CapsuleErrorV1::Json(error.to_string()))?;
+        let canonical_manifest = canonical_bytes(&manifest)
+            .map_err(|error| CapsuleErrorV1::Canonical(error.to_string()))?;
+        if canonical_manifest != manifest_bytes {
+            return Err(CapsuleErrorV1::Manifest);
+        }
         let count = usize::try_from(cursor.u32()?).map_err(|_| CapsuleErrorV1::Size)?;
         if count > limits.maximum_blob_count {
             return Err(CapsuleErrorV1::Size);

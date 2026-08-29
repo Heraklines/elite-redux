@@ -225,6 +225,7 @@ dependencies = [
  "er-types",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -339,6 +340,32 @@ dependencies = [
  "er-protocol",
  "er-rng",
  "er-run",
+ "er-state",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-lab"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "er-agent-protocol",
+ "er-batch",
+ "er-canonical",
+ "er-content",
+ "er-dev-types",
+ "er-devplane",
+ "er-env",
+ "er-game",
+ "er-impact",
+ "er-kernel",
+ "er-model",
+ "er-render-model",
+ "er-repro",
+ "er-sim",
  "er-state",
  "er-types",
  "serde",
@@ -519,6 +546,7 @@ dependencies = [
  "er-game",
  "er-impact",
  "er-kernel",
+ "er-lab",
  "er-mechanics",
  "er-model",
  "er-progression",

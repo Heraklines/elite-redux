@@ -217,6 +217,9 @@ pub enum GameActionV1 {
         hook: RunHook,
         context: RunExecutionContextV2,
     },
+    Bootstrap {
+        action: crate::BootstrapActionV1,
+    },
     Battle {
         action: BattleUiActionV1,
     },
@@ -296,11 +299,16 @@ pub enum GameActionError {
     EmptySaveSlot,
     #[error("material digest must use the canonical blake3-v1 format")]
     MaterialDigest,
+    #[error("bootstrap action is invalid: {0}")]
+    Bootstrap(String),
 }
 
 impl GameActionV1 {
     pub fn validate(&self) -> Result<(), GameActionError> {
         match self {
+            Self::Bootstrap { action } => action
+                .validate(true)
+                .map_err(|error| GameActionError::Bootstrap(error.to_string())),
             Self::ExecuteRunProgram { program, .. } if *program == RunProgramId::ZERO => {
                 Err(GameActionError::ZeroProgram)
             }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -133,6 +133,42 @@ for (const crate of coreCrates) {
   if (manifest.includes("er-lab")) {
     fail(`forbidden dependency ${crate} -> er-lab`);
   }
+}
+
+const readTree = directory => readdirSync(resolve(ROOT, directory), { withFileTypes: true })
+  .flatMap(entry => entry.isDirectory()
+    ? readTree(`${directory}/${entry.name}`)
+    : [`${directory}/${entry.name}`])
+  .filter(path => path.endsWith(".rs"))
+  .map(path => read(path))
+  .join("\n");
+const labSource = readTree("rust/crates/er-lab/src");
+for (const forbidden of [
+  "choose_move",
+  "select_reward",
+  "apply_damage",
+  "force_capture",
+  "resolve_turn",
+  "submit_command",
+]) {
+  if (labSource.includes(forbidden)) {
+    fail(`semantic action bypass appears in er-lab: ${forbidden}`);
+  }
+}
+for (const crate of coreCrates) {
+  const coreSource = readTree(`rust/crates/${crate}/src`);
+  if (coreSource.includes("er_lab::") || coreSource.includes("extern crate er_lab")) {
+    fail(`forbidden source dependency ${crate} -> er-lab`);
+  }
+}
+
+const cliSource = read("rust/crates/er-cli/src/main.rs");
+if (cliSource.includes("reader.read_until")) {
+  fail("agent JSONL framing buffers an unbounded line");
+}
+const capsuleSource = read("rust/crates/er-repro/src/capsule.rs");
+if (capsuleSource.lastIndexOf("maximum_total_decompressed_bytes") > capsuleSource.indexOf("blob.decode(limits)?")) {
+  fail("capsule aggregate decompression bound is checked after decompression");
 }
 
 const api = read("rust/contracts/m72-api.md");

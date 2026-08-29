@@ -78,3 +78,80 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed G35 contract freeze"
+
+  m72-foundation:
+    name: M7.2 bootstrap scenario search navigation daemon foundation
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-lab-g35' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m72-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run instant-lab foundation contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m72_foundation
+          cargo test -p er-cli m72::tests
+
+  m72-foundation-wasm:
+    name: M7.2 foundation native Wasm parity
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-lab-g35' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check bootstrap and laboratory crates for Wasm
+        working-directory: rust
+        run: >-
+          cargo check --target wasm32-unknown-unknown
+          -p er-types -p er-game -p er-repro -p er-agent-protocol -p er-lab
+
+  m72-m0-m71-regression:
+    name: M7.2 complete M0-M7.1 regression
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-lab-g35' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m72-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run complete inherited Rust regression
+        working-directory: rust
+        run: cargo test --workspace --all-targets
+
+  m72-g36-aggregate:
+    name: M7.2 G36 instant-foundation aggregate
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-lab-g36' ||
+        github.ref_name == 'arch/rust-kernel-m7-lab-g37' ||
+        github.ref_name == 'arch/rust-kernel-m7-lab-g38'
+      }}
+    needs:
+      - m72-g35-aggregate
+      - m72-foundation
+      - m72-foundation-wasm
+      - m72-m0-m71-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed G36 instant-agent foundation"
