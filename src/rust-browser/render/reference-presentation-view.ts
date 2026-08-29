@@ -1,6 +1,6 @@
 export type PresentationSettlementOutcomeV1 = "SETTLED" | "INTENTIONALLY_SKIPPED" | "FAILED";
 
-interface PresentationCueV1 {
+export interface BrowserPresentationCueV1 {
   event_id: string;
   kind:
     | "MOVE_USED"
@@ -17,7 +17,7 @@ interface PresentationCueV1 {
   duration_ms?: number;
 }
 
-const CUE_KINDS = new Set<PresentationCueV1["kind"]>([
+const CUE_KINDS = new Set<BrowserPresentationCueV1["kind"]>([
   "MOVE_USED",
   "HP_CHANGED",
   "STATUS_APPLIED",
@@ -29,15 +29,15 @@ const CUE_KINDS = new Set<PresentationCueV1["kind"]>([
   "BATTLE_LOST",
 ]);
 
-function decodeCue(bytes: Uint8Array): PresentationCueV1 {
+export function decodeBrowserPresentationCue(bytes: Uint8Array): BrowserPresentationCueV1 {
   const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   if (typeof value !== "object" || value == null) {
     throw new Error("presentation cue is not an object");
   }
-  const cue = value as Partial<PresentationCueV1>;
+  const cue = value as Partial<BrowserPresentationCueV1>;
   if (
     typeof cue.event_id !== "string"
-    || !CUE_KINDS.has(cue.kind as PresentationCueV1["kind"])
+    || !CUE_KINDS.has(cue.kind as BrowserPresentationCueV1["kind"])
     || (cue.blocking_policy !== "NON_BLOCKING" && cue.blocking_policy !== "BLOCKS_HUMAN_INPUT")
     || typeof cue.text !== "string"
     || (cue.duration_ms != null
@@ -45,7 +45,7 @@ function decodeCue(bytes: Uint8Array): PresentationCueV1 {
   ) {
     throw new Error("presentation cue does not match the frozen reference shape");
   }
-  return cue as PresentationCueV1;
+  return cue as BrowserPresentationCueV1;
 }
 
 export class ReferencePresentationView {
@@ -65,9 +65,9 @@ export class ReferencePresentationView {
     if (this.#disposed) {
       return "FAILED";
     }
-    let cue: PresentationCueV1;
+    let cue: BrowserPresentationCueV1;
     try {
-      cue = decodeCue(bytes);
+      cue = decodeBrowserPresentationCue(bytes);
     } catch {
       return "FAILED";
     }

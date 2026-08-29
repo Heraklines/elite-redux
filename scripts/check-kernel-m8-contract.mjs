@@ -148,6 +148,18 @@ if (
   fail("G40 attestation or M8 shadow drift registry is invalid");
 }
 
+const g41 = JSON.parse(read("rust/fixtures/m8/m8-g41-qualification.json"));
+if (
+  g41.candidate_sha !== "1c30288a380b743f05889edf4d9f7c30601bcb97"
+  || g41.workflow_run_id !== 33252792510
+  || g41.conclusion !== "SUCCESS"
+  || g41.unexplained_mechanical_divergence_count !== 0
+  || g41.production_default !== "LEGACY_TYPESCRIPT"
+  || g41.deployment_authorized !== false
+) {
+  fail("G41 quarantined shadow attestation is invalid");
+}
+
 const requiredContracts = [
   "m8-api.md",
   "m8-cache-release.md",

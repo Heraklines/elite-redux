@@ -20,7 +20,7 @@ export interface LogicalUiProjectionV1 {
   fault: string | null;
 }
 
-function decodeProjection(bytes: Uint8Array): LogicalUiProjectionV1 {
+export function decodeLogicalUiProjection(bytes: Uint8Array): LogicalUiProjectionV1 {
   const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   if (typeof value !== "object" || value == null) {
     throw new Error("Rust UI projection is not an object");
@@ -54,7 +54,7 @@ export class DomReferenceView {
     if (this.#disposed) {
       throw new Error("DOM reference view is disposed");
     }
-    const projection = decodeProjection(bytes);
+    const projection = decodeLogicalUiProjection(bytes);
     const fragment = document.createDocumentFragment();
     const heading = document.createElement("h1");
     heading.textContent = projection.title;
