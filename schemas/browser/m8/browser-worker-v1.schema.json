@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elite-redux.invalid/schemas/browser/m8/browser-worker-v1.schema.json",
+  "title": "Elite Redux Rust browser worker protocol v1",
+  "oneOf": [{ "$ref": "#/$defs/requestEnvelope" }, { "$ref": "#/$defs/responseEnvelope" }],
+  "$defs": {
+    "safeU53": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "bytes": {
+      "type": "array",
+      "maxItems": 4194304,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+    },
+    "executionMode": {
+      "enum": ["LEGACY_TYPESCRIPT", "TYPESCRIPT_WITH_RUST_SHADOW", "RUST_LOCAL_AUTHORITY", "RUST_STAGING_AUTHORITY"]
+    },
+    "physicalKey": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "enum": [
+                "ARROW_UP",
+                "ARROW_DOWN",
+                "ARROW_LEFT",
+                "ARROW_RIGHT",
+                "ENTER",
+                "SPACE",
+                "ESCAPE",
+                "BACKSPACE",
+                "KEY_A",
+                "KEY_B",
+                "KEY_C",
+                "KEY_D",
+                "KEY_E",
+                "KEY_F",
+                "KEY_N",
+                "KEY_R",
+                "KEY_T"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "UNKNOWN" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        }
+      ]
+    },
+    "rawInput": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "data"],
+          "properties": {
+            "kind": { "const": "KEY_DOWN" },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code", "printable", "browser_repeat", "focus"],
+              "properties": {
+                "code": { "$ref": "#/$defs/physicalKey" },
+                "printable": { "type": "boolean" },
+                "browser_repeat": { "type": "boolean" },
+                "focus": { "enum": ["GAME", "TEXT_ENTRY"] }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "data"],
+          "properties": {
+            "kind": { "const": "KEY_UP" },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code"],
+              "properties": { "code": { "$ref": "#/$defs/physicalKey" } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "data"],
+          "properties": {
+            "kind": { "enum": ["GAMEPAD_DOWN", "GAMEPAD_UP"] },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["button"],
+              "properties": { "button": { "type": "integer", "minimum": 0, "maximum": 65535 } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "data"],
+          "properties": {
+            "kind": { "const": "FOCUS_CHANGED" },
+            "data": { "enum": ["GAME", "TEXT_ENTRY"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "enum": ["WINDOW_BLURRED", "WINDOW_FOCUSED"] } }
+        }
+      ]
+    },
+    "requestEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "request_id", "sequence", "request"],
+      "properties": {
+        "version": { "const": 1 },
+        "request_id": { "$ref": "#/$defs/safeU53" },
+        "sequence": { "$ref": "#/$defs/safeU53" },
+        "request": { "$ref": "#/$defs/request" }
+      }
+    },
+    "request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "INITIALIZE" }, "value": { "$ref": "#/$defs/init" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "RAW_INPUT" }, "value": { "$ref": "#/$defs/rawInput" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "ADVANCE_TIME" }, "value": { "$ref": "#/$defs/safeU53" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "TIMER_WAKEUP" }, "value": { "$ref": "#/$defs/wakeup" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "NETWORK_FRAME" }, "value": { "$ref": "#/$defs/networkFrame" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "TRANSPORT_CHANGED" }, "value": { "$ref": "#/$defs/transport" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "STORAGE_RESULT" }, "value": { "$ref": "#/$defs/storageResult" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "PRESENTATION_SETTLED" },
+            "value": { "$ref": "#/$defs/presentationSettled" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": { "kind": { "const": "LIFECYCLE" }, "value": { "$ref": "#/$defs/lifecycle" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "OBSERVE" },
+            "value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["profile"],
+              "properties": { "profile": { "type": "string", "minLength": 1, "maxLength": 128 } }
+            }
+          }
+        },
+        { "$ref": "#/$defs/unitSnapshot" },
+        { "$ref": "#/$defs/unitRepro" },
+        { "$ref": "#/$defs/unitDispose" }
+      ]
+    },
+    "init": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "execution_identity_bytes", "session_start_bytes", "maximum_pending_requests"],
+      "properties": {
+        "mode": { "$ref": "#/$defs/executionMode" },
+        "execution_identity_bytes": { "$ref": "#/$defs/bytes" },
+        "session_start_bytes": { "$ref": "#/$defs/bytes" },
+        "maximum_pending_requests": { "type": "integer", "minimum": 1, "maximum": 256 }
+      }
+    },
+    "wakeup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["monotonic_micros"],
+      "properties": { "monotonic_micros": { "$ref": "#/$defs/safeU53" } }
+    },
+    "networkFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation", "bytes"],
+      "properties": { "generation": { "$ref": "#/$defs/safeU53" }, "bytes": { "$ref": "#/$defs/bytes" } }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation", "connected"],
+      "properties": { "generation": { "$ref": "#/$defs/safeU53" }, "connected": { "type": "boolean" } }
+    },
+    "storageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "bytes"],
+      "properties": { "request_id": { "$ref": "#/$defs/safeU53" }, "bytes": { "$ref": "#/$defs/bytes" } }
+    },
+    "presentationSettled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "outcome"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "outcome": { "enum": ["SETTLED", "INTENTIONALLY_SKIPPED", "FAILED"] }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "VISIBILITY_CHANGED",
+            "PAGE_HIDDEN",
+            "PAGE_SHOWN",
+            "PAGE_FREEZE",
+            "PAGE_RESUME",
+            "BEFORE_UNLOAD",
+            "NETWORK_ONLINE",
+            "NETWORK_OFFLINE"
+          ]
+        },
+        "value": { "enum": ["HIDDEN", "VISIBLE"] }
+      },
+      "unevaluatedProperties": false
+    },
+    "unitSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "SNAPSHOT" } }
+    },
+    "unitRepro": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "EXPORT_REPRO" } }
+    },
+    "unitDispose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "DISPOSE" } }
+    },
+    "responseEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "request_id", "accepted_sequence", "after_mechanical_digest", "response"],
+      "properties": {
+        "version": { "const": 1 },
+        "request_id": { "$ref": "#/$defs/safeU53" },
+        "accepted_sequence": { "$ref": "#/$defs/safeU53" },
+        "after_mechanical_digest": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "response": { "$ref": "#/$defs/response" }
+      }
+    },
+    "response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "READY" },
+            "value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["identity_bytes"],
+              "properties": { "identity_bytes": { "$ref": "#/$defs/bytes" } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "EFFECTS" }, "value": { "$ref": "#/$defs/effectBatch" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["OBSERVATION", "SNAPSHOT", "REPRO"] },
+            "value": { "$ref": "#/$defs/bytes" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "FAULT" }, "value": { "$ref": "#/$defs/fault" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "DISPOSED" } }
+        }
+      ]
+    },
+    "effectBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["external_sequence", "effects", "observation_bytes", "next_wakeup_micros"],
+      "properties": {
+        "external_sequence": { "$ref": "#/$defs/safeU53" },
+        "effects": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/effect" } },
+        "observation_bytes": { "$ref": "#/$defs/bytes" },
+        "next_wakeup_micros": { "oneOf": [{ "$ref": "#/$defs/safeU53" }, { "type": "null" }] }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "UI_CHANGED",
+            "PRESENTATION",
+            "PRESENTATION_SCENE_CHANGED",
+            "SEND_NETWORK_FRAME",
+            "STORAGE_REQUEST",
+            "ASSET_REQUEST",
+            "AUDIO_CUE",
+            "TERMINAL",
+            "TELEMETRY",
+            "REPRO_READY"
+          ]
+        },
+        "value": {}
+      },
+      "unevaluatedProperties": false
+    },
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "normalized_panic", "repro_reference"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "normalized_panic": { "type": ["string", "null"], "maxLength": 1024 },
+        "repro_reference": { "type": ["string", "null"], "maxLength": 512 }
+      }
+    }
+  }
+}

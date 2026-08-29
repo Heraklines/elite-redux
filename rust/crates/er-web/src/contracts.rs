@@ -4,11 +4,32 @@ use er_types::{RawInputEvent, SafeU53};
 use serde::{Deserialize, Serialize};
 
 pub const BROWSER_WORKER_PROTOCOL_VERSION_V1: u32 = 1;
+pub const MAXIMUM_BROWSER_REQUEST_BYTES_V1: usize = 1_048_576;
+pub const MAXIMUM_BROWSER_EFFECT_BYTES_V1: usize = 4_194_304;
+pub const MAXIMUM_BROWSER_BATCH_REQUESTS_V1: usize = 256;
+pub const MAXIMUM_BROWSER_PENDING_REQUESTS_V1: usize = 256;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BrowserVisibilityV1 {
+    Hidden,
+    Visible,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PresentationSettlementOutcomeV1 {
+    Settled,
+    IntentionallySkipped,
+    Failed,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BrowserExecutionModeV1 {
+    #[serde(rename = "LEGACY_TYPESCRIPT")]
     LegacyTypeScript,
+    #[serde(rename = "TYPESCRIPT_WITH_RUST_SHADOW")]
     TypeScriptWithRustShadow,
     RustLocalAuthority,
     RustStagingAuthority,
@@ -17,7 +38,7 @@ pub enum BrowserExecutionModeV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
 pub enum BrowserLifecycleEventV1 {
-    VisibilityChanged(String),
+    VisibilityChanged(BrowserVisibilityV1),
     PageHidden,
     PageShown,
     PageFreeze,
@@ -59,7 +80,7 @@ pub enum BrowserRequestV1 {
     },
     PresentationSettled {
         event_id: String,
-        outcome: String,
+        outcome: PresentationSettlementOutcomeV1,
     },
     Lifecycle(BrowserLifecycleEventV1),
     Observe {
@@ -132,4 +153,49 @@ pub struct BrowserResponseEnvelopeV1 {
     pub accepted_sequence: SafeU53,
     pub after_mechanical_digest: String,
     pub response: BrowserResponseV1,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{
+        BROWSER_WORKER_PROTOCOL_VERSION_V1, BrowserExecutionModeV1, BrowserRequestEnvelopeV1,
+        BrowserRequestV1,
+    };
+    use er_types::SafeU53;
+
+    #[test]
+    fn execution_mode_wire_names_match_the_browser_contract()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(
+            serde_json::to_value(BrowserExecutionModeV1::LegacyTypeScript)?,
+            json!("LEGACY_TYPESCRIPT")
+        );
+        assert_eq!(
+            serde_json::to_value(BrowserExecutionModeV1::TypeScriptWithRustShadow)?,
+            json!("TYPESCRIPT_WITH_RUST_SHADOW")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unit_request_encoding_is_closed_and_versioned() -> Result<(), Box<dyn std::error::Error>> {
+        let envelope = BrowserRequestEnvelopeV1 {
+            version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
+            request_id: SafeU53::new(1)?,
+            sequence: SafeU53::new(1)?,
+            request: BrowserRequestV1::Snapshot,
+        };
+        assert_eq!(
+            serde_json::to_value(envelope)?,
+            json!({
+                "version": 1,
+                "request_id": 1,
+                "sequence": 1,
+                "request": {"kind": "SNAPSHOT"}
+            })
+        );
+        Ok(())
+    }
 }

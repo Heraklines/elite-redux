@@ -1,0 +1,169 @@
+name: Rust Kernel M8 G40 Local Browser
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m8-browser-g40
+    paths:
+      - ".github/workflows/rust-kernel-m8-local.yml"
+      - "rust/**"
+      - "schemas/browser/m8/**"
+      - "scripts/build-kernel-m8-web.mjs"
+      - "src/rust-browser/**"
+      - "test/browser/rust-browser/**"
+      - "test/node/rust-browser/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m8-g40-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  static-native:
+    name: M8A ABI static native Wasm contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check M8A TypeScript and browser production build
+        shell: bash
+        run: |
+          set +e
+          pnpm typecheck > m8a-typecheck.log 2>&1
+          status=$?
+          set -e
+          owned="$(grep -E '^(src/rust-browser|test/(node|browser)/rust-browser)/[^()]+\([0-9]+,[0-9]+\): error TS' m8a-typecheck.log || true)"
+          if [ -n "$owned" ]; then printf '%s\n' "$owned"; exit 1; fi
+          diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' m8a-typecheck.log || true)"
+          if [ "$status" -ne 0 ] && [ "$diagnostics" -eq 0 ]; then cat m8a-typecheck.log; exit 1; fi
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched \
+            src/rust-browser test/node/rust-browser test/browser/rust-browser \
+            scripts/build-kernel-m8-web.mjs schemas/browser/m8
+          pnpm build
+      - name: Run worker ABI and native host contracts
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run --config test/node/vitest.config.ts \
+            test/node/rust-browser/worker-abi.test.ts \
+            test/node/rust-browser/worker-security.test.ts
+          cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+          cargo clippy --manifest-path rust/Cargo.toml -p er-web --all-targets --no-deps -- -D warnings
+          cargo test --manifest-path rust/Cargo.toml -p er-web
+          cargo check --manifest-path rust/Cargo.toml -p er-web --target wasm32-unknown-unknown
+          node scripts/check-kernel-m8-contract.mjs
+
+  wasm-bundle:
+    name: M8A immutable Wasm content session bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m8-wasm-bindgen-${{ runner.os }}-${{ runner.arch }}-0.2.127-${{ hashFiles('rust/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Install exact wasm-bindgen CLI
+        run: |
+          set -euo pipefail
+          if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then
+            cargo install wasm-bindgen-cli --version 0.2.127 --locked
+          fi
+          wasm-bindgen --version | grep -Fx 'wasm-bindgen 0.2.127'
+      - name: Build immutable browser assets
+        run: >-
+          node scripts/build-kernel-m8-web.mjs
+          --out-dir "$RUNNER_TEMP/m8-web"
+          --content rust/fixtures/m8/browser-reference/content-pack.json
+          --identity rust/fixtures/m8/browser-reference/execution-identity.bin
+          --session rust/fixtures/m8/browser-reference/session-start.json
+      - run: cp rust/fixtures/m8/browser-reference/expected-terminal-digest.txt "$RUNNER_TEMP/m8-web/"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m8-web-${{ github.sha }}
+          path: ${{ runner.temp }}/m8-web
+          if-no-files-found: error
+          retention-days: 14
+
+  browser-journey:
+    name: M8A Chromium natural raw-key local journey
+    needs: wasm-bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v7
+        with:
+          name: m8-web-${{ github.sha }}
+          path: ${{ runner.temp }}/m8-web
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run Rust-local public browser journey
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m8-web
+        run: pnpm exec playwright test test/browser/rust-browser/rust-local.spec.ts --workers=1
+
+  inherited-regression:
+    name: M8A complete inherited Rust regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m8-g40-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - working-directory: rust
+        run: >-
+          cargo test --workspace --all-targets --
+          --skip m3_audited_production_surface_matches_frozen_manifest
+
+  g40-aggregate:
+    name: M8 G40 Rust-local browser qualification
+    needs:
+      - static-native
+      - wasm-bundle
+      - browser-journey
+      - inherited-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M8 exact SHA $GITHUB_SHA passed G40 Rust-local browser qualification"
