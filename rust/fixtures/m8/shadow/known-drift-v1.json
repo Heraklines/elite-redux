@@ -1,0 +1,338 @@
+{
+  "schema_version": 1,
+  "browser_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
+  "source_report": "rust/fixtures/m8/m8-dynamic-oracle-drift-report.json",
+  "known_drift_count": 47,
+  "unexplained_drift_count": 0,
+  "known_drifts": [
+    {
+      "id": "M3:battle-cases/always-hit.json",
+      "lane": "M3",
+      "path": "battle-cases/always-hit.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/burn-application.json",
+      "lane": "M3",
+      "path": "battle-cases/burn-application.json",
+      "first_difference_path": "$.expected_action_order[2]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/burn-physical-penalty.json",
+      "lane": "M3",
+      "path": "battle-cases/burn-physical-penalty.json",
+      "first_difference_path": "$.expected_action_order[2]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/burn-residual.json",
+      "lane": "M3",
+      "path": "battle-cases/burn-residual.json",
+      "first_difference_path": "$.expected_action_order[2]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/critical-hit.json",
+      "lane": "M3",
+      "path": "battle-cases/critical-hit.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/defeat.json",
+      "lane": "M3",
+      "path": "battle-cases/defeat.json",
+      "first_difference_path": "$.commands.replacement_proposals[0]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/doubles-single-target.json",
+      "lane": "M3",
+      "path": "battle-cases/doubles-single-target.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/existing-status-rejected.json",
+      "lane": "M3",
+      "path": "battle-cases/existing-status-rejected.json",
+      "first_difference_path": "$.expected_action_order[1].disposition",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/forced-replacement.json",
+      "lane": "M3",
+      "path": "battle-cases/forced-replacement.json",
+      "first_difference_path": "$.commands.replacement_proposals[0]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/grass-powder-immunity.json",
+      "lane": "M3",
+      "path": "battle-cases/grass-powder-immunity.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/intimidate-stage-floor.json",
+      "lane": "M3",
+      "path": "battle-cases/intimidate-stage-floor.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/intimidate-switch-in.json",
+      "lane": "M3",
+      "path": "battle-cases/intimidate-switch-in.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/miss.json",
+      "lane": "M3",
+      "path": "battle-cases/miss.json",
+      "first_difference_path": "$.expected_action_order[1].disposition",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/mixed-side-simultaneous-faint.json",
+      "lane": "M3",
+      "path": "battle-cases/mixed-side-simultaneous-faint.json",
+      "first_difference_path": "$.commands.replacement_proposals[0]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/no-legal-replacement.json",
+      "lane": "M3",
+      "path": "battle-cases/no-legal-replacement.json",
+      "first_difference_path": "$.commands.replacement_proposals[0]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/none-ability-no-trigger.json",
+      "lane": "M3",
+      "path": "battle-cases/none-ability-no-trigger.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/paralysis-application.json",
+      "lane": "M3",
+      "path": "battle-cases/paralysis-application.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/paralysis-full-stop.json",
+      "lane": "M3",
+      "path": "battle-cases/paralysis-full-stop.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/paralysis-speed-order.json",
+      "lane": "M3",
+      "path": "battle-cases/paralysis-speed-order.json",
+      "first_difference_path": "$.expected_action_order[3].disposition",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/physical-hit.json",
+      "lane": "M3",
+      "path": "battle-cases/physical-hit.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/poison-application.json",
+      "lane": "M3",
+      "path": "battle-cases/poison-application.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/poison-residual.json",
+      "lane": "M3",
+      "path": "battle-cases/poison-residual.json",
+      "first_difference_path": "$.expected_action_order[1].disposition",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/poison-type-immunity.json",
+      "lane": "M3",
+      "path": "battle-cases/poison-type-immunity.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/pp-consumption.json",
+      "lane": "M3",
+      "path": "battle-cases/pp-consumption.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/pp-unusable-rejected.json",
+      "lane": "M3",
+      "path": "battle-cases/pp-unusable-rejected.json",
+      "first_difference_path": "$.expected_action_order[2]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/same-side-simultaneous-faint.json",
+      "lane": "M3",
+      "path": "battle-cases/same-side-simultaneous-faint.json",
+      "first_difference_path": "$.commands.replacement_proposals[0]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/special-hit-priority.json",
+      "lane": "M3",
+      "path": "battle-cases/special-hit-priority.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/speed-tie.json",
+      "lane": "M3",
+      "path": "battle-cases/speed-tie.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/spread-stage-down.json",
+      "lane": "M3",
+      "path": "battle-cases/spread-stage-down.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/stage-floor-cap.json",
+      "lane": "M3",
+      "path": "battle-cases/stage-floor-cap.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/type-native-immunity.json",
+      "lane": "M3",
+      "path": "battle-cases/type-native-immunity.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/type-resistance.json",
+      "lane": "M3",
+      "path": "battle-cases/type-resistance.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/type-weakness.json",
+      "lane": "M3",
+      "path": "battle-cases/type-weakness.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/victory.json",
+      "lane": "M3",
+      "path": "battle-cases/victory.json",
+      "first_difference_path": "$.expected_action_order[1].bracket_modifier",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/voluntary-switch.json",
+      "lane": "M3",
+      "path": "battle-cases/voluntary-switch.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.enemy_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/wonder-guard-block.json",
+      "lane": "M3",
+      "path": "battle-cases/wonder-guard-block.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.player_party[0].hp",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/wonder-guard-status-pass.json",
+      "lane": "M3",
+      "path": "battle-cases/wonder-guard-status-pass.json",
+      "first_difference_path": "$.expected_final_state.canonical.battle.battle_rng.saved_substream.carry",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:battle-cases/wonder-guard-super-effective-pass.json",
+      "lane": "M3",
+      "path": "battle-cases/wonder-guard-super-effective-pass.json",
+      "first_difference_path": "$.expected_action_order[1].bracket_modifier",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M3:content-pack-v1.json",
+      "lane": "M3",
+      "path": "content-pack-v1.json",
+      "first_difference_path": "$.content_pack.hash",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:battle-content-pack-v1.json",
+      "lane": "M4",
+      "path": "battle-content-pack-v1.json",
+      "first_difference_path": "$.hash",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:biomes/town-crossroads-route-v1.json",
+      "lane": "M4",
+      "path": "biomes/town-crossroads-route-v1.json",
+      "first_difference_path": "$.final.canonical.save_data.battleFormat",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:encounters/plains-wave-11-captured-v1.json",
+      "lane": "M4",
+      "path": "encounters/plains-wave-11-captured-v1.json",
+      "first_difference_path": "$.final.canonical.save_data.battleFormat",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:markets/town-wave-10-v1.json",
+      "lane": "M4",
+      "path": "markets/town-wave-10-v1.json",
+      "first_difference_path": "$.decisions[0].options[13].pregenArgs",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:migration/m3-to-m4-companions-v1.json",
+      "lane": "M4",
+      "path": "migration/m3-to-m4-companions-v1.json",
+      "first_difference_path": "$.battle_companions[17].participation.defeated_enemies[0]",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:progression/nacli-medium-slow-level-17-v1.json",
+      "lane": "M4",
+      "path": "progression/nacli-medium-slow-level-17-v1.json",
+      "first_difference_path": "$.final.canonical.save_data.battleFormat",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:rewards/regular-reroll-lock-v1.json",
+      "lane": "M4",
+      "path": "rewards/regular-reroll-lock-v1.json",
+      "first_difference_path": "$.decisions[3].canonical.options[0].id",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    },
+    {
+      "id": "M4:run-segments/classic-composed-wave-9-through-11-v1.json",
+      "lane": "M4",
+      "path": "run-segments/classic-composed-wave-9-through-11-v1.json",
+      "first_difference_path": "$.decisions[16].mode_after",
+      "classification": "KNOWN_CURRENT_BROWSER_DRIFT"
+    }
+  ]
+}

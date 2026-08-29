@@ -132,6 +132,22 @@ if (
   fail("dynamic M3/M4 oracle refresh is not fully classified");
 }
 
+const g40 = JSON.parse(read("rust/fixtures/m8/m8-g40-qualification.json"));
+const shadowDrift = JSON.parse(read("rust/fixtures/m8/shadow/known-drift-v1.json"));
+if (
+  g40.candidate_sha !== "8600691498501f16d0ccbb613dcf3dac9fbe30db"
+  || g40.workflow_run_id !== 33250719775
+  || g40.conclusion !== "SUCCESS"
+  || g40.production_default !== "LEGACY_TYPESCRIPT"
+  || g40.deployment_authorized !== false
+  || shadowDrift.browser_sha !== BROWSER_SHA
+  || shadowDrift.known_drift_count !== 47
+  || shadowDrift.unexplained_drift_count !== 0
+  || shadowDrift.known_drifts.length !== 47
+) {
+  fail("G40 attestation or M8 shadow drift registry is invalid");
+}
+
 const requiredContracts = [
   "m8-api.md",
   "m8-cache-release.md",
