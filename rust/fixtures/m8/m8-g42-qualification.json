@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "candidate_sha": "ae063bd48bb4391c17e5658a8922a7abc99e4440",
+  "workflow_run_id": 33256066882,
+  "workflow_url": "https://github.com/Heraklines/elite-redux/actions/runs/33256066882",
+  "aggregate_job": "M8 G42 browser adapter qualification",
+  "conclusion": "SUCCESS",
+  "full_rust_phaser_solo": true,
+  "two_browser_rust_webrtc": true,
+  "hot_rejoin": true,
+  "mixed_peer_rejected": true,
+  "production_default": "LEGACY_TYPESCRIPT",
+  "deployment_authorized": false
+}

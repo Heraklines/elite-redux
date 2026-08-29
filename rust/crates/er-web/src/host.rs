@@ -6,8 +6,9 @@ use std::sync::Arc;
 use er_canonical::{canonical_bytes, content_digest};
 use er_game::m7_content::{GameContentBundleV1, PreparedGameContentV1};
 use er_game::m7_material::mechanical_digest;
-use er_kernel::game_kernel_v6::GameKernelV6;
+use er_kernel::game_kernel_v6::{GameKernelV6, KernelControlEffectV6};
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
+use er_protocol::EndpointRole;
 use er_types::SafeU53;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -244,13 +245,17 @@ fn process_request(
             })
         }
         BrowserRequestV1::RawInput(event) => {
-            kernel
+            let control_effect = kernel
                 .raw_input(event.clone())
                 .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?;
-            Ok(BrowserResponseV1::Effects(effect_batch(
-                kernel,
-                envelope.sequence,
-            )?))
+            let mut batch = effect_batch(kernel, envelope.sequence)?;
+            if let Some(KernelControlEffectV6::ProposalReady { bytes, .. }) = control_effect {
+                batch.effects.push(BrowserEffectV1::SendNetworkFrame {
+                    generation: protocol_generation(kernel)?,
+                    bytes,
+                });
+            }
+            Ok(BrowserResponseV1::Effects(batch))
         }
         BrowserRequestV1::AdvanceTime(milliseconds) => {
             kernel
@@ -280,10 +285,34 @@ fn process_request(
                 envelope.sequence,
             )?))
         }
-        BrowserRequestV1::NetworkFrame { .. } | BrowserRequestV1::TransportChanged { .. } => {
-            Err(BrowserWebErrorV1::Kernel(
-                "browser transport is unavailable in Rust-local authority mode".to_owned(),
-            ))
+        BrowserRequestV1::NetworkFrame { bytes, .. } => {
+            let role = kernel
+                .snapshot()
+                .protocol
+                .as_ref()
+                .map(|protocol| protocol.role)
+                .ok_or_else(|| {
+                    BrowserWebErrorV1::Kernel(
+                        "browser network frame reached a kernel without protocol ownership"
+                            .to_owned(),
+                    )
+                })?;
+            match role {
+                EndpointRole::Authority => {
+                    kernel
+                        .admit_replica_proposal(bytes)
+                        .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?;
+                }
+                EndpointRole::Replica => {
+                    kernel
+                        .apply_replica_material(bytes)
+                        .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?;
+                }
+            }
+            Ok(BrowserResponseV1::Effects(effect_batch(
+                kernel,
+                envelope.sequence,
+            )?))
         }
         BrowserRequestV1::PresentationSettled { .. } => {
             kernel.clear_presentations();
@@ -305,9 +334,12 @@ fn process_request(
                 .map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))?,
         )),
         BrowserRequestV1::Dispose => Ok(BrowserResponseV1::Disposed),
-        BrowserRequestV1::StorageResult { .. } | BrowserRequestV1::Lifecycle(_) => Ok(
-            BrowserResponseV1::Effects(effect_batch(kernel, envelope.sequence)?),
-        ),
+        BrowserRequestV1::TransportChanged { .. }
+        | BrowserRequestV1::StorageResult { .. }
+        | BrowserRequestV1::Lifecycle(_) => Ok(BrowserResponseV1::Effects(effect_batch(
+            kernel,
+            envelope.sequence,
+        )?)),
     }
 }
 
@@ -316,7 +348,7 @@ fn effect_batch(
     external_sequence: SafeU53,
 ) -> Result<BrowserEffectBatchV1, BrowserWebErrorV1> {
     let snapshot = kernel.snapshot();
-    let observation_bytes = canonical_bytes(&snapshot)
+    let observation_bytes = canonical_bytes(&json!({ "game_state": kernel.state() }))
         .map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))?;
     let mut effects = vec![BrowserEffectV1::UiChanged(ui_projection(kernel)?)];
     for (index, presentation) in kernel.pending_presentations().iter().enumerate() {
@@ -339,6 +371,19 @@ fn effect_batch(
                 .map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))?,
         ));
     }
+    if snapshot
+        .protocol
+        .as_ref()
+        .is_some_and(|protocol| protocol.role == EndpointRole::Authority)
+    {
+        let generation = protocol_generation(kernel)?;
+        for transaction in &snapshot.prepared_transactions {
+            effects.push(BrowserEffectV1::SendNetworkFrame {
+                generation,
+                bytes: transaction.material_bytes.clone(),
+            });
+        }
+    }
     let next_wakeup_micros = snapshot
         .scheduler
         .timers
@@ -353,6 +398,19 @@ fn effect_batch(
         observation_bytes,
         next_wakeup_micros,
     })
+}
+
+fn protocol_generation(kernel: &GameKernelV6) -> Result<SafeU53, BrowserWebErrorV1> {
+    kernel
+        .snapshot()
+        .protocol
+        .as_ref()
+        .map(|protocol| protocol.frame_context.context.connection_generation.get())
+        .ok_or_else(|| {
+            BrowserWebErrorV1::Kernel(
+                "browser protocol generation is unavailable for this kernel".to_owned(),
+            )
+        })
 }
 
 fn ui_projection(kernel: &GameKernelV6) -> Result<Vec<u8>, BrowserWebErrorV1> {

@@ -100,6 +100,8 @@ jobs:
           --content rust/fixtures/m8/browser-reference/content-pack.json
           --identity rust/fixtures/m8/browser-reference/execution-identity.bin
           --session rust/fixtures/m8/browser-reference/session-start.json
+          --authority-session rust/fixtures/m8/browser-reference/session-authority.json
+          --replica-session rust/fixtures/m8/browser-reference/session-replica.json
       - run: cp rust/fixtures/m8/browser-reference/expected-terminal-digest.txt "$RUNNER_TEMP/m8-web/"
       - uses: actions/upload-artifact@v6
         with:

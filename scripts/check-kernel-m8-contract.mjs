@@ -160,6 +160,26 @@ if (
   fail("G41 quarantined shadow attestation is invalid");
 }
 
+const g42 = JSON.parse(read("rust/fixtures/m8/m8-g42-qualification.json"));
+const browserSecurity = JSON.parse(read("rust/fixtures/m8/m8-browser-security-audit.json"));
+if (
+  g42.candidate_sha !== "ae063bd48bb4391c17e5658a8922a7abc99e4440"
+  || g42.workflow_run_id !== 33256066882
+  || g42.conclusion !== "SUCCESS"
+  || g42.full_rust_phaser_solo !== true
+  || g42.two_browser_rust_webrtc !== true
+  || g42.hot_rejoin !== true
+  || g42.mixed_peer_rejected !== true
+  || g42.production_default !== "LEGACY_TYPESCRIPT"
+  || g42.deployment_authorized !== false
+  || browserSecurity.browser_sha !== BROWSER_SHA
+  || browserSecurity.open_security_gap_count !== 0
+  || browserSecurity.checks.some(check => check.status !== "PASS")
+  || read("src/main.ts").includes("rust-browser")
+) {
+  fail("G42 adapter attestation or final browser security audit is invalid");
+}
+
 const requiredContracts = [
   "m8-api.md",
   "m8-cache-release.md",

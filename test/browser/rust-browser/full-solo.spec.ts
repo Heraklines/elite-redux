@@ -28,7 +28,7 @@ new Phaser.Game({ type: Phaser.CANVAS, parent: "game", width: 640, height: 360, 
 
 test.beforeAll(async () => {
   server = await createServer({
-    root: resolve(import.meta.dirname, "../../../.."),
+    root: resolve(import.meta.dirname, "../../.."),
     server: { host: "127.0.0.1", port: 0 },
     plugins: [
       {

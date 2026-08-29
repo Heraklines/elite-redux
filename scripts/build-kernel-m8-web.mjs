@@ -14,15 +14,27 @@ const outputRoot = args.get("--out-dir");
 const contentPath = args.get("--content");
 const identityPath = args.get("--identity");
 const sessionPath = args.get("--session");
-if (!outputRoot || !isAbsolute(outputRoot) || !contentPath || !identityPath || !sessionPath) {
+const authoritySessionPath = args.get("--authority-session");
+const replicaSessionPath = args.get("--replica-session");
+if (
+  !outputRoot
+  || !isAbsolute(outputRoot)
+  || !contentPath
+  || !identityPath
+  || !sessionPath
+  || !authoritySessionPath
+  || !replicaSessionPath
+) {
   throw new Error(
-    "usage: build-kernel-m8-web --out-dir <absolute-directory> --content <content-pack-path> --identity <identity-path> --session <snapshot-path>",
+    "usage: build-kernel-m8-web --out-dir <absolute-directory> --content <content-pack-path> --identity <identity-path> --session <snapshot-path> --authority-session <snapshot-path> --replica-session <snapshot-path>",
   );
 }
 const out = resolve(outputRoot);
 const content = resolve(ROOT, contentPath);
 const identity = resolve(ROOT, identityPath);
 const session = resolve(ROOT, sessionPath);
+const authoritySession = resolve(ROOT, authoritySessionPath);
+const replicaSession = resolve(ROOT, replicaSessionPath);
 mkdirSync(out, { recursive: true });
 
 function run(command, commandArgs, cwd = ROOT) {
@@ -46,8 +58,18 @@ renameSync(resolve(out, "er_web_bg.wasm"), resolve(out, "er_web.wasm"));
 copyFileSync(content, resolve(out, "content-pack.json"));
 copyFileSync(identity, resolve(out, "execution-identity.bin"));
 copyFileSync(session, resolve(out, "session-start.json"));
+copyFileSync(authoritySession, resolve(out, "session-authority.json"));
+copyFileSync(replicaSession, resolve(out, "session-replica.json"));
 
-const files = ["er_web.wasm", "er_web.js", "content-pack.json", "execution-identity.bin", "session-start.json"];
+const files = [
+  "er_web.wasm",
+  "er_web.js",
+  "content-pack.json",
+  "execution-identity.bin",
+  "session-start.json",
+  "session-authority.json",
+  "session-replica.json",
+];
 const assets = Object.fromEntries(
   files.map(file => {
     const bytes = readFileSync(resolve(out, file));

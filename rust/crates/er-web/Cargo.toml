@@ -14,6 +14,7 @@ er-dev-types = { path = "../er-dev-types" }
 er-env = { path = "../er-env" }
 er-game = { path = "../er-game" }
 er-kernel = { path = "../er-kernel" }
+er-protocol = { path = "../er-protocol" }
 er-repro = { path = "../er-repro" }
 er-types = { path = "../er-types" }
 serde.workspace = true

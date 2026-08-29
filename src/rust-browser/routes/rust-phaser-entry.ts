@@ -18,6 +18,7 @@ export interface RustPhaserRouteOptionsV1 {
   executionIdentityBytes: Uint8Array;
   sessionStartBytes: Uint8Array;
   scene: Phaser.Scene;
+  mode?: BrowserExecutionModeV1.RUST_LOCAL_AUTHORITY | BrowserExecutionModeV1.RUST_STAGING_AUTHORITY;
 }
 
 export interface RustPhaserRouteSessionV1 {
@@ -27,12 +28,13 @@ export interface RustPhaserRouteSessionV1 {
 }
 
 export async function startRustPhaserRoute(options: RustPhaserRouteOptionsV1): Promise<RustPhaserRouteSessionV1> {
+  const mode = options.mode ?? BrowserExecutionModeV1.RUST_LOCAL_AUTHORITY;
   const host = await RustBrowserHost.create({
     workerUrl: options.workerUrl,
     initialize: {
       kind: "INITIALIZE",
       value: {
-        mode: BrowserExecutionModeV1.RUST_LOCAL_AUTHORITY,
+        mode,
         execution_identity_bytes: Array.from(options.executionIdentityBytes),
         session_start_bytes: Array.from(options.sessionStartBytes),
         maximum_pending_requests: 64,

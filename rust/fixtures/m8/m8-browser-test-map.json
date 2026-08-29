@@ -1,18 +1,1 @@
-{
-  "schema_version": 1,
-  "browser_base_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
-  "suites": [
-    {"id":"LEGACY_PUBLIC_JOURNEYS","harness":"test/browser/coop-public-ui","runtime":"LEGACY_TYPESCRIPT","status":"AVAILABLE_AT_G39"},
-    {"id":"RUST_LOCAL_SOLO","harness":"test/browser/rust-browser/rust-local.spec.ts","runtime":"RUST_LOCAL_AUTHORITY","status":"PLANNED_M8A"},
-    {"id":"RUST_SHADOW_RENDERED","harness":"test/browser/rust-browser/rust-shadow.spec.ts","runtime":"TYPESCRIPT_WITH_RUST_SHADOW","status":"PLANNED_M8B"},
-    {"id":"RUST_STAGING_COOP","harness":"test/browser/rust-browser/rust-staging-coop.spec.ts","runtime":"RUST_STAGING_AUTHORITY","status":"PLANNED_M8D"},
-    {"id":"WORKER_ABI","harness":"test/node/rust-browser/worker-abi.test.ts","runtime":"WORKER_ONLY","status":"PLANNED_M8A"},
-    {"id":"SHADOW_CORPUS","harness":"test/node/rust-browser/shadow-corpus.test.ts","runtime":"WORKER_ONLY","status":"PLANNED_M8B"},
-    {"id":"CACHE_RELEASE","harness":"test/browser/rust-browser/release-cache.spec.ts","runtime":"RUST_STAGING_AUTHORITY","status":"PLANNED_M8D"},
-    {"id":"MOBILE_INPUT","harness":"test/browser/rust-browser/mobile-input.spec.ts","runtime":"RUST_LOCAL_AUTHORITY","status":"PLANNED_M8D"}
-  ],
-  "browsers":["CHROMIUM","FIREFOX","WEBKIT"],
-  "viewports":["DESKTOP","MOBILE_LOW_END"],
-  "journeys":["NATURAL_START","COMPLETE_SOLO_RUN","SAVE_RELOAD","OFFLINE_CACHE","TWO_BROWSER_COOP","DISCONNECT_REJOIN","TERMINAL","REPRO_EXPORT"],
-  "default_runtime":"LEGACY_TYPESCRIPT"
-}
+{"schema_version":1,"browser_base_sha":"b2ed1a6eb050a18d5f335ec826e01b7b425ce311","suites":[{"id":"LEGACY_PUBLIC_JOURNEYS","harness":"test/browser/coop-public-ui","runtime":"LEGACY_TYPESCRIPT","status":"AVAILABLE_AT_G39"},{"id":"RUST_LOCAL_SOLO","harness":"test/browser/rust-browser/full-solo.spec.ts","runtime":"RUST_LOCAL_AUTHORITY","status":"AVAILABLE_AT_G40"},{"id":"RUST_SHADOW_RENDERED","harness":"test/node/rust-browser/shadow-isolation.test.ts","runtime":"TYPESCRIPT_WITH_RUST_SHADOW","status":"AVAILABLE_AT_G41"},{"id":"RUST_STAGING_COOP","harness":"test/browser/rust-browser/full-coop.spec.ts","runtime":"RUST_STAGING_AUTHORITY","status":"AVAILABLE_AT_G43"},{"id":"WORKER_ABI","harness":"test/node/rust-browser/worker-abi.test.ts","runtime":"WORKER_ONLY","status":"AVAILABLE_AT_G40"},{"id":"SHADOW_CORPUS","harness":"test/node/rust-browser/shadow-corpus.test.ts","runtime":"WORKER_ONLY","status":"AVAILABLE_AT_G41"},{"id":"CACHE_RELEASE","harness":"test/browser/rust-browser/release-cache.spec.ts","runtime":"RUST_STAGING_AUTHORITY","status":"AVAILABLE_AT_G43"},{"id":"MOBILE_INPUT","harness":"test/browser/rust-browser/mobile-profile.spec.ts","runtime":"RUST_LOCAL_AUTHORITY","status":"AVAILABLE_AT_G43"}],"browsers":["CHROMIUM","FIREFOX","WEBKIT"],"viewports":["DESKTOP","MOBILE_LOW_END"],"journeys":["NATURAL_START","COMPLETE_SOLO_RUN","SAVE_RELOAD","OFFLINE_CACHE","TWO_BROWSER_COOP","DISCONNECT_REJOIN","TERMINAL","REPRO_EXPORT"],"default_runtime":"LEGACY_TYPESCRIPT"}

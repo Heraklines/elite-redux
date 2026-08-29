@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "browser_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
+  "g42_run_id": 33256066882,
+  "production_default": "LEGACY_TYPESCRIPT",
+  "deployment_authorized": false,
+  "checks": [
+    { "id": "WORKER_ONLY_KERNEL", "status": "PASS", "evidence": "test/node/rust-browser/worker-security.test.ts" },
+    {
+      "id": "OPAQUE_STORAGE_TRANSPORT",
+      "status": "PASS",
+      "evidence": "test/browser/rust-browser/save-offline.spec.ts"
+    },
+    { "id": "DIRECT_FRAME_BOUND", "status": "PASS", "evidence": "src/rust-browser/adapters/transport-adapter.ts" },
+    { "id": "P33_SIGNALING_ONLY", "status": "PASS", "evidence": "src/rust-browser/adapters/signaling-adapter.ts" },
+    {
+      "id": "MIXED_AUTHORITY_REJECTED",
+      "status": "PASS",
+      "evidence": "test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts"
+    },
+    {
+      "id": "SHADOW_EFFECT_QUARANTINE",
+      "status": "PASS",
+      "evidence": "test/node/rust-browser/shadow-isolation.test.ts"
+    },
+    {
+      "id": "PHASER_VIEW_ONLY",
+      "status": "PASS",
+      "evidence": "test/browser/rust-browser/adapters/phaser-adapter.spec.ts"
+    },
+    { "id": "ATOMIC_RELEASE_CACHE", "status": "PASS", "evidence": "test/browser/rust-browser/release-cache.spec.ts" }
+  ],
+  "open_security_gap_count": 0
+}
