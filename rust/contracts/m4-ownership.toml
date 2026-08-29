@@ -1,0 +1,282 @@
+schema_version = 1
+milestone = "M4"
+project = "PokéRogue Redux"
+m3_base_sha = "45c89493e7edec9c4da247a98cd7858b1f015c09"
+m4_oracle_sha = "45c89493e7edec9c4da247a98cd7858b1f015c09"
+integration_branch = "arch/rust-kernel-m4"
+public_api = "rust/contracts/m4-api.md"
+contract_lock = "rust/contracts/m4-contract.toml"
+
+[rules]
+isolated_worktree = true
+exclusive_paths = true
+same_freeze_sha_for_each_generation = true
+public_signatures_frozen_after_g12 = true
+workers_may_spawn_agents = false
+workers_may_rebase_onto_each_other = false
+integration_owner_only_merges = true
+integration_owner_only_pushes = true
+integration_owner_only_contract_changes = true
+integration_owner_only_shared_crate_roots = true
+integration_owner_only_kernel_step = true
+production_typescript_read_only = true
+m3_source_lock_read_only = true
+local_rust_execution = false
+local_coop_vitest = false
+hosted_rust_gate_required = true
+branch_base_must_equal_hosted_green_head = true
+one_behavioral_concern_per_commit = true
+
+[dependency_order]
+g12 = ["oracle", "contracts", "slice", "stubs", "bootstrap_gate"]
+m4a = ["types", "state_ownership", "migration", "run_content", "progression", "modifiers", "surfaces", "biomes", "fixtures", "tests"]
+m4b = ["game_runtime", "controls", "materials", "common_applier", "kernel_step", "simulator", "campaigns", "snapshots", "wasm", "benchmarks"]
+m4c = ["oracle_parity", "co_op_faults", "two_hundred_wave", "migration", "resources", "performance"]
+
+[generation_gates]
+m4a_requires_gap_classified_manifests = true
+m4b_requires_hosted_foundation_green = true
+m4c_requires_hosted_integration_green = true
+final_requires_exact_sha_all_green = true
+
+[[lanes]]
+id = "M4A-01"
+generation = "M4A"
+branch = "wrk/rk-m4a-01-types"
+paths = ["rust/crates/er-types/src/run_ids.rs", "rust/crates/er-types/src/run_model.rs", "rust/crates/er-types/src/ui_menu.rs"]
+deliverable = "Strong run IDs, closed run enums, and shared logical-menu graph types"
+
+[[lanes]]
+id = "M4A-02"
+generation = "M4A"
+branch = "wrk/rk-m4a-state"
+paths = ["rust/crates/er-state/src/game_v2.rs", "rust/crates/er-state/src/run_v2.rs", "rust/crates/er-state/src/pokemon_v2.rs", "rust/crates/er-state/src/battle_v2.rs", "rust/crates/er-state/src/world_v2.rs", "rust/crates/er-state/src/validation_v2.rs", "rust/crates/er-state/tests/m4_state_v2.rs"]
+deliverable = "Versioned GameState, RunState, PokemonState, BattleState, world ownership, and validation migration targets"
+
+[[lanes]]
+id = "M4A-05"
+generation = "M4A"
+branch = "wrk/rk-m4a-05-migration"
+paths = ["rust/crates/er-state/src/migration.rs", "rust/crates/er-state/tests/m4_migration.rs", "rust/fixtures/m4/migration/**"]
+deliverable = "Typed zero-RNG M3-to-M4 migration with exact companion data"
+
+[[lanes]]
+id = "M4A-06"
+generation = "M4A"
+branch = "wrk/rk-m4a-run-content"
+paths = ["rust/crates/er-run/src/content.rs", "rust/crates/er-run/src/capability.rs", "rust/crates/er-run/src/rng_audit.rs", "rust/crates/er-run/src/error.rs", "rust/crates/er-run/tests/m4_content.rs"]
+deliverable = "Immutable run content pack, hashes, RNG audit records, and fail-closed capabilities"
+
+[[lanes]]
+id = "M4A-07"
+generation = "M4A"
+branch = "wrk/rk-m4a-07-progression"
+paths = ["rust/crates/er-run/src/experience.rs", "rust/crates/er-run/src/stats.rs", "rust/crates/er-run/src/progression.rs", "rust/crates/er-run/tests/m4_progression.rs"]
+deliverable = "EXP, level, permanent stats, participation, and atomic progression queue"
+
+[[lanes]]
+id = "M4A-08"
+generation = "M4A"
+branch = "wrk/rk-m4a-08-move-learning"
+paths = ["rust/crates/er-run/src/move_learning.rs", "rust/crates/er-run/tests/m4_move_learning.rs"]
+deliverable = "Owned move-learning task transitions and menu-independent decisions"
+
+[[lanes]]
+id = "M4A-09"
+generation = "M4A"
+branch = "wrk/rk-m4a-09-modifiers"
+paths = ["rust/crates/er-run/src/modifier.rs", "rust/crates/er-run/src/money.rs", "rust/crates/er-run/tests/m4_modifiers.rs"]
+deliverable = "Closed selected modifier effects, stacks, targeting, and money"
+
+[[lanes]]
+id = "M4A-10"
+generation = "M4A"
+branch = "wrk/rk-m4a-10-rewards"
+paths = ["rust/crates/er-run/src/reward.rs", "rust/crates/er-run/tests/m4_rewards.rs"]
+deliverable = "Reward generation, locks, rerolls, pricing, and audit"
+
+[[lanes]]
+id = "M4A-11"
+generation = "M4A"
+branch = "wrk/rk-m4a-11-biomes"
+paths = ["rust/crates/er-run/src/biome.rs", "rust/crates/er-run/src/route.rs", "rust/crates/er-run/src/encounter.rs", "rust/crates/er-run/tests/m4_biomes.rs"]
+deliverable = "Biome structure, route vectors, static encounter plans, and BattleStartV2 inputs"
+
+[[lanes]]
+id = "M4A-12"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle"
+paths = ["scripts/export-kernel-m4-oracle.mjs", "test/kernel-fixtures/m4/**", "rust/fixtures/m4/oracle/**"]
+deliverable = "Fresh-process TypeScript oracle exporter, migration companions, and causal M4 fixtures"
+
+[[lanes]]
+id = "M4A-13"
+generation = "M4A"
+branch = "wrk/rk-m4a-13-foundation-tests"
+paths = ["rust/crates/er-testkit/src/m4_fixture.rs", "rust/crates/er-testkit/tests/m4_foundation.rs"]
+deliverable = "Cross-crate fixture loader, schema, property, and differential foundation tests"
+
+[[lanes]]
+id = "M4A-12P"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-progression"
+paths = ["test/kernel-fixtures/m4/export/progression-capture.ts"]
+deliverable = "Live wave-nine progression and move-learning oracle capture"
+
+[[lanes]]
+id = "M4A-12R"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-rewards"
+paths = ["test/kernel-fixtures/m4/export/reward-market-capture.ts"]
+deliverable = "Live regular reward and Town market oracle capture"
+
+[[lanes]]
+id = "M4A-12B"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-biome"
+paths = ["test/kernel-fixtures/m4/export/biome-encounter-capture.ts"]
+deliverable = "Live biome, route, and encounter oracle capture"
+
+[[lanes]]
+id = "M4A-12M"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-migration"
+paths = ["test/kernel-fixtures/m4/export/migration-companion-capture.ts"]
+deliverable = "Live M3-to-M4 progression companion oracle capture"
+
+[[lanes]]
+id = "M4A-12C"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-content"
+paths = ["test/kernel-fixtures/m4/export/run-content-capture.ts"]
+deliverable = "M4 battle and run content packs with exact independent hashes"
+
+[[lanes]]
+id = "M4A-14"
+generation = "M4A"
+branch = "wrk/rk-m4a-snapshot"
+paths = ["rust/crates/er-types/src/trace_v3.rs", "rust/crates/er-kernel/src/snapshot_v3.rs", "rust/crates/er-sim/src/snapshot_v3.rs", "rust/crates/er-kernel/tests/m4_snapshot_v3.rs", "rust/crates/er-sim/tests/m4_pair_snapshot_v3.rs"]
+deliverable = "Strict V3 endpoint, pair, and trace roots with full-owner validation"
+
+[[lanes]]
+id = "M4A-15"
+generation = "M4A"
+branch = "wrk/rk-m4a-settlement"
+paths = ["rust/crates/er-run/src/settlement.rs", "rust/crates/er-run/tests/m4_settlement.rs"]
+deliverable = "Pure typed battle participation and one-time settlement preparation"
+
+[[lanes]]
+id = "M4A-RI"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-isolation"
+paths = ["scripts/export-kernel-m4-oracle.mjs", "test/kernel-fixtures/m4/export-run-oracle.test.ts", "test/kernel-fixtures/m4/export-helper-runner.test.ts"]
+deliverable = "Sequential integration-owner repair isolating each oracle capture in its own fresh process"
+
+[[lanes]]
+id = "M4A-16"
+generation = "M4A"
+branch = "wrk/rk-m4a-battle-content"
+paths = ["rust/crates/er-content/src/pack.rs", "rust/crates/er-content/src/m4_moves.rs", "rust/crates/er-content/src/m4_pack.rs", "rust/crates/er-content/tests/m4_pack.rs"]
+deliverable = "M4-oracle battle pack preserving M3 closure and adding exact Body Slam"
+
+[[lanes]]
+id = "M4B-01"
+generation = "M4B"
+branch = "wrk/rk-m4b-01-run-runtime"
+paths = ["rust/crates/er-game/src/run_runtime.rs", "rust/crates/er-game/src/run_event.rs", "rust/crates/er-game/tests/m4_run_runtime.rs"]
+deliverable = "Run-stage state machine and quiescent internal events"
+
+[[lanes]]
+id = "M4B-02"
+generation = "M4B"
+branch = "wrk/rk-m4b-02-controls"
+paths = ["rust/crates/er-game/src/game_control.rs", "rust/crates/er-game/src/run_menu.rs", "rust/crates/er-game/tests/m4_controls.rs"]
+deliverable = "Per-seat run control plans and raw-key logical menus"
+
+[[lanes]]
+id = "M4B-03"
+generation = "M4B"
+branch = "wrk/rk-m4b-03-materials"
+paths = ["rust/crates/er-protocol/src/run_material.rs", "rust/crates/er-protocol/tests/m4_run_material.rs"]
+deliverable = "Typed wave, interaction, terminal, turn-V2, and replacement-V2 envelopes"
+
+[[lanes]]
+id = "M4B-04"
+generation = "M4B"
+branch = "wrk/rk-m4b-04-applier"
+paths = ["rust/crates/er-game/src/run_material.rs", "rust/crates/er-game/tests/m4_material_apply.rs"]
+deliverable = "Single authority/replica canonical material applier"
+
+[[lanes]]
+id = "M4B-05"
+generation = "M4B"
+branch = "wrk/rk-m4b-05-surface-runtime"
+paths = ["rust/crates/er-game/src/progression_control.rs", "rust/crates/er-game/src/reward_control.rs", "rust/crates/er-game/src/biome_control.rs", "rust/crates/er-game/tests/m4_surfaces.rs"]
+deliverable = "Move-learning, reward, market, Crossroads, and biome control adapters"
+
+[[lanes]]
+id = "M4B-06"
+generation = "M4B"
+branch = "wrk/rk-m4b-06-authority"
+paths = ["rust/crates/er-kernel/src/run_authority.rs", "rust/crates/er-kernel/tests/m4_run_authority.rs"]
+deliverable = "Run proposal admission, ownership, idempotence, and staged commits"
+
+[[lanes]]
+id = "M4B-07"
+generation = "M4B"
+branch = "wrk/rk-m4b-07-kernel"
+paths = ["rust/crates/er-kernel/src/kernel.rs", "rust/crates/er-kernel/src/run_ui.rs", "rust/crates/er-kernel/tests/m4_kernel.rs"]
+deliverable = "Exclusive GameKernel step integration for the M4 run path"
+
+[[lanes]]
+id = "M4B-08"
+generation = "M4B"
+branch = "wrk/rk-m4b-08-sim"
+paths = ["rust/crates/er-sim/src/m4_pair.rs", "rust/crates/er-sim/tests/m4_pair.rs"]
+deliverable = "Two-client run simulation and deterministic fault controls"
+
+[[lanes]]
+id = "M4B-09"
+generation = "M4B"
+branch = "wrk/rk-m4b-09-snapshot"
+paths = ["rust/crates/er-kernel/src/snapshot_v3.rs", "rust/crates/er-sim/src/snapshot_v3.rs", "rust/crates/er-sim/tests/m4_snapshot_restore.rs"]
+deliverable = "Complete V3 endpoint/pair snapshots and restoration parity"
+
+[[lanes]]
+id = "M4B-10"
+generation = "M4B"
+branch = "wrk/rk-m4b-10-local-campaign"
+paths = ["rust/crates/er-sim/tests/m4_raw_key_local.rs"]
+deliverable = "Wave 9-11 local raw-key parity campaign"
+
+[[lanes]]
+id = "M4B-11"
+generation = "M4B"
+branch = "wrk/rk-m4b-11-coop-campaign"
+paths = ["rust/crates/er-sim/tests/m4_raw_key_coop.rs"]
+deliverable = "Wave 9-11 two-client raw-key authority campaign"
+
+[[lanes]]
+id = "M4B-12"
+generation = "M4B"
+branch = "wrk/rk-m4b-12-faults"
+paths = ["rust/crates/er-sim/tests/m4_run_faults.rs", "rust/crates/er-sim/tests/m4_run_recovery.rs"]
+deliverable = "Delay, duplicate, disconnect, recovery, and stale-input campaigns"
+
+[[lanes]]
+id = "M4B-13"
+generation = "M4B"
+branch = "wrk/rk-m4b-13-wasm"
+paths = ["rust/crates/er-wasm/src/m4_schema.rs", "rust/crates/er-wasm/tests/m4_parity.rs"]
+deliverable = "Native/Wasm V2 state, V3 trace, and event-by-event parity"
+
+[[lanes]]
+id = "M4B-14"
+generation = "M4B"
+branch = "wrk/rk-m4b-14-bench"
+paths = ["rust/crates/er-sim/benches/m4_run.rs", "rust/crates/er-sim/tests/m4_resource_teardown.rs"]
+deliverable = "M4 performance workload and zero-resource teardown proofs"
+
+[shared_paths]
+owners = ["integration-owner"]
+paths = ["rust/Cargo.toml", "rust/Cargo.lock", "rust/crates/er-run/Cargo.toml", "rust/crates/er-run/src/lib.rs", "rust/crates/er-types/src/lib.rs", "rust/crates/er-state/src/lib.rs", "rust/crates/er-game/src/lib.rs", "rust/crates/er-protocol/src/lib.rs", "rust/crates/er-kernel/src/lib.rs", "rust/crates/er-sim/src/lib.rs", "rust/crates/er-wasm/src/lib.rs", ".github/workflows/rust-kernel-m4.yml"]

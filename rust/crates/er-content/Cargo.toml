@@ -1,0 +1,17 @@
+[package]
+name = "er-content"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-canonical = { path = "../er-canonical" }
+er-mechanics = { path = "../er-mechanics" }
+er-types = { path = "../er-types" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

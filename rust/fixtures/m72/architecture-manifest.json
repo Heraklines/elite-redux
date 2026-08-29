@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "m71_base_sha": "79e3544029e422deb8389a12f8b75e7f0febfb3e",
+  "current_owners": [
+    {"concern":"CONTENT_IDENTITY","symbol":"er_types::m7::GameContentIdentity"},
+    {"concern":"ENVIRONMENT","symbol":"er_env::GameEnvironment"},
+    {"concern":"GAME_STATE","symbol":"er_state::m7_state::GameStateV5"},
+    {"concern":"KERNEL","symbol":"er_kernel::kernel_v6::GameKernelV6"},
+    {"concern":"LOGICAL_MENU","symbol":"er_types::m7_menu::GameMenuV2"},
+    {"concern":"MATERIAL_APPLIER","symbol":"er_game::m7_material::apply_game_material_v5"},
+    {"concern":"RAW_INPUT_ROUTE","symbol":"er_env::GameEnvironment::raw_input"},
+    {"concern":"REPLAY_WRITER","symbol":"er_dev_types::trace_v7::KernelTraceV7"},
+    {"concern":"RUNTIME","symbol":"er_game::m7_runtime::GameRuntimeV5"},
+    {"concern":"SCHEDULER","symbol":"er_kernel::snapshot::KernelSchedulerSnapshotV2"},
+    {"concern":"SNAPSHOT_WRITER","symbol":"er_kernel::snapshot_v6::RestorableKernelSnapshotV6"}
+  ],
+  "forbidden_current_runtime_terms": [
+    "ControlMenuPlan",
+    "AuthorityResolutionPlan",
+    "ApplyAuthorityMaterial",
+    "ProjectAuthorityControl"
+  ],
+  "forbidden_core_dependencies": ["er-lab"],
+  "historical_policy": "migration-only",
+  "new_crate_budget": ["er-lab"]
+}

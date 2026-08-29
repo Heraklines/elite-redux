@@ -1,0 +1,23 @@
+[package]
+name = "er-devplane"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+blake3.workspace = true
+er-canonical = { path = "../er-canonical" }
+er-content = { path = "../er-content" }
+er-dev-types = { path = "../er-dev-types" }
+er-env = { path = "../er-env" }
+er-kernel = { path = "../er-kernel" }
+er-model = { path = "../er-model" }
+er-render-model = { path = "../er-render-model" }
+er-sim = { path = "../er-sim" }
+er-types = { path = "../er-types" }
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "project": "PokéRogue Redux",
+  "m3_base_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "segment": {
+    "id": "classic-composed-wave-9-through-11-v1",
+    "kind": "oracle-composed-canonical-state-and-captured-vectors",
+    "start_wave": 9,
+    "end_wave": 11,
+    "initial_biome": { "id": 0, "key": "TOWN" },
+    "selected_biome": { "id": 1, "key": "PLAINS" },
+    "required_control_order": [
+      "BATTLE",
+      "MOVE_LEARN",
+      "REWARD_SHOP",
+      "BATTLE",
+      "BIOME_MARKET",
+      "CROSSROADS",
+      "BIOME_SELECT",
+      "BATTLE"
+    ],
+    "driver": "raw-physical-keys-only",
+    "natural_single_seed_claim": false
+  },
+  "battle_content": {
+    "species_ids": [1, 7, 19, 23, 50, 52, 915, 932],
+    "move_ids": [1, 34, 39, 52, 77, 78, 98, 158, 230, 351, 589],
+    "ability_ids": [0, 22, 25, 165],
+    "m3_source_manifest": "../m3/m3-slice-manifest.json",
+    "m4_additional_move_ids": [34, 39, 98, 158, 230],
+    "m4_additional_content_source": "M4_ORACLE_EXPORTED_POST_INITIALIZATION_DEFINITIONS"
+  },
+  "progression": {
+    "species": { "id": 932, "key": "NACLI" },
+    "growth_rate": { "id": 3, "key": "MEDIUM_SLOW" },
+    "captured_encounter_growth_rate": { "id": 2, "key": "MEDIUM_FAST" },
+    "nature_ids": [0, 3, 10, 15, 24],
+    "selected_parity_nature": { "id": 0, "key": "HARDY" },
+    "iv_order": ["HP", "ATK", "DEF", "SPATK", "SPDEF", "SPD"],
+    "iv_range": { "minimum": 0, "maximum": 31 },
+    "level_move_candidates": [
+      { "level": 17, "id": 34, "key": "BODY_SLAM" }
+    ],
+    "parity_level_before": 16,
+    "parity_level_after": 17,
+    "parity_initial_moves": [1, 52, 77, 78],
+    "parity_replacement_move": { "slot": 0, "before_move_id": 1, "after_move_id": 34 },
+    "level_cap_source": "TEST_ONLY_LEVEL_CAP_OVERRIDE_17",
+    "pause_evolutions": false,
+    "evolution_level": 23,
+    "initial_moves_source": "ORACLE_COMPOSED_SUPPORTED_BATTLE_LOADOUT",
+    "evolution_execution": "UNSUPPORTED_FAIL_CLOSED"
+  },
+  "modifier_ids": [
+    { "id": 1, "key": "AMULET_COIN", "kind": "PERSISTENT" },
+    { "id": 2, "key": "CANDY_JAR", "kind": "PERSISTENT" },
+    { "id": 3, "key": "EXP_CHARM", "kind": "PERSISTENT" },
+    { "id": 4, "key": "SUPER_EXP_CHARM", "kind": "PERSISTENT" },
+    { "id": 5, "key": "GOLDEN_EXP_CHARM", "kind": "PERSISTENT" },
+    { "id": 6, "key": "HEALING_CHARM", "kind": "PERSISTENT" },
+    { "id": 7, "key": "LOCK_CAPSULE", "kind": "PERSISTENT" },
+    { "id": 100, "key": "POTION", "kind": "IMMEDIATE_TARGETED" },
+    { "id": 101, "key": "SUPER_POTION", "kind": "IMMEDIATE_TARGETED" },
+    { "id": 102, "key": "HYPER_POTION", "kind": "IMMEDIATE_TARGETED" },
+    { "id": 103, "key": "MAX_POTION", "kind": "IMMEDIATE_TARGETED" },
+    { "id": 200, "key": "NUGGET", "kind": "IMMEDIATE_MONEY" },
+    { "id": 201, "key": "BIG_NUGGET", "kind": "IMMEDIATE_MONEY" },
+    { "id": 202, "key": "RELIC_GOLD", "kind": "IMMEDIATE_MONEY" },
+    { "id": 300, "key": "RARE_CANDY", "kind": "IMMEDIATE_TARGETED" },
+    { "id": 301, "key": "RARER_CANDY", "kind": "IMMEDIATE_TARGETED" },
+    { "id": 400, "key": "POKEBALL", "kind": "PERSISTENT_INVENTORY" },
+    { "id": 401, "key": "GREAT_BALL", "kind": "PERSISTENT_INVENTORY" }
+  ],
+  "regular_reward_shop": {
+    "supports_reroll": true,
+    "supports_locks": true,
+    "reroll_base_cost": 250,
+    "lock_cost_tiers": [50, 125, 300, 750, 2000],
+    "selected_capability_keys": ["LOCK_CAPSULE", "POTION", "NUGGET", "RARE_CANDY"]
+  },
+  "biome_market": {
+    "supports_reroll": false,
+    "supports_locks": false,
+    "maximum_stock_entries": 16,
+    "selected_capability_keys": ["POKEBALL", "GREAT_BALL"]
+  },
+  "biomes": [
+    { "id": 0, "key": "TOWN" },
+    { "id": 1, "key": "PLAINS" },
+    { "id": 2, "key": "GRASS" },
+    { "id": 4, "key": "METROPOLIS" },
+    { "id": 9, "key": "LAKE" },
+    { "id": 50, "key": "END" }
+  ],
+  "route_subset": {
+    "town_base": [1],
+    "plains_base": [2, 4, 9],
+    "maximum_extra_routes": 3,
+    "extra_route_success_percent": 50
+  },
+  "encounter_candidates": [
+    {
+      "id": "plains-wave-11-captured-v1",
+      "biome_id": 1,
+      "source": "ORACLE_CAPTURE_REQUIRED",
+      "generation_mode": "STATIC_CAPTURED_VECTOR",
+      "species_id_policy": "FROM_CAPTURED_POST_INITIALIZATION_VECTOR"
+    }
+  ],
+  "scripted_enemy_policy": "SCRIPTED_ONLY",
+  "enemy_modifiers": "EMPTY_ONLY",
+  "encounter_battle_rng": "ORACLE_CAPTURED_EXACT_STATE",
+  "unsupported_policy": "FAIL_CLOSED"
+}

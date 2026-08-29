@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "contract_state": "G13_PUBLISHED_FRESH_PROCESS_VERIFIED",
+  "exporter": {
+    "script": "scripts/export-kernel-m4-oracle.mjs",
+    "test": "test/kernel-fixtures/m4/export-run-oracle.test.ts",
+    "fresh_process_count": 2,
+    "byte_identical_required": true,
+    "production_typescript_read_only": true
+  },
+  "required_outputs": [
+    "rust/fixtures/m4/oracle/battle-content-pack-v1.json",
+    "rust/fixtures/m4/oracle/run-content-pack-v1.json",
+    "rust/fixtures/m4/oracle/rng-vectors-v1.json",
+    "rust/fixtures/m4/oracle/run-segments/classic-composed-wave-9-through-11-v1.json",
+    "rust/fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json",
+    "rust/fixtures/m4/oracle/rewards/regular-reroll-lock-v1.json",
+    "rust/fixtures/m4/oracle/markets/town-wave-10-v1.json",
+    "rust/fixtures/m4/oracle/biomes/town-crossroads-route-v1.json",
+    "rust/fixtures/m4/oracle/encounters/plains-wave-11-captured-v1.json",
+    "rust/fixtures/m4/oracle/migration/m3-to-m4-companions-v1.json"
+  ],
+  "publication_requirements": [
+    "EXACT_ORACLE_SHA_CHECKOUT",
+    "EXACT_EXPORTER_SHA",
+    "FRESH_PROCESS_BYTE_IDENTITY",
+    "NO_UNRECORDED_RNG_STATE_CHANGE",
+    "COMPLETE_PROVENANCE",
+    "ALL_M3_STATES_HAVE_MIGRATION_COMPANIONS",
+    "FIRST_DIVERGENCE_FIELDS_PRESENT",
+    "NO_ZERO_OR_NULL_PLACEHOLDERS",
+    "ALL_GAPS_CLASSIFIED"
+  ],
+  "parity_segment": {
+    "id": "classic-composed-wave-9-through-11-v1",
+    "initial_state_requirement": "ORACLE_EXPORTED_WAVE_9_CANONICAL_STATE",
+    "composition_requirement": "EVERY_JOIN_HAS_IDENTICAL_CANONICAL_STATE_CONTENT_HASH_AND_RNG_FRONTIER",
+    "driver_requirement": "RAW_PHYSICAL_KEYS_ONLY",
+    "semantic_shortcuts_forbidden": true,
+    "natural_single_seed_claim": false
+  }
+}

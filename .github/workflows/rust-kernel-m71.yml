@@ -1,0 +1,334 @@
+name: Rust Kernel M7.1 Developer Plane
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m7-devplane-g31
+      - arch/rust-kernel-m7-devplane-g32
+      - arch/rust-kernel-m7-devplane-g33
+      - arch/rust-kernel-m7-devplane-g34
+    paths:
+      - ".github/workflows/rust-kernel-m71.yml"
+      - "rust/**"
+      - "scripts/*kernel-m71*"
+      - "docs/plans/rust-kernel/m71-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m71-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  m71-m7-final-attestation:
+    name: M7.1 M7 final attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/fixtures/m71/
+            /rust/Cargo.toml
+            /rust/contracts/m71-contract.toml
+            /scripts/check-kernel-m71-contract.mjs
+            /rust/contracts/
+            /rust/crates/
+            /docs/plans/rust-kernel/
+          submodules: false
+      - run: node scripts/check-kernel-m71-contract.mjs
+
+  m71-contract-freeze:
+    name: M7.1 contract and dependency freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: node scripts/check-kernel-m71-contract.mjs
+      - name: Reject upstream developer-plane dependencies
+        run: |
+          set -euo pipefail
+          for crate in er-state er-battle er-run er-game er-kernel er-protocol er-mechanics; do
+            if grep -E 'er-(dev-types|devplane|repro|agent-protocol|model|render-model|impact|batch)' "rust/crates/$crate/Cargo.toml"; then
+              printf 'forbidden developer-plane dependency in %s\n' "$crate" >&2
+              exit 1
+            fi
+          done
+
+  m71-format:
+    name: M7.1 format and workspace check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-bootstrap-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Check formatting and all developer-plane crates
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p er-dev-types -p er-model -p er-render-model -p er-impact \
+            -p er-devplane -p er-repro -p er-batch -p er-agent-protocol
+
+  m71-g31-aggregate:
+    name: M7.1 G31 contract aggregate
+    needs:
+      - m71-m7-final-attestation
+      - m71-contract-freeze
+      - m71-format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G31 contract freeze"
+
+  m71-g30-byte-parity:
+    name: M7.1 G30 mechanical byte parity
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m71-g30-parity.mjs
+
+  m71-foundation:
+    name: M7.1 identity observation causal snapshot foundation
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run developer-plane foundation contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m71_foundation
+          cargo test -p er-testkit --test m7_system_proof
+          cargo test -p er-testkit --test m7_behavior_proofs
+
+  m71-native-wasm:
+    name: M7.1 native Wasm type parity
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check portable developer-plane boundary crates
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo check -p er-dev-types -p er-model -p er-render-model
+          cargo check --target wasm32-unknown-unknown -p er-dev-types -p er-model -p er-render-model
+
+  m71-m0-m7-regression:
+    name: M7.1 M0-M7 regression
+    if: ${{ github.ref_name != 'arch/rust-kernel-m7-devplane-g31' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run complete Rust regression
+        working-directory: rust
+        run: cargo test --workspace --all-targets
+
+  m71-g32-aggregate:
+    name: M7.1 G32 foundation aggregate
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g32' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    needs:
+      - m71-g31-aggregate
+      - m71-g30-byte-parity
+      - m71-foundation
+      - m71-native-wasm
+      - m71-m0-m7-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G32 mechanical foundation"
+
+  m71-reproduction:
+    name: M7.1 capsule replay diff minimize JSONL
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-reproduction-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run exact reproduction and agent contracts
+        working-directory: rust
+        run: cargo test -p er-testkit --test m71_reproduction
+
+  m71-reproduction-wasm:
+    name: M7.1 reproduction boundary Wasm check
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check reproduction and agent crates for Wasm
+        working-directory: rust
+        run: cargo check --target wasm32-unknown-unknown -p er-repro -p er-agent-protocol
+
+  m71-g33-aggregate:
+    name: M7.1 G33 reproduction aggregate
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g33' ||
+        github.ref_name == 'arch/rust-kernel-m7-devplane-g34'
+      }}
+    needs:
+      - m71-g32-aggregate
+      - m71-reproduction
+      - m71-reproduction-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G33 reproduction and agent gate"
+
+  m71-final-integration:
+    name: M7.1 impact batch render model reload audit
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-final-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run final developer-plane integration contracts
+        working-directory: rust
+        run: cargo test -p er-testkit --test m71_final_integration
+
+  m71-final-wasm:
+    name: M7.1 complete developer-plane Wasm parity
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check every developer-plane crate for Wasm
+        working-directory: rust
+        run: >-
+          cargo check --target wasm32-unknown-unknown
+          -p er-dev-types -p er-model -p er-render-model -p er-impact
+          -p er-devplane -p er-repro -p er-batch -p er-agent-protocol
+
+  m71-final-performance:
+    name: M7.1 release-profile performance and teardown
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-final-release-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run JSONL ceiling and teardown proof
+        working-directory: rust
+        run: >-
+          cargo test --release -p er-testkit --test m71_final_integration
+          jsonl_throughput_and_protocol_teardown_meet_g34_ceiling -- --exact
+
+  m71-final-api-audit:
+    name: M7.1 API bypass privacy parity audit
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m71-contract.mjs
+      - run: node scripts/check-kernel-m71-g30-parity.mjs
+
+  m71-g34-aggregate:
+    name: M7.1 G34 immutable qualification
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    needs:
+      - m71-g33-aggregate
+      - m71-final-integration
+      - m71-final-wasm
+      - m71-final-performance
+      - m71-final-api-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed immutable G34 qualification"

@@ -1,0 +1,118 @@
+schema_version = 1
+milestone = "M5"
+integration_branch = "arch/rust-kernel-m5"
+base_sha = "dde38446141880ec32331622307cc19105aee309"
+oracle_sha = "328824692f95b1aa1b38af85b54a6b72d9259eb4"
+writer_isolation = "one isolated worktree and exclusive manifest per writer"
+public_contract_changes = "integration owner only after contract request"
+production_typescript = "read-only"
+
+[[surface]]
+name = "contracts"
+owner = "integration"
+paths = ["rust/contracts/m5-*", "docs/plans/rust-kernel/m5-*", "scripts/check-kernel-m5-contract.mjs"]
+
+[[surface]]
+name = "source-catalog"
+owner = "oracle-catalog"
+paths = ["scripts/export-kernel-m5-source-catalog.mjs", "scripts/prepare-kernel-m5-oracle-refresh.mjs", "scripts/classify-kernel-m5-oracle-refresh.mjs", "rust/fixtures/m5/source-catalog-*"]
+
+[[surface]]
+name = "oracle-refresh"
+owner = "oracle-fixtures"
+paths = ["scripts/export-kernel-m3-oracle.mjs", "scripts/export-kernel-m4-oracle.mjs", "test/kernel-fixtures/m3/**", "test/kernel-fixtures/m4/**", "rust/fixtures/m5/oracle-refresh/**"]
+
+[[surface]]
+name = "mechanics-types"
+owner = "mechanics-contract"
+paths = ["rust/crates/er-types/src/mechanics.rs", "rust/crates/er-types/tests/m5_mechanics_ids.rs"]
+
+[[surface]]
+name = "mechanics-ir"
+owner = "mechanics-ir"
+paths = ["rust/crates/er-mechanics/**"]
+
+[[surface]]
+name = "content-pack-v2"
+owner = "content-pack"
+paths = ["rust/crates/er-content/src/m5_*", "rust/crates/er-content/tests/m5_*", "rust/fixtures/m5/*manifest*.json"]
+
+[[surface]]
+name = "content-compiler"
+owner = "content-compiler"
+paths = ["rust/crates/er-content-compiler/**"]
+
+[[surface]]
+name = "state-v3"
+owner = "state-migration"
+paths = ["rust/crates/er-state/src/*_v3.rs", "rust/crates/er-state/src/mechanic_state.rs", "rust/crates/er-state/src/migration_v3.rs", "rust/crates/er-state/tests/m5_*"]
+
+[[surface]]
+name = "mechanics-executor"
+owner = "executor"
+paths = ["rust/crates/er-battle/src/mechanics/**", "rust/crates/er-battle/tests/m5_executor*"]
+
+[[surface]]
+name = "mechanic-families"
+owner = "families"
+paths = ["rust/crates/er-battle/src/mechanics/families/**", "rust/crates/er-battle/tests/m5_families*"]
+
+[[surface]]
+name = "game-material-v3"
+owner = "game-integration"
+paths = ["rust/crates/er-game/src/*_v3.rs", "rust/crates/er-game/tests/m5_*"]
+
+[[surface]]
+name = "protocol-material-v3"
+owner = "protocol-integration"
+paths = ["rust/crates/er-protocol/src/*_v3.rs", "rust/crates/er-protocol/tests/m5_*"]
+
+[[surface]]
+name = "snapshot-trace-v4"
+owner = "snapshot-v4"
+paths = ["rust/crates/er-kernel/src/snapshot_v4.rs", "rust/crates/er-sim/src/snapshot_v4.rs", "rust/crates/er-sim/src/trace_v4.rs", "rust/crates/*/tests/m5_*snapshot*"]
+
+[[surface]]
+name = "run-content-v2"
+owner = "run-integration"
+paths = ["rust/crates/er-run/src/*_v2.rs", "rust/crates/er-run/tests/m5_*"]
+
+[[surface]]
+name = "wasm-parity-v4"
+owner = "wasm-parity"
+paths = ["rust/crates/er-wasm/src/*", "rust/crates/er-wasm/tests/m5_*"]
+
+[[surface]]
+name = "system-proof"
+owner = "system-proof"
+paths = ["rust/crates/er-sim/tests/m5_*", "rust/crates/er-testkit/src/m5_*", "rust/fixtures/m5/reports/**"]
+
+[[surface]]
+name = "ci"
+owner = "integration"
+paths = [".github/workflows/rust-kernel-m5.yml"]
+
+[merge_order]
+steps = [
+  "contracts-and-oracle",
+  "mechanics-types",
+  "mechanics-ir",
+  "content-pack-v2",
+  "content-compiler",
+  "state-v3",
+  "executor",
+  "mechanic-families",
+  "protocol-and-game-materials",
+  "snapshot-trace-v4",
+  "run-and-wasm-integration",
+  "system-proof",
+  "ci-qualification",
+]
+
+[exclusive_files]
+workspace_manifest = "integration"
+workspace_lockfile = "integration"
+kernel_step = "integration"
+public_mechanics_api = "integration"
+wire_schema = "integration"
+classification_schema = "integration"

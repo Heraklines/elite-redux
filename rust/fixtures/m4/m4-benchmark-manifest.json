@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "runner_class": "github-hosted-standard-linux-x64",
+  "profile": "release",
+  "workloads": [
+    { "id": "wave-transitions-10000", "count": 10000, "ceiling_ms": 30000 },
+    { "id": "reward-market-cycles-1000", "count": 1000, "ceiling_ms": 30000 },
+    { "id": "biome-transitions-1000", "count": 1000, "ceiling_ms": 30000 },
+    { "id": "complete-runs-200-waves-100", "count": 100, "waves_each": 200, "ceiling_ms": 120000 },
+    { "id": "run-surface-raw-key-events-100000", "count": 100000, "ceiling_ms": 5000 },
+    { "id": "two-client-wave-transitions-1000", "count": 1000, "ceiling_ms": 30000 }
+  ],
+  "peak_rss": {
+    "workload_id": "single-complete-run-200-waves",
+    "ceiling_mib": 512
+  },
+  "record": ["candidate_sha", "runner_image", "cpu", "setup_ms", "content_load_ms", "execution_ms", "peak_rss_bytes", "events", "waves", "battles", "transitions", "rng_draws"],
+  "accepted_baseline": "FIRST_EXACT_SHA_ALL_GREEN_M4_RUN",
+  "regression_limit_percent": 25
+}

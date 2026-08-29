@@ -1,0 +1,65 @@
+[workspace]
+members = [
+    "crates/er-canonical",
+    "crates/er-types",
+    "crates/er-dev-types",
+    "crates/er-rng",
+    "crates/er-content",
+    "crates/er-mechanics",
+    "crates/er-content-compiler",
+    "crates/er-state",
+    "crates/er-run",
+    "crates/er-progression",
+    "crates/er-world",
+    "crates/er-ai",
+    "crates/er-scenario",
+    "crates/er-save",
+    "crates/er-model",
+    "crates/er-render-model",
+    "crates/er-impact",
+    "crates/er-env",
+    "crates/er-devplane",
+    "crates/er-repro",
+    "crates/er-batch",
+    "crates/er-agent-protocol",
+    "crates/er-lab",
+    "crates/er-cli",
+    "crates/er-battle",
+    "crates/er-game",
+    "crates/er-kernel",
+    "crates/er-protocol",
+    "crates/er-sim",
+    "crates/er-testkit",
+    "crates/er-wasm",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97.1"
+version = "0.1.0"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
+thiserror = "2.0"
+blake3 = "=1.8.6"
+sha2 = "0.10"
+proptest = "1.6"
+wasm-bindgen-test = "0.3"
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+missing_debug_implementations = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"

@@ -1,0 +1,322 @@
+name: Rust Kernel M7 Gate
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m7-g27
+      - arch/rust-kernel-m7-g28
+      - arch/rust-kernel-m7-g29a
+      - arch/rust-kernel-m7-g29b
+      - arch/rust-kernel-m7-g29c
+      - arch/rust-kernel-m7-g29
+      - arch/rust-kernel-m7-g30
+    paths:
+      - ".github/workflows/rust-kernel-m7.yml"
+      - ".github/workflows/rust-kernel-m7-focused.yml"
+      - "rust/**"
+      - "scripts/*kernel-m7*"
+      - "test/kernel-fixtures/m7/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m7-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  m7-format-check:
+    name: M7 format and workspace check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Check complete Rust workspace
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets
+
+  m7-foundation:
+    name: M7A state content IR snapshot foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-foundation-tests-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m7-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run M7A foundation contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-types m7
+          cargo test -p er-state m7_state
+          cargo test -p er-scenario
+          cargo test -p er-ai
+          cargo test -p er-progression
+          cargo test -p er-save
+          cargo test -p er-content-compiler --lib m7
+          cargo test -p er-game --lib m7_content
+          cargo test -p er-kernel --lib snapshot_v6
+          cargo test -p er-testkit --test m7_foundation
+          cargo test -p er-testkit --test m7_system_proof
+
+  m7-full-content-cutover:
+    name: M7 direct full-content dispatch closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-full-content-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m7-foundation-tests-${{ runner.os }}-${{ runner.arch }}-
+      - name: Prove complete prepared M6 catalog and V5 dispatch path
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m7_foundation
+          cargo test -p er-testkit --test m6_move_parity -- --test-threads=1
+          cargo test -p er-testkit --test m6_ability_parity -- --test-threads=1
+          cargo test -p er-testkit --test m6_item_parity -- --test-threads=1
+          cargo test -p er-testkit --test m6_field_parity -- --test-threads=1
+          cargo test -p er-testkit --test m6_species_form_parity -- --test-threads=1
+          cargo test -p er-testkit --test m6_properties -- --test-threads=1
+
+  m7-native-wasm-cutover:
+    name: M7 direct native Wasm boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+            ~/.rustup/toolchains
+          key: m7-wasm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Check native and wasm32 boundary
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo check -p er-wasm --lib
+          cargo check --target wasm32-unknown-unknown -p er-wasm --lib
+
+  m7-m0-m6-regression:
+    name: M0-M6 Rust regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m7-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run complete historical Rust regression
+        working-directory: rust
+        run: |
+          set -o pipefail
+          cargo test --workspace --all-targets 2>&1 | tee "$RUNNER_TEMP/m0-m6-regression.log"
+      - name: Publish regression failure summary
+        if: failure()
+        run: |
+          {
+            printf '%s\n' '### M0-M6 regression failure tail' '```text'
+            tail -n 160 "$RUNNER_TEMP/m0-m6-regression.log"
+            printf '%s\n' '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          encoded_tail="$(grep -n -B 12 -A 20 -E '(FAILED|panicked|failures:|error: test failed)' "$RUNNER_TEMP/m0-m6-regression.log" | tail -n 100 | base64 -w0)"
+          printf '::error title=M0-M6 regression tail::base64:%s\n' "$encoded_tail"
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: m0-m6-regression-failure
+          path: ${{ runner.temp }}/m0-m6-regression.log
+          if-no-files-found: error
+          retention-days: 14
+
+  m7-performance:
+    name: M7 release headless performance proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-performance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run release headless system proof
+        working-directory: rust
+        run: cargo test --release -p er-testkit --test m7_system_proof
+
+  m7-g27-causal:
+    name: M7 G27 typed causal spine
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-causal-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run typed action material FIFO and proof contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-content-compiler --lib m7
+          cargo test -p er-game --lib m7_internal_event
+          cargo test -p er-kernel --lib replica_proposal_effect
+          cargo test -p er-testkit --test m7_causal_spine
+          cargo test -p er-testkit --test m7_behavior_proofs
+          cargo test -p er-testkit --test m7_system_proof
+
+
+  m7-g29-system-closure:
+    name: M7 G29 complete system closure
+    if: >-
+      ${{
+        github.ref_name == 'arch/rust-kernel-m7-g29' ||
+        github.ref_name == 'arch/rust-kernel-m7-g30'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/fixtures/m7/
+            /rust/crates/er-testkit/tests/
+            /scripts/check-kernel-m7-closure.mjs
+          submodules: false
+      - name: Require zero behavior gaps and complete campaigns
+        run: |
+          node scripts/check-kernel-m7-closure.mjs \
+            --stage g29 \
+            --report "$RUNNER_TEMP/m7-closure-report.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m7-closure-report
+          path: ${{ runner.temp }}/m7-closure-report.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m7-g27-foundation-aggregate:
+    name: M7 G27 causal aggregate
+    needs:
+      - m7-format-check
+      - m7-foundation
+      - m7-full-content-cutover
+      - m7-native-wasm-cutover
+      - m7-m0-m6-regression
+      - m7-performance
+      - m7-g27-causal
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed G27 typed causal qualification"
+
+  m7-g30-aggregate:
+    name: M7 G30 final aggregate
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-g30' }}
+    needs:
+      - m7-g27-foundation-aggregate
+      - m7-g29-system-closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed complete G30 qualification"

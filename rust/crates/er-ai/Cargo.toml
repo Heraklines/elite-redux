@@ -1,0 +1,17 @@
+[package]
+name = "er-ai"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-canonical = { path = "../er-canonical" }
+er-content = { path = "../er-content" }
+er-state = { path = "../er-state" }
+er-types = { path = "../er-types" }
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

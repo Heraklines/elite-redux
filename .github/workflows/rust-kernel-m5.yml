@@ -1,0 +1,574 @@
+name: Rust Kernel M5 Gate
+
+on:
+  push:
+    branches:
+      - "arch/rust-kernel-m5"
+      - "wrk/rk-m5-*"
+      - "ci/rust-m5/**"
+    paths:
+      - ".github/workflows/rust-kernel-m5.yml"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docs/plans/rust-kernel/m5-*.md"
+      - "rust/**"
+      - "scripts/*kernel-m5*.mjs"
+      - "scripts/export-kernel-m3-oracle.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m3/**"
+      - "test/kernel-fixtures/m4/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m5-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  M4_FINAL_SHA: dde38446141880ec32331622307cc19105aee309
+  M5_ORACLE_SHA: 328824692f95b1aa1b38af85b54a6b72d9259eb4
+
+jobs:
+  m5-source-lock:
+    name: M5 source lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Preserve M4 production TypeScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${M4_FINAL_SHA}^{commit}"
+          git merge-base --is-ancestor "$M4_FINAL_SHA" "$GITHUB_SHA"
+          git diff --exit-code "$M4_FINAL_SHA" "$GITHUB_SHA" -- src rust/source-lock.toml
+          git diff --check "$M4_FINAL_SHA" "$GITHUB_SHA"
+
+  m5-contract-freeze:
+    name: M5 G16 contract freeze
+    needs: m5-source-lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out contract surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/contracts/
+            /rust/fixtures/m4/m4-final-qualification.json
+            /rust/fixtures/m5/source-catalog-v1.json
+            /scripts/check-kernel-m5-contract.mjs
+          submodules: false
+
+      - name: Validate exact M5 contracts and catalog
+        env:
+          M5_ATTESTATION_PATH: artifacts/m5-g16-attestation.json
+        run: node scripts/check-kernel-m5-contract.mjs
+
+      - name: Upload G16 attestation
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-g16-attestation
+          path: artifacts/m5-g16-attestation.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m5-ir-foundation:
+    name: M5 mechanics IR foundation
+    needs:
+      - m5-source-lock
+      - m5-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out Rust foundation
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Cache Rust foundation
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m5-ir-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m5-ir-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Check and test closed mechanics IR
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo fmt --all -- --check
+            cargo check -p er-types -p er-mechanics -p er-content -p er-content-compiler -p er-state
+            cargo test -p er-mechanics --test program_validation
+            cargo test -p er-content --test m5_pack
+            cargo test -p er-battle --test m5_mechanic_sources
+            cargo test -p er-battle --test m5_executor
+            cargo test -p er-battle --test m5_properties
+            cargo test -p er-testkit --test m5_atomic_executor
+          } 2>&1 | tee "$RUNNER_TEMP/m5-ir-foundation.log"
+
+      - name: Publish IR foundation failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-ir-foundation.log" 2>/dev/null | grep -aE "^error|^Diff in|panicked|FAILED|test result" -A4 | tail -c 3500 || true)"
+          if [ -z "$diagnostic" ]; then
+            diagnostic="$(tail -c 1500 "$RUNNER_TEMP/m5-ir-foundation.log" 2>/dev/null || true)"
+          fi
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 mechanics IR foundation failure::$diagnostic"
+
+  m5-m4-regression:
+    name: M0-M4 Rust regression
+    needs:
+      - m5-source-lock
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out complete Rust workspace
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+
+      - name: Cache complete Rust regression
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m5-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m5-regression-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run M0-M4 workspace regression
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --workspace --all-targets 2>&1 | tee "$RUNNER_TEMP/m5-m4-regression.log"
+
+      - name: Publish regression failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-m4-regression.log" 2>/dev/null | grep -aE "^error|panicked|FAILED|test result" -A5 | tail -c 3500 || true)"
+
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M0-M4 Rust regression failure::$diagnostic"
+  m5-executor-parity:
+    name: M5 G18 executor parity
+    needs:
+      - m5-source-lock
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out Rust executor
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Install Wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Verify native executor contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-battle --test m5_mechanic_sources
+          cargo test -p er-battle --test m5_executor
+          cargo test -p er-testkit --test m5_atomic_executor
+
+      - name: Verify Wasm executor graph
+        working-directory: rust
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-unknown
+        run: cargo check -p er-types -p er-rng -p er-mechanics -p er-content -p er-state -p er-battle -p er-wasm
+
+  m5-source-catalog:
+    name: M5 source catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out integration tooling
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Install repository-pinned pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install immutable parser dependency
+        run: pnpm install --frozen-lockfile
+
+      - name: Materialize exact read-only oracle source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m5-oracle" "$M5_ORACLE_SHA"
+
+      - name: Export deterministic source catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m5-source-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m5-oracle" \
+            --oracle-sha "$M5_ORACLE_SHA" \
+            --output "$RUNNER_TEMP/m5-source-catalog-v1.json" \
+            2>&1 | tee "$RUNNER_TEMP/m5-source-catalog.log"
+
+      - name: Publish source-catalog failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-source-catalog.log" 2>/dev/null | tail -n 60 | tail -c 3500 || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 source catalog failure::$diagnostic"
+
+      - name: Upload source catalog
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-source-catalog
+          path: |
+            ${{ runner.temp }}/m5-source-catalog-v1.json
+            ${{ runner.temp }}/m5-source-catalog.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  m5-oracle-refresh:
+    name: M5 ${{ matrix.fixture }} oracle refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [m3, m4]
+    steps:
+      - name: Check out integration tooling
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Install repository-pinned pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore pinned BLAKE3 verifier
+        id: b3sum-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m5-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
+      - name: Install pinned BLAKE3 verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+
+      - name: Save pinned BLAKE3 verifier
+        if: steps.b3sum-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m5-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
+      - name: Materialize exact oracle source and test overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m5-oracle" "$M5_ORACLE_SHA"
+          node scripts/prepare-kernel-m5-oracle-refresh.mjs \
+            --oracle-root "$RUNNER_TEMP/m5-oracle" \
+            --oracle-sha "$M5_ORACLE_SHA"
+
+      - name: Install immutable oracle dependencies
+        working-directory: ${{ runner.temp }}/m5-oracle
+        run: pnpm install --frozen-lockfile
+
+      - name: Export refreshed fixtures twice
+        working-directory: ${{ runner.temp }}/m5-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M5_ORACLE_REFRESH_SHA: ${{ env.M5_ORACLE_SHA }}
+          M4_ORACLE_GAP_REPORT: ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle/gaps.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m5-${{ matrix.fixture }}-oracle"
+          if [[ "${{ matrix.fixture }}" == "m3" ]]; then
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m5-m3-oracle" \
+              2>&1 | tee "$RUNNER_TEMP/m5-m3-oracle.log"
+          else
+            node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m5-m4-oracle" \
+              2>&1 | tee "$RUNNER_TEMP/m5-m4-oracle.log"
+          fi
+
+      - name: Publish oracle-refresh failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-${{ matrix.fixture }}-oracle.log" 2>/dev/null | tail -n 60 | tail -c 3500 || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 ${{ matrix.fixture }} oracle refresh failure::$diagnostic"
+
+      - name: Upload refreshed fixtures or typed gaps
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-${{ matrix.fixture }}-oracle-refresh
+          path: |
+            ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle
+            ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  m5-oracle-classification:
+    name: M5 oracle drift classification
+    needs:
+      - m5-source-lock
+      - m5-source-catalog
+      - m5-oracle-refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact integration candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Download M3 refresh
+        uses: actions/download-artifact@v6
+        with:
+          name: m5-m3-oracle-refresh
+          path: artifacts/fresh-m3
+
+      - name: Download M4 refresh
+        uses: actions/download-artifact@v6
+        with:
+          name: m5-m4-oracle-refresh
+          path: artifacts/fresh-m4
+
+      - name: Classify every fixture difference
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/classify-kernel-m5-oracle-refresh.mjs \
+            --oracle-sha "$M5_ORACLE_SHA" \
+            --legacy-m3 rust/fixtures/m3/oracle \
+            --fresh-m3 artifacts/fresh-m3/m5-m3-oracle \
+            --legacy-m4 rust/fixtures/m4/oracle \
+            --fresh-m4 artifacts/fresh-m4/m5-m4-oracle \
+            --output "$GITHUB_WORKSPACE/artifacts/m5-oracle-drift-v1.json" \
+            2>&1 | tee "$RUNNER_TEMP/m5-oracle-classification.log"
+
+      - name: Publish classification failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(tail -c 3500 "$RUNNER_TEMP/m5-oracle-classification.log" 2>/dev/null || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 oracle classification failure::$diagnostic"
+
+      - name: Upload classified drift
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-oracle-drift
+          path: |
+            artifacts/m5-oracle-drift-v1.json
+            ${{ runner.temp }}/m5-oracle-classification.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  m5-performance:
+    name: M5 performance regression
+    needs:
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out Rust benchmark
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Run release executor benchmarks
+        working-directory: rust
+        run: cargo test --release -p er-testkit --bench m5_runtime_benchmark -- --nocapture
+
+  m5-system-audit:
+    name: M5 classification and bypass audit
+    needs:
+      - m5-source-lock
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact system candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Regenerate complete classifications
+        run: |
+          set -euo pipefail
+          node scripts/generate-kernel-m5-classification.mjs
+          git diff --exit-code -- \
+            rust/fixtures/m5/classification-manifest-v1.json \
+            rust/fixtures/m5/bespoke-manifest-v1.json \
+            rust/fixtures/m5/capability-report-v1.json
+
+      - name: Require exact catalog closure
+        run: |
+          set -euo pipefail
+          test "$(jq -r '.unclassified_count' rust/fixtures/m5/capability-report-v1.json)" = 0
+          test "$(jq -r '.source_count' rust/fixtures/m5/capability-report-v1.json)" = 1953
+          test "$(jq -r '.entries | length' rust/fixtures/m5/classification-manifest-v1.json)" = 1953
+
+      - name: Run final bypass tests
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-mechanics --test program_validation
+          cargo test -p er-battle --test m5_properties
+          cargo test -p er-testkit --test m5_atomic_executor
+
+  m5-g17-foundation:
+    name: M5 G17 foundation aggregate
+    needs:
+      - m5-source-lock
+      - m5-contract-freeze
+      - m5-ir-foundation
+      - m5-m4-regression
+      - m5-source-catalog
+      - m5-oracle-refresh
+      - m5-oracle-classification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest exact-SHA G17 foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G17 foundation"
+
+  m5-g18-executor:
+    name: M5 G18 executor aggregate
+    needs:
+      - m5-g17-foundation
+      - m5-executor-parity
+      - m5-m4-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest exact-SHA G18 executor
+        run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G18 executor"
+
+  m5-g19-family:
+    name: M5 G19 family aggregate
+    needs:
+      - m5-g18-executor
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest every admitted family primitive
+        run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G19 families"
+
+  m5-g20-qualification:
+    name: M5 G20 exact-SHA qualification
+    needs:
+      - m5-g19-family
+      - m5-performance
+      - m5-system-audit
+      - m5-executor-parity
+      - m5-m4-regression
+      - m5-oracle-classification
+      - m5-source-lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest complete M5 qualification
+        run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G20 qualification"

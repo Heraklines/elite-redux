@@ -1,0 +1,161 @@
+name: Rust Kernel M7 Focused
+
+on:
+  push:
+    branches:
+      - "ci/rust-kernel-m7/**"
+    paths:
+      - ".github/workflows/rust-kernel-m7-focused.yml"
+      - "rust/**"
+      - "scripts/*kernel-m7*"
+      - "test/kernel-fixtures/m7/**"
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: Focused M7 domain
+        required: true
+        type: choice
+        options:
+          - causal
+          - world
+          - save
+          - capture
+          - progression
+          - economy
+          - run-meta
+          - ai
+          - scenario
+      semantic_group:
+        description: Optional exact m7g-* semantic group
+        required: false
+        type: string
+      test_filter:
+        description: Optional Rust test-name filter
+        required: false
+        type: string
+      oracle_required:
+        description: Regenerate the frozen oracle-facing semantic groups
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m7-focused-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  M7_DOMAIN: ${{ inputs.domain || 'causal' }}
+  M7_SEMANTIC_GROUP: ${{ inputs.semantic_group || '' }}
+  M7_TEST_FILTER: ${{ inputs.test_filter || '' }}
+  M7_ORACLE_REQUIRED: ${{ inputs.oracle_required || 'false' }}
+
+jobs:
+  static:
+    name: Focused static and contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-focused-static-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Validate frozen M7 contract
+        run: node scripts/check-kernel-m7-contract.mjs
+      - name: Check Rust formatting
+        working-directory: rust
+        run: cargo fmt --all -- --check
+      - name: Check focused workspace contracts
+        working-directory: rust
+        run: cargo check --workspace --all-targets
+
+  oracle:
+    name: Focused frozen-oracle reproducibility
+    if: ${{ inputs.oracle_required == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          path: integration
+          submodules: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7
+          fetch-depth: 1
+          path: oracle
+          submodules: false
+      - name: Rebuild semantic groups twice
+        working-directory: integration
+        run: |
+          set -euo pipefail
+          export M7_TYPESCRIPT_ROOT="$PWD/node_modules/typescript"
+          npm ci --ignore-scripts
+          node scripts/build-kernel-m7-semantic-groups.mjs \
+            --oracle-root "$GITHUB_WORKSPACE/oracle" \
+            --output-root "$RUNNER_TEMP/groups-a"
+          node scripts/build-kernel-m7-semantic-groups.mjs \
+            --oracle-root "$GITHUB_WORKSPACE/oracle" \
+            --output-root "$RUNNER_TEMP/groups-b"
+          diff -ru "$RUNNER_TEMP/groups-a" "$RUNNER_TEMP/groups-b"
+          diff -u rust/fixtures/m7/m7-semantic-groups-v1.json \
+            "$RUNNER_TEMP/groups-a/m7-semantic-groups-v1.json"
+          diff -u rust/fixtures/m7/m7-domain-closure-v1.json \
+            "$RUNNER_TEMP/groups-a/m7-domain-closure-v1.json"
+
+  focused-tests:
+    name: Focused ${{ inputs.domain || 'causal' }} tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-focused-tests-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run selected domain tests
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          filter=( )
+          if [[ -n "$M7_TEST_FILTER" ]]; then
+            filter=( "$M7_TEST_FILTER" )
+          fi
+          case "$M7_DOMAIN" in
+            causal)
+              cargo test -p er-types --lib -- "${filter[@]}"
+              cargo test -p er-game --lib -- "${filter[@]}"
+              cargo test -p er-kernel --lib -- "${filter[@]}"
+              cargo test -p er-testkit --test m7_system_proof -- "${filter[@]}"
+              ;;
+            world)
+              cargo test -p er-world -- "${filter[@]}"
+              cargo test -p er-testkit --test m7_system_proof -- "${filter[@]}"
+              ;;
+            save) cargo test -p er-save -- "${filter[@]}" ;;
+            capture|progression) cargo test -p er-progression -- "${filter[@]}" ;;
+            economy|run-meta) cargo test -p er-run -- "${filter[@]}" ;;
+            ai) cargo test -p er-ai -- "${filter[@]}" ;;
+            scenario) cargo test -p er-scenario -- "${filter[@]}" ;;
+            *) printf 'Unsupported M7 domain: %s\n' "$M7_DOMAIN" >&2; exit 2 ;;
+          esac
+      - name: Record focused ownership
+        run: |
+          printf 'domain=%s\nsemantic_group=%s\n' "$M7_DOMAIN" "$M7_SEMANTIC_GROUP"

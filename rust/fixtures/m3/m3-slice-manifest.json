@@ -1,0 +1,468 @@
+{
+  "schema_version": 1,
+  "project": "PokéRogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "source_provenance": {
+    "content_oracle": "docs/plans/rust-kernel/m3-content-oracle.md",
+    "damage_oracle": "docs/plans/rust-kernel/m3-damage-oracle.md",
+    "rng_oracle": "docs/plans/rust-kernel/m3-rng-oracle.md",
+    "state_oracle": "docs/plans/rust-kernel/m3-state-oracle.md"
+  },
+  "battle_formats": {
+    "single": {
+      "player_capacity": 1,
+      "enemy_capacity": 1,
+      "authority_seat": 1,
+      "player_seat_ownership": [1],
+      "adjacency": [
+        {
+          "first": ["PLAYER", 0],
+          "second": ["ENEMY", 0]
+        }
+      ]
+    },
+    "coop_double": {
+      "player_capacity": 2,
+      "enemy_capacity": 2,
+      "authority_seat": 1,
+      "player_seat_ownership": [1, 2],
+      "adjacency": [
+        {
+          "first": ["PLAYER", 0],
+          "second": ["PLAYER", 1]
+        },
+        {
+          "first": ["PLAYER", 0],
+          "second": ["ENEMY", 0]
+        },
+        {
+          "first": ["PLAYER", 0],
+          "second": ["ENEMY", 1]
+        },
+        {
+          "first": ["PLAYER", 1],
+          "second": ["ENEMY", 0]
+        },
+        {
+          "first": ["PLAYER", 1],
+          "second": ["ENEMY", 1]
+        },
+        {
+          "first": ["ENEMY", 0],
+          "second": ["ENEMY", 1]
+        }
+      ]
+    }
+  },
+  "species": {
+    "player_physical": 19,
+    "player_special": 7,
+    "player_status": 1,
+    "switch_in_carrier": 23,
+    "enemy_neutral": 52,
+    "enemy_weak": 7,
+    "enemy_resistant": 1,
+    "enemy_immune": 50,
+    "ability_immunity_carrier": 52
+  },
+  "species_definitions": [
+    {
+      "id": 1,
+      "name": "Bulbasaur",
+      "base_stats": {
+        "hp": 47,
+        "attack": 49,
+        "defense": 49,
+        "special_attack": 65,
+        "special_defense": 65,
+        "speed": 45
+      },
+      "oracle_er_type_ids": [8, 10],
+      "runtime_types": ["GRASS", "POISON"],
+      "oracle_active_ability_refs": [268, 257, 34],
+      "oracle_innate_refs": [65, 47, 344]
+    },
+    {
+      "id": 7,
+      "name": "Squirtle",
+      "base_stats": {
+        "hp": 50,
+        "attack": 48,
+        "defense": 65,
+        "special_attack": 50,
+        "special_defense": 64,
+        "speed": 43
+      },
+      "oracle_er_type_ids": [12, null],
+      "runtime_types": ["WATER"],
+      "oracle_active_ability_refs": [192, 144, 804],
+      "oracle_innate_refs": [67, 75, 41]
+    },
+    {
+      "id": 19,
+      "name": "Rattata",
+      "base_stats": {
+        "hp": 30,
+        "attack": 56,
+        "defense": 35,
+        "special_attack": 25,
+        "special_defense": 35,
+        "speed": 72
+      },
+      "oracle_er_type_ids": [0, null],
+      "runtime_types": ["NORMAL"],
+      "oracle_active_ability_refs": [55, 96, 364],
+      "oracle_innate_refs": [62, 95, 50]
+    },
+    {
+      "id": 23,
+      "name": "Ekans",
+      "base_stats": {
+        "hp": 55,
+        "attack": 60,
+        "defense": 49,
+        "special_attack": 40,
+        "special_defense": 59,
+        "speed": 55
+      },
+      "oracle_er_type_ids": [10, null],
+      "runtime_types": ["POISON"],
+      "oracle_active_ability_refs": [196, 523, 22],
+      "oracle_innate_refs": [338, 61, 302]
+    },
+    {
+      "id": 50,
+      "name": "Diglett",
+      "base_stats": {
+        "hp": 10,
+        "attack": 55,
+        "defense": 25,
+        "special_attack": 35,
+        "special_defense": 45,
+        "speed": 95
+      },
+      "oracle_er_type_ids": [9, null],
+      "runtime_types": ["GROUND"],
+      "oracle_active_ability_refs": [146, 71, 159],
+      "oracle_innate_refs": [360, 299, 355]
+    },
+    {
+      "id": 52,
+      "name": "Meowth",
+      "base_stats": {
+        "hp": 40,
+        "attack": 55,
+        "defense": 35,
+        "special_attack": 65,
+        "special_defense": 40,
+        "speed": 90
+      },
+      "oracle_er_type_ids": [0, null],
+      "runtime_types": ["NORMAL"],
+      "oracle_active_ability_refs": [97, 7, 158],
+      "oracle_innate_refs": [288, 101, 370]
+    }
+  ],
+  "moves": {
+    "physical_baseline": 1,
+    "special_baseline": 351,
+    "low_accuracy": 77,
+    "priority": 351,
+    "spread": 589,
+    "attack_stage_down": 589,
+    "burn": 52,
+    "poison": 77,
+    "paralysis": 78
+  },
+  "move_definitions": [
+    {
+      "id": 1,
+      "name": "POUND",
+      "category": "PHYSICAL",
+      "runtime_type": "NORMAL",
+      "power": 40,
+      "accuracy": 100,
+      "pp": 35,
+      "effect_chance": -1,
+      "priority": 0,
+      "target": "NEAR_OTHER",
+      "flags": ["CONTACT"],
+      "effects": ["DAMAGE"]
+    },
+    {
+      "id": 52,
+      "name": "EMBER",
+      "category": "SPECIAL",
+      "runtime_type": "FIRE",
+      "power": 20,
+      "accuracy": 100,
+      "pp": 20,
+      "effect_chance": 100,
+      "priority": 0,
+      "target": "NEAR_OTHER",
+      "flags": ["THAWS_USER_FREEZE"],
+      "effects": ["DAMAGE", "APPLY_BURN"]
+    },
+    {
+      "id": 77,
+      "name": "POISON_POWDER",
+      "category": "STATUS",
+      "runtime_type": "POISON",
+      "power": -1,
+      "accuracy": 75,
+      "pp": 35,
+      "effect_chance": -1,
+      "priority": 0,
+      "target": "NEAR_OTHER",
+      "flags": ["POWDER", "REFLECTABLE"],
+      "effects": ["APPLY_POISON"]
+    },
+    {
+      "id": 78,
+      "name": "STUN_SPORE",
+      "category": "STATUS",
+      "runtime_type": "GRASS",
+      "power": -1,
+      "accuracy": 100,
+      "pp": 20,
+      "effect_chance": -1,
+      "priority": 0,
+      "target": "NEAR_OTHER",
+      "flags": ["POWDER", "REFLECTABLE"],
+      "effects": ["APPLY_PARALYSIS"]
+    },
+    {
+      "id": 351,
+      "name": "SHOCK_WAVE",
+      "category": "SPECIAL",
+      "runtime_type": "ELECTRIC",
+      "power": 40,
+      "accuracy": -1,
+      "pp": 15,
+      "effect_chance": -1,
+      "priority": 2,
+      "target": "NEAR_OTHER",
+      "flags": [],
+      "effects": ["DAMAGE"]
+    },
+    {
+      "id": 589,
+      "name": "PLAY_NICE",
+      "category": "STATUS",
+      "runtime_type": "NORMAL",
+      "power": -1,
+      "accuracy": -1,
+      "pp": 20,
+      "effect_chance": -1,
+      "priority": 0,
+      "target": "ALL_NEAR_ENEMIES",
+      "flags": ["IGNORE_SUBSTITUTE", "REFLECTABLE"],
+      "effects": ["LOWER_ATTACK_ONE_STAGE"]
+    }
+  ],
+  "abilities": {
+    "none": 0,
+    "switch_in_stat_change": 22,
+    "type_immunity": 25
+  },
+  "ability_definitions": [
+    {
+      "id": 0,
+      "name": "NONE",
+      "effect": "NONE"
+    },
+    {
+      "id": 22,
+      "name": "INTIMIDATE",
+      "effect": "POST_SUMMON_ADJACENT_OPPONENT_ATTACK_MINUS_ONE"
+    },
+    {
+      "id": 25,
+      "name": "WONDER_GUARD",
+      "effect": "NON_SUPER_EFFECTIVE_ATTACK_IMMUNITY"
+    }
+  ],
+  "type_chart": {
+    "default_multiplier": "1",
+    "dual_type_composition": "LEFT_TO_RIGHT_PRODUCT",
+    "non_neutral_entries": [
+      {
+        "attack_type": "FIRE",
+        "defense_type": "GRASS",
+        "multiplier": "2"
+      },
+      {
+        "attack_type": "FIRE",
+        "defense_type": "WATER",
+        "multiplier": "1/2"
+      },
+      {
+        "attack_type": "POISON",
+        "defense_type": "GRASS",
+        "multiplier": "2"
+      },
+      {
+        "attack_type": "POISON",
+        "defense_type": "POISON",
+        "multiplier": "1/2"
+      },
+      {
+        "attack_type": "POISON",
+        "defense_type": "GROUND",
+        "multiplier": "1/2"
+      },
+      {
+        "attack_type": "GRASS",
+        "defense_type": "WATER",
+        "multiplier": "2"
+      },
+      {
+        "attack_type": "GRASS",
+        "defense_type": "GROUND",
+        "multiplier": "2"
+      },
+      {
+        "attack_type": "GRASS",
+        "defense_type": "GRASS",
+        "multiplier": "1/2"
+      },
+      {
+        "attack_type": "GRASS",
+        "defense_type": "POISON",
+        "multiplier": "1/2"
+      },
+      {
+        "attack_type": "ELECTRIC",
+        "defense_type": "WATER",
+        "multiplier": "2"
+      },
+      {
+        "attack_type": "ELECTRIC",
+        "defense_type": "GRASS",
+        "multiplier": "1/2"
+      },
+      {
+        "attack_type": "ELECTRIC",
+        "defense_type": "GROUND",
+        "multiplier": "0"
+      }
+    ]
+  },
+  "status_admission_rules": {
+    "existing_non_none_status_rejects_new_status": true,
+    "poison_rejected_by_types": ["POISON", "STEEL"],
+    "paralysis_rejected_by_types": ["ELECTRIC"],
+    "burn_rejected_by_types": ["FIRE"],
+    "powder_moves_rejected_by_types": ["GRASS"],
+    "steel_fire_and_electric_type_carriers_are_absent_from_selected_species": true,
+    "safeguard_substitute_reflection_and_unselected_immunity_abilities_are_rejected_at_load": true
+  },
+  "statuses": [
+    {
+      "id": 6,
+      "name": "BURN"
+    },
+    {
+      "id": 1,
+      "name": "POISON"
+    },
+    {
+      "id": 3,
+      "name": "PARALYSIS"
+    }
+  ],
+  "loadouts": [
+    {
+      "loadout_id": "player-physical-none",
+      "species_id": 19,
+      "move_slots": [1, 52, 351, 589],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "player-special-none",
+      "species_id": 7,
+      "move_slots": [351, 52, 1, 589],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "player-status-none",
+      "species_id": 1,
+      "move_slots": [77, 78, 589, 1],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "switch-in-intimidate",
+      "species_id": 23,
+      "move_slots": [1, 77, 78, 589],
+      "active_ability_id": 22,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "enemy-neutral-none",
+      "species_id": 52,
+      "move_slots": [1, 52, 351, 589],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "enemy-weak-none",
+      "species_id": 7,
+      "move_slots": [1, 52, 351, 589],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "enemy-resistant-none",
+      "species_id": 1,
+      "move_slots": [1, 52, 351, 589],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "enemy-native-immune-none",
+      "species_id": 50,
+      "move_slots": [1, 52, 351, 589],
+      "active_ability_id": 0,
+      "passive_ability_ids": [null, null, null]
+    },
+    {
+      "loadout_id": "enemy-wonder-guard",
+      "species_id": 52,
+      "move_slots": [1, 52, 351, 589],
+      "active_ability_id": 25,
+      "passive_ability_ids": [null, null, null]
+    }
+  ],
+  "ability_loadout_policy": {
+    "source": "pinned scenario ability and passive override boundary",
+    "allowed_ids": [0, 22, 25],
+    "active_is_required": true,
+    "unused_passive_slots_are_null": true,
+    "natural_unselected_species_abilities_are_not_imported": true,
+    "active_suppressed_is_false": true,
+    "passive_suppressed_slots_are_false": true,
+    "dynamic_suppression_is_rejected": true
+  },
+  "loadout_state_policy": {
+    "level_stats_hp_status_and_stage_values_come_from_full_oracle_case_state": true,
+    "all_move_slots_start_with_pp_used_zero_unless_a_case_explicitly_overrides_it": true,
+    "pp_ups_are_zero": true,
+    "max_pp_override_is_null": true,
+    "natural_species_ability_selection_is_not_used": true
+  },
+  "runtime_normalization": {
+    "move_power_minus_one": "NONE",
+    "move_accuracy_minus_one": "ALWAYS_HITS",
+    "effect_chance_minus_one": "NONE",
+    "base_pp_minus_one": "UNSUPPORTED_UNBOUNDED_PP",
+    "pp_ups": 0,
+    "max_pp_override": null,
+    "effective_typing_maximum_count": 2,
+    "weather": "NONE",
+    "terrain": "NONE",
+    "arena_conditions": []
+  }
+}

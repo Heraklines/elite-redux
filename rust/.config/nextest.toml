@@ -1,0 +1,8 @@
+[profile.default]
+retries = 0
+flaky-result = "fail"
+fail-fast = false
+
+[profile.ci]
+inherits = "default"
+global-timeout = "10m"

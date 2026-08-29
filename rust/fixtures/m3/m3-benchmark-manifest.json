@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "manifest_id": "rust-kernel-m3-bench-v1",
+  "project": "Pok\u00e9Rogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+  "protocol_version": "er-coop-48",
+  "frame_protocol_version": 2,
+  "source_lock_schema_version": 1,
+  "ownership_schema_version": 6,
+  "toolchain": {
+    "channel": "1.97.1",
+    "profile": "minimal",
+    "package": "er-sim",
+    "bench_target": "m3_benchmark",
+    "build_profile": "release"
+  },
+  "content_identity": {
+    "algorithm": "sha256",
+    "definition": "sha256 of the exact manifest bytes plus sorted declared benchmark-source sha256 values"
+  },
+  "measurement_policy": {
+    "runner": "github-hosted-linux",
+    "build_setup_elapsed": "coordinator wall time and GNU /usr/bin/time RSS for release-profile cargo setup",
+    "content_load_elapsed": "benchmark marker monotonic elapsed nanoseconds for published content-pack loading",
+    "execution_elapsed": "benchmark marker monotonic elapsed nanoseconds excluding content-pack loading",
+    "outer_elapsed": "coordinator wall time for the isolated release benchmark test process",
+    "rss_source": "GNU /usr/bin/time %M KiB, converted to bytes",
+    "kernel_clock_source": "none",
+    "cross_target_suite_execution": "native continuation-test invocation plus Node replayM3ContinuationSuite execution; wasm-pack install/test/build setup is recorded separately",
+    "preexisting_baseline": "none",
+    "acceptance": "unaccepted until a hosted measurement artifact records every workload",
+    "regression_comparison": "optional accepted same-input same-runner artifact; fail above 125 percent"
+  },
+  "cross_target_suite_target": {
+    "metric": "execution_elapsed_ms",
+    "operator": "<",
+    "max_exclusive_ms": 30000
+  },
+  "measurement_state": {
+    "status": "unaccepted",
+    "accepted": false,
+    "reason": "No hosted measurement artifact is attached to this manifest",
+    "artifact": null,
+    "measured_at": null
+  },
+  "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+  "workloads": [
+    {
+      "id": "raw-menu-events",
+      "description": "100,000 raw physical menu key events through one production M3 Battle kernel",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_raw_menu_events",
+      "iterations": 0,
+      "schedules": 0,
+      "steps": 100000,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": {"metric": "execution_elapsed_ns", "operator": "<", "max_exclusive_ns": 5000000000},
+      "target_counts": {"turns": 0, "battles": 1, "inputs": 100000, "rng_draws": null},
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "content_load_elapsed_ns": null,
+        "execution_elapsed_ns": null,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "counts": null,
+        "checksum": null
+      }
+    },
+    {
+      "id": "simple-turn-resolutions",
+      "description": "10,000 complete simple turn resolutions with raw player input and hosted presentation settlement",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_simple_turn_resolutions",
+      "iterations": 10000,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": {"metric": "execution_elapsed_ns", "operator": "<", "max_exclusive_ns": 30000000000},
+      "target_counts": {"turns": 10000, "battles": 10000, "inputs": null, "rng_draws": null},
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "content_load_elapsed_ns": null,
+        "execution_elapsed_ns": null,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "counts": null,
+        "checksum": null
+      }
+    },
+    {
+      "id": "complete-short-battles",
+      "description": "1,000 complete published short victory battles through raw input and presentation settlement",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_complete_short_battles",
+      "iterations": 1000,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": {"metric": "execution_elapsed_ns", "operator": "<", "max_exclusive_ns": 30000000000},
+      "target_counts": {"turns": 1000, "battles": 1000, "inputs": null, "rng_draws": null},
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "content_load_elapsed_ns": null,
+        "execution_elapsed_ns": null,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "counts": null,
+        "checksum": null
+      }
+    },
+    {
+      "id": "two-client-supported-turns",
+      "description": "1,000 supported two-client authority/replica turns on the published doubles topology",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_two_client_supported_turns",
+      "iterations": 1000,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": {"metric": "execution_elapsed_ns", "operator": "<", "max_exclusive_ns": 30000000000},
+      "target_counts": {"turns": 1000, "battles": 1000, "inputs": null, "rng_draws": null},
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "content_load_elapsed_ns": null,
+        "execution_elapsed_ns": null,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "counts": null,
+        "checksum": null
+      }
+    },
+    {
+      "id": "complete-supported-coop-battle",
+      "description": "One complete supported two-client co-op battle with pair initialization excluded from execution timing",
+      "bench_target": "m3_benchmark",
+      "test_name": "m3_complete_supported_coop_battle",
+      "iterations": 1,
+      "schedules": 0,
+      "steps": 0,
+      "seed": "81985529216486895",
+      "requires_linux": true,
+      "timeout_ms": 900000,
+      "target": {"metric": "execution_elapsed_ns", "operator": "<", "max_exclusive_ns": 100000000},
+      "target_counts": {"turns": 1, "battles": 1, "inputs": null, "rng_draws": null},
+      "source_paths": ["rust/crates/er-sim/benches/m3_benchmark.rs"],
+      "measurement": {
+        "status": "not_measured",
+        "accepted": false,
+        "content_load_elapsed_ns": null,
+        "execution_elapsed_ns": null,
+        "elapsed_wall_ms": null,
+        "peak_rss_bytes": null,
+        "counts": null,
+        "checksum": null
+      }
+    }
+  ]
+}

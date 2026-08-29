@@ -1,0 +1,20 @@
+{
+  "milestone": "M6",
+  "sha": "93d0d047b4fefaea2033920047010214a8fcd5c0",
+  "gate_run_id": 33003637831,
+  "contract_bootstrap": "success",
+  "foundation": "success",
+  "m0_m5_regression": "success",
+  "oracle_refresh": "success",
+  "semantic_extraction": "success",
+  "move_parity": "success",
+  "ability_parity": "success",
+  "item_parity": "success",
+  "field_parity": "success",
+  "species_form_parity": "success",
+  "raw_key_campaigns": "success",
+  "snapshot_v5": "success",
+  "native_wasm": "success",
+  "performance": "success",
+  "g25_aggregate": "success"
+}

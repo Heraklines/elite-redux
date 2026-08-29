@@ -1,0 +1,4906 @@
+{
+  "schema_version": 1,
+  "browser_base_sha": "b2ed1a6eb050a18d5f335ec826e01b7b425ce311",
+  "rust_source_tag": "rust-kernel-m72-final",
+  "rust_source_sha": "ea57c3cedd5dbc5856baf3748c0f03a7dc2c9273",
+  "digest_kind": "git-blob-sha1",
+  "allowed_roots": [
+    ".github/workflows/rust-kernel-*.yml",
+    "docs/plans/rust-kernel/**",
+    "rust/**",
+    "scripts/benchmark-kernel-*.mjs",
+    "scripts/build-kernel-*.mjs",
+    "scripts/check-kernel-*.mjs"
+  ],
+  "forbidden_roots": [
+    "assets/**",
+    "deploy/**",
+    "editor/**",
+    "existing-browser-workflows",
+    "existing-coop-workflows",
+    "index.css",
+    "index.html",
+    "locales/**",
+    "package.json",
+    "pnpm-lock.yaml",
+    "src/**",
+    "test/**",
+    "vite.config.*",
+    "workers/**"
+  ],
+  "file_count": 812,
+  "files": [
+    {
+      "path": ".github/workflows/rust-kernel-m4.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "38a4ad969674bdeadafb3562aa2ad4e4d3f8d904"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m5.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8055f8495f6e9f99864f89c5380105a7affe8de4"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m6-focused.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5c6c2572a69bcc62a5032e95fe363381b2cf1b05"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m6.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e8b00fc63bb3491ea61aea8d5609cedcfeb1f9de"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m7-bootstrap.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "195f143bf17690f5a7f6f3f86e1c5b4111ed7527"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m7-focused.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6a88b3fdd845168467457bd8327e6682709d9e30"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m7.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "87d3f8e2b31990c4e177e5b3ed74fcb1a2be33f5"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m71.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2004aecb8e622bffa21a3674128d39f88630d9b5"
+    },
+    {
+      "path": ".github/workflows/rust-kernel-m72.yml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "63178611957d6e39d42a375835e16ee81be8c339"
+    },
+    {
+      "path": "docs/plans/rust-kernel/authority-v2-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28cbce9a08ce4269ec8e9f36df2af9de701d603d"
+    },
+    {
+      "path": "docs/plans/rust-kernel/baseline-methodology.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e6b091bd5ad46a282e9a3fde006ac3867c767b0a"
+    },
+    {
+      "path": "docs/plans/rust-kernel/canonicalization-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1d835e96d1656d92855f2fd6d77726e5ec42d82d"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0001-shared-wire-boundaries.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "50859e5c5874bf91b8d0fb5879d7fbd404a7f3e6"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0002-successor-shared-boundary.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f74ae42f334fc1981b72eee29e135dbf55ff79f0"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0006-sole-scheduler-and-rebind-actions.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0659d6081bff27b6f49dc8b368090424068ad865"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0007-recovery-live-revalidation.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6e870f87815e3a1c7a07b859808de9fdfb122994"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0008-validation-typed-boundary.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "68c594b24d2578fd6143654144bd4060e30ae3fb"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0009-endpoint-qualified-presentation.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6bb9aafd7105ae7cda6df4249afb03ab3b468e4a"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0010-lossless-diagnostic-seeds.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6b52a5c4edc0d55fd5e0cafee90bb78b3570ba6a"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0011-recovered-entry-staging-boundary.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "be681c6a6ee9d1d8bf97d01605315e25219b05f9"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0012-semantic-oracle-claim-boundary.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a4accf9f6262030943b4bd2e61751642f32320ac"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0013-phaser-rng-source-fidelity.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4314b3bd3feb38a7eefde15c0fe70b1722c8adf2"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0014-replacement-occurrence-identities.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "946917282878130c35bc49e985bb7328e39c3983"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0015-strict-signed-safe-integers.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6d786f18f2d493b3def9d924ee22a1ecd5d52809"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0016-replacement-control-source-actor.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d440388964ceb689555506532e1e2d6be1bdc96c"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0017-canonical-wave-seed.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6005c134f60820d3c997416ca8caa7e939e98374"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0018-battle-resolve-error-surface.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c8604cd9e2681fe5ebcb5bd7cc2e371c7ea12d4d"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0019-resolver-authority-epoch.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3ed9f547d1cfb4f257262b68a04c79fa79013ba0"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0020-staged-game-transaction-seam.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "46cf55193b8198860c0dd986b8005a74be4ea445"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0021-m3-turn-successor-coordinate.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "20774ddb3eef8e79c3060def61d01c4831093e39"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0022-trusted-content-transaction-path.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7bb66293a1c3ec39e9620c9e500d485177403936"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0023-terminal-presentation-tombstones.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "93189291a3916d7231ed7148cafe8ec3245ec28b"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0024-presentation-rebind-continuity.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7a8bf44dba12ae7445f97096ea52ce509136aefa"
+    },
+    {
+      "path": "docs/plans/rust-kernel/change-requests/CR-0025-sealed-digest-and-canonical-value-reuse.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "963c8d86928fa5be1b7432a152cbaf0a3c5afd17"
+    },
+    {
+      "path": "docs/plans/rust-kernel/input-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5eaca3552d6cb4a6290482f21b7ec1059416aea8"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m2-adversarial-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e76bb0ce3a9f93841939269cad3cbb069c96cac3"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-action-order-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c38149616b71d51ddfa979e160d7a3df9aee6889"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-command-ui-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b884639a1ff32febfb69ed5d09a7e3c9d1ccc081"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-content-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1f8431325c99b7341854942692b3476f1637f656"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-contract-freeze-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "46f632e905a83693c9efa07144ef8394e934d25d"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-damage-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6980a38939466af8cdff3d8b88bbba164a97bbbf"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-oracle-exporter-design.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0c96d1173717db570ce0148c70846c42af117fd6"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-rng-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c8e139caa3a14ff2793a77a699dd632865ea19f0"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m3-state-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5e55aef2c6c2cf4b0c6261e953ba45245c61ae39"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-adversarial-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7e0c3a823443477b8138100b13f0ed8f96e1a5c4"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-biome-routing-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6f1e7e18d30b3920952d478d4c0bb68c4540d95c"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-biome-structure-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2f99601a57a6e7f4ac7e4ff2076e1fd2694b46dc"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-encounter-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "437a03b8797f4aeb0d504f8af75434f894ba9ac0"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-interaction-ownership-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "30473640cd38ed0848b16ced0713d8a2ae5a36cf"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-level-stat-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7713afb4cab3332a2c33ef7500686ae66480d9ec"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-market-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "101f4e59370b7511abd16ce3a7e873d6a7489a69"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-menu-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a2a7aaac2f5b4f8b8519a085d45e093dea5ab010"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-modifier-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "92e1d4c3e6615305ca1c9d1ce22b7a2dceceeaf6"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-move-learning-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4554ac901805e6ff851d30242175fcac6b9534ee"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-progression-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "020749b6386e3e65f97fbd839cdc2b3e6e543e7f"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-reward-generation-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3446e3f1c3645b18cdb1739d99552afff86448a1"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m4-run-flow-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "29b9d16fee0157cfd0e365dd27072ba817a87f3b"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m5-oracle-inventory.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "208ffb2060465f46e83631ed26024f1b6f66ceb8"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m6-migration-performance.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2632a2b37640a69bec7428c8354506ad1c42bc7d"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m6-query-order.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e21fd54db57b5d13b5d286805651543b61cd12e0"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m6-rng-sites.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a7a694fae22c2b6a8dec4620f6e6f079b5018764"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m6-semantic-extraction.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f850edb323fa4e06426ed6bad95e47586d953ffe"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m6-targeting.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e364ed73de6331bef22cad11f5e8cdb0210daad2"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m6-trigger-order.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a65afc7620fb78c472c67ea91667e066cd40cd43"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m71-boundary-security-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d95bf6c32d8018a48cd4b1d471c9ffebb1cbadc4"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m71-evidence-digest-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5da5f71074b685ba6458c33e9f9d4f02b845df68"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m71-repro-impact-performance-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4c3428e03f359b93f15abb5788212011b2d6910c"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m71-snapshot-session-audit.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a2f28ec1398c167bb563c2b4c95a502c9eb5b663"
+    },
+    {
+      "path": "docs/plans/rust-kernel/m72-oracle-extraction.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b0e79a1dbae954f916674fb7089aca19fba50a56"
+    },
+    {
+      "path": "docs/plans/rust-kernel/menu-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8b266f68f163015425648bb9aa524e2376134c8c"
+    },
+    {
+      "path": "docs/plans/rust-kernel/state-trace-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b252a5c268b9cc2b26187fa6ece84de027638d9f"
+    },
+    {
+      "path": "docs/plans/rust-kernel/test-oracle.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d009520834a42789270960efe2506fce43437e02"
+    },
+    {
+      "path": "rust/.config/nextest.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "62d87f6633c5ab8b83a98c5de7f29f61e80e88cd"
+    },
+    {
+      "path": "rust/Cargo.lock",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e9fa34b5c05b823579dfbdb6bd63938d7c28e0ee"
+    },
+    {
+      "path": "rust/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0664a71468b2669bd42e49cf7f89a1fae0a3c73e"
+    },
+    {
+      "path": "rust/contracts/m1-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "17b93177c318518aa1a6fb1cd4c8a97abcde27c4"
+    },
+    {
+      "path": "rust/contracts/m1-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4bd9749732af6462eaede79110e98c3ef5190199"
+    },
+    {
+      "path": "rust/contracts/m2-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5c1e0edd8a13041324ed5f16264517a20cf8e8fe"
+    },
+    {
+      "path": "rust/contracts/m2-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "61ad4f645155e971f1437d30cb52e5e2086e0b8e"
+    },
+    {
+      "path": "rust/contracts/m3-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8083e92fce5dcc18d419c9950b51934b36ede1f3"
+    },
+    {
+      "path": "rust/contracts/m3-atomic-transition.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ed3351a25c1788e2506d9e8debc83c4e2ad93edf"
+    },
+    {
+      "path": "rust/contracts/m3-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9e578cd5f8770fd37eede9822ec92b41f1fee2ee"
+    },
+    {
+      "path": "rust/contracts/m3-error-policy.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "160808ff2e76cf8efd64e8ededf7b20ac8549f7c"
+    },
+    {
+      "path": "rust/contracts/m3-internal-event-loop.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bc3447bab75098b43ed0a5d34174c7d489ef81df"
+    },
+    {
+      "path": "rust/contracts/m3-js-number-rng.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f612dbc9c0ce78bbf2440f4e0ec730a099b92759"
+    },
+    {
+      "path": "rust/contracts/m3-oracle-export.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4e59f44fa53ed165b0b8a3c63e9883ee8275a07b"
+    },
+    {
+      "path": "rust/contracts/m3-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d404612b53128d52f4434029c5cff556a372a540"
+    },
+    {
+      "path": "rust/contracts/m3-presentation-control.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d5d3f2a7a8a4823710d75deb8299e930853fc878"
+    },
+    {
+      "path": "rust/contracts/m3-snapshot-trace.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fd0bc5bcac9a8816951e2040579746c26fc7c162"
+    },
+    {
+      "path": "rust/contracts/m3-ui-navigation.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dbe0e782afc311c68e14591b8890132197c4b32a"
+    },
+    {
+      "path": "rust/contracts/m4-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b8068a96bbc340a115ac3ce3a6fba1088002642b"
+    },
+    {
+      "path": "rust/contracts/m4-atomic-transition.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3468ac46a1b36ad37f3e1d148786ffe8b5252e23"
+    },
+    {
+      "path": "rust/contracts/m4-biome-encounter.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "54d7f83c90a68f72bbb98427d6dd83158591b0bb"
+    },
+    {
+      "path": "rust/contracts/m4-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "01a4de8db60e5011bc95b778955b157716f9b553"
+    },
+    {
+      "path": "rust/contracts/m4-error-policy.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "83e9013e92fd1efa99b32619a0bb161ef1da2f0c"
+    },
+    {
+      "path": "rust/contracts/m4-game-control.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e32cb818d5c3689248dd45ba54476a38cfe2db5c"
+    },
+    {
+      "path": "rust/contracts/m4-oracle-export.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "882b5bceaaba46385b122bda8a28bf9869e092da"
+    },
+    {
+      "path": "rust/contracts/m4-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fad76862df063b003d5e11d1807852f5d38c639f"
+    },
+    {
+      "path": "rust/contracts/m4-performance.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1cf84669273727b9fad3ee08e2406ad89d6fb146"
+    },
+    {
+      "path": "rust/contracts/m4-progression.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "54cb0e2a74701be20c6ac89748ea8fe73df123a3"
+    },
+    {
+      "path": "rust/contracts/m4-reward-market.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "39b759a1cd90e1361585b168bf831026ef9bfa77"
+    },
+    {
+      "path": "rust/contracts/m4-run-material.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5aad2eda1a3a15033b228f38c8cc482fc16fdd66"
+    },
+    {
+      "path": "rust/contracts/m4-snapshot-trace.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "764cfde271db4c8c1a944a2426dd90439a32c645"
+    },
+    {
+      "path": "rust/contracts/m5-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7627aca33b2ec3d4e52db71b852b830829a5a158"
+    },
+    {
+      "path": "rust/contracts/m5-content-compiler.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ddde7a5d7d3a278b743f880cb0c6b062c25222ee"
+    },
+    {
+      "path": "rust/contracts/m5-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3da1b0a6f01aabf23c4682d42b12fa25af7977b3"
+    },
+    {
+      "path": "rust/contracts/m5-error-policy.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d15b37c092c7c8567bd38540efacd1260176c9e5"
+    },
+    {
+      "path": "rust/contracts/m5-mechanics-ir.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1e8e0168b370a9b39859878634dd068392b2be58"
+    },
+    {
+      "path": "rust/contracts/m5-oracle-export.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ad01429f263402106632f011466e25a7e872f9f9"
+    },
+    {
+      "path": "rust/contracts/m5-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bb896ace36e835ba47b2a14e83fc779e754a3fa8"
+    },
+    {
+      "path": "rust/contracts/m5-state-snapshot.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "71dc5ae7ed46ee5dbc4451b30f87586d005c8765"
+    },
+    {
+      "path": "rust/contracts/m6-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "850b1c4a29ead5134e678d049b72f79de3a099c8"
+    },
+    {
+      "path": "rust/contracts/m6-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c0d0fd96cd2193c18d9d1f14fb118bf483875113"
+    },
+    {
+      "path": "rust/contracts/m6-mechanics-ir.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "85c15fb6605d8521c685a49433cdd5c1b8694b12"
+    },
+    {
+      "path": "rust/contracts/m6-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "53eed1568f3ea6b3765e18524380c023770ea576"
+    },
+    {
+      "path": "rust/contracts/m6-state-snapshot.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a19e28552ff6c7025b24bbdeef0fe71adbc8aa07"
+    },
+    {
+      "path": "rust/contracts/m7-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f30ee209771788830ee4299e926b89f103202d3c"
+    },
+    {
+      "path": "rust/contracts/m7-closure-evidence.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cb5ac136a50e5f7c4301c12baa9c037a83131d0c"
+    },
+    {
+      "path": "rust/contracts/m7-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b8732ea1a1f8edf2722293678c5d5103d52cca0e"
+    },
+    {
+      "path": "rust/contracts/m7-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "61e5717ac2a8eb8df0017bc1412daf3f8e5135bf"
+    },
+    {
+      "path": "rust/contracts/m71-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f504e676dbce7dddd005e7cce97aefa5ac0e6e0f"
+    },
+    {
+      "path": "rust/contracts/m71-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7ad7ff6b9fa7b94a522e6c8fc80ac48aa361435d"
+    },
+    {
+      "path": "rust/contracts/m71-error-policy.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "38c935f418cc3498aac7d4e18be5919369f096c8"
+    },
+    {
+      "path": "rust/contracts/m71-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "14af051cb3102cae576b1a2037cb1d9c9215fc08"
+    },
+    {
+      "path": "rust/contracts/m71-performance.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "91daa6075faac0f7b525ac6b9ef5b34e34ca4d7c"
+    },
+    {
+      "path": "rust/contracts/m71-privacy.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "99d04c74bae9ebf6cac88d6009d4081597b953b2"
+    },
+    {
+      "path": "rust/contracts/m72-api.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7b08dd1b417bd0c3cff2f1f2de44df01d10be061"
+    },
+    {
+      "path": "rust/contracts/m72-architecture-simplification.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "042a8a89cda3d7495eb2f8a379ae3c89ee2df666"
+    },
+    {
+      "path": "rust/contracts/m72-contract.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e49cae07dbf576404094aae9c4d2a7f922c5d37a"
+    },
+    {
+      "path": "rust/contracts/m72-error-policy.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "40243a2bc3ef2263d6c2efe67f1aefeee882b335"
+    },
+    {
+      "path": "rust/contracts/m72-ownership.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e2eef7c616a959eac25c4960b5c2e36cb4f927c7"
+    },
+    {
+      "path": "rust/contracts/m72-performance.md",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5a051f7998147ea4f1c63c7b46e8737a3c4a9ec4"
+    },
+    {
+      "path": "rust/crates/er-agent-protocol/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e7ba0cd53ac8ce59db8edc59857fbf2d0e24d6cd"
+    },
+    {
+      "path": "rust/crates/er-agent-protocol/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "776181e9d8fb3b37780f016d5e4b785a323f8dd0"
+    },
+    {
+      "path": "rust/crates/er-agent-protocol/src/m72.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b7744596627f0de206d4c34db9d3ffc5c024bd70"
+    },
+    {
+      "path": "rust/crates/er-ai/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "114365299a9f7b5945d32351f4ec23382e74d04c"
+    },
+    {
+      "path": "rust/crates/er-ai/src/full_surface.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "20643f597fb3ace525ee2f2cfc702326475a0df9"
+    },
+    {
+      "path": "rust/crates/er-ai/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e5c0a410c05f4f3d18b07800b4603e2c0adf91eb"
+    },
+    {
+      "path": "rust/crates/er-ai/src/mode_profiles.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c4baad0fdbba973a1a666f919c79660d5e420515"
+    },
+    {
+      "path": "rust/crates/er-ai/src/party_snapshots.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3fdc659a6790f1e7254309bca035f6ab8bd2a67f"
+    },
+    {
+      "path": "rust/crates/er-ai/src/showdown_session.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cb2164a638314ffcc58ba2b92c4f0a86177fac99"
+    },
+    {
+      "path": "rust/crates/er-ai/src/showdown.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a76aeb676a0793aa26b0e7c80eb34e0b9cc0e810"
+    },
+    {
+      "path": "rust/crates/er-ai/src/trainer_party.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e1e97db7c9a927310722655173957f5101dbbbce"
+    },
+    {
+      "path": "rust/crates/er-batch/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "553380768e49c41e82d27a210776b5ec8d7ff32a"
+    },
+    {
+      "path": "rust/crates/er-batch/src/environment.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0404962577fb574819f041cc9b428e9633cdc752"
+    },
+    {
+      "path": "rust/crates/er-batch/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1b7cf0035722c9977ae0646d1d9d42b33ba627cb"
+    },
+    {
+      "path": "rust/crates/er-batch/src/operations.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a6feb74306d1d1e9d0f26340ec7dec95c7edcc5e"
+    },
+    {
+      "path": "rust/crates/er-battle/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bc646cdeab454a253037ffa89a30562a6c682696"
+    },
+    {
+      "path": "rust/crates/er-battle/src/ability_pipeline.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b01f820ab4db4492785c4ddae4f03201ba3455fc"
+    },
+    {
+      "path": "rust/crates/er-battle/src/ability.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bf8d34a6e03f5c9d7ee2c3dd6c7a7d8463079fa4"
+    },
+    {
+      "path": "rust/crates/er-battle/src/accuracy.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "af3f1a1fd0596fddb9bc2b834722d8e9b561a70d"
+    },
+    {
+      "path": "rust/crates/er-battle/src/action_order.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b55abbb799c6c283cd06f733d315922aedea9e17"
+    },
+    {
+      "path": "rust/crates/er-battle/src/command.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bfa8081aef0477773cc3b0f65fec0902b58b536c"
+    },
+    {
+      "path": "rust/crates/er-battle/src/critical.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "339307d49343c62c0f36affbf7404e4dbb2cd6be"
+    },
+    {
+      "path": "rust/crates/er-battle/src/damage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "da2e7159d91f6cbfa23e8de8ae4c170aa90cb39d"
+    },
+    {
+      "path": "rust/crates/er-battle/src/error.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "306b26a372f70fd8ecad993f7e94e1b32f757aef"
+    },
+    {
+      "path": "rust/crates/er-battle/src/faint.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "becb62b2af9bb3935695868a7c2fd11d80d7cb0a"
+    },
+    {
+      "path": "rust/crates/er-battle/src/js_math.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5094dd70cebaeb38319b8337e7f3fdd64da1bfd0"
+    },
+    {
+      "path": "rust/crates/er-battle/src/legality.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "37b5091784834e585ec2bc6dad1ce861026df4e3"
+    },
+    {
+      "path": "rust/crates/er-battle/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2246d9a96c7a996705bb215e999c56d4a2277da7"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/ability_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6821e7aeeee039b6db636b5de5d2036cf97651e2"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/action_lock.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "34b41055650ec160c4c6e329b95c728c275bc5a2"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/boss.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "20fdf13172bdc5f19bca507fa3eb5fa246d14b39"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/forms.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a432bd12365cdbb94a2dc7458058eb574b376011"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/guard.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e9f912eb7842c0fed6be0e49ebc5e53fd7f07bde"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/item_lifecycle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "187d417692d2bda64ad0063bf141f355ad35a522"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8bfe6883ff85a74c3f15f2448b6899975a9f9dea"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/move_copy.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f853b7c6a440a48169b0c281418228e6ab48452f"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/pivot_redirect.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0991d9a706495de9a12ea17a21acd1e03049ed5e"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/scheduled_effects.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "58e9416771a53ba07077448e183df295ca8b27bd"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/special_damage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f85487243c48fc46b77814389bb1ede7cfeaa0ae"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/substitute.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "111d48565582907e49fbaf138a7e337583101bad"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/suppression_immunity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7c4c68f46e490f0d95f2ecaac2325603a6653f2b"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/bespoke/transform_imposter.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cf2548be8592f07531775d5324f619d9a8ca3608"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/item_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1c4d6201c23fcc32f9202057240c29f7a28a2544"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bfd91e565dea1f3c481bcdfc8ec8bd39dd80f763"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/move_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "823d4628429b9df83af5f3ec879732db2f9eea78"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/routine_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "608010fbad1297fb57ac39e240d94309e6dc409c"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/status_field_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "76fcbad551548807b5837d323837fa468fb858ab"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/switch_target_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0725eb67d66b43eb292cf028ae0a113ffcda2d55"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/system/ability_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0291e2afbb2e3371705fe2e6d2616d96d1404193"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/system/field_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "db1ee1b4aa85bf78997547fd297fb1244c36e4f9"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/system/item_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "06b490582547e48fbeacb722f4f0fe6ebe5110d7"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/system/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ea1d25323ffacbb457820fecca5bb6da0187c8d1"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/system/move_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e8b49599430995756c46891d6530c4db5b76c7ea"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m6/system/species_form_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1f49ac35ba26baa2ed76c0eb01cf069841ee530b"
+    },
+    {
+      "path": "rust/crates/er-battle/src/m7_resolver.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ea20b15a46bd5663162b3e7a0e637a860f371835"
+    },
+    {
+      "path": "rust/crates/er-battle/src/mechanics_condition.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c709c8bc4135499c42d9842d0a310c3540786a85"
+    },
+    {
+      "path": "rust/crates/er-battle/src/mechanics_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f060f34578593800f9dea759c73651c20cad76da"
+    },
+    {
+      "path": "rust/crates/er-battle/src/mechanics_mutation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f8c37e4ab844bd047fb74f99c4ee61f08a863753"
+    },
+    {
+      "path": "rust/crates/er-battle/src/mechanics_query.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "36298700c1822a3fdaeb24e73a28af6b7cb21d1a"
+    },
+    {
+      "path": "rust/crates/er-battle/src/mechanics_selector.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "04ba957a7e6e198b1d12a4577226b0970dde72ef"
+    },
+    {
+      "path": "rust/crates/er-battle/src/mechanics.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "73ef4359f4b76050e8b15e4e9e5782647614d87b"
+    },
+    {
+      "path": "rust/crates/er-battle/src/move_effect.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "54b060c579582f942e48458afb4388c5dd519339"
+    },
+    {
+      "path": "rust/crates/er-battle/src/move_pipeline.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "af4a352d9545683f9ad397ae600f94de0fd2dc6b"
+    },
+    {
+      "path": "rust/crates/er-battle/src/outcome.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "84d1f4acb3ce1d8a95ca6ce707d343a50c685482"
+    },
+    {
+      "path": "rust/crates/er-battle/src/presentation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "81a593601bf0f5df13ee722b9a695d5836fe6173"
+    },
+    {
+      "path": "rust/crates/er-battle/src/replacement.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1885d092b00042895ff00e84171768f5c7e42ee6"
+    },
+    {
+      "path": "rust/crates/er-battle/src/resolver.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1315ac5ef95a28df848d56fd7291e842d1a8cf36"
+    },
+    {
+      "path": "rust/crates/er-battle/src/stat_stage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "904e4866ff3f31b5277becab8b462d3549e39bdd"
+    },
+    {
+      "path": "rust/crates/er-battle/src/status.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6de93b846ce67c61d9cb43a109a0730ae362e380"
+    },
+    {
+      "path": "rust/crates/er-battle/src/switch.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "993ac37a046eb8969f24eb1602e5489a606635fa"
+    },
+    {
+      "path": "rust/crates/er-battle/src/turn.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "269493c951688daa52a3a2daf8d5875871e59ca6"
+    },
+    {
+      "path": "rust/crates/er-battle/src/type_effectiveness.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ed054a38e233ccf2fb87b02e0c056976d1dac7b0"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_ability_pipeline.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e26e3fe57caefbbde1b040d06c401e6302853002"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_accuracy_critical.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7cbab444a0a35b712c81cc0395fffbbc499907d3"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_action_order.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9da59a1dc2a5ad8ec1924a28e1b806cbb46f5b82"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_command_legality.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2f42113355b6786aaeefd6583e8fee89d267c7c8"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_damage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cab0773b4b3648c950dbf1ba99ba201121285a01"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_faint_replacement.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "158a73ba6c35591feefb68b126adfad773849cd1"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_mechanics_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "18af080d2cbe51019ac983e7c613b9377e4d06f5"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_move_pipeline.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f1ec6d7b6aca0f00ab072ed5cae5613fa4f05ad6"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_oracle_differential.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8eadc71458135787345dc67b7fe8df0de9280957"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_presentation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0eb35e438c370e9102601f020bd5ba8a27b1e70f"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_status_stage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b7eb6b38e3a29d56a28b3b7780f7c6a31121346d"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_switch.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c99b5e700c3212f82995720a677aaec9e114a9d1"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_turn_outcome.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8e1ef9e25feebececa55f1c8cd7886ea88df764e"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m3_type_effectiveness.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "885a792f4ad6d1dcf267965948fc74ece9e113af"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m5_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8f3011c6cb81a33b16956c4a3b53bc0d60159a05"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m5_mechanic_sources.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1e86f879328baac9c61542fc23dba5c9f405a011"
+    },
+    {
+      "path": "rust/crates/er-battle/tests/m5_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7141b7563ba05e709e4de2d59936790ca7934169"
+    },
+    {
+      "path": "rust/crates/er-canonical/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a5567a582f86b56e1ce8f10fcf0d9cd166173c90"
+    },
+    {
+      "path": "rust/crates/er-canonical/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4a7221ff070befac6dbc0c0424a21da162935ebb"
+    },
+    {
+      "path": "rust/crates/er-cli/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6f606373b5e7b504d377af27dbcfb881773949da"
+    },
+    {
+      "path": "rust/crates/er-cli/src/m72_lab.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "38fdd167d4c8b6cf14587aa1566d3791d334433b"
+    },
+    {
+      "path": "rust/crates/er-cli/src/m72.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "695d1b58829dbbad6e066c8a21c1e3ba66ebe4e3"
+    },
+    {
+      "path": "rust/crates/er-cli/src/main.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "38e5e0f043b0f491c11c83f3a67e6600ecccbbda"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ffb3c49b63bd55c04813e1f842cc5a5676199a9a"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1d16e41fd5052d39f86daa1a96b21644659a57ff"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/abilities.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b31f62ef972b86795a185f41a9d7d35173222211"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/catalog.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1ad744c5984b7916b6831c0438b5e4f9ef511bf3"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/items.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cfe7150bbaba35a6329f555438b0e4c6acf217cc"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "09660dd33f493c53d20d1331985a93b872a33257"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/moves.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6296ab0c59761e505458554c9eb9af7d0c9eeb27"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/pack_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cc35097011bdba12f22d33d8ce03ca6e930d1a99"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/pipeline.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e02f74cf0c63d9b27d7f40de2623adf8eac8bc65"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/routine.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8435d14f35b3343f8bf2c2a5f108f085da1d8bdd"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/status_field.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d9fb090f21474832e1d0ab023ed7c32cf278996b"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m6/switch_target.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7b7a9698851f7e18da6626a462d4bcc0ea3edf91"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m7_world.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1569c700a82491c499eb8f7b6f5f6771ef3090a0"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/m7.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7fb44e59b857b98f011c72bd83ecad3f697b236d"
+    },
+    {
+      "path": "rust/crates/er-content-compiler/src/main.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "05182913033259f6df69b3b0f04e3fa85740a647"
+    },
+    {
+      "path": "rust/crates/er-content/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3005a0141680c7468463ba98e03f3581828953ac"
+    },
+    {
+      "path": "rust/crates/er-content/src/abilities.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b9d37d345a01e51278a11b34ea8ef0784e072c46"
+    },
+    {
+      "path": "rust/crates/er-content/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ac9b487cf23d8d6a6d85428a159f6071c0eeacbe"
+    },
+    {
+      "path": "rust/crates/er-content/src/m4_abilities.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "53eae0071b3c55c547f67a8f0af8e79cef79f9c4"
+    },
+    {
+      "path": "rust/crates/er-content/src/m4_moves.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "39260e9e5a0c6dcbcc9e8097017190f03fb28ef0"
+    },
+    {
+      "path": "rust/crates/er-content/src/m4_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "31bc8d8e5be7a06c86e09a9c5cee9b8d14ef5c00"
+    },
+    {
+      "path": "rust/crates/er-content/src/m4_species.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c819fee18c583724e6ce64337176ca22f2d6e710"
+    },
+    {
+      "path": "rust/crates/er-content/src/m5_bootstrap.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "feb002ffb65c16acefce304812fd15e4e0f1ece2"
+    },
+    {
+      "path": "rust/crates/er-content/src/m5_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1fcfeaf947590762eed380a84da1ff49aa71a3e5"
+    },
+    {
+      "path": "rust/crates/er-content/src/m6_catalog.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cf773a7717aeef8ae9b0737c1f43d618fdd40ae4"
+    },
+    {
+      "path": "rust/crates/er-content/src/m6_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d8102f3ada1561dcdf6b0b2a0472e0dbe7e1e20f"
+    },
+    {
+      "path": "rust/crates/er-content/src/m6_prepared.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d4badda66f366d89e039624ae39f9d692814a5f9"
+    },
+    {
+      "path": "rust/crates/er-content/src/m6_species_gap.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3e350a6e3806b2ec48e7b7562e0dc812ba6b5c61"
+    },
+    {
+      "path": "rust/crates/er-content/src/moves.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28102a797e94d8a7cba89b8cf4ea79d7fa0f22bb"
+    },
+    {
+      "path": "rust/crates/er-content/src/pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e0b033555a7e81fa0b65ca02dd530e2f8ecc52ba"
+    },
+    {
+      "path": "rust/crates/er-content/src/species.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4fa4cd4aeaed86ae969b0a673b5117fa4a2fa0c7"
+    },
+    {
+      "path": "rust/crates/er-content/tests/m3_moves_abilities.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "71c49abf047eade7536a895858065cf02f9f6ad0"
+    },
+    {
+      "path": "rust/crates/er-content/tests/m3_species_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ba7a47d9df0baa9470b087fbb7a53f64e7dfccc0"
+    },
+    {
+      "path": "rust/crates/er-content/tests/m4_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "22ae86ed9bc4f60a4d275ce363bb566a70f7b047"
+    },
+    {
+      "path": "rust/crates/er-content/tests/m5_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8d65311aaa8e9af1458f7396247c0c263ef1397a"
+    },
+    {
+      "path": "rust/crates/er-content/tests/m6_catalog.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "aa30878ce1cd1194893d6436f5d5979d41151852"
+    },
+    {
+      "path": "rust/crates/er-content/tests/m6_pack.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "34a9b53ec2f201da75b14b8977ba502e9abec04f"
+    },
+    {
+      "path": "rust/crates/er-dev-types/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "09e804c844f959de282878dc5b4afa8ced04fd11"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/causal.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4b2bc37374cc8fb71befaa1841a56d4981dc32ad"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/compatibility.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0ad093ccac4ddd9b51a09f98ccc1d3fc516648d6"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/digest.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f59be48bdedf68b58bef50df43aeda7c001b38ae"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/identity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "403372d57117433592d457318340ef17ce57d61e"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "298156d33471ee1a84f796f19c4050a4d5325f73"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/observation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6ae31339091e401d1b2ad9e151f98d9310976b60"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/performance.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "be389009390fce10d2fcc3f2c080dccb40a4a026"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/snapshot_v7.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9876cd34f85d5921dd0db67dba6970d290a52143"
+    },
+    {
+      "path": "rust/crates/er-dev-types/src/trace_v7.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fdb669021a2a6c659b017abea4729eb8c4ab115f"
+    },
+    {
+      "path": "rust/crates/er-devplane/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "10db2e27822d0375a30dd7b4f621e111c8b26d3b"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/capsule.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4209db8245cdbe9a77e187704e6f3cf4fc9101d6"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/checkpoint.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fcedf4a20914e9e3c5e6f4ec3f1e267796e469be"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "48b0282bfb902c70a3e22eae9c70b623e79902f3"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/lineage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9cb5d30df689c8e0162fa6fdeb16ede96fe4ee14"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/pair.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cd74b2f9593ad0f146dc626d8a8cfa6fe6b6a970"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/performance.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c27e07a4b2e36d44e74d37c033c988712f4af267"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/reload.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "74539ae9052c21d51266fbdde558af2d054f5dfc"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/solo.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6fbbd0a5e9ab2c6c12acfa81a35932420eaef4bf"
+    },
+    {
+      "path": "rust/crates/er-devplane/src/telemetry.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6e73a6872d9d547f59d73de63a40803d5498815e"
+    },
+    {
+      "path": "rust/crates/er-env/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9801120a432b58f76017a77162729a885b504ea2"
+    },
+    {
+      "path": "rust/crates/er-env/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "953d16d9e13b7a6d708e87d50a6aa8a424217135"
+    },
+    {
+      "path": "rust/crates/er-game/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "14fcf40444aaaf5bcc64287da56cea95b084d074"
+    },
+    {
+      "path": "rust/crates/er-game/src/authority_commands.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "503f20cad41f29c2dee996501ab3099999b3cffd"
+    },
+    {
+      "path": "rust/crates/er-game/src/battle_adapter_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2dca6d734fe550ecfd3db5ea836f38788347651a"
+    },
+    {
+      "path": "rust/crates/er-game/src/battle_start_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1b31706b011801b05e392e1222dad500681553f3"
+    },
+    {
+      "path": "rust/crates/er-game/src/command_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cbefe09ed71fd5d7c9bb4a39d15ee66401b01def"
+    },
+    {
+      "path": "rust/crates/er-game/src/internal_event.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8a58f3fa8699d8bfbc5d53a30907c6513509bad0"
+    },
+    {
+      "path": "rust/crates/er-game/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "57d926f58d94ab65b24c3163aa30d1376bb53012"
+    },
+    {
+      "path": "rust/crates/er-game/src/local_battle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "39aea28b9c2ce005fce451d8bdd3c37c9a2b77c5"
+    },
+    {
+      "path": "rust/crates/er-game/src/m6/coop_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "836fa8d147bde16904b93daff45bfd3679f91a31"
+    },
+    {
+      "path": "rust/crates/er-game/src/m6/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dc5d78a41d129b0f5c07561b8d2f1248b570b552"
+    },
+    {
+      "path": "rust/crates/er-game/src/m6/recovery_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "39ee87341786458ea9f1e382ca8ce21b0f6ceff0"
+    },
+    {
+      "path": "rust/crates/er-game/src/m6/runtime_v4.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b1b76f0535a6a82dd6efe0410996afd16c1d9872"
+    },
+    {
+      "path": "rust/crates/er-game/src/m6/solo_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "90969c9dc7a1c94ce0106501489c82bb7f9f7853"
+    },
+    {
+      "path": "rust/crates/er-game/src/m7_content.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2644cb6d40a74ca52db869af989c13eb89db41e0"
+    },
+    {
+      "path": "rust/crates/er-game/src/m7_internal_event.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3eb4cb48e06e69a46267a4396a219985eb80b490"
+    },
+    {
+      "path": "rust/crates/er-game/src/m7_material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d14470fd90ae4401fd0f18245cc6a1831f18d050"
+    },
+    {
+      "path": "rust/crates/er-game/src/m7_progression_control.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ec493886f7463f351cec4708a80526e69e571008"
+    },
+    {
+      "path": "rust/crates/er-game/src/m7_run_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8aa2375a28aec207a9cb048eb512f2853bcd50d6"
+    },
+    {
+      "path": "rust/crates/er-game/src/m7_runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "80c003001db1eda84de1bb4b39d89539635cbc01"
+    },
+    {
+      "path": "rust/crates/er-game/src/m72_bootstrap.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c9f41bc0135bee0c3e43f1d331c5e52a60e1ddf5"
+    },
+    {
+      "path": "rust/crates/er-game/src/m72_new_run_material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4c049605ad602d542b8cb940a6eba8178f147667"
+    },
+    {
+      "path": "rust/crates/er-game/src/material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1bca8655497b21f3376e2cb4403d9b43d4be0355"
+    },
+    {
+      "path": "rust/crates/er-game/src/move_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cc5bb863e35e21bea70e13be28054df5b26511d4"
+    },
+    {
+      "path": "rust/crates/er-game/src/party_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3236226f01cb51095e07b586c54e83c1518a5faf"
+    },
+    {
+      "path": "rust/crates/er-game/src/party_option_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7d043db727763983affd0aed584aa635a7538a3b"
+    },
+    {
+      "path": "rust/crates/er-game/src/replacement_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fbc6ddebf12b90a92110b1ae83ff879b85a727ea"
+    },
+    {
+      "path": "rust/crates/er-game/src/run_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bd1ced06542cb5f8c9ccc4deb4db979244a7b9b6"
+    },
+    {
+      "path": "rust/crates/er-game/src/run_runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "394d5a2891aa9d94c5a62a88584e1f2bf2e1625d"
+    },
+    {
+      "path": "rust/crates/er-game/src/run_transition.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d7968ea7a94def5f2d332ebd24f0f6a07f5c16a4"
+    },
+    {
+      "path": "rust/crates/er-game/src/runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "adc446c609011c061e6ef06a9b75446567ab5963"
+    },
+    {
+      "path": "rust/crates/er-game/src/snapshot.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "16403ded4844efe78c0dce97c37ca0c23c53c215"
+    },
+    {
+      "path": "rust/crates/er-game/src/target_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0548a77f09ecd2b0c54af84d892b26a263b3005a"
+    },
+    {
+      "path": "rust/crates/er-game/src/transaction.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9812501bbda5777f4460569a4648403b7354c96a"
+    },
+    {
+      "path": "rust/crates/er-game/tests/m3_command_menus.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "60b6d4ac29b11dd79d6d0454adfe48e6f6580bfb"
+    },
+    {
+      "path": "rust/crates/er-game/tests/m3_internal_event_boundary.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "94ad0b4e5f752cdc020b435babdbea5a06e1c0dd"
+    },
+    {
+      "path": "rust/crates/er-game/tests/m3_local_battle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9c78b14f18865f6916209ad03f5e9bd3d4e21bb7"
+    },
+    {
+      "path": "rust/crates/er-game/tests/m3_party_menus.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fb1cbf1c4c37b3c49fac14d2e555882a6399c4dd"
+    },
+    {
+      "path": "rust/crates/er-game/tests/m3_runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5759f12373d0ee767d664eb06e2bca6e88068bb6"
+    },
+    {
+      "path": "rust/crates/er-impact/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "33512be58835816ae9dc5b006a4d4ee97d2abdaa"
+    },
+    {
+      "path": "rust/crates/er-impact/src/generate.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "acbff9e55961580e5a6fafb9fbe83d8af0e010be"
+    },
+    {
+      "path": "rust/crates/er-impact/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e3577bd3b7c119177d3fbc4e539914aedf9f83d5"
+    },
+    {
+      "path": "rust/crates/er-impact/src/query.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ddb2b7cddd4cb26c59a4f83add885fd730fbf888"
+    },
+    {
+      "path": "rust/crates/er-kernel/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2f0c0b5db708275499b930f67f02492efe104f67"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/battle_authority.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3ed982bc9d3269c95920b1073c1ebb3b01c9cc17"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/battle_kernel.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "627be1a2ee6691b2da60c895a4e1f10ae6a899a1"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/battle_presentation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3285cf83316ccade48f061d694991a6587de9a10"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/battle_replica.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0e998733626d105e026e3ae629c21487244690c1"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/battle_ui.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d369491926ee6b7777eff834dea34000611700b7"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/game_kernel_v6.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1a3687f2fac06aef80f55638edba01c579e2ae35"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/input_router.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "067000ef8d52afea97cc2530b95d1f72e2ba212a"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/kernel.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "15e32e29de38874d38e6807a69f4961f34ea887b"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2f50141361d160af9f8c4b555171880d2d1d6ead"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/m6_kernel_v5.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f51c96a93b6597fd35f4e4cd4ef4521c2b16d04d"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/snapshot_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5131b23bd24314ee2588126927bd17e2c36f0992"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/snapshot_v4.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dd63f31a540758274d6155b67aa59e5b52cafab2"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/snapshot_v5.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8a6f33766fbd9d1a33320c1a7b9724b62d17c459"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/snapshot_v6.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5db08bef8840950049c44a12d56511945ef1c354"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/snapshot.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ec98ce810760d33e4e9527e920c1ba770e81248f"
+    },
+    {
+      "path": "rust/crates/er-kernel/src/ui_reducer.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fb5f3cc07f37ddd8211af1be18163f6d45696222"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m1_keyboard_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dba059cfb41dad87c3aae42678cfbe948d3c7933"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m2_protocol_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "84a2995b341dde0fc71611a4d4be89857837f17a"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m3_authority_commands.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a3ce100bc10069affe834e0064277a124f39f817"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m3_battle_presentation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8d18952dcf77df90a54c0a13bb637b08a890387f"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m3_battle_ui.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2cf1dab143d341d0ebeb1fb4126cc4a6656d0842"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m3_material_apply.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "193e527166aea152cd3b7ff016504d56113c7aa0"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m3_tail_proof_routing.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "305cbdcef3a769caf444d72855caaab1134e19ee"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m3_terminal_protocol.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "24e54201ac320100a23a65917fa2028d027b9d32"
+    },
+    {
+      "path": "rust/crates/er-kernel/tests/m4_snapshot_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cdbe13632e8c31043c0dab8bfa1dc12e18b6e5b2"
+    },
+    {
+      "path": "rust/crates/er-lab/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "069821b806c609fd2c96b9c68251d7e025873a3d"
+    },
+    {
+      "path": "rust/crates/er-lab/src/architecture.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8b9dde3d0f2f2c13af04d37504ef458709bc8596"
+    },
+    {
+      "path": "rust/crates/er-lab/src/artifact_store.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "89e470103ec256230e78abd0d62744c8bb231390"
+    },
+    {
+      "path": "rust/crates/er-lab/src/bisect.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5cb05450b3806726f219cf094dca2e17ec76902f"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/battle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7c439eaa557c98bea298aa76bce3b33462bb4d63"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/capture.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "45c03c28fb727f792c23d6cf37f2f5d9815689e3"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "79440f38a619d799885d1e39ad33c70d9ed73784"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/pair.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "33a802589c3bcfb22b565cf2bb313bc4e24e8157"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/progression.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b5441c3611c8f2160e70a56e9e152e69a1b041db"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/run_surface.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0fe1c5d304e9fab629383417bf7c1322e53af657"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/scenario_node.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "97b3b6f0df725f3d44aa7455cf5249294215cf40"
+    },
+    {
+      "path": "rust/crates/er-lab/src/builders/world.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "32c33c755ea378ed58f9fd4c66b8e62565610835"
+    },
+    {
+      "path": "rust/crates/er-lab/src/cache.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fc8727ab8935eb27cd32580885df934e8e7782b6"
+    },
+    {
+      "path": "rust/crates/er-lab/src/cluster.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ab17ce15a7c67261daf79d7ccb359c821bdb91f5"
+    },
+    {
+      "path": "rust/crates/er-lab/src/content_diff.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5d86a679f1730ce04b2ef9d8324d5a58284debb5"
+    },
+    {
+      "path": "rust/crates/er-lab/src/corpus.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f3a3cd37c4845be42c17aeb1918efe15c9d160db"
+    },
+    {
+      "path": "rust/crates/er-lab/src/counterfactual.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5c90beefcd33d6a7ddf6c1d0dd0dd857629fc04d"
+    },
+    {
+      "path": "rust/crates/er-lab/src/coverage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "14376edc5ec62652031503817ddb78a37216b636"
+    },
+    {
+      "path": "rust/crates/er-lab/src/daemon.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9e7dac33ead754046d1379da08700fd0b113fe7f"
+    },
+    {
+      "path": "rust/crates/er-lab/src/experiment.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e3aeadbb81b5a1975adb8c68f966932fb6d9cd77"
+    },
+    {
+      "path": "rust/crates/er-lab/src/explore.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "385fd9e810f1795837c9c42c5aa9c2b3fb5dae85"
+    },
+    {
+      "path": "rust/crates/er-lab/src/fingerprint.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c08d4d2de3ddc2b037d635ced9b0661028d55d40"
+    },
+    {
+      "path": "rust/crates/er-lab/src/impact.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "db82485025f2a294ef1e5a3d7c2ffda5b948e57c"
+    },
+    {
+      "path": "rust/crates/er-lab/src/incremental.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c5adcc527f91e12fe3d91c092671d1f9188cace6"
+    },
+    {
+      "path": "rust/crates/er-lab/src/legality.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7d11d55e203bf34624944171b0ac80d70bcc8d68"
+    },
+    {
+      "path": "rust/crates/er-lab/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "55c3ef58fccd63b4d3bffebdf3d7e523f5dddf5b"
+    },
+    {
+      "path": "rust/crates/er-lab/src/matrix.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cefee7a054c50d13e9224ebaede74933929206e2"
+    },
+    {
+      "path": "rust/crates/er-lab/src/migration.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1c07b0c2a50ca9032c47dbe4e2bfeb1e179a3ece"
+    },
+    {
+      "path": "rust/crates/er-lab/src/mutation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7c2adb068f82704d09c14ee662c044233d87b121"
+    },
+    {
+      "path": "rust/crates/er-lab/src/navigation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4fbc177f57f7a873d9324a6f425eb063e94bdb01"
+    },
+    {
+      "path": "rust/crates/er-lab/src/performance.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9b76ad19d7e9a39ee75b4dedb45013bf766b6661"
+    },
+    {
+      "path": "rust/crates/er-lab/src/platform.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "83a53d8df655775cb3a490a009532f36ad6e2128"
+    },
+    {
+      "path": "rust/crates/er-lab/src/preset.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "968f55b0ce41f01ae53a4be68147bcd4bf13f8b2"
+    },
+    {
+      "path": "rust/crates/er-lab/src/query.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a93b9ae78529ee79d6ee39485304b23044551591"
+    },
+    {
+      "path": "rust/crates/er-lab/src/reload.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3aacacb03d4acdd5ca2c2ebc5e6ce47d5eaafb1d"
+    },
+    {
+      "path": "rust/crates/er-lab/src/scenario.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "77f0e8b0f6694aab1df325ff5c24e427bf3e1a44"
+    },
+    {
+      "path": "rust/crates/er-lab/src/security.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fd4f596e8a9175ec46a5320879459f592dbb32e0"
+    },
+    {
+      "path": "rust/crates/er-lab/src/viewer.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9c47e4465e10614d3f531bb3bf140d56953fab15"
+    },
+    {
+      "path": "rust/crates/er-mechanics/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6caeda6576b27a3ef71a43aba2cfbdd9a07fc6f5"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/condition_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "75e57b0db50184b8ae3139f3c021995fdc3facb6"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/condition.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cd9f00a950f8b0cec14811c485f49ae87b6ecb38"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/families.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d532afd6b4f090716db3ad1d881a595c0bd05f95"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/ids.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8149c1adccf4f8f98403c2af56633bd9e800a48c"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "77b9cfa649c197f4ae197eedd701c252c2809ed4"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/m6.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "203ad04808e953a21402989e034ca0ae515f5de9"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/operation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "add9015db8f12ca051c8cca710c98156023eb2b2"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/program_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e17722c1450bf7140ce47f510d53e580b14dae54"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/program.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "877345f995b94148fda2f73c68e02ec656392e1a"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/selector_operation_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2eede824ab04abac5b1486082774d39c921370f9"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/selector.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "44ed0adf06a30ffe50e548e475e45155d9c82eb9"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6dcb2c0c2030f3dae7d34e82324824b5777d861d"
+    },
+    {
+      "path": "rust/crates/er-mechanics/src/value.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c4a463387f6010cd2e89251de89f58ea3120a8a0"
+    },
+    {
+      "path": "rust/crates/er-mechanics/tests/program_validation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "492186d288479e1d24871943da5323b407153376"
+    },
+    {
+      "path": "rust/crates/er-model/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "216d9a9d2df2c62d71cae8106494918944c81d67"
+    },
+    {
+      "path": "rust/crates/er-model/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1d93203eaa23f2e6f2ea61cc102b4e43da2197f6"
+    },
+    {
+      "path": "rust/crates/er-model/src/replay.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3be149d0c1a0e94c45d859bcb95b108823908b75"
+    },
+    {
+      "path": "rust/crates/er-progression/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f9bc58ae93061f84f069d9fd0038d5bde772b6bf"
+    },
+    {
+      "path": "rust/crates/er-progression/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c59e6f3f56550167c7f52be8855fa8bbdc0e9c33"
+    },
+    {
+      "path": "rust/crates/er-progression/src/lifecycle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28b8fae367ef774a74a3135a9ddb2ed029597273"
+    },
+    {
+      "path": "rust/crates/er-progression/src/material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0f615f4afc6bb6fb244aef7285d0262cd7d59105"
+    },
+    {
+      "path": "rust/crates/er-progression/src/oracle_surface.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d17103b4e90c18611bef956daff68b38d4a65745"
+    },
+    {
+      "path": "rust/crates/er-progression/src/progression.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a96b18a6de9a6cc1ebb49c2c217d052cef00a8ab"
+    },
+    {
+      "path": "rust/crates/er-protocol/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2e40f7711b418105fa73e4d0e042a1c62a766626"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/authority_log.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "03b15ce694768dea77e7b50d4555367a96f3031a"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/battle_material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bd25c89f8de7f027a318c956c1ba2438a80f4cd1"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/battle_terminal.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b40f22bbd8c7a38f68ba19213e05776817e96ea2"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dc020c559cbe3c75d0ff4a076ff40252d17eacb2"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/proposal.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ee7aab8936e8bebb53eb22c40388796563f40eb6"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/recovery.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bbbe188b30e808942a051c9b69bb135bb57abebd"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/replacement_material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5657d5e70f7b8b9299263428d82f30a83f38f619"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/replica.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2beb41a4276a2b25bb8e9fd145a884b143b4a7cb"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/scheduler.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28e6c6147b6251b7738d94eadc0e19ca4c112b77"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/snapshot.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e38885677500bb627cc5e3b2b18238f71a775d5f"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/successor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7a3f6d4145581e0f5368873cd4f4b7ff3d44315a"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/tail_proof.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5d549d0b792b46fc8b1ceee724fa3a9f748f3430"
+    },
+    {
+      "path": "rust/crates/er-protocol/src/validation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4af9287cd68600fa434848a1ae0c194911225881"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/authority_v2_contract_map.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "feb54e38812759c0538fba1925c72984edd73430"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/authority_v2_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dd55f3c53addd8c960572f3f4dcf8ee73a685793"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_authority_log.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "32b30d7c469c1df15110e3624ff32e7d7e7afdf5"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_proposal.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c68dbf205cfc7a9a913e2c96b2bd30429592afb6"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_recovery.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "326744da5407c845c87ba867e6ec151397d8fa2e"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_replica.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9584e4633da30d6b34a074c442b604edf3c852d9"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_scheduler.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "65800319cc9c2a9738f4844bc6036d234ad1f6b3"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_successor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "202763ec991532350719d202c4ebd3f53eaa0e0c"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m2_validation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6f67b9f05e1ce57357ae41db9f49a7faa63c5f77"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m3_battle_material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1ea0abcd75055b725f6c010686b5b553cd8c150a"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m3_battle_terminal.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f483f3306d47e3b602ab6be3353affb19b48686c"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m3_local_authority_log.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1a34f1cb4091ed8fbfc914fc2381cbebfb283abd"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m3_tail_proof.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "998b759b7b2f430ac402485db5a16a7b5d508ee9"
+    },
+    {
+      "path": "rust/crates/er-protocol/tests/m3_terminal_authority_log.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "936e9ee9460d33c032c170a1dd7f48154008d520"
+    },
+    {
+      "path": "rust/crates/er-render-model/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e1089fff47f712e90df9785f2a40e635c0401adc"
+    },
+    {
+      "path": "rust/crates/er-render-model/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8556a9526f8807b5e58ecf85de53518336e6b586"
+    },
+    {
+      "path": "rust/crates/er-render-model/src/scene.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4a6fd81c57322f9d9d843f8ca92be28ff4d038f2"
+    },
+    {
+      "path": "rust/crates/er-render-model/src/validate.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "07d9982845f9585835fa66bfb535a65e46b6ad65"
+    },
+    {
+      "path": "rust/crates/er-repro/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d0a7f1d97713f013fc1c5cd91512156c16e7088d"
+    },
+    {
+      "path": "rust/crates/er-repro/src/capsule.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fc5fa9c728aa38beff34db5659b6fa52c474b364"
+    },
+    {
+      "path": "rust/crates/er-repro/src/corpus.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5dba0d304f74c57ae33191c7d9ec31286474c9f5"
+    },
+    {
+      "path": "rust/crates/er-repro/src/diff.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "de0271645cef9ba53967618750b79266c0d01b3d"
+    },
+    {
+      "path": "rust/crates/er-repro/src/explain.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1542e10cfdeef9e0b7db948620a820c55c64e630"
+    },
+    {
+      "path": "rust/crates/er-repro/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "344c4b3967469e900b715bada293e88581f2488b"
+    },
+    {
+      "path": "rust/crates/er-repro/src/minimize.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "eef750ec9cbdc0da07ab734cea6c8b196ad52a2a"
+    },
+    {
+      "path": "rust/crates/er-repro/src/replay.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "55d4c8044fb52abf260d2851700fc7143e7bde15"
+    },
+    {
+      "path": "rust/crates/er-rng/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "84a5e59c4d866efafd9bc8cfc765935954564e04"
+    },
+    {
+      "path": "rust/crates/er-rng/src/audit.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7688725f4e04627c3374ff72009013daf465dfec"
+    },
+    {
+      "path": "rust/crates/er-rng/src/battle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e45665daff35b512d30d0fbfc0b77e25eace3a76"
+    },
+    {
+      "path": "rust/crates/er-rng/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "019fabcc593e9b41d4b9efe05a2cd39a128bfea4"
+    },
+    {
+      "path": "rust/crates/er-rng/src/phaser.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c5b33f57cd3608d672988d2da227d7c6fe8d80e3"
+    },
+    {
+      "path": "rust/crates/er-rng/tests/m3_rng.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5759ff76ed124736acb5637dc0c0773f1f95877d"
+    },
+    {
+      "path": "rust/crates/er-run/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8449a54b05bbda54df2b531bb788a1bd72066a86"
+    },
+    {
+      "path": "rust/crates/er-run/src/biome.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "919b9523b851befc0af508661dd256d77e9b702e"
+    },
+    {
+      "path": "rust/crates/er-run/src/capability.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1a7da20273fcefdde804432a1e2b69049e588859"
+    },
+    {
+      "path": "rust/crates/er-run/src/capture.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8657ef0252a1848aaafe59785e44c3879a419692"
+    },
+    {
+      "path": "rust/crates/er-run/src/content.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0a840849408d539a4845483077d0940a3c159332"
+    },
+    {
+      "path": "rust/crates/er-run/src/economy_surface.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3618b7cca9778c9f28b68f45109322e2951066cf"
+    },
+    {
+      "path": "rust/crates/er-run/src/encounter_plan.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "75f487424b9d489a5621a764418f1a5e6f637aa7"
+    },
+    {
+      "path": "rust/crates/er-run/src/encounter.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "04a8dadad050aa9e994d30711497d0d005f0efca"
+    },
+    {
+      "path": "rust/crates/er-run/src/error.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3c283aa7ae3c43d5f0cf3ab81ac87ce5cdb27511"
+    },
+    {
+      "path": "rust/crates/er-run/src/experience.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ab97603066d30f3c3371de47adb5478243fbe98e"
+    },
+    {
+      "path": "rust/crates/er-run/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "25dab899b8548d1677b151100535690aee631a16"
+    },
+    {
+      "path": "rust/crates/er-run/src/meta_surface.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "53b51a815ea01c000eaf00514f5305153aba92e8"
+    },
+    {
+      "path": "rust/crates/er-run/src/modifier.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b88add4e31716ef1dd12bdc18910cdd8c748b0c3"
+    },
+    {
+      "path": "rust/crates/er-run/src/money.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "478817d59ec9dbc6ea876714f500c157519a006d"
+    },
+    {
+      "path": "rust/crates/er-run/src/move_learning.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b0550ec534a8d865d6842d65815567e67becf856"
+    },
+    {
+      "path": "rust/crates/er-run/src/progression.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d8cb437f9f917b37fddd7eff0709b2b25897f892"
+    },
+    {
+      "path": "rust/crates/er-run/src/reward.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d2f4771deb66451a3ad34f9e1b992077e49f1fff"
+    },
+    {
+      "path": "rust/crates/er-run/src/rng_audit.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "628753d3c6f77fe3a1410bffb48195c65511ec2b"
+    },
+    {
+      "path": "rust/crates/er-run/src/run_material.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "43480de9a68b2b1e49ac7241cfff6b912c4ab24f"
+    },
+    {
+      "path": "rust/crates/er-run/src/settlement.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4f58cd0a3dd7c3836fd763eebe8337fb61c91f08"
+    },
+    {
+      "path": "rust/crates/er-run/src/stats.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0a7343cf7ac4b697680b1014361181b0b7be4713"
+    },
+    {
+      "path": "rust/crates/er-run/src/transition.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "685388f2df0d95b7926d3d187c9bdd1ab1b33823"
+    },
+    {
+      "path": "rust/crates/er-run/tests/m4_content.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3b3c975445f93eb7fdd6ae23db3f6a9d94c4ddda"
+    },
+    {
+      "path": "rust/crates/er-run/tests/m4_foundation_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6bfe9be847832fcb65fac47bada891bd650e6ff6"
+    },
+    {
+      "path": "rust/crates/er-run/tests/m4_settlement.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7107458a5183cd1e29c317f79ed7fecfc7b0a169"
+    },
+    {
+      "path": "rust/crates/er-save/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5cb8f5df57c11fc64a08a3d75fc320f6b26beee1"
+    },
+    {
+      "path": "rust/crates/er-save/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "46af114af2aa4f2c70479cebb6969539510f8ef3"
+    },
+    {
+      "path": "rust/crates/er-save/src/mode_save.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "43b25ef1b1240b3cc28992055360dc8fc7282f7f"
+    },
+    {
+      "path": "rust/crates/er-save/src/oracle_replay.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "08362ea59917a45fffe70b906193ebb02158922b"
+    },
+    {
+      "path": "rust/crates/er-save/src/profile.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "04b9ae6e91911587f8b4d26c11f87b33dc4b7c6e"
+    },
+    {
+      "path": "rust/crates/er-save/src/session.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e64268a30adbb3bf5ef72a8e908ebf8b29bfffa8"
+    },
+    {
+      "path": "rust/crates/er-scenario/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "74710bb6543bb38241d1b5ad000ae46cdfe29218"
+    },
+    {
+      "path": "rust/crates/er-scenario/src/full_surface.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0a018cf9bb3d15fa873dcb73e8f0ecd688db0e0c"
+    },
+    {
+      "path": "rust/crates/er-scenario/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "08eb9e39cff63ef397b5a40b6a9c27b7bc0e7399"
+    },
+    {
+      "path": "rust/crates/er-scenario/src/party_requirements.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d4ed339a4fa0e64d31234ecf5ce6bfaa636a4474"
+    },
+    {
+      "path": "rust/crates/er-scenario/src/runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "318232793a9364bc008d12f7c43eff05cfaf96f7"
+    },
+    {
+      "path": "rust/crates/er-scenario/src/training_session.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b7d72a8f9d5d62a4557dbdac39b35bb1ab5c8e02"
+    },
+    {
+      "path": "rust/crates/er-sim/benches/m2_benchmark.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ea0e3ef91d925d5676f9ef2be4b05068b1076a17"
+    },
+    {
+      "path": "rust/crates/er-sim/benches/m3_benchmark.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0c2a2d53fdc8e8dc5ba227994bdb0a0adaade262"
+    },
+    {
+      "path": "rust/crates/er-sim/benches/m4_runtime_benchmark.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "62688307fd19232adbf00fdee1d44bea1b96ed9f"
+    },
+    {
+      "path": "rust/crates/er-sim/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "89d34142356861a408a7780cf2aa042573bfc124"
+    },
+    {
+      "path": "rust/crates/er-sim/src/clock.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cd230c3868f0308d5a5f331faaac2a36e3981f29"
+    },
+    {
+      "path": "rust/crates/er-sim/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d44206968edc98df0d9de826a33d4785d79a98c0"
+    },
+    {
+      "path": "rust/crates/er-sim/src/m4_pair.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7162653e3ba38b5afb961cc4ec5434075d0c514e"
+    },
+    {
+      "path": "rust/crates/er-sim/src/network.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1a142dffac6f04a2a5e6c1e922eaeaa9fa14f879"
+    },
+    {
+      "path": "rust/crates/er-sim/src/pair.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9fc5c41f84ea631878e1febf7b399600a8037f88"
+    },
+    {
+      "path": "rust/crates/er-sim/src/presenter.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bf00ebf76b6f16a402704ee35abb46fcab3f3457"
+    },
+    {
+      "path": "rust/crates/er-sim/src/snapshot_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "666e02e09b5a595977c3b2103dd7df3fb014d360"
+    },
+    {
+      "path": "rust/crates/er-sim/src/snapshot_v4.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b1cac99a33881401a9e66819cf22785312345274"
+    },
+    {
+      "path": "rust/crates/er-sim/src/snapshot_v5.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "728b6a1c821cb5ba3bbb18c93f46d2f9fecb0f99"
+    },
+    {
+      "path": "rust/crates/er-sim/src/snapshot.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "41d19146a172c166cb150bfa1bab9a8abb9f27bc"
+    },
+    {
+      "path": "rust/crates/er-sim/src/storage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a270165d795f634d92d5816ee2611b1966171b22"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_adapters.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "38c76dcecfd17a93a84e5173952efd533dd684aa"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_api_bypass.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1939b1c36d4ef0ebcb64accd928d335f83e45e1b"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_clock.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dca506693542574664f8dd2d4292162aad458b0b"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_command_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9fe93f6e4ccb8d9e6620e4cca97c3f0fe2083350"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_interaction_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f15d6d344832ff87d2401b3c7845e7a0ca73b588"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_network.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7a077216e499c711730442df3e38b2697a74bb62"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_recovery_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "604aa04c71119be387521adc2c2937f4a60a4eb0"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_replacement_campaign.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5aaa296d58c7196b821bc89dea06e957eca151b2"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_resource_teardown.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b9429216bef4eea6f8f99f2c8560cc1be9742c63"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m2_suspend_reconnect.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3feb3e2bfe2ca972856b5a90659f2895c706cd5c"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_api_bypass.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "63562d13c315c3b1f855be633fd1c58d3144e36a"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_fault_recovery.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "877adb1452849e276640bb0ebf8d6cdfaa23f71d"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_pair_trace_live.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "433ffb802e69398920151767b80918c0d620c693"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_presenter.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "70e7789882ee72af9c9771c32a1654748aa10e3c"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_raw_key_coop.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a3be8f5855f768b759e5a58dc530e8a78563e9f6"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_raw_key_local.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6149d135388303ba2f4750f605bce085a50256a8"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_resource_teardown.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "58110843237ce98c071a42da672117acb8483ab9"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_snapshot_continuation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f695d7952a53487a0703dff98a723779a4ec01ca"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m3_trace_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ca8f615e9ff2ff58eaaec1aab9cf70763ffa217d"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m4_battle_start_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "86104c9f47ddc7e4d062a6c31d2ccb578d512126"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m4_pair_snapshot_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "eee01541a023d883854acdabb2708b32b1268123"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m4_raw_key_coop.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2c70be7de729a611b06db1f43221c885e7b6da44"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m4_raw_key_local.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4b470eaa94cd2c6724491ad4a29e1050f9217f59"
+    },
+    {
+      "path": "rust/crates/er-sim/tests/m4_run_faults.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a965160c4daf8592e19a4a9974d74688f09389f7"
+    },
+    {
+      "path": "rust/crates/er-state/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3bfc6e76c48e8f576551e7b515a79bf170b3bdea"
+    },
+    {
+      "path": "rust/crates/er-state/src/battle_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "daccd03f58723131bc13dda329470742fed59919"
+    },
+    {
+      "path": "rust/crates/er-state/src/battle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fd18b1901887a2197a3aefa24cb08a0fefaf9d1d"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/action_lock.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a0456f366b50f1f948e8f569e2684fe759b01d07"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/boss.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "10016d0b2a801337e0c7ade698ed04f83b661991"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/forms.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "589950ff3cdc07ca9a92117bbafbeaa11a9bfeb1"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/guard.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bf77017bf1603267c00c5c44e4f5dac1a6051538"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/item_lifecycle.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ab4d83fc3216b0c94baef5ee5a802f967e8f9ec6"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/mod.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "af44ef3cf31d64a1cf5b16650137d753029c9c54"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/move_copy.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "65565e067fa7828e8fedc80074632439325d0d0f"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/pivot_redirect.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e92054e6318196753eca3bca9da48688d29cb381"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/scheduled_effects.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e11a649262ae2123c493a085794299289ef9c7be"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/special_damage.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c8e6b4d3aa346cc9f8024872b2086172e341c9ea"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/substitute.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "19d86f986387d4ab03a226283f2a3ec055b9a610"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/suppression_immunity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5936f83af9d7b08aa14c6705f6d1747dc7a53d7a"
+    },
+    {
+      "path": "rust/crates/er-state/src/bespoke_v2/transform_imposter.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "34fa6f3bd1408c7ae067fee88f6cdf5f205deb6f"
+    },
+    {
+      "path": "rust/crates/er-state/src/conditions.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fb449701edd0689cb1c0400f7a3d9e897dab6b39"
+    },
+    {
+      "path": "rust/crates/er-state/src/digest_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fa51b3162fac38f46544a146a488980c41c5ccf3"
+    },
+    {
+      "path": "rust/crates/er-state/src/digest_v4.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5cb9afaf3a32a94617d934c2e1bc4155b7e039b3"
+    },
+    {
+      "path": "rust/crates/er-state/src/digest.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "17f8921aabaeb805025e5b1a9257a70fd30e5c4f"
+    },
+    {
+      "path": "rust/crates/er-state/src/field.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2cc53943de45ad65d3601300373d73ad97fd3c9c"
+    },
+    {
+      "path": "rust/crates/er-state/src/format.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3f5e7eef13e8af1534c4c97341390911a761359a"
+    },
+    {
+      "path": "rust/crates/er-state/src/game_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4cdad3159756075e49bb919b5a7399d50d6d978a"
+    },
+    {
+      "path": "rust/crates/er-state/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "421e1ad22b566ab8b1049b3cd603d2068604c799"
+    },
+    {
+      "path": "rust/crates/er-state/src/m7_state.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3f8d10439a9605e28172a1cb3bf420f5060f9a94"
+    },
+    {
+      "path": "rust/crates/er-state/src/mechanic_state_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "21f84913bba25e52e7d55caf9d67360b01776bb4"
+    },
+    {
+      "path": "rust/crates/er-state/src/mechanic_state.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9cd01a2846f3f60c61e1ff99755ce6e633ee9b8d"
+    },
+    {
+      "path": "rust/crates/er-state/src/migration_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "29f03465a74bb5ab61cd1e49bd5c9a5050ffa1a9"
+    },
+    {
+      "path": "rust/crates/er-state/src/migration_v4.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "68d9806f126e3c8034dcf5d8410263e419c1c13e"
+    },
+    {
+      "path": "rust/crates/er-state/src/migration.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "44fac34f6ce3f6d889e11ab1621c2d64fbb2aa2d"
+    },
+    {
+      "path": "rust/crates/er-state/src/pokemon_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "90b91c39700bd68629dcea47c3eb0919eada74fb"
+    },
+    {
+      "path": "rust/crates/er-state/src/pokemon.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "14845e5bedebd822c21a7af896ed68d946d5ffc2"
+    },
+    {
+      "path": "rust/crates/er-state/src/run_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d0a1e5e2a7e5b285de85ad69d299583c25e331ec"
+    },
+    {
+      "path": "rust/crates/er-state/src/snapshot.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2eaa513f0ee412a9a66d6ecc2cdeffffbe95f81a"
+    },
+    {
+      "path": "rust/crates/er-state/src/surface_digest.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8e20f5794954ce8f8eb68f5f7fa2e28e69cfcbe1"
+    },
+    {
+      "path": "rust/crates/er-state/src/validation_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "59ec25992341e9487aca4b072d43e14ab6962893"
+    },
+    {
+      "path": "rust/crates/er-state/src/validation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c7af4e5c506c7da6cd99adc698cc3209889384eb"
+    },
+    {
+      "path": "rust/crates/er-state/src/world_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "779161dcfbf26404509d36448a83a5b1c7e20329"
+    },
+    {
+      "path": "rust/crates/er-state/tests/m3_battle_state.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "437cc1fb31f37ae8e5868fbfbe63b696a47513d7"
+    },
+    {
+      "path": "rust/crates/er-state/tests/m3_pokemon_state.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b147bf0f6884a70dffbcc2a8210c1bb88e29ee5c"
+    },
+    {
+      "path": "rust/crates/er-state/tests/m3_validation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "aebbc843c03ef99409de31d57e67ace4c0f1e4ba"
+    },
+    {
+      "path": "rust/crates/er-state/tests/m4_foundation_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4c4dfd3329b0edfaa97c220695d8d702862d88ac"
+    },
+    {
+      "path": "rust/crates/er-state/tests/m4_migration.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0bfbd328ce9a4292db91ee0d512a720888ebb696"
+    },
+    {
+      "path": "rust/crates/er-state/tests/m4_state_v2.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3ccf6ad50a80f54f2b579c6e1926da5591cf559d"
+    },
+    {
+      "path": "rust/crates/er-testkit/benches/m5_runtime_benchmark.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4e37d0503af93eff2edc5e9a7203fb3b997cd5ff"
+    },
+    {
+      "path": "rust/crates/er-testkit/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "79962dfbf8feb8b760ed44cca24d2a88f7719e9e"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/assertions.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3eb3da7fd656c1de03f902a9edf81eadbbae6647"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/fixture.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3394690d64cc2315c6e199edf6bdced185319d13"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/keyboard_driver.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8ee2ef824b63ac0023e7854ee1db2ec78e11f3ee"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ef65884b14d20b0ca63a66e45d61c88bf3837966"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/m3_fixture.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f5b11a29949226fa6827d69fde00997cf9b7eb77"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/m4_fixture.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "082d5f9ffeae65158deba686c0d7cde63d1dc5b4"
+    },
+    {
+      "path": "rust/crates/er-testkit/src/m7_proof_registry.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "18e1b82462cca52962c366c0ec11a9282d3e1814"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/keyboard_driver_api.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9b30e14dc24d5e22cb98726322474ee9c25f08e6"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m2_pair_driver.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f251d0054610d66fa84c3e1c812b6640351260b5"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m3_foundation_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e82915e9a95c6b0998eeec59278943c2ba1ba630"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m5_atomic_executor.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f07bcec5af9d6a14ec293d371e54dd135f22b07c"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_ability_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "38adad14ae50ddb33a1d45908a91f4119f122bce"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_bespoke_closure.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a9dc9cee5da8297bf32b34d114db6f6448ce0726"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_bypass.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a0ee970e3b4f9719879858c274f55485d9022b1b"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_coop_campaigns.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0ae2d8a784f783c5ce865a9f1727c3dac883e58f"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_field_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ec5459c98b8ecb03c56721b288249cb25a7f9b7f"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_foundation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6b6bf57bcaf68ee6a5b43b0af130a3623934b6cb"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_item_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2d1f4eb6208fcd57be9ce5d73c6837d0c6917452"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_migration.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4155e302cbe05310a06052927a81b7c62172234e"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_move_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "14f12d880607ba6e14c5875deca589193456c383"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_native_wasm.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fab100bc69f10b7aa646c4ee407bd39460c5c491"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_performance.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "30c2220d6bfc6c1b9e308f976e6d8c6f0f7bf8ee"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_prepared_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f9b5fc84141760e829797e1d1966a44f9b252fb4"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_properties.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "08307d820fce39e7929f9d651f3f53d4d694634f"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_routine_mapping.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "03752c076bb328b2d94a2d2cb16e8a8c96d83f11"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_snapshot_v5.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9835442477bbcf88f2581bd2a664740e20927b36"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_solo_campaigns.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b2ba764c76bf3dad42b03ac7cd8128401d44be3e"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m6_species_form_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0c73b15ac0f1b3aa5bb62afff8c7cbc5aecf6f14"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_behavior_proofs.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "80d942579473cde968eb0ea8d5778cb34a112edd"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_causal_spine.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1921cc30d240b49a19423b7e87b888add02b2a64"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_foundation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "290883d9d6f27fb6c140fd24081c3f793c43a20f"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_full_run_differential.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4193d205167f871798f29d0db53f09b1821d401d"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_randomized_campaigns.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "df4c7ac4e71bd0035c183c47c3cf95e83f30c30b"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_raw_key_coop.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e95b711d90ec04dc37a41d1e6560e9d708a796bc"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_raw_key_solo.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "160fd8b9154d4d98dc1fdd33b9a8170e18c6e77e"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m7_system_proof.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a16cb32a7d57e4759d9d6a2aa1ef449563622985"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m71_final_integration.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f5e3aaefb2267a13c14d4f07793bf58894a9efe4"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m71_foundation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "56a0f07319b00720c1c8dbd80563f7637e85cea3"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m71_reproduction.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "185de2ef4f6e34d5dfafb1580684b933e8df1930"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m72_autonomous.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e5f99d0d6117de5550f1dcead7d88f55659140e7"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m72_final.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d9db8f33ac46f53953668845e607d7cf65182a6f"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/m72_foundation.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dcba7e0389eca1db715fd072394e9bbcb837a25e"
+    },
+    {
+      "path": "rust/crates/er-testkit/tests/support/m6_benchmark.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "06a7726466b50b565f334859206b72b797d4cee0"
+    },
+    {
+      "path": "rust/crates/er-types/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "cf58cebc75b67e48c40417e9bdbe2a5d1b8b5040"
+    },
+    {
+      "path": "rust/crates/er-types/src/authority.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ec56cd91ec8a6dc4bf8d657d9644e28db781ea54"
+    },
+    {
+      "path": "rust/crates/er-types/src/battle_command.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ffbbdbfb187d895851fc308bdfb35bf913aeb4db"
+    },
+    {
+      "path": "rust/crates/er-types/src/battle_control.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b8e09164fa58824382e2e2bd331a6e9252cbc7cc"
+    },
+    {
+      "path": "rust/crates/er-types/src/battle_ids.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9dc65c9c97cf99d9960486104c6e55cb42570f7d"
+    },
+    {
+      "path": "rust/crates/er-types/src/battle_model.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3b3508ab5d1d4ed32576dd48b2bb84259ea998f0"
+    },
+    {
+      "path": "rust/crates/er-types/src/battle_ui.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "35cd22ce65d606f76b89049fc77aff9183e2f003"
+    },
+    {
+      "path": "rust/crates/er-types/src/ids.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a7c7b0c610db3250f40a39828f1873a6474b1cab"
+    },
+    {
+      "path": "rust/crates/er-types/src/input.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "42526ba51055a73a398eed7d3ecb988ad80618e8"
+    },
+    {
+      "path": "rust/crates/er-types/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b65fd07f5b52eb0c684a3f71758cc271b20d85ed"
+    },
+    {
+      "path": "rust/crates/er-types/src/m6.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c6fe56f4b0d11391834c7517fcb8f3988639e3f2"
+    },
+    {
+      "path": "rust/crates/er-types/src/m7_action.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c8ede77afe0db15a0193f70f7d19f63503828e68"
+    },
+    {
+      "path": "rust/crates/er-types/src/m7_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "32682b31a48e658f620a2c13a0b44e410d3f94f6"
+    },
+    {
+      "path": "rust/crates/er-types/src/m7_run_ir.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "147cb623a41358ffe879bb75becb75ed070912a3"
+    },
+    {
+      "path": "rust/crates/er-types/src/m7.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "297e08621ac80e32b2b4cca3e83b948424b5598e"
+    },
+    {
+      "path": "rust/crates/er-types/src/m72_bootstrap.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c672bc962828a96b14ee588379b003b9a925d95b"
+    },
+    {
+      "path": "rust/crates/er-types/src/mechanics.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "eddd864182cc4fccbe221726439d74acf8097cca"
+    },
+    {
+      "path": "rust/crates/er-types/src/protocol.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "948f05f15467f5869ab2f2def3b64f3857a42f2c"
+    },
+    {
+      "path": "rust/crates/er-types/src/run_control.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d823e043feb6a7a4ee3d32470a4beaaedde74875"
+    },
+    {
+      "path": "rust/crates/er-types/src/run_ids.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a1036cd3b94b5dc88671a61605cffb9b98a5521c"
+    },
+    {
+      "path": "rust/crates/er-types/src/run_model.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "51ceb36ec59606e5293dfd48692bfd03f041146f"
+    },
+    {
+      "path": "rust/crates/er-types/src/trace_v3.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c203a7a3215fc6db5af76bf2245eeaba8ad9b270"
+    },
+    {
+      "path": "rust/crates/er-types/src/trace.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c59a22075f85bf50e75dd94d45043d736580cbfa"
+    },
+    {
+      "path": "rust/crates/er-types/src/ui_menu.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "712df4fca4af3051c1f92d3c11a7bb3abead89d7"
+    },
+    {
+      "path": "rust/crates/er-types/src/ui.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "614dfd739509d2954bc4dde63a1a33ed76f1b6b2"
+    },
+    {
+      "path": "rust/crates/er-types/tests/m4_types.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7e99f0df7e4a11ba84cd3e9a607911e3328c90db"
+    },
+    {
+      "path": "rust/crates/er-wasm/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7cb5415299e64fba94e6f72e12ce4c0550772ff5"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "004cc85e887c82f455cdb6ae6167cf51d750cd30"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/m2_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5c2dd20f6765e0b969d5f762c0866447a79b4669"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/m3_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3fef14377d2b334749262259558509ed3ed3a2e5"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/m3_schema.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d8fc60da36376cdd2ecf93ba69b379d7215f019d"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/m4_schema.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "869ccb189bfb17400f3b9129eb0fca75d0b5cd3e"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/m6_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8f9bf3e7361069387bbdbfecc1d9b058a953ed4f"
+    },
+    {
+      "path": "rust/crates/er-wasm/src/m7_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "20283693d404c83974e4eac23efd552c24f38a2e"
+    },
+    {
+      "path": "rust/crates/er-wasm/tests/m2_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d8da7b6391fd15ba548edc2fd34e56a25d244bec"
+    },
+    {
+      "path": "rust/crates/er-wasm/tests/m3_parity.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "017a1af23fca05b2b867cfbe2c6c412f811ba3cb"
+    },
+    {
+      "path": "rust/crates/er-wasm/tests/m3_schema.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "85074e7d30b1ebb46801e60aad4db279fccee48f"
+    },
+    {
+      "path": "rust/crates/er-world/Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "77737de99f994ef5741b7d5bd99f290cda7a5539"
+    },
+    {
+      "path": "rust/crates/er-world/src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bc89472f5be0adac4ac0fe00f10727cef5708a5b"
+    },
+    {
+      "path": "rust/crates/er-world/src/runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5b5851d6a6dd9525844e296013fe7ce8adbe572a"
+    },
+    {
+      "path": "rust/deny.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c1c3624f265bd78e71430b79febd63b62a6d8ae8"
+    },
+    {
+      "path": "rust/fixtures/m3/m3-audited-production-blobs.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "eb25a32654dde658e4211212308790bece5cd4cf"
+    },
+    {
+      "path": "rust/fixtures/m3/m3-benchmark-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f8e0cdb5ed3352c466420cbf9f4d707653f6d0c3"
+    },
+    {
+      "path": "rust/fixtures/m3/m3-capability-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9385929dc8e40e080b2dfadf8c979cca7da7a44e"
+    },
+    {
+      "path": "rust/fixtures/m3/m3-coverage-map.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "66fd66340aeded1f513693d906dcfaef77362290"
+    },
+    {
+      "path": "rust/fixtures/m3/m3-oracle-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9c3dc2f8402f2f0191bfd7f2a3911662de0d82ee"
+    },
+    {
+      "path": "rust/fixtures/m3/m3-slice-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9f0fb928652a618d506f4aa236700fbbcf58733a"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/always-hit.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "62cca21a96335c3cce3f9e6d2203c7ffc58936d3"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/burn-application.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d7e4708fa4728f358396233fd1e1548724e37d25"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/burn-physical-penalty.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6bdaeb7c4b7a47f07398e074919a1a7bae0d2d74"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/burn-residual.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "35e351d0155d67a37a1cc72dc4f4eb8f98a5217d"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/critical-hit.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d03c8c5dcb1dacf2a7b7d0878ed1db4d51f64bad"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/defeat.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "25f6933230f26a1d057536ad4ec1ab7ae9fbe19d"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/doubles-single-target.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d26c9313398bdb447c027e75cf21aec62d7d569b"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/existing-status-rejected.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "50a2e6c12d4930d1569e8c4be5bd22cc6ccd17c5"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/forced-replacement.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "31c3b12c7dd555218702d6ba33c2720329896128"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/grass-powder-immunity.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fb9d7b915dcd1d5e48db79fa8c3f9dd1988b3756"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1450bade6dedccffe63bacb04b915317aa6152de"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/intimidate-switch-in.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a5fcb0ffb55e782aa6a0cee94e844c6c4c5971e4"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/miss.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "91e5f536eda45b1ab943408a5909c8fef2380ce8"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/mixed-side-simultaneous-faint.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3037b1da922a9ab9f046cc3ec40140640f049a23"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/no-legal-replacement.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bf5b6958ddc08ae177cf41d64b9be34dbe8dc254"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dc9dc54274d1ae17e54dc4f517f500ad4a62de2d"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/paralysis-application.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4117497188f0bbe40a3a527adc63ff7107709615"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/paralysis-full-stop.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0c14c4801436fc386ac039eeae0ccbb6de5d5ab7"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/paralysis-speed-order.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3a17e1f41225bbb14e4863aeb370ec13bf03c7e0"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/physical-hit.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f0d8013c531c2c416fae1d5412f4ba256f0a52de"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/poison-application.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "60ed8c995b663f372907f620bed3488bd50caabb"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/poison-residual.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "95b07e0a3de5472a3a6b0d3c4b5ebfa28c22dc10"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/poison-type-immunity.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "52e347d74ee6b181989f6f66753d2234fa04bfec"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/pp-consumption.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bae5ab1167b4756b5d0535bae1a369c656809c23"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "60f035c001d3aa2da6cc66ece4e4f640ac4ac1c7"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/same-side-simultaneous-faint.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "390b608a0e4a7dc8b434e149aa70b39cfc19caba"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/special-hit-priority.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f427a8c4ec86aeaca350bb3c5fff76244fb5cfbf"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/speed-tie.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4507819629fc26155d8a3b9e1f6fdf8be2c0f395"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/spread-stage-down.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28ec8de91dbdc3f79d3109f7a5e6286e0c0ede1b"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/stage-floor-cap.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ea9adcb95cb5721b9e7cc9c1ec3a99dd9437e9f7"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/type-native-immunity.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2df822f8d45264c833b7254661281aaddfd03b79"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/type-resistance.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2cec02064b465ef8741faf9a9292c4886f498d24"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/type-weakness.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "044c217c7ed7355d64d0b556d3757a80546add97"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/victory.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "aaf9862749c633792481e008acb59f2b7ce24a5e"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/voluntary-switch.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "72ec869ebaf8ef75f4e5da1debf46fd7d705479e"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-block.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "fc827f5c7f535b9f5de84de17a66db686634b874"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "799f4eddb0062bfa7a9165e279bb466b2aa0d03a"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/battle-cases/wonder-guard-super-effective-pass.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c88f7093efcbe4a7bd63aa2ad954d2b69649bb0d"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/content-pack-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ee0ea31df65bcdbbc5d80566b2416b9af1c62bd9"
+    },
+    {
+      "path": "rust/fixtures/m3/oracle/rng-vectors-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "85dfd096800514504c8cf71094a3b7fdbcf933f3"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/battle-command-offer-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "20a737e3f287e4ca2bdae1dc437618cbb94cd365"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/battle-command-proposal-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "676c3976fe6b616339dd771e8fcb44a5e551bf0b"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/battle-control-plan-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "184e634947b4e00f9d9552b9c4ebd2c554ff25cb"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/battle-presentation-event-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f46f417e2f26f71fda38fb08ed0d73b4514c86a2"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/battle-replacement-proposal-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ef80fd5766bb5ce1153f77478a6a5249b5d2006f"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/battle-ui-projection-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "700d853d5e61226b00543f7de44eda5331fff90e"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/f64-bits-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "45b3bb860487ac8db5e6660cb37641130da39952"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/game-state-active-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b92f34a75d70c466146497e335242b25ae91fa57"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d349b3ad1b49a79c55593030746144f73328ba76"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/phaser-rdg-state-mismatch-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a4276897650da135aea9070f14f6051652b45e47"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/phaser-rdg-state-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3cf616f6ffe245e7b393fa4d6c243cca2e7ae938"
+    },
+    {
+      "path": "rust/fixtures/m3/schema/scripted-enemy-policy-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "24021441b6d727ddb29d466011859696fd820dc0"
+    },
+    {
+      "path": "rust/fixtures/m4/m4-benchmark-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0a478b7da0cf374e7e5b6b00020e770ecae26393"
+    },
+    {
+      "path": "rust/fixtures/m4/m4-capability-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c273d5e0340ff34276ee41a9dbdf5601fece9636"
+    },
+    {
+      "path": "rust/fixtures/m4/m4-coverage-map.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a56d3f85e15f58cbb05d3bbeb00f3faaa3da6c94"
+    },
+    {
+      "path": "rust/fixtures/m4/m4-final-qualification.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b352269fcfcf03655bbbfa074aad708909b87478"
+    },
+    {
+      "path": "rust/fixtures/m4/m4-oracle-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2989d5b629ff9575f00b1022ceb09e8c5f3ffb00"
+    },
+    {
+      "path": "rust/fixtures/m4/m4-slice-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2335b01a192699774589ea37646cdbf06aa85acb"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/battle-content-pack-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d8995cb67d99aec69613070bfa7f4c1c013bcba0"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/biomes/town-crossroads-route-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6667a915f70c78b6017cf90cb113bc24296a8fb6"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/encounters/plains-wave-11-captured-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b9120e90e997e89369f692ec0dfa3218a5e9e779"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/markets/town-wave-10-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f1c300f61306c4bba5c505cfbfc9de9a1f8f7d58"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/migration/m3-to-m4-companions-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9fe333d224a078dd86c0f1faa38ad498044bf62c"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6791981bb12bee0444f368c59104d365e2124997"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/rewards/regular-reroll-lock-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "49ad8243ac0412b820433e849f88fe4d526d253a"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/rng-vectors-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8d342b3bc996f2c66adc88e69dc17be33f198360"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/run-content-pack-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5f0068c596daf6033444d7f5237ede2c79fad893"
+    },
+    {
+      "path": "rust/fixtures/m4/oracle/run-segments/classic-composed-wave-9-through-11-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "65023dc8c3409b374c8d216a3a27d2958317ab3d"
+    },
+    {
+      "path": "rust/fixtures/m5/bespoke-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7b0bb7d7b6105652e2ed7e553866b89525759f7f"
+    },
+    {
+      "path": "rust/fixtures/m5/capability-report-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "81ec84b449e63168ac40141d12773d5790ad7fee"
+    },
+    {
+      "path": "rust/fixtures/m5/classification-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b2a4dca6026695bae50e273207c61d42347ecb81"
+    },
+    {
+      "path": "rust/fixtures/m5/m5-final-qualification.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "88dee97603327cf1cab8af12b4acc9227b453bd6"
+    },
+    {
+      "path": "rust/fixtures/m5/source-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1a59a164b1e71095bf00f618dfcb38c93ff24957"
+    },
+    {
+      "path": "rust/fixtures/m6/behavior-unit-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "765a25243f18eb3432464395b0f9609908052d5c"
+    },
+    {
+      "path": "rust/fixtures/m6/bespoke-clusters-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "62386253fc1f00bad0371b449cd371df9ea22d86"
+    },
+    {
+      "path": "rust/fixtures/m6/m6-final-qualification.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "097ff2a96497ec259386fd74990a14d17b73694f"
+    },
+    {
+      "path": "rust/fixtures/m6/oracle-witness-plan-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "204a1f040c579685b6a95a6f3218fccaee005af9"
+    },
+    {
+      "path": "rust/fixtures/m6/primitive-gap-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f4d5f033be1da1ce1ad995337c8f5bd4c5f3abf8"
+    },
+    {
+      "path": "rust/fixtures/m6/raw-source-catalog-v2.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b988714b42f9c18e6845ddd97cb3bd782dd7d1fc"
+    },
+    {
+      "path": "rust/fixtures/m6/rng-site-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "079b29fdff47ea731bf41539f71f4a3c94c1d02e"
+    },
+    {
+      "path": "rust/fixtures/m6/semantic-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "504e6aba962fc97e7d9c7da7860ea24220570f62"
+    },
+    {
+      "path": "rust/fixtures/m7/ai-policy-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f7242b614649c535c593f8d5a23fa5ed41cd55f6"
+    },
+    {
+      "path": "rust/fixtures/m7/game-system-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "23aee948a45caefd8ceb8925c2ca3de23aa323a7"
+    },
+    {
+      "path": "rust/fixtures/m7/legacy-bridge-audit-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b72487621f5802231874dab48f281f996e0d0f02"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-catalog-drift-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "de3427f96d17bfef5a1d0fa94c30fdda3bf9aeb6"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/behavior-unit-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bebb76de55d60fd1767910b18200da22c56cddd0"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/bespoke-clusters-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "21381414fbbf8dc6323ac3df2306bca5c076fd0e"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/oracle-witness-plan-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c6c2a73ab407c0ad600982896c7a7ffa33f5bf05"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/primitive-gap-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9ce9bbfc10d9bc4a49f3e819c50becf74e5c88de"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/raw-source-catalog-v2.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "16d70930e87f5d102ef9b9b78f446aa1796ade35"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/rng-site-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "9d400289cf411a4a3bb3f4004fea37116b422334"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-refresh/semantic-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "82779293e0311c05839bad705fb27a56133288f7"
+    },
+    {
+      "path": "rust/fixtures/m7/m6-semantic-drift-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "07ee9c690f68abe15561f9964700de55089db1f1"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-behavior-implementation-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8eef30d4205ebbec0c5cffdb500fdabadcf50da3"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-behavior-implementation-v2.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d3243c543df62ac0acaa4635291773e886d93a79"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-domain-closure-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "75b4abe8d5044af41e3a17ab8d5d667381691e96"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-final-qualification.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "6970ff92e1cdada0853fd5c8374b793da7c86232"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-gap-clusters-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c93393c8d0b5e165d578767ce28436730585f1d8"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-oracle-fixture-drift-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "f9241bb24245e8330d96e9cf1c506a8791ea09fe"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-oracle-witness-plan-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "58254a4501e76140c32a9c77b7931a12dce19481"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-semantic-groups-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "025f4b0856221a2a5e2e577933627bc878456d77"
+    },
+    {
+      "path": "rust/fixtures/m7/m7-world-oracle-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "467b1eec533c776ddd2be5aeb8ac527aea50b70f"
+    },
+    {
+      "path": "rust/fixtures/m7/oracle-selection.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7f4430fb97205b29e13a6f77464bdc921a1026a1"
+    },
+    {
+      "path": "rust/fixtures/m7/performance-security-audit-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e1365cde62968b52a4ca7605bdfd6cde59284093"
+    },
+    {
+      "path": "rust/fixtures/m7/platform-boundary-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e163d1ec82fbcc03dae082c5eb0c47cec02a8d65"
+    },
+    {
+      "path": "rust/fixtures/m7/run-behavior-unit-manifest-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1d20ac696703088844a3c3ce8ba7b207bf06ba56"
+    },
+    {
+      "path": "rust/fixtures/m7/save-field-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "54ffbe5821a2546ee850e2ce0964245cdc933244"
+    },
+    {
+      "path": "rust/fixtures/m7/scenario-catalog-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "a5f15420f14e0d1ddd66b165cea7803c237b1338"
+    },
+    {
+      "path": "rust/fixtures/m71/m7-final-attestation.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "352c14fcdc053101de1d2dffe1cea9240d66b227"
+    },
+    {
+      "path": "rust/fixtures/m72/architecture-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bf5430808394e144bfe804d5cebad86f68310e6d"
+    },
+    {
+      "path": "rust/fixtures/m72/m71-final-attestation.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "53679538f53e77e7ca59736c572c6d1aedc3ae70"
+    },
+    {
+      "path": "rust/fixtures/m72/m72-slice-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b6ad3af7e6995b29425a4e9f80472d9e8db2be64"
+    },
+    {
+      "path": "rust/fixtures/v1/authority-v2-test-map.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28f7f02e5e385b0919f16e3fb2873968a23c6237"
+    },
+    {
+      "path": "rust/fixtures/v1/baseline-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "d14db0cdd98a8a58f96e1ada1dc177f8e2397e20"
+    },
+    {
+      "path": "rust/fixtures/v1/m2-benchmark-baseline.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "3adb800bb781520fce04e865c22a6ba695dc984c"
+    },
+    {
+      "path": "rust/fixtures/v1/m2-benchmark-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "58ebdfb94ffca1d944d6674cb97d250814ae5ee3"
+    },
+    {
+      "path": "rust/fixtures/v1/m2-network-rng-golden.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5204183afe2202e574167407780b38450786ef3c"
+    },
+    {
+      "path": "rust/fixtures/v1/m2-parity/game-kernel-raw-input.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "45148cb85361bd1ca95ed18cae2e7e1864a593cb"
+    },
+    {
+      "path": "rust/fixtures/v1/m2-parity/replica-authority-v2-command.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "890c8ceb2bd7febe8da79a75f083b67fb3765f18"
+    },
+    {
+      "path": "rust/fixtures/v1/test-coverage-map.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0504d67431ff60d98bdbf0e5ba9a6b83cd796819"
+    },
+    {
+      "path": "rust/rust-toolchain.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1f2833c1b283c80c229edc7591fd65f12b18c2b4"
+    },
+    {
+      "path": "rust/source-lock.toml",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "2a21d24b5ba7985a96acce755c5b19414d34b79a"
+    },
+    {
+      "path": "scripts/benchmark-kernel-baseline.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e2da67f78346b924b9805e9c42264d353ab1cc16"
+    },
+    {
+      "path": "scripts/benchmark-kernel-m2.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7a49693de4adca3e412d694e0acf791452e9a774"
+    },
+    {
+      "path": "scripts/benchmark-kernel-m3.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "253d392dd54ed807a6648e1c36da9f3183d9b308"
+    },
+    {
+      "path": "scripts/build-kernel-m7-implementation-manifest.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1c4538986c418ddef739a6318c0a8e22bbf89455"
+    },
+    {
+      "path": "scripts/build-kernel-m7-implementation-v2.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5130cb0b8c354c8916eb09ff0a978014efee45c0"
+    },
+    {
+      "path": "scripts/build-kernel-m7-semantic-groups.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ae7fbbcc5b4b38902a8e043e6591cf0f2dd45341"
+    },
+    {
+      "path": "scripts/check-kernel-m4-contract.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "47c27a3c95c7eea5c997c61365b6a9bdff516e32"
+    },
+    {
+      "path": "scripts/check-kernel-m5-contract.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "ea0e7954a9690ed0b6a8aa2b643c12e45702747e"
+    },
+    {
+      "path": "scripts/check-kernel-m6-contract.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "0acdbaeb0d38d511b22d04eb5016e901f9794c73"
+    },
+    {
+      "path": "scripts/check-kernel-m6-runtime-semantics.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bce840a34082dad316ff89679285fc03b3c8e1f0"
+    },
+    {
+      "path": "scripts/check-kernel-m7-closure.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "55a11d605325940fc32531e11aabdae7729b09ed"
+    },
+    {
+      "path": "scripts/check-kernel-m7-contract.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "1400c3b6bfcdd6a01cfd399b0404db1f64a82aa9"
+    },
+    {
+      "path": "scripts/check-kernel-m7-proof-registry.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e1aa40ddab24cc10a6fadc90a26d3ae29a6e61ca"
+    },
+    {
+      "path": "scripts/check-kernel-m71-contract.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "c90f4c51d94f6a10e7ec96c0a6a7429a2b70333d"
+    },
+    {
+      "path": "scripts/check-kernel-m71-g30-parity.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "11373879746d5e36c9b76cffcb30ea1632b62893"
+    },
+    {
+      "path": "scripts/check-kernel-m72-contract.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b6683a06dd8aa7b7f3f28664a498aa6ce5c2aeeb"
+    }
+  ]
+}

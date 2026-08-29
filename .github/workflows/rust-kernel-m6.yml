@@ -1,0 +1,753 @@
+name: Rust Kernel M6 Gate
+
+on:
+  push:
+    branches:
+      - "arch/rust-kernel-m6"
+      - "wrk/rk-m6-*"
+      - "ci/rust-m6/**"
+    paths:
+      - ".github/workflows/rust-kernel-m6.yml"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docs/plans/rust-kernel/m6-*.md"
+      - "rust/**"
+      - "scripts/*kernel-m6*.mjs"
+      - "scripts/export-kernel-m3-oracle.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "scripts/export-kernel-m5-source-catalog.mjs"
+      - "scripts/prepare-kernel-m5-oracle-refresh.mjs"
+      - "test/kernel-fixtures/m3/**"
+      - "test/kernel-fixtures/m4/**"
+      - "test/kernel-fixtures/m6/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m6-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  M5_FINAL_SHA: 200caaee1697fe40a293f0a5da76af8b11f3cea9
+  M6_ORACLE_SHA: 3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7
+
+jobs:
+  m6-source-lock:
+    name: M6 source lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - name: Preserve M5 production TypeScript
+        run: |
+          set -euo pipefail
+          git cat-file -e "${M5_FINAL_SHA}^{commit}"
+          git merge-base --is-ancestor "$M5_FINAL_SHA" "$GITHUB_SHA"
+          git diff --exit-code "$M5_FINAL_SHA" "$GITHUB_SHA" -- src rust/source-lock.toml
+          git diff --check "$M5_FINAL_SHA" "$GITHUB_SHA"
+
+  m6-m5-final-manifest:
+    name: M6 M5 final manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/fixtures/m5/m5-final-qualification.json
+          submodules: false
+      - name: Validate exact M5 final evidence
+        run: |
+          set -euo pipefail
+          test "$(jq -r '.sha' rust/fixtures/m5/m5-final-qualification.json)" = "$M5_FINAL_SHA"
+          test "$(jq -r '.gate_run_id' rust/fixtures/m5/m5-final-qualification.json)" = 32655233460
+          test "$(jq -r '[to_entries[] | select(.key != "milestone" and .key != "sha" and .key != "gate_run_id") | .value] | all(. == "success")' rust/fixtures/m5/m5-final-qualification.json)" = true
+
+  m6-source-catalog:
+    name: M6 raw source catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize exact M6 oracle
+        run: git worktree add --detach "$RUNNER_TEMP/m6-oracle" "$M6_ORACLE_SHA"
+      - name: Export deterministic M6 source catalog
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m5-source-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m6-oracle" \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --output "$RUNNER_TEMP/m6-source-catalog-v2.json"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m6-source-catalog
+          path: ${{ runner.temp }}/m6-source-catalog-v2.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m6-semantic-extraction:
+    name: M6 semantic extraction
+    needs: m6-source-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - name: Restore immutable M6 semantic bundle
+        id: semantic-bundle
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ${{ runner.temp }}/m6-semantic-bundle.tgz
+            ${{ runner.temp }}/m6-semantic-bundle.tgz.sha256
+          key: m6-semantic-bundle-v1-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m6-semantic-catalog.mjs', 'scripts/check-kernel-m6-runtime-semantics.mjs', 'test/kernel-fixtures/m6/**', 'rust/fixtures/m6/raw-source-catalog-v2.json') }}-utc-c
+      - name: Verify and unpack immutable M6 semantic bundle
+        if: steps.semantic-bundle.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sha256sum -c m6-semantic-bundle.tgz.sha256
+          tar -xzf m6-semantic-bundle.tgz
+      - uses: pnpm/action-setup@v5
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+      - uses: actions/download-artifact@v6
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        with:
+          name: m6-source-catalog
+          path: artifacts/source-catalog
+      - name: Materialize exact M6 oracle
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        run: git worktree add --detach "$RUNNER_TEMP/m6-oracle" "$M6_ORACLE_SHA"
+      - name: Export static semantic catalog twice
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_TYPESCRIPT_ROOT: ${{ github.workspace }}/node_modules/typescript
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m6-semantic-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m6-oracle" \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --raw-catalog "$GITHUB_WORKSPACE/artifacts/source-catalog/m6-source-catalog-v2.json" \
+            --output-root "$RUNNER_TEMP/m6-semantic-a"
+          node scripts/export-kernel-m6-semantic-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m6-oracle" \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --raw-catalog "$GITHUB_WORKSPACE/artifacts/source-catalog/m6-source-catalog-v2.json" \
+            --output-root "$RUNNER_TEMP/m6-semantic-b"
+      - name: Verify static fresh-process determinism
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        run: diff -ru "$RUNNER_TEMP/m6-semantic-a" "$RUNNER_TEMP/m6-semantic-b"
+      - name: Verify committed static semantic catalog
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        run: diff -ru rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
+      - name: Publish semantic catalog mismatch
+        if: failure()
+        run: node scripts/diagnose-kernel-m6-semantic-diff.mjs rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
+      - name: Apply runtime semantic test overlay
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m6-oracle/test/kernel-fixtures/m6"
+          cp test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            "$RUNNER_TEMP/m6-oracle/test/kernel-fixtures/m6/export-semantic-runtime.test.ts"
+      - name: Install immutable oracle dependencies
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/m6-oracle
+        run: pnpm install --frozen-lockfile
+      - name: Export first runtime semantic catalog
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/m6-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_ORACLE_SHA: ${{ env.M6_ORACLE_SHA }}
+          M6_SEMANTIC_RUNTIME_OUTPUT: ${{ runner.temp }}/m6-runtime-a.json
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism \
+            2>&1 | tee "$RUNNER_TEMP/m6-runtime-a.log"
+      - name: Export repeated runtime semantic catalog
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/m6-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_ORACLE_SHA: ${{ env.M6_ORACLE_SHA }}
+          M6_SEMANTIC_RUNTIME_OUTPUT: ${{ runner.temp }}/m6-runtime-b.json
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism \
+            2>&1 | tee "$RUNNER_TEMP/m6-runtime-b.log"
+      - name: Verify runtime semantic determinism
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        run: diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
+      - name: Verify runtime and static semantic agreement
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          node scripts/check-kernel-m6-runtime-semantics.mjs \
+            "$RUNNER_TEMP/m6-runtime-a.json" \
+            rust/fixtures/m6/semantic-catalog-v1.json \
+            rust/fixtures/m6/raw-source-catalog-v2.json \
+            2>&1 | tee "$RUNNER_TEMP/m6-runtime-agreement.log"
+      - name: Create immutable M6 semantic bundle
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          tar -czf m6-semantic-bundle.tgz m6-semantic-a m6-runtime-a.json
+          sha256sum m6-semantic-bundle.tgz > m6-semantic-bundle.tgz.sha256
+      - name: Save immutable M6 semantic bundle
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ${{ runner.temp }}/m6-semantic-bundle.tgz
+            ${{ runner.temp }}/m6-semantic-bundle.tgz.sha256
+          key: m6-semantic-bundle-v1-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m6-semantic-catalog.mjs', 'scripts/check-kernel-m6-runtime-semantics.mjs', 'test/kernel-fixtures/m6/**', 'rust/fixtures/m6/raw-source-catalog-v2.json') }}-utc-c
+      - name: Publish runtime semantic failure
+        if: failure()
+        run: |
+          diagnostic="$(tail -c 3500 "$RUNNER_TEMP/m6-runtime-agreement.log" 2>/dev/null || tail -c 3500 "$RUNNER_TEMP/m6-runtime-a.log" 2>/dev/null || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M6 runtime semantic extraction failure::$diagnostic"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m6-semantic-extraction
+          path: |
+            ${{ runner.temp }}/m6-semantic-a
+            ${{ runner.temp }}/m6-runtime-a.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m6-oracle-refresh:
+    name: M6 ${{ matrix.fixture }} oracle refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [m3, m4]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - name: Restore immutable oracle bundle
+        id: oracle-bundle
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle
+          key: m6-oracle-bundle-v1-${{ matrix.fixture }}-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m3-oracle.mjs', 'scripts/export-kernel-m4-oracle.mjs', 'scripts/prepare-kernel-m5-oracle-refresh.mjs', 'test/kernel-fixtures/m3/**', 'test/kernel-fixtures/m4/**') }}-utc-c
+      - uses: pnpm/action-setup@v5
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/cache/restore@v5
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        id: b3sum-cache
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m6-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+      - name: Install pinned BLAKE3 verifier
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+      - uses: actions/cache/save@v5
+        if: steps.oracle-bundle.outputs.cache-hit != 'true' && steps.b3sum-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m6-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+      - name: Apply test-only oracle overlay
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m6-oracle" "$M6_ORACLE_SHA"
+          node scripts/prepare-kernel-m5-oracle-refresh.mjs \
+            --oracle-root "$RUNNER_TEMP/m6-oracle" \
+            --oracle-sha "$M6_ORACLE_SHA"
+      - name: Install immutable oracle dependencies
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/m6-oracle
+        run: pnpm install --frozen-lockfile
+      - name: Export refreshed fixtures twice
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}/m6-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M5_ORACLE_REFRESH_SHA: ${{ env.M6_ORACLE_SHA }}
+          M4_ORACLE_GAP_REPORT: ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle/gaps.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m6-${{ matrix.fixture }}-oracle"
+          if [[ "${{ matrix.fixture }}" == "m3" ]]; then
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m6-m3-oracle" \
+              2>&1 | tee "$RUNNER_TEMP/m6-m3-oracle.log"
+          else
+            node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m6-m4-oracle" \
+              2>&1 | tee "$RUNNER_TEMP/m6-m4-oracle.log"
+          fi
+      - name: Write immutable oracle bundle manifest
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/m6-${{ matrix.fixture }}-oracle"
+          (
+            cd "$bundle"
+            find . -type f ! -name .immutable-sha256 -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > .immutable-sha256
+          )
+      - name: Save immutable oracle bundle
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle
+          key: m6-oracle-bundle-v1-${{ matrix.fixture }}-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m3-oracle.mjs', 'scripts/export-kernel-m4-oracle.mjs', 'scripts/prepare-kernel-m5-oracle-refresh.mjs', 'test/kernel-fixtures/m3/**', 'test/kernel-fixtures/m4/**') }}-utc-c
+      - name: Verify immutable oracle bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/m6-${{ matrix.fixture }}-oracle"
+          test -s "$bundle/.immutable-sha256"
+          (cd "$bundle" && sha256sum -c .immutable-sha256)
+      - name: Publish failure annotation
+        if: failure()
+        run: |
+          diagnostic="$(tail -n 60 "$RUNNER_TEMP/m6-${{ matrix.fixture }}-oracle.log" 2>/dev/null | tail -c 3500 || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M6 ${{ matrix.fixture }} oracle refresh failure::$diagnostic"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m6-${{ matrix.fixture }}-oracle-refresh
+          path: |
+            ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle
+            ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  m6-oracle-classification:
+    name: M6 oracle drift classification
+    needs:
+      - m6-source-lock
+      - m6-m5-final-manifest
+      - m6-source-catalog
+      - m6-oracle-refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: m6-m3-oracle-refresh
+          path: artifacts/fresh-m3
+      - uses: actions/download-artifact@v6
+        with:
+          name: m6-m4-oracle-refresh
+          path: artifacts/fresh-m4
+      - uses: actions/download-artifact@v6
+        with:
+          name: m6-source-catalog
+          path: artifacts/fresh-catalog
+      - name: Classify M3 and M4 drift
+        run: |
+          set -euo pipefail
+          node scripts/classify-kernel-m5-oracle-refresh.mjs \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --legacy-m3 rust/fixtures/m3/oracle \
+            --fresh-m3 artifacts/fresh-m3/m6-m3-oracle \
+            --legacy-m4 rust/fixtures/m4/oracle \
+            --fresh-m4 artifacts/fresh-m4/m6-m4-oracle \
+            --output "$GITHUB_WORKSPACE/artifacts/m6-oracle-fixture-drift-v1.json"
+      - name: Classify M5 catalog drift
+        run: |
+          node scripts/classify-kernel-m6-catalog-drift.mjs \
+            --legacy rust/fixtures/m5/source-catalog-v1.json \
+            --fresh artifacts/fresh-catalog/m6-source-catalog-v2.json \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --output "$GITHUB_WORKSPACE/artifacts/m6-catalog-drift-v1.json"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m6-oracle-drift
+          path: |
+            artifacts/m6-oracle-fixture-drift-v1.json
+            artifacts/m6-catalog-drift-v1.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m6-contract-freeze:
+    name: M6 G21 contract freeze
+    needs: m6-semantic-extraction
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /docs/plans/rust-kernel/
+            /rust/contracts/
+            /rust/fixtures/m5/m5-final-qualification.json
+            /rust/fixtures/m6/
+            /scripts/check-kernel-m6-contract.mjs
+          submodules: false
+      - name: Validate exact M6 contracts and semantic inventory
+        run: node scripts/check-kernel-m6-contract.mjs
+
+  m6-contract-types:
+    name: M6 G21 compileable contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-g21-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-g21-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check and test M6 contract types
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p er-types -p er-mechanics
+          cargo test -p er-mechanics
+
+  m6-g21-oracle-bootstrap:
+    name: M6 G21 oracle bootstrap
+    needs:
+      - m6-source-lock
+      - m6-m5-final-manifest
+      - m6-source-catalog
+      - m6-oracle-refresh
+      - m6-semantic-extraction
+      - m6-oracle-classification
+      - m6-contract-freeze
+      - m6-contract-types
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M6 exact SHA $GITHUB_SHA passed oracle bootstrap"
+
+  m6-g22-foundation:
+    name: M6 G22 foundation
+    needs: m6-contract-types
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+            m6-g21-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check and test complete M6A foundation
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets
+          cargo test -p er-types m6
+          cargo test -p er-mechanics
+          cargo test -p er-content --test m6_catalog --test m6_pack
+          cargo test -p er-content-compiler --lib
+          cargo test -p er-state mechanic_state_v2
+          cargo test -p er-battle --lib m6:: -- --test-threads=1
+          cargo test -p er-testkit --test m6_foundation --test m6_bypass --test m6_migration
+          cargo test -p er-testkit --test m6_routine_mapping
+          cargo test -p er-testkit --test m6_prepared_parity
+          cargo test -p er-testkit --test m6_bespoke_closure
+
+  m6-m0-m5-regression:
+    name: M0-M5 Rust regression
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-g22-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+            m6-g21-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run complete M0-M5 Rust regression
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --workspace --all-targets
+
+  m6d-parity:
+    name: M6D parity ${{ matrix.surface }}
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - surface: moves
+            test: m6_move_parity
+          - surface: abilities
+            test: m6_ability_parity
+          - surface: items
+            test: m6_item_parity
+          - surface: field
+            test: m6_field_parity
+          - surface: species-forms
+            test: m6_species_form_parity
+          - surface: properties
+            test: m6_properties
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6d-${{ matrix.surface }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-${{ matrix.surface }}-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run exact M6D parity surface
+        working-directory: rust
+        run: cargo test -p er-testkit --test ${{ matrix.test }} -- --test-threads=1
+
+  m6d-campaigns:
+    name: M6D raw-key campaigns snapshots teardown
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6d-campaigns-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-campaigns-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run deterministic M6 campaigns
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m6_solo_campaigns -- --test-threads=1
+          cargo test -p er-testkit --test m6_coop_campaigns -- --test-threads=1
+          cargo test -p er-testkit --test m6_snapshot_v5 -- --test-threads=1
+          cargo test -p er-testkit --test m6_native_wasm -- --test-threads=1
+          cargo test -p er-testkit --test m6_bespoke_closure -- --test-threads=1
+
+  m6d-wasm:
+    name: M6D wasm32 build and native boundary
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+            ~/.rustup/toolchains
+          key: m6d-wasm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-wasm-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Build production Wasm boundary
+        working-directory: rust
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-unknown
+        run: cargo check -p er-wasm
+      - name: Verify native side of identical boundary
+        working-directory: rust
+        run: cargo test -p er-testkit --test m6_native_wasm -- --test-threads=1
+
+  m6d-performance:
+    name: M6D release performance qualification
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6d-performance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-performance-${{ runner.os }}-${{ runner.arch }}-
+      - name: Enforce release ceilings
+        working-directory: rust
+        env:
+          ER_M6_PERFORMANCE_ENFORCE: "1"
+        run: cargo test --release -p er-testkit --test m6_performance -- --test-threads=1
+
+  m6-g25-aggregate:
+    name: M6 G25 final aggregate
+    needs:
+      - m6-g22-foundation
+      - m6-m0-m5-regression
+      - m6-source-lock
+      - m6-oracle-classification
+      - m6-g21-oracle-bootstrap
+      - m6d-parity
+      - m6d-campaigns
+      - m6d-wasm
+      - m6d-performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M6 exact SHA $GITHUB_SHA passed G25 final qualification"

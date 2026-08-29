@@ -1,0 +1,25 @@
+m2_base_sha = "7357166c19bdb5cf0e32c84b0f74f22e79d80798"
+
+oracle_game_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+oracle_protocol_version = "er-coop-47"
+
+battle_state_schema_version = 1
+content_pack_schema_version = 1
+battle_turn_material_version = 1
+battle_replacement_material_version = 1
+command_proposal_version = 1
+replacement_proposal_version = 1
+battle_control_plan_version = 1
+battle_start_version = 1
+restorable_snapshot_version = 2
+kernel_trace_version = 2
+rng_algorithm_version = 1
+menu_navigation_version = 1
+capability_manifest_version = 1
+oracle_manifest_version = 1
+coverage_map_version = 1
+turn_coordinate_version = 1
+mechanical_digest_version = 1
+kernel_determinism_digest_version = 1
+presentation_plan_digest_version = 1
+pair_determinism_digest_version = 1

@@ -1,0 +1,447 @@
+{
+  "parity_fixture_schema_version": 1,
+  "seed": "18446744073709551615",
+  "protocol_fixture": "replica-authority-v2-command-v1",
+  "protocol_environment": {
+    "role": "replica",
+    "session_id": "m2-parity-session",
+    "run_id": "m2-parity-run",
+    "seat_map_id": "m2-parity-seat-map",
+    "local_seat": 1,
+    "authority_seat": 0,
+    "connection_generation": 1,
+    "operation_id": "operation/m2-parity",
+    "option_id": "move:first",
+    "control_id": "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+  },
+  "input_map": {
+    "keyboard": [
+      {"key": {"kind": "ENTER"}, "button": "SUBMIT"}
+    ],
+    "gamepad": [],
+    "initial_repeat_delay_ms": 250,
+    "repeat_interval_ms": 250
+  },
+  "header": {
+    "trace_version": 1,
+    "schema_version": 1,
+    "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+    "protocol_version": "er-coop-47",
+    "content_hash": "blake3-v1:m2-parity-replica-authority-v2-command",
+    "rust_toolchain": "1.97.1"
+  },
+  "initial_snapshot": {
+    "state": {
+      "initError": null,
+      "liveResources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "storage_requests": [],
+        "timers": []
+      },
+      "protocol": {
+        "authorityGeneration": 1,
+        "authoritySeatId": 0,
+        "context": {
+          "authoritySeatId": 0,
+          "connectionGeneration": 1,
+          "membershipRevision": 1,
+          "runId": "m2-parity-run",
+          "seatMapId": "m2-parity-seat-map",
+          "senderSeatId": 1,
+          "sessionEpoch": 1,
+          "sessionId": "m2-parity-session"
+        },
+        "leases": {
+          "committedTombstones": [],
+          "disposed": false,
+          "liveOperationIds": [],
+          "timerIds": []
+        },
+        "pendingControl": null,
+        "pendingMaterial": null,
+        "pendingRecovery": null,
+        "recovery": {
+          "bundleFrontier": null,
+          "capturedFrontier": null,
+          "disposed": false,
+          "fenceState": "open",
+          "phase": null,
+          "requestId": null,
+          "timerIds": []
+        },
+        "recoveryFence": {
+          "authorityWaitCreationFrozen": false,
+          "commandAdmissionFrozen": false,
+          "controlSurfaceStartFrozen": false,
+          "materializationFrozen": false,
+          "progressionFrozen": false,
+          "state": "open"
+        },
+        "replica": {
+          "disposed": false,
+          "frontier": {
+            "control": 0,
+            "material": 0,
+            "received": 0
+          },
+          "installedControlIds": [],
+          "pendingOperationId": null,
+          "pendingRevision": null,
+          "requestedTailFrom": null
+        },
+        "role": "replica",
+        "stagedAuthorityRebind": null,
+        "transports": {
+          "0": "CONNECTED",
+          "1": "CONNECTED"
+        }
+      },
+      "terminal": null
+    },
+    "ui": {
+      "actionable": true,
+      "generation": 1,
+      "owner_seat": 1,
+      "stack": [
+        {
+          "kind": "COMMAND",
+          "menu": {
+            "cancel": {
+              "kind": "DISABLED"
+            },
+            "control_id": "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42",
+            "cursor": 0,
+            "operation_id": "operation/m2-parity",
+            "options": [
+              {
+                "enabled": true,
+                "id": "move:first",
+                "label_key": "menu.move.first",
+                "visible": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "events": [
+    {
+      "sequence": 0,
+      "virtual_time_ms": 0,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_DOWN",
+          "data": {
+            "code": {"kind": "ENTER"},
+            "printable": false,
+            "browser_repeat": false,
+            "focus": "GAME"
+          }
+        }
+      },
+      "expected_effect_digest": "fd9471945cfa7ef6216cd2d0953ca5712952ac0c0dab13fe38a82a545fbfde0e",
+      "expected_state_digest": "0445e33c3e2fc5ed59516d508fcaefcadc2e84e49979964d3fc24179fcec1fb0",
+      "expected_ui_digest": "eba98b6aa0cbd42089b60969aac177c17210429c0ac64959f441da4be4153fed",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "sequence": 1,
+      "virtual_time_ms": 50,
+      "input": {
+        "kind": "RAW_INPUT",
+        "seat": 1,
+        "event": {
+          "kind": "KEY_UP",
+          "data": {"code": {"kind": "ENTER"}}
+        }
+      },
+      "expected_effect_digest": "633e1919af0a867f64606ce169d46c6f7a090be6a082a857f428a2ce5c216e87",
+      "expected_state_digest": "87abd836c9f0016f89a75c9f37042ea96ccaab044cfc3a0200bc3420149d18c9",
+      "expected_ui_digest": "eba98b6aa0cbd42089b60969aac177c17210429c0ac64959f441da4be4153fed",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "sequence": 2,
+      "virtual_time_ms": 250,
+      "input": {
+        "kind": "TIMER_FIRED",
+        "endpoint": 1,
+        "timer_id": 2
+      },
+      "expected_effect_digest": "68a517f3692876a05c865a2aea5236d69365be5fb5c70441c33cf66ff45ae845",
+      "expected_state_digest": "b795b443766019429fa6e70a4cb76124532208c6780062f50a34d505f4328ee6",
+      "expected_ui_digest": "eba98b6aa0cbd42089b60969aac177c17210429c0ac64959f441da4be4153fed",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "sequence": 3,
+      "virtual_time_ms": 500,
+      "input": {
+        "kind": "NETWORK_FRAME",
+        "endpoint": 1,
+        "frame": {
+          "v": 2,
+          "t": "authorityEntry",
+          "ctx": {
+            "sessionId": "m2-parity-session",
+            "runId": "m2-parity-run",
+            "sessionEpoch": 1,
+            "seatMapId": "m2-parity-seat-map",
+            "membershipRevision": 1,
+            "senderSeatId": 0,
+            "authoritySeatId": 0,
+            "connectionGeneration": 1
+          },
+          "body": {
+            "revision": 1,
+            "operationId": "operation/m2-parity",
+            "kind": "TURN_COMMIT",
+            "material": {
+              "digest": "material/m2-parity",
+              "payload": {
+                "operation": "operation/m2-parity",
+                "epoch": 1,
+                "wave": 1,
+                "turn": 1
+              }
+            },
+            "nextControl": {
+              "kind": "COMMAND_FRONTIER",
+              "epoch": 1,
+              "wave": 1,
+              "turn": 1,
+              "commands": [
+                {"ownerSeatId": 1, "pokemonId": 42, "fieldIndex": 0}
+              ]
+            },
+            "subsumes": []
+          }
+        }
+      },
+      "expected_effect_digest": "21a95a21bb3c4bc0a39b78e22cd08a15db54c011252a8f6ae61a856ff5be5d3e",
+      "expected_state_digest": "620e10c07be915250ae74cb6a7a05c634266f5b41a93450be68f974b0ddbe905",
+      "expected_ui_digest": "eba98b6aa0cbd42089b60969aac177c17210429c0ac64959f441da4be4153fed",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "sequence": 4,
+      "virtual_time_ms": 750,
+      "input": {
+        "kind": "MATERIAL_APPLIED",
+        "endpoint": 1,
+        "revision": 1,
+        "outcome": {"kind": "applied"}
+      },
+      "expected_effect_digest": "b0a22b3b9cf3767b2e4e69e829ef574f8182bdac4857578e3793b2c3295da208",
+      "expected_state_digest": "812c1c3d7e965d4bdc02ee224c4f34dc0fc412318b96a0e45e92a7c683441acc",
+      "expected_ui_digest": "eba98b6aa0cbd42089b60969aac177c17210429c0ac64959f441da4be4153fed",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "sequence": 5,
+      "virtual_time_ms": 1000,
+      "input": {
+        "kind": "CONTROL_PROJECTED",
+        "endpoint": 1,
+        "revision": 1,
+        "outcome": {
+          "kind": "installed",
+          "control_id": "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        }
+      },
+      "expected_effect_digest": "cd89646f59d6df255f9b625e79e399a65abbaa6f4fb6cc004254082ec0800763",
+      "expected_state_digest": "8912a292b26269ecf3dc48e586482037b1d9090ada17e20fd0daa898241bc9f0",
+      "expected_ui_digest": "39c529474ebc34206ee8cb3fdae87c9e6c762eb469eee37e1d00ca2b7255e607",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [
+          1
+        ],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "sequence": 6,
+      "virtual_time_ms": 1250,
+      "input": {
+        "kind": "PRESENTATION_SETTLED",
+        "endpoint": 1,
+        "event_id": 1,
+        "outcome": {"kind": "SETTLED"}
+      },
+      "expected_effect_digest": "bef1a87f0cb7247812e14bf34b517601fefe4c976c0184eafdca12a3a55f1caa",
+      "expected_state_digest": "0ceb987629b33783cfc16629314bc73d857e2d9ba40b7451b49b3689e8e07503",
+      "expected_ui_digest": "39c529474ebc34206ee8cb3fdae87c9e6c762eb469eee37e1d00ca2b7255e607",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "sequence": 7,
+      "virtual_time_ms": 1500,
+      "input": {
+        "kind": "TRANSPORT_CHANGED",
+        "endpoint": 0,
+        "state": "DISCONNECTED",
+        "generation": 1
+      },
+      "expected_effect_digest": "d53d18c23212ea7b6300594bb89bce60218f6eff2b9d628b8cc42d3e79bbd5ab",
+      "expected_state_digest": "af719ae7f808f57161a9699ef64348f189ef35bff3aed93db0bcadf38264ddc4",
+      "expected_ui_digest": "39c529474ebc34206ee8cb3fdae87c9e6c762eb469eee37e1d00ca2b7255e607",
+      "expected_live_resources": {
+        "controls": [
+          "COMMAND_FRONTIER/e1/w1/t1/f0:s1:p42"
+        ],
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "sequence": 8,
+      "virtual_time_ms": 1750,
+      "input": {
+        "kind": "TRANSPORT_CHANGED",
+        "endpoint": 0,
+        "state": "CONNECTED",
+        "generation": 2
+      },
+      "expected_effect_digest": "8a063cef93cc49e478cd58375b753293397c33ecabf7a1d1338ccd5fcc4eb4f0",
+      "expected_state_digest": "48b8dd2e046faa61fead3f8bb23a2b8411351c1c32c75081bd844859a0f1bb08",
+      "expected_ui_digest": "65c1a76ac04a48fcc03a233940b58f0c51ad43ff30455fe802eca2450a038f6b",
+      "expected_live_resources": {
+        "presentations": [],
+        "proposal_leases": [
+          "operation/m2-parity"
+        ],
+        "recovery_transactions": [
+          "recovery-2"
+        ],
+        "storage_requests": [],
+        "timers": [
+          1,
+          3,
+          4
+        ],
+        "waits": [
+          "authority-v2.recovery"
+        ]
+      }
+    },
+    {
+      "sequence": 9,
+      "virtual_time_ms": 2000,
+      "input": {
+        "kind": "TIMER_FIRED",
+        "endpoint": 1,
+        "timer_id": 4
+      },
+      "expected_effect_digest": "bf9120ade3c6d61219ac3a242112765717fb0e9aa0b736f87024841893fa659a",
+      "expected_state_digest": "052c1e9f1d7d576281b8a6605bc60567a90591c3416dcb5cd201badf1ceb223c",
+      "expected_ui_digest": "91122df14ee13e46fd931cc657fbcfafb63549bd19b6499a1e7d4dcdf98bf810",
+      "expected_live_resources": {
+        "presentations": [],
+        "storage_requests": [],
+        "timers": []
+      }
+    }
+  ]
+}

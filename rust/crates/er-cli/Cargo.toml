@@ -1,0 +1,24 @@
+[package]
+name = "er-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-agent-protocol = { path = "../er-agent-protocol" }
+er-canonical = { path = "../er-canonical" }
+er-env = { path = "../er-env" }
+er-game = { path = "../er-game" }
+er-kernel = { path = "../er-kernel" }
+er-lab = { path = "../er-lab" }
+er-repro = { path = "../er-repro" }
+er-save = { path = "../er-save" }
+er-state = { path = "../er-state" }
+serde.workspace = true
+er-types = { path = "../er-types" }
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

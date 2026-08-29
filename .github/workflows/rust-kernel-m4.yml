@@ -1,0 +1,549 @@
+name: Rust Kernel M4 Gate
+
+on:
+  push:
+    branches:
+      - "arch/rust-kernel-m4"
+      - "wrk/rk-m4-*"
+      - "ci/rust-m4/**"
+    paths:
+      - ".github/workflows/rust-kernel-m4.yml"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docs/plans/rust-kernel/m4-*.md"
+      - "rust/**"
+      - "scripts/check-kernel-m4-contract.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m4/**"
+      - "src/**"
+  pull_request:
+    paths:
+      - ".github/workflows/rust-kernel-m4.yml"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docs/plans/rust-kernel/m4-*.md"
+      - "rust/**"
+      - "scripts/check-kernel-m4-contract.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m4/**"
+      - "src/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m4-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  M3_BASE_SHA: 45c89493e7edec9c4da247a98cd7858b1f015c09
+
+jobs:
+  classify:
+    name: Classify M4 changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.paths.outputs.rust }}
+      oracle: ${{ steps.paths.outputs.oracle }}
+    steps:
+      - name: Check out change history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Classify affected surfaces
+        id: paths
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            echo "oracle=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base="$BASE_SHA"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          git diff --name-only "$base" "$GITHUB_SHA" > "$RUNNER_TEMP/m4-changed-paths"
+
+          rust=false
+          oracle=false
+          while IFS= read -r path; do
+            case "$path" in
+              rust/*|schemas/kernel/*|.github/workflows/rust-kernel-m4.yml)
+                rust=true
+                ;;
+            esac
+            case "$path" in
+              src/*|test/kernel-fixtures/m4/*|scripts/export-kernel-m4-oracle.mjs|.nvmrc|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.github/workflows/rust-kernel-m4.yml)
+                oracle=true
+                ;;
+            esac
+          done < "$RUNNER_TEMP/m4-changed-paths"
+
+          echo "rust=$rust" >> "$GITHUB_OUTPUT"
+          echo "oracle=$oracle" >> "$GITHUB_OUTPUT"
+
+  m4-source-lock:
+    name: M4 source lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Preserve M3 production TypeScript and source lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${M3_BASE_SHA}^{commit}"
+          git merge-base --is-ancestor "$M3_BASE_SHA" "$GITHUB_SHA"
+          git diff --exit-code "$M3_BASE_SHA" "$GITHUB_SHA" -- rust/source-lock.toml src
+          git diff --check "$M3_BASE_SHA" "$GITHUB_SHA"
+
+  m4-contract-freeze:
+    name: M4 contract freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out contract surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/rust-kernel-m4.yml
+            /rust/contracts/
+            /rust/fixtures/m4/
+            /scripts/check-kernel-m4-contract.mjs
+          submodules: false
+
+      - name: Validate exact G12 contracts and manifests
+        env:
+          M4_ATTESTATION_PATH: artifacts/m4-g12-attestation.json
+        run: node scripts/check-kernel-m4-contract.mjs
+
+      - name: Upload G12 attestation
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-g12-attestation
+          path: artifacts/m4-g12-attestation.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m4-foundation-rust:
+    name: M4 foundation Rust
+    needs:
+      - classify
+      - m4-source-lock
+      - m4-contract-freeze
+    if: github.event_name == 'workflow_dispatch' || needs.classify.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out Rust foundation
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+
+      - name: Cache Rust foundation artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-foundation-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Check formatting and workspace
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo fmt --all -- --check
+            cargo check --workspace --all-targets
+          } 2>&1 | tee cargo-diagnostics.log
+
+      - name: Upload Rust diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-foundation-cargo-log
+          path: rust/cargo-diagnostics.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Run focused M4 foundation contracts
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo test -p er-types --test m4_types
+            cargo test -p er-state --test m4_state_v2
+            cargo test -p er-run --test m4_content
+            cargo test -p er-content --test m4_pack
+            cargo test -p er-state --test m4_migration
+            cargo test -p er-run --test m4_settlement
+            cargo test -p er-state --test m4_foundation_properties
+            cargo test -p er-run --test m4_foundation_properties
+            cargo test -p er-kernel --test m4_snapshot_v3
+            cargo test -p er-sim --test m4_pair_snapshot_v3
+            cargo test -p er-sim --test m4_battle_start_v2
+            cargo test -p er-sim --test m4_raw_key_local
+            cargo test -p er-sim --test m4_raw_key_coop
+            cargo test -p er-sim --test m4_run_faults
+          } 2>&1 | tee cargo-test-diagnostics.log
+
+      - name: Upload Rust test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-foundation-cargo-test-log
+          path: |
+            rust/cargo-test-diagnostics.log
+            rust/lockfile-drift.diff
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Require committed lockfile
+        working-directory: rust
+        shell: bash
+        run: |
+          if ! git diff --exit-code -- Cargo.lock > lockfile-drift.diff; then
+            cat lockfile-drift.diff
+            exit 1
+          fi
+
+      - name: Upload lockfile drift evidence
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-lockfile-drift
+          path: rust/lockfile-drift.diff
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload generated lockfile evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-foundation-cargo-lock
+          path: rust/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+  # A commit message containing "qualification" promotes the focused train to
+  # the complete regression, oracle, benchmark, and exact-SHA aggregate.
+  m4-m3-regression-core:
+    name: M3 regression core
+    needs:
+      - m4-source-lock
+      - m4-contract-freeze
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       contains(github.event.head_commit.message, 'qualification'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out regression candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+
+      - name: Cache Rust regression artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-m3reg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-m3reg-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run M1-M3 content, state, battle, and protocol suites
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo test -p er-content
+            cargo test -p er-state
+            cargo test -p er-battle
+            cargo test -p er-protocol
+          } 2>&1 | tee m3-regression-core.log
+
+      - name: Upload core regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-m3regression-core-log
+          path: rust/m3-regression-core.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  m4-m3-regression-integration:
+    name: M3 regression integration
+    needs:
+      - m4-source-lock
+      - m4-contract-freeze
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       contains(github.event.head_commit.message, 'qualification'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out regression candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+
+      - name: Cache Rust regression artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-m3reg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-m3reg-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run M2-M3 game, kernel, and simulator campaigns
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo test -p er-game
+            cargo test -p er-kernel
+            cargo test -p er-sim
+          } 2>&1 | tee m3-regression-integration.log
+
+      - name: Upload integration regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-m3regression-integration-log
+          path: rust/m3-regression-integration.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  m4-focused-runtime-benchmarks:
+    name: M4 focused runtime benchmarks
+    needs:
+      - classify
+      - m4-source-lock
+      - m4-contract-freeze
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       needs.classify.outputs.rust == 'true' &&
+       contains(github.event.head_commit.message, 'qualification'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out benchmark candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Cache Rust benchmark artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-bench-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-bench-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Measure implemented run runtime paths
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --release -p er-sim --bench m4_runtime_benchmark -- --nocapture \
+            2>&1 | tee m4-focused-runtime-benchmarks.log
+
+      - name: Upload focused benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-focused-runtime-benchmarks
+          path: rust/m4-focused-runtime-benchmarks.log
+          if-no-files-found: error
+          retention-days: 14
+
+  m4-oracle-probe:
+    name: M4 oracle fresh-process probe
+    needs:
+      - classify
+      - m4-source-lock
+      - m4-contract-freeze
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.classify.outputs.oracle == 'true' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       contains(github.event.head_commit.message, 'qualification'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact oracle candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Install repository-pinned pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Restore pinned BLAKE3 verifier
+        id: b3sum-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m4-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
+      - name: Install pinned BLAKE3 verifier
+        run: |
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+
+      - name: Save pinned BLAKE3 verifier
+        if: steps.b3sum-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m4-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
+      - name: Install immutable dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Export exact M4 oracle vectors twice
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M4_ORACLE_GAP_REPORT: ${{ github.workspace }}/artifacts/m4-oracle-gaps.json
+        run: |
+          mkdir -p artifacts
+          node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m4-oracle-output"
+
+      - name: Upload oracle output or typed gaps
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-oracle-probe
+          path: |
+            artifacts/m4-oracle-gaps.json
+            ${{ runner.temp }}/m4-oracle-output
+          if-no-files-found: warn
+          retention-days: 14
+
+  m4-g15-qualification:
+    name: M4 G15 exact-SHA qualification
+    needs:
+      - classify
+      - m4-source-lock
+      - m4-contract-freeze
+      - m4-foundation-rust
+      - m4-m3-regression-core
+      - m4-m3-regression-integration
+      - m4-focused-runtime-benchmarks
+      - m4-oracle-probe
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+        contains(github.event.head_commit.message, 'qualification')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every M4 qualification dependency
+        env:
+          SOURCE_LOCK: ${{ needs.m4-source-lock.result }}
+          CONTRACT_FREEZE: ${{ needs.m4-contract-freeze.result }}
+          FOUNDATION: ${{ needs.m4-foundation-rust.result }}
+          REGRESSION_CORE: ${{ needs.m4-m3-regression-core.result }}
+          REGRESSION_INTEGRATION: ${{ needs.m4-m3-regression-integration.result }}
+          BENCHMARKS: ${{ needs.m4-focused-runtime-benchmarks.result }}
+          ORACLE: ${{ needs.m4-oracle-probe.result }}
+        run: |
+          set -euo pipefail
+          for result in \
+            "$SOURCE_LOCK" \
+            "$CONTRACT_FREEZE" \
+            "$FOUNDATION" \
+            "$REGRESSION_CORE" \
+            "$REGRESSION_INTEGRATION" \
+            "$BENCHMARKS" \
+            "$ORACLE"
+          do
+            test "$result" = success
+          done
+          printf '%s\n' "M4 exact SHA $GITHUB_SHA passed G15 qualification"

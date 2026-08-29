@@ -1,0 +1,27 @@
+[package]
+name = "er-sim"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-battle = { path = "../er-battle" }
+er-canonical = { path = "../er-canonical" }
+er-content = { path = "../er-content" }
+er-content-compiler = { path = "../er-content-compiler" }
+er-game = { path = "../er-game" }
+er-kernel = { path = "../er-kernel" }
+er-mechanics = { path = "../er-mechanics" }
+er-protocol = { path = "../er-protocol" }
+er-run = { path = "../er-run" }
+er-rng = { path = "../er-rng" }
+er-state = { path = "../er-state" }
+er-testkit = { path = "../er-testkit" }
+er-types = { path = "../er-types" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

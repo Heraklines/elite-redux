@@ -1,0 +1,176 @@
+integration_branch = "arch/rust-kernel-m6"
+integration_base_sha = "200caaee1697fe40a293f0a5da76af8b11f3cea9"
+oracle_sha = "3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7"
+contract = "rust/contracts/m6-contract.toml"
+production_typescript_read_only = true
+isolated_writer_worktrees = true
+worker_rebase = false
+public_api_changes_after_g21 = "contract-change-request-only"
+
+[integration_owner]
+exclusive = [
+  "rust/Cargo.toml",
+  "rust/Cargo.lock",
+  "rust/crates/er-kernel/src/kernel.rs",
+  "rust/contracts/m6-*",
+  ".github/workflows/rust-kernel-m6.yml",
+]
+responsibilities = [
+  "merge in frozen dependency order",
+  "resolve contract requests",
+  "stage and push exact integration candidates",
+  "run G21 through G25 aggregates",
+  "create final tag only after G25 green",
+]
+
+[semantic_extraction]
+exclusive = [
+  "scripts/export-kernel-m6-semantic-catalog.mjs",
+  "scripts/export-kernel-m5-source-catalog.mjs",
+  "scripts/check-kernel-m6-contract.mjs",
+  "scripts/check-kernel-m6-runtime-semantics.mjs",
+  "scripts/diagnose-kernel-m6-semantic-diff.mjs",
+  "test/kernel-fixtures/m6/export-semantic-runtime.test.ts",
+  "test/kernel-fixtures/m4/export/oracle-frontier.ts",
+  "rust/fixtures/m6/raw-source-catalog-v2.json",
+  "rust/fixtures/m6/semantic-catalog-v1.json",
+  "rust/fixtures/m6/behavior-unit-manifest-v1.json",
+  "rust/fixtures/m6/primitive-gap-manifest-v1.json",
+  "rust/fixtures/m6/bespoke-clusters-v1.json",
+  "rust/fixtures/m6/oracle-witness-plan-v1.json",
+  "rust/fixtures/m6/rng-site-manifest-v1.json",
+  "docs/plans/rust-kernel/m6-*.md",
+]
+
+[m6a_ids_catalog]
+exclusive = [
+  "rust/crates/er-types/src/m6.rs",
+  "rust/crates/er-types/src/lib.rs",
+  "rust/crates/er-content/src/m6_catalog.rs",
+]
+
+[m6a_ir_hooks_queries]
+exclusive = [
+  "rust/crates/er-mechanics/src/lib.rs",
+  "rust/crates/er-mechanics/src/m6.rs",
+  "rust/crates/er-mechanics/src/v2/hook.rs",
+  "rust/crates/er-mechanics/src/v2/query.rs",
+  "rust/crates/er-mechanics/src/v2/program.rs",
+]
+
+[m6a_ir_conditions_values]
+exclusive = [
+  "rust/crates/er-mechanics/src/v2/condition.rs",
+  "rust/crates/er-mechanics/src/v2/value.rs",
+]
+
+[m6a_ir_selectors]
+exclusive = [
+  "rust/crates/er-mechanics/src/v2/selector.rs",
+  "rust/crates/er-types/src/topology_v2.rs",
+]
+
+[m6a_ir_operations]
+exclusive = [
+  "rust/crates/er-mechanics/src/v2/operation.rs",
+  "rust/crates/er-mechanics/src/v2/scheduled.rs",
+]
+
+[m6a_state]
+exclusive = [
+  "rust/crates/er-state/src/migration_v4.rs",
+  "rust/crates/er-state/src/mechanic_state_v2.rs",
+  "rust/crates/er-state/src/validation_v4.rs",
+]
+
+[m6a_content]
+exclusive = [
+  "rust/crates/er-content/src/m6_pack.rs",
+  "rust/crates/er-content/src/m6_prepared.rs",
+]
+
+[m6a_compiler]
+exclusive = [
+  "rust/crates/er-content-compiler/src/m6/mod.rs",
+  "rust/crates/er-content-compiler/src/m6/catalog.rs",
+  "rust/crates/er-content-compiler/src/m6/pipeline.rs",
+]
+
+[m6a_migration_snapshot]
+exclusive = [
+  "rust/crates/er-game/src/material_v4.rs",
+  "rust/crates/er-kernel/src/snapshot_v5.rs",
+  "rust/crates/er-sim/src/snapshot_v5.rs",
+]
+
+[m6a_tests]
+exclusive = [
+  "rust/crates/er-testkit/tests/m6_foundation.rs",
+  "rust/crates/er-testkit/tests/m6_migration.rs",
+  "rust/crates/er-testkit/tests/m6_bypass.rs",
+]
+
+[m6b_moves]
+exclusive = [
+  "rust/crates/er-content-compiler/src/m6/moves.rs",
+  "rust/crates/er-battle/src/m6/move_executor.rs",
+]
+
+[m6b_abilities]
+exclusive = [
+  "rust/crates/er-content-compiler/src/m6/abilities.rs",
+  "rust/crates/er-battle/src/m6/ability_executor.rs",
+]
+
+[m6b_items]
+exclusive = [
+  "rust/crates/er-content-compiler/src/m6/items.rs",
+  "rust/crates/er-battle/src/m6/item_executor.rs",
+]
+
+[m6b_status_field]
+exclusive = [
+  "rust/crates/er-content-compiler/src/m6/status_field.rs",
+  "rust/crates/er-battle/src/m6/status_field_executor.rs",
+]
+
+[m6b_switch_target]
+exclusive = [
+  "rust/crates/er-content-compiler/src/m6/switch_target.rs",
+  "rust/crates/er-battle/src/m6/switch_target_executor.rs",
+]
+
+[m6b_tests]
+exclusive = [
+  "rust/crates/er-testkit/tests/m6_routine_*.rs",
+  "rust/fixtures/m6/witnesses/routine/**",
+]
+
+[m6c_bespoke]
+exclusive = [
+  "rust/crates/er-battle/src/m6/bespoke.rs",
+  "rust/crates/er-battle/src/m6/bespoke/**",
+  "rust/fixtures/m6/witnesses/bespoke/**",
+]
+rule = "one central exhaustive BespokeMechanicId dispatcher; split implementation files by frozen cluster"
+
+[m6d_system]
+exclusive = [
+  "rust/crates/er-testkit/tests/m6_system_*.rs",
+  "rust/crates/er-sim/tests/m6_*.rs",
+  "rust/crates/er-wasm/tests/m6_*.rs",
+  "rust/fixtures/m6/m6-benchmark-manifest.json",
+]
+
+[handoff]
+required = [
+  "branch",
+  "base_sha",
+  "head_sha",
+  "owned_files",
+  "static_checks",
+  "hosted_run_and_jobs",
+  "fixture_dependencies",
+  "unsupported_or_pending_behavior_units",
+  "contract_requests",
+]

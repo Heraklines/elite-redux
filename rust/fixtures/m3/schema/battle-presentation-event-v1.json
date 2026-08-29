@@ -1,0 +1,1 @@
+{"event_id":{"operation_id":"battle/1/wave/1/turn/1/result","sequence":0},"kind":{"incoming":8,"kind":"SWITCHED","outgoing":7,"slot":{"position":0,"side":"PLAYER"}},"policy":"BLOCKS_HUMAN_INPUT","skip_policy":"FORBIDDEN"}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "policy": "FAIL_CLOSED",
+  "supported": {
+    "modifier_tiers": [0, 1, 2, 3, 4],
+    "modes": ["CLASSIC_SOLO", "CLASSIC_COOP_DOUBLE"],
+    "growth_rates": [
+      { "id": 2, "key": "MEDIUM_FAST" },
+      { "id": 3, "key": "MEDIUM_SLOW" }
+    ],
+    "natures": [
+      { "id": 0, "key": "HARDY" },
+      { "id": 3, "key": "ADAMANT" },
+      { "id": 10, "key": "TIMID" },
+      { "id": 15, "key": "MODEST" },
+      { "id": 24, "key": "QUIRKY" }
+    ],
+    "modifier_registry_keys": [
+      "AMULET_COIN",
+      "CANDY_JAR",
+      "EXP_CHARM",
+      "SUPER_EXP_CHARM",
+      "GOLDEN_EXP_CHARM",
+      "HEALING_CHARM",
+      "LOCK_CAPSULE",
+      "POTION",
+      "SUPER_POTION",
+      "HYPER_POTION",
+      "MAX_POTION",
+      "NUGGET",
+      "BIG_NUGGET",
+      "RELIC_GOLD",
+      "RARE_CANDY",
+      "RARER_CANDY",
+      "POKEBALL",
+      "GREAT_BALL"
+    ],
+    "regular_reward_actions": ["FREE_SELECT", "SKIP", "BUY", "TARGET", "REROLL", "LOCK_TOGGLE"],
+    "biome_market_actions": ["BUY", "TARGET", "LEAVE"],
+    "biome_ids": [0, 1, 2, 4, 9, 50],
+    "route_rng_domains": ["AUTHORITY_ADDRESSED", "EXACT_AMBIENT_STATE"],
+    "encounter_sources": ["STATIC_CAPTURED_VECTOR", "STATIC_FIXED_VECTOR"],
+    "enemy_policies": ["SCRIPTED_ENEMY_POLICY_V1"]
+  },
+  "unsupported": [
+    { "code": "EVOLUTION_EXECUTION", "behavior": "PROGRESSION_PREFLIGHT_FAILURE" },
+    { "code": "FUSION_OR_FORM_CHANGE", "behavior": "CONTENT_LOAD_FAILURE" },
+    { "code": "MYSTERY_ENCOUNTER", "behavior": "RUN_INITIALIZATION_FAILURE" },
+    { "code": "CAPTURE_OR_FLEE", "behavior": "CONTROL_UNAVAILABLE" },
+    { "code": "TM_OR_REMEMBER_MOVE", "behavior": "MODIFIER_CAPABILITY_FAILURE" },
+    { "code": "DYNAMIC_MODIFIER_GENERATOR_CALLBACK", "behavior": "GENERATION_FAILURE" },
+    { "code": "DYNAMIC_MODIFIER_APPLY_CALLBACK", "behavior": "ACTION_PREFLIGHT_FAILURE" },
+    { "code": "TRAINER_CONSTRUCTOR_CALLBACK", "behavior": "ENCOUNTER_GENERATION_FAILURE" },
+    { "code": "SMART_OR_RANDOM_AI", "behavior": "ENCOUNTER_INITIALIZATION_FAILURE" },
+    { "code": "WEIGHTED_OR_EVENT_ROUTE_CALLBACK", "behavior": "ROUTE_GENERATION_FAILURE" },
+    { "code": "NOTORIETY_OR_RELIC_CALLBACK", "behavior": "BIOME_TRANSITION_FAILURE" },
+    { "code": "DAILY_ENDLESS_RANDOM_BIOME", "behavior": "RUN_INITIALIZATION_FAILURE" },
+    { "code": "UNSELECTED_GROWTH_OR_NATURE", "behavior": "CONTENT_LOAD_FAILURE" },
+    { "code": "NONFINITE_OR_OUT_OF_SAFE_INTEGER_PRICE", "behavior": "SURFACE_GENERATION_FAILURE" },
+    { "code": "CALLBACK_OR_SCRIPT_OR_TRAIT_OBJECT_CONTENT", "behavior": "CONTENT_LOAD_FAILURE" }
+  ],
+  "silent_noop_forbidden": true,
+  "replica_generation_forbidden": true,
+  "production_typescript_changes_forbidden": true
+}

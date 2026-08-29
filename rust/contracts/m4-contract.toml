@@ -1,0 +1,68 @@
+m3_base_sha = "45c89493e7edec9c4da247a98cd7858b1f015c09"
+m4_oracle_sha = "45c89493e7edec9c4da247a98cd7858b1f015c09"
+m3_parity_oracle_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+oracle_protocol_version = "er-coop-47"
+inherits_contract = "rust/contracts/m3-contract.toml"
+inheritance_policy = "all M3 keys remain exact unless explicitly overridden below"
+game_state_schema_version = 2
+battle_state_schema_version = 2
+pokemon_state_schema_version = 2
+battle_start_version = 2
+battle_content_pack_schema_version = 1
+command_proposal_version = 1
+replacement_proposal_version = 1
+battle_control_plan_version = 1
+rng_algorithm_version = 1
+menu_navigation_version = 1
+capability_manifest_version = 1
+oracle_manifest_version = 1
+coverage_map_version = 1
+turn_coordinate_version = 1
+battle_turn_material_version = 2
+battle_replacement_material_version = 2
+wave_advance_material_version = 1
+run_interaction_material_version = 1
+run_terminal_material_version = 1
+
+run_content_pack_schema_version = 1
+run_slice_manifest_version = 1
+run_capability_manifest_version = 1
+run_oracle_manifest_version = 1
+run_coverage_map_version = 1
+run_benchmark_manifest_version = 1
+run_state_schema_version = 1
+progression_queue_version = 1
+progression_task_schema_version = 1
+run_surface_state_schema_version = 1
+
+game_control_plan_version = 1
+
+reward_shop_surface_version = 1
+biome_market_surface_version = 1
+crossroads_surface_version = 1
+biome_selection_surface_version = 1
+encounter_plan_version = 1
+
+restorable_snapshot_version = 3
+kernel_trace_version = 3
+mechanical_digest_version = 2
+kernel_determinism_digest_version = 2
+pair_determinism_digest_version = 2
+presentation_plan_digest_version = 1
+surface_digest_version = 1
+run_content_hash_version = 1
+
+parity_segment_start_wave = 9
+parity_segment_end_wave = 11
+parity_segment_kind = "oracle-composed-canonical-state-and-captured-vectors"
+parity_segment_initial_state = "oracle-exported-wave-9-canonical-state"
+parity_segment_driver = "raw-physical-keys-only"
+parity_segment_semantic_shortcuts = false
+
+nested_state_versioning = "explicit-game-battle-pokemon-discriminants"
+party_ordering = "stable-roster-vector-party-index-reordering-deferred"
+modifier_id_authority = "m4-contract-owned-numeric-id-mapped-to-typescript-registry-key"
+regular_reward_reroll_and_locks = true
+biome_market_reroll_and_locks = false
+unsupported_behavior = "fail-closed"
+production_typescript_read_only = true

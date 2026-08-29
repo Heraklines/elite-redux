@@ -1,0 +1,325 @@
+//! The M4 run runtime state machine.
+//!
+//! Contract: `rust/contracts/m4-api.md` (stage invariants) and
+//! `rust/contracts/m4-run-material.md` (apply protocol). One production
+//! applier serves both authority and replica: neither side adopts a prepared
+//! candidate directly, and replicas never rerun any RNG.
+
+use std::sync::Arc;
+
+use thiserror::Error;
+
+use er_run::run_material::{AuthorityRunMaterial, RunMaterialHeader};
+use er_run::transition::GameContentBundle;
+use er_state::digest_v2::MechanicalStateDigestV2;
+use er_state::game_v2::GameStateV2;
+use er_types::SeatId;
+use er_types::battle_ids::ContentPackHash;
+use er_types::run_control::{GameControl, GameControlPlan};
+use er_types::run_model::RunStage;
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum RunRuntimeError {
+    #[error("material before-digest disagrees with the endpoint-local frontier")]
+    LocalFrontierMismatch,
+    #[error("material header digests disagree with their carried states")]
+    HeaderDigestMismatch,
+    #[error("material carries an unsupported schema version")]
+    UnsupportedSchema,
+    #[error("material M3 parity oracle SHA is not frozen")]
+    WrongParityOracle,
+    #[error("material content hashes disagree with loaded content identity")]
+    ContentIdentity,
+    #[error("material after-state validation failed")]
+    InvalidAfterState,
+    #[error("material next-control plan failed validation")]
+    InvalidNextControl,
+    #[error("run surface action preparation failed: {0}")]
+    Preparation(String),
+}
+
+/// The run-side runtime: complete game state plus immutable content identity.
+///
+/// Material application replaces the whole state atomically on success and
+/// leaves `self` untouched on any failure (`m4-atomic-transition.md`).
+#[derive(Clone, Debug)]
+pub struct RunRuntime {
+    state: GameStateV2,
+    content: Arc<GameContentBundle>,
+}
+
+impl RunRuntime {
+    /// Constructs one runtime from validated initial state and content
+    /// identity. State must already validate.
+    pub fn new(
+        state: GameStateV2,
+        content: Arc<GameContentBundle>,
+    ) -> Result<Self, RunRuntimeError> {
+        state
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidAfterState)?;
+        if state.battle_content_hash != content.battle.hash
+            || state.run_content_hash != content.run.run_content_hash
+            || content.run.battle_content_hash != content.battle.hash
+        {
+            return Err(RunRuntimeError::ContentIdentity);
+        }
+        Ok(Self { state, content })
+    }
+
+    pub fn state(&self) -> &GameStateV2 {
+        &self.state
+    }
+
+    pub fn content(&self) -> &Arc<GameContentBundle> {
+        &self.content
+    }
+
+    pub fn sync_battle_mechanics(
+        &mut self,
+        resolved: &er_state::snapshot::GameState,
+    ) -> Result<(), RunRuntimeError> {
+        let merged = crate::battle_adapter_v2::merge_battle_v1_into_v2(&self.state, resolved)
+            .map_err(|error| RunRuntimeError::Preparation(error.to_string()))?;
+        self.state = merged;
+        Ok(())
+    }
+
+    pub fn settle_terminal_battle(&mut self) -> Result<(), RunRuntimeError> {
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(RunRuntimeError::InvalidAfterState)?;
+        if battle.outcome == er_types::battle_model::BattleOutcome::Ongoing
+            || battle.settlement.settled
+        {
+            return Ok(());
+        }
+        let prepared = er_run::settlement::prepare_battle_settlement(
+            &self.state,
+            &er_run::settlement::BattleSettlementInput {
+                source_battle_id: battle.battle_id,
+                wave: battle.wave,
+            },
+        )
+        .map_err(|error| RunRuntimeError::Preparation(error.to_string()))?;
+        self.state = prepared.after_state;
+        Ok(())
+    }
+
+    pub fn complete_final_victory(&mut self) -> Result<(), RunRuntimeError> {
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(RunRuntimeError::InvalidAfterState)?;
+        if self.state.run.stage != RunStage::AwaitingWaveAdvance
+            || !battle.settlement.settled
+            || battle.outcome != er_types::battle_model::BattleOutcome::Victory
+        {
+            return Err(RunRuntimeError::InvalidAfterState);
+        }
+        let mut completed = self.state.clone();
+        completed.battle = None;
+        completed.run.stage = RunStage::Complete;
+        completed.run.outcome = er_types::run_model::RunOutcome::Victory;
+        completed
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidAfterState)?;
+        self.state = completed;
+        Ok(())
+    }
+    pub fn prepare_action_material(
+        &self,
+        action: &er_types::run_model::RunSurfaceAction,
+        current_control: &GameControlPlan,
+        encounter: Option<&er_run::encounter_plan::EncounterPlan>,
+        reward_surface: Option<&er_state::run_v2::RewardShopSurfaceState>,
+    ) -> Result<AuthorityRunMaterial, RunRuntimeError> {
+        let prepared = match action {
+            er_types::run_model::RunSurfaceAction::Crossroads(_) => {
+                crate::run_transition::prepare_crossroads_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
+            er_types::run_model::RunSurfaceAction::Reward(_) => {
+                crate::run_transition::prepare_reward_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
+            er_types::run_model::RunSurfaceAction::BiomeMarket(_) => {
+                crate::run_transition::prepare_market_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
+            er_types::run_model::RunSurfaceAction::LearnMove(
+                er_types::run_model::LearnMoveDecision::Replace { .. },
+            ) => reward_surface
+                .ok_or(crate::run_transition::RunTransitionPreparationError::MissingReward)
+                .and_then(|reward_surface| {
+                    crate::run_transition::prepare_move_replace_transition(
+                        &self.state,
+                        self.content.as_ref(),
+                        action,
+                        current_control,
+                        reward_surface,
+                    )
+                }),
+            er_types::run_model::RunSurfaceAction::LearnMove(_) => {
+                crate::run_transition::prepare_move_learn_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
+            er_types::run_model::RunSurfaceAction::BiomeSelect(_) => encounter
+                .ok_or(crate::run_transition::RunTransitionPreparationError::MissingEncounter)
+                .and_then(|encounter| {
+                    crate::run_transition::prepare_biome_select_transition(
+                        &self.state,
+                        self.content.as_ref(),
+                        action,
+                        current_control,
+                        encounter,
+                    )
+                }),
+        };
+        prepared.map_err(|error| RunRuntimeError::Preparation(error.to_string()))
+    }
+
+    /// The endpoint-local mechanical frontier used in step 7 of the apply
+    /// protocol.
+    pub fn frontier_digest(&self) -> Result<MechanicalStateDigestV2, RunRuntimeError> {
+        MechanicalStateDigestV2::compute(&self.state)
+            .map_err(|_| RunRuntimeError::InvalidAfterState)
+    }
+
+    /// Applies one run material through the shared production path.
+    ///
+    /// Steps 1-5 and 8-9 of `m4-run-material.md`: canonical bytes are decoded
+    /// by the caller; here we validate kind/schema/oracle/content identity,
+    /// recompute both digests from the carried states, compare the local
+    /// frontier, validate control, then swap atomically. Duplicate application
+    /// is detected upstream by operation identity at the kernel layer.
+    pub fn apply(&mut self, material: &AuthorityRunMaterial) -> Result<(), RunRuntimeError> {
+        let header = match material {
+            AuthorityRunMaterial::WaveAdvance(value) => {
+                if value.schema_version != er_run::run_material::WAVE_ADVANCE_MATERIAL_VERSION {
+                    return Err(RunRuntimeError::UnsupportedSchema);
+                }
+                &value.header
+            }
+            AuthorityRunMaterial::Interaction(value) => {
+                if value.schema_version != er_run::run_material::RUN_INTERACTION_MATERIAL_VERSION {
+                    return Err(RunRuntimeError::UnsupportedSchema);
+                }
+                &value.header
+            }
+            AuthorityRunMaterial::Terminal(value) => {
+                if value.schema_version != er_run::run_material::RUN_TERMINAL_MATERIAL_VERSION {
+                    return Err(RunRuntimeError::UnsupportedSchema);
+                }
+                &value.header
+            }
+        };
+        Self::validate_header(
+            header,
+            material,
+            self.content.battle.hash.clone(),
+            self.content.run.run_content_hash.clone(),
+            &self.content.run.m4_oracle_sha,
+        )?;
+        let local = self.frontier_digest()?;
+        if *header.before_digest.as_str() != *local.as_str() {
+            return Err(RunRuntimeError::LocalFrontierMismatch);
+        }
+        header
+            .after_state
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidAfterState)?;
+        crate::run_menu::RunMenuReducer::new(header.next_control.clone())
+            .map_err(|_| RunRuntimeError::InvalidNextControl)?;
+        // Step 9: atomic whole-state swap. Nothing above mutated self.
+        self.state = header.after_state.clone();
+        Ok(())
+    }
+
+    fn validate_header(
+        header: &RunMaterialHeader,
+        _material: &AuthorityRunMaterial,
+        battle_hash: ContentPackHash,
+        run_hash: er_types::run_ids::RunContentPackHash,
+        oracle_sha: &str,
+    ) -> Result<(), RunRuntimeError> {
+        if header.m3_parity_oracle_sha != er_run::run_material::RUN_MATERIAL_M3_PARITY_ORACLE_SHA {
+            return Err(RunRuntimeError::WrongParityOracle);
+        }
+        if header.m4_oracle_sha != oracle_sha {
+            return Err(RunRuntimeError::WrongParityOracle);
+        }
+        if header.battle_content_hash != battle_hash || header.run_content_hash != run_hash {
+            return Err(RunRuntimeError::ContentIdentity);
+        }
+        // Step 3/4 digests are recomputed from the carried states themselves.
+        let before = MechanicalStateDigestV2::compute(&header.before_state)
+            .map_err(|_| RunRuntimeError::HeaderDigestMismatch)?;
+        if before != header.before_digest {
+            return Err(RunRuntimeError::HeaderDigestMismatch);
+        }
+        let after = MechanicalStateDigestV2::compute(&header.after_state)
+            .map_err(|_| RunRuntimeError::HeaderDigestMismatch)?;
+        if *after.as_str() != *header.after_digest.as_str() {
+            return Err(RunRuntimeError::HeaderDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// Projects the solo-seat [`GameControlPlan`] implied by one validated stage.
+///
+/// Stage table (`rust/contracts/m4-api.md`, "Stage invariants"):
+/// - Battle installs the battle's retained control (projected upstream).
+/// - AwaitingWaveAdvance waits on the wave-tick operation.
+/// - Progression/Surface install their surface controls (projected upstream).
+/// - Complete installs [`GameControl::Complete`].
+///
+/// This helper covers the two stages whose control is fully determined by
+/// state alone (AwaitingWaveAdvance waiting, Complete); surface-specific menus
+/// are projected by their owning adapters with captured option evidence.
+pub fn project_terminal_or_wait_control(
+    state: &GameStateV2,
+    next_control_id: impl Into<String>,
+    owner_seat: SeatId,
+    menu_instance_id: er_types::battle_ids::MenuInstanceId,
+) -> Result<GameControlPlan, RunRuntimeError> {
+    state
+        .validate()
+        .map_err(|_| RunRuntimeError::InvalidAfterState)?;
+    if state.run.stage != RunStage::Complete {
+        // Only the terminal stage's control is fully determined by state
+        // alone; surface menus are projected by their owning adapters.
+        return Err(RunRuntimeError::InvalidNextControl);
+    }
+    let control = GameControl::Complete(state.run.outcome);
+    let seats = vec![er_types::run_control::SeatControlPlan {
+        seat: owner_seat,
+        owner: true,
+        control_id: next_control_id.into(),
+        menu_instance_id,
+        actionable_after: er_types::run_control::PresentationBarrier::NonBlocking,
+        control,
+    }];
+    GameControlPlan::new(seats, "run-stage".to_owned(), menu_instance_id)
+        .map_err(|_| RunRuntimeError::InvalidNextControl)
+}

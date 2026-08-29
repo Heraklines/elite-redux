@@ -1,0 +1,233 @@
+schema_version = 6
+milestone = "M2"
+project = "PokéRogue Redux"
+bootstrap_parent_sha = "87eb36290675378b7b08c20a09f6cdd757ae9515"
+branch_base = "the exact hosted-green commit containing this manifest"
+integration_branch = "arch/rust-kernel-v0"
+public_api = "rust/contracts/m2-api.md"
+
+[rules]
+isolated_worktree = true
+exclusive_paths = true
+public_signatures_frozen = true
+all_m2a_lane_source_stubs_in_bootstrap = true
+bootstrap_may_touch_future_lane_paths = true
+dependency_free_property_generators = true
+workers_may_spawn_agents = false
+integration_owner_only_merges = true
+integration_owner_only_pushes = true
+production_typescript_read_only = true
+local_rust_execution = false
+local_coop_vitest = false
+
+[[integration_exceptions]]
+lane = "M2-05"
+path = "rust/crates/er-protocol/src/scheduler.rs"
+symbol = "KernelScheduler::set_next_timer_id_for_test"
+scope = "cfg(test)-only proposal allocator rollback evidence"
+production_access = false
+approved_by = "integration owner"
+
+[[lanes]]
+id = "M2-01"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-01"
+paths = ["rust/crates/er-protocol/src/scheduler.rs", "rust/crates/er-protocol/tests/m2_scheduler.rs"]
+deliverable = "KernelScheduler ownership, cancellation, disposal, and timer metadata"
+
+[[lanes]]
+id = "M2-02"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-02"
+paths = ["rust/crates/er-protocol/src/validation.rs", "rust/crates/er-protocol/tests/m2_validation.rs"]
+deliverable = "Raw-first frame/context/body classification"
+contract_dependencies = ["CR-0008 raw-first typed validation boundary"]
+
+[[lanes]]
+id = "M2-03"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-03"
+paths = ["rust/crates/er-protocol/src/authority_log.rs", "rust/crates/er-protocol/tests/m2_authority_log.rs"]
+deliverable = "Global revisions, bounded retention, receipts, leases, and recovery slices"
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0006 sole scheduler and rebind outcome"]
+
+[[lanes]]
+id = "M2-04"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-04"
+paths = ["rust/crates/er-protocol/src/replica.rs", "rust/crates/er-protocol/tests/m2_replica.rs"]
+deliverable = "Receive/material/control frontiers, duplicate and gap handling"
+contract_dependencies = ["CR-0011 full recovered-entry staging boundary"]
+
+[[lanes]]
+id = "M2-05"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-05"
+paths = ["rust/crates/er-protocol/src/proposal.rs", "rust/crates/er-protocol/tests/m2_proposal.rs"]
+deliverable = "Proposal admission fingerprints and resend leases"
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0006 sole scheduler"]
+
+[[lanes]]
+id = "M2-06"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-06"
+paths = ["rust/crates/er-protocol/src/successor.rs", "rust/crates/er-protocol/tests/m2_successor.rs"]
+deliverable = "Exact control identity and successor authorization"
+contract_dependencies = ["CR-0002 shared successor boundary"]
+
+[[lanes]]
+id = "M2-07"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-07"
+paths = ["rust/crates/er-protocol/src/recovery.rs", "rust/crates/er-protocol/tests/m2_recovery.rs"]
+deliverable = "Recovery bundle validation, fence, and transaction"
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0007 live recovery continuations"]
+
+[[lanes]]
+id = "M2-08"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-08"
+paths = ["rust/crates/er-sim/src/clock.rs", "rust/crates/er-sim/tests/m2_clock.rs"]
+deliverable = "One deterministic virtual clock and pause-class semantics"
+contract_dependencies = ["M2-01 KernelScheduler exact API", "CR-0006 endpoint-qualified timer identity"]
+
+[[lanes]]
+id = "M2-09"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-09"
+paths = ["rust/crates/er-sim/src/network.rs", "rust/crates/er-sim/tests/m2_network.rs"]
+deliverable = "Seeded loss, duplicate, delay, reorder, reconnect, and corruption"
+contract_dependencies = ["CR-0010 lossless diagnostic seeds and saturating observational counters"]
+
+[[lanes]]
+id = "M2-10"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-10"
+paths = ["rust/crates/er-sim/src/presenter.rs", "rust/crates/er-sim/src/storage.rs", "rust/crates/er-sim/tests/m2_adapters.rs"]
+deliverable = "Deterministic presenter and atomic memory storage adapters"
+contract_dependencies = ["CR-0009 endpoint-qualified presentation and one-shot storage faults"]
+
+[[lanes]]
+id = "M2-11"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-11"
+paths = ["rust/crates/er-protocol/tests/authority_v2_contract_map.rs", "rust/fixtures/v1/authority-v2-test-map.json", "test/kernel-fixtures/v1/authority-v2/**"]
+deliverable = "Every pinned TypeScript Authority V2 node contract mapped to Rust evidence"
+
+[[lanes]]
+id = "M2-12"
+target_generation = "G4"
+branch = "codex/rust-kernel-m2-12"
+paths = ["rust/crates/er-protocol/tests/authority_v2_properties.rs"]
+deliverable = "State-machine properties and malformed-input generation"
+generator = "dependency-free deterministic exhaustive and seeded generators"
+
+[[lanes]]
+id = "M2B-01"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-01"
+paths = ["rust/crates/er-kernel/src/kernel.rs", "rust/crates/er-kernel/tests/m1_keyboard_menu.rs", "rust/crates/er-kernel/tests/m2_protocol_menu.rs"]
+deliverable = "Production protocol, menu, input, and effect integration"
+contract_dependencies = ["CR-0011 full-entry recovery dispatch"]
+
+[[lanes]]
+id = "M2B-02"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-02"
+paths = ["rust/crates/er-sim/src/pair.rs"]
+deliverable = "Two-kernel effect-only orchestrator"
+contract_dependencies = ["CR-0009 endpoint-qualified presentation", "CR-0010 lossless snapshot seeds"]
+
+[[lanes]]
+id = "M2B-03"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-03"
+paths = ["rust/crates/er-testkit/src/keyboard_driver.rs", "rust/crates/er-testkit/tests/keyboard_driver_api.rs", "rust/crates/er-testkit/tests/m2_pair_driver.rs"]
+deliverable = "Persistent two-seat raw-key driver integration"
+
+[[lanes]]
+id = "M2B-04"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-04"
+paths = ["rust/crates/er-sim/tests/m2_command_campaign.rs"]
+deliverable = "Raw-key command lifecycle campaign"
+
+[[lanes]]
+id = "M2B-05"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-05"
+paths = ["rust/crates/er-sim/tests/m2_replacement_campaign.rs"]
+deliverable = "Raw-key delayed replacement campaign"
+
+[[lanes]]
+id = "M2B-06"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-06"
+paths = ["rust/crates/er-sim/tests/m2_interaction_campaign.rs"]
+deliverable = "Raw-key shared-interaction and duplicate-retry campaign"
+
+[[lanes]]
+id = "M2B-07"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-07"
+paths = ["rust/crates/er-sim/tests/m2_recovery_campaign.rs"]
+deliverable = "Recovery, control-pending, and stale-menu campaigns"
+
+[[lanes]]
+id = "M2B-08"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-08"
+paths = ["rust/crates/er-sim/tests/m2_suspend_reconnect.rs"]
+deliverable = "Suspend, resume, disconnect, reconnect, and absolute terminal campaigns"
+
+[[lanes]]
+id = "M2B-09"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-09"
+paths = ["rust/crates/er-wasm/src/m2_parity.rs", "rust/crates/er-wasm/tests/**", "rust/fixtures/v1/m2-parity/**"]
+deliverable = "Independent native/Wasm event-by-event trace parity"
+contract_dependencies = ["CR-0010 lossless diagnostic and snapshot seeds"]
+
+[[lanes]]
+id = "M2B-10"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-10"
+paths = ["rust/crates/er-sim/tests/m2_resource_teardown.rs"]
+deliverable = "Resource-zero teardown across every owner"
+
+[[lanes]]
+id = "M2B-11"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-11"
+paths = ["rust/crates/er-sim/benches/**", "rust/fixtures/v1/m2-benchmark-manifest.json", "scripts/benchmark-kernel-m2.mjs"]
+deliverable = "Four measured M2 benchmark workloads and baseline metadata"
+contract_dependencies = ["CR-0010 lossless diagnostic and snapshot seeds"]
+
+[[lanes]]
+id = "M2B-12"
+target_generation = "G5"
+branch = "codex/rust-kernel-m2b-12"
+paths = ["rust/crates/er-sim/tests/m2_api_bypass.rs", "docs/plans/rust-kernel/m2-adversarial-audit.md"]
+deliverable = "Adversarial no-bypass, no-sleep, and no-test-branch audit"
+
+[integration_owned]
+paths = [
+  "rust/Cargo.toml",
+  "rust/Cargo.lock",
+  "rust/crates/*/Cargo.toml",
+  "rust/crates/er-types/src/authority.rs",
+  "rust/crates/er-types/src/ids.rs",
+  "rust/crates/er-types/src/input.rs",
+  "rust/crates/er-types/src/lib.rs",
+  "rust/crates/er-types/src/protocol.rs",
+  "rust/crates/er-types/src/trace.rs",
+  "rust/crates/er-kernel/src/input_router.rs",
+  "rust/crates/er-protocol/src/lib.rs",
+  "rust/crates/er-sim/src/lib.rs",
+  "rust/crates/er-kernel/src/lib.rs",
+  "rust/crates/er-testkit/src/lib.rs",
+  "rust/crates/er-wasm/src/lib.rs",
+  "rust/contracts/**",
+  "rust/source-lock.toml",
+  ".github/workflows/rust-kernel.yml",
+]

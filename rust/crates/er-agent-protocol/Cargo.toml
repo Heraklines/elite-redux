@@ -1,0 +1,19 @@
+[package]
+name = "er-agent-protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+blake3.workspace = true
+er-batch = { path = "../er-batch" }
+er-dev-types = { path = "../er-dev-types" }
+er-devplane = { path = "../er-devplane" }
+er-repro = { path = "../er-repro" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

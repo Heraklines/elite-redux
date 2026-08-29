@@ -1,0 +1,15 @@
+[package]
+name = "er-render-model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+er-dev-types = { path = "../er-dev-types" }
+er-types = { path = "../er-types" }
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

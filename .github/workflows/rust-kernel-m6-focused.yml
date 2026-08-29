@@ -1,0 +1,245 @@
+name: Rust Kernel M6 Focused
+
+on:
+  push:
+    branches:
+      - "ci/rust-m6/**"
+    paths:
+      - ".github/workflows/rust-kernel-m6-focused.yml"
+      - "rust/**"
+  workflow_dispatch:
+    inputs:
+      run_workspace_regression:
+        description: "Run complete M0-M5 workspace regression"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-m6-focused-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  plan:
+    name: Focused M6 ownership plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      workspace_regression: ${{ steps.plan.outputs.workspace_regression }}
+      oracle_inputs_changed: ${{ steps.plan.outputs.oracle_inputs_changed }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          submodules: false
+      - id: plan
+        name: Classify focused change surface
+        shell: bash
+        env:
+          DISPATCH_REGRESSION: ${{ inputs.run_workspace_regression || false }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message || '' }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            changed="$(git diff-tree --no-commit-id --name-only -r HEAD)"
+          else
+            base="${{ github.event.before }}"
+            if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+              base="HEAD^"
+            fi
+            changed="$(git diff --name-only "$base" HEAD)"
+          fi
+          printf '%s\n' "$changed"
+          oracle=false
+          if grep -Eq '^(scripts/(export-kernel-(m3|m4|m5|m6)|prepare-kernel-m5)|test/kernel-fixtures/(m3|m4|m6)/|rust/contracts/m6-|rust/fixtures/m6/|\.nvmrc$|pnpm-lock\.yaml$)' <<<"$changed"; then
+            oracle=true
+          fi
+          regression=false
+          if [[ "$DISPATCH_REGRESSION" == "true" || "${GITHUB_REF_NAME}" == *"/regression/"* || "$HEAD_MESSAGE" == *"[m6-regression]"* ]]; then
+            regression=true
+          fi
+          echo "oracle_inputs_changed=$oracle" >> "$GITHUB_OUTPUT"
+          echo "workspace_regression=$regression" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Focused M6 plan"
+            echo "- Oracle inputs changed: $oracle (focused evidence never substitutes for the full oracle gate)"
+            echo "- Workspace regression: $regression"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  rust-static:
+    name: Focused Rust format check clippy
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-focused-static-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-focused-static-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Format and compile complete changed graph
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets
+      - name: Clippy M6 routine libraries
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy -p er-content-compiler -p er-battle --lib --no-deps -- \
+            -D warnings \
+            -A unused-imports \
+            -A clippy::manual-saturating-arithmetic \
+            -A clippy::useless-conversion
+
+  routine-mapping:
+    name: Focused M6 routine mapping
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-focused-routine-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-focused-routine-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run exact changed routine contracts first
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m6_routine_mapping
+          cargo test -p er-testkit --test m6_prepared_parity
+          cargo test -p er-testkit --test m6_bespoke_closure
+
+  family-tests:
+    name: Focused M6 family tests
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-focused-family-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-focused-family-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run M6 foundation and family suites
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p er-content-compiler --lib
+          cargo test -p er-battle --lib m6:: -- --test-threads=1
+          cargo test -p er-testkit --test m6_foundation --test m6_bypass --test m6_migration
+
+  workspace-regression:
+    name: Focused optional M0-M5 regression
+    if: needs.plan.outputs.workspace_regression == 'true'
+    needs:
+      - plan
+      - routine-mapping
+      - family-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-focused-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-focused-regression-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-regression-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run complete historical Rust regression
+        working-directory: rust
+        run: cargo test --workspace --all-targets
+
+  focused-aggregate:
+    name: Focused M6 aggregate
+    if: always()
+    needs:
+      - plan
+      - rust-static
+      - routine-mapping
+      - family-tests
+      - workspace-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every selected focused job
+        shell: bash
+        env:
+          STATIC_RESULT: ${{ needs.rust-static.result }}
+          ROUTINE_RESULT: ${{ needs.routine-mapping.result }}
+          FAMILY_RESULT: ${{ needs.family-tests.result }}
+          REGRESSION_RESULT: ${{ needs.workspace-regression.result }}
+        run: |
+          set -euo pipefail
+          [[ "$REGRESSION_RESULT" == success || "$REGRESSION_RESULT" == skipped ]]
+          test "$STATIC_RESULT" = success
+          test "$ROUTINE_RESULT" = success
+          test "$FAMILY_RESULT" = success
+          printf '%s\n' "Focused M6 SHA $GITHUB_SHA passed selected Rust diagnostics; full checkpoint evidence remains separate"

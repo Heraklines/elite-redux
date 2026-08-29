@@ -1,0 +1,52 @@
+m7_final_sha = "1599f19c5d05ec8646819414f6ef7556f1f8bc89"
+m7_g30_run_id = 33191709410
+m7_oracle_sha = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7"
+m7_final_tag = "rust-kernel-m7-final"
+m7_final_attestation_version = 1
+
+execution_identity_version = 1
+developer_session_version = 1
+observation_version = 1
+evidence_profile_version = 1
+
+causal_graph_version = 1
+diagnostic_digest_version = 1
+performance_evidence_version = 1
+
+restorable_snapshot_version = 7
+kernel_trace_version = 7
+repro_capsule_version = 1
+failure_oracle_version = 1
+checkpoint_store_version = 1
+session_lineage_version = 1
+
+agent_protocol_version = 1
+presentation_scene_version = 1
+platform_trace_version = 1
+render_trace_version = 1
+model_boundary_version = 1
+
+impact_graph_version = 1
+batch_environment_version = 1
+telemetry_ring_version = 1
+reload_compatibility_version = 1
+
+maximum_internal_events_per_external_input = 4096
+maximum_jsonl_line_bytes = 1048576
+maximum_inline_artifact_bytes = 65536
+maximum_capsule_manifest_bytes = 1048576
+maximum_capsule_blob_count = 4096
+maximum_capsule_uncompressed_bytes = 1073741824
+
+mechanical_compatibility_policy = "only mechanical identity controls snapshot replay and session compatibility"
+game_semantics_policy = "M7 G30 bytes and behavior remain exact"
+core_dependency_policy = "core game crates never depend on developer-plane crates"
+action_policy = "raw physical input and external environment events only"
+inspection_policy = "privileged observation never creates semantic action bypass"
+causal_id_policy = "deterministically derived independent of evidence profile"
+retention_policy = "all evidence telemetry checkpoints and artifacts are byte bounded"
+model_policy = "canonical model decisions are authority-only and responses are replay recorded"
+renderer_policy = "renderer diagnostics never enter mechanical state"
+platform_policy = "platform traces are diagnostic external evidence only"
+reload_policy = "preflight runs on an isolated fork and never mutates the live session"
+batch_policy = "single-thread deterministic reference before any parallel implementation"

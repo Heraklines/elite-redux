@@ -1,0 +1,370 @@
+schema_version = 1
+milestone = "M3"
+project = "PokéRogue Redux"
+m2_base_sha = "7357166c19bdb5cf0e32c84b0f74f22e79d80798"
+oracle_game_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
+integration_branch = "arch/rust-kernel-m3"
+branch_base_resolution = "head_sha in the m3-g6-attestation artifact from a successful overall Rust Kernel Gate run on arch/rust-kernel-m3"
+public_api = "rust/contracts/m3-api.md"
+contract_lock = "rust/contracts/m3-contract.toml"
+
+[rules]
+isolated_worktree = true
+exclusive_paths = true
+same_freeze_sha_for_each_generation = true
+public_signatures_frozen_after_g6 = true
+workers_may_spawn_agents = false
+workers_may_rebase_onto_each_other = false
+integration_owner_only_merges = true
+integration_owner_only_pushes = true
+integration_owner_only_contract_changes = true
+integration_owner_only_shared_crate_roots = true
+integration_owner_only_kernel_step = true
+production_typescript_read_only = true
+m2_source_lock_read_only = true
+local_rust_execution = false
+local_coop_vitest = false
+hosted_rust_gate_required = true
+branch_base_must_equal_hosted_green_head = true
+integration_owner_verifies_green_attestation = true
+one_behavioral_concern_per_commit = true
+
+[dependency_order]
+m3a = ["types", "rng", "content", "state", "command_control", "fixtures", "tests"]
+m3b = ["ordering", "numeric_mechanics", "effects", "switch_faint_outcome", "presentation", "differential_tests"]
+m3c = ["game_runtime", "ui_adapter", "material_protocol", "kernel_step", "simulated_pair", "campaigns", "wasm_teardown_benchmarks"]
+
+[generation_gates]
+m3b_requires_all_38_published_fixtures = true
+m3b_requires_both_published_supporting_artifacts = true
+m3b_requires_fresh_process_double_export_job = true
+m3b_requires_gap_free_manifest = true
+m3b_requires_branch_aware_hosted_publication_job = true
+m3b_requires_independent_exact_sha_export_checkouts = true
+m3b_requires_verified_git_and_content_provenance = true
+
+[[lanes]]
+id = "M3A-01"
+generation = "M3A"
+branch = "wrk/rk-m3a-01-rng"
+paths = ["rust/crates/er-rng/src/phaser.rs", "rust/crates/er-rng/src/battle.rs", "rust/crates/er-rng/src/audit.rs", "rust/crates/er-rng/tests/m3_rng.rs"]
+deliverable = "Exact Phaser-compatible run and battle RNG implementation, state, audit, and golden tests"
+contract_dependencies = ["m3-js-number-rng.md", "m3-rng-oracle.md"]
+
+[[lanes]]
+id = "M3A-02"
+generation = "M3A"
+branch = "wrk/rk-m3a-02-types"
+paths = ["rust/crates/er-types/src/battle_ids.rs", "rust/crates/er-types/src/battle_model.rs"]
+deliverable = "Stable battle IDs, canonical byte/full-width wrappers, topology IDs, and closed battle enums"
+contract_dependencies = ["m3-api.md"]
+
+[[lanes]]
+id = "M3A-03"
+generation = "M3A"
+branch = "wrk/rk-m3a-03-content-species"
+paths = ["rust/crates/er-content/src/species.rs", "rust/crates/er-content/src/pack.rs", "rust/crates/er-content/tests/m3_species_pack.rs"]
+deliverable = "Selected species data, immutable pack construction, capability validation, and content hash"
+contract_dependencies = ["m3-slice-manifest.json", "m3-capability-manifest.json", "m3-content-oracle.md"]
+
+[[lanes]]
+id = "M3A-04"
+generation = "M3A"
+branch = "wrk/rk-m3a-04-content-moves"
+paths = ["rust/crates/er-content/src/moves.rs", "rust/crates/er-content/src/abilities.rs", "rust/crates/er-content/tests/m3_moves_abilities.rs"]
+deliverable = "Selected move and ability definitions with closed supported effects"
+contract_dependencies = ["m3-slice-manifest.json", "m3-capability-manifest.json", "m3-content-oracle.md"]
+
+[[lanes]]
+id = "M3A-05"
+generation = "M3A"
+branch = "wrk/rk-m3a-05-exporter"
+paths = ["scripts/export-kernel-m3-oracle.mjs", "test/kernel-fixtures/m3/export-battle-oracle.test.ts", "rust/fixtures/m3/oracle/**"]
+deliverable = "Fresh-process deterministic TypeScript oracle exporter and generated causal fixtures"
+contract_dependencies = ["m3-oracle-export.md", "m3-oracle-exporter-design.md"]
+
+[[lanes]]
+id = "M3A-06"
+generation = "M3A"
+branch = "wrk/rk-m3a-06-state-pokemon"
+paths = ["rust/crates/er-state/src/pokemon.rs", "rust/crates/er-state/tests/m3_pokemon_state.rs"]
+deliverable = "Canonical Pokémon, move-slot, ability/passive, status, and stat-stage state"
+contract_dependencies = ["m3-api.md", "m3-state-oracle.md"]
+
+[[lanes]]
+id = "M3A-07"
+generation = "M3A"
+branch = "wrk/rk-m3a-07-state-battle"
+paths = ["rust/crates/er-state/src/battle.rs", "rust/crates/er-state/src/field.rs", "rust/crates/er-state/src/format.rs", "rust/crates/er-state/src/conditions.rs", "rust/crates/er-state/tests/m3_battle_state.rs"]
+deliverable = "Canonical battle, party, field, topology, format, turn, and outcome state"
+contract_dependencies = ["m3-api.md", "m3-state-oracle.md"]
+
+[[lanes]]
+id = "M3A-08"
+generation = "M3A"
+branch = "wrk/rk-m3a-08-state-validation"
+paths = ["rust/crates/er-state/src/validation.rs", "rust/crates/er-state/src/snapshot.rs", "rust/crates/er-state/src/digest.rs", "rust/crates/er-state/tests/m3_validation.rs"]
+deliverable = "State invariants, canonical mechanical snapshots, and MechanicalStateDigest"
+contract_dependencies = ["m3-api.md", "m3-snapshot-trace.md"]
+
+[[lanes]]
+id = "M3A-09"
+generation = "M3A"
+branch = "wrk/rk-m3a-09-command"
+paths = ["rust/crates/er-types/src/battle_command.rs", "rust/crates/er-battle/src/command.rs", "rust/crates/er-battle/src/legality.rs", "rust/crates/er-battle/tests/m3_command_legality.rs"]
+deliverable = "Typed Fight/Switch commands, forced-replacement proposals, exact fingerprints, and fail-closed legality"
+contract_dependencies = ["m3-api.md", "m3-content-oracle.md"]
+
+[[lanes]]
+id = "M3A-10"
+generation = "M3A"
+branch = "wrk/rk-m3a-10-control-dto"
+paths = ["rust/crates/er-types/src/battle_control.rs", "rust/crates/er-types/src/battle_ui.rs"]
+deliverable = "BattleControl, per-seat allocator DTOs, stable menu identities/graphs, and typed presentation DTOs"
+contract_dependencies = ["m3-api.md", "m3-ui-navigation.md", "m3-presentation-control.md"]
+
+[[lanes]]
+id = "M3A-11"
+generation = "M3A"
+branch = "wrk/rk-m3a-11-wasm-schema"
+paths = ["rust/crates/er-wasm/src/m3_schema.rs", "rust/crates/er-wasm/tests/m3_schema.rs", "rust/fixtures/m3/schema/**"]
+deliverable = "Native/wasm32 JSON and exact-bit-string schema parity for M3 DTOs"
+contract_dependencies = ["m3-api.md", "m3-contract.toml"]
+
+[[lanes]]
+id = "M3A-12"
+generation = "M3A"
+branch = "wrk/rk-m3a-12-foundation-tests"
+paths = ["rust/crates/er-testkit/src/m3_fixture.rs", "rust/crates/er-testkit/tests/m3_foundation_properties.rs"]
+deliverable = "Cross-crate foundation fixture loader and dependency-free deterministic property checks"
+contract_dependencies = ["m3-coverage-map.json", "m3-oracle-manifest.json"]
+
+[[lanes]]
+id = "M3B-01"
+generation = "M3B"
+branch = "wrk/rk-m3b-01-order"
+paths = ["rust/crates/er-battle/src/action_order.rs", "rust/crates/er-battle/tests/m3_action_order.rs"]
+deliverable = "Exact supported action comparator, speed tie draw, and switch ordering"
+contract_dependencies = ["m3-action-order-oracle.md", "m3-js-number-rng.md"]
+
+[[lanes]]
+id = "M3B-02"
+generation = "M3B"
+branch = "wrk/rk-m3b-02-accuracy-crit"
+paths = ["rust/crates/er-battle/src/accuracy.rs", "rust/crates/er-battle/src/critical.rs", "rust/crates/er-battle/tests/m3_accuracy_critical.rs"]
+deliverable = "Accuracy and critical-hit rules with exact RNG draw order"
+contract_dependencies = ["m3-damage-oracle.md", "m3-js-number-rng.md"]
+
+[[lanes]]
+id = "M3B-03"
+generation = "M3B"
+branch = "wrk/rk-m3b-03-damage"
+paths = ["rust/crates/er-battle/src/js_math.rs", "rust/crates/er-battle/src/damage.rs", "rust/crates/er-battle/tests/m3_damage.rs"]
+deliverable = "JavaScript-ordered damage formula, rounding points, STAB, burn, variance, and minimum damage"
+contract_dependencies = ["m3-damage-oracle.md", "m3-js-number-rng.md"]
+
+[[lanes]]
+id = "M3B-04"
+generation = "M3B"
+branch = "wrk/rk-m3b-04-types"
+paths = ["rust/crates/er-battle/src/type_effectiveness.rs", "rust/crates/er-battle/tests/m3_type_effectiveness.rs"]
+deliverable = "Selected-slice type chart and immunity/effectiveness composition"
+contract_dependencies = ["m3-content-oracle.md", "m3-damage-oracle.md"]
+
+[[lanes]]
+id = "M3B-05"
+generation = "M3B"
+branch = "wrk/rk-m3b-05-status-stage"
+paths = ["rust/crates/er-battle/src/stat_stage.rs", "rust/crates/er-battle/src/status.rs", "rust/crates/er-battle/tests/m3_status_stage.rs"]
+deliverable = "Stat stages plus Burn, Poison, and Paralysis application and residual behavior"
+contract_dependencies = ["m3-action-order-oracle.md", "m3-damage-oracle.md"]
+
+[[lanes]]
+id = "M3B-06"
+generation = "M3B"
+branch = "wrk/rk-m3b-06-move-effects"
+paths = ["rust/crates/er-battle/src/move_effect.rs", "rust/crates/er-battle/src/move_pipeline.rs", "rust/crates/er-battle/tests/m3_move_pipeline.rs"]
+deliverable = "Closed physical, special, and status move-effect pipeline"
+contract_dependencies = ["m3-content-oracle.md", "m3-action-order-oracle.md"]
+
+[[lanes]]
+id = "M3B-07"
+generation = "M3B"
+branch = "wrk/rk-m3b-07-abilities"
+paths = ["rust/crates/er-battle/src/ability.rs", "rust/crates/er-battle/src/ability_pipeline.rs", "rust/crates/er-battle/tests/m3_ability_pipeline.rs"]
+deliverable = "NONE, Intimidate-like switch-in, and selected type-immunity ability triggers"
+contract_dependencies = ["m3-content-oracle.md", "m3-action-order-oracle.md"]
+
+[[lanes]]
+id = "M3B-08"
+generation = "M3B"
+branch = "wrk/rk-m3b-08-switch"
+paths = ["rust/crates/er-battle/src/switch.rs", "rust/crates/er-battle/tests/m3_switch.rs"]
+deliverable = "Voluntary switch legality, mutations, switch-in triggers, and presentation evidence"
+contract_dependencies = ["m3-action-order-oracle.md"]
+
+[[lanes]]
+id = "M3B-09"
+generation = "M3B"
+branch = "wrk/rk-m3b-09-faint-replacement"
+paths = ["rust/crates/er-battle/src/faint.rs", "rust/crates/er-battle/src/replacement.rs", "rust/crates/er-battle/tests/m3_faint_replacement.rs"]
+deliverable = "Faint queue, occurrence identity, simultaneous faints, and replacement transition"
+contract_dependencies = ["m3-action-order-oracle.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3B-10"
+generation = "M3B"
+branch = "wrk/rk-m3b-10-turn-outcome"
+paths = ["rust/crates/er-battle/src/turn.rs", "rust/crates/er-battle/src/outcome.rs", "rust/crates/er-battle/tests/m3_turn_outcome.rs"]
+deliverable = "Turn orchestration, residual phase, next control, victory, and defeat"
+contract_dependencies = ["m3-action-order-oracle.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3B-11"
+generation = "M3B"
+branch = "wrk/rk-m3b-11-presentation"
+paths = ["rust/crates/er-battle/src/presentation.rs", "rust/crates/er-battle/tests/m3_presentation.rs"]
+deliverable = "Typed ordered battle presentation plan builder"
+contract_dependencies = ["m3-presentation-control.md", "m3-oracle-manifest.json"]
+
+[[lanes]]
+id = "M3B-12"
+generation = "M3B"
+branch = "wrk/rk-m3b-12-differential"
+paths = ["rust/crates/er-battle/tests/m3_oracle_differential.rs", "rust/crates/er-battle/tests/m3_mechanics_properties.rs"]
+deliverable = "Oracle causal differential suite and first-divergence diagnostics"
+contract_dependencies = ["m3-oracle-export.md", "m3-coverage-map.json"]
+
+[[lanes]]
+id = "M3C-01"
+generation = "M3C"
+branch = "wrk/rk-m3c-01-game-runtime"
+paths = ["rust/crates/er-game/src/runtime.rs", "rust/crates/er-game/src/internal_event.rs", "rust/crates/er-game/src/transaction.rs", "rust/crates/er-game/tests/m3_runtime.rs"]
+deliverable = "GameRuntime, internal FIFO, clone-and-swap transaction, command collection, and control state"
+contract_dependencies = ["m3-internal-event-loop.md", "m3-atomic-transition.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3C-02"
+generation = "M3C"
+branch = "wrk/rk-m3c-02-ui-adapter"
+paths = ["rust/crates/er-kernel/src/input_router.rs", "rust/crates/er-kernel/src/ui_reducer.rs", "rust/crates/er-kernel/src/battle_ui.rs", "rust/crates/er-kernel/tests/m3_battle_ui.rs"]
+deliverable = "Menu-instance-bound raw input and exact graph reducer adapter"
+contract_dependencies = ["m3-ui-navigation.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3C-03"
+generation = "M3C"
+branch = "wrk/rk-m3c-03-command-menus"
+paths = ["rust/crates/er-game/src/command_menu.rs", "rust/crates/er-game/src/move_menu.rs", "rust/crates/er-game/src/target_menu.rs", "rust/crates/er-game/tests/m3_command_menus.rs"]
+deliverable = "Command, move, target menu construction, cancel history, and command collection"
+contract_dependencies = ["m3-command-ui-oracle.md", "m3-ui-navigation.md"]
+
+[[lanes]]
+id = "M3C-04"
+generation = "M3C"
+branch = "wrk/rk-m3c-04-party-menus"
+paths = ["rust/crates/er-game/src/party_menu.rs", "rust/crates/er-game/src/party_option_menu.rs", "rust/crates/er-game/src/replacement_menu.rs", "rust/crates/er-game/tests/m3_party_menus.rs"]
+deliverable = "Voluntary party, Send Out option submenu, and mandatory replacement menu construction"
+contract_dependencies = ["m3-command-ui-oracle.md", "m3-ui-navigation.md"]
+
+[[lanes]]
+id = "M3C-05"
+generation = "M3C"
+branch = "wrk/rk-m3c-05-local-flow"
+paths = ["rust/crates/er-game/src/local_battle.rs", "rust/crates/er-game/tests/m3_local_battle.rs"]
+deliverable = "Single-kernel battle lifecycle through the same GameRuntime and material path"
+contract_dependencies = ["m3-atomic-transition.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3C-06"
+generation = "M3C"
+branch = "wrk/rk-m3c-06-authority"
+paths = ["rust/crates/er-game/src/authority_commands.rs", "rust/crates/er-kernel/src/battle_authority.rs", "rust/crates/er-kernel/tests/m3_authority_commands.rs"]
+deliverable = "Authority command/replacement admission, resolution request, and staged commit adapter"
+contract_dependencies = ["m3-atomic-transition.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3C-07"
+generation = "M3C"
+branch = "wrk/rk-m3c-07-material-apply"
+paths = ["rust/crates/er-game/src/material.rs", "rust/crates/er-kernel/src/battle_replica.rs", "rust/crates/er-kernel/tests/m3_material_apply.rs"]
+deliverable = "One serialized TURN/REPLACEMENT applier with partial-frontier reconciliation and allocator sync"
+contract_dependencies = ["m3-atomic-transition.md", "m3-api.md"]
+
+[[lanes]]
+id = "M3C-08"
+generation = "M3C"
+branch = "wrk/rk-m3c-08-protocol-material"
+paths = ["rust/crates/er-protocol/src/battle_material.rs", "rust/crates/er-protocol/src/replacement_material.rs", "rust/crates/er-protocol/tests/m3_battle_material.rs"]
+deliverable = "Authority V2 TURN/REPLACEMENT opaque-envelope digest, kind, revision, and operation validation"
+contract_dependencies = ["m3-api.md", "m3-error-policy.md"]
+
+[[lanes]]
+id = "M3C-09"
+generation = "M3C"
+branch = "wrk/rk-m3c-09-raw-local"
+paths = ["rust/crates/er-sim/tests/m3_raw_key_local.rs"]
+deliverable = "Representative singles raw-key battle campaigns with no semantic bypass"
+contract_dependencies = ["m3-coverage-map.json", "m3-ui-navigation.md"]
+
+[[lanes]]
+id = "M3C-10"
+generation = "M3C"
+branch = "wrk/rk-m3c-10-raw-coop"
+paths = ["rust/crates/er-sim/tests/m3_raw_key_coop.rs"]
+deliverable = "Two-seat forced-doubles authority/replica campaigns through transport effects"
+contract_dependencies = ["m3-coverage-map.json", "m3-api.md"]
+
+[[lanes]]
+id = "M3C-11"
+generation = "M3C"
+branch = "wrk/rk-m3c-11-snapshot-fault"
+paths = ["rust/crates/er-sim/src/snapshot.rs", "rust/crates/er-sim/tests/m3_snapshot_continuation.rs",
+"rust/crates/er-sim/tests/m3_fault_recovery.rs", "rust/crates/er-kernel/src/snapshot.rs",
+"rust/crates/er-game/src/snapshot.rs", "rust/crates/er-protocol/src/snapshot.rs"]
+deliverable = "Complete owner/endpoint/pair restoration plus delayed/duplicate/corrupt/reconnect fault continuations"
+contract_dependencies = ["m3-snapshot-trace.md", "m3-error-policy.md"]
+
+[[lanes]]
+id = "M3C-12"
+generation = "M3C"
+branch = "wrk/rk-m3c-12-final-evidence"
+paths = ["rust/crates/er-wasm/src/m3_parity.rs", "rust/crates/er-wasm/tests/m3_parity.rs", "rust/crates/er-sim/tests/m3_resource_teardown.rs", "rust/crates/er-sim/tests/m3_api_bypass.rs", "rust/crates/er-sim/benches/m3_benchmark.rs", "rust/fixtures/m3/m3-benchmark-manifest.json", "scripts/benchmark-kernel-m3.mjs"]
+deliverable = "Eventwise native/wasm32 parity, teardown, architecture-negative audit, and measured benchmarks"
+contract_dependencies = ["m3-snapshot-trace.md", "m3-coverage-map.json"]
+
+[integration_owned]
+paths = [
+  "rust/Cargo.toml",
+  "rust/Cargo.lock",
+  "rust/crates/*/Cargo.toml",
+  "rust/crates/*/src/lib.rs",
+  "rust/crates/er-battle/src/error.rs",
+  "rust/crates/er-battle/src/resolver.rs",
+  "rust/crates/er-kernel/src/kernel.rs",
+  "rust/crates/er-kernel/tests/m1_keyboard_menu.rs",
+  "rust/crates/er-kernel/tests/m2_protocol_menu.rs",
+  "rust/crates/er-protocol/src/lib.rs",
+  "rust/crates/er-sim/src/lib.rs",
+  "rust/crates/er-sim/src/pair.rs",
+  "rust/crates/er-testkit/src/lib.rs",
+  "rust/crates/er-testkit/src/protocol_fixture_harness.rs",
+  "rust/crates/er-types/src/lib.rs",
+  "rust/crates/er-types/src/authority.rs",
+  "rust/crates/er-types/src/protocol.rs",
+  "rust/crates/er-types/src/trace.rs",
+  "rust/crates/er-types/src/ui.rs",
+  "rust/contracts/**",
+  "rust/fixtures/m3/m3-slice-manifest.json",
+  "rust/fixtures/m3/m3-capability-manifest.json",
+  "rust/fixtures/m3/m3-oracle-manifest.json",
+  "rust/fixtures/m3/m3-coverage-map.json",
+  "rust/source-lock.toml",
+  ".github/workflows/rust-kernel.yml",
+]
+
+[[integration_exceptions]]
+lane = "M3A-05"
+paths = ["scripts/export-kernel-m3-oracle.mjs", "test/kernel-fixtures/m3/export-battle-oracle.test.ts"]
+scope = "test/export tooling only; no production TypeScript path may change"
+approved_by = "integration owner"

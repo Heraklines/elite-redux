@@ -1,0 +1,32 @@
+[package]
+name = "er-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+er-battle = { path = "../er-battle" }
+er-canonical = { path = "../er-canonical" }
+er-content = { path = "../er-content" }
+er-game = { path = "../er-game" }
+er-kernel = { path = "../er-kernel" }
+er-progression = { path = "../er-progression" }
+er-protocol = { path = "../er-protocol" }
+er-rng = { path = "../er-rng" }
+er-state = { path = "../er-state" }
+er-types = { path = "../er-types" }
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+wasm-bindgen-test.workspace = true
+
+[lints]
+workspace = true
