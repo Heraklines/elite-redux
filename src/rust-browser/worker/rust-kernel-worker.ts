@@ -21,7 +21,7 @@ function postBytes(bytes: Uint8Array): void {
     throw new Error("worker response is empty or oversized");
   }
   const transferable = bytes.slice();
-  self.postMessage(transferable.buffer, { transfer: [transferable.buffer] });
+  self.postMessage(transferable.buffer, [transferable.buffer]);
 }
 
 function postProtocolFault(code: string, message: string, requestId = 0, sequence = 0): void {

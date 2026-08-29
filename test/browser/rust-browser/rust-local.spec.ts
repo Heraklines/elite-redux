@@ -17,10 +17,13 @@ let server: ViteDevServer;
 const html = `<!doctype html>
 <html><body><main id="ui"></main><section id="presentation"></section>
 <script type="module">
+globalThis.__m8Stage = "SCRIPT_START";
+globalThis.addEventListener("unhandledrejection", event => { globalThis.__m8StartupError = String(event.reason?.stack ?? event.reason); });
 import { startRustLocalRoute } from "/src/rust-browser/routes/rust-local-entry.ts";
 const manifest = await (await fetch("/m8-assets/m8-web-assets.json")).json();
 const identity = new Uint8Array(await (await fetch("/m8-assets/execution-identity.bin")).arrayBuffer());
 let snapshot = new Uint8Array(await (await fetch("/m8-assets/session-start.json")).arrayBuffer());
+globalThis.__m8Stage = "ASSETS_READY";
 let session;
 async function start() {
   const worker = new URL("/src/rust-browser/worker/rust-kernel-worker.ts", location.href);
@@ -28,6 +31,7 @@ async function start() {
   worker.searchParams.set("wasm_sha256", manifest.assets["er_web.wasm"].sha256);
   worker.searchParams.set("content", "/m8-assets/content-pack.json");
   worker.searchParams.set("content_sha256", manifest.assets["content-pack.json"].sha256);
+  globalThis.__m8Stage = "HOST_START";
   session = await startRustLocalRoute({
     workerUrl: worker,
     executionIdentityBytes: identity,
@@ -38,8 +42,13 @@ async function start() {
     executionIdentity: new TextDecoder().decode(identity),
     contentIdentity: manifest.assets["content-pack.json"].sha256,
   });
+  globalThis.__m8Stage = "HOST_READY";
 }
-await start();
+try {
+  await start();
+} catch (error) {
+  globalThis.__m8StartupError = String(error?.stack ?? error);
+}
 globalThis.__m8Harness = {
   async reload() { snapshot = await session.snapshot(); await session.dispose(); await start(); },
   async repro() { return Array.from(await session.exportRepro()); },
@@ -104,8 +113,26 @@ test("natural raw-key Rust-local run restores and tears down", async ({ page }) 
   if (address == null) {
     throw new Error("Vite did not publish a Rust-local address");
   }
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  page.on("console", message => {
+    if (message.type() === "error") {
+      pageErrors.push(message.text());
+    }
+  });
+  page.on("requestfailed", request => pageErrors.push(`${request.url()}: ${request.failure()?.errorText ?? "failed"}`));
   await page.goto(new URL("rust-local-test.html", address).href);
-  await expect(page.locator("[data-rust-kernel-view='reference-v1']")).toBeVisible();
+  try {
+    await expect(page.locator("[data-rust-kernel-view='reference-v1']")).toBeVisible({ timeout: 20_000 });
+  } catch (error) {
+    const startup = await page.evaluate(() => ({
+      stage: globalThis.__m8Stage,
+      error: globalThis.__m8StartupError,
+    }));
+    throw new Error(
+      `Rust-local browser did not initialize: ${String(error)}; stage: ${startup.stage}; startup: ${startup.error}; page errors: ${pageErrors.join(" | ")}`,
+    );
+  }
   await page.keyboard.press("Space");
   await expect(page.locator("[role='alert'][data-kind='terminal']")).toBeVisible({ timeout: 15_000 });
   const actualDigest = await page.evaluate(() =>

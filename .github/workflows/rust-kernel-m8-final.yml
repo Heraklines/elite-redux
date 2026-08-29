@@ -187,16 +187,23 @@ jobs:
           name: m8-final-web-${{ github.sha }}
           path: ${{ runner.temp }}/m8-web
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - name: Run cross-browser Rust core matrix
+      - name: Run cross-browser platform matrix
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m8-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=${{ matrix.browser }}
+          test/browser/rust-browser/save-offline.spec.ts
+          test/browser/rust-browser/release-cache.spec.ts
+          test/browser/rust-browser/input-accessibility.spec.ts
+      - name: Run cross-engine Wasm worker journey
+        if: matrix.browser != 'firefox'
         env:
           M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m8-web
         run: >-
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=${{ matrix.browser }}
           test/browser/rust-browser/rust-local.spec.ts
-          test/browser/rust-browser/save-offline.spec.ts
-          test/browser/rust-browser/release-cache.spec.ts
-          test/browser/rust-browser/input-accessibility.spec.ts
       - name: Run Chromium production-fidelity Rust Phaser and co-op
         if: matrix.browser == 'chromium'
         env:

@@ -7,7 +7,7 @@ export interface RustWasmHostV1 {
 }
 
 export interface RustWasmModuleV1 {
-  default(input: { module_or_path: WebAssembly.Module }): Promise<unknown>;
+  default(input: { module_or_path: Uint8Array<ArrayBuffer> }): Promise<unknown>;
   BrowserKernelHostV1: {
     create(contentBytes: Uint8Array, initBytes: Uint8Array): RustWasmHostV1;
   };
@@ -39,7 +39,6 @@ export async function loadRustWasmModule(url: URL, expectedSha256: string): Prom
   if (actual !== expectedSha256) {
     throw new Error("Wasm release digest mismatch");
   }
-  const module = await WebAssembly.compile(bytes);
   const glueUrl = new URL(url.href.replace(/\.wasm$/u, ".js"));
   // Release-manifest selection determines the same-origin glue URL at runtime.
   const glue: unknown = await import(/* @vite-ignore */ glueUrl.href);
@@ -52,6 +51,11 @@ export async function loadRustWasmModule(url: URL, expectedSha256: string): Prom
     throw new Error("Wasm glue does not expose the frozen browser ABI");
   }
   const typed = glue as RustWasmModuleV1;
-  await typed.default({ module_or_path: module });
+  const verifiedBytes = new Uint8Array(bytes);
+  try {
+    await typed.default({ module_or_path: verifiedBytes });
+  } finally {
+    verifiedBytes.fill(0);
+  }
   return typed;
 }
