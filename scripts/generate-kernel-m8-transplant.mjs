@@ -13,7 +13,9 @@ const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8"
 const approved = path =>
   path.startsWith("rust/")
   || path.startsWith("docs/plans/rust-kernel/")
+  || path.startsWith("schemas/kernel/source/")
   || /^scripts\/(?:audit|benchmark|build|check|classify|diagnose|export|generate|prepare)-kernel-.*\.mjs$/u.test(path)
+  || path.startsWith("test/kernel-fixtures/v1/")
   || path === "test/kernel-fixtures/m3/export-battle-oracle.test.ts"
   || path === "test/kernel-fixtures/m4/export-helper-runner.test.ts"
   || path === "test/kernel-fixtures/m4/export-run-oracle.test.ts"
@@ -53,6 +55,7 @@ const manifest = {
   allowed_roots: [
     ".github/workflows/rust-kernel-*.yml",
     "docs/plans/rust-kernel/**",
+    "schemas/kernel/source/**",
     "rust/**",
     "scripts/audit-kernel-*.mjs",
     "scripts/benchmark-kernel-*.mjs",
@@ -63,6 +66,7 @@ const manifest = {
     "scripts/export-kernel-*.mjs",
     "scripts/generate-kernel-*.mjs",
     "scripts/prepare-kernel-*.mjs",
+    "test/kernel-fixtures/v1/**",
     "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
     "test/kernel-fixtures/m4/export-helper-runner.test.ts",
     "test/kernel-fixtures/m4/export-run-oracle.test.ts",

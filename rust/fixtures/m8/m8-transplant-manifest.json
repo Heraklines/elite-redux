@@ -11,6 +11,7 @@
   "allowed_roots": [
     ".github/workflows/rust-kernel-*.yml",
     "docs/plans/rust-kernel/**",
+    "schemas/kernel/source/**",
     "rust/**",
     "scripts/audit-kernel-*.mjs",
     "scripts/benchmark-kernel-*.mjs",
@@ -21,6 +22,7 @@
     "scripts/export-kernel-*.mjs",
     "scripts/generate-kernel-*.mjs",
     "scripts/prepare-kernel-*.mjs",
+    "test/kernel-fixtures/v1/**",
     "test/kernel-fixtures/m3/export-battle-oracle.test.ts",
     "test/kernel-fixtures/m4/export-helper-runner.test.ts",
     "test/kernel-fixtures/m4/export-run-oracle.test.ts",
@@ -42,7 +44,7 @@
     "vite.config.*",
     "workers/**"
   ],
-  "file_count": 839,
+  "file_count": 855,
   "files": [
     {
       "path": ".github/workflows/rust-kernel-m4.yml",
@@ -4821,6 +4823,36 @@
       "digest": "2a21d24b5ba7985a96acce755c5b19414d34b79a"
     },
     {
+      "path": "schemas/kernel/source/authority-v2-map-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "64a32f4d72d1415a2834df6d7bf89dd00b96c21f"
+    },
+    {
+      "path": "schemas/kernel/source/canonicalization-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "80062743eb98f397cf858d0fcd1ec47fe323b8ac"
+    },
+    {
+      "path": "schemas/kernel/source/input-map-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "4f2186d436c8daab44f3ba6d354da865e73573bc"
+    },
+    {
+      "path": "schemas/kernel/source/menu-behaviors-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "5a79dfe04620981c5ae789d0436aad5da8281461"
+    },
+    {
+      "path": "schemas/kernel/source/state-fields-v1.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e8c63ab6202d4e0d8d564cbf6391a376badac933"
+    },
+    {
       "path": "scripts/audit-kernel-m7-architecture.mjs",
       "mode": "100644",
       "type": "blob",
@@ -5077,6 +5109,72 @@
       "mode": "100644",
       "type": "blob",
       "digest": "a783cf66e505bef030a037e088b3381f36fce87a"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/authority-entry-kinds.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7d67f2cc313dc1c1ea597fe03e05c2011c1570a4"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/authority-v2/contracts.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "b4ce63ad6f110e4bd4a63be4ddfa5f43ce82b87e"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/buttons.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "8adf328267d61e220c11f640bfa2c42225ed8e49"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/checkpoints.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bf890357aca27176768ff0ac153912f08359ba9f"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/input-maps.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "e1e09349e0f48cdd526d217d0704cc9d110f4220"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "28b207a7d452c6661ddf23cc56662f33128ab22a"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/next-controls.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "dbd3cf459179e6468268d316962bde81d848ad20"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/protocol.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "7fd4e1707fa0201f1480450bd1b08e5d620c6d51"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/receipts.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "88ef5ee8d394afd73dc434dd4ac5636adf2f022e"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/replay-traces.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "bfa6646363e67df24b9fb013535fb4924bf10770"
+    },
+    {
+      "path": "test/kernel-fixtures/v1/schema.json",
+      "mode": "100644",
+      "type": "blob",
+      "digest": "20c352d027d2e2148ed9508a6587651beaca9c7b"
     }
   ]
 }

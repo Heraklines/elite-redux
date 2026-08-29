@@ -1,0 +1,232 @@
+{
+  "canonical_digest": "baf6c7ed3dbec6d5a41190671c336c09db520e7694abdec4eed3fd739f0efafe",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "canonical_algorithms": [
+      "makeReplayTrace",
+      "validateReplayTrace"
+    ],
+    "fixtures": [
+      {
+        "id": "valid-coop-v2",
+        "trace": {
+          "challenges": [
+            {
+              "id": 7,
+              "severity": 1,
+              "value": 2
+            }
+          ],
+          "coop": {
+            "runConfig": {
+              "challenges": [
+                {
+                  "id": 7,
+                  "severity": 1,
+                  "value": 2
+                }
+              ],
+              "difficulty": "elite",
+              "kind": "coop",
+              "netcodeMode": "authoritative",
+              "seed": "fixture-coop-seed"
+            }
+          },
+          "difficulty": "elite",
+          "events": [
+            {
+              "command": {
+                "kind": "move",
+                "moveIndex": 0,
+                "target": 2
+              },
+              "slotFieldIndex": 0,
+              "turn": 0,
+              "type": "command",
+              "wave": 1
+            },
+            {
+              "choice": 1,
+              "data": [
+                0,
+                0
+              ],
+              "kind": "reward",
+              "seq": 0,
+              "type": "interaction"
+            }
+          ],
+          "gameModeId": 6,
+          "roster": [
+            {
+              "coopOwner": "host",
+              "hp": 20,
+              "level": 5,
+              "maxHp": 20,
+              "species": 1
+            },
+            {
+              "coopOwner": "guest",
+              "hp": 20,
+              "level": 5,
+              "maxHp": 20,
+              "species": 4
+            }
+          ],
+          "seed": "fixture-coop-seed",
+          "version": 2
+        },
+        "validation": {
+          "errors": [],
+          "ok": true
+        }
+      },
+      {
+        "id": "valid-single-player-v2-with-end-state",
+        "trace": {
+          "challenges": [],
+          "checkpoint": {
+            "modifiers": [],
+            "money": 321,
+            "party": [
+              {
+                "hp": 30,
+                "level": 10,
+                "maxHp": 30,
+                "species": 25
+              }
+            ],
+            "pokeballCounts": {
+              "POKEBALL": 2
+            },
+            "seed": "fixture-solo-seed",
+            "wave": 2
+          },
+          "difficulty": "youngster",
+          "endState": {
+            "money": 321,
+            "party": [
+              {
+                "hp": 30,
+                "level": 10,
+                "maxHp": 30,
+                "species": 25
+              }
+            ],
+            "waveIndex": 2
+          },
+          "events": [
+            {
+              "command": {
+                "kind": "run"
+              },
+              "slotFieldIndex": 0,
+              "turn": 1,
+              "type": "command",
+              "wave": 2
+            }
+          ],
+          "gameModeId": 0,
+          "roster": [
+            {
+              "hp": 30,
+              "level": 10,
+              "maxHp": 30,
+              "species": 25
+            }
+          ],
+          "seed": "fixture-solo-seed",
+          "version": 2
+        },
+        "validation": {
+          "errors": [],
+          "ok": true
+        }
+      },
+      {
+        "id": "valid-legacy-v1",
+        "trace": {
+          "challenges": [],
+          "difficulty": "youngster",
+          "events": [],
+          "gameModeId": 0,
+          "roster": [
+            {
+              "species": 1
+            }
+          ],
+          "seed": "fixture-v1-seed",
+          "version": 1
+        },
+        "validation": {
+          "errors": [],
+          "ok": true
+        }
+      },
+      {
+        "id": "invalid-structure",
+        "trace": {
+          "challenges": [],
+          "checkpoint": {
+            "party": [],
+            "seed": "",
+            "wave": 1.5
+          },
+          "coop": {},
+          "difficulty": "youngster",
+          "events": [
+            {
+              "command": {
+                "kind": "unknown"
+              },
+              "slotFieldIndex": 0,
+              "turn": 0,
+              "type": "command",
+              "wave": 1.5
+            },
+            {
+              "choice": "bad",
+              "kind": 3,
+              "seq": "bad",
+              "type": "interaction"
+            },
+            {
+              "type": "future"
+            }
+          ],
+          "gameModeId": 0,
+          "roster": [],
+          "seed": "",
+          "version": 99
+        },
+        "validation": {
+          "errors": [
+            "unsupported trace version 99 (loader supports 1/2)",
+            "missing run seed (a replay needs the seed to pin RNG)",
+            "empty roster (a replay needs at least one starting mon)",
+            "event[0] command: wave/turn/slotFieldIndex must be integers",
+            "event[0] command: malformed command kind",
+            "event[1] interaction: seq/kind/choice malformed",
+            "event[2]: unknown event type future",
+            "coop layer present but missing runConfig",
+            "checkpoint present but missing a valid wave/seed cursor",
+            "checkpoint present but has an empty party (a boot needs at least one mon)"
+          ],
+          "ok": false
+        }
+      }
+    ],
+    "source_file": "src/data/elite-redux/replay-trace.ts",
+    "supported_versions": [
+      1,
+      2
+    ],
+    "trace_version": 2
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/data/elite-redux/replay-trace.ts"
+}

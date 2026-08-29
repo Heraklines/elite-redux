@@ -1,0 +1,329 @@
+{
+  "canonical_digest": "ce661010164c12faf803bf3b5d5a4aba16ae851215ee455e7c8ff107ea52c461",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "canonical_algorithms": [
+      "serializeMonState",
+      "serializeArenaTag",
+      "buildCheckpoint",
+      "normalizeMonState"
+    ],
+    "fixtures": [
+      {
+        "id": "build-clamps-and-optional-fields",
+        "input": {
+          "arena": {
+            "arenaTags": [
+              {
+                "layers": 0.4,
+                "side": -1,
+                "tagType": "Spikes",
+                "turnCount": -2.4
+              },
+              {
+                "layers": 1,
+                "side": 2,
+                "tagType": 7,
+                "turnCount": 1
+              }
+            ],
+            "terrain": 3.9,
+            "terrainTurnsLeft": -1.2,
+            "weather": -2.2,
+            "weatherTurnsLeft": 4.9
+          },
+          "money": 123.9,
+          "mons": [
+            {
+              "abilityId": 7.8,
+              "bi": 0,
+              "coopOwner": "guest",
+              "erTags": [
+                {
+                  "turns": 2.8,
+                  "type": "bleed"
+                },
+                {
+                  "turns": 3,
+                  "type": 7
+                }
+              ],
+              "fainted": false,
+              "formIndex": 2.2,
+              "hp": 125.9,
+              "isTerastallized": true,
+              "maxHp": 100.2,
+              "moves": [
+                {
+                  "id": -2.2,
+                  "ppUsed": 5.8
+                },
+                {
+                  "id": 10,
+                  "ppUsed": -1
+                }
+              ],
+              "partyIndex": -2,
+              "speciesId": -1,
+              "statStages": [
+                -9,
+                -6.4,
+                0,
+                6.9,
+                8,
+                1.8
+              ],
+              "status": -1,
+              "statusSleepTurnsRemaining": -1,
+              "statusToxicTurnCount": 3.9,
+              "teraType": 3.9
+            },
+            {
+              "bi": 1,
+              "coopOwner": "host",
+              "fainted": false,
+              "hp": -1,
+              "maxHp": 0,
+              "partyIndex": 1.9,
+              "speciesId": 25.9,
+              "statStages": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                99
+              ],
+              "status": 2.9,
+              "statusSleepTurnsRemaining": 2.9
+            }
+          ]
+        },
+        "operation": "buildCheckpoint",
+        "output": {
+          "arenaTags": [
+            {
+              "layers": 1,
+              "side": 0,
+              "tagType": "Spikes",
+              "turnCount": 0
+            }
+          ],
+          "field": [
+            {
+              "abilityId": 7.8,
+              "bi": 0,
+              "coopOwner": "guest",
+              "erTags": [
+                {
+                  "turns": 2,
+                  "type": "bleed"
+                }
+              ],
+              "fainted": false,
+              "hp": 100,
+              "isTerastallized": true,
+              "maxHp": 100,
+              "moves": [
+                {
+                  "id": 0,
+                  "ppUsed": 5
+                },
+                {
+                  "id": 10,
+                  "ppUsed": 0
+                }
+              ],
+              "partyIndex": -2,
+              "speciesId": 0,
+              "statStages": [
+                -6,
+                -6,
+                0,
+                6,
+                6,
+                1,
+                0
+              ],
+              "status": 0,
+              "statusToxicTurnCount": 3,
+              "teraType": 3
+            },
+            {
+              "bi": 1,
+              "coopOwner": "host",
+              "fainted": true,
+              "hp": 0,
+              "maxHp": 1,
+              "partyIndex": 1,
+              "speciesId": 25,
+              "statStages": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": 2,
+              "statusSleepTurnsRemaining": 2
+            }
+          ],
+          "money": 123,
+          "terrain": 3,
+          "terrainTurnsLeft": 0,
+          "weather": 0,
+          "weatherTurnsLeft": 4
+        }
+      },
+      {
+        "absent_means": {
+          "arenaTags": "older host omits tags and guest leaves its tags unchanged",
+          "money": "older caller / no money leaves guest money unchanged"
+        },
+        "id": "build-omits-absent-optional-fields",
+        "input": {
+          "arena": {
+            "terrain": 0,
+            "terrainTurnsLeft": 0,
+            "weather": 0,
+            "weatherTurnsLeft": 0
+          },
+          "mons": [
+            {
+              "bi": 2,
+              "fainted": false,
+              "hp": 20,
+              "maxHp": 20,
+              "partyIndex": 2,
+              "speciesId": 133,
+              "statStages": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": 0
+            }
+          ]
+        },
+        "operation": "buildCheckpoint",
+        "output": {
+          "field": [
+            {
+              "bi": 2,
+              "fainted": false,
+              "hp": 20,
+              "maxHp": 20,
+              "partyIndex": 2,
+              "speciesId": 133,
+              "statStages": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": 0
+            }
+          ],
+          "terrain": 0,
+          "terrainTurnsLeft": 0,
+          "weather": 0,
+          "weatherTurnsLeft": 0
+        }
+      },
+      {
+        "id": "normalize-reclamps-received-state",
+        "input": {
+          "abilityId": 12.9,
+          "bi": 3,
+          "coopOwner": "guest",
+          "erTags": [
+            {
+              "turns": -4.2,
+              "type": "fear"
+            }
+          ],
+          "fainted": false,
+          "formIndex": 1.9,
+          "hp": 999,
+          "isTerastallized": false,
+          "maxHp": 50,
+          "moves": [
+            {
+              "id": 7.9,
+              "ppUsed": -2
+            }
+          ],
+          "partyIndex": 3,
+          "speciesId": 999,
+          "statStages": [
+            -99,
+            -1.9,
+            0,
+            1.9,
+            99,
+            4.9
+          ],
+          "status": 4,
+          "statusSleepTurnsRemaining": 0.9,
+          "statusToxicTurnCount": 4.9,
+          "teraType": 8.9
+        },
+        "operation": "normalizeMonState",
+        "output": {
+          "abilityId": 12.9,
+          "bi": 3,
+          "coopOwner": "guest",
+          "erTags": [
+            {
+              "turns": 0,
+              "type": "fear"
+            }
+          ],
+          "fainted": false,
+          "hp": 50,
+          "isTerastallized": false,
+          "maxHp": 50,
+          "moves": [
+            {
+              "id": 7,
+              "ppUsed": 0
+            }
+          ],
+          "partyIndex": 3,
+          "speciesId": 999,
+          "statStages": [
+            -6,
+            -1,
+            0,
+            1,
+            6,
+            4,
+            0
+          ],
+          "status": 4,
+          "statusSleepTurnsRemaining": 0,
+          "statusToxicTurnCount": 4,
+          "teraType": 8
+        }
+      }
+    ],
+    "source_file": "src/data/elite-redux/coop/coop-battle-checkpoint.ts"
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/data/elite-redux/coop/coop-battle-checkpoint.ts"
+}

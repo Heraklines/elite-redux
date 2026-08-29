@@ -1,0 +1,4512 @@
+{
+  "canonical_digest": "f42daa2533716716bb4f73e3172b2d0e8775d33567ba3cda95a1c069742cc1ea",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "authority_v2": {
+      "ack_stages": [
+        "admitted",
+        "materialApplied",
+        "controlInstalled",
+        "presentationSettled"
+      ],
+      "entry_kinds": [
+        "TURN_COMMIT",
+        "REPLACEMENT_COMMIT",
+        "INTERACTION_COMMIT",
+        "CONTROL_COMMIT",
+        "WAVE_ADVANCE",
+        "TERMINAL_COMMIT"
+      ],
+      "interaction_operation_surfaces": {
+        "ABILITY_PICK": [
+          "op:ability"
+        ],
+        "ABILITY_PRESENT": [
+          "op:ability"
+        ],
+        "BARGAIN": [
+          "op:bargain"
+        ],
+        "BARGAIN_PRESENT": [
+          "op:bargain"
+        ],
+        "BIOME_PICK": [
+          "op:biome"
+        ],
+        "CATCH_FULL": [
+          "op:catchFull"
+        ],
+        "COLO_PICK": [
+          "op:colosseum"
+        ],
+        "CROSSROADS_PICK": [
+          "op:biome"
+        ],
+        "LEARN_MOVE": [
+          "op:learnMove"
+        ],
+        "LEARN_MOVE_BATCH": [
+          "op:learnMove"
+        ],
+        "ME_BUTTON": [
+          "op:me"
+        ],
+        "ME_PICK": [
+          "op:me"
+        ],
+        "ME_PRESENT": [
+          "op:me"
+        ],
+        "ME_SUB": [
+          "op:me"
+        ],
+        "ME_TERMINAL": [
+          "op:me",
+          "op:reward",
+          "op:biome"
+        ],
+        "QUIZ_ANSWER": [
+          "op:me"
+        ],
+        "REVIVAL": [
+          "op:revival"
+        ],
+        "REWARD": [
+          "op:reward"
+        ],
+        "REWARD_PRESENT": [
+          "op:reward"
+        ],
+        "SHOP_BUY": [
+          "op:reward"
+        ],
+        "SHOP_PRESENT": [
+          "op:reward"
+        ],
+        "STORMGLASS": [
+          "op:stormglass"
+        ],
+        "STORMGLASS_PRESENT": [
+          "op:stormglass"
+        ]
+      },
+      "interaction_surfaces": [
+        "op:ability",
+        "op:bargain",
+        "op:biome",
+        "op:catchFull",
+        "op:colosseum",
+        "op:learnMove",
+        "op:me",
+        "op:revival",
+        "op:reward",
+        "op:stormglass"
+      ],
+      "next_control_kinds": [
+        "COMMAND_FRONTIER",
+        "REPLACEMENT",
+        "SHARED_INTERACTION",
+        "AWAIT_SUCCESSOR",
+        "TERMINAL"
+      ]
+    },
+    "buttons": {
+      "enum": "Button",
+      "members": [
+        {
+          "name": "UP",
+          "value": 0
+        },
+        {
+          "name": "DOWN",
+          "value": 1
+        },
+        {
+          "name": "LEFT",
+          "value": 2
+        },
+        {
+          "name": "RIGHT",
+          "value": 3
+        },
+        {
+          "name": "SUBMIT",
+          "value": 4
+        },
+        {
+          "name": "ACTION",
+          "value": 5
+        },
+        {
+          "name": "CANCEL",
+          "value": 6
+        },
+        {
+          "name": "MENU",
+          "value": 7
+        },
+        {
+          "name": "STATS",
+          "value": 8
+        },
+        {
+          "name": "CYCLE_SHINY",
+          "value": 9
+        },
+        {
+          "name": "CYCLE_FORM",
+          "value": 10
+        },
+        {
+          "name": "CYCLE_GENDER",
+          "value": 11
+        },
+        {
+          "name": "CYCLE_ABILITY",
+          "value": 12
+        },
+        {
+          "name": "CYCLE_NATURE",
+          "value": 13
+        },
+        {
+          "name": "CYCLE_TERA",
+          "value": 14
+        },
+        {
+          "name": "SPEED_UP",
+          "value": 15
+        },
+        {
+          "name": "SLOW_DOWN",
+          "value": 16
+        },
+        {
+          "name": "DEV_CUSTOM",
+          "value": 17
+        }
+      ]
+    },
+    "game_modes": {
+      "enum": "GameModes",
+      "members": [
+        {
+          "name": "CLASSIC",
+          "value": 0
+        },
+        {
+          "name": "ENDLESS",
+          "value": 1
+        },
+        {
+          "name": "SPLICED_ENDLESS",
+          "value": 2
+        },
+        {
+          "name": "DAILY",
+          "value": 3
+        },
+        {
+          "name": "CHALLENGE",
+          "value": 4
+        },
+        {
+          "name": "LLM_DIRECTOR",
+          "value": 5
+        },
+        {
+          "name": "COOP",
+          "value": 6
+        },
+        {
+          "name": "SHOWDOWN",
+          "value": 7
+        }
+      ]
+    },
+    "input_maps": {
+      "configs": [
+        {
+          "blacklist": [
+            "KEY_ENTER",
+            "KEY_ESC",
+            "KEY_SPACE",
+            "KEY_BACKSPACE",
+            "KEY_ARROW_UP",
+            "KEY_ARROW_DOWN",
+            "KEY_ARROW_LEFT",
+            "KEY_ARROW_RIGHT",
+            "KEY_DEL",
+            "KEY_HOME"
+          ],
+          "defaults_by_mode": {
+            "development": {
+              "KEY_0": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_1": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_2": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_3": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_4": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_5": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_6": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_7": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_8": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_9": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_A": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "ALT_BUTTON_LEFT",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_LEFT"
+              },
+              "KEY_ALT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_ARROW_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingKeyboard.BUTTON_DOWN"
+              },
+              "KEY_ARROW_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingKeyboard.BUTTON_LEFT"
+              },
+              "KEY_ARROW_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingKeyboard.BUTTON_RIGHT"
+              },
+              "KEY_ARROW_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingKeyboard.BUTTON_UP"
+              },
+              "KEY_B": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_BACKSPACE": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingKeyboard.BUTTON_CANCEL"
+              },
+              "KEY_BACK_SLASH": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_C": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingKeyboard.BUTTON_STATS"
+              },
+              "KEY_COMMA": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_CTRL": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_D": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "ALT_BUTTON_RIGHT",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_RIGHT"
+              },
+              "KEY_DEL": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_E": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_ABILITY"
+              },
+              "KEY_END": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_ENTER": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "setting": "BUTTON_SUBMIT",
+                "source_expression": "SettingKeyboard.BUTTON_SUBMIT"
+              },
+              "KEY_ESC": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingKeyboard.BUTTON_MENU"
+              },
+              "KEY_F": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_FORM"
+              },
+              "KEY_F1": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F10": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F11": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F12": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F2": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F3": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F4": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F5": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F6": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F7": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F8": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F9": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_FORWARD_SLASH": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_G": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_GENDER"
+              },
+              "KEY_H": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_HOME": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_I": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_INSERT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_J": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_K": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_L": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_LEFT_BRACKET": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_M": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "ALT_BUTTON_MENU",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_MENU"
+              },
+              "KEY_MINUS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_N": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_NATURE"
+              },
+              "KEY_O": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_P": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_PAGE_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingKeyboard.BUTTON_SLOW_DOWN"
+              },
+              "KEY_PAGE_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingKeyboard.BUTTON_SPEED_UP"
+              },
+              "KEY_PERIOD": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_PLUS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_Q": {
+                "button_name": "DEV_CUSTOM",
+                "button_value": 17,
+                "setting": "BUTTON_DEV_CUSTOM",
+                "source_expression": "isDev ? SettingKeyboard.BUTTON_DEV_CUSTOM : -1"
+              },
+              "KEY_QUOTATION": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_R": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_SHINY"
+              },
+              "KEY_RIGHT_BRACKET": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "ALT_BUTTON_DOWN",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_DOWN"
+              },
+              "KEY_SEMICOLON": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_SHIFT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "ALT_BUTTON_STATS",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_STATS"
+              },
+              "KEY_SPACE": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingKeyboard.BUTTON_ACTION"
+              },
+              "KEY_T": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "ALT_BUTTON_CYCLE_FORM",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_CYCLE_FORM"
+              },
+              "KEY_TAB": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_TILDE": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_U": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_V": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_TERA"
+              },
+              "KEY_W": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "ALT_BUTTON_UP",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_UP"
+              },
+              "KEY_X": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "ALT_BUTTON_CANCEL",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_CANCEL"
+              },
+              "KEY_Y": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "ALT_BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_CYCLE_SHINY"
+              },
+              "KEY_Z": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "ALT_BUTTON_ACTION",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_ACTION"
+              }
+            },
+            "production": {
+              "KEY_0": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_1": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_2": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_3": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_4": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_5": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_6": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_7": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_8": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_9": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_A": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "ALT_BUTTON_LEFT",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_LEFT"
+              },
+              "KEY_ALT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_ARROW_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingKeyboard.BUTTON_DOWN"
+              },
+              "KEY_ARROW_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingKeyboard.BUTTON_LEFT"
+              },
+              "KEY_ARROW_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingKeyboard.BUTTON_RIGHT"
+              },
+              "KEY_ARROW_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingKeyboard.BUTTON_UP"
+              },
+              "KEY_B": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_BACKSPACE": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingKeyboard.BUTTON_CANCEL"
+              },
+              "KEY_BACK_SLASH": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_C": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingKeyboard.BUTTON_STATS"
+              },
+              "KEY_COMMA": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_CTRL": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_D": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "ALT_BUTTON_RIGHT",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_RIGHT"
+              },
+              "KEY_DEL": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_E": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_ABILITY"
+              },
+              "KEY_END": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_ENTER": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "setting": "BUTTON_SUBMIT",
+                "source_expression": "SettingKeyboard.BUTTON_SUBMIT"
+              },
+              "KEY_ESC": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingKeyboard.BUTTON_MENU"
+              },
+              "KEY_F": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_FORM"
+              },
+              "KEY_F1": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F10": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F11": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F12": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F2": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F3": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F4": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F5": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F6": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F7": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F8": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_F9": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_FORWARD_SLASH": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_G": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_GENDER"
+              },
+              "KEY_H": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_HOME": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_I": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_INSERT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_J": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_K": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_L": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_LEFT_BRACKET": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_M": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "ALT_BUTTON_MENU",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_MENU"
+              },
+              "KEY_MINUS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_N": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_NATURE"
+              },
+              "KEY_O": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_P": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_PAGE_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingKeyboard.BUTTON_SLOW_DOWN"
+              },
+              "KEY_PAGE_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingKeyboard.BUTTON_SPEED_UP"
+              },
+              "KEY_PERIOD": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_PLUS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_Q": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "isDev ? SettingKeyboard.BUTTON_DEV_CUSTOM : -1"
+              },
+              "KEY_QUOTATION": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_R": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_SHINY"
+              },
+              "KEY_RIGHT_BRACKET": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "ALT_BUTTON_DOWN",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_DOWN"
+              },
+              "KEY_SEMICOLON": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_SHIFT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "ALT_BUTTON_STATS",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_STATS"
+              },
+              "KEY_SPACE": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingKeyboard.BUTTON_ACTION"
+              },
+              "KEY_T": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "ALT_BUTTON_CYCLE_FORM",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_CYCLE_FORM"
+              },
+              "KEY_TAB": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_TILDE": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_U": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "KEY_V": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingKeyboard.BUTTON_CYCLE_TERA"
+              },
+              "KEY_W": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "ALT_BUTTON_UP",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_UP"
+              },
+              "KEY_X": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "ALT_BUTTON_CANCEL",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_CANCEL"
+              },
+              "KEY_Y": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "ALT_BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_CYCLE_SHINY"
+              },
+              "KEY_Z": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "ALT_BUTTON_ACTION",
+                "source_expression": "SettingKeyboard.ALT_BUTTON_ACTION"
+              }
+            }
+          },
+          "device_mapping": {
+            "KEY_0": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "ZERO",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.ZERO"
+            },
+            "KEY_1": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "ONE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.ONE"
+            },
+            "KEY_2": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "TWO",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.TWO"
+            },
+            "KEY_3": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "THREE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.THREE"
+            },
+            "KEY_4": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "FOUR",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.FOUR"
+            },
+            "KEY_5": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "FIVE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.FIVE"
+            },
+            "KEY_6": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "SIX",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.SIX"
+            },
+            "KEY_7": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "SEVEN",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.SEVEN"
+            },
+            "KEY_8": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "EIGHT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.EIGHT"
+            },
+            "KEY_9": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "NINE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.NINE"
+            },
+            "KEY_A": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "A",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.A"
+            },
+            "KEY_ALT": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "ALT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.ALT"
+            },
+            "KEY_ARROW_DOWN": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "DOWN",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.DOWN"
+            },
+            "KEY_ARROW_LEFT": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "LEFT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.LEFT"
+            },
+            "KEY_ARROW_RIGHT": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "RIGHT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.RIGHT"
+            },
+            "KEY_ARROW_UP": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "UP",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.UP"
+            },
+            "KEY_B": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "B",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.B"
+            },
+            "KEY_BACKSPACE": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "BACKSPACE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.BACKSPACE"
+            },
+            "KEY_BACK_SLASH": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "BACK_SLASH",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.BACK_SLASH"
+            },
+            "KEY_C": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "C",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.C"
+            },
+            "KEY_COMMA": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "COMMA",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.COMMA"
+            },
+            "KEY_CTRL": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "CTRL",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.CTRL"
+            },
+            "KEY_D": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "D",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.D"
+            },
+            "KEY_DEL": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "DELETE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.DELETE"
+            },
+            "KEY_E": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "E",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.E"
+            },
+            "KEY_END": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "END",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.END"
+            },
+            "KEY_ENTER": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "ENTER",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.ENTER"
+            },
+            "KEY_ESC": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "ESC",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.ESC"
+            },
+            "KEY_F": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F"
+            },
+            "KEY_F1": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F1",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F1"
+            },
+            "KEY_F10": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F10",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F10"
+            },
+            "KEY_F11": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F11",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F11"
+            },
+            "KEY_F12": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F12",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F12"
+            },
+            "KEY_F2": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F2",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F2"
+            },
+            "KEY_F3": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F3",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F3"
+            },
+            "KEY_F4": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F4",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F4"
+            },
+            "KEY_F5": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F5",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F5"
+            },
+            "KEY_F6": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F6",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F6"
+            },
+            "KEY_F7": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F7",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F7"
+            },
+            "KEY_F8": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F8",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F8"
+            },
+            "KEY_F9": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "F9",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.F9"
+            },
+            "KEY_FORWARD_SLASH": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "FORWARD_SLASH",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.FORWARD_SLASH"
+            },
+            "KEY_G": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "G",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.G"
+            },
+            "KEY_H": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "H",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.H"
+            },
+            "KEY_HOME": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "HOME",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.HOME"
+            },
+            "KEY_I": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "I",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.I"
+            },
+            "KEY_INSERT": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "INSERT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.INSERT"
+            },
+            "KEY_J": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "J",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.J"
+            },
+            "KEY_K": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "K",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.K"
+            },
+            "KEY_L": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "L",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.L"
+            },
+            "KEY_LEFT_BRACKET": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "OPEN_BRACKET",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.OPEN_BRACKET"
+            },
+            "KEY_M": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "M",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.M"
+            },
+            "KEY_MINUS": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "NUMPAD_SUBTRACT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT"
+            },
+            "KEY_N": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "N",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.N"
+            },
+            "KEY_O": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "O",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.O"
+            },
+            "KEY_P": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "P",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.P"
+            },
+            "KEY_PAGE_DOWN": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "PAGE_DOWN",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.PAGE_DOWN"
+            },
+            "KEY_PAGE_UP": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "PAGE_UP",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.PAGE_UP"
+            },
+            "KEY_PERIOD": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "PERIOD",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.PERIOD"
+            },
+            "KEY_PLUS": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "NUMPAD_ADD",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD"
+            },
+            "KEY_Q": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "Q",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.Q"
+            },
+            "KEY_QUOTATION": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "QUOTES",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.QUOTES"
+            },
+            "KEY_R": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "R",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.R"
+            },
+            "KEY_RIGHT_BRACKET": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "CLOSED_BRACKET",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.CLOSED_BRACKET"
+            },
+            "KEY_S": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "S",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.S"
+            },
+            "KEY_SEMICOLON": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "SEMICOLON",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.SEMICOLON"
+            },
+            "KEY_SHIFT": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "SHIFT",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.SHIFT"
+            },
+            "KEY_SPACE": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "SPACE",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.SPACE"
+            },
+            "KEY_T": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "T",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.T"
+            },
+            "KEY_TAB": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "TAB",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.TAB"
+            },
+            "KEY_TILDE": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "BACKTICK",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.BACKTICK"
+            },
+            "KEY_U": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "U",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.U"
+            },
+            "KEY_V": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "V",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.V"
+            },
+            "KEY_W": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "W",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.W"
+            },
+            "KEY_X": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "X",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.X"
+            },
+            "KEY_Y": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "Y",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.Y"
+            },
+            "KEY_Z": {
+              "keycode": null,
+              "keycode_status": "unresolved-phaser-constant",
+              "source_constant": "Z",
+              "source_expression": "Phaser.Input.Keyboard.KeyCodes.Z"
+            }
+          },
+          "export_name": "CFG_KEYBOARD_QWERTY",
+          "icons": {
+            "KEY_0": "0.png",
+            "KEY_1": "1.png",
+            "KEY_2": "2.png",
+            "KEY_3": "3.png",
+            "KEY_4": "4.png",
+            "KEY_5": "5.png",
+            "KEY_6": "6.png",
+            "KEY_7": "7.png",
+            "KEY_8": "8.png",
+            "KEY_9": "9.png",
+            "KEY_A": "A.png",
+            "KEY_ALT": "ALT.png",
+            "KEY_ARROW_DOWN": "KEY_ARROW_DOWN.png",
+            "KEY_ARROW_LEFT": "KEY_ARROW_LEFT.png",
+            "KEY_ARROW_RIGHT": "KEY_ARROW_RIGHT.png",
+            "KEY_ARROW_UP": "KEY_ARROW_UP.png",
+            "KEY_B": "B.png",
+            "KEY_BACKSPACE": "BACK.png",
+            "KEY_BACK_SLASH": "BACK_SLASH.png",
+            "KEY_C": "C.png",
+            "KEY_COMMA": "COMMA.png",
+            "KEY_CTRL": "CTRL.png",
+            "KEY_D": "D.png",
+            "KEY_DEL": "DEL.png",
+            "KEY_E": "E.png",
+            "KEY_END": "END.png",
+            "KEY_ENTER": "ENTER.png",
+            "KEY_ESC": "ESC.png",
+            "KEY_F": "F.png",
+            "KEY_F1": "F1.png",
+            "KEY_F10": "F10.png",
+            "KEY_F11": "F11.png",
+            "KEY_F12": "F12.png",
+            "KEY_F2": "F2.png",
+            "KEY_F3": "F3.png",
+            "KEY_F4": "F4.png",
+            "KEY_F5": "F5.png",
+            "KEY_F6": "F6.png",
+            "KEY_F7": "F7.png",
+            "KEY_F8": "F8.png",
+            "KEY_F9": "F9.png",
+            "KEY_FORWARD_SLASH": "FORWARD_SLASH.png",
+            "KEY_G": "G.png",
+            "KEY_H": "H.png",
+            "KEY_HOME": "HOME.png",
+            "KEY_I": "I.png",
+            "KEY_INSERT": "INS.png",
+            "KEY_J": "J.png",
+            "KEY_K": "K.png",
+            "KEY_L": "L.png",
+            "KEY_LEFT_BRACKET": "LEFT_BRACKET.png",
+            "KEY_M": "M.png",
+            "KEY_MINUS": "MINUS.png",
+            "KEY_N": "N.png",
+            "KEY_O": "O.png",
+            "KEY_P": "P.png",
+            "KEY_PAGE_DOWN": "PAGE_DOWN.png",
+            "KEY_PAGE_UP": "PAGE_UP.png",
+            "KEY_PERIOD": "PERIOD.png",
+            "KEY_PLUS": "PLUS.png",
+            "KEY_Q": "Q.png",
+            "KEY_QUOTATION": "QUOTE.png",
+            "KEY_R": "R.png",
+            "KEY_RIGHT_BRACKET": "RIGHT_BRACKET.png",
+            "KEY_S": "S.png",
+            "KEY_SEMICOLON": "SEMICOLON.png",
+            "KEY_SHIFT": "SHIFT.png",
+            "KEY_SPACE": "SPACE.png",
+            "KEY_T": "T.png",
+            "KEY_TAB": "TAB.png",
+            "KEY_TILDE": "TILDE.png",
+            "KEY_U": "U.png",
+            "KEY_V": "V.png",
+            "KEY_W": "W.png",
+            "KEY_X": "X.png",
+            "KEY_Y": "Y.png",
+            "KEY_Z": "Z.png"
+          },
+          "id": "keyboard",
+          "pad_id": "default",
+          "pad_type": "keyboard",
+          "settings_by_mode": {
+            "development": {
+              "ALT_BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "ALT_BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "ALT_BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "ALT_BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "ALT_BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "ALT_BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "ALT_BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "ALT_BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "ALT_BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "ALT_BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "ALT_BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "ALT_BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "ALT_BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "ALT_BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "ALT_BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "ALT_BUTTON_SUBMIT": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "source_expression": "Button.SUBMIT"
+              },
+              "ALT_BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              },
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DEV_CUSTOM": {
+                "button_name": "DEV_CUSTOM",
+                "button_value": 17,
+                "source_expression": "Button.DEV_CUSTOM"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_SUBMIT": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "source_expression": "Button.SUBMIT"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            },
+            "production": {
+              "ALT_BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "ALT_BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "ALT_BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "ALT_BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "ALT_BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "ALT_BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "ALT_BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "ALT_BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "ALT_BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "ALT_BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "ALT_BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "ALT_BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "ALT_BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "ALT_BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "ALT_BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "ALT_BUTTON_SUBMIT": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "source_expression": "Button.SUBMIT"
+              },
+              "ALT_BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              },
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_SUBMIT": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "source_expression": "Button.SUBMIT"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            }
+          },
+          "source_file": "src/configs/inputs/cfg-keyboard-qwerty.ts"
+        },
+        {
+          "blacklist": [],
+          "defaults_by_mode": {
+            "development": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              },
+              "TOUCH": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "setting": "BUTTON_SUBMIT",
+                "source_expression": "SettingGamepad.BUTTON_SUBMIT"
+              }
+            },
+            "production": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              },
+              "TOUCH": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "setting": "BUTTON_SUBMIT",
+                "source_expression": "SettingGamepad.BUTTON_SUBMIT"
+              }
+            }
+          },
+          "device_mapping": {
+            "LB": {
+              "keycode": 4,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "4"
+            },
+            "LC_E": {
+              "keycode": 15,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "15"
+            },
+            "LC_N": {
+              "keycode": 12,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "12"
+            },
+            "LC_S": {
+              "keycode": 13,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "13"
+            },
+            "LC_W": {
+              "keycode": 14,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "14"
+            },
+            "LS": {
+              "keycode": 10,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "10"
+            },
+            "LT": {
+              "keycode": 6,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "6"
+            },
+            "RB": {
+              "keycode": 5,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "5"
+            },
+            "RC_E": {
+              "keycode": 1,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "1"
+            },
+            "RC_N": {
+              "keycode": 3,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "3"
+            },
+            "RC_S": {
+              "keycode": 0,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "0"
+            },
+            "RC_W": {
+              "keycode": 2,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "2"
+            },
+            "RS": {
+              "keycode": 11,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "11"
+            },
+            "RT": {
+              "keycode": 7,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "7"
+            },
+            "SELECT": {
+              "keycode": 8,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "8"
+            },
+            "START": {
+              "keycode": 9,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "9"
+            },
+            "TOUCH": {
+              "keycode": 17,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "17"
+            }
+          },
+          "export_name": "PAD_DUALSHOCK",
+          "icons": {
+            "LB": "L1.png",
+            "LC_E": "RIGHT.png",
+            "LC_N": "UP.png",
+            "LC_S": "DOWN.png",
+            "LC_W": "LEFT.png",
+            "LS": "L3.png",
+            "LT": "L2.png",
+            "RB": "R1.png",
+            "RC_E": "CIRCLE.png",
+            "RC_N": "TRIANGLE.png",
+            "RC_S": "CROSS.png",
+            "RC_W": "SQUARE.png",
+            "RS": "R3.png",
+            "RT": "R2.png",
+            "SELECT": "SELECT.png",
+            "START": "START.png",
+            "TOUCH": "TOUCH.png"
+          },
+          "id": "pad-dualshock",
+          "pad_id": "Dualshock",
+          "pad_type": "dualshock",
+          "settings_by_mode": {
+            "development": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_SUBMIT": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "source_expression": "Button.SUBMIT"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            },
+            "production": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_SUBMIT": {
+                "button_name": "SUBMIT",
+                "button_value": 4,
+                "source_expression": "Button.SUBMIT"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            }
+          },
+          "source_file": "src/configs/inputs/pad-dualshock.ts"
+        },
+        {
+          "blacklist": [
+            "LC_N",
+            "LC_S",
+            "LC_W",
+            "LC_E"
+          ],
+          "defaults_by_mode": {
+            "development": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            },
+            "production": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            }
+          },
+          "device_mapping": {
+            "LB": {
+              "keycode": 4,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "4"
+            },
+            "LC_E": {
+              "keycode": 15,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "15"
+            },
+            "LC_N": {
+              "keycode": 12,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "12"
+            },
+            "LC_S": {
+              "keycode": 13,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "13"
+            },
+            "LC_W": {
+              "keycode": 14,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "14"
+            },
+            "LS": {
+              "keycode": 10,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "10"
+            },
+            "LT": {
+              "keycode": 6,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "6"
+            },
+            "RB": {
+              "keycode": 5,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "5"
+            },
+            "RC_E": {
+              "keycode": 1,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "1"
+            },
+            "RC_N": {
+              "keycode": 3,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "3"
+            },
+            "RC_S": {
+              "keycode": 0,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "0"
+            },
+            "RC_W": {
+              "keycode": 2,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "2"
+            },
+            "RS": {
+              "keycode": 11,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "11"
+            },
+            "RT": {
+              "keycode": 7,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "7"
+            },
+            "SELECT": {
+              "keycode": 8,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "8"
+            },
+            "START": {
+              "keycode": 9,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "9"
+            }
+          },
+          "export_name": "PAD_GENERIC",
+          "icons": {
+            "LB": "Bumper_L.png",
+            "LC_E": "RIGHT.png",
+            "LC_N": "UP.png",
+            "LC_S": "DOWN.png",
+            "LC_W": "LEFT.png",
+            "LS": "LS.png",
+            "LT": "Trigger_L.png",
+            "RB": "Bumper_R.png",
+            "RC_E": "XB_Letter_B_OL.png",
+            "RC_N": "XB_Letter_Y_OL.png",
+            "RC_S": "XB_Letter_A_OL.png",
+            "RC_W": "XB_Letter_X_OL.png",
+            "RS": "RS.png",
+            "RT": "Trigger_R.png",
+            "SELECT": "SELECT.png",
+            "START": "START.png"
+          },
+          "id": "pad-generic",
+          "pad_id": "Generic",
+          "pad_type": "xbox",
+          "settings_by_mode": {
+            "development": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            },
+            "production": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            }
+          },
+          "source_file": "src/configs/inputs/pad-generic.ts"
+        },
+        {
+          "blacklist": [],
+          "defaults_by_mode": {
+            "development": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "MENU": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            },
+            "production": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "MENU": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            }
+          },
+          "device_mapping": {
+            "LB": {
+              "keycode": 4,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "4"
+            },
+            "LC_E": {
+              "keycode": 15,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "15"
+            },
+            "LC_N": {
+              "keycode": 12,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "12"
+            },
+            "LC_S": {
+              "keycode": 13,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "13"
+            },
+            "LC_W": {
+              "keycode": 14,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "14"
+            },
+            "LS": {
+              "keycode": 10,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "10"
+            },
+            "LT": {
+              "keycode": 6,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "6"
+            },
+            "MENU": {
+              "keycode": 16,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "16"
+            },
+            "RB": {
+              "keycode": 5,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "5"
+            },
+            "RC_E": {
+              "keycode": 0,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "0"
+            },
+            "RC_N": {
+              "keycode": 2,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "2"
+            },
+            "RC_S": {
+              "keycode": 1,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "1"
+            },
+            "RC_W": {
+              "keycode": 3,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "3"
+            },
+            "RS": {
+              "keycode": 11,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "11"
+            },
+            "RT": {
+              "keycode": 7,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "7"
+            },
+            "SELECT": {
+              "keycode": 8,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "8"
+            },
+            "START": {
+              "keycode": 9,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "9"
+            }
+          },
+          "export_name": "PAD_PROCON",
+          "icons": {
+            "LB": "Bumper_L.png",
+            "LC_E": "RIGHT.png",
+            "LC_N": "UP.png",
+            "LC_S": "DOWN.png",
+            "LC_W": "LEFT.png",
+            "LS": "LS.png",
+            "LT": "Trigger_L.png",
+            "RB": "Bumper_R.png",
+            "RC_E": "XB_Letter_A_OL.png",
+            "RC_N": "XB_Letter_X_OL.png",
+            "RC_S": "XB_Letter_B_OL.png",
+            "RC_W": "XB_Letter_Y_OL.png",
+            "RS": "RS.png",
+            "RT": "Trigger_R.png",
+            "SELECT": "SELECT.png",
+            "START": "START.png"
+          },
+          "id": "pad-procon",
+          "pad_id": "Pro Controller",
+          "pad_type": "xbox",
+          "settings_by_mode": {
+            "development": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            },
+            "production": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            }
+          },
+          "source_file": "src/configs/inputs/pad-procon.ts"
+        },
+        {
+          "blacklist": [],
+          "defaults_by_mode": {
+            "development": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "LT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "RT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            },
+            "production": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "LT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "RT": {
+                "button_name": "UNBOUND",
+                "button_value": -1,
+                "setting": "UNBOUND",
+                "source_expression": "-1"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            }
+          },
+          "device_mapping": {
+            "LB": {
+              "keycode": 4,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "4"
+            },
+            "LC_E": {
+              "keycode": 15,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "15"
+            },
+            "LC_N": {
+              "keycode": 12,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "12"
+            },
+            "LC_S": {
+              "keycode": 13,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "13"
+            },
+            "LC_W": {
+              "keycode": 14,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "14"
+            },
+            "RB": {
+              "keycode": 5,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "5"
+            },
+            "RC_E": {
+              "keycode": 1,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "1"
+            },
+            "RC_N": {
+              "keycode": 0,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "0"
+            },
+            "RC_S": {
+              "keycode": 2,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "2"
+            },
+            "RC_W": {
+              "keycode": 3,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "3"
+            },
+            "SELECT": {
+              "keycode": 8,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "8"
+            },
+            "START": {
+              "keycode": 9,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "9"
+            }
+          },
+          "export_name": "PAD_UNLICENSED_SNES",
+          "icons": {
+            "LB": "Bumper_L.png",
+            "LC_E": "RIGHT.png",
+            "LC_N": "UP.png",
+            "LC_S": "DOWN.png",
+            "LC_W": "LEFT.png",
+            "RB": "Bumper_R.png",
+            "RC_E": "XB_Letter_B_OL.png",
+            "RC_N": "XB_Letter_Y_OL.png",
+            "RC_S": "XB_Letter_A_OL.png",
+            "RC_W": "XB_Letter_X_OL.png",
+            "SELECT": "SELECT.png",
+            "START": "START.png"
+          },
+          "id": "pad-unlicensed-snes",
+          "pad_id": "081f-e401",
+          "pad_type": "xbox",
+          "settings_by_mode": {
+            "development": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            },
+            "production": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            }
+          },
+          "source_file": "src/configs/inputs/pad-unlicensed-snes.ts"
+        },
+        {
+          "blacklist": [],
+          "defaults_by_mode": {
+            "development": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            },
+            "production": {
+              "LB": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "setting": "BUTTON_CYCLE_FORM",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_FORM"
+              },
+              "LC_E": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "setting": "BUTTON_RIGHT",
+                "source_expression": "SettingGamepad.BUTTON_RIGHT"
+              },
+              "LC_N": {
+                "button_name": "UP",
+                "button_value": 0,
+                "setting": "BUTTON_UP",
+                "source_expression": "SettingGamepad.BUTTON_UP"
+              },
+              "LC_S": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "setting": "BUTTON_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_DOWN"
+              },
+              "LC_W": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "setting": "BUTTON_LEFT",
+                "source_expression": "SettingGamepad.BUTTON_LEFT"
+              },
+              "LS": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "setting": "BUTTON_SPEED_UP",
+                "source_expression": "SettingGamepad.BUTTON_SPEED_UP"
+              },
+              "LT": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "setting": "BUTTON_CYCLE_GENDER",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_GENDER"
+              },
+              "RB": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "setting": "BUTTON_CYCLE_SHINY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_SHINY"
+              },
+              "RC_E": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "setting": "BUTTON_CANCEL",
+                "source_expression": "SettingGamepad.BUTTON_CANCEL"
+              },
+              "RC_N": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "setting": "BUTTON_CYCLE_TERA",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_TERA"
+              },
+              "RC_S": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "setting": "BUTTON_ACTION",
+                "source_expression": "SettingGamepad.BUTTON_ACTION"
+              },
+              "RC_W": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "setting": "BUTTON_CYCLE_NATURE",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_NATURE"
+              },
+              "RS": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "setting": "BUTTON_SLOW_DOWN",
+                "source_expression": "SettingGamepad.BUTTON_SLOW_DOWN"
+              },
+              "RT": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "setting": "BUTTON_CYCLE_ABILITY",
+                "source_expression": "SettingGamepad.BUTTON_CYCLE_ABILITY"
+              },
+              "SELECT": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "setting": "BUTTON_STATS",
+                "source_expression": "SettingGamepad.BUTTON_STATS"
+              },
+              "START": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "setting": "BUTTON_MENU",
+                "source_expression": "SettingGamepad.BUTTON_MENU"
+              }
+            }
+          },
+          "device_mapping": {
+            "LB": {
+              "keycode": 4,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "4"
+            },
+            "LC_E": {
+              "keycode": 15,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "15"
+            },
+            "LC_N": {
+              "keycode": 12,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "12"
+            },
+            "LC_S": {
+              "keycode": 13,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "13"
+            },
+            "LC_W": {
+              "keycode": 14,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "14"
+            },
+            "LS": {
+              "keycode": 10,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "10"
+            },
+            "LT": {
+              "keycode": 6,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "6"
+            },
+            "RB": {
+              "keycode": 5,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "5"
+            },
+            "RC_E": {
+              "keycode": 1,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "1"
+            },
+            "RC_N": {
+              "keycode": 3,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "3"
+            },
+            "RC_S": {
+              "keycode": 0,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "0"
+            },
+            "RC_W": {
+              "keycode": 2,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "2"
+            },
+            "RS": {
+              "keycode": 11,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "11"
+            },
+            "RT": {
+              "keycode": 7,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "7"
+            },
+            "SELECT": {
+              "keycode": 8,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "8"
+            },
+            "START": {
+              "keycode": 9,
+              "keycode_status": "resolved-source-literal",
+              "source_expression": "9"
+            }
+          },
+          "export_name": "PAD_XBOX360",
+          "icons": {
+            "LB": "Bumper_L.png",
+            "LC_E": "RIGHT.png",
+            "LC_N": "UP.png",
+            "LC_S": "DOWN.png",
+            "LC_W": "LEFT.png",
+            "LS": "LS.png",
+            "LT": "Trigger_L.png",
+            "RB": "Bumper_R.png",
+            "RC_E": "XB_Letter_B_OL.png",
+            "RC_N": "XB_Letter_Y_OL.png",
+            "RC_S": "XB_Letter_A_OL.png",
+            "RC_W": "XB_Letter_X_OL.png",
+            "RS": "RS.png",
+            "RT": "Trigger_R.png",
+            "SELECT": "SELECT.png",
+            "START": "START.png"
+          },
+          "id": "pad-xbox360",
+          "pad_id": "Xbox 360 controller (XInput STANDARD GAMEPAD)",
+          "pad_type": "xbox",
+          "settings_by_mode": {
+            "development": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            },
+            "production": {
+              "BUTTON_ACTION": {
+                "button_name": "ACTION",
+                "button_value": 5,
+                "source_expression": "Button.ACTION"
+              },
+              "BUTTON_CANCEL": {
+                "button_name": "CANCEL",
+                "button_value": 6,
+                "source_expression": "Button.CANCEL"
+              },
+              "BUTTON_CYCLE_ABILITY": {
+                "button_name": "CYCLE_ABILITY",
+                "button_value": 12,
+                "source_expression": "Button.CYCLE_ABILITY"
+              },
+              "BUTTON_CYCLE_FORM": {
+                "button_name": "CYCLE_FORM",
+                "button_value": 10,
+                "source_expression": "Button.CYCLE_FORM"
+              },
+              "BUTTON_CYCLE_GENDER": {
+                "button_name": "CYCLE_GENDER",
+                "button_value": 11,
+                "source_expression": "Button.CYCLE_GENDER"
+              },
+              "BUTTON_CYCLE_NATURE": {
+                "button_name": "CYCLE_NATURE",
+                "button_value": 13,
+                "source_expression": "Button.CYCLE_NATURE"
+              },
+              "BUTTON_CYCLE_SHINY": {
+                "button_name": "CYCLE_SHINY",
+                "button_value": 9,
+                "source_expression": "Button.CYCLE_SHINY"
+              },
+              "BUTTON_CYCLE_TERA": {
+                "button_name": "CYCLE_TERA",
+                "button_value": 14,
+                "source_expression": "Button.CYCLE_TERA"
+              },
+              "BUTTON_DOWN": {
+                "button_name": "DOWN",
+                "button_value": 1,
+                "source_expression": "Button.DOWN"
+              },
+              "BUTTON_LEFT": {
+                "button_name": "LEFT",
+                "button_value": 2,
+                "source_expression": "Button.LEFT"
+              },
+              "BUTTON_MENU": {
+                "button_name": "MENU",
+                "button_value": 7,
+                "source_expression": "Button.MENU"
+              },
+              "BUTTON_RIGHT": {
+                "button_name": "RIGHT",
+                "button_value": 3,
+                "source_expression": "Button.RIGHT"
+              },
+              "BUTTON_SLOW_DOWN": {
+                "button_name": "SLOW_DOWN",
+                "button_value": 16,
+                "source_expression": "Button.SLOW_DOWN"
+              },
+              "BUTTON_SPEED_UP": {
+                "button_name": "SPEED_UP",
+                "button_value": 15,
+                "source_expression": "Button.SPEED_UP"
+              },
+              "BUTTON_STATS": {
+                "button_name": "STATS",
+                "button_value": 8,
+                "source_expression": "Button.STATS"
+              },
+              "BUTTON_UP": {
+                "button_name": "UP",
+                "button_value": 0,
+                "source_expression": "Button.UP"
+              }
+            }
+          },
+          "source_file": "src/configs/inputs/pad-xbox360.ts"
+        }
+      ],
+      "dev_mode_expression": "src/constants/app-constants.ts: isDev = import.meta.env.MODE === \"development\"",
+      "fallback_config": "PAD_GENERIC"
+    },
+    "protocol": {
+      "authority_frame_protocol_version": 2,
+      "authority_frame_types": [
+        "authorityEntry",
+        "authorityReceipt",
+        "tailRequest",
+        "tailProof",
+        "recoveryRequest",
+        "recoveryBundle",
+        "recoveryApplied",
+        "terminal"
+      ],
+      "pairing_version": "er-coop-48"
+    },
+    "replay_trace": {
+      "supported_versions": [
+        1,
+        2
+      ],
+      "version": 2
+    },
+    "source_files": {
+      "appConstants": "src/constants/app-constants.ts",
+      "authorityContract": "src/data/elite-redux/coop/authority-v2/contract.ts",
+      "authorityEntry": "src/data/elite-redux/coop/authority-v2/authority-entry.ts",
+      "buttons": "src/enums/buttons.ts",
+      "checkpoint": "src/data/elite-redux/coop/coop-battle-checkpoint.ts",
+      "coopTransport": "src/data/elite-redux/coop/coop-transport.ts",
+      "dualshockPadConfig": "src/configs/inputs/pad-dualshock.ts",
+      "frameCodec": "src/data/elite-redux/coop/authority-v2/frame-codec.ts",
+      "frameContext": "src/data/elite-redux/coop/authority-v2/frame-context.ts",
+      "gameModes": "src/enums/game-modes.ts",
+      "genericPadConfig": "src/configs/inputs/pad-generic.ts",
+      "inputController": "src/inputs-controller.ts",
+      "keyboardConfig": "src/configs/inputs/cfg-keyboard-qwerty.ts",
+      "nextControl": "src/data/elite-redux/coop/authority-v2/next-control.ts",
+      "proconPadConfig": "src/configs/inputs/pad-procon.ts",
+      "protocolValidator": "src/data/elite-redux/coop/authority-v2/protocol-validator.ts",
+      "replayTrace": "src/data/elite-redux/replay-trace.ts",
+      "snesPadConfig": "src/configs/inputs/pad-unlicensed-snes.ts",
+      "uiInputs": "src/ui-inputs.ts",
+      "xboxPadConfig": "src/configs/inputs/pad-xbox360.ts"
+    }
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "scripts/export-kernel-schema.mjs"
+}

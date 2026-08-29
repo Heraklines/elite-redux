@@ -1,0 +1,32 @@
+{
+  "canonical_digest": "265d276e47ccb76bc2af5a02b41412c5e0a90803acb7d2392acc64b05af92771",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "authority_frame": {
+      "frame_types": [
+        "authorityEntry",
+        "authorityReceipt",
+        "tailRequest",
+        "tailProof",
+        "recoveryRequest",
+        "recoveryBundle",
+        "recoveryApplied",
+        "terminal"
+      ],
+      "protocol_constant": "COOP_FRAME_PROTOCOL_VERSION",
+      "protocol_version": 2,
+      "source_file": "src/data/elite-redux/coop/authority-v2/frame-codec.ts"
+    },
+    "pairing": {
+      "constant": "COOP_PROTOCOL_VERSION",
+      "source_file": "src/data/elite-redux/coop/coop-transport.ts",
+      "value": "er-coop-48"
+    }
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/data/elite-redux/coop/coop-transport.ts"
+}

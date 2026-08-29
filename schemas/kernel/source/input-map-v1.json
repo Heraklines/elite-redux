@@ -1,0 +1,707 @@
+{
+  "schema_version": 1,
+  "project": "PokéRogue Redux",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "protocol_version": "er-coop-47",
+  "protocol_source": {
+    "path": "src/data/elite-redux/coop/coop-transport.ts",
+    "line": 138,
+    "constant": "COOP_PROTOCOL_VERSION",
+    "value": "er-coop-47"
+  },
+  "legacy_source_paths": [
+    "src/enums/buttons.ts",
+    "src/inputs-controller.ts",
+    "src/ui-inputs.ts",
+    "src/ui/handlers/ui-handler.ts"
+  ],
+  "source_files": [
+    "src/enums/buttons.ts",
+    "src/inputs-controller.ts",
+    "src/ui-inputs.ts",
+    "src/ui/handlers/ui-handler.ts",
+    "src/configs/inputs/cfg-keyboard-qwerty.ts",
+    "src/configs/inputs/config-handler.ts",
+    "src/configs/inputs/pad-dualshock.ts",
+    "src/configs/inputs/pad-generic.ts",
+    "src/configs/inputs/pad-procon.ts",
+    "src/configs/inputs/pad-unlicensed-snes.ts",
+    "src/configs/inputs/pad-xbox360.ts",
+    "src/@types/configs/inputs.ts",
+    "src/system/settings/settings-keyboard.ts",
+    "src/system/settings/settings-gamepad.ts",
+    "src/constants/app-constants.ts",
+    "src/enums/devices.ts",
+    "src/enums/ui-mode.ts",
+    "src/global-scene.ts",
+    "src/touch-controls.ts",
+    "src/utils/data.ts",
+    "src/utils/enums.ts",
+    "src/system/settings/settings.ts",
+    "src/ui/settings/move-touch-controls-handler.ts",
+    "src/ui/handlers/command-ui-handler.ts",
+    "src/ui/handlers/fight-ui-handler.ts",
+    "src/ui/handlers/learn-move-batch-ui-handler.ts",
+    "src/ui/handlers/message-ui-handler.ts",
+    "src/ui/handlers/party-ui-handler.ts",
+    "src/ui/handlers/pokedex-page-ui-handler.ts",
+    "src/ui/handlers/pokedex-ui-handler.ts",
+    "src/ui/handlers/run-info-ui-handler.ts",
+    "src/ui/settings/settings-audio-ui-handler.ts",
+    "src/ui/settings/settings-display-ui-handler.ts",
+    "src/ui/settings/settings-gamepad-ui-handler.ts",
+    "src/ui/settings/settings-keyboard-ui-handler.ts",
+    "src/ui/settings/settings-ui-handler.ts",
+    "src/ui/handlers/showdown-set-editor-ui-handler.ts",
+    "src/ui/handlers/showdown-team-menu-ui-handler.ts",
+    "src/ui/handlers/starter-select-ui-handler.ts",
+    "src/ui/handlers/summary-ui-handler.ts",
+    "index.html",
+    "package.json",
+    "pnpm-lock.yaml",
+    "phaser@3.90.0/src/input/keyboard/keys/KeyCodes.js",
+    "src/data/elite-redux/coop/coop-transport.ts"
+  ],
+  "physical_inputs": {
+    "keyboard": {
+      "event_channel": "globalScene.input.keyboard",
+      "events": ["keydown", "keyup"],
+      "event_type": "KeyboardEvent",
+      "lookup_field": "event.keyCode",
+      "browser_code_kind": "legacy KeyboardEvent.keyCode numeric value",
+      "profile": "CFG_KEYBOARD_QWERTY",
+      "profile_id": "default",
+      "declared_key_count": 77,
+      "code_source": "Phaser.Input.Keyboard.KeyCodes from phaser@3.90.0",
+      "subscription_guard": "keyboard listener registration is nested inside if (typeof globalScene.input.gamepad !== \"undefined\")",
+      "subscription_guard_source": "src/inputs-controller.ts:151-184"
+    },
+    "gamepad": {
+      "event_channel": "globalScene.input.gamepad",
+      "events": ["down", "up"],
+      "event_type": "Phaser.Input.Gamepad.Gamepad / Phaser.Input.Gamepad.Button",
+      "lookup_field": "button.index",
+      "profile_selection_order": [
+        {
+          "profile": "PAD_UNLICENSED_SNES",
+          "when_gamepad_id_lowercase_includes": ["081f", "e401"]
+        },
+        {
+          "profile": "PAD_XBOX360",
+          "when_gamepad_id_lowercase_includes": ["xbox", "360"]
+        },
+        {
+          "profile": "PAD_DUALSHOCK",
+          "when_gamepad_id_lowercase_includes": ["054c"]
+        },
+        {
+          "profile": "PAD_PROCON",
+          "when_gamepad_id_lowercase_includes": ["057e", "2009"]
+        },
+        {
+          "profile": "PAD_GENERIC",
+          "when_gamepad_id_lowercase_includes": [],
+          "fallback": true
+        }
+      ],
+      "profiles": [
+        "PAD_DUALSHOCK",
+        "PAD_GENERIC",
+        "PAD_PROCON",
+        "PAD_UNLICENSED_SNES",
+        "PAD_XBOX360"
+      ]
+    },
+    "touch": {
+      "event_channel": "DOM elements with data-key",
+      "events": ["touchstart", "touchend", "touchcancel", "pointerdown", "pointerup"],
+      "lookup_field": "HTMLElement.dataset.key",
+      "synthetic_controller_type": "keyboard",
+      "synthetic_marker": "isTouch=true",
+      "dom_source": "index.html#touchControls",
+      "declared_element_count": 21,
+      "touchcancel_behavior": {
+        "release_emitted": false,
+        "lock_removed": false,
+        "repeat_cleared": false,
+        "active_class_removed": false,
+        "conditional_effect": "if currentTarget is an HTMLElement and its dataset contains skipPointerDown, delete dataset.skipPointerEvent",
+        "condition_mismatch": "touchstart writes skipPointerEvent, while touchcancel checks skipPointerDown",
+        "source": "src/touch-controls.ts:64-87"
+      }
+    }
+  },
+  "logical_buttons": [
+    {
+      "name": "UP",
+      "value": 0,
+      "keydown_action": "buttonDirection(UP)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "DOWN",
+      "value": 1,
+      "keydown_action": "buttonDirection(DOWN)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "LEFT",
+      "value": 2,
+      "keydown_action": "buttonDirection(LEFT)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "RIGHT",
+      "value": 3,
+      "keydown_action": "buttonDirection(RIGHT)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "SUBMIT",
+      "value": 4,
+      "keydown_action": "buttonTouch() -> processInput(SUBMIT) || processInput(ACTION)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "ACTION",
+      "value": 5,
+      "keydown_action": "buttonAb(ACTION)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CANCEL",
+      "value": 6,
+      "keydown_action": "buttonAb(CANCEL)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "MENU",
+      "value": 7,
+      "keydown_action": "buttonMenu()",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "STATS",
+      "value": 8,
+      "keydown_action": "buttonGoToFilter(STATS)",
+      "keyup_action": "buttonStats(false)",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CYCLE_SHINY",
+      "value": 9,
+      "keydown_action": "buttonCycleOption(CYCLE_SHINY)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CYCLE_FORM",
+      "value": 10,
+      "keydown_action": "buttonCycleOption(CYCLE_FORM)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CYCLE_GENDER",
+      "value": 11,
+      "keydown_action": "buttonCycleOption(CYCLE_GENDER)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CYCLE_ABILITY",
+      "value": 12,
+      "keydown_action": "buttonCycleOption(CYCLE_ABILITY)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CYCLE_NATURE",
+      "value": 13,
+      "keydown_action": "buttonCycleOption(CYCLE_NATURE)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "CYCLE_TERA",
+      "value": 14,
+      "keydown_action": "buttonCycleOption(CYCLE_TERA)",
+      "keyup_action": "buttonInfo(false)",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "SPEED_UP",
+      "value": 15,
+      "keydown_action": "buttonSpeedChange(true)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "SLOW_DOWN",
+      "value": 16,
+      "keydown_action": "buttonSpeedChange(false)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true
+    },
+    {
+      "name": "DEV_CUSTOM",
+      "value": 17,
+      "keydown_action": "if isDev: import(./dev-function).then(customDevFunction)",
+      "keyup_action": "noop",
+      "runtime_repeatable": true,
+      "availability": "development build only"
+    }
+  ],
+  "mappings": {
+    "keyboard_default": {
+      "KEY_A": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.A", "browser_key_code": 65, "default_setting": "ALT_BUTTON_LEFT", "logical_button": "LEFT"},
+      "KEY_B": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.B", "browser_key_code": 66, "default_setting": -1, "logical_button": null},
+      "KEY_C": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.C", "browser_key_code": 67, "default_setting": "BUTTON_STATS", "logical_button": "STATS"},
+      "KEY_D": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.D", "browser_key_code": 68, "default_setting": "ALT_BUTTON_RIGHT", "logical_button": "RIGHT"},
+      "KEY_E": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.E", "browser_key_code": 69, "default_setting": "BUTTON_CYCLE_ABILITY", "logical_button": "CYCLE_ABILITY"},
+      "KEY_F": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F", "browser_key_code": 70, "default_setting": "BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+      "KEY_G": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.G", "browser_key_code": 71, "default_setting": "BUTTON_CYCLE_GENDER", "logical_button": "CYCLE_GENDER"},
+      "KEY_H": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.H", "browser_key_code": 72, "default_setting": -1, "logical_button": null},
+      "KEY_I": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.I", "browser_key_code": 73, "default_setting": -1, "logical_button": null},
+      "KEY_J": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.J", "browser_key_code": 74, "default_setting": -1, "logical_button": null},
+      "KEY_K": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.K", "browser_key_code": 75, "default_setting": -1, "logical_button": null},
+      "KEY_L": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.L", "browser_key_code": 76, "default_setting": -1, "logical_button": null},
+      "KEY_M": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.M", "browser_key_code": 77, "default_setting": "ALT_BUTTON_MENU", "logical_button": "MENU"},
+      "KEY_N": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.N", "browser_key_code": 78, "default_setting": "BUTTON_CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+      "KEY_O": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.O", "browser_key_code": 79, "default_setting": -1, "logical_button": null},
+      "KEY_P": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.P", "browser_key_code": 80, "default_setting": -1, "logical_button": null},
+      "KEY_Q": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.Q", "browser_key_code": 81, "default_by_build": {"development": {"default_setting": "BUTTON_DEV_CUSTOM", "logical_button": "DEV_CUSTOM"}, "other": {"default_setting": -1, "logical_button": null}}},
+      "KEY_R": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.R", "browser_key_code": 82, "default_setting": "BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+      "KEY_S": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.S", "browser_key_code": 83, "default_setting": "ALT_BUTTON_DOWN", "logical_button": "DOWN"},
+      "KEY_T": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.T", "browser_key_code": 84, "default_setting": "ALT_BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+      "KEY_U": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.U", "browser_key_code": 85, "default_setting": -1, "logical_button": null},
+      "KEY_V": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.V", "browser_key_code": 86, "default_setting": "BUTTON_CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+      "KEY_W": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.W", "browser_key_code": 87, "default_setting": "ALT_BUTTON_UP", "logical_button": "UP"},
+      "KEY_X": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.X", "browser_key_code": 88, "default_setting": "ALT_BUTTON_CANCEL", "logical_button": "CANCEL"},
+      "KEY_Y": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.Y", "browser_key_code": 89, "default_setting": "ALT_BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+      "KEY_Z": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.Z", "browser_key_code": 90, "default_setting": "ALT_BUTTON_ACTION", "logical_button": "ACTION"},
+      "KEY_0": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.ZERO", "browser_key_code": 48, "default_setting": -1, "logical_button": null},
+      "KEY_1": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.ONE", "browser_key_code": 49, "default_setting": -1, "logical_button": null},
+      "KEY_2": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.TWO", "browser_key_code": 50, "default_setting": -1, "logical_button": null},
+      "KEY_3": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.THREE", "browser_key_code": 51, "default_setting": -1, "logical_button": null},
+      "KEY_4": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.FOUR", "browser_key_code": 52, "default_setting": -1, "logical_button": null},
+      "KEY_5": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.FIVE", "browser_key_code": 53, "default_setting": -1, "logical_button": null},
+      "KEY_6": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.SIX", "browser_key_code": 54, "default_setting": -1, "logical_button": null},
+      "KEY_7": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.SEVEN", "browser_key_code": 55, "default_setting": -1, "logical_button": null},
+      "KEY_8": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.EIGHT", "browser_key_code": 56, "default_setting": -1, "logical_button": null},
+      "KEY_9": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.NINE", "browser_key_code": 57, "default_setting": -1, "logical_button": null},
+      "KEY_F1": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F1", "browser_key_code": 112, "default_setting": -1, "logical_button": null},
+      "KEY_F2": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F2", "browser_key_code": 113, "default_setting": -1, "logical_button": null},
+      "KEY_F3": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F3", "browser_key_code": 114, "default_setting": -1, "logical_button": null},
+      "KEY_F4": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F4", "browser_key_code": 115, "default_setting": -1, "logical_button": null},
+      "KEY_F5": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F5", "browser_key_code": 116, "default_setting": -1, "logical_button": null},
+      "KEY_F6": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F6", "browser_key_code": 117, "default_setting": -1, "logical_button": null},
+      "KEY_F7": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F7", "browser_key_code": 118, "default_setting": -1, "logical_button": null},
+      "KEY_F8": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F8", "browser_key_code": 119, "default_setting": -1, "logical_button": null},
+      "KEY_F9": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F9", "browser_key_code": 120, "default_setting": -1, "logical_button": null},
+      "KEY_F10": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F10", "browser_key_code": 121, "default_setting": -1, "logical_button": null},
+      "KEY_F11": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F11", "browser_key_code": 122, "default_setting": -1, "logical_button": null},
+      "KEY_F12": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.F12", "browser_key_code": 123, "default_setting": -1, "logical_button": null},
+      "KEY_PAGE_DOWN": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.PAGE_DOWN", "browser_key_code": 34, "default_setting": "BUTTON_SLOW_DOWN", "logical_button": "SLOW_DOWN"},
+      "KEY_PAGE_UP": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.PAGE_UP", "browser_key_code": 33, "default_setting": "BUTTON_SPEED_UP", "logical_button": "SPEED_UP"},
+      "KEY_CTRL": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.CTRL", "browser_key_code": 17, "default_setting": -1, "logical_button": null},
+      "KEY_DEL": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.DELETE", "browser_key_code": 46, "default_setting": -1, "logical_button": null},
+      "KEY_END": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.END", "browser_key_code": 35, "default_setting": -1, "logical_button": null},
+      "KEY_ENTER": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.ENTER", "browser_key_code": 13, "default_setting": "BUTTON_SUBMIT", "logical_button": "SUBMIT"},
+      "KEY_ESC": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.ESC", "browser_key_code": 27, "default_setting": "BUTTON_MENU", "logical_button": "MENU"},
+      "KEY_HOME": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.HOME", "browser_key_code": 36, "default_setting": -1, "logical_button": null},
+      "KEY_INSERT": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.INSERT", "browser_key_code": 45, "default_setting": -1, "logical_button": null},
+      "KEY_PLUS": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD", "browser_key_code": 107, "default_setting": -1, "logical_button": null},
+      "KEY_MINUS": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.NUMPAD_SUBTRACT", "browser_key_code": 109, "default_setting": -1, "logical_button": null},
+      "KEY_QUOTATION": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.QUOTES", "browser_key_code": 222, "default_setting": -1, "logical_button": null},
+      "KEY_SHIFT": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.SHIFT", "browser_key_code": 16, "default_setting": "ALT_BUTTON_STATS", "logical_button": "STATS"},
+      "KEY_SPACE": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.SPACE", "browser_key_code": 32, "default_setting": "BUTTON_ACTION", "logical_button": "ACTION"},
+      "KEY_TAB": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.TAB", "browser_key_code": 9, "default_setting": -1, "logical_button": null},
+      "KEY_TILDE": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.BACKTICK", "browser_key_code": 192, "default_setting": -1, "logical_button": null},
+      "KEY_ARROW_UP": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.UP", "browser_key_code": 38, "default_setting": "BUTTON_UP", "logical_button": "UP"},
+      "KEY_ARROW_DOWN": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.DOWN", "browser_key_code": 40, "default_setting": "BUTTON_DOWN", "logical_button": "DOWN"},
+      "KEY_ARROW_LEFT": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.LEFT", "browser_key_code": 37, "default_setting": "BUTTON_LEFT", "logical_button": "LEFT"},
+      "KEY_ARROW_RIGHT": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.RIGHT", "browser_key_code": 39, "default_setting": "BUTTON_RIGHT", "logical_button": "RIGHT"},
+      "KEY_LEFT_BRACKET": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.OPEN_BRACKET", "browser_key_code": 219, "default_setting": -1, "logical_button": null},
+      "KEY_RIGHT_BRACKET": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.CLOSED_BRACKET", "browser_key_code": 221, "default_setting": -1, "logical_button": null},
+      "KEY_SEMICOLON": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.SEMICOLON", "browser_key_code": 186, "default_setting": -1, "logical_button": null},
+      "KEY_COMMA": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.COMMA", "browser_key_code": 188, "default_setting": -1, "logical_button": null},
+      "KEY_PERIOD": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.PERIOD", "browser_key_code": 190, "default_setting": -1, "logical_button": null},
+      "KEY_BACK_SLASH": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.BACK_SLASH", "browser_key_code": 220, "default_setting": -1, "logical_button": null},
+      "KEY_FORWARD_SLASH": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.FORWARD_SLASH", "browser_key_code": 191, "default_setting": -1, "logical_button": null},
+      "KEY_BACKSPACE": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.BACKSPACE", "browser_key_code": 8, "default_setting": "BUTTON_CANCEL", "logical_button": "CANCEL"},
+      "KEY_ALT": {"phaser_keycode": "Phaser.Input.Keyboard.KeyCodes.ALT", "browser_key_code": 18, "default_setting": -1, "logical_button": null}
+    },
+    "gamepad_defaults": {
+      "PAD_DUALSHOCK": {
+        "pad_id": "Dualshock",
+        "pad_type": "dualshock",
+        "entries": {
+          "RC_S": {"button_index": 0, "default_setting": "BUTTON_ACTION", "logical_button": "ACTION"},
+          "RC_E": {"button_index": 1, "default_setting": "BUTTON_CANCEL", "logical_button": "CANCEL"},
+          "RC_W": {"button_index": 2, "default_setting": "BUTTON_CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+          "RC_N": {"button_index": 3, "default_setting": "BUTTON_CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+          "START": {"button_index": 9, "default_setting": "BUTTON_MENU", "logical_button": "MENU"},
+          "SELECT": {"button_index": 8, "default_setting": "BUTTON_STATS", "logical_button": "STATS"},
+          "LB": {"button_index": 4, "default_setting": "BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+          "RB": {"button_index": 5, "default_setting": "BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+          "LT": {"button_index": 6, "default_setting": "BUTTON_CYCLE_GENDER", "logical_button": "CYCLE_GENDER"},
+          "RT": {"button_index": 7, "default_setting": "BUTTON_CYCLE_ABILITY", "logical_button": "CYCLE_ABILITY"},
+          "LS": {"button_index": 10, "default_setting": "BUTTON_SPEED_UP", "logical_button": "SPEED_UP"},
+          "RS": {"button_index": 11, "default_setting": "BUTTON_SLOW_DOWN", "logical_button": "SLOW_DOWN"},
+          "LC_N": {"button_index": 12, "default_setting": "BUTTON_UP", "logical_button": "UP"},
+          "LC_S": {"button_index": 13, "default_setting": "BUTTON_DOWN", "logical_button": "DOWN"},
+          "LC_W": {"button_index": 14, "default_setting": "BUTTON_LEFT", "logical_button": "LEFT"},
+          "LC_E": {"button_index": 15, "default_setting": "BUTTON_RIGHT", "logical_button": "RIGHT"},
+          "TOUCH": {"button_index": 17, "default_setting": "BUTTON_SUBMIT", "logical_button": "SUBMIT"}
+        }
+      },
+      "PAD_GENERIC": {
+        "pad_id": "Generic",
+        "pad_type": "xbox",
+        "entries": {
+          "RC_S": {"button_index": 0, "default_setting": "BUTTON_ACTION", "logical_button": "ACTION"},
+          "RC_E": {"button_index": 1, "default_setting": "BUTTON_CANCEL", "logical_button": "CANCEL"},
+          "RC_W": {"button_index": 2, "default_setting": "BUTTON_CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+          "RC_N": {"button_index": 3, "default_setting": "BUTTON_CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+          "START": {"button_index": 9, "default_setting": "BUTTON_MENU", "logical_button": "MENU"},
+          "SELECT": {"button_index": 8, "default_setting": "BUTTON_STATS", "logical_button": "STATS"},
+          "LB": {"button_index": 4, "default_setting": "BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+          "RB": {"button_index": 5, "default_setting": "BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+          "LT": {"button_index": 6, "default_setting": "BUTTON_CYCLE_GENDER", "logical_button": "CYCLE_GENDER"},
+          "RT": {"button_index": 7, "default_setting": "BUTTON_CYCLE_ABILITY", "logical_button": "CYCLE_ABILITY"},
+          "LS": {"button_index": 10, "default_setting": "BUTTON_SPEED_UP", "logical_button": "SPEED_UP"},
+          "RS": {"button_index": 11, "default_setting": "BUTTON_SLOW_DOWN", "logical_button": "SLOW_DOWN"},
+          "LC_N": {"button_index": 12, "default_setting": "BUTTON_UP", "logical_button": "UP"},
+          "LC_S": {"button_index": 13, "default_setting": "BUTTON_DOWN", "logical_button": "DOWN"},
+          "LC_W": {"button_index": 14, "default_setting": "BUTTON_LEFT", "logical_button": "LEFT"},
+          "LC_E": {"button_index": 15, "default_setting": "BUTTON_RIGHT", "logical_button": "RIGHT"}
+        }
+      },
+      "PAD_PROCON": {
+        "pad_id": "Pro Controller",
+        "pad_type": "xbox",
+        "entries": {
+          "RC_S": {"button_index": 1, "default_setting": "BUTTON_ACTION", "logical_button": "ACTION"},
+          "RC_E": {"button_index": 0, "default_setting": "BUTTON_CANCEL", "logical_button": "CANCEL"},
+          "RC_W": {"button_index": 3, "default_setting": "BUTTON_CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+          "RC_N": {"button_index": 2, "default_setting": "BUTTON_CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+          "START": {"button_index": 9, "default_setting": "BUTTON_MENU", "logical_button": "MENU"},
+          "SELECT": {"button_index": 8, "default_setting": "BUTTON_STATS", "logical_button": "STATS"},
+          "LB": {"button_index": 4, "default_setting": "BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+          "RB": {"button_index": 5, "default_setting": "BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+          "LT": {"button_index": 6, "default_setting": "BUTTON_CYCLE_GENDER", "logical_button": "CYCLE_GENDER"},
+          "RT": {"button_index": 7, "default_setting": "BUTTON_CYCLE_ABILITY", "logical_button": "CYCLE_ABILITY"},
+          "LS": {"button_index": 10, "default_setting": "BUTTON_SPEED_UP", "logical_button": "SPEED_UP"},
+          "RS": {"button_index": 11, "default_setting": "BUTTON_SLOW_DOWN", "logical_button": "SLOW_DOWN"},
+          "LC_N": {"button_index": 12, "default_setting": "BUTTON_UP", "logical_button": "UP"},
+          "LC_S": {"button_index": 13, "default_setting": "BUTTON_DOWN", "logical_button": "DOWN"},
+          "LC_W": {"button_index": 14, "default_setting": "BUTTON_LEFT", "logical_button": "LEFT"},
+          "LC_E": {"button_index": 15, "default_setting": "BUTTON_RIGHT", "logical_button": "RIGHT"},
+          "MENU": {"button_index": 16, "default_setting": -1, "logical_button": null}
+        }
+      },
+      "PAD_UNLICENSED_SNES": {
+        "pad_id": "081f-e401",
+        "pad_type": "xbox",
+        "entries": {
+          "RC_S": {"button_index": 2, "default_setting": "BUTTON_ACTION", "logical_button": "ACTION"},
+          "RC_E": {"button_index": 1, "default_setting": "BUTTON_CANCEL", "logical_button": "CANCEL"},
+          "RC_W": {"button_index": 3, "default_setting": "BUTTON_CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+          "RC_N": {"button_index": 0, "default_setting": "BUTTON_CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+          "START": {"button_index": 9, "default_setting": "BUTTON_MENU", "logical_button": "MENU"},
+          "SELECT": {"button_index": 8, "default_setting": "BUTTON_STATS", "logical_button": "STATS"},
+          "LB": {"button_index": 4, "default_setting": "BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+          "RB": {"button_index": 5, "default_setting": "BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+          "LC_N": {"button_index": 12, "default_setting": "BUTTON_UP", "logical_button": "UP"},
+          "LC_S": {"button_index": 13, "default_setting": "BUTTON_DOWN", "logical_button": "DOWN"},
+          "LC_W": {"button_index": 14, "default_setting": "BUTTON_LEFT", "logical_button": "LEFT"},
+          "LC_E": {"button_index": 15, "default_setting": "BUTTON_RIGHT", "logical_button": "RIGHT"},
+          "LT": {"button_index": null, "default_setting": -1, "logical_button": null, "status": "declared in default but absent from deviceMapping"},
+          "RT": {"button_index": null, "default_setting": -1, "logical_button": null, "status": "declared in default but absent from deviceMapping"},
+          "LS": {"button_index": null, "default_setting": -1, "logical_button": null, "status": "declared in default but absent from deviceMapping"},
+          "RS": {"button_index": null, "default_setting": -1, "logical_button": null, "status": "declared in default but absent from deviceMapping"}
+        }
+      },
+      "PAD_XBOX360": {
+        "pad_id": "Xbox 360 controller (XInput STANDARD GAMEPAD)",
+        "pad_type": "xbox",
+        "entries": {
+          "RC_S": {"button_index": 0, "default_setting": "BUTTON_ACTION", "logical_button": "ACTION"},
+          "RC_E": {"button_index": 1, "default_setting": "BUTTON_CANCEL", "logical_button": "CANCEL"},
+          "RC_W": {"button_index": 2, "default_setting": "BUTTON_CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+          "RC_N": {"button_index": 3, "default_setting": "BUTTON_CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+          "START": {"button_index": 9, "default_setting": "BUTTON_MENU", "logical_button": "MENU"},
+          "SELECT": {"button_index": 8, "default_setting": "BUTTON_STATS", "logical_button": "STATS"},
+          "LB": {"button_index": 4, "default_setting": "BUTTON_CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+          "RB": {"button_index": 5, "default_setting": "BUTTON_CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+          "LT": {"button_index": 6, "default_setting": "BUTTON_CYCLE_GENDER", "logical_button": "CYCLE_GENDER"},
+          "RT": {"button_index": 7, "default_setting": "BUTTON_CYCLE_ABILITY", "logical_button": "CYCLE_ABILITY"},
+          "LS": {"button_index": 10, "default_setting": "BUTTON_SPEED_UP", "logical_button": "SPEED_UP"},
+          "RS": {"button_index": 11, "default_setting": "BUTTON_SLOW_DOWN", "logical_button": "SLOW_DOWN"},
+          "LC_N": {"button_index": 12, "default_setting": "BUTTON_UP", "logical_button": "UP"},
+          "LC_S": {"button_index": 13, "default_setting": "BUTTON_DOWN", "logical_button": "DOWN"},
+          "LC_W": {"button_index": 14, "default_setting": "BUTTON_LEFT", "logical_button": "LEFT"},
+          "LC_E": {"button_index": 15, "default_setting": "BUTTON_RIGHT", "logical_button": "RIGHT"}
+        }
+      }
+    },
+    "touch_data_key": [
+      {"element_id": "dpadUp", "data_key": "UP", "logical_button": "UP"},
+      {"element_id": "dpadRight", "data_key": "RIGHT", "logical_button": "RIGHT"},
+      {"element_id": "dpadDown", "data_key": "DOWN", "logical_button": "DOWN"},
+      {"element_id": "dpadLeft", "data_key": "LEFT", "logical_button": "LEFT"},
+      {"element_id": "apadAction", "data_key": "ACTION", "logical_button": "ACTION"},
+      {"element_id": "apadCancel", "data_key": "CANCEL", "logical_button": "CANCEL"},
+      {"element_id": "apadSubmit", "data_key": "SUBMIT", "logical_button": "SUBMIT"},
+      {"element_id": "apadPreviousTab", "data_key": "CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+      {"element_id": "apadNextTab", "data_key": "CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+      {"element_id": "apadOpenFilters", "data_key": "STATS", "logical_button": "STATS"},
+      {"element_id": "apadMenu", "data_key": "MENU", "logical_button": "MENU"},
+      {"element_id": "apadCycleForm", "data_key": "CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+      {"element_id": "apadCycleGender", "data_key": "CYCLE_GENDER", "logical_button": "CYCLE_GENDER"},
+      {"element_id": "apadCycleShiny", "data_key": "CYCLE_SHINY", "logical_button": "CYCLE_SHINY"},
+      {"element_id": "apadCycleAbility", "data_key": "CYCLE_ABILITY", "logical_button": "CYCLE_ABILITY"},
+      {"element_id": "apadCycleNature", "data_key": "CYCLE_NATURE", "logical_button": "CYCLE_NATURE"},
+      {"element_id": "apadCycleTera", "data_key": "CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+      {"element_id": "apadInfo", "data_key": "CYCLE_TERA", "logical_button": "CYCLE_TERA"},
+      {"element_id": "apadStats", "data_key": "STATS", "logical_button": "STATS"},
+      {"element_id": "apadOmniform", "data_key": "CYCLE_FORM", "logical_button": "CYCLE_FORM"},
+      {"element_id": "apadGiftAbility", "data_key": "CYCLE_SHINY", "logical_button": "CYCLE_SHINY"}
+    ],
+    "resolution": {
+      "keyboard_and_gamepad": "getButtonWithKeycode(config, code) -> getSettingNameWithKeycode(config, code) -> config.settings[settingName]",
+      "get_key_order": "getKeyWithKeycode returns the first Object.entries(config.deviceMapping) value equal to the incoming code",
+      "custom_binding": "InputsController clones config.default into config.custom when no saved custom mapping exists; saved/custom bindings replace the default setting before lookup",
+      "touch": "TouchControl checks Button enum ownership of data-key and emits that enum value directly"
+    }
+  },
+  "runtime_custom_mapping": {
+    "declared_defaults": {
+      "keyboard": "mappings.keyboard_default is CFG_KEYBOARD_QWERTY.default, including every declared physical key and its -1/unbound entries",
+      "gamepad": "mappings.gamepad_defaults is each selected PAD_*.default table, including declared-but-unmapped entries"
+    },
+    "runtime_custom_state": {
+      "shape": "config.custom[device_mapping_key] is a setting name alias or -1",
+      "initialization": "InputsController uses an existing custom table or a shallow copy of config.default for keyboard and gamepad setup",
+      "persistence": "setupKeyboard and setupGamepad save the resulting mapping configuration through gameData.saveMappingConfigs",
+      "injection": "injectConfig replaces config.custom after migrating BUTTON_CYCLE_VARIANT to BUTTON_CYCLE_TERA",
+      "oracle_boundary": "No user-persisted or injected custom table is asserted here; mappings.* remains the complete declared-default layer"
+    },
+    "setting_alias_tables": {
+      "keyboard": {
+        "alias_to_canonical": {
+          "ALT_BUTTON_UP": "BUTTON_UP",
+          "ALT_BUTTON_DOWN": "BUTTON_DOWN",
+          "ALT_BUTTON_LEFT": "BUTTON_LEFT",
+          "ALT_BUTTON_RIGHT": "BUTTON_RIGHT",
+          "ALT_BUTTON_ACTION": "BUTTON_ACTION",
+          "ALT_BUTTON_CANCEL": "BUTTON_CANCEL",
+          "ALT_BUTTON_MENU": "BUTTON_MENU",
+          "ALT_BUTTON_STATS": "BUTTON_STATS",
+          "ALT_BUTTON_CYCLE_FORM": "BUTTON_CYCLE_FORM",
+          "ALT_BUTTON_CYCLE_SHINY": "BUTTON_CYCLE_SHINY",
+          "ALT_BUTTON_CYCLE_GENDER": "BUTTON_CYCLE_GENDER",
+          "ALT_BUTTON_CYCLE_ABILITY": "BUTTON_CYCLE_ABILITY",
+          "ALT_BUTTON_CYCLE_NATURE": "BUTTON_CYCLE_NATURE",
+          "ALT_BUTTON_CYCLE_TERA": "BUTTON_CYCLE_TERA",
+          "ALT_BUTTON_SPEED_UP": "BUTTON_SPEED_UP",
+          "ALT_BUTTON_SLOW_DOWN": "BUTTON_SLOW_DOWN",
+          "ALT_BUTTON_SUBMIT": "BUTTON_SUBMIT"
+        },
+        "resolution": "config.settings contains both canonical and ALT setting names, and both names index the same logical Button"
+      },
+      "gamepad": {
+        "alias_to_canonical": {},
+        "resolution": "gamepad settings expose no ALT alias family; custom values use the canonical BUTTON_* names"
+      },
+      "source": "src/configs/inputs/cfg-keyboard-qwerty.ts:187-222; src/configs/inputs/pad-dualshock.ts:49-66; src/configs/inputs/pad-generic.ts:47-63; src/configs/inputs/pad-procon.ts:48-64; src/configs/inputs/pad-unlicensed-snes.ts:39-55; src/configs/inputs/pad-xbox360.ts:47-63"
+    },
+    "blacklist_constraints": {
+      "keyboard": {
+        "config_physical_keys": ["KEY_ENTER", "KEY_ESC", "KEY_SPACE", "KEY_BACKSPACE", "KEY_ARROW_UP", "KEY_ARROW_DOWN", "KEY_ARROW_LEFT", "KEY_ARROW_RIGHT", "KEY_DEL", "KEY_HOME"],
+        "settings_ui": ["BUTTON_SUBMIT", "BUTTON_MENU", "BUTTON_ACTION", "BUTTON_CANCEL", "BUTTON_UP", "BUTTON_DOWN", "BUTTON_LEFT", "BUTTON_RIGHT"]
+      },
+      "gamepad": {
+        "config_physical_keys_by_profile": {
+          "PAD_DUALSHOCK": [],
+          "PAD_GENERIC": ["LC_N", "LC_S", "LC_W", "LC_E"],
+          "PAD_PROCON": [],
+          "PAD_UNLICENSED_SNES": [],
+          "PAD_XBOX360": []
+        },
+        "settings_ui": ["BUTTON_UP", "BUTTON_DOWN", "BUTTON_LEFT", "BUTTON_RIGHT"]
+      },
+      "enforcement": "assign checks the physical-key and target-setting constraints; deleteBind, canIAssignThisKey, and canIOverrideThisSetting reject blacklisted physical keys",
+      "source": "src/configs/inputs/config-handler.ts:195-203,255-287; src/configs/inputs/cfg-keyboard-qwerty.ts:303-314; src/configs/inputs/pad-generic.ts:83; src/system/settings/settings-keyboard.ts:128-137; src/system/settings/settings-gamepad.ts:80-85"
+    }
+  },
+  "repeat_policy": {
+    "delay_ms": 250,
+    "keyboard": {
+      "first_down": "emit input_down, clear any existing interval for the logical button, create a 250 ms interval, then add logical button to buttonLock",
+      "repeat_down": "interval emits input_down for the captured logical button unless a printable key's DOM text focus guard returns",
+      "browser_repeat": "event.repeat is not read; subsequent browser keydown events are suppressed when buttonLock already contains the logical button",
+      "keyup": "emit input_up, splice the first matching logical buttonLock entry, and clear the logical button interval",
+      "lock_granularity": "logical Button, not physical keyCode"
+    },
+    "gamepad": {
+      "first_down": "emit input_down, clear any existing interval for the logical button, create a 250 ms interval, then add logical button to buttonLock",
+      "repeat_down": "interval clears itself if the logical button is no longer locked; otherwise emits input_down every 250 ms",
+      "browser_repeat": "no event.repeat equivalent is inspected; repeated Phaser down events are suppressed by the logical buttonLock",
+      "keyup": "emit input_up, splice the first matching logical buttonLock entry, and clear the logical button interval",
+      "lock_granularity": "logical Button, not gamepad identity plus button index"
+    },
+    "touch": {
+      "first_down": "simulate keyboard input_down, create a 250 ms interval, then add the data-key string to buttonLock",
+      "repeat_down": "simulate keyboard input_down every 250 ms; a false simulation clears that interval",
+      "keyup": "simulate keyboard input_up, remove active classes, splice the first matching data-key lock, and clear its interval",
+      "lock_granularity": "data-key string"
+    },
+    "declared_nonrepeat_intent": {
+      "buttons": ["MENU", "STATS"],
+      "declaration": "InputsController.interactions is not initialized for MENU or STATS",
+      "observed_runtime": "keyboardKeyDown and gamepadButtonDown do not consult interactions, so mapped MENU and STATS still arm repeat intervals"
+    }
+  },
+  "keyup_edge_cases": {
+    "oracle_bug_risk": "Both keyboard and gamepad keyup handlers splice without checking whether the logical button is currently locked; this records production behavior only and does not prescribe a fix",
+    "keyboard": {
+      "condition": "getButtonWithKeycode returns a mapped button but buttonLock.indexOf(buttonUp) is -1",
+      "actual_operation": "const index = buttonLock.indexOf(buttonUp); buttonLock.splice(index, 1)",
+      "unmatched_index": -1,
+      "effect": "Array.splice(-1, 1) removes the last unrelated lock when buttonLock is non-empty, is a no-op when empty, and clearInterval(inputInterval[buttonUp]) still runs",
+      "source": "src/inputs-controller.ts:419-427"
+    },
+    "gamepad": {
+      "condition": "getButtonWithKeycode returns a mapped button but buttonLock.indexOf(buttonUp) is -1",
+      "actual_operation": "const index = buttonLock.indexOf(buttonUp); buttonLock.splice(index, 1)",
+      "unmatched_index": -1,
+      "effect": "Array.splice(-1, 1) removes the last unrelated lock when buttonLock is non-empty, is a no-op when empty, and clearInterval(inputInterval[buttonUp]) still runs",
+      "source": "src/inputs-controller.ts:501-509"
+    }
+  },
+  "focus_policy": {
+    "dom_text_field_predicate": "document exists, activeElement is non-null, and tagName is INPUT or TEXTAREA or isContentEditable is true",
+    "printable_predicate": "typeof event.key === string and event.key.length === 1",
+    "keydown": "a printable keydown while the predicate is true is suppressed and its event.keyCode is recorded in suppressedPrintableKeyCodes; non-printable keydown continues through mapping",
+    "keyup": "a recorded suppressed printable keyCode is deleted and returns without input_up; keyup does not re-evaluate focus, so a down accepted before focus changes still cleans its interval and lock",
+    "held_printable_focus_change": "an interval created while focus was outside a DOM text field remains armed but emits no repeat while the field is focused; its keyup still clears it",
+    "no_document": "isDomTextInputFocused returns false when document is undefined"
+  },
+  "blur_policy": {
+    "trigger": "globalScene.game.events Phaser.Core.Events.BLUR",
+    "handler": "InputsController.loseFocus",
+    "controller_cleanup": "clear every inputInterval, empty buttonLock, and clear suppressedPrintableKeyCodes",
+    "touch_cleanup": "TouchControl.deactivatePressedKey clears touch intervals, removes active classes from data-key nodes, and empties its buttonLock",
+    "synthetic_release": "no input_up event is emitted by either cleanup path",
+    "regain_focus": "no explicit focus listener is registered; the existing keyboard/gamepad listeners remain attached"
+  },
+  "global_dependencies": [
+    {
+      "name": "globalScene",
+      "kind": "module singleton",
+      "uses": ["game.events", "input.keyboard", "input.gamepad", "ui", "gameData", "inputMethod", "enableVibration", "gameSpeed", "field state"],
+      "evidence": "src/global-scene.ts:1-6; src/inputs-controller.ts:init, keyboardKeyDown, gamepadButtonDown; src/ui-inputs.ts:detectInputMethod and action helpers"
+    },
+    {
+      "name": "Phaser",
+      "kind": "external runtime and keycode table",
+      "uses": ["Core.Events.BLUR", "Input.Keyboard.KeyCodes", "Input.Gamepad events and types", "Events.EventEmitter", "Math.Clamp"],
+      "evidence": "src/inputs-controller.ts:27,147-183; src/configs/inputs/cfg-keyboard-qwerty.ts:9-97; src/ui-inputs.ts:24,319-321; package.json:86; pnpm-lock.yaml:1885-1886"
+    },
+    {
+      "name": "document",
+      "kind": "browser DOM",
+      "uses": ["activeElement", "data-key query/binding", "active class cleanup", "touch controls", "contentEditable focus"],
+      "evidence": "src/inputs-controller.ts:isDomTextInputFocused; src/touch-controls.ts:init, touchButtonUp, deactivatePressedKey; index.html:93-190"
+    },
+    {
+      "name": "window",
+      "kind": "browser global",
+      "uses": ["touch configuration and orientation", "touch capability helpers"],
+      "evidence": "src/touch-controls.ts:hasTouchscreen, isMobile, isIos; src/ui/settings/move-touch-controls-handler.ts:constructor, enableConfigurationMode, disableConfigurationMode"
+    },
+    {
+      "name": "navigator",
+      "kind": "browser global",
+      "uses": ["vibrate availability and call", "mobile detection"],
+      "evidence": "src/ui-inputs.ts:83-87; src/touch-controls.ts:isMobile, isIos"
+    },
+    {
+      "name": "setInterval / clearInterval",
+      "kind": "timer globals",
+      "uses": ["keyboard, gamepad, and touch repeat plus cleanup"],
+      "evidence": "src/inputs-controller.ts:383-397,468-479,557-565; src/touch-controls.ts:116-122,137,212-213"
+    },
+    {
+      "name": "setTimeout",
+      "kind": "timer global",
+      "uses": ["500 ms delayed installation of move-touch-controls-handler pointer listeners"],
+      "evidence": "src/ui/settings/move-touch-controls-handler.ts:360-364"
+    },
+    {
+      "name": "import.meta.env.MODE",
+      "kind": "build-time environment",
+      "uses": ["development-only BUTTON_DEV_CUSTOM setting and action"],
+      "evidence": "src/constants/app-constants.ts:1-6; src/configs/inputs/cfg-keyboard-qwerty.ts:187-222,253; src/ui-inputs.ts:108-112"
+    },
+    {
+      "name": "localStorage",
+      "kind": "browser persistence",
+      "uses": ["touch-control positions only; no logical input mapping"],
+      "evidence": "src/ui/settings/move-touch-controls-handler.ts:getSavedPositionsOfCurrentOrientation, saveCurrentPositions"
+    }
+  ],
+  "dead_declarations": [
+    {
+      "symbol": "InputsController.interactions",
+      "status": "dead/unread state",
+      "evidence": "src/inputs-controller.ts:95,122-132 initializes it; no read or write occurs in the input handlers",
+      "effect": "the constructor's MENU/STATS non-repeat intent is not enforced"
+    },
+    {
+      "symbol": "Button.DEV_CUSTOM outside development mode",
+      "status": "conditional/unreachable from the default keyboard config",
+      "evidence": "src/constants/app-constants.ts:6; src/configs/inputs/cfg-keyboard-qwerty.ts:222,253; src/ui-inputs.ts:108-112",
+      "effect": "KEY_Q resolves to DEV_CUSTOM only when isDev is true; otherwise its default is -1 and no button is returned"
+    },
+    {
+      "symbol": "PAD_PROCON.default.MENU",
+      "status": "physical declaration is unbound by default",
+      "evidence": "src/configs/inputs/pad-procon.ts:28,66-83",
+      "effect": "button index 16 resolves to no logical Button until a custom mapping assigns it"
+    },
+    {
+      "symbol": "PAD_UNLICENSED_SNES.default LT/RT/LS/RS",
+      "status": "default names are absent from deviceMapping",
+      "evidence": "src/configs/inputs/pad-unlicensed-snes.ts:11-24,57-73",
+      "effect": "those default -1 entries have no physical button index to resolve"
+    }
+  ],
+  "missing_evidence": [
+    {
+      "claim": "browser-specific production delivery of KeyboardEvent.keyCode",
+      "status": "not determined by repository source",
+      "evidence": "source reads event.keyCode at src/inputs-controller.ts:374 and 419; the oracle records the pinned Phaser constants, but no browser runtime was executed"
+    },
+    {
+      "claim": "saved custom mappings",
+      "status": "not a fixed oracle value",
+      "evidence": "src/inputs-controller.ts:307-310,322-326,623-639 allows persisted/injected custom values; mappings here are the declared defaults"
+    },
+    {
+      "claim": "per-screen processInput semantics",
+      "status": "delegated to concrete UI handlers and not expanded into this physical-input inventory",
+      "evidence": "src/ui/handlers/ui-handler.ts:20-28 declares abstract processInput; src/ui-inputs.ts:166-297 selects or forwards handlers"
+    }
+  ]
+}

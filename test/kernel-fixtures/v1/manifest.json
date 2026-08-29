@@ -1,0 +1,80 @@
+{
+  "canonical_digest": "27423fd5c203f82589517be99b39fc496b09542e13b9807e36bb61565a55e506",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+    "digest_kind": "fixture-content-sha256-v1",
+    "fixtures": [
+      {
+        "canonical_digest": "5bd18ba2dea0167fadee5e90541b9df7aad4fb9051260b6c040d32e7a2ee1d9a",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/authority-entry-kinds.json",
+        "source_file": "src/data/elite-redux/coop/authority-v2/contract.ts"
+      },
+      {
+        "canonical_digest": "593324cb2e7be21254088d71623b778ab8476d6a4fb969e95adca878f42b0039",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/buttons.json",
+        "source_file": "src/enums/buttons.ts"
+      },
+      {
+        "canonical_digest": "ce661010164c12faf803bf3b5d5a4aba16ae851215ee455e7c8ff107ea52c461",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/checkpoints.json",
+        "source_file": "src/data/elite-redux/coop/coop-battle-checkpoint.ts"
+      },
+      {
+        "canonical_digest": "6b47ca175d428815656d9bb4175de566625ccbe9bac754c1fe24b65a03e6a395",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/input-maps.json",
+        "source_file": "src/inputs-controller.ts"
+      },
+      {
+        "canonical_digest": "bcf6d7ec0ba75962157ab78d6fbea012a9ca19c7fac43c479c5e8dd2aee1d642",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/next-controls.json",
+        "source_file": "src/data/elite-redux/coop/authority-v2/next-control.ts"
+      },
+      {
+        "canonical_digest": "265d276e47ccb76bc2af5a02b41412c5e0a90803acb7d2392acc64b05af92771",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/protocol.json",
+        "source_file": "src/data/elite-redux/coop/coop-transport.ts"
+      },
+      {
+        "canonical_digest": "9acf42d80cffffa26936c5961ead169ee447937dc279bc0b98957839206e93da",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/receipts.json",
+        "source_file": "src/data/elite-redux/coop/authority-v2/contract.ts"
+      },
+      {
+        "canonical_digest": "baf6c7ed3dbec6d5a41190671c336c09db520e7694abdec4eed3fd739f0efafe",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/replay-traces.json",
+        "source_file": "src/data/elite-redux/replay-trace.ts"
+      },
+      {
+        "canonical_digest": "f42daa2533716716bb4f73e3172b2d0e8775d33567ba3cda95a1c069742cc1ea",
+        "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+        "digest_kind": "fixture-content-sha256-v1",
+        "fixture_file": "test/kernel-fixtures/v1/schema.json",
+        "source_file": "scripts/export-kernel-schema.mjs"
+      }
+    ],
+    "manifest_version": 1
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "scripts/export-kernel-fixtures.mjs"
+}

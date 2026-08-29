@@ -85,6 +85,7 @@ const allowedBrowserAddition = path =>
   path.startsWith("src/rust-browser/")
   || path.startsWith("test/browser/rust-browser/")
   || path.startsWith("test/node/rust-browser/")
+  || path.startsWith("test/kernel-fixtures/v1/")
   || path === "test/kernel-fixtures/m3/export-battle-oracle.test.ts"
   || path === "test/kernel-fixtures/m4/export-helper-runner.test.ts"
   || path === "test/kernel-fixtures/m4/export-run-oracle.test.ts"

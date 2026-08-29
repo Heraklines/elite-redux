@@ -1,0 +1,36 @@
+{
+  "canonical_digest": "5bd18ba2dea0167fadee5e90541b9df7aad4fb9051260b6c040d32e7a2ee1d9a",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "ack_stages": [
+      "admitted",
+      "materialApplied",
+      "controlInstalled",
+      "presentationSettled"
+    ],
+    "authority_entry_validator_source": "src/data/elite-redux/coop/authority-v2/authority-entry.ts",
+    "entry_kinds": [
+      "TURN_COMMIT",
+      "REPLACEMENT_COMMIT",
+      "INTERACTION_COMMIT",
+      "CONTROL_COMMIT",
+      "WAVE_ADVANCE",
+      "TERMINAL_COMMIT"
+    ],
+    "next_control_kinds": [
+      "COMMAND_FRONTIER",
+      "REPLACEMENT",
+      "SHARED_INTERACTION",
+      "AWAIT_SUCCESSOR",
+      "TERMINAL"
+    ],
+    "protocol_validator_source": "src/data/elite-redux/coop/authority-v2/protocol-validator.ts",
+    "source_file": "src/data/elite-redux/coop/authority-v2/contract.ts"
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/data/elite-redux/coop/authority-v2/contract.ts"
+}

@@ -1,0 +1,97 @@
+{
+  "canonical_digest": "9acf42d80cffffa26936c5961ead169ee447937dc279bc0b98957839206e93da",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "context_source_file": "src/data/elite-redux/coop/authority-v2/frame-context.ts",
+    "fixtures": [
+      {
+        "expected_shape": "controlId is absent",
+        "id": "admitted",
+        "receipt": {
+          "context": {
+            "authoritySeatId": 0,
+            "connectionGeneration": 2,
+            "membershipRevision": 1,
+            "runId": "fixture-run",
+            "seatMapId": "fixture-seat-map",
+            "senderSeatId": 1,
+            "sessionEpoch": 1,
+            "sessionId": "fixture-session"
+          },
+          "operationId": "turn/e1/w2/t1",
+          "revision": 1,
+          "stage": "admitted"
+        },
+        "sequence": 1
+      },
+      {
+        "expected_shape": "controlId is absent",
+        "id": "materialApplied",
+        "receipt": {
+          "context": {
+            "authoritySeatId": 0,
+            "connectionGeneration": 2,
+            "membershipRevision": 1,
+            "runId": "fixture-run",
+            "seatMapId": "fixture-seat-map",
+            "senderSeatId": 1,
+            "sessionEpoch": 1,
+            "sessionId": "fixture-session"
+          },
+          "operationId": "turn/e1/w2/t1",
+          "revision": 1,
+          "stage": "materialApplied"
+        },
+        "sequence": 2
+      },
+      {
+        "expected_shape": "controlId is present",
+        "id": "controlInstalled",
+        "receipt": {
+          "context": {
+            "authoritySeatId": 0,
+            "connectionGeneration": 2,
+            "membershipRevision": 1,
+            "runId": "fixture-run",
+            "seatMapId": "fixture-seat-map",
+            "senderSeatId": 1,
+            "sessionEpoch": 1,
+            "sessionId": "fixture-session"
+          },
+          "controlId": "COMMAND_FRONTIER/e1/w2/t1/f1:s1:p202",
+          "operationId": "turn/e1/w2/t1",
+          "revision": 1,
+          "stage": "controlInstalled"
+        },
+        "sequence": 3
+      },
+      {
+        "expected_shape": "controlId is absent",
+        "id": "presentationSettled",
+        "receipt": {
+          "context": {
+            "authoritySeatId": 0,
+            "connectionGeneration": 2,
+            "membershipRevision": 1,
+            "runId": "fixture-run",
+            "seatMapId": "fixture-seat-map",
+            "senderSeatId": 1,
+            "sessionEpoch": 1,
+            "sessionId": "fixture-session"
+          },
+          "operationId": "turn/e1/w2/t1",
+          "revision": 1,
+          "stage": "presentationSettled"
+        },
+        "sequence": 4
+      }
+    ],
+    "source_file": "src/data/elite-redux/coop/authority-v2/contract.ts"
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/data/elite-redux/coop/authority-v2/contract.ts"
+}

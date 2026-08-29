@@ -1,0 +1,454 @@
+{
+  "schema_version": 1,
+  "project_name": "PokéRogue Redux",
+  "fixture_kind": "authority-v2-contract-evidence-v1",
+  "authority_contract": "authority-v2",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
+  "protocol_version": "er-coop-48",
+  "frame_protocol_version": 2,
+  "source_oracle": "schemas/kernel/source/authority-v2-map-v1.json",
+  "coverage_categories": {
+    "absent-null": ["interactions-learn#family-nullability", "recovery#revision-zero-nullability"],
+    "enum-tag": ["wave#terminal-freeze-and-subsumption"],
+    "timer-owner": ["runtime#timer-metadata-and-disposal", "scheduler-clock-seam#connected-time-retry"],
+    "canonicalization": ["control#exact-control-address", "cutover-interaction#closed-interaction-envelope", "interactions-learn#learn-material-digest-boundary", "turn#turn-entry-stages"],
+    "context": ["cutover-turn#host-commit-context", "frames#mandatory-context-and-classification", "session-identity#frame-identity-binding"],
+    "successor": ["control#ordered-wait-frontier", "faint-replacement-command-open#replacement-to-command-open", "replacement#ordered-replacement-chain", "wave#terminal-freeze-and-subsumption"],
+    "recovery": ["recovery#fence-before-request", "recovery#revision-zero-nullability", "recovery-channel#correlated-request-proof"],
+    "cleanup": ["interactions-reward#reward-rollback-boundary", "log#revision-retention-quorum", "recovery-channel#correlated-request-proof", "runtime#timer-metadata-and-disposal", "shadow#tap-routing-and-disposal"]
+  },
+  "payload": [
+    {
+      "fixture_id": "command-frontier",
+      "typescript_source": "test/node/authority-v2-command-frontier.test.ts",
+      "source_lock_symbols": ["CoopCommandControlTarget", "CoopNextControl"],
+      "semantic_class": "mechanical-control",
+      "cases": [
+        {
+          "case_id": "owned-coordinate-frontier",
+          "rust_types": ["er_types::CommandFrontierControl", "er_types::CommandControlTarget"],
+          "rust_assertion": "Command targets retain ownerSeatId, pokemonId, and fieldIndex; unresolved ownership is not invented.",
+          "oracle_boundary": "portable"
+        },
+        {
+          "case_id": "showdown-coordinate-proof",
+          "rust_types": ["er_protocol::partition_control_for_seat", "er_protocol::control_owner_seat_ids"],
+          "rust_assertion": "Seat partitioning is derived from stated command ownership and does not depend on a Phaser queue.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "control-open",
+      "typescript_source": "test/node/authority-v2-control-open.test.ts",
+      "source_lock_symbols": ["CoopCommandOpenMaterialV2|CoopInteractionOpenMaterialV2"],
+      "semantic_class": "entry-material",
+      "cases": [
+        {
+          "case_id": "post-entry-effects-image",
+          "rust_types": ["er_protocol::AuthorityEntryDraft", "er_types::Material"],
+          "rust_assertion": "A control-open entry retains its complete opaque material image and stated successor before revision assignment.",
+          "oracle_boundary": "browser-adapter-input"
+        }
+      ]
+    },
+    {
+      "fixture_id": "control",
+      "typescript_source": "test/node/authority-v2-control.test.ts",
+      "source_lock_symbols": ["CoopNextControl", "AwaitSuccessorControl", "CoopControlInstallResult + CoopV2InteractionSurfaceObservation"],
+      "semantic_class": "control-identity-and-projection",
+      "cases": [
+        {
+          "case_id": "exact-control-address",
+          "rust_types": ["er_protocol::control_id_of", "er_protocol::validate_next_control", "er_types::NextControl"],
+          "rust_assertion": "The stated control identity is the only receipt/projector address; projection cannot select a local successor.",
+          "oracle_boundary": "portable"
+        },
+        {
+          "case_id": "ordered-wait-frontier",
+          "rust_types": ["er_protocol::successor_wait_allows", "er_types::AwaitSuccessorControl"],
+          "rust_assertion": "An await successor admits only its stated coordinates, allowed kinds, and explicit N/N+1 rule.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "cutover-interaction",
+      "typescript_source": "test/node/authority-v2-cutover-interaction.test.ts",
+      "source_lock_symbols": ["CoopV2InteractionEnvelopeMaterial", "CoopV2InteractionProjectionPlan"],
+      "semantic_class": "adapter-cutover",
+      "cases": [
+        {
+          "case_id": "closed-interaction-envelope",
+          "rust_types": ["er_types::Material", "er_protocol::control_allows_successor_entry"],
+          "rust_assertion": "The interaction envelope remains opaque material while successor authorization stays in typed control identity.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "cutover-replacement",
+      "typescript_source": "test/node/authority-v2-cutover-replacement.test.ts",
+      "source_lock_symbols": ["ReplacementProposal|ReplacementCommitImage"],
+      "semantic_class": "adapter-cutover",
+      "cases": [
+        {
+          "case_id": "staged-replacement-carrier",
+          "rust_types": ["er_types::ReplacementControl", "er_protocol::AuthorityEntryDraft"],
+          "rust_assertion": "Replacement carrier details are adapter material; the Rust boundary retains the named operation and ordered control address.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "cutover-turn",
+      "typescript_source": "test/node/authority-v2-cutover-turn.test.ts",
+      "source_lock_symbols": ["TurnResolutionImage"],
+      "semantic_class": "adapter-cutover",
+      "cases": [
+        {
+          "case_id": "host-commit-context",
+          "rust_types": ["er_types::Material", "er_protocol::AuthorityEntryDraft", "er_types::FrameContext"],
+          "rust_assertion": "Turn material is carried through an authenticated entry draft; host/guest routing is not inferred by the Rust DTO.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "cutover-wave",
+      "typescript_source": "test/node/authority-v2-cutover-wave.test.ts",
+      "source_lock_symbols": ["CoopWaveTransitionMaterialV2|CoopTerminalMaterialV2", "TerminalControl"],
+      "semantic_class": "adapter-cutover",
+      "cases": [
+        {
+          "case_id": "wave-terminal-commit",
+          "rust_types": ["er_types::Material", "er_types::TerminalControl", "er_types::AuthorityEntryKind"],
+          "rust_assertion": "Wave and terminal entries retain their material kind and typed successor; terminal control is not a browser phase name.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "duo-delivery",
+      "typescript_source": "test/node/authority-v2-duo-delivery.test.ts",
+      "source_lock_symbols": ["CoopAuthorityEntry", "CoopAuthorityReceipt", "AuthorityLedger + BoundedRevisionWindow"],
+      "semantic_class": "delivery-and-receipts",
+      "cases": [
+        {
+          "case_id": "staged-receipt-delivery",
+          "rust_types": ["er_protocol::AuthorityLog", "er_protocol::AuthorityReplica", "er_types::AuthorityReceipt"],
+          "rust_assertion": "Delivery evidence advances admitted, materialApplied, and controlInstalled in order; presentationSettled is non-mechanical.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "faint-replacement-command-open",
+      "typescript_source": "test/node/authority-v2-faint-replacement-command-open.test.ts",
+      "source_lock_symbols": ["CoopReplacementControlAddress", "AwaitSuccessorControl"],
+      "semantic_class": "successor-authorization",
+      "cases": [
+        {
+          "case_id": "replacement-to-command-open",
+          "rust_types": ["er_protocol::control_allows_successor_entry", "er_protocol::successor_wait_allows"],
+          "rust_assertion": "A surviving command-open successor is admitted only when its typed address satisfies the predecessor replacement wait.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "frames",
+      "typescript_source": "test/node/authority-v2-frames.test.ts",
+      "source_lock_symbols": ["CoopFrameContextV2", "CoopFrameV2", "CoopInboundFrameResultV2"],
+      "semantic_class": "raw-frame-boundary",
+      "cases": [
+        {
+          "case_id": "mandatory-context-and-classification",
+          "rust_types": ["er_types::NetworkFrame", "er_protocol::FrameValidator", "er_protocol::InboundFrameResult"],
+          "rust_assertion": "Raw input is classified before typed body use; unknown types drop cosmetically and malformed known frames violate the protocol.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "interaction-control-ledger",
+      "typescript_source": "test/node/authority-v2-interaction-control-ledger.test.ts",
+      "source_lock_symbols": ["SharedInteractionControl", "CoopControlInstallResult + CoopV2InteractionSurfaceObservation"],
+      "semantic_class": "control-claim-ownership",
+      "cases": [
+        {
+          "case_id": "address-exact-interaction-claim",
+          "rust_types": ["er_types::SharedInteractionControl", "er_protocol::control_id_of", "er_protocol::control_owner_seat_id"],
+          "rust_assertion": "Interaction ownership and control identity are derived from the stated address; a local surface observation is not a new successor.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "interaction-projection",
+      "typescript_source": "test/node/authority-v2-interaction-projection.test.ts",
+      "source_lock_symbols": ["CoopV2InteractionProjectionPlan"],
+      "semantic_class": "closed-projection",
+      "cases": [
+        {
+          "case_id": "immutable-plan-decode",
+          "rust_types": ["er_types::Material", "er_types::NextControl", "er_protocol::validate_next_control"],
+          "rust_assertion": "Incomplete projection capsules fail closed; no ambient engine queue is consulted to invent a plan.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "interactions-learn",
+      "typescript_source": "test/node/authority-v2-interactions-learn.test.ts",
+      "source_lock_symbols": ["CoopInteractionMaterial families"],
+      "semantic_class": "interaction-material",
+      "cases": [
+        {
+          "case_id": "learn-material-digest-boundary",
+          "rust_types": ["er_types::Material", "er_types::AuthorityEntryBody"],
+          "rust_assertion": "Surface-specific learn material remains an opaque payload with an adapter-owned digest at the protocol boundary.",
+          "oracle_boundary": "browser-adapter-boundary"
+        },
+        {
+          "case_id": "family-nullability",
+          "rust_types": ["er_types::Material"],
+          "rust_assertion": "Generic payload presence and explicit JSON null remain distinguishable until the adapter validator narrows the image.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "interactions-mystery",
+      "typescript_source": "test/node/authority-v2-interactions-mystery.test.ts",
+      "source_lock_symbols": ["CoopInteractionMaterial families"],
+      "semantic_class": "interaction-material",
+      "cases": [
+        {
+          "case_id": "mystery-window-boundary",
+          "rust_types": ["er_types::Material", "er_types::SharedInteractionControl"],
+          "rust_assertion": "Mystery option/terminal/catch/revival material is carried through the typed entry boundary while ME watcher lifecycle stays adapter-owned.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "interactions-reward",
+      "typescript_source": "test/node/authority-v2-interactions-reward.test.ts",
+      "source_lock_symbols": ["CoopInteractionMaterial families"],
+      "semantic_class": "interaction-material",
+      "cases": [
+        {
+          "case_id": "reward-rollback-boundary",
+          "rust_types": ["er_types::Material", "er_protocol::AuthorityLog"],
+          "rust_assertion": "Reward, market, and biome outcomes are opaque adapter images; protocol evidence retains digest and lease cleanup ownership.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "log",
+      "typescript_source": "test/node/authority-v2-log.test.ts",
+      "source_lock_symbols": ["CoopAuthorityEntry", "AuthorityLedger + BoundedRevisionWindow"],
+      "semantic_class": "authority-log",
+      "cases": [
+        {
+          "case_id": "revision-retention-quorum",
+          "rust_types": ["er_protocol::AuthorityLog::commit", "er_protocol::AuthorityLog::accept_receipt_detailed", "er_protocol::AuthorityLog::recovery_slice"],
+          "rust_assertion": "Revision assignment, bounded retention, mechanical receipt quorum, recovery slices, and disposal belong to one authority log.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "mutation-ledger",
+      "typescript_source": "test/node/authority-v2-mutation-ledger.test.ts",
+      "source_lock_symbols": ["CoopRuntimeContext", "CoopAuthorityEntry"],
+      "semantic_class": "mutation-barrier-boundary",
+      "cases": [
+        {
+          "case_id": "mutation-token-gate",
+          "rust_types": ["er_protocol::AuthorityEntryDraft", "er_types::Material"],
+          "rust_assertion": "The M2A map records the entry-draft boundary; mutation-token ownership remains an adapter seam until the kernel integration lane.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "proposal-admission",
+      "typescript_source": "test/node/authority-v2-proposal-admission.test.ts",
+      "source_lock_symbols": ["CoopV2ProposalAdmissionLedger|CoopV2ProposalLeaseManager"],
+      "semantic_class": "proposal-admission",
+      "cases": [
+        {
+          "case_id": "duplicate-conflict-capacity",
+          "rust_types": ["er_protocol::ProposalAdmissionLedger", "er_protocol::ProposalIdentity", "er_protocol::ProposalAdmission"],
+          "rust_assertion": "Operation identity is admitted independently from revision assignment; duplicate and conflicting fingerprints remain distinct outcomes.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "proposal-lease",
+      "typescript_source": "test/node/authority-v2-proposal-lease.test.ts",
+      "source_lock_symbols": ["CoopV2ProposalAdmissionLedger|CoopV2ProposalLeaseManager"],
+      "semantic_class": "proposal-lease",
+      "cases": [
+        {
+          "case_id": "bounded-retry-and-closure",
+          "rust_types": ["er_protocol::ProposalLeaseManager", "er_protocol::ProposalLeaseAction", "er_protocol::ProposalLeaseStart"],
+          "rust_assertion": "The lease retains the exact opaque proposal, retries in connected time, honors the absolute ceiling, and closes only on the exact committed operation.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "recovery-channel",
+      "typescript_source": "test/node/authority-v2-recovery-channel.test.ts",
+      "source_lock_symbols": ["CoopRecoveryRequestV2", "CoopRecoveryAppliedProofV2"],
+      "semantic_class": "recovery-channel",
+      "cases": [
+        {
+          "case_id": "correlated-request-proof",
+          "rust_types": ["er_types::RecoveryRequestBody", "er_types::RecoveryAppliedProof", "er_protocol::RecoveryTransaction"],
+          "rust_assertion": "Request and applied-proof identities are correlated; proof completion does not retire AuthorityLog entries.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "recovery",
+      "typescript_source": "test/node/authority-v2-recovery.test.ts",
+      "source_lock_symbols": ["CoopRecoveryBundle", "CoopRecoveryFence"],
+      "semantic_class": "recovery-transaction",
+      "cases": [
+        {
+          "case_id": "fence-before-request",
+          "rust_types": ["er_protocol::RecoveryFence", "er_protocol::validate_recovery_bundle", "er_protocol::RecoveryTransaction"],
+          "rust_assertion": "The fence is acquired before request effects; only a valid contiguous bundle can advance material/frontier/control and release it.",
+          "oracle_boundary": "portable"
+        },
+        {
+          "case_id": "revision-zero-nullability",
+          "rust_types": ["er_types::RecoveryBundle", "er_types::AuthorityRecoverySlice"],
+          "rust_assertion": "Revision zero alone permits null frontierOperationId and nextControl with an empty required tail.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "replacement",
+      "typescript_source": "test/node/authority-v2-replacement.test.ts",
+      "source_lock_symbols": ["ReplacementProposal|ReplacementCommitImage", "CoopReplacementControlAddress"],
+      "semantic_class": "replacement-material-and-control",
+      "cases": [
+        {
+          "case_id": "ordered-replacement-chain",
+          "rust_types": ["er_types::ReplacementControl", "er_types::ReplacementControlAddress", "er_protocol::control_allows_successor_entry"],
+          "rust_assertion": "Replacement head and remaining tail preserve boundary coordinates, increasing occurrences, and unique operation identities.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "runtime",
+      "typescript_source": "test/node/authority-v2-runtime.test.ts",
+      "source_lock_symbols": ["CoopRuntimeContext", "CoopScheduler + CoopTimerOwner"],
+      "semantic_class": "scheduler-and-lifecycle",
+      "cases": [
+        {
+          "case_id": "timer-metadata-and-disposal",
+          "rust_types": ["er_protocol::KernelScheduler", "er_protocol::ScheduledTimer", "er_types::TimerOwner"],
+          "rust_assertion": "Every timer carries endpoint, owner identity, address, reason, delay, and time class; disposal leaves no live registration.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "scheduler-clock-seam",
+      "typescript_source": "test/node/authority-v2-scheduler-clock-seam.test.ts",
+      "source_lock_symbols": ["CoopScheduler + CoopTimerOwner"],
+      "semantic_class": "deterministic-clock-seam",
+      "cases": [
+        {
+          "case_id": "connected-time-retry",
+          "rust_types": ["er_protocol::KernelScheduler", "er_types::TimeClass::Connected", "er_types::TimerOwner"],
+          "rust_assertion": "Injected virtual advancement controls connected-time retry ordering; absolute timers remain independent of pause classes.",
+          "oracle_boundary": "portable"
+        }
+      ]
+    },
+    {
+      "fixture_id": "session-identity",
+      "typescript_source": "test/node/authority-v2-session-identity.test.ts",
+      "source_lock_symbols": ["CoopV2SessionIdentity"],
+      "semantic_class": "authenticated-identity",
+      "cases": [
+        {
+          "case_id": "frame-identity-binding",
+          "rust_types": ["er_types::FrameContext", "er_protocol::frame_contexts_compatible", "er_protocol::AuthorityLog::rebind_connection"],
+          "rust_assertion": "Session/run/epoch/seat-map/membership compatibility is distinct from exact sender/authority/generation equality.",
+          "oracle_boundary": "browser-identity-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "shadow",
+      "typescript_source": "test/node/authority-v2-shadow.test.ts",
+      "source_lock_symbols": ["CoopAuthorityEntry", "CoopRecoveryBundle", "CoopV2InteractionEnvelopeMaterial"],
+      "semantic_class": "shadow-harness-boundary",
+      "cases": [
+        {
+          "case_id": "tap-routing-and-disposal",
+          "rust_types": ["er_protocol::AuthorityLog", "er_protocol::AuthorityReplica", "er_protocol::RecoveryTransaction", "er_protocol::FrameValidator"],
+          "rust_assertion": "Rust evidence names the durable log/replica/recovery/frame boundaries; browser shadow selectors remain explicit non-mechanical state.",
+          "oracle_boundary": "browser-adapter-boundary"
+        }
+      ]
+    },
+    {
+      "fixture_id": "simulator",
+      "typescript_source": "test/node/authority-v2-simulator.test.ts",
+      "source_lock_symbols": ["CoopAuthorityEntry", "CoopNextControl", "CoopRecoveryBundle"],
+      "semantic_class": "reference-simulator",
+      "cases": [
+        {
+          "case_id": "seeded-fault-oracle",
+          "rust_types": ["er_protocol::AuthorityLog", "er_protocol::AuthorityReplica", "er_protocol::KernelScheduler"],
+          "rust_assertion": "The simulator remains a reference schedule/trace oracle; it is not treated as a Rust production implementation or G5 campaign pass.",
+          "oracle_boundary": "reference-simulator"
+        }
+      ]
+    },
+    {
+      "fixture_id": "turn",
+      "typescript_source": "test/node/authority-v2-turn.test.ts",
+      "source_lock_symbols": ["TurnResolutionImage", "CoopAuthorityEntry", "CoopAuthoritativeMaterial"],
+      "semantic_class": "turn-material-and-progression",
+      "cases": [
+        {
+          "case_id": "turn-entry-stages",
+          "rust_types": ["er_protocol::AuthorityLog::commit", "er_protocol::AuthorityReplica::admit", "er_protocol::ProposalLeaseManager", "er_types::Material"],
+          "rust_assertion": "Turn commit evidence preserves adapter-owned digest material, predecessor successor authorization, staged replica application, and proposal lease identity.",
+          "oracle_boundary": "portable-core-with-adapter-input"
+        }
+      ]
+    },
+    {
+      "fixture_id": "wave",
+      "typescript_source": "test/node/authority-v2-wave.test.ts",
+      "source_lock_symbols": ["CoopWaveTransitionMaterialV2|CoopTerminalMaterialV2", "TerminalControl", "CoopAuthorityEntry"],
+      "semantic_class": "wave-terminal-progression",
+      "cases": [
+        {
+          "case_id": "terminal-freeze-and-subsumption",
+          "rust_types": ["er_types::AuthorityEntryKind::TerminalCommit", "er_types::TerminalControl", "er_protocol::AuthorityLog::commit"],
+          "rust_assertion": "Wave/terminal entries state supersession and terminal control explicitly; terminalization freezes liveness and does not infer a future control.",
+          "oracle_boundary": "portable-core-with-adapter-input"
+        }
+      ]
+    }
+  ],
+  "canonical_digest": "9072146d1587f78e03f5a14709bd60fab4d824203038a8b3b1abd221c96da850"
+}

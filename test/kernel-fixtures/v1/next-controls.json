@@ -1,0 +1,133 @@
+{
+  "canonical_digest": "bcf6d7ec0ba75962157ab78d6fbea012a9ca19c7fac43c479c5e8dd2aee1d642",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "canonical_algorithm": "next-control.ts: controlIdOf",
+    "fixtures": [
+      {
+        "control": {
+          "commands": [
+            {
+              "fieldIndex": 1,
+              "ownerSeatId": 1,
+              "pokemonId": 202
+            },
+            {
+              "fieldIndex": 0,
+              "ownerSeatId": 0,
+              "pokemonId": 101
+            }
+          ],
+          "epoch": 1,
+          "kind": "COMMAND_FRONTIER",
+          "turn": 1,
+          "wave": 2
+        },
+        "control_id": "COMMAND_FRONTIER/e1/w2/t1/f0:s0:p101,f1:s1:p202",
+        "expected_shape": "valid per nextControlIssues()",
+        "id": "command-frontier"
+      },
+      {
+        "control": {
+          "epoch": 1,
+          "fieldIndex": 0,
+          "kind": "REPLACEMENT",
+          "occurrence": 0,
+          "operationId": "replacement/e1/w2/t1/o0/f0",
+          "ownerSeatId": 0,
+          "remaining": [
+            {
+              "epoch": 1,
+              "fieldIndex": 1,
+              "occurrence": 1,
+              "operationId": "replacement/e1/w2/t1/o1/f1",
+              "ownerSeatId": 1,
+              "turn": 1,
+              "wave": 2
+            }
+          ],
+          "turn": 1,
+          "wave": 2
+        },
+        "control_id": "REPLACEMENT/replacement%2Fe1%2Fw2%2Ft1%2Fo0%2Ff0/s0/e1/w2/t1/o0/f0/remaining:replacement%2Fe1%2Fw2%2Ft1%2Fo1%2Ff1:s1:e1:w2:t1:o1:f1",
+        "expected_shape": "valid per nextControlIssues()",
+        "id": "replacement"
+      },
+      {
+        "control": {
+          "epoch": 1,
+          "kind": "SHARED_INTERACTION",
+          "operationId": "interaction/e1/w2/t1/ability",
+          "operationKind": "ABILITY_PRESENT",
+          "ownerSeatId": 1,
+          "successor": {
+            "operationIds": null,
+            "operationKinds": [
+              "ABILITY_PRESENT"
+            ]
+          },
+          "surfaceClass": "op:ability",
+          "turn": 1,
+          "wave": 2
+        },
+        "control_id": "SHARED_INTERACTION/op%3Aability/ABILITY_PRESENT/interaction%2Fe1%2Fw2%2Ft1%2Fability/s1/e1/w2/t1/results:ABILITY_PRESENT/resultIds:*",
+        "expected_shape": "valid per nextControlIssues()",
+        "id": "shared-interaction"
+      },
+      {
+        "control": {
+          "afterOperationId": "turn/e1/w2/t1",
+          "allowNextWaveStart": false,
+          "allowedControlAddresses": [
+            {
+              "materialKind": "command-open",
+              "operationId": null,
+              "turn": 2,
+              "wave": 2
+            }
+          ],
+          "allowedInteractionAddresses": [
+            {
+              "operationKind": "ME_BUTTON",
+              "surfaceClass": "op:me",
+              "turn": 1,
+              "wave": 2
+            }
+          ],
+          "allowedKinds": [
+            "TURN_COMMIT",
+            "REPLACEMENT_COMMIT",
+            "INTERACTION_COMMIT",
+            "CONTROL_COMMIT",
+            "WAVE_ADVANCE",
+            "TERMINAL_COMMIT"
+          ],
+          "epoch": 1,
+          "expectedOperationId": null,
+          "kind": "AWAIT_SUCCESSOR",
+          "turn": 1,
+          "wave": 2
+        },
+        "control_id": "AWAIT_SUCCESSOR/turn%2Fe1%2Fw2%2Ft1/e1/w2/t1/TURN_COMMIT,REPLACEMENT_COMMIT,INTERACTION_COMMIT,CONTROL_COMMIT,WAVE_ADVANCE,TERMINAL_COMMIT/interactionAddresses:op%3Ame:ME_BUTTON:w2:t1/controlAddresses:command-open:w2:t2:id*/nextWave:0/next:*",
+        "expected_shape": "valid per nextControlIssues()",
+        "id": "await-successor"
+      },
+      {
+        "control": {
+          "kind": "TERMINAL",
+          "terminalId": "terminal/e1/w2"
+        },
+        "control_id": "TERMINAL/terminal%2Fe1%2Fw2",
+        "expected_shape": "valid per nextControlIssues()",
+        "id": "terminal"
+      }
+    ],
+    "source_file": "src/data/elite-redux/coop/authority-v2/next-control.ts"
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/data/elite-redux/coop/authority-v2/next-control.ts"
+}

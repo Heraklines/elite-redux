@@ -1,0 +1,128 @@
+{
+  "canonical_digest": "593324cb2e7be21254088d71623b778ab8476d6a4fb969e95adca878f42b0039",
+  "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
+  "digest_kind": "fixture-content-sha256-v1",
+  "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
+  "payload": {
+    "by_name": {
+      "ACTION": 5,
+      "CANCEL": 6,
+      "CYCLE_ABILITY": 12,
+      "CYCLE_FORM": 10,
+      "CYCLE_GENDER": 11,
+      "CYCLE_NATURE": 13,
+      "CYCLE_SHINY": 9,
+      "CYCLE_TERA": 14,
+      "DEV_CUSTOM": 17,
+      "DOWN": 1,
+      "LEFT": 2,
+      "MENU": 7,
+      "RIGHT": 3,
+      "SLOW_DOWN": 16,
+      "SPEED_UP": 15,
+      "STATS": 8,
+      "SUBMIT": 4,
+      "UP": 0
+    },
+    "by_value": {
+      "0": "UP",
+      "1": "DOWN",
+      "2": "LEFT",
+      "3": "RIGHT",
+      "4": "SUBMIT",
+      "5": "ACTION",
+      "6": "CANCEL",
+      "7": "MENU",
+      "8": "STATS",
+      "9": "CYCLE_SHINY",
+      "10": "CYCLE_FORM",
+      "11": "CYCLE_GENDER",
+      "12": "CYCLE_ABILITY",
+      "13": "CYCLE_NATURE",
+      "14": "CYCLE_TERA",
+      "15": "SPEED_UP",
+      "16": "SLOW_DOWN",
+      "17": "DEV_CUSTOM"
+    },
+    "enum": "Button",
+    "members": [
+      {
+        "name": "UP",
+        "value": 0
+      },
+      {
+        "name": "DOWN",
+        "value": 1
+      },
+      {
+        "name": "LEFT",
+        "value": 2
+      },
+      {
+        "name": "RIGHT",
+        "value": 3
+      },
+      {
+        "name": "SUBMIT",
+        "value": 4
+      },
+      {
+        "name": "ACTION",
+        "value": 5
+      },
+      {
+        "name": "CANCEL",
+        "value": 6
+      },
+      {
+        "name": "MENU",
+        "value": 7
+      },
+      {
+        "name": "STATS",
+        "value": 8
+      },
+      {
+        "name": "CYCLE_SHINY",
+        "value": 9
+      },
+      {
+        "name": "CYCLE_FORM",
+        "value": 10
+      },
+      {
+        "name": "CYCLE_GENDER",
+        "value": 11
+      },
+      {
+        "name": "CYCLE_ABILITY",
+        "value": 12
+      },
+      {
+        "name": "CYCLE_NATURE",
+        "value": 13
+      },
+      {
+        "name": "CYCLE_TERA",
+        "value": 14
+      },
+      {
+        "name": "SPEED_UP",
+        "value": 15
+      },
+      {
+        "name": "SLOW_DOWN",
+        "value": 16
+      },
+      {
+        "name": "DEV_CUSTOM",
+        "value": 17
+      }
+    ],
+    "source_file": "src/enums/buttons.ts"
+  },
+  "project_name": "PokéRogue Redux",
+  "protocol_version": "er-coop-48",
+  "schema_version": 1,
+  "source_file": "src/enums/buttons.ts"
+}
