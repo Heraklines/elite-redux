@@ -185,5 +185,22 @@
     "name": "Fae Heart",
     "rules": [],
     "version": 1
+  },
+  "new-ability-9": {
+    "componentRules": [],
+    "description": "Inner Focus + Fighting Spirit + Fatal Precision\n\"It readies itself to face its enemies by focusing its mental energies. Its fighting style can be summed up in a single word: heartless.\"",
+    "flags": {},
+    "generation": 9,
+    "id": 20008,
+    "includes": [
+      39,
+      5038,
+      5078
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Heartless Style",
+    "rules": [],
+    "version": 1
   }
 }
