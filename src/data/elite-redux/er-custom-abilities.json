@@ -19,17 +19,17 @@
   },
   "new-ability-10": {
     "componentRules": [],
-    "description": "Impenetrable + Armor Tail",
+    "description": "Impenetrable + Water Absorb",
     "flags": {},
     "generation": 9,
     "id": 20009,
     "includes": [
       5064,
-      296
+      11
     ],
     "mechanics": [],
     "modifiers": [],
-    "name": "Old Ocean",
+    "name": "Old Ocean Relic",
     "rules": [],
     "version": 1
   },
