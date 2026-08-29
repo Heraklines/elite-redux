@@ -1,6 +1,7 @@
 //! Terminal adapter for the M7 headless environment.
 
 mod m72;
+mod m72_lab;
 
 use std::collections::BTreeMap;
 use std::env;
@@ -159,6 +160,12 @@ fn agent_jsonl(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>>
         return Err("agent requires --protocol jsonl".into());
     }
     let content = load_content(options)?;
+    if options.get("warm").map(String::as_str) == Some("true") {
+        let maximum_sessions = options
+            .get("maximum-sessions")
+            .map_or(Ok(256_usize), |value| value.parse())?;
+        return m72_lab::run_warm_agent_v1(content, maximum_sessions);
+    }
     let snapshot_path = option_path(options, "snapshot", "ER_M7_SNAPSHOT")?;
     let snapshot: RestorableKernelSnapshotV6 = decode_file(&snapshot_path)?;
     let environment = GameEnvironment::from_snapshot(snapshot, Arc::clone(&content))?;

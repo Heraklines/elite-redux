@@ -219,6 +219,7 @@ dependencies = [
  "er-env",
  "er-game",
  "er-kernel",
+ "er-lab",
  "er-repro",
  "er-save",
  "er-state",
