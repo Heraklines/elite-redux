@@ -1,0 +1,36 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1
+url:      https://elite-redux-staging.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0
+platform: Win32
+screen:   2560x1440 @1x  devmem:?
+boot:     boot-start@0ms -> loading-complete@38633ms -> title-shown@44206ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     M8mVGk7pP4ssRLbmpKOryIz3
+party:    
+
+----- DESCRIPTION -----
+amarkov - wave 100 freeze
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1","source":"github","sha":"d45f186c7af7287a259ec4b1e4c200e213e0e9de","workflow":{"provider":"github-actions","runId":"33251084223","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[17:49:18.643] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:49:19.243] LOG: [ER] build {"version":1,"id":"github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1","source":"github","sha":"d45f186c7af7287a259ec4b1e4c200e213e0e9de","workflow":{"provider":"github-actions","runId":"33251084223","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[17:49:19.448] LOG: [dev-tools] loaded — 12 picker scenarios + Send Logs button
+[17:49:56.333] DEBUG: Destroying loading scene
+[17:49:56.333] DEBUG: Destroyed loading scene
+[17:49:56.569] LOG: Seed: M8mVGk7pP4ssRLbmpKOryIz3
+[17:49:56.569] LOG: Wave Seed: M8mVGk7pP4ssRLbmpKOryIz3 0
+[17:49:58.617] LOG: %cStart Phase LoginPhase color:green;
+[17:49:59.450] LOG: Client Session: KNM87Rqs2D4km7s2MzxejH3FEo7sKAHH
+[17:50:01.814] DEBUG: Using cached system data
+[17:50:01.898] LOG: %cStart Phase TitlePhase color:green;
+[17:50:01.898] LOG: Getting Session Slot id: %d 2
+[17:50:02.806] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
