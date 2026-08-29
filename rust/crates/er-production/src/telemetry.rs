@@ -77,19 +77,20 @@ impl ProductionHealthEventV1 {
         if self.schema_version != 1 {
             return Err(ProductionContractErrorV1::Telemetry("schema"));
         }
-        if let Some(fingerprint) = &self.failure_fingerprint {
-            if !valid_sha256(&fingerprint.0) {
-                return Err(ProductionContractErrorV1::Telemetry("failure fingerprint"));
-            }
+        if self
+            .failure_fingerprint
+            .as_ref()
+            .is_some_and(|fingerprint| !valid_sha256(&fingerprint.0))
+        {
+            return Err(ProductionContractErrorV1::Telemetry("failure fingerprint"));
         }
-        if let Some(performance) = &self.performance {
-            if performance.samples == 0
+        if self.performance.as_ref().is_some_and(|performance| {
+            performance.samples == 0
                 || performance.median_micros > performance.p95_micros
                 || performance.p95_micros > performance.p99_micros
                 || performance.p99_micros > performance.maximum_micros
-            {
-                return Err(ProductionContractErrorV1::Telemetry("performance summary"));
-            }
+        }) {
+            return Err(ProductionContractErrorV1::Telemetry("performance summary"));
         }
         Ok(())
     }
