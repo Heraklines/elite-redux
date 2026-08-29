@@ -247,3 +247,88 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed G33 reproduction and agent gate"
+
+  m71-final-integration:
+    name: M7.1 impact batch render model reload audit
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-final-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run final developer-plane integration contracts
+        working-directory: rust
+        run: cargo test -p er-testkit --test m71_final_integration
+
+  m71-final-wasm:
+    name: M7.1 complete developer-plane Wasm parity
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Check every developer-plane crate for Wasm
+        working-directory: rust
+        run: >-
+          cargo check --target wasm32-unknown-unknown
+          -p er-dev-types -p er-model -p er-render-model -p er-impact
+          -p er-devplane -p er-repro -p er-batch -p er-agent-protocol
+
+  m71-final-performance:
+    name: M7.1 release-profile performance and teardown
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m71-final-release-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run JSONL ceiling and teardown proof
+        working-directory: rust
+        run: >-
+          cargo test --release -p er-testkit --test m71_final_integration
+          jsonl_throughput_and_protocol_teardown_meet_g34_ceiling -- --exact
+
+  m71-final-api-audit:
+    name: M7.1 API bypass privacy parity audit
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m71-contract.mjs
+      - run: node scripts/check-kernel-m71-g30-parity.mjs
+
+  m71-g34-aggregate:
+    name: M7.1 G34 immutable qualification
+    if: ${{ github.ref_name == 'arch/rust-kernel-m7-devplane-g34' }}
+    needs:
+      - m71-g33-aggregate
+      - m71-final-integration
+      - m71-final-wasm
+      - m71-final-performance
+      - m71-final-api-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.1 exact SHA $GITHUB_SHA passed immutable G34 qualification"
