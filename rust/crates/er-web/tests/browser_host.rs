@@ -139,12 +139,22 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
         };
         let bytes = er_canonical::canonical_bytes(&vec![request])?;
         host.dispatch_batch_native(&bytes)?;
+        let connected = BrowserRequestEnvelopeV1 {
+            version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
+            request_id: safe(2)?,
+            sequence: safe(2)?,
+            request: BrowserRequestV1::TransportChanged {
+                generation: safe(1)?,
+                connected: true,
+            },
+        };
+        host.dispatch_batch_native(&er_canonical::canonical_bytes(&vec![connected])?)?;
     }
     let authority_requests = vec![
         BrowserRequestEnvelopeV1 {
             version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
-            request_id: safe(2)?,
-            sequence: safe(2)?,
+            request_id: safe(3)?,
+            sequence: safe(3)?,
             request: BrowserRequestV1::RawInput(RawInputEvent::KeyDown {
                 code: PhysicalKey::Space,
                 printable: true,
@@ -154,18 +164,19 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
         },
         BrowserRequestEnvelopeV1 {
             version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
-            request_id: safe(3)?,
-            sequence: safe(3)?,
+            request_id: safe(4)?,
+            sequence: safe(4)?,
             request: BrowserRequestV1::RawInput(RawInputEvent::KeyUp {
                 code: PhysicalKey::Space,
             }),
         },
     ];
-    let authority_responses: Vec<BrowserResponseEnvelopeV1> = serde_json::from_slice(
-        &authority
-            .dispatch_batch_native(&er_canonical::canonical_bytes(&authority_requests)?)
-            .map_err(|_| "authority raw input failed")?,
-    )?;
+    let mut authority_responses = Vec::<BrowserResponseEnvelopeV1>::new();
+    for request in authority_requests {
+        authority_responses.extend(serde_json::from_slice::<Vec<BrowserResponseEnvelopeV1>>(
+            &authority.dispatch_batch_native(&er_canonical::canonical_bytes(&vec![request])?)?,
+        )?);
+    }
     let materials = authority_responses
         .iter()
         .flat_map(|response| match &response.response {
@@ -182,7 +193,7 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
         .into_iter()
         .enumerate()
         .map(|(index, bytes)| {
-            let sequence = safe(u64::try_from(index)? + 2)?;
+            let sequence = safe(u64::try_from(index)? + 3)?;
             Ok(BrowserRequestEnvelopeV1 {
                 version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
                 request_id: sequence,

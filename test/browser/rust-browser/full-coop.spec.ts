@@ -23,7 +23,17 @@ const host = await RustBrowserHost.create({ workerUrl: worker, initialize: { kin
 const compatibility = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", mechanical_identity: "m1", content_hash: manifest.assets["content-pack.json"].sha256, material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
 let work = Promise.resolve(); let received = 0; let pc; let generation = 0; let transportConnected = false;
 async function handle(responses) { for (const envelope of responses) if (envelope.response.kind === "EFFECTS") for (const effect of envelope.response.value.effects) if (effect.kind === "SEND_NETWORK_FRAME") transport.send(effect.value.generation, new Uint8Array(effect.value.bytes)); }
-function enqueue(request) { if (request.kind === "NETWORK_FRAME") received += 1; if (request.kind === "TRANSPORT_CHANGED") transportConnected = request.value.connected; work = work.then(async () => handle(await host.dispatch(request))); }
+function enqueue(request) {
+  if (request.kind === "NETWORK_FRAME") received += 1;
+  if (request.kind === "TRANSPORT_CHANGED") transportConnected = request.value.connected;
+  work = work.then(async () => {
+    try {
+      await handle(await host.dispatch(request));
+    } catch (error) {
+      throw new Error(role + ":" + request.kind + ":" + String(error));
+    }
+  });
+}
 const transport = new RustBrowserTransportAdapterV1({ compatibility, emit: enqueue }); const input = new BrowserRawInputAdapter({ emit: enqueue }); if (role === "authority") input.start();
 function waitIce(connection) { if (connection.iceGatheringState === "complete") return Promise.resolve(); const { promise, resolve } = Promise.withResolvers(); connection.addEventListener("icegatheringstatechange", () => { if (connection.iceGatheringState === "complete") resolve(); }); return promise; }
 function waitUntil(predicate) { const { promise, resolve, reject } = Promise.withResolvers(); let frames = 0; const tick = () => { if (predicate()) { resolve(); return; } if (++frames > 600) { reject(new Error("co-op condition did not settle")); return; } requestAnimationFrame(tick); }; tick(); return promise; }

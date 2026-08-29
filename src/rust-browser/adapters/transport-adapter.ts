@@ -19,6 +19,7 @@ export class RustBrowserTransportAdapterV1 {
   readonly #generations = new ConnectionGenerationV1();
   #channel: RTCDataChannel | null = null;
   #handshakeAccepted = false;
+  #handshakeSent = false;
   #disposed = false;
 
   constructor(options: RustBrowserTransportOptionsV1) {
@@ -34,6 +35,7 @@ export class RustBrowserTransportAdapterV1 {
     const generation = this.#generations.advance();
     this.#channel = channel;
     this.#handshakeAccepted = false;
+    this.#handshakeSent = false;
     channel.binaryType = "arraybuffer";
     channel.addEventListener("open", this.#onOpen);
     channel.addEventListener("message", this.#onMessage);
@@ -70,9 +72,10 @@ export class RustBrowserTransportAdapterV1 {
 
   readonly #onOpen = (): void => {
     const channel = this.#channel;
-    if (channel == null || channel.readyState !== "open") {
+    if (channel == null || channel.readyState !== "open" || this.#handshakeSent) {
       return;
     }
+    this.#handshakeSent = true;
     channel.send(Uint8Array.from(encodeCompatibilityHandshake(this.#compatibility)).buffer);
   };
 
@@ -123,6 +126,7 @@ export class RustBrowserTransportAdapterV1 {
     const channel = this.#channel;
     this.#channel = null;
     this.#handshakeAccepted = false;
+    this.#handshakeSent = false;
     if (channel == null) {
       return;
     }

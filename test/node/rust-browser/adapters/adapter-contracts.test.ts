@@ -118,6 +118,16 @@ describe("M8 browser adapters", () => {
     expect(() => assertCompatibleRustPeer(identity, mixed)).toThrow(/mixed TypeScript\/Rust/u);
   });
 
+  it("sends exactly one compatibility handshake when open is observed twice", () => {
+    const channel = new PairedChannel();
+    channel.readyState = "open";
+    const transport = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: () => undefined });
+    transport.attach(channel as unknown as RTCDataChannel);
+    channel.dispatchEvent(new Event("open"));
+    expect(channel.sent).toHaveLength(1);
+    transport.dispose();
+  });
+
   it("negotiates binary frames and hot-rejoins with a new generation", async () => {
     const [leftChannel, rightChannel] = pair();
     const leftEvents: Array<{ kind: string; value?: unknown }> = [];

@@ -9,6 +9,12 @@ import {
 } from "../contracts/browser-contracts";
 import { loadRustWasmModule, type RustWasmHostV1 } from "./rust-wasm-loader";
 
+interface WorkerTransferPortV1 {
+  postMessage(message: ArrayBuffer, transfer: Transferable[]): void;
+}
+
+const transferPort = self as unknown as WorkerTransferPortV1;
+
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
 let host: RustWasmHostV1 | null = null;
@@ -21,7 +27,7 @@ function postBytes(bytes: Uint8Array): void {
     throw new Error("worker response is empty or oversized");
   }
   const transferable = bytes.slice();
-  self.postMessage(transferable.buffer, [transferable.buffer]);
+  transferPort.postMessage(transferable.buffer, [transferable.buffer]);
 }
 
 function postProtocolFault(code: string, message: string, requestId = 0, sequence = 0): void {
