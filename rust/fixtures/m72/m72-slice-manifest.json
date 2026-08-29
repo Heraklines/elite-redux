@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "startup_stages": [
+    "TITLE",
+    "MODE_SELECT",
+    "CHALLENGE_SELECT",
+    "STARTER_SELECT",
+    "CONFIRMATION",
+    "DIFFICULTY_SELECT",
+    "SAVE_SELECT",
+    "WAITING_FOR_PARTNER",
+    "COMPLETE"
+  ],
+  "production_difficulties": ["YOUNGSTER", "ACE", "ELITE", "HELL"],
+  "scenario_families": [
+    "PRE_RUN",
+    "BATTLE",
+    "RUN_SURFACE",
+    "PROGRESSION",
+    "CAPTURE",
+    "WORLD",
+    "SCENARIO_NODE",
+    "SOLO_RECOVERY",
+    "PAIR_RECOVERY",
+    "TERMINAL"
+  ],
+  "constructible_controls": [
+    "TITLE",
+    "MODE_SELECT",
+    "STARTER_SELECT",
+    "BATTLE_COMMAND",
+    "BATTLE_REPLACEMENT",
+    "CAPTURE",
+    "FULL_PARTY",
+    "PROGRESSION",
+    "MOVE_LEARN",
+    "EVOLUTION",
+    "FUSION",
+    "REWARD",
+    "MARKET",
+    "SCENARIO",
+    "BIOME",
+    "ROUTE",
+    "SAVE",
+    "COMPLETE"
+  ],
+  "replay_only_boundaries": [
+    "PREPARED_TRANSACTION",
+    "MATERIAL_RECEIVED_NOT_APPLIED",
+    "PROPOSAL_ADMITTED_NOT_COMMITTED",
+    "PARTIAL_PRESENTATION",
+    "RECOVERY_FENCE_HELD",
+    "TIMER_CALLBACK_IN_FLIGHT",
+    "DELAYED_NETWORK_PACKET"
+  ],
+  "reachability_classes": [
+    "RECORDED_NATURAL",
+    "CANONICALLY_GENERATED",
+    "SYNTHETIC_VALID",
+    "INVALID_NEGATIVE_TEST"
+  ],
+  "query_methods": [
+    "behavior.describe",
+    "behavior.search",
+    "content.describe",
+    "content.search",
+    "control.describe",
+    "control.explain",
+    "control.explain_option",
+    "control.plan_navigation",
+    "scenario.describe",
+    "scenario.search",
+    "scenario.validate",
+    "state.delta",
+    "state.inspect",
+    "state.query"
+  ],
+  "post_initialization_policy": "RAW_PHYSICAL_INPUT_AND_EXTERNAL_EVENTS_ONLY"
+}

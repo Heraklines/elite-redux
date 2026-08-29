@@ -1,0 +1,80 @@
+name: Rust Kernel M7.2 Instant Agent Laboratory
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m7-lab-g35
+      - arch/rust-kernel-m7-lab-g36
+      - arch/rust-kernel-m7-lab-g37
+      - arch/rust-kernel-m7-lab-g38
+    paths:
+      - ".github/workflows/rust-kernel-m72.yml"
+      - "rust/**"
+      - "scripts/*kernel-m72*"
+      - "docs/plans/rust-kernel/m72-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m72-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  m72-base-attestation:
+    name: M7.2 exact M7.1 base attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m72-contract.mjs
+
+  m72-contract-freeze:
+    name: M7.2 contract schema ownership freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-kernel-m72-contract.mjs
+      - name: Reject core dependency on er-lab
+        run: |
+          set -euo pipefail
+          for crate in er-state er-battle er-run er-game er-kernel er-protocol er-mechanics; do
+            if grep -F 'er-lab' "rust/crates/$crate/Cargo.toml"; then
+              printf 'forbidden core dependency %s -> er-lab\n' "$crate" >&2
+              exit 1
+            fi
+          done
+
+  m72-contract-static:
+    name: M7.2 contract formatting and manifest static
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Check Rust formatting and contract JSON
+        working-directory: rust
+        run: cargo fmt --all -- --check
+      - name: Parse M7.2 JSON manifests
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('rust/fixtures/m72/m71-final-attestation.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('rust/fixtures/m72/m72-slice-manifest.json','utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('rust/fixtures/m72/architecture-manifest.json','utf8'))"
+
+  m72-g35-aggregate:
+    name: M7.2 G35 contract aggregate
+    needs:
+      - m72-base-attestation
+      - m72-contract-freeze
+      - m72-contract-static
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7.2 exact SHA $GITHUB_SHA passed G35 contract freeze"

@@ -1,0 +1,155 @@
+integration_branch = "arch/rust-kernel-m7-lab"
+base_sha = "79e3544029e422deb8389a12f8b75e7f0febfb3e"
+new_crates = ["er-lab"]
+
+[bootstrap_machine]
+owner = "M72-A01"
+exclusive = ["rust/crates/er-game/src/m72_bootstrap.rs"]
+
+[new_run_material]
+owner = "M72-A02"
+exclusive = ["rust/crates/er-game/src/m72_new_run_material.rs"]
+
+[battle_scenario]
+owner = "M72-A03"
+exclusive = ["rust/crates/er-lab/src/builders/battle.rs"]
+
+[run_scenarios]
+owner = "M72-A04"
+exclusive = ["rust/crates/er-lab/src/builders/run_surface.rs", "rust/crates/er-lab/src/builders/progression.rs", "rust/crates/er-lab/src/builders/capture.rs", "rust/crates/er-lab/src/builders/world.rs", "rust/crates/er-lab/src/builders/scenario_node.rs"]
+
+[pair_scenarios]
+owner = "M72-A05"
+exclusive = ["rust/crates/er-lab/src/builders/pair.rs"]
+
+[scenario_validation]
+owner = "M72-A06"
+exclusive = ["rust/crates/er-lab/src/scenario.rs", "rust/crates/er-lab/src/builders/mod.rs"]
+
+[preset_registry]
+owner = "M72-A07"
+exclusive = ["rust/crates/er-lab/src/preset.rs", "rust/crates/er-lab/src/artifact_store.rs", "rust/scenarios/**"]
+
+[lab_queries]
+owner = "M72-A08"
+exclusive = ["rust/crates/er-lab/src/query.rs"]
+
+[legality]
+owner = "M72-A09"
+exclusive = ["rust/crates/er-lab/src/legality.rs"]
+
+[navigation]
+owner = "M72-A10"
+exclusive = ["rust/crates/er-lab/src/navigation.rs"]
+
+[warm_daemon]
+owner = "M72-A11"
+exclusive = ["rust/crates/er-lab/src/daemon.rs", "rust/crates/er-agent-protocol/src/m72.rs", "rust/crates/er-cli/src/m72.rs"]
+
+[foundation_tests]
+owner = "M72-A12"
+exclusive = ["rust/crates/er-testkit/tests/m72_foundation.rs"]
+
+[experiment_plan]
+owner = "M72-B01"
+exclusive = ["rust/crates/er-lab/src/experiment.rs"]
+
+[experiment_matrix]
+owner = "M72-B02"
+exclusive = ["rust/crates/er-lab/src/matrix.rs"]
+
+[coverage]
+owner = "M72-B03"
+exclusive = ["rust/crates/er-lab/src/coverage.rs"]
+
+[explorer]
+owner = "M72-B04"
+exclusive = ["rust/crates/er-lab/src/explore.rs"]
+
+[fingerprint]
+owner = "M72-B05"
+exclusive = ["rust/crates/er-lab/src/fingerprint.rs"]
+
+[cluster]
+owner = "M72-B06"
+exclusive = ["rust/crates/er-lab/src/cluster.rs"]
+
+[counterfactual]
+owner = "M72-B07"
+exclusive = ["rust/crates/er-lab/src/counterfactual.rs"]
+
+[bisect]
+owner = "M72-B08"
+exclusive = ["rust/crates/er-lab/src/bisect.rs"]
+
+[regression_corpus]
+owner = "M72-B09"
+exclusive = ["rust/crates/er-lab/src/corpus.rs", "rust/regressions/**"]
+
+[mutation]
+owner = "M72-B10"
+exclusive = ["rust/crates/er-lab/src/mutation.rs"]
+
+[impact_integration]
+owner = "M72-B11"
+exclusive = ["rust/crates/er-lab/src/impact.rs"]
+
+[autonomous_tests]
+owner = "M72-B12"
+exclusive = ["rust/crates/er-testkit/tests/m72_autonomous.rs"]
+
+[incremental_content]
+owner = "M72-C01"
+exclusive = ["rust/crates/er-lab/src/incremental.rs"]
+
+[content_diff]
+owner = "M72-C02"
+exclusive = ["rust/crates/er-lab/src/content_diff.rs"]
+
+[content_reload]
+owner = "M72-C03"
+exclusive = ["rust/crates/er-lab/src/reload.rs"]
+
+[session_migration]
+owner = "M72-C04"
+exclusive = ["rust/crates/er-lab/src/migration.rs"]
+
+[cross_platform]
+owner = "M72-C05"
+exclusive = ["rust/crates/er-lab/src/platform.rs", "rust/fixtures/m72/cross-platform/**"]
+
+[semantic_viewer]
+owner = "M72-C06"
+exclusive = ["rust/crates/er-lab/src/viewer.rs"]
+
+[compat_isolation]
+owner = "M72-C07"
+exclusive = ["rust/contracts/m72-architecture-simplification.md", "rust/fixtures/m72/architecture-manifest.json"]
+
+[dependency_simplification]
+owner = "M72-C08"
+exclusive = ["rust/crates/er-lab/Cargo.toml", "rust/Cargo.toml"]
+
+[artifact_security]
+owner = "M72-C09"
+exclusive = ["rust/crates/er-lab/src/security.rs"]
+
+[hermetic_cache]
+owner = "M72-C10"
+exclusive = ["rust/crates/er-lab/src/cache.rs"]
+
+[benchmark_attribution]
+owner = "M72-C11"
+exclusive = ["rust/crates/er-lab/src/performance.rs"]
+
+[final_audit]
+owner = "M72-C12"
+exclusive = ["rust/crates/er-testkit/tests/m72_final.rs", ".github/workflows/rust-kernel-m72.yml", "scripts/check-kernel-m72-contract.mjs"]
+
+[integration_owner]
+exclusive = ["rust/crates/er-lab/src/lib.rs", "rust/Cargo.lock", "rust/crates/er-game/src/lib.rs", "rust/crates/er-agent-protocol/src/lib.rs", "rust/crates/er-cli/src/main.rs"]
+
+[forbidden_dependencies]
+core_crates = ["er-state", "er-battle", "er-run", "er-game", "er-kernel", "er-protocol", "er-mechanics"]
+forbidden = ["er-lab"]
+policy = "core crates never name er-lab in Cargo.toml or source imports"
