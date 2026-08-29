@@ -18,44 +18,18 @@
     "version": 1
   },
   "new-ability-10": {
-    "componentRules": [
-      {
-        "chance": 100,
-        "conditionLogic": "all",
-        "conditions": [
-          {
-            "kind": "holder-hp",
-            "maxPercent": 25,
-            "minPercent": 1
-          }
-        ],
-        "effects": [
-          {
-            "abilityId": 5352,
-            "attrIndex": 0,
-            "attrType": "FirstTurnPriorityClampAbAttr",
-            "parameterOverrides": {
-              "changeAmount": 1
-            }
-          }
-        ],
-        "hook": {
-          "abilityId": 66,
-          "attrIndex": 0,
-          "attrType": "LowHpMoveTypePowerBoostAbAttr"
-        },
-        "key": "component-1",
-        "prerequisiteHooks": []
-      }
-    ],
-    "description": "Boosts Priority for all moves to +1 when the user is under 1/4 HP",
+    "componentRules": [],
+    "description": "Impenetrable + Armor Tail",
     "flags": {},
     "generation": 9,
     "id": 20009,
-    "includes": [],
+    "includes": [
+      5064,
+      296
+    ],
     "mechanics": [],
     "modifiers": [],
-    "name": "Desparation",
+    "name": "Old Ocean",
     "rules": [],
     "version": 1
   },
