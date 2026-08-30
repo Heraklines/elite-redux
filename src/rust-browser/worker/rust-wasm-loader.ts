@@ -14,48 +14,82 @@ export interface RustWasmModuleV1 {
 }
 
 const MAXIMUM_WASM_BYTES = 33_554_432;
+const MAXIMUM_GLUE_BYTES = 4_194_304;
+const SHA256 = /^[0-9a-f]{64}$/u;
 
 export async function loadRustWasmModule(url: URL, expectedSha256: string): Promise<RustWasmModuleV1> {
-  if (!/^[0-9a-f]{64}$/u.test(expectedSha256)) {
+  if (!SHA256.test(expectedSha256)) {
     throw new Error("invalid Wasm release digest");
   }
   if (!url.pathname.endsWith(".wasm") || url.origin !== globalThis.location.origin) {
     throw new Error("Wasm URL must be a same-origin .wasm asset");
   }
-  const response = await fetch(url, { cache: "no-store", credentials: "same-origin" });
+  const response = await fetch(url, { cache: "no-store", credentials: "same-origin", redirect: "error" });
   if (!response.ok) {
     throw new Error(`Wasm fetch failed: ${response.status}`);
   }
-  const declaredLength = Number(response.headers.get("content-length") ?? 0);
-  if (declaredLength > MAXIMUM_WASM_BYTES) {
-    throw new Error("Wasm release asset is oversized");
-  }
-  const bytes = await response.arrayBuffer();
-  if (bytes.byteLength === 0 || bytes.byteLength > MAXIMUM_WASM_BYTES) {
-    throw new Error("Wasm release asset is empty or oversized");
-  }
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  const actual = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
-  if (actual !== expectedSha256) {
-    throw new Error("Wasm release digest mismatch");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength === 0 || bytes.byteLength > MAXIMUM_WASM_BYTES || (await sha256(bytes)) !== expectedSha256) {
+    bytes.fill(0);
+    throw new Error("Wasm release asset is empty, oversized, or mismatched");
   }
   const glueUrl = new URL(url.href.replace(/\.wasm$/u, ".js"));
-  // Release-manifest selection determines the same-origin glue URL at runtime.
-  const glue: unknown = await import(/* @vite-ignore */ glueUrl.href);
+  const glue = await import(/* @vite-ignore */ glueUrl.href);
+  const typed = validateModule(glue);
+  try {
+    await typed.default({ module_or_path: Uint8Array.from(bytes) });
+  } finally {
+    bytes.fill(0);
+  }
+  return typed;
+}
+
+export async function loadRustWasmModuleFromVerifiedBytesV1(options: {
+  glueBytes: Uint8Array;
+  glueSha256: string;
+  wasmBytes: Uint8Array;
+  wasmSha256: string;
+}): Promise<RustWasmModuleV1> {
   if (
-    typeof glue !== "object"
-    || glue == null
-    || typeof (glue as Partial<RustWasmModuleV1>).default !== "function"
-    || typeof (glue as Partial<RustWasmModuleV1>).BrowserKernelHostV1?.create !== "function"
+    !SHA256.test(options.glueSha256)
+    || !SHA256.test(options.wasmSha256)
+    || options.glueBytes.byteLength === 0
+    || options.glueBytes.byteLength > MAXIMUM_GLUE_BYTES
+    || options.wasmBytes.byteLength === 0
+    || options.wasmBytes.byteLength > MAXIMUM_WASM_BYTES
+    || (await sha256(options.glueBytes)) !== options.glueSha256
+    || (await sha256(options.wasmBytes)) !== options.wasmSha256
+  ) {
+    throw new Error("verified Wasm/glue cohort is invalid");
+  }
+  const glueCopy = Uint8Array.from(options.glueBytes);
+  const wasmCopy = Uint8Array.from(options.wasmBytes);
+  const glueUrl = URL.createObjectURL(new Blob([glueCopy], { type: "text/javascript" }));
+  try {
+    const glue = await import(/* @vite-ignore */ glueUrl);
+    const typed = validateModule(glue);
+    await typed.default({ module_or_path: wasmCopy });
+    return typed;
+  } finally {
+    URL.revokeObjectURL(glueUrl);
+    glueCopy.fill(0);
+    wasmCopy.fill(0);
+  }
+}
+
+function validateModule(value: unknown): RustWasmModuleV1 {
+  if (
+    typeof value !== "object"
+    || value == null
+    || typeof (value as Partial<RustWasmModuleV1>).default !== "function"
+    || typeof (value as Partial<RustWasmModuleV1>).BrowserKernelHostV1?.create !== "function"
   ) {
     throw new Error("Wasm glue does not expose the frozen browser ABI");
   }
-  const typed = glue as RustWasmModuleV1;
-  const verifiedBytes = new Uint8Array(bytes);
-  try {
-    await typed.default({ module_or_path: verifiedBytes });
-  } finally {
-    verifiedBytes.fill(0);
-  }
-  return typed;
+  return value as RustWasmModuleV1;
+}
+
+async function sha256(bytes: Uint8Array): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer));
+  return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
 }

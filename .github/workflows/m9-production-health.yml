@@ -1,0 +1,57 @@
+name: M9 Production Release Health
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      release_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve active candidate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          RELEASE='${{ inputs.release_id }}'
+          if [ -z "$RELEASE" ]; then
+            pnpm exec wrangler r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --remote
+            node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy.json"
+            RELEASE=$(jq -r .payload.candidate_release "$RUNNER_TEMP/policy.json")
+          fi
+          echo "RELEASE_ID=$RELEASE" >> "$GITHUB_ENV"
+      - name: Fetch bounded telemetry aggregate
+        env:
+          M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            --header "Authorization: Bearer ${M9_HEALTH_TOKEN}" \
+            "https://er-telemetry.heraklines.workers.dev/m9/health/${RELEASE_ID}" \
+            > "$RUNNER_TEMP/health-input.json"
+          test "$(wc -c < "$RUNNER_TEMP/health-input.json")" -le 65536
+          node scripts/m9-release-health.mjs --input "$RUNNER_TEMP/health-input.json" --output "$RUNNER_TEMP/health.json"
+      - name: Publish deterministic health snapshot
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler r2 object put "er-m9-releases/health/${RELEASE_ID}.json" --file "$RUNNER_TEMP/health.json" --content-type application/json --remote
+          jq -e '.hard_stop == false' "$RUNNER_TEMP/health.json"

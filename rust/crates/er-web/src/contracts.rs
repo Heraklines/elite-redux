@@ -33,6 +33,10 @@ pub enum BrowserExecutionModeV1 {
     TypeScriptWithRustShadow,
     RustLocalAuthority,
     RustStagingAuthority,
+    RustProductionAuthority,
+    RustCanaryAuthority,
+    RustShadowSample,
+    LegacyTransition,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -55,6 +59,8 @@ pub struct BrowserInitV1 {
     pub execution_identity_bytes: Vec<u8>,
     pub session_start_bytes: Vec<u8>,
     pub maximum_pending_requests: usize,
+    pub production_release_id: Option<String>,
+    pub production_generation: Option<SafeU53>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

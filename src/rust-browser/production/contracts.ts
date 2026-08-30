@@ -253,6 +253,7 @@ export interface RolloutPolicyV1 {
   candidate_release: string;
   stable_release: string;
   legacy_release: string | null;
+  active_ring: string;
   rings: RolloutRingV1[];
   hard_stop_rules: string[];
   soft_stop_rules: string[];

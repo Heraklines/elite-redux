@@ -9,6 +9,10 @@ export enum BrowserExecutionModeV1 {
   TYPESCRIPT_WITH_RUST_SHADOW = "TYPESCRIPT_WITH_RUST_SHADOW",
   RUST_LOCAL_AUTHORITY = "RUST_LOCAL_AUTHORITY",
   RUST_STAGING_AUTHORITY = "RUST_STAGING_AUTHORITY",
+  RUST_PRODUCTION_AUTHORITY = "RUST_PRODUCTION_AUTHORITY",
+  RUST_CANARY_AUTHORITY = "RUST_CANARY_AUTHORITY",
+  RUST_SHADOW_SAMPLE = "RUST_SHADOW_SAMPLE",
+  LEGACY_TRANSITION = "LEGACY_TRANSITION",
 }
 
 export type BrowserLifecycleEventV1 =
@@ -50,6 +54,8 @@ export interface BrowserInitV1 {
   execution_identity_bytes: number[];
   session_start_bytes: number[];
   maximum_pending_requests: number;
+  production_release_id?: string;
+  production_generation?: number;
 }
 
 export type BrowserRequestV1 =

@@ -22,6 +22,7 @@ export interface GenerationWorkerHostOptionsV1 {
   maximumPendingRequests?: number;
   responseTimeoutMs?: number;
   workerFactory?: (url: URL) => Worker;
+  configureWorker?: (worker: Worker) => void;
   channelFactory?: () => MessageChannel;
 }
 
@@ -46,6 +47,7 @@ export class GenerationWorkerHostV1 implements BrowserKernelGenerationV1 {
       options.workerFactory
       ?? (url => new Worker(url, { type: "module", name: `er-kernel-${this.identity.generation}` }))
     )(options.workerUrl);
+    options.configureWorker?.(this.#worker);
     const channel = (options.channelFactory ?? (() => new MessageChannel()))();
     this.#port = channel.port1;
     this.#port.addEventListener("message", this.#onMessage);

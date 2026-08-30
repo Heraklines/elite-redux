@@ -7,7 +7,12 @@ import {
   MAXIMUM_BROWSER_PENDING_REQUESTS_V1,
   MAXIMUM_BROWSER_REQUEST_BYTES_V1,
 } from "../contracts/browser-contracts";
-import { loadRustWasmModule, type RustWasmHostV1 } from "./rust-wasm-loader";
+import {
+  loadRustWasmModule,
+  loadRustWasmModuleFromVerifiedBytesV1,
+  type RustWasmHostV1,
+  type RustWasmModuleV1,
+} from "./rust-wasm-loader";
 
 interface WorkerTransferPortV1 {
   postMessage(message: ArrayBuffer, transfer: Transferable[]): void;
@@ -19,9 +24,33 @@ interface AttachGenerationPortV1 {
   port: MessagePort;
 }
 
+interface AttachProductionArtifactsV1 {
+  kind: "ATTACH_PRODUCTION_ARTIFACTS_V1";
+  release_id: string;
+  generation: number;
+  glue_sha256: string;
+  wasm_sha256: string;
+  content_sha256: string;
+  glue_bytes: ArrayBuffer;
+  wasm_bytes: ArrayBuffer;
+  content_bytes: ArrayBuffer;
+}
+
+interface ProductionArtifactsV1 {
+  releaseId: string;
+  generation: number;
+  glueSha256: string;
+  wasmSha256: string;
+  contentSha256: string;
+  glueBytes: Uint8Array;
+  wasmBytes: Uint8Array;
+  contentBytes: Uint8Array;
+}
+
 const globalTransferPort = self as unknown as WorkerTransferPortV1;
 let transferPort: WorkerTransferPortV1 = globalTransferPort;
 let generationPort: MessagePort | null = null;
+let productionArtifacts: ProductionArtifactsV1 | null = null;
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
@@ -99,15 +128,44 @@ async function initialize(first: BrowserRequestEnvelopeV1): Promise<void> {
   if (first.request.kind !== "INITIALIZE") {
     throw new Error("first browser worker request must initialize the kernel");
   }
-  const query = new URLSearchParams(self.location.search);
-  const wasmUrl = new URL(query.get("wasm") ?? "", self.location.href);
-  const contentUrl = new URL(query.get("content") ?? "", self.location.href);
-  const wasmDigest = query.get("wasm_sha256") ?? "";
-  const contentDigest = query.get("content_sha256") ?? "";
-  const [module, contentBytes] = await Promise.all([
-    loadRustWasmModule(wasmUrl, wasmDigest),
-    fetchContent(contentUrl, contentDigest),
-  ]);
+  let module: RustWasmModuleV1;
+  let contentBytes: Uint8Array;
+  if (productionArtifacts == null) {
+    const query = new URLSearchParams(self.location.search);
+    const wasmUrl = new URL(query.get("wasm") ?? "", self.location.href);
+    const contentUrl = new URL(query.get("content") ?? "", self.location.href);
+    const wasmDigest = query.get("wasm_sha256") ?? "";
+    const contentDigest = query.get("content_sha256") ?? "";
+    [module, contentBytes] = await Promise.all([
+      loadRustWasmModule(wasmUrl, wasmDigest),
+      fetchContent(contentUrl, contentDigest),
+    ]);
+  } else {
+    const artifacts = productionArtifacts;
+    productionArtifacts = null;
+    if (
+      first.request.value.production_release_id !== artifacts.releaseId
+      || first.request.value.production_generation !== artifacts.generation
+    ) {
+      zeroizeProductionArtifacts(artifacts);
+      throw new Error("production Worker execution identity is cross-release");
+    }
+    if ((await sha256(artifacts.contentBytes)) !== artifacts.contentSha256) {
+      zeroizeProductionArtifacts(artifacts);
+      throw new Error("production content digest mismatch");
+    }
+    try {
+      module = await loadRustWasmModuleFromVerifiedBytesV1({
+        glueBytes: artifacts.glueBytes,
+        glueSha256: artifacts.glueSha256,
+        wasmBytes: artifacts.wasmBytes,
+        wasmSha256: artifacts.wasmSha256,
+      });
+      contentBytes = Uint8Array.from(artifacts.contentBytes);
+    } finally {
+      zeroizeProductionArtifacts(artifacts);
+    }
+  }
   const initBytes = Uint8Array.from(first.request.value.session_start_bytes);
   try {
     host = module.BrowserKernelHostV1.create(contentBytes, initBytes);
@@ -115,6 +173,12 @@ async function initialize(first: BrowserRequestEnvelopeV1): Promise<void> {
     contentBytes.fill(0);
     initBytes.fill(0);
   }
+}
+
+function zeroizeProductionArtifacts(artifacts: ProductionArtifactsV1): void {
+  artifacts.glueBytes.fill(0);
+  artifacts.wasmBytes.fill(0);
+  artifacts.contentBytes.fill(0);
 }
 
 async function processBatch(buffer: ArrayBuffer): Promise<void> {
@@ -186,6 +250,45 @@ function acceptProtocolMessage(event: MessageEvent<unknown>): void {
 }
 
 self.onmessage = (event: MessageEvent<unknown>) => {
+  const production = event.data as Partial<AttachProductionArtifactsV1> | null;
+  if (production?.kind === "ATTACH_PRODUCTION_ARTIFACTS_V1") {
+    if (
+      productionArtifacts != null
+      || generationPort != null
+      || host != null
+      || pending !== 0
+      || typeof production.release_id !== "string"
+      || production.release_id.length === 0
+      || !Number.isSafeInteger(production.generation)
+      || (production.generation ?? -1) < 0
+      || !/^[0-9a-f]{64}$/u.test(production.glue_sha256 ?? "")
+      || !/^[0-9a-f]{64}$/u.test(production.wasm_sha256 ?? "")
+      || !/^[0-9a-f]{64}$/u.test(production.content_sha256 ?? "")
+      || !(production.glue_bytes instanceof ArrayBuffer)
+      || !(production.wasm_bytes instanceof ArrayBuffer)
+      || !(production.content_bytes instanceof ArrayBuffer)
+      || production.glue_bytes.byteLength === 0
+      || production.glue_bytes.byteLength > MAXIMUM_BROWSER_EFFECT_BYTES_V1
+      || production.wasm_bytes.byteLength === 0
+      || production.wasm_bytes.byteLength > 33_554_432
+      || production.content_bytes.byteLength === 0
+      || production.content_bytes.byteLength > MAXIMUM_BROWSER_EFFECT_BYTES_V1
+    ) {
+      postProtocolFault("INVALID_PRODUCTION_ARTIFACTS", "production artifact attachment is invalid");
+      return;
+    }
+    productionArtifacts = {
+      releaseId: production.release_id ?? "",
+      generation: production.generation ?? 0,
+      glueSha256: production.glue_sha256 ?? "",
+      wasmSha256: production.wasm_sha256 ?? "",
+      contentSha256: production.content_sha256 ?? "",
+      glueBytes: new Uint8Array(production.glue_bytes),
+      wasmBytes: new Uint8Array(production.wasm_bytes),
+      contentBytes: new Uint8Array(production.content_bytes),
+    };
+    return;
+  }
   const candidate = event.data as Partial<AttachGenerationPortV1> | null;
   if (candidate?.kind === "ATTACH_PORT_V1") {
     if (
@@ -193,6 +296,7 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       || host != null
       || pending !== 0
       || !Number.isSafeInteger(candidate.generation)
+      || (productionArtifacts != null && candidate.generation !== productionArtifacts.generation)
       || (candidate.generation ?? -1) < 0
       || !(candidate.port instanceof MessagePort)
     ) {

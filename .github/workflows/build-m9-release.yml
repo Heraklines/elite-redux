@@ -1,0 +1,149 @@
+name: Build M9 Immutable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact qualified M9 candidate SHA
+        required: true
+        type: string
+      release_id:
+        description: Immutable release identifier
+        required: true
+        type: string
+      release_epoch:
+        description: Monotonic release epoch
+        required: true
+        type: number
+      channel:
+        description: Release channel
+        required: true
+        type: choice
+        options: [INTERNAL, PREVIEW, CANARY, STABLE, ROLLBACK, LEGACY_TRANSITION]
+      exact_asset_sha:
+        description: Exact qualified er-assets SHA
+        required: true
+        type: string
+      content_path:
+        description: Qualified content bundle path
+        required: true
+        default: rust/fixtures/m8/browser-reference/content-pack.json
+        type: string
+      content_hash:
+        description: Exact qualified game content hash
+        required: true
+        type: string
+      mechanics_sha256:
+        description: Exact qualified mechanics digest
+        required: true
+        type: string
+      previous_rust_release:
+        required: false
+        type: string
+      legacy_transition_release:
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-once:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: m9-release-build
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+      - name: Verify immutable candidate and M8.1 ancestry
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.candidate_sha }}"
+          git merge-base --is-ancestor 1b9b167ded66a2dcef842a8aae5789c08d9f6d5b HEAD
+          echo "${{ inputs.exact_asset_sha }}" | grep -Eq '^[0-9a-f]{40}$'
+          echo "${{ inputs.mechanics_sha256 }}" | grep -Eq '^[0-9a-f]{64}$'
+          test "$(jq -r .content_hash '${{ inputs.content_path }}')" = "${{ inputs.content_hash }}"
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-release-${{ runner.os }}-${{ runner.arch }}-0.2.127-${{ hashFiles('rust/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Install exact wasm-bindgen
+        run: |
+          if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then
+            cargo install wasm-bindgen-cli --version 0.2.127 --locked
+          fi
+      - name: Build production browser and Wasm once
+        run: |
+          mkdir -p "$RUNNER_TEMP/m9-browser" "$RUNNER_TEMP/m9-web" "$RUNNER_TEMP/m9-release"
+          node scripts/build-kernel-m9-browser.mjs \
+            --out-dir "$RUNNER_TEMP/m9-browser" \
+            --authority "$(test '${{ inputs.channel }}' = LEGACY_TRANSITION && echo legacy || echo rust)"
+          node scripts/build-kernel-m8-web.mjs \
+            --out-dir "$RUNNER_TEMP/m9-web" \
+            --content "${{ inputs.content_path }}" \
+            --identity rust/fixtures/m8/browser-reference/execution-identity.bin \
+            --session rust/fixtures/m8/browser-reference/session-start.json \
+            --authority-session rust/fixtures/m8/browser-reference/session-authority.json \
+            --replica-session rust/fixtures/m8/browser-reference/session-replica.json
+          cp "$RUNNER_TEMP/m9-browser/"*.js "$RUNNER_TEMP/m9-release/"
+          cp "$RUNNER_TEMP/m9-web/er_web.js" "$RUNNER_TEMP/m9-web/er_web.wasm" "$RUNNER_TEMP/m9-web/content-pack.json" "$RUNNER_TEMP/m9-release/"
+          printf '%s\n' '{"schema_version":1,"asset_sha":"${{ inputs.exact_asset_sha }}"}' > "$RUNNER_TEMP/m9-release/asset-manifest.json"
+      - name: Create release metadata
+        run: |
+          NOW=$(($(date +%s) * 1000))
+          EXPIRES=$((NOW + 31536000000))
+          jq -n \
+            --arg release_id '${{ inputs.release_id }}' \
+            --arg channel '${{ inputs.channel }}' \
+            --arg integration_sha '${{ inputs.candidate_sha }}' \
+            --arg asset_sha '${{ inputs.exact_asset_sha }}' \
+            --arg content_hash '${{ inputs.content_hash }}' \
+            --arg mechanics_sha '${{ inputs.mechanics_sha256 }}' \
+            --arg previous '${{ inputs.previous_rust_release }}' \
+            --arg legacy '${{ inputs.legacy_transition_release }}' \
+            --argjson epoch '${{ inputs.release_epoch }}' \
+            --argjson now "$NOW" --argjson expires "$EXPIRES" --argjson run "$GITHUB_RUN_ID" \
+            '{release_id:$release_id,release_epoch:$epoch,channel:$channel,issued_at:$now,expires_at:$expires,
+              integration_sha:$integration_sha,rust_base_sha:"1b9b167ded66a2dcef842a8aae5789c08d9f6d5b",
+              browser_base_sha:"8122fdd5863ee47b6c122d6e6fbb4228906b0b4f",oracle_sha:"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+              qualified_asset_sha:$asset_sha,
+              mechanical_identity:{schema_version:1,mechanics_sha256:$mechanics_sha,content_hash:$content_hash,authority_protocol:"er-coop-47",active_model_identity:"er-model-v1"},
+              build_identity:{schema_version:1,toolchain:"rust-1.97.1",target:"wasm32-unknown-unknown",profile:"release",lockfile_sha256:"0000000000000000000000000000000000000000000000000000000000000000",build_config_sha256:"0000000000000000000000000000000000000000000000000000000000000000",debug_surfaces_absent:true},
+              material_schemas:{turn:1,replacement:1,recovery:1,presentation:1},save_schema:2,
+              previous_rust_release:(if $previous=="" then null else $previous end),legacy_transition_release:(if $legacy=="" then null else $legacy end),
+              platform_api_versions:{schema_version:1,save_api:2,telemetry_api:1,signaling_api:33,showdown_api:1,achievement_api:1},
+              qualification:{workflow_run_id:$run,workflow_name:"Build M9 Immutable Release"}}' \
+            > "$RUNNER_TEMP/m9-metadata.json"
+          LOCK=$(sha256sum rust/Cargo.lock | cut -d' ' -f1)
+          CONFIG=$(sha256sum vite.config.ts | cut -d' ' -f1)
+          jq --arg lock "$LOCK" --arg config "$CONFIG" '.build_identity.lockfile_sha256=$lock | .build_identity.build_config_sha256=$config' \
+            "$RUNNER_TEMP/m9-metadata.json" > "$RUNNER_TEMP/m9-metadata-final.json"
+      - name: Sign and independently verify release
+        env:
+          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
+        run: |
+          node scripts/seal-kernel-m9-release.mjs --input "$RUNNER_TEMP/m9-release" --metadata "$RUNNER_TEMP/m9-metadata-final.json" --output "$RUNNER_TEMP/m9-release/signed-manifest.json" --key-id m9-prod-2026-01
+          node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/m9-release/signed-manifest.json" --artifacts "$RUNNER_TEMP/m9-release"
+          cargo metadata --manifest-path rust/Cargo.toml --locked --format-version 1 > "$RUNNER_TEMP/m9-release/rust-sbom.json"
+          pnpm list --prod --json > "$RUNNER_TEMP/m9-release/browser-sbom.json"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9-release-${{ inputs.release_id }}
+          path: ${{ runner.temp }}/m9-release
+          if-no-files-found: error
+          retention-days: 90

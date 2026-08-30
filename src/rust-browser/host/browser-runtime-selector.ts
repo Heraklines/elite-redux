@@ -7,7 +7,7 @@ const ALLOWED_DEV_RUNTIME: Partial<Record<string, BrowserExecutionModeV1>> = {
 
 export function selectBrowserExecutionMode(): BrowserExecutionModeV1 {
   if (!import.meta.env.DEV) {
-    return BrowserExecutionModeV1.LEGACY_TYPESCRIPT;
+    return BrowserExecutionModeV1.RUST_PRODUCTION_AUTHORITY;
   }
   const requested = new URLSearchParams(globalThis.location?.search ?? "").get("runtime");
   return requested == null

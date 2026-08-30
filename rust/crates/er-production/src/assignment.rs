@@ -98,7 +98,7 @@ impl RuntimeAssignmentV1 {
         Ok(())
     }
 
-    fn signed_bytes(&self) -> Result<Vec<u8>, ProductionContractErrorV1> {
+    pub fn signed_bytes(&self) -> Result<Vec<u8>, ProductionContractErrorV1> {
         let payload = canonical_bytes(self)
             .map_err(|error| ProductionContractErrorV1::Canonical(error.to_string()))?;
         let mut bytes = Vec::with_capacity(ASSIGNMENT_DOMAIN_V1.len() + payload.len());

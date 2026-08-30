@@ -247,7 +247,23 @@ fn process_request(
     match &envelope.request {
         BrowserRequestV1::Initialize(init) => {
             if envelope.sequence != SafeU53::new(1).map_err(|_| BrowserWebErrorV1::Sequence)?
-                || init.mode == BrowserExecutionModeV1::LegacyTypeScript
+                || matches!(
+                    init.mode,
+                    BrowserExecutionModeV1::LegacyTypeScript
+                        | BrowserExecutionModeV1::LegacyTransition
+                )
+                || matches!(
+                    init.mode,
+                    BrowserExecutionModeV1::RustProductionAuthority
+                        | BrowserExecutionModeV1::RustCanaryAuthority
+                        | BrowserExecutionModeV1::RustShadowSample
+                ) && (init
+                    .production_release_id
+                    .as_ref()
+                    .is_none_or(|release| release.is_empty() || release.len() > 128)
+                    || init
+                        .production_generation
+                        .is_none_or(|generation| generation.get() == 0))
                 || init.execution_identity_bytes != content_identity_bytes
                 || init.session_start_bytes != initial_snapshot_bytes
                 || init.maximum_pending_requests == 0

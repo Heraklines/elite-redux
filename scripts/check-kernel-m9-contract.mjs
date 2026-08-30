@@ -83,6 +83,34 @@ for (const finding of [
     fail(`security audit omits ${finding}`);
   }
 }
+for (const path of [
+  "src/rust-browser/production/release-keys.ts",
+  "src/rust-browser/production/configured-production-main.ts",
+  "src/rust-browser/production/release-cache-v2.ts",
+  "scripts/seal-kernel-m9-release.mjs",
+  ".github/workflows/build-m9-release.yml",
+  ".github/workflows/publish-m9-release.yml",
+  ".github/workflows/promote-m9-rollout.yml",
+  ".github/workflows/rollback-m9-rollout.yml",
+  ".github/workflows/m9-production-health.yml",
+]) {
+  if (read(path).trim().length === 0) {
+    fail(`missing M9 release-control surface ${path}`);
+  }
+}
+const productionMain = read("src/main.ts");
+if (
+  !productionMain.includes("startConfiguredProductionMainV1")
+  || productionMain.includes("battle-scene")
+  || productionMain.includes("startUpdateChecker")
+) {
+  fail("production entry is not Rust-first and minimal");
+}
+for (const workflow of ["promote-m9-rollout.yml", "rollback-m9-rollout.yml"]) {
+  if (read(`.github/workflows/${workflow}`).includes("pnpm build")) {
+    fail(`${workflow} rebuilds an immutable release`);
+  }
+}
 console.log(
   `M9 G48 contract freeze: M8.1 ${M81_SHA}, G47 ${M81_G47}, ${contracts.length} contracts, eight security blockers classified`,
 );

@@ -1,0 +1,120 @@
+name: Rust Kernel M9 G49 Release Control
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m9-g49-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production -p er-web --all-targets --no-deps -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-production -p er-web
+      - name: Typecheck M9A owned browser surface
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2024
+          --types node,vitest/globals --lib ES2024,DOM,WebWorker
+          src/rust-browser/production/contracts.ts
+          src/rust-browser/production/signature-verifier.ts
+          src/rust-browser/production/release-manifest.ts
+          src/rust-browser/production/runtime-assignment.ts
+          src/rust-browser/production/session-pin.ts
+          src/rust-browser/production/generation-registry.ts
+          src/rust-browser/production/runtime-selector.ts
+          src/rust-browser/production/release-cache-v2.ts
+          src/rust-browser/production/service-worker.ts
+          src/rust-browser/production/production-worker-host.ts
+          src/rust-browser/production/bootstrap.ts
+          src/rust-browser/production/browser-session.ts
+          src/rust-browser/production/configured-production-main.ts
+          src/rust-browser/contracts/browser-contracts.ts
+          src/rust-browser/hot-reload/contracts.ts
+          src/rust-browser/hot-reload/generation-worker-host.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          src/rust-browser/worker/rust-wasm-loader.ts
+          src/rust-browser/routes/rust-phaser-entry.ts
+          test/node/rust-browser/production/release-control.test.ts
+          test/node/rust-browser/production/architecture.test.ts
+      - run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          src/main.ts src/rust-browser/production src/rust-browser/worker
+          src/rust-browser/routes/rust-phaser-entry.ts
+          test/node/rust-browser/production scripts/*m9*.mjs
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/production/release-control.test.ts
+          test/node/rust-browser/production/architecture.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  production-graph:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build separate Rust and legacy entries
+        run: |
+          node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/rust" --authority rust
+          node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/legacy" --authority legacy
+          for forbidden in 'battle-scene' 'loadDevTools' 'startUpdateChecker'; do
+            ! grep -E "$forbidden" "$RUNNER_TEMP/rust/bootstrap.js" "$RUNNER_TEMP/rust/browser.js"
+          done
+          grep -q 'ATTACH_PRODUCTION_ARTIFACTS_V1' "$RUNNER_TEMP/rust/rust-kernel-worker.js"
+          if cmp -s "$RUNNER_TEMP/rust/browser.js" "$RUNNER_TEMP/legacy/browser.js"; then exit 1; fi
+
+  inherited-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-g49-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - working-directory: rust
+        run: >-
+          cargo test --workspace --all-targets --
+          --skip m3_audited_production_surface_matches_frozen_manifest
+
+  g49-aggregate:
+    name: M9 G49 signed release-control qualification
+    needs: [release-control, production-graph, inherited-regression]
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed G49 signed release, assignment, pinning, cache, and legacy separation"

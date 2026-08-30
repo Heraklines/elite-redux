@@ -36,6 +36,8 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
             execution_identity_bytes: IDENTITY.to_vec(),
             session_start_bytes: SESSION.to_vec(),
             maximum_pending_requests: 8,
+            production_release_id: None,
+            production_generation: None,
         }),
     };
     let ready_bytes = er_canonical::canonical_bytes(&vec![initialize])?;
@@ -135,6 +137,8 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
                 execution_identity_bytes: IDENTITY.to_vec(),
                 session_start_bytes: session.to_vec(),
                 maximum_pending_requests: 8,
+                production_release_id: None,
+                production_generation: None,
             }),
         };
         let bytes = er_canonical::canonical_bytes(&vec![request])?;

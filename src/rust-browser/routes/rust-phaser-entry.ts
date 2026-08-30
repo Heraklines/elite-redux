@@ -3,6 +3,7 @@ import { BrowserClockAdapter } from "../adapters/clock-adapter";
 import { BrowserRawInputAdapter } from "../adapters/input-adapter";
 import { BrowserLifecycleAdapter } from "../adapters/lifecycle-adapter";
 import {
+  type BrowserEffectV1,
   BrowserExecutionModeV1,
   type BrowserRequestV1,
   type BrowserResponseEnvelopeV1,
@@ -27,6 +28,11 @@ export interface RustPhaserRouteSessionV1 {
   dispose(): Promise<void>;
 }
 
+export interface RustPhaserKernelHostV1 {
+  dispatch(request: BrowserRequestV1): Promise<BrowserResponseEnvelopeV1[]>;
+  dispose(): Promise<void>;
+}
+
 export async function startRustPhaserRoute(options: RustPhaserRouteOptionsV1): Promise<RustPhaserRouteSessionV1> {
   const mode = options.mode ?? BrowserExecutionModeV1.RUST_LOCAL_AUTHORITY;
   const host = await RustBrowserHost.create({
@@ -41,12 +47,36 @@ export async function startRustPhaserRoute(options: RustPhaserRouteOptionsV1): P
       },
     },
   });
-  const ui = new PhaserUiAdapterV1(options.scene);
-  const battle = new PhaserBattleAdapterV1(options.scene);
-  const surface = new PhaserSurfaceAdapterV1(options.scene);
+  return startRustPhaserHostV1(host, options.scene);
+}
+
+export async function startRustPhaserHostV1(
+  host: RustPhaserKernelHostV1,
+  scene: Phaser.Scene,
+): Promise<RustPhaserRouteSessionV1> {
+  const ui = new PhaserUiAdapterV1(scene);
+  const battle = new PhaserBattleAdapterV1(scene);
+  const surface = new PhaserSurfaceAdapterV1(scene);
   const trace = new PresentationSettlementTraceV1();
   let work = Promise.resolve();
   let disposed = false;
+  let dispatch: (request: BrowserRequestV1) => Promise<BrowserResponseEnvelopeV1[]>;
+
+  const handleEffect = async (envelope: BrowserResponseEnvelopeV1, effect: BrowserEffectV1): Promise<void> => {
+    if (effect.kind === "UI_CHANGED") {
+      ui.render(Uint8Array.from(effect.value));
+    } else if (effect.kind === "PRESENTATION_SCENE_CHANGED") {
+      surface.render(Uint8Array.from(effect.value));
+    } else if (effect.kind === "PRESENTATION") {
+      const bytes = Uint8Array.from(effect.value);
+      const cue = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as { event_id: string };
+      const generation = envelope.accepted_sequence;
+      trace.begin(cue.event_id, generation, "PHASER");
+      const outcome = await battle.present(bytes);
+      trace.settle(cue.event_id, generation, outcome);
+      await dispatch({ kind: "PRESENTATION_SETTLED", value: { event_id: cue.event_id, outcome } });
+    }
+  };
 
   const handle = async (responses: readonly BrowserResponseEnvelopeV1[]): Promise<void> => {
     for (const envelope of responses) {
@@ -57,25 +87,13 @@ export async function startRustPhaserRoute(options: RustPhaserRouteOptionsV1): P
         continue;
       }
       for (const effect of envelope.response.value.effects) {
-        if (effect.kind === "UI_CHANGED") {
-          ui.render(Uint8Array.from(effect.value));
-        } else if (effect.kind === "PRESENTATION_SCENE_CHANGED") {
-          surface.render(Uint8Array.from(effect.value));
-        } else if (effect.kind === "PRESENTATION") {
-          const bytes = Uint8Array.from(effect.value);
-          const cue = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as { event_id: string };
-          const generation = envelope.accepted_sequence;
-          trace.begin(cue.event_id, generation, "PHASER");
-          const outcome = await battle.present(bytes);
-          trace.settle(cue.event_id, generation, outcome);
-          await dispatch({ kind: "PRESENTATION_SETTLED", value: { event_id: cue.event_id, outcome } });
-        }
+        await handleEffect(envelope, effect);
       }
       clock.schedule(envelope.response.value.next_wakeup_micros);
     }
   };
 
-  const dispatch = async (request: BrowserRequestV1): Promise<BrowserResponseEnvelopeV1[]> => {
+  dispatch = async (request: BrowserRequestV1): Promise<BrowserResponseEnvelopeV1[]> => {
     if (disposed) {
       throw new Error("Rust Phaser route is disposed");
     }

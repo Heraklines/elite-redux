@@ -109,6 +109,7 @@ pub struct RolloutPolicyV1 {
     pub candidate_release: ProductionReleaseId,
     pub stable_release: ProductionReleaseId,
     pub legacy_release: Option<ProductionReleaseId>,
+    pub active_ring: RolloutRingId,
     pub rings: Vec<RolloutRingV1>,
     pub hard_stop_rules: Vec<RolloutHardStopRuleV1>,
     pub soft_stop_rules: Vec<RolloutSoftStopRuleV1>,
@@ -235,6 +236,10 @@ impl RolloutPolicyV1 {
             || self.issued_at.0 >= self.expires_at.0
         {
             return Err(ProductionContractErrorV1::Rollout("policy shape"));
+        }
+        self.active_ring.validate("active rollout ring")?;
+        if !self.rings.iter().any(|ring| ring.ring == self.active_ring) {
+            return Err(ProductionContractErrorV1::Rollout("active ring"));
         }
         let expected = [0_u16, 0, 0, 100, 500, 2_500, 5_000, 10_000];
         if self

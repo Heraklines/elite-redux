@@ -1,0 +1,84 @@
+name: Promote M9 Rollout Policy
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_release:
+        required: true
+        type: string
+      stable_release:
+        required: true
+        type: string
+      target_ring:
+        required: true
+        type: choice
+        options: [R0, R1, R2, R3, R4, R5, R6, R7]
+      expected_current_policy_hash:
+        description: SHA-256 of current signed policy, or NONE for R0
+        required: true
+        type: string
+      explicit_confirmation:
+        description: Type PROMOTE_IDENTICAL_BYTES
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    if: inputs.explicit_confirmation == 'PROMOTE_IDENTICAL_BYTES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: m9-rollout-promotion
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch immutable release, current policy, and health
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler r2 object get "er-m9-releases/manifests/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/manifest.json" --remote
+          pnpm exec wrangler r2 object get "er-m9-releases/health/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/health.json" --remote
+          if [ "${{ inputs.expected_current_policy_hash }}" != NONE ]; then
+            pnpm exec wrangler r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/current.json" --remote
+            test "$(sha256sum "$RUNNER_TEMP/current.json" | cut -d' ' -f1)" = "${{ inputs.expected_current_policy_hash }}"
+            node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/current.json"
+            jq -r .payload "$RUNNER_TEMP/current.json" > "$RUNNER_TEMP/current-payload.json"
+            CURRENT_ARGS="--current $RUNNER_TEMP/current.json"
+            echo "CURRENT_ARGS=$CURRENT_ARGS" >> "$GITHUB_ENV"
+          else
+            test "${{ inputs.target_ring }}" = R0
+          fi
+          node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
+          test "$(jq -r .payload.release_id "$RUNNER_TEMP/manifest.json")" = "${{ inputs.candidate_release }}"
+      - name: Evaluate health and sign next policy
+        env:
+          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
+        run: |
+          node scripts/m9-rollout-policy.mjs \
+            --target-ring "${{ inputs.target_ring }}" \
+            --candidate-release "${{ inputs.candidate_release }}" \
+            --stable-release "${{ inputs.stable_release }}" \
+            --health "$RUNNER_TEMP/health.json" \
+            --output "$RUNNER_TEMP/policy-payload.json" \
+            $CURRENT_ARGS
+          node scripts/m9-sign-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy-payload.json" --output "$RUNNER_TEMP/policy.json" --key-id m9-prod-2026-01
+          node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy.json"
+      - name: Publish policy revision only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          REVISION=$(jq -r .payload.policy_version "$RUNNER_TEMP/policy.json")
+          pnpm exec wrangler r2 object put "er-m9-releases/policies/${REVISION}.json" --file "$RUNNER_TEMP/policy.json" --content-type application/json --remote
+          pnpm exec wrangler r2 object put er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --content-type application/json --remote
+          sha256sum "$RUNNER_TEMP/policy.json"
