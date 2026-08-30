@@ -65,17 +65,15 @@ jobs:
           printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx --yes wrangler@4.127.1 secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
           printf '%s' "$M9_HEALTH_TOKEN" | npx --yes wrangler@4.127.1 secret put M9_HEALTH_TOKEN --config workers/er-telemetry/wrangler.toml
       - name: Deploy exact save and runtime-assignment Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config workers/er-save-api/wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.127.1 deploy --config workers/er-save-api/wrangler.toml
       - name: Deploy exact bounded-health Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config workers/er-telemetry/wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.127.1 deploy --config workers/er-telemetry/wrangler.toml
       - name: Verify bounded production health endpoint
         env:
           M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
