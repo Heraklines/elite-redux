@@ -1,0 +1,52 @@
+name: Provision M9 Rust Preview Save Database
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/provision-m9-rust-save-db.yml]
+  workflow_dispatch:
+    inputs:
+      explicit_confirmation:
+        description: Type PROVISION_ISOLATED_M9_RUST_SAVES
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provision-m9-rust-save-db
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.event_name == 'workflow_dispatch' && inputs.explicit_confirmation == 'PROVISION_ISOLATED_M9_RUST_SAVES'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: m9-r0-workers
+    steps:
+      - name: Create or locate isolated Rust preview D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          NAME=er-m9-rust-preview-saves
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database" \
+            > "$RUNNER_TEMP/databases.json"
+          UUID=$(jq -r --arg name "$NAME" '.result[] | select(.name == $name) | .uuid' "$RUNNER_TEMP/databases.json" | head -n 1)
+          if [ -z "$UUID" ]; then
+            curl --fail --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data "{\"name\":\"${NAME}\"}" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database" \
+              > "$RUNNER_TEMP/created.json"
+            jq -e '.success == true' "$RUNNER_TEMP/created.json" > /dev/null
+            UUID=$(jq -r .result.uuid "$RUNNER_TEMP/created.json")
+          fi
+          echo "$UUID" | grep -Eq '^[0-9a-f-]{36}$'
+          printf 'M9_RUST_SAVES_DATABASE_ID=%s\n' "$UUID"
+          printf 'No legacy save database or table was read or modified.\n'
