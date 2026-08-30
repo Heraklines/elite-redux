@@ -61,7 +61,7 @@ jobs:
                 || run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
               core.setFailed('M9 R0 reset candidate lacks exact successful G52 evidence');
             }
-      - name: Fetch and verify current R0 plus immutable releases
+      - name: Fetch and verify current pre-stable policy plus immutable releases
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -69,7 +69,8 @@ jobs:
           npx --yes wrangler@4.127.1 r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/current.json" --remote
           test "$(sha256sum "$RUNNER_TEMP/current.json" | cut -d' ' -f1)" = "${{ inputs.expected_current_policy_hash }}"
           node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/current.json"
-          test "$(jq -r .payload.active_ring "$RUNNER_TEMP/current.json")" = R0
+          CURRENT_RING=$(jq -r .payload.active_ring "$RUNNER_TEMP/current.json")
+          case "$CURRENT_RING" in R0|R1|R2|R3|R4|R5|R6) ;; *) exit 1 ;; esac
           for pair in candidate:${{ inputs.candidate_release }} stable:${{ inputs.stable_release }} legacy:${{ inputs.legacy_release }}; do
             NAME=${pair%%:*}; RELEASE=${pair#*:}
             npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/manifests/${RELEASE}.json" --file "$RUNNER_TEMP/${NAME}.json" --remote
