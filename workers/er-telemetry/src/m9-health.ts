@@ -102,15 +102,15 @@ interface PerformanceSummaryV1 {
 interface AggregateRow {
   observed_sessions: number;
   first_at: number | null;
-  worker_total: number;
-  worker_failures: number;
-  kernel_faults: number;
-  migration_failures: number;
-  save_total: number;
-  save_failures: number;
-  coop_total: number;
-  coop_failures: number;
-  hard_stop_count: number;
+  worker_total: number | null;
+  worker_failures: number | null;
+  kernel_faults: number | null;
+  migration_failures: number | null;
+  save_total: number | null;
+  save_failures: number | null;
+  coop_total: number | null;
+  coop_failures: number | null;
+  hard_stop_count: number | null;
   hard_stop_fingerprint: string | null;
 }
 
@@ -216,6 +216,18 @@ async function readAggregate(
   if (aggregate == null) {
     return response({ error: "health query failed" }, 503, cors);
   }
+  const normalized = {
+    ...aggregate,
+    worker_total: aggregate.worker_total ?? 0,
+    worker_failures: aggregate.worker_failures ?? 0,
+    kernel_faults: aggregate.kernel_faults ?? 0,
+    migration_failures: aggregate.migration_failures ?? 0,
+    save_total: aggregate.save_total ?? 0,
+    save_failures: aggregate.save_failures ?? 0,
+    coop_total: aggregate.coop_total ?? 0,
+    coop_failures: aggregate.coop_failures ?? 0,
+    hard_stop_count: aggregate.hard_stop_count ?? 0,
+  };
   const performanceRows = await env.DB.prepare(
     `SELECT performance_json FROM m9_health_events
      WHERE release_id = ? AND performance_json IS NOT NULL
@@ -227,9 +239,9 @@ async function readAggregate(
     .map(row => parsePerformance(row.performance_json)?.p95_micros ?? 0)
     .sort((left, right) => left - right);
 
-  const currentCloud = basisPoints(aggregate.save_failures, aggregate.save_total);
-  const currentCoop = basisPoints(aggregate.coop_failures, aggregate.coop_total);
-  const currentCrash = basisPoints(aggregate.kernel_faults, aggregate.observed_sessions);
+  const currentCloud = basisPoints(normalized.save_failures, normalized.save_total);
+  const currentCoop = basisPoints(normalized.coop_failures, normalized.coop_total);
+  const currentCrash = basisPoints(normalized.kernel_faults, normalized.observed_sessions);
   const baselineCloud = environmentCount(env.M9_BASELINE_CLOUD_SAVE_FAILURE_BP, 10_000);
   const baselineCoop = environmentCount(env.M9_BASELINE_COOP_FAILURE_BP, 10_000);
   const baselineInput = environmentCount(env.M9_BASELINE_INPUT_P95_MICROS, Number.MAX_SAFE_INTEGER);
@@ -244,7 +256,7 @@ async function readAggregate(
     JSON.stringify({
       schema_version: 1,
       release_id: releaseId,
-      aggregate,
+      aggregate: normalized,
       performance_p95_micros: p95,
       window_start_ms: windowStartMs,
       window_end_ms: windowEndMs,
@@ -255,11 +267,11 @@ async function readAggregate(
     {
       schema_version: 1,
       release_id: releaseId,
-      observed_sessions: aggregate.observed_sessions,
+      observed_sessions: normalized.observed_sessions,
       observed_minutes: Math.floor((windowEndMs - windowStartMs) / 60_000),
-      worker_initialization_failure_basis_points: basisPoints(aggregate.worker_failures, aggregate.worker_total),
+      worker_initialization_failure_basis_points: basisPoints(normalized.worker_failures, normalized.worker_total),
       unrecoverable_kernel_fault_basis_points: currentCrash,
-      deterministic_migration_failures: aggregate.migration_failures,
+      deterministic_migration_failures: normalized.migration_failures,
       cloud_save_regression_basis_points: Math.max(0, currentCloud - baselineCloud),
       coop_relative_regression_percent:
         baselineCoop === 0 ? (currentCoop === 0 ? 0 : 100) : percentDelta(currentCoop, baselineCoop),
@@ -267,8 +279,8 @@ async function readAggregate(
       input_latency_regression_percent: inputRegression,
       crash_free_regression_basis_points: Math.max(0, currentCrash - baselineCrash),
       hard_stop_fingerprints:
-        aggregate.hard_stop_count > 0 && aggregate.hard_stop_fingerprint != null
-          ? [aggregate.hard_stop_fingerprint]
+        normalized.hard_stop_count > 0 && normalized.hard_stop_fingerprint != null
+          ? [normalized.hard_stop_fingerprint]
           : [],
       input_event_aggregate_hash: inputEventAggregateHash,
       window_start_ms: windowStartMs,
