@@ -11,6 +11,17 @@ export interface RustWasmModuleV1 {
   BrowserKernelHostV1: {
     create(contentBytes: Uint8Array, initBytes: Uint8Array): RustWasmHostV1;
   };
+  migrate_production_save_v2(
+    contentBytes: Uint8Array,
+    legacyBytes: Uint8Array,
+    templateBytes: Uint8Array,
+    metadataBytes: Uint8Array,
+  ): Uint8Array;
+  restore_production_save_v2(
+    contentBytes: Uint8Array,
+    envelopeBytes: Uint8Array,
+    templateBytes: Uint8Array,
+  ): Uint8Array;
 }
 
 const MAXIMUM_WASM_BYTES = 33_554_432;
@@ -83,6 +94,8 @@ function validateModule(value: unknown): RustWasmModuleV1 {
     || value == null
     || typeof (value as Partial<RustWasmModuleV1>).default !== "function"
     || typeof (value as Partial<RustWasmModuleV1>).BrowserKernelHostV1?.create !== "function"
+    || typeof (value as Partial<RustWasmModuleV1>).migrate_production_save_v2 !== "function"
+    || typeof (value as Partial<RustWasmModuleV1>).restore_production_save_v2 !== "function"
   ) {
     throw new Error("Wasm glue does not expose the frozen browser ABI");
   }

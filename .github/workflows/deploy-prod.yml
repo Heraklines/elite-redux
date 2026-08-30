@@ -195,6 +195,13 @@ jobs:
       - name: Refresh community suggestion achievement catalog
         run: node scripts/elite-redux/build-community-suggestion-achievements.mjs
 
+      - name: Configure M9 runtime assignment signer
+        env:
+          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
+          printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx wrangler secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
+
       - name: Deploy cloud-save API (production)
         uses: cloudflare/wrangler-action@v3
         with:

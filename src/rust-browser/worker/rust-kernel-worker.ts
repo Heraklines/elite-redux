@@ -18,6 +18,9 @@ interface WorkerTransferPortV1 {
   postMessage(message: ArrayBuffer, transfer: Transferable[]): void;
 }
 
+interface WorkerObjectPortV1 {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+}
 interface AttachGenerationPortV1 {
   kind: "ATTACH_PORT_V1";
   generation: number;
@@ -47,7 +50,18 @@ interface ProductionArtifactsV1 {
   contentBytes: Uint8Array;
 }
 
+interface MigrateProductionSaveV2 {
+  kind: "MIGRATE_PRODUCTION_SAVE_V2";
+  operation: "MIGRATE_LEGACY" | "RESTORE_RUST";
+  release_id: string;
+  generation: number;
+  legacy_bytes: ArrayBuffer;
+  template_bytes: ArrayBuffer;
+  metadata_bytes: ArrayBuffer;
+}
+
 const globalTransferPort = self as unknown as WorkerTransferPortV1;
+const workerObjectPort = self as unknown as WorkerObjectPortV1;
 let transferPort: WorkerTransferPortV1 = globalTransferPort;
 let generationPort: MessagePort | null = null;
 let productionArtifacts: ProductionArtifactsV1 | null = null;
@@ -249,6 +263,68 @@ function acceptProtocolMessage(event: MessageEvent<unknown>): void {
     });
 }
 
+async function processProductionSaveMigrationV2(message: MigrateProductionSaveV2): Promise<void> {
+  const artifacts = productionArtifacts;
+  productionArtifacts = null;
+  if (
+    artifacts == null
+    || message.release_id !== artifacts.releaseId
+    || (message.operation !== "MIGRATE_LEGACY" && message.operation !== "RESTORE_RUST")
+    || message.generation !== artifacts.generation
+    || !(message.legacy_bytes instanceof ArrayBuffer)
+    || !(message.template_bytes instanceof ArrayBuffer)
+    || !(message.metadata_bytes instanceof ArrayBuffer)
+    || message.legacy_bytes.byteLength === 0
+    || message.legacy_bytes.byteLength > 268_435_456
+    || message.template_bytes.byteLength === 0
+    || message.template_bytes.byteLength > MAXIMUM_BROWSER_EFFECT_BYTES_V1
+    || message.metadata_bytes.byteLength > 65_536
+    || (message.operation === "MIGRATE_LEGACY" && message.metadata_bytes.byteLength === 0)
+    || (await sha256(artifacts.contentBytes)) !== artifacts.contentSha256
+  ) {
+    if (artifacts != null) {
+      zeroizeProductionArtifacts(artifacts);
+    }
+    throw new Error("production save migration request is invalid");
+  }
+  const legacy = new Uint8Array(message.legacy_bytes);
+  const template = new Uint8Array(message.template_bytes);
+  const metadata = new Uint8Array(message.metadata_bytes);
+  try {
+    const module = await loadRustWasmModuleFromVerifiedBytesV1({
+      glueBytes: artifacts.glueBytes,
+      glueSha256: artifacts.glueSha256,
+      wasmBytes: artifacts.wasmBytes,
+      wasmSha256: artifacts.wasmSha256,
+    });
+    const output =
+      message.operation === "MIGRATE_LEGACY"
+        ? module.migrate_production_save_v2(artifacts.contentBytes, legacy, template, metadata)
+        : module.restore_production_save_v2(artifacts.contentBytes, legacy, template);
+    if (output.byteLength === 0 || output.byteLength > 268_435_456) {
+      output.fill(0);
+      throw new Error("Rust production save migration returned invalid bytes");
+    }
+    const transferable = Uint8Array.from(output);
+    output.fill(0);
+    workerObjectPort.postMessage(
+      {
+        kind: "PROCESSED_PRODUCTION_SAVE_V2",
+        release_id: message.release_id,
+        generation: message.generation,
+        bytes: transferable.buffer,
+      },
+      [transferable.buffer],
+    );
+    disposed = true;
+  } finally {
+    legacy.fill(0);
+    template.fill(0);
+    metadata.fill(0);
+    zeroizeProductionArtifacts(artifacts);
+  }
+}
+
 self.onmessage = (event: MessageEvent<unknown>) => {
   const production = event.data as Partial<AttachProductionArtifactsV1> | null;
   if (production?.kind === "ATTACH_PRODUCTION_ARTIFACTS_V1") {
@@ -287,6 +363,20 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       wasmBytes: new Uint8Array(production.wasm_bytes),
       contentBytes: new Uint8Array(production.content_bytes),
     };
+    return;
+  }
+  const migration = event.data as Partial<MigrateProductionSaveV2> | null;
+  if (migration?.kind === "MIGRATE_PRODUCTION_SAVE_V2") {
+    queue = queue
+      .then(() => processProductionSaveMigrationV2(migration as MigrateProductionSaveV2))
+      .catch(error => {
+        const message = error instanceof Error ? error.message : String(error);
+        workerObjectPort.postMessage({
+          kind: "PRODUCTION_SAVE_MIGRATION_FAULT",
+          message: message.slice(0, 512),
+        });
+        disposed = true;
+      });
     return;
   }
   const candidate = event.data as Partial<AttachGenerationPortV1> | null;

@@ -27,6 +27,7 @@ export interface ProductionArtifactSetV1 {
   content: ArtifactIdentityV1;
   asset_manifest: ArtifactIdentityV1;
   service_worker: ArtifactIdentityV1;
+  session_template: ArtifactIdentityV1;
 }
 
 export interface MechanicalCompatibilityIdentityV1 {
@@ -69,6 +70,16 @@ export interface ProductionQualificationEvidenceV1 {
   workflow_name: string;
   conclusion: "SUCCESS";
   artifact_set_sha256: string;
+}
+
+export interface ProfileResultEnvelopeV1 {
+  schema_version: 1;
+  pseudonymous_account_id: string;
+  release_id: string;
+  profile_bytes: number[];
+  profile_sha256: string;
+  achievement_result_bytes: number[];
+  achievement_result_sha256: string;
 }
 
 export interface ProductionReleaseManifestV2 {

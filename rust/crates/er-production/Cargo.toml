@@ -8,8 +8,11 @@ publish = false
 [dependencies]
 ed25519-dalek.workspace = true
 er-canonical = { path = "../er-canonical" }
+er-game = { path = "../er-game" }
+er-kernel = { path = "../er-kernel" }
 er-kernel-worker = { path = "../er-kernel-worker" }
 er-save = { path = "../er-save" }
+er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 serde_json.workspace = true

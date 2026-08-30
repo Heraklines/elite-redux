@@ -1,0 +1,111 @@
+name: Rust Kernel M9 G50 Save Account Co-op
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m9-g50-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  save-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production -p er-web --all-targets --no-deps -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-production -p er-web
+      - run: cargo check --manifest-path rust/Cargo.toml -p er-web --target wasm32-unknown-unknown
+      - name: Typecheck M9B owned browser surface
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2024
+          --types node,vitest/globals --lib ES2024,DOM,WebWorker
+          src/rust-browser/production/contracts.ts
+          src/rust-browser/production/save-envelope.ts
+          src/rust-browser/production/save-lease.ts
+          src/rust-browser/production/save-migration.ts
+          src/rust-browser/production/production-save-worker.ts
+          src/rust-browser/production/platform-context.ts
+          src/rust-browser/production/coop-release.ts
+          src/rust-browser/production/type-guards.ts
+          src/rust-browser/adapters/cloud-save-adapter.ts
+          src/rust-browser/adapters/signaling-adapter.ts
+          src/rust-browser/adapters/transport-adapter.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          src/rust-browser/worker/rust-wasm-loader.ts
+          workers/er-save-api/src/m9-production.ts
+          workers/er-save-api/src/m9-type-guards.ts
+          test/node/rust-browser/production/save-coop.test.ts
+          test/node/rust-browser/adapters/adapter-contracts.test.ts
+      - run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          src/rust-browser/production src/rust-browser/adapters/cloud-save-adapter.ts
+          src/rust-browser/adapters/signaling-adapter.ts src/rust-browser/worker
+          workers/er-save-api/src/m9-production.ts workers/er-save-api/src/m9-type-guards.ts
+          test/node/rust-browser/production test/node/rust-browser/adapters/adapter-contracts.test.ts
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/production/save-coop.test.ts
+          test/node/rust-browser/adapters/adapter-contracts.test.ts
+          --pool=forks --isolate --no-file-parallelism
+      - run: >-
+          pnpm exec vitest run
+          test/tests/elite-redux/coop/coop-cloud-save-worker-integration.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  wasm-coop-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-g50-wasm-${{ runner.os }}-${{ runner.arch }}-0.2.127-${{ hashFiles('rust/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
+      - run: |
+          if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then cargo install wasm-bindgen-cli --version 0.2.127 --locked; fi
+          node scripts/build-kernel-m8-web.mjs --out-dir "$RUNNER_TEMP/m9-web" --content rust/fixtures/m8/browser-reference/content-pack.json --identity rust/fixtures/m8/browser-reference/execution-identity.bin --session rust/fixtures/m8/browser-reference/session-start.json --authority-session rust/fixtures/m8/browser-reference/session-authority.json --replica-session rust/fixtures/m8/browser-reference/session-replica.json
+      - run: pnpm exec playwright install --with-deps chromium
+      - env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: pnpm exec playwright test test/browser/rust-browser/full-coop.spec.ts --config playwright.rust-browser.config.ts --project chromium --workers=1
+
+  g50-aggregate:
+    name: M9 G50 save migration account and co-op qualification
+    needs: [save-migration, wasm-coop-browser]
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed G50 copy-on-write save and pinned Rust co-op"

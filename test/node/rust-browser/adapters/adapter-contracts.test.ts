@@ -13,6 +13,8 @@ import { PresentationSettlementTraceV1 } from "../../../../src/rust-browser/rend
 const identity: BrowserKernelCompatibilityV1 = {
   browser_worker_protocol: 1,
   authority_protocol: "er-coop-47",
+  release_id: "release-v1",
+  compatible_releases: [],
   mechanical_identity: "mechanical-v1",
   content_hash: "content-v1",
   material_schema: 5,

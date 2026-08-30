@@ -27,6 +27,7 @@ pub struct ProductionArtifactSetV1 {
     pub content: ArtifactIdentityV1,
     pub asset_manifest: ArtifactIdentityV1,
     pub service_worker: ArtifactIdentityV1,
+    pub session_template: ArtifactIdentityV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -86,6 +87,7 @@ impl ProductionArtifactSetV1 {
             &self.content,
             &self.asset_manifest,
             &self.service_worker,
+            &self.session_template,
         ];
         let mut urls = BTreeSet::new();
         for artifact in artifacts {

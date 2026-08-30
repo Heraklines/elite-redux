@@ -89,6 +89,11 @@ import {
   seasonIdFromTime,
 } from "./showdown-rank";
 import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
+import {
+  handleM9PlatformContext,
+  handleM9RuntimeAssignment,
+  handleM9Save,
+} from "./m9-production";
 
 interface Env {
   DB: D1Database;
@@ -98,6 +103,12 @@ interface Env {
    * (503) for local/misconfigured Workers; the client drops any non-2xx without affecting gameplay.
    */
   TELEMETRY?: TelemetryR2Bucket;
+  /** Signed M9 release manifests, rollout policy, health, and rollback directives. */
+  M9_RELEASES: R2Bucket;
+  /** Ed25519 PKCS#8 private key used only for short-lived runtime assignments. */
+  M9_RELEASE_SIGNING_PRIVATE_KEY: string;
+  /** Optional comma-separated internal/preview account allowlist. */
+  M9_INTERNAL_ACCOUNTS?: string;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
   SESSION_SECRET: string;
   /** Shared only with the co-op signaling Worker; signs short-lived identity tickets. */
@@ -330,8 +341,9 @@ function corsHeaders(env: Env, origin: string | null): Record<string, string> {
   const value = !allow || allow === "*" ? "*" : allow.split(",").includes(origin ?? "") ? (origin ?? "*") : "null";
   return {
     "Access-Control-Allow-Origin": value,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,If-Match,X-Er-Release,X-Er-Save-Schema",
+    "Access-Control-Expose-Headers": "ETag,X-Er-Release-Id,X-Er-Save-Slot,X-Er-Save-Schema,X-Er-Save-Generation",
     "Access-Control-Max-Age": "86400",
   };
 }
@@ -5795,6 +5807,15 @@ export default {
         return text("Unauthorized.", 401, cors);
       }
 
+      if (pathname === "/m9/platform-context" && method === "GET") {
+        return await handleM9PlatformContext(auth, env, cors);
+      }
+      if (pathname === "/m9/runtime-assignment" && method === "POST") {
+        return await handleM9RuntimeAssignment(request, auth, env, cors);
+      }
+      if (pathname === "/m9/save" && (method === "GET" || method === "PUT")) {
+        return await handleM9Save(request, url, auth, env, cors);
+      }
       if (pathname === "/account/info" && method === "GET") {
         return await handleAccountInfo(auth, env, cors);
       }

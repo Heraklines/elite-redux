@@ -101,7 +101,7 @@ jobs:
             --authority-session rust/fixtures/m8/browser-reference/session-authority.json \
             --replica-session rust/fixtures/m8/browser-reference/session-replica.json
           cp "$RUNNER_TEMP/m9-browser/"*.js "$RUNNER_TEMP/m9-release/"
-          cp "$RUNNER_TEMP/m9-web/er_web.js" "$RUNNER_TEMP/m9-web/er_web.wasm" "$RUNNER_TEMP/m9-web/content-pack.json" "$RUNNER_TEMP/m9-release/"
+          cp "$RUNNER_TEMP/m9-web/er_web.js" "$RUNNER_TEMP/m9-web/er_web.wasm" "$RUNNER_TEMP/m9-web/content-pack.json" "$RUNNER_TEMP/m9-web/session-start.json" "$RUNNER_TEMP/m9-release/"
           printf '%s\n' '{"schema_version":1,"asset_sha":"${{ inputs.exact_asset_sha }}"}' > "$RUNNER_TEMP/m9-release/asset-manifest.json"
       - name: Create release metadata
         run: |
@@ -124,7 +124,7 @@ jobs:
               qualified_asset_sha:$asset_sha,
               mechanical_identity:{schema_version:1,mechanics_sha256:$mechanics_sha,content_hash:$content_hash,authority_protocol:"er-coop-47",active_model_identity:"er-model-v1"},
               build_identity:{schema_version:1,toolchain:"rust-1.97.1",target:"wasm32-unknown-unknown",profile:"release",lockfile_sha256:"0000000000000000000000000000000000000000000000000000000000000000",build_config_sha256:"0000000000000000000000000000000000000000000000000000000000000000",debug_surfaces_absent:true},
-              material_schemas:{turn:1,replacement:1,recovery:1,presentation:1},save_schema:2,
+              material_schemas:{turn:1,replacement:1,recovery:1,presentation:1},save_schema:1,
               previous_rust_release:(if $previous=="" then null else $previous end),legacy_transition_release:(if $legacy=="" then null else $legacy end),
               platform_api_versions:{schema_version:1,save_api:2,telemetry_api:1,signaling_api:33,showdown_api:1,achievement_api:1},
               qualification:{workflow_run_id:$run,workflow_name:"Build M9 Immutable Release"}}' \

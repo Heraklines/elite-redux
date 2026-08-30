@@ -27,6 +27,7 @@ const artifactFiles = {
   content: ["content-pack.json", "application/json"],
   asset_manifest: ["asset-manifest.json", "application/json"],
   service_worker: ["service-worker.js", "text/javascript"],
+  session_template: ["session-start.json", "application/json"],
 };
 const artifacts = {};
 for (const [kind, [name, mediaType]] of Object.entries(artifactFiles)) {

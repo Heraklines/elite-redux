@@ -174,6 +174,7 @@ fn manifest(
             content: artifact("content.json"),
             asset_manifest: artifact("assets.json"),
             service_worker: artifact("service-worker.js"),
+            session_template: artifact("session-start.json"),
         },
         previous_rust_release: None,
         legacy_transition_release: None,

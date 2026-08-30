@@ -1,4 +1,13 @@
+use std::sync::Arc;
+
 use er_canonical::canonical_bytes;
+use er_game::m7_content::PreparedGameContentV1;
+use er_kernel::game_kernel_v6::GameKernelV6;
+use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
+use er_save::{GameSaveV1, migrate_typescript_save_v1};
+use er_state::m7_state::{GAME_STATE_SCHEMA_VERSION_V5, GameStateV5};
+use er_types::GameContentIdentity;
+use er_types::SafeU53;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -74,6 +83,39 @@ pub trait ProductionSaveMigratorV1: std::fmt::Debug {
     fn target_schema(&self) -> u32;
     fn migrate(&self, source: &[u8]) -> Result<Vec<u8>, ProductionContractErrorV1>;
     fn validate_fresh_restore(&self, target: &[u8]) -> Result<String, ProductionContractErrorV1>;
+}
+
+#[derive(Clone, Debug)]
+pub struct LegacyTypeScriptSaveMigratorV1 {
+    pub content_identity: GameContentIdentity,
+}
+
+impl ProductionSaveMigratorV1 for LegacyTypeScriptSaveMigratorV1 {
+    fn migrator_id(&self) -> SaveMigratorId {
+        SaveMigratorId("legacy-typescript-v1-to-rust-v1".to_owned())
+    }
+
+    fn source_schema(&self) -> u32 {
+        1
+    }
+
+    fn target_schema(&self) -> u32 {
+        1
+    }
+
+    fn migrate(&self, source: &[u8]) -> Result<Vec<u8>, ProductionContractErrorV1> {
+        migrate_typescript_save_v1(source, &self.content_identity)
+            .and_then(|save| save.canonical_bytes())
+            .map_err(|_| ProductionContractErrorV1::Save("legacy migration"))
+    }
+
+    fn validate_fresh_restore(&self, target: &[u8]) -> Result<String, ProductionContractErrorV1> {
+        let save = GameSaveV1::decode_canonical(target, &self.content_identity)
+            .map_err(|_| ProductionContractErrorV1::Save("fresh migrated restore"))?;
+        save.validate(&self.content_identity)
+            .map_err(|_| ProductionContractErrorV1::Save("migrated state validation"))?;
+        Ok(sha256(target))
+    }
 }
 
 impl SaveMigrationReceiptV1 {
@@ -187,6 +229,49 @@ pub fn prepare_copy_on_write_migration_v1<M: ProductionSaveMigratorV1>(
         target_payload: first,
         receipt,
     })
+}
+
+pub fn restore_game_save_to_kernel_snapshot_v1(
+    save: &GameSaveV1,
+    template: &RestorableKernelSnapshotV6,
+    content: Arc<PreparedGameContentV1>,
+) -> Result<Vec<u8>, ProductionContractErrorV1> {
+    save.validate(content.identity())
+        .map_err(|_| ProductionContractErrorV1::Save("save state validation"))?;
+    if template.content_identity != *content.identity()
+        || template.protocol.is_some()
+        || !template.pending_presentations.is_empty()
+        || !template.prepared_transactions.is_empty()
+        || !template.pressed_keys.is_empty()
+    {
+        return Err(ProductionContractErrorV1::Save("unsafe session template"));
+    }
+    let state = GameStateV5 {
+        schema_version: GAME_STATE_SCHEMA_VERSION_V5,
+        content_identity: content.identity().clone(),
+        profile: save.profile.clone(),
+        active_run: save.run.clone(),
+    };
+    let kernel = GameKernelV6::new(
+        state,
+        content.clone(),
+        template.input_router.clone(),
+        template.scheduler.clone(),
+        None,
+        SafeU53::new(0).map_err(|_| ProductionContractErrorV1::Save("replay sequence"))?,
+        None,
+    )
+    .map_err(|_| ProductionContractErrorV1::Save("fresh kernel construction"))?;
+    let snapshot = kernel.snapshot();
+    let restored = GameKernelV6::from_snapshot(snapshot.clone(), content)
+        .map_err(|_| ProductionContractErrorV1::Save("fresh kernel restore"))?;
+    if restored.snapshot() != snapshot {
+        return Err(ProductionContractErrorV1::Save(
+            "snapshot continuation mismatch",
+        ));
+    }
+    canonical_bytes(&snapshot)
+        .map_err(|error| ProductionContractErrorV1::Canonical(error.to_string()))
 }
 
 fn sha256(bytes: &[u8]) -> String {

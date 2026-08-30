@@ -5,7 +5,7 @@ import { createServer, type ViteDevServer } from "vite";
 let server: ViteDevServer;
 const html = `<!doctype html><html><body><script type="module">
 import { RustBrowserTransportAdapterV1 } from "/src/rust-browser/adapters/transport-adapter.ts";
-const identity = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: new URLSearchParams(location.search).get("runtime") === "typescript" ? "TYPESCRIPT" : "RUST" };
+const identity = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: new URLSearchParams(location.search).get("runtime") === "typescript" ? "TYPESCRIPT" : "RUST" };
 const events = []; const adapter = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: event => events.push(event) }); let pc; let generation = 0;
 function waitIce(connection) { if (connection.iceGatheringState === "complete") return Promise.resolve(); const { promise, resolve } = Promise.withResolvers(); connection.addEventListener("icegatheringstatechange", () => { if (connection.iceGatheringState === "complete") resolve(); }); return promise; }
 function waitUntil(predicate) { const { promise, resolve, reject } = Promise.withResolvers(); let frames = 0; const tick = () => { if (predicate()) { resolve(); return; } if (++frames > 600) { reject(new Error("RTC condition did not settle")); return; } requestAnimationFrame(tick); }; tick(); return promise; }

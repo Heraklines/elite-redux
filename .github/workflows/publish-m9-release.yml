@@ -50,8 +50,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          if ! pnpm exec wrangler r2 bucket list --json | jq -e '.[] | select(.name == "er-m9-releases")' > /dev/null; then
+            pnpm exec wrangler r2 bucket create er-m9-releases
+          fi
           MANIFEST="$RUNNER_TEMP/m9-release/signed-manifest.json"
-          for kind in bootstrap_js browser_js worker_js wasm_glue_js wasm content asset_manifest service_worker; do
+          for kind in bootstrap_js browser_js worker_js wasm_glue_js wasm content asset_manifest service_worker session_template; do
             URL=$(jq -r ".payload.artifacts.${kind}.url" "$MANIFEST")
             NAME=$(basename "$URL")
             MEDIA=$(jq -r ".payload.artifacts.${kind}.media_type" "$MANIFEST")

@@ -1,17 +1,26 @@
+import { CloudSaveAdapterV1 } from "../adapters/cloud-save-adapter";
 import { startProductionBootstrapV1 } from "./bootstrap";
 import { getOrCreateBrowserGameSessionIdV1 } from "./browser-session";
 import type { SignedProductionManifestV1, SignedRuntimeAssignmentV1 } from "./contracts";
-import { type CompleteProductionReleaseV2, materializeVerifiedArtifactUrlV1 } from "./release-cache-v2";
+import { loadAuthenticatedPlatformContextV1 } from "./platform-context";
+import { ProductionSaveMigrationWorkerV1 } from "./production-save-worker";
+import {
+  type CompleteProductionReleaseV2,
+  materializeVerifiedArtifactUrlV1,
+  readVerifiedArtifactBytesV1,
+} from "./release-cache-v2";
 import { PINNED_PRODUCTION_RELEASE_KEYS_V1 } from "./release-keys";
+import { ProductionSaveLeaseManagerV1 } from "./save-lease";
+import { loadOrMigrateProductionSaveV1 } from "./save-migration";
 import { IndexedDbSessionRuntimePinStoreV1 } from "./session-pin";
 import { decodeBoundedSignedJsonV1 } from "./signature-verifier";
 
 const MAXIMUM_MANIFEST_BYTES = 131_072;
 const MAXIMUM_ASSIGNMENT_BYTES = 65_536;
-const MAXIMUM_SESSION_START_BYTES = 8_388_608;
 
 export async function startConfiguredProductionMainV1(): Promise<void> {
   const sessionId = await getOrCreateBrowserGameSessionIdV1();
+  const platform = await loadAuthenticatedPlatformContextV1();
   const pinStore = new IndexedDbSessionRuntimePinStoreV1();
   const session = await startProductionBootstrapV1({
     sessionId,
@@ -45,15 +54,35 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         MAXIMUM_ASSIGNMENT_BYTES,
       );
     },
-    async prepareSessionStart(selection) {
-      const response = await fetch(
-        `/m9/session-start/${encodeURIComponent(sessionId)}?release_id=${encodeURIComponent(selection.release.release_id)}`,
-        { cache: "no-store", credentials: "include", redirect: "error" },
-      );
-      if (response.headers.get("x-er-release-id") !== selection.release.release_id) {
-        throw new Error("production session start response is cross-release");
+    async prepareSessionStart(_selection, release) {
+      const cloud = new CloudSaveAdapterV1({
+        endpoint: new URL("/m9/save", globalThis.location.origin),
+        allowedOrigin: globalThis.location.origin,
+        releaseIdentity: release.manifest.release_id,
+        productionSaveSchema: release.manifest.save_schema,
+        requireProductionIdentity: true,
+      });
+      const leases = new ProductionSaveLeaseManagerV1();
+      try {
+        const source = await cloud.load(platform.default_save_slot);
+        if (source == null) {
+          return readVerifiedArtifactBytesV1(release, release.manifest.artifacts.session_template);
+        }
+        const result = await loadOrMigrateProductionSaveV1({
+          cloud,
+          source,
+          leases,
+          backend: new ProductionSaveMigrationWorkerV1(release),
+          release: release.manifest,
+          accountId: platform.pseudonymous_account_id,
+          slot: platform.default_save_slot,
+          browserInstanceId: `instance-${crypto.randomUUID()}`,
+        });
+        return result.sessionStartBytes;
+      } finally {
+        cloud.dispose();
+        leases.dispose();
       }
-      return boundedResponse(response, MAXIMUM_SESSION_START_BYTES, "application/json");
     },
     async startRustView(host, _selection, release) {
       const entry = await loadVerifiedBrowserEntry(release);

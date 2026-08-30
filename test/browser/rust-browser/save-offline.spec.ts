@@ -12,7 +12,7 @@ import { CloudSaveAdapterV1 } from "/src/rust-browser/adapters/cloud-save-adapte
 import { installAtomicReleaseCache, loadAtomicReleaseCache } from "/src/rust-browser/adapters/release-cache.ts";
 import { MobileInputAdapterV1 } from "/src/rust-browser/adapters/mobile-input-adapter.ts";
 import { RustBrowserTransportAdapterV1 } from "/src/rust-browser/adapters/transport-adapter.ts";
-const identity = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
+const identity = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
 async function waitUntil(predicate) {
   const { promise, resolve, reject } = Promise.withResolvers();
   let frames = 0;

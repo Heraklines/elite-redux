@@ -1,8 +1,9 @@
-const MAXIMUM_CLOUD_SAVE_BYTES = 4_194_304;
+const MAXIMUM_CLOUD_SAVE_BYTES = 268_435_456;
 
 export interface CloudSaveValueV1 {
   revision: string;
   bytes: Uint8Array;
+  generation?: number;
 }
 
 export class CloudSaveConflictV1 extends Error {
@@ -16,22 +17,34 @@ export interface CloudSaveAdapterOptionsV1 {
   endpoint: URL;
   allowedOrigin: string;
   releaseIdentity: string;
+  productionSaveSchema?: number;
+  requireProductionIdentity?: boolean;
 }
 
 export class CloudSaveAdapterV1 {
   readonly #endpoint: URL;
   readonly #allowedOrigin: string;
   readonly #releaseIdentity: string;
+  readonly #productionSaveSchema: number;
+  readonly #requireProductionIdentity: boolean;
   readonly #controller = new AbortController();
   #disposed = false;
 
   constructor(options: CloudSaveAdapterOptionsV1) {
-    if (options.endpoint.origin !== options.allowedOrigin || options.releaseIdentity.length === 0) {
-      throw new Error("cloud save endpoint or release identity is invalid");
+    const schema = options.productionSaveSchema ?? 1;
+    if (
+      options.endpoint.origin !== options.allowedOrigin
+      || options.releaseIdentity.length === 0
+      || !Number.isSafeInteger(schema)
+      || schema < 1
+    ) {
+      throw new Error("cloud save endpoint, release, or schema identity is invalid");
     }
     this.#endpoint = options.endpoint;
     this.#allowedOrigin = options.allowedOrigin;
     this.#releaseIdentity = options.releaseIdentity;
+    this.#productionSaveSchema = schema;
+    this.#requireProductionIdentity = options.requireProductionIdentity ?? false;
   }
 
   async load(slot: string): Promise<CloudSaveValueV1 | null> {
@@ -39,7 +52,11 @@ export class CloudSaveAdapterV1 {
     const response = await fetch(this.#slot(slot), {
       credentials: "include",
       cache: "no-store",
-      headers: { accept: "application/octet-stream", "x-er-release": this.#releaseIdentity },
+      headers: {
+        accept: "application/octet-stream",
+        "x-er-release": this.#releaseIdentity,
+        "x-er-save-schema": String(this.#productionSaveSchema),
+      },
       signal: this.#controller.signal,
     });
     if (response.status === 404) {
@@ -48,7 +65,12 @@ export class CloudSaveAdapterV1 {
     if (!response.ok) {
       throw new Error(`cloud save load failed: ${response.status}`);
     }
-    return { revision: requiredRevision(response), bytes: await boundedBytes(response) };
+    this.#assertProductionIdentity(response, slot);
+    return {
+      revision: requiredRevision(response),
+      bytes: await boundedBytes(response),
+      ...(this.#requireProductionIdentity ? { generation: requiredGeneration(response) } : {}),
+    };
   }
 
   async compareAndSwap(slot: string, expectedRevision: string | null, bytes: Uint8Array): Promise<string> {
@@ -64,6 +86,7 @@ export class CloudSaveAdapterV1 {
         "content-type": "application/octet-stream",
         "if-match": expectedRevision ?? "*",
         "x-er-release": this.#releaseIdentity,
+        "x-er-save-schema": String(this.#productionSaveSchema),
       },
       body: Uint8Array.from(bytes).buffer,
       signal: this.#controller.signal,
@@ -74,6 +97,7 @@ export class CloudSaveAdapterV1 {
     if (!response.ok) {
       throw new Error(`cloud save write failed: ${response.status}`);
     }
+    this.#assertProductionIdentity(response, slot);
     return requiredRevision(response);
   }
 
@@ -102,6 +126,19 @@ export class CloudSaveAdapterV1 {
       throw new Error("cloud save adapter is disposed");
     }
   }
+
+  #assertProductionIdentity(response: Response, slot: string): void {
+    if (!this.#requireProductionIdentity) {
+      return;
+    }
+    if (
+      response.headers.get("x-er-release-id") !== this.#releaseIdentity
+      || response.headers.get("x-er-save-slot") !== slot
+      || response.headers.get("x-er-save-schema") !== String(this.#productionSaveSchema)
+    ) {
+      throw new Error("cloud save response is cross-release, cross-slot, or wrong-schema");
+    }
+  }
 }
 
 async function boundedBytes(response: Response): Promise<Uint8Array> {
@@ -122,4 +159,12 @@ function requiredRevision(response: Response): string {
     throw new Error("cloud save response has no bounded revision");
   }
   return revision;
+}
+
+function requiredGeneration(response: Response): number {
+  const generation = Number(response.headers.get("x-er-save-generation"));
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error("cloud save response has no safe generation");
+  }
+  return generation;
 }

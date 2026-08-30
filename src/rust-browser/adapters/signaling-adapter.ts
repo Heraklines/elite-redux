@@ -1,6 +1,10 @@
+import { isUnknownRecord } from "../production/type-guards";
+
 export interface BrowserKernelCompatibilityV1 {
   browser_worker_protocol: 1;
   authority_protocol: string;
+  release_id: string;
+  compatible_releases: string[];
   mechanical_identity: string;
   content_hash: string;
   material_schema: number;
@@ -19,11 +23,7 @@ export interface AuthenticatedSignalingTicketV1 {
 const MAXIMUM_TICKET_BYTES = 16_384;
 
 export function encodeCompatibilityHandshake(identity: BrowserKernelCompatibilityV1): Uint8Array {
-  for (const [key, value] of Object.entries(identity)) {
-    if ((typeof value === "string" && (value.length === 0 || value.length > 512)) || value == null) {
-      throw new Error(`browser compatibility field ${key} is invalid`);
-    }
-  }
+  validateCompatibility(identity);
   return new TextEncoder().encode(
     JSON.stringify(Object.fromEntries(Object.entries(identity).sort(([left], [right]) => left.localeCompare(right)))),
   );
@@ -33,21 +33,78 @@ export function assertCompatibleRustPeer(
   local: BrowserKernelCompatibilityV1,
   remoteBytes: Uint8Array,
 ): BrowserKernelCompatibilityV1 {
+  validateCompatibility(local);
   if (remoteBytes.byteLength === 0 || remoteBytes.byteLength > MAXIMUM_TICKET_BYTES) {
     throw new Error("peer compatibility handshake is empty or oversized");
   }
-  const remote = JSON.parse(
-    new TextDecoder("utf-8", { fatal: true }).decode(remoteBytes),
-  ) as Partial<BrowserKernelCompatibilityV1>;
-  if (remote.authority_runtime !== "RUST") {
+  const remote: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(remoteBytes));
+  if (isUnknownRecord(remote) && "authority_runtime" in remote && remote.authority_runtime !== "RUST") {
     throw new Error("mixed TypeScript/Rust authority peers are forbidden");
   }
-  for (const key of Object.keys(local) as Array<keyof BrowserKernelCompatibilityV1>) {
+  if (!isBrowserKernelCompatibility(remote)) {
+    throw new Error("peer compatibility handshake is malformed");
+  }
+  for (const key of [
+    "browser_worker_protocol",
+    "authority_protocol",
+    "mechanical_identity",
+    "content_hash",
+    "material_schema",
+    "save_schema",
+    "browser_kernel_abi",
+    "active_model_identity",
+    "authority_runtime",
+  ] as const) {
     if (remote[key] !== local[key]) {
       throw new Error(`Rust peer compatibility mismatch at ${key}`);
     }
   }
-  return remote as BrowserKernelCompatibilityV1;
+  if (
+    remote.release_id !== local.release_id
+    && (!remote.compatible_releases.includes(local.release_id)
+      || !local.compatible_releases.includes(remote.release_id))
+  ) {
+    throw new Error("Rust peer releases have no signed compatibility relation");
+  }
+  return remote;
+}
+
+function validateCompatibility(identity: BrowserKernelCompatibilityV1): void {
+  if (
+    identity.authority_runtime !== "RUST"
+    || identity.browser_worker_protocol !== 1
+    || identity.authority_protocol.length === 0
+    || identity.release_id.length === 0
+    || identity.compatible_releases.length > 16
+    || identity.compatible_releases.some(release => release.length === 0 || release.length > 128)
+    || identity.mechanical_identity.length === 0
+    || identity.content_hash.length === 0
+    || !Number.isSafeInteger(identity.material_schema)
+    || !Number.isSafeInteger(identity.save_schema)
+    || !Number.isSafeInteger(identity.browser_kernel_abi)
+    || identity.active_model_identity.length === 0
+  ) {
+    throw new Error("browser Rust compatibility identity is invalid");
+  }
+}
+
+function isBrowserKernelCompatibility(value: unknown): value is BrowserKernelCompatibilityV1 {
+  if (!isUnknownRecord(value) || !Array.isArray(value.compatible_releases)) {
+    return false;
+  }
+  return (
+    value.authority_runtime === "RUST"
+    && value.browser_worker_protocol === 1
+    && typeof value.authority_protocol === "string"
+    && typeof value.release_id === "string"
+    && value.compatible_releases.every(release => typeof release === "string")
+    && typeof value.mechanical_identity === "string"
+    && typeof value.content_hash === "string"
+    && typeof value.material_schema === "number"
+    && typeof value.save_schema === "number"
+    && typeof value.browser_kernel_abi === "number"
+    && typeof value.active_model_identity === "string"
+  );
 }
 
 export async function fetchAuthenticatedSignalingTicket(

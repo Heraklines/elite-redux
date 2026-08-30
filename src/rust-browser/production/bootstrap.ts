@@ -2,6 +2,7 @@ import type { BrowserKernelGenerationIdentityV1, BrowserKernelGenerationV1 } fro
 import type { ProductionAuthorityRuntimeV1, SessionRuntimePinV1 } from "./contracts";
 import { ProductionWorkerHostV1 } from "./production-worker-host";
 import {
+  type CompleteProductionReleaseV2,
   installCompleteProductionReleaseV2,
   loadCompleteProductionReleaseV2,
   releaseProductionReleasePinV2,
@@ -17,15 +18,18 @@ import type { SessionRuntimePinStoreV1 } from "./session-pin";
 export interface ProductionBootstrapDependenciesV1 extends ProductionRuntimeSelectionDependenciesV1 {
   caches: CacheStorage;
   pinStore: SessionRuntimePinStoreV1;
-  prepareSessionStart(selection: VerifiedProductionRuntimeSelectionV1): Promise<Uint8Array>;
+  prepareSessionStart(
+    selection: VerifiedProductionRuntimeSelectionV1,
+    release: CompleteProductionReleaseV2,
+  ): Promise<Uint8Array>;
   startRustView(
     host: BrowserKernelGenerationV1,
     selection: VerifiedProductionRuntimeSelectionV1,
-    release: Awaited<ReturnType<typeof loadCompleteProductionReleaseV2>>,
+    release: CompleteProductionReleaseV2,
   ): Promise<{ dispose(): Promise<void> }>;
   startLegacyTransition(
     selection: VerifiedProductionRuntimeSelectionV1,
-    release: Awaited<ReturnType<typeof loadCompleteProductionReleaseV2>>,
+    release: CompleteProductionReleaseV2,
   ): Promise<{ dispose(): Promise<void> }>;
 }
 
@@ -49,12 +53,15 @@ export async function startProductionBootstrapV1(
     : startRustSession(dependencies, selection, release, authority);
 }
 
-type CompleteReleaseV2 = Awaited<ReturnType<typeof loadCompleteProductionReleaseV2>>;
+interface EnsuredPinV1 {
+  pin: SessionRuntimePinV1;
+  created: boolean;
+}
 
 async function loadOrInstallRelease(
   dependencies: ProductionBootstrapDependenciesV1,
   selection: VerifiedProductionRuntimeSelectionV1,
-): Promise<CompleteReleaseV2> {
+): Promise<CompleteProductionReleaseV2> {
   try {
     return await loadCompleteProductionReleaseV2(dependencies.caches, selection.release);
   } catch {
@@ -65,7 +72,7 @@ async function loadOrInstallRelease(
 async function startLegacySession(
   dependencies: ProductionBootstrapDependenciesV1,
   selection: VerifiedProductionRuntimeSelectionV1,
-  release: CompleteReleaseV2,
+  release: CompleteProductionReleaseV2,
 ): Promise<ProductionBrowserSessionV1> {
   const { pin, created } = await ensurePin(
     dependencies,
@@ -86,12 +93,12 @@ async function startLegacySession(
 async function startRustSession(
   dependencies: ProductionBootstrapDependenciesV1,
   selection: VerifiedProductionRuntimeSelectionV1,
-  release: CompleteReleaseV2,
+  release: CompleteProductionReleaseV2,
   authority: Exclude<ProductionAuthorityRuntimeV1, "LEGACY_TRANSITION">,
 ): Promise<ProductionBrowserSessionV1> {
-  const sessionStart = await dependencies.prepareSessionStart(selection);
+  const sessionStart = await dependencies.prepareSessionStart(selection, release);
   let host: ProductionWorkerHostV1 | null = null;
-  let pinState: Awaited<ReturnType<typeof ensurePin>> | null = null;
+  let pinState: EnsuredPinV1 | null = null;
   try {
     host = await ProductionWorkerHostV1.create({
       release,
@@ -119,7 +126,7 @@ async function ensurePin(
   selection: VerifiedProductionRuntimeSelectionV1,
   generation: BrowserKernelGenerationV1["identity"],
   authority: ProductionAuthorityRuntimeV1,
-): Promise<{ pin: SessionRuntimePinV1; created: boolean }> {
+): Promise<EnsuredPinV1> {
   const pin = selection.existingPin ?? createPin(selection, generation, authority);
   const created = selection.existingPin == null;
   if (created) {
