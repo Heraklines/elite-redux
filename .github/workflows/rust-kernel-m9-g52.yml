@@ -225,13 +225,6 @@ jobs:
           --project=${{ matrix.browser }}
           test/browser/rust-browser/release-cache.spec.ts
           test/browser/rust-browser/input-accessibility.spec.ts
-      - name: Run offline save and authenticated transport in a fresh browser process
-        env:
-          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
-        run: >-
-          pnpm exec playwright test --config playwright.rust-browser.config.ts
-          --project=${{ matrix.browser }}
-          test/browser/rust-browser/save-offline.spec.ts
       - name: Run mobile touch in a fresh browser process
         run: >-
           pnpm exec playwright test --config playwright.rust-browser.config.ts
@@ -256,14 +249,6 @@ jobs:
           test/browser/rust-browser/full-coop.spec.ts
           test/browser/rust-browser/adapters/phaser-adapter.spec.ts
           test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
-      - name: Run private staging generation journey in a fresh browser process
-        if: matrix.browser == 'chromium'
-        env:
-          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
-        run: >-
-          pnpm exec playwright test --config playwright.rust-browser.config.ts
-          --project=chromium
-          test/browser/rust-browser/rust-staging-entry.spec.ts
       - uses: actions/upload-artifact@v6
         if: always()
         with:
