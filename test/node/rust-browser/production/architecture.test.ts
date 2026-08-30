@@ -78,6 +78,8 @@ describe("M9 production authority architecture", () => {
     const releaseCache = read("src/rust-browser/production/release-cache-v2.ts");
     expect(releaseCache).toContain("cache.put(releaseObjectUrl(artifact.url)");
     expect(releaseCache).toContain("cache.match(releaseObjectUrl(artifact.url)");
+    expect(releaseCache).toContain('"x-er-source-url": expectedUrl');
+    expect(releaseCache).toContain("new Response(responseBody");
     const restoreWorker = read("src/rust-browser/production/production-save-restore-worker.ts");
     expect(restoreWorker).toContain("const glueMessage = Uint8Array.from(glue)");
     expect(restoreWorker).toContain("const templateMessage = Uint8Array.from(template)");

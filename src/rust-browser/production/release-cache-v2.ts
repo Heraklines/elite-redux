@@ -160,7 +160,9 @@ async function verifyCompleteProductionReleaseV2(cache: Cache, manifest: Product
 }
 
 async function verifyArtifactResponseV1(response: Response, artifact: ArtifactIdentityV1): Promise<Response> {
-  if (!response.ok || response.redirected || new URL(response.url).href !== releaseObjectUrl(artifact.url)) {
+  const expectedUrl = releaseObjectUrl(artifact.url);
+  const responseIdentity = response.url || response.headers.get("x-er-source-url") || "";
+  if (!response.ok || response.redirected || responseIdentity !== expectedUrl) {
     throw new Error("production artifact response identity is invalid");
   }
   const declared = Number(response.headers.get("content-length") ?? artifact.bytes);
@@ -169,14 +171,27 @@ async function verifyArtifactResponseV1(response: Response, artifact: ArtifactId
     throw new Error("production artifact length or media type differs from manifest");
   }
   const bytes = new Uint8Array(await response.clone().arrayBuffer());
+  let verifiedBytes: Uint8Array;
   try {
     if (bytes.byteLength !== artifact.bytes || (await sha256(bytes)) !== artifact.sha256) {
       throw new Error("production artifact bytes differ from manifest");
     }
+    verifiedBytes = Uint8Array.from(bytes);
   } finally {
     bytes.fill(0);
   }
-  return response.clone();
+  const responseBody = new ArrayBuffer(verifiedBytes.byteLength);
+  new Uint8Array(responseBody).set(verifiedBytes);
+  verifiedBytes.fill(0);
+  return new Response(responseBody, {
+    status: 200,
+    headers: {
+      "cache-control": "public, max-age=31536000, immutable",
+      "content-length": String(artifact.bytes),
+      "content-type": artifact.media_type,
+      "x-er-source-url": expectedUrl,
+    },
+  });
 }
 function releaseObjectUrl(path: string): string {
   if (!/^\/__m9_releases\/[a-zA-Z0-9._:/-]+$/u.test(path)) {
