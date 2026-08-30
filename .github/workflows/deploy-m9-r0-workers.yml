@@ -83,7 +83,7 @@ jobs:
             --config workers/er-save-api/wrangler.toml \
             --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('rust_preview_saves','rust_preview_save_backups') ORDER BY name" \
             --json > "$RUNNER_TEMP/m9-rust-preview-tables.json"
-          jq -e '.[0].results | map(.name) == [\"rust_preview_save_backups\", \"rust_preview_saves\"]' \
+          jq -e '.[0].results | map(.name) == ["rust_preview_save_backups", "rust_preview_saves"]' \
             "$RUNNER_TEMP/m9-rust-preview-tables.json" > /dev/null
       - name: Configure production-only M9 secrets
         env:
