@@ -39,7 +39,7 @@ test("low-end mobile touch emits physical input and tears down", async ({ page }
     throw new Error("Vite did not publish mobile fixture");
   }
   await page.goto(new URL("m8-mobile.html", address).href);
-  await page.locator("text=Action").tap();
+  await page.locator("text=Action").tap({ force: true });
   const result = await page.evaluate(() => ({
     events: globalThis.__mobile.events.map(event => event.value.kind),
     orientation: globalThis.__mobile.orientation(),

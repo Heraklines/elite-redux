@@ -243,10 +243,17 @@ jobs:
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=chromium
           test/browser/rust-browser/full-solo.spec.ts
-          test/browser/rust-browser/rust-staging-entry.spec.ts
           test/browser/rust-browser/full-coop.spec.ts
           test/browser/rust-browser/adapters/phaser-adapter.spec.ts
           test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
+      - name: Run private staging generation journey in a fresh browser process
+        if: matrix.browser == 'chromium'
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=chromium
+          test/browser/rust-browser/rust-staging-entry.spec.ts
       - uses: actions/upload-artifact@v6
         if: always()
         with:
