@@ -1,4 +1,5 @@
 import type { ArtifactIdentityV1, ProductionReleaseManifestV2 } from "./contracts";
+import { M9_RELEASE_OBJECT_ORIGIN_V1 } from "./preview-account";
 import { validateProductionReleaseManifestV2 } from "./release-manifest";
 
 const REGISTRY_CACHE = "er-m9-release-registry-v2";
@@ -27,9 +28,9 @@ export async function installCompleteProductionReleaseV2(
   const cache = await storage.open(cacheName);
   try {
     for (const artifact of Object.values(manifest.artifacts)) {
-      const response = await fetch(artifact.url, {
+      const response = await fetch(releaseObjectUrl(artifact.url), {
         cache: "no-store",
-        credentials: "same-origin",
+        credentials: "omit",
         redirect: "error",
       });
       const verified = await verifyArtifactResponseV1(response, artifact);
@@ -155,11 +156,7 @@ async function verifyCompleteProductionReleaseV2(cache: Cache, manifest: Product
 }
 
 async function verifyArtifactResponseV1(response: Response, artifact: ArtifactIdentityV1): Promise<Response> {
-  if (
-    !response.ok
-    || response.redirected
-    || new URL(response.url).href !== new URL(artifact.url, location.origin).href
-  ) {
+  if (!response.ok || response.redirected || new URL(response.url).href !== releaseObjectUrl(artifact.url)) {
     throw new Error("production artifact response identity is invalid");
   }
   const declared = Number(response.headers.get("content-length") ?? artifact.bytes);
@@ -176,6 +173,12 @@ async function verifyArtifactResponseV1(response: Response, artifact: ArtifactId
     bytes.fill(0);
   }
   return response.clone();
+}
+function releaseObjectUrl(path: string): string {
+  if (!/^\/__m9_releases\/[a-zA-Z0-9._:/-]+$/u.test(path)) {
+    throw new Error("production artifact path is outside the release-object namespace");
+  }
+  return new URL(path, M9_RELEASE_OBJECT_ORIGIN_V1).href;
 }
 
 async function recordRelease(storage: CacheStorage, manifest: ProductionReleaseManifestV2): Promise<void> {

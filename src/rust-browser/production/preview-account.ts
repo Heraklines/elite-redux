@@ -1,4 +1,5 @@
 export const M9_PREVIEW_WORKER_ORIGIN_V1 = "https://er-m9-preview-save.heraklines.workers.dev" as const;
+export const M9_RELEASE_OBJECT_ORIGIN_V1 = "https://er-save-api.heraklines.workers.dev" as const;
 export const M9_PREVIEW_SESSION_COOKIE_V1 = "er_m9_preview_session" as const;
 
 const AUTHORIZATION = /^[A-Za-z0-9._~-]{32,512}$/u;

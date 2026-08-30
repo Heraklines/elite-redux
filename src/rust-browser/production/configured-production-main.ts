@@ -12,6 +12,7 @@ import { loadAuthenticatedPlatformContextV1, readProductionAccountAuthorizationV
 import {
   bootstrapRustPreviewAccountV1,
   M9_PREVIEW_WORKER_ORIGIN_V1,
+  M9_RELEASE_OBJECT_ORIGIN_V1,
   PreviewAuthorizationRequiredV1,
   persistRustPreviewAuthorizationV1,
 } from "./preview-account";
@@ -51,11 +52,14 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
     pinStore,
     loadPin: id => pinStore.load(id),
     async loadRelease(releaseId) {
-      const response = await fetch(`/__m9_manifests/${encodeURIComponent(releaseId)}.json`, {
-        cache: "no-store",
-        credentials: "same-origin",
-        redirect: "error",
-      });
+      const response = await fetch(
+        `${M9_RELEASE_OBJECT_ORIGIN_V1}/__m9_manifests/${encodeURIComponent(releaseId)}.json`,
+        {
+          cache: "no-store",
+          credentials: "omit",
+          redirect: "error",
+        },
+      );
       return decodeBoundedSignedJsonV1<SignedProductionManifestV1>(
         await boundedResponse(response, MAXIMUM_MANIFEST_BYTES, "application/json"),
         MAXIMUM_MANIFEST_BYTES,
