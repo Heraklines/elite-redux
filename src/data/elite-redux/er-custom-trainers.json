@@ -271,7 +271,6 @@
     "challenge": "none",
     "defeatDialogue": "Whoa, you're tough!",
     "difficulties": [
-      "elite",
       "hell"
     ],
     "endless": true,
@@ -287,6 +286,10 @@
           {
             "count": 1,
             "item": "MULTI_LENS"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
           }
         ],
         "level": null,
@@ -299,7 +302,12 @@
         "shiny": {
           "around": "shadowfire"
         },
-        "species": 10684
+        "species": 10684,
+        "vitamins": {
+          "def": 2,
+          "hp": 4,
+          "spdef": 2
+        }
       },
       {
         "abilitySlot": 1,
@@ -307,6 +315,10 @@
           {
             "count": 1,
             "item": "SCOPE_LENS"
+          },
+          {
+            "count": 3,
+            "item": "QUICK_CLAW"
           }
         ],
         "level": null,
@@ -316,15 +328,22 @@
           "EARTHQUAKE",
           "PARTING_SHOT"
         ],
-        "slotChance": 50,
-        "species": 959
+        "slotChance": 25,
+        "species": 10778,
+        "vitamins": {
+          "atk": 6
+        }
       },
       {
         "abilitySlot": 1,
         "heldItems": [
           {
-            "count": 2,
+            "count": 4,
             "item": "SHELL_BELL"
+          },
+          {
+            "count": 2,
+            "item": "BLACK_GLASSES"
           }
         ],
         "level": null,
@@ -335,19 +354,22 @@
           "SUCKER_PUNCH"
         ],
         "sanityOff": true,
-        "slotChance": 50,
-        "species": 10035
+        "slotChance": 25,
+        "species": 10035,
+        "vitamins": {
+          "atk": 4
+        }
       },
       {
         "abilitySlot": 0,
         "heldItems": [
           {
-            "count": 1,
-            "item": "BATON"
-          },
-          {
             "count": 3,
             "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "REVIVER_SEED"
           }
         ],
         "level": null,
@@ -357,15 +379,22 @@
           "BATON_PASS",
           "SPORE"
         ],
-        "slotChance": 50,
-        "species": 235
+        "slotChance": 25,
+        "species": 235,
+        "vitamins": {
+          "spd": 5
+        }
       },
       {
         "abilitySlot": 0,
         "heldItems": [
           {
-            "count": 1,
+            "count": 3,
             "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "MENTAL_HERB"
           }
         ],
         "level": null,
@@ -375,7 +404,11 @@
           "COUNTER",
           "SLEEP_TALK"
         ],
-        "species": 202
+        "slotChance": 25,
+        "species": 202,
+        "vitamins": {
+          "hp": 5
+        }
       },
       {
         "abilitySlot": 0,
@@ -383,6 +416,10 @@
           {
             "count": 1,
             "item": "FOCUS_BAND"
+          },
+          {
+            "count": 2,
+            "item": "WIDE_LENS"
           }
         ],
         "level": null,
@@ -392,12 +429,18 @@
           "FURY_CUTTER",
           "SHADOW_SNEAK"
         ],
-        "species": 10518
+        "species": 10518,
+        "vitamins": {
+          "atk": 3,
+          "def": 31,
+          "spd": 2,
+          "spdef": 31
+        }
       }
     ],
     "trainerClass": "YOUNGSTER",
     "victoryDialogue": "Throughout Heaven and Earth, I alone am the Honored One...",
-    "weight": 5
+    "weight": 10
   },
   "TRAINER_70004": {
     "battleBgm": "battle_kanto_gym",
