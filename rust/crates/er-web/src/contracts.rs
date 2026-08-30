@@ -59,7 +59,9 @@ pub struct BrowserInitV1 {
     pub execution_identity_bytes: Vec<u8>,
     pub session_start_bytes: Vec<u8>,
     pub maximum_pending_requests: usize,
+    #[serde(default)]
     pub production_release_id: Option<String>,
+    #[serde(default)]
     pub production_generation: Option<SafeU53>,
 }
 
@@ -166,8 +168,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        BROWSER_WORKER_PROTOCOL_VERSION_V1, BrowserExecutionModeV1, BrowserRequestEnvelopeV1,
-        BrowserRequestV1,
+        BROWSER_WORKER_PROTOCOL_VERSION_V1, BrowserExecutionModeV1, BrowserInitV1,
+        BrowserRequestEnvelopeV1, BrowserRequestV1,
     };
     use er_types::SafeU53;
 
@@ -202,6 +204,20 @@ mod tests {
                 "request": {"kind": "SNAPSHOT"}
             })
         );
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_m8_initialize_defaults_production_identity_fields()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let value: BrowserInitV1 = serde_json::from_value(json!({
+            "mode": "RUST_STAGING_AUTHORITY",
+            "execution_identity_bytes": [1],
+            "session_start_bytes": [2],
+            "maximum_pending_requests": 8
+        }))?;
+        assert_eq!(value.production_release_id, None);
+        assert_eq!(value.production_generation, None);
         Ok(())
     }
 }
