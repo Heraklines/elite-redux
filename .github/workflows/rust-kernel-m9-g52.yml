@@ -120,8 +120,9 @@ jobs:
           const { readFileSync } = require('node:fs');
           const preview = readFileSync('workers/er-m9-preview-save/wrangler.toml', 'utf8');
           const legacy = readFileSync('workers/er-save-api/wrangler.toml', 'utf8');
-          if (!/binding\\s*=\\s*\"RUST_PREVIEW_DB\"/.test(preview)
-              || /binding\\s*=\\s*\"DB\"/.test(preview)
+          if (!/binding\s*=\s*"RUST_PREVIEW_DB"/.test(preview)
+              || /binding\s*=\s*"DB"/.test(preview)
+              || !/M9_PREVIEW_DATABASE_IDENTITY_HASH\s*=\s*"b860cac56eb16855e2a46fc6ba2f458666f06d0ab4e04ca4c83f0e3962afd36e"/.test(preview)
               || /RUST_PREVIEW_DB|M9_RUST_SAVES/.test(legacy)) {
             throw new Error('M9 preview and legacy D1 capabilities are not physically separated');
           }
