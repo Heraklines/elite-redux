@@ -37,6 +37,9 @@ jobs:
           workers/er-m9-preview-save/src/index.ts
           workers/er-telemetry/src/index.ts
           src/rust-browser/production/configured-production-main.ts
+          src/rust-browser/production/production-worker-host.ts
+          src/rust-browser/production/release-cache-v2.ts
+          src/rust-browser/routes/rust-phaser-entry.ts
           src/rust-browser/worker/rust-kernel-worker.ts
           test/node/rust-browser/production/preview-save-backend.test.ts
           test/node/rust-browser/production/preview-save-storage.test.ts
@@ -54,8 +57,11 @@ jobs:
           src/rust-browser/production/preview-remote-lease.ts
           src/rust-browser/production/preview-save-storage.ts
           src/rust-browser/production/production-save-restore-worker.ts
+          src/rust-browser/production/production-worker-host.ts
           src/rust-browser/production/release-cache-v2.ts
+          src/rust-browser/routes/rust-phaser-entry.ts
           src/rust-browser/worker/rust-kernel-worker.ts
+          scripts/run-m9-preview-journey.mjs
           test/node/rust-browser/production/preview-save-backend.test.ts
           test/node/rust-browser/production/preview-save-storage.test.ts
           test/node/rust-browser/production/preview-backup-drill.test.ts
@@ -70,7 +76,7 @@ jobs:
           test/node/rust-browser/production/architecture.test.ts
           --pool=forks --isolate --no-file-parallelism
 
-  sealed-preview-bundle:
+  candidate-source-bundle:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -84,7 +90,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build and inspect preview browser bundle
+      - name: Build development candidate source bundle
         run: |
           node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-preview" --authority rust
           grep -R -q 'er-m9-preview-save.heraklines.workers.dev' "$RUNNER_TEMP/m9-preview"
@@ -92,10 +98,40 @@ jobs:
           ! grep -R -E 'MIGRATE_LEGACY|MIGRATE_PRODUCTION_SAVE_V2|pokerogue_sessionId' "$RUNNER_TEMP/m9-preview"
       - uses: actions/upload-artifact@v6
         with:
-          name: m9-preview-focused-bundle-${{ github.sha }}
+          name: m9-preview-source-candidate-${{ github.sha }}
           path: ${{ runner.temp }}/m9-preview
           if-no-files-found: error
           retention-days: 7
+
+  immutable-release-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fetch and verify immutable release under test
+        run: |
+          RELEASE_ID=$(jq -r .release_id rust/fixtures/m9/m9-r1-release-under-test.json)
+          EXPECTED_HASH=$(jq -r .release_manifest_hash rust/fixtures/m9/m9-r1-release-under-test.json)
+          curl --fail --silent --show-error --max-time 60 \
+            "https://er-save-api.heraklines.workers.dev/__m9_manifests/${RELEASE_ID}.json" \
+            > "$RUNNER_TEMP/manifest.json"
+          test "$(sha256sum "$RUNNER_TEMP/manifest.json" | cut -d' ' -f1)" = "$EXPECTED_HASH"
+          node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
+          mkdir -p "$RUNNER_TEMP/release-evidence"
+          cp "$RUNNER_TEMP/manifest.json" "$RUNNER_TEMP/release-evidence/manifest.json"
+          jq -r '.payload.artifacts | to_entries[] | [.key, .value.url, .value.sha256] | @tsv' \
+            "$RUNNER_TEMP/manifest.json" | while IFS=$'\t' read -r KIND URL SHA; do
+              curl --fail --silent --show-error --max-time 120 \
+                "https://er-save-api.heraklines.workers.dev${URL}" > "$RUNNER_TEMP/${KIND}.artifact"
+              test "$(sha256sum "$RUNNER_TEMP/${KIND}.artifact" | cut -d' ' -f1)" = "$SHA"
+              printf '%s\t%s\n' "$KIND" "$SHA" >> "$RUNNER_TEMP/release-evidence/artifacts.tsv"
+            done
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9-preview-immutable-release-${{ github.sha }}
+          path: ${{ runner.temp }}/release-evidence
+          if-no-files-found: error
+          retention-days: 30
 
   browser-save-reload:
     runs-on: ubuntu-latest
@@ -112,8 +148,42 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Run browser save reload contract
+      - name: Run local browser save reload regression
         run: >-
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=chromium
           test/browser/rust-browser/save-offline.spec.ts
+
+  deployed-preview-journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Load immutable journey identity
+        run: |
+          echo "M9_EXPECTED_RELEASE_ID=$(jq -r .release_id rust/fixtures/m9/m9-r1-release-under-test.json)" >> "$GITHUB_ENV"
+          echo "M9_EXPECTED_MANIFEST_SHA256=$(jq -r .release_manifest_hash rust/fixtures/m9/m9-r1-release-under-test.json)" >> "$GITHUB_ENV"
+          echo "M9_EXPECTED_PREVIEW_DATABASE_SHA256=$(jq -r .preview_database_identity_hash rust/fixtures/m9/m9-r1-release-under-test.json)" >> "$GITHUB_ENV"
+      - name: Run deployed fresh-account terminal and reload journey
+        env:
+          M9_PREVIEW_INVITE_SECRET: ${{ secrets.M9_PREVIEW_INVITE_SECRET }}
+          M9_PREVIEW_URL: https://m9-r1-internal.elite-redux.pages.dev
+          M9_MINIMUM_ACTIVE_MS: 60000
+          M9_EVIDENCE_OUTPUT: ${{ runner.temp }}/m9-preview-journey/evidence.json
+        run: node scripts/run-m9-preview-journey.mjs
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9-preview-live-journey-${{ github.sha }}
+          path: ${{ runner.temp }}/m9-preview-journey/evidence.json
+          if-no-files-found: error
+          retention-days: 30

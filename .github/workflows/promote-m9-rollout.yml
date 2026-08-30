@@ -23,14 +23,18 @@ on:
         description: SHA-256 of current signed policy, or NONE for R0
         required: true
         type: string
+      observation_run_id:
+        description: Successful deployed-preview journey workflow run; required for R2
+        required: false
+        type: number
       explicit_confirmation:
         description: Type PROMOTE_IDENTICAL_BYTES
         required: true
         type: string
 
 permissions:
+  actions: read
   contents: read
-
 jobs:
   promote:
     if: inputs.explicit_confirmation == 'PROMOTE_IDENTICAL_BYTES'
@@ -47,6 +51,60 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
+      - name: Validate deployed-preview observation run
+        if: inputs.target_ring == 'R2'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runId = Number('${{ inputs.observation_run_id }}');
+            if (!Number.isSafeInteger(runId) || runId < 1) {
+              core.setFailed('R2 requires a deployed-preview observation run');
+              return;
+            }
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+            if (run.data.name !== 'M9 Preview Focused Qualification' || run.data.conclusion !== 'success') {
+              core.setFailed('R2 observation workflow is not the exact successful focused qualification');
+              return;
+            }
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+              per_page: 100,
+            });
+            const journeys = artifacts.filter(
+              artifact => artifact.name.startsWith('m9-preview-live-journey-') && !artifact.expired,
+            );
+            if (journeys.length !== 1) {
+              core.setFailed('R2 observation run must contain exactly one live-journey artifact');
+            }
+      - name: Download deployed-preview observation
+        if: inputs.target_ring == 'R2'
+        uses: actions/download-artifact@v6
+        with:
+          run-id: ${{ inputs.observation_run_id }}
+          pattern: m9-preview-live-journey-*
+          path: ${{ runner.temp }}/m9-observation
+          github-token: ${{ github.token }}
+      - name: Validate deployed-preview observation
+        if: inputs.target_ring == 'R2'
+        run: |
+          EVIDENCE=$(find "$RUNNER_TEMP/m9-observation" -name evidence.json -type f -print -quit)
+          test -n "$EVIDENCE"
+          test "$(jq -r .release_id "$EVIDENCE")" = "${{ inputs.candidate_release }}"
+          test "$(jq -r .active_duration_ms "$EVIDENCE")" -ge 60000
+          test "$(jq -r .hard_stop_failures "$EVIDENCE")" = 0
+          test "$(jq -r .imports_disabled "$EVIDENCE")" = true
+          test "$(jq -r .signed_r1_assignment "$EVIDENCE")" = true
+          test "$(jq -r .exact_release_cache "$EVIDENCE")" = true
+          test "$(jq -r .raw_input_transition "$EVIDENCE")" = true
+          test "$(jq -r .save_write_readback "$EVIDENCE")" = true
+          test "$(jq -r .natural_reload_readback "$EVIDENCE")" = true
+          test "$(jq -r .teardown.lease_reacquired_after_close "$EVIDENCE")" = true
       - name: Fetch immutable release, current policy, and health
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
