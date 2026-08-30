@@ -49,10 +49,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          pnpm exec wrangler r2 object get "er-m9-releases/manifests/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/manifest.json" --remote
-          pnpm exec wrangler r2 object get "er-m9-releases/health/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/health.json" --remote
+          npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/manifests/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/manifest.json" --remote
+          npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/health/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/health.json" --remote
           if [ "${{ inputs.expected_current_policy_hash }}" != NONE ]; then
-            pnpm exec wrangler r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/current.json" --remote
+            npx --yes wrangler@4.127.1 r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/current.json" --remote
             test "$(sha256sum "$RUNNER_TEMP/current.json" | cut -d' ' -f1)" = "${{ inputs.expected_current_policy_hash }}"
             node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/current.json"
             jq -r .payload "$RUNNER_TEMP/current.json" > "$RUNNER_TEMP/current-payload.json"
@@ -87,6 +87,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           REVISION=$(jq -r .payload.policy_version "$RUNNER_TEMP/policy.json")
-          pnpm exec wrangler r2 object put "er-m9-releases/policies/${REVISION}.json" --file "$RUNNER_TEMP/policy.json" --content-type application/json --remote
-          pnpm exec wrangler r2 object put er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --content-type application/json --remote
+          npx --yes wrangler@4.127.1 r2 object put "er-m9-releases/policies/${REVISION}.json" --file "$RUNNER_TEMP/policy.json" --content-type application/json --remote
+          npx --yes wrangler@4.127.1 r2 object put er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --content-type application/json --remote
           sha256sum "$RUNNER_TEMP/policy.json"

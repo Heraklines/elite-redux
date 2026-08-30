@@ -35,13 +35,13 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          pnpm exec wrangler r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --remote
+          npx --yes wrangler@4.127.1 r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --remote
           node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy.json"
           RELEASE='${{ inputs.release_id }}'
           if [ -z "$RELEASE" ]; then
             RELEASE=$(jq -r .payload.candidate_release "$RUNNER_TEMP/policy.json")
           fi
-          pnpm exec wrangler r2 object get "er-m9-releases/manifests/${RELEASE}.json" --file "$RUNNER_TEMP/manifest.json" --remote
+          npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/manifests/${RELEASE}.json" --file "$RUNNER_TEMP/manifest.json" --remote
           node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
           test "$(jq -r .payload.release_id "$RUNNER_TEMP/manifest.json")" = "$RELEASE"
           echo "RELEASE_ID=$RELEASE" >> "$GITHUB_ENV"
@@ -67,5 +67,5 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          pnpm exec wrangler r2 object put "er-m9-releases/health/${RELEASE_ID}.json" --file "$RUNNER_TEMP/health.json" --content-type application/json --remote
+          npx --yes wrangler@4.127.1 r2 object put "er-m9-releases/health/${RELEASE_ID}.json" --file "$RUNNER_TEMP/health.json" --content-type application/json --remote
           jq -e '.hard_stop == false' "$RUNNER_TEMP/health.json"
