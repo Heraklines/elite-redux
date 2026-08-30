@@ -1,0 +1,2027 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   384x832 @2.8125x  devmem:8 GB
+boot:     boot-start@0ms -> ios-icons-deferred@926ms -> ios-bgm-deferred@927ms -> loading-complete@13314ms -> title-shown@18355ms -> ios-icons-bg-start@18355ms -> ios-icons-bg-done@46060ms
+lastSess: ok (reached title)
+mode:     4  wave:1
+seed:     sVsYiVDVeOrv5pcIZXrsKFLR
+party:    Snuglett(L5 16hp f0), Heracross(L5 24hp f0), Vanillite(L5 20hp f0), Burmy(L5 22hp f0), Smoliv(L5 20hp f0), Meowth(L5 20hp f0)
+enemy:    Yungoos(L2)
+
+----- COMMENT -----
+Snuglett should not have 2 hits with Multiheaded, should be 1 hit
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1","source":"github","sha":"d45f186c7af7287a259ec4b1e4c200e213e0e9de","workflow":{"provider":"github-actions","runId":"33251084223","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[07:33:03.041] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:03.041] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:03.041] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.041] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:03.041] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:03.047] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:03.047] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:03.048] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:03.048] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:03.048] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:03.048] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.048] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:03.048] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:03.049] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:03.049] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:03.049] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:03.050] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:03.050] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:03.050] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:03.050] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:03.050] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:03.051] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:03.051] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:03.051] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:03.051] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:03.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:03.052] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:03.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:03.052] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:03.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:03.053] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:03.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:03.053] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:03.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:03.053] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:03.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:03.054] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:03.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:03.054] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:03.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:03.054] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:03.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:03.055] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:03.055] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:03.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:03.062] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:03.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:03.062] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:03.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:03.062] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:03.063] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:03.064] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:03.064] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:03.064] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:03.064] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:03.064] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:03.064] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:03.065] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:03.065] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:03.066] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:03.066] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:03.066] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:03.066] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:03.066] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:03.066] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:03.067] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:03.067] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:03.067] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:03.067] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:03.067] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:03.067] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:03.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:03.068] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:03.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:03.068] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:03.069] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:03.069] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:03.069] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:03.069] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:03.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:03.070] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:03.070] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:03.078] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:03.078] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:03.078] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:03.078] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:03.078] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:03.078] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.079] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:03.079] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:03.080] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:03.080] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:03.080] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:03.080] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:03.080] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:03.080] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:03.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:03.081] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:03.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:03.082] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:03.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:03.082] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:03.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:03.082] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:03.083] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:03.083] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:03.083] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:03.083] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:03.083] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:03.083] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:03.084] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:03.084] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:03.084] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:03.084] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:03.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:03.085] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:03.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:03.085] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:03.086] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:03.086] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.086] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:03.086] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:03.094] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:03.095] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:03.095] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:03.095] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:03.095] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:03.095] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.095] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:03.095] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:03.096] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:03.096] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:03.097] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:03.097] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:03.097] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:03.097] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:03.097] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:03.097] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:03.098] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:03.098] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:03.098] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:03.098] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:03.099] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:03.099] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:03.099] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:03.099] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:03.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:03.100] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:03.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:03.100] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:03.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:03.100] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:03.101] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:03.101] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:03.101] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:03.101] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:03.101] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:03.101] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:03.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:03.102] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:03.102] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:03.111] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:03.111] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:03.111] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:03.111] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:03.111] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:03.111] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.111] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:03.111] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:03.113] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:03.113] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:03.113] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:03.113] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:03.113] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:03.113] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:03.114] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:03.114] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:03.114] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:03.114] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:03.115] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:03.115] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:03.115] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:03.115] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:03.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:03.116] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:03.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:03.116] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:03.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:03.116] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:03.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:03.117] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:03.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:03.117] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:03.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:03.117] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:03.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:03.118] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:03.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:03.118] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:03.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:03.118] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:05.592] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:10.575] LOG: %cSaving starter preferences color: blue
+[07:33:10.575] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:10.610] LOG: Getting Session Slot id: %d 0
+[07:33:10.618] LOG: Getting Session Slot id: %d 1
+[07:33:10.620] LOG: Getting Session Slot id: %d 2
+[07:33:10.622] LOG: Getting Session Slot id: %d 3
+[07:33:10.624] LOG: Getting Session Slot id: %d 4
+[07:33:11.106] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[07:33:11.106] LOG: Mega Hypno's variant icon does not exist. Replacing with default.
+[07:33:11.106] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[07:33:13.372] DEBUG: %cSending a request to delete session in slot %d color: blue 1
+[07:33:16.307] LOG: Wave Seed: zXx1JI7[5jcsWjnhj7kbsGtj 1
+[07:33:16.322] LOG: %cStart Phase EncounterPhase color:green;
+[07:33:16.328] LOG: Starting species pool tier: COMMON
+[07:33:16.341] LOG: Pokemon: Wild Bidoof | Species ID: 399 | Level: 2 | Nature: Impish (+Def/-SpAtk)
+[07:33:16.341] LOG: Stats (IVs): HP: 15 (31), Atk: 7 (31), Def: 8 (29), Spatk: 5 (7), Spdef: 7 (20), Spd: 6 (5)
+[07:33:16.342] LOG: Ability: Simple | Passive Ability: Unaware 
+[07:33:16.342] LOG: Moveset: ["Hyper Fang","Strength","Mud Sport","Defense Curl"]
+[07:33:17.350] DEBUG: Session data saved to slot 1!
+[07:33:20.135] LOG: Wave Seed: zXx1JI7[5jcsWjnhj7kbsGtj 1
+[07:33:20.565] LOG: %cStart Phase SummonPhase color:green;
+[07:33:20.863] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:33:20.865] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:33:22.488] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:33:22.491] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:22.491] LOG: Ran PSP for: Heracross
+[07:33:22.491] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:22.492] LOG: Ran PSP for: Bidoof
+[07:33:22.492] LOG: %cStart Phase TurnInitPhase color:green;
+[07:33:22.492] LOG: %cStart Phase CommandPhase color:green;
+[07:33:23.731] DEBUG: Session data saved to slot 1!
+[07:33:26.742] LOG: Seed: v1mzSF9BpIr0uJMbMojpe8ng
+[07:33:26.742] LOG: Wave Seed: v1mzSF9BpIr0uJMbMojpe8ng 0
+[07:33:26.910] WARN: AnimationManager key already exists: prompt
+[07:33:26.910] WARN: AnimationManager key already exists: tera_sparkle
+[07:33:26.910] LOG: Seed: sVsYiVDVeOrv5pcIZXrsKFLR
+[07:33:26.910] LOG: Wave Seed: sVsYiVDVeOrv5pcIZXrsKFLR 0
+[07:33:29.518] LOG: %cStart Phase LoginPhase color:green;
+[07:33:30.711] LOG: Client Session: CQAYk5cCqZxzXxwqM2rjKk2kMOAb7L1I
+[07:33:32.244] LOG: %cStart Phase TitlePhase color:green;
+[07:33:32.244] LOG: Getting Session Slot id: %d 1
+[07:33:32.548] LOG: use seasonal splash messages true
+[07:33:34.505] LOG: %cStart Phase SelectChallengePhase color:green;
+[07:33:35.731] LOG: %cStart Phase SelectStarterPhase color:green;
+[07:33:35.816] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.816] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.817] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.817] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.817] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.817] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.818] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.818] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.825] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.825] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.826] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.826] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.827] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.827] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.829] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.829] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.831] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.831] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.833] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.833] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.834] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.834] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.837] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.837] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.837] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.837] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.837] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.837] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.840] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.840] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.840] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.840] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.841] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.841] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.843] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.843] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.844] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.844] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.844] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.844] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.870] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.870] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.870] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.870] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.870] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.870] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.871] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.871] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.872] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.872] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.873] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.873] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.873] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.873] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.874] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.874] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.874] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.874] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.875] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.875] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.875] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.875] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.876] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.876] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.876] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.876] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.876] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.876] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.877] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.877] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.877] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.877] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.878] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.878] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.878] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.878] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.879] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.879] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.879] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.879] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.887] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.887] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.888] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.888] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.888] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.888] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.888] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.888] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.889] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.889] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.889] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.889] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.890] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.890] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.890] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.890] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.891] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.891] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.891] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.891] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.892] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.892] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.892] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.892] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.893] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.893] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.893] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.893] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.893] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.893] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.894] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.894] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.894] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.894] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.894] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.894] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.895] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.895] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.895] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.895] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.903] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.903] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.904] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.904] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.904] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.905] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.905] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.906] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.906] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.907] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.907] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.907] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.907] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.907] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.907] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.908] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.908] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.908] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.908] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.908] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.908] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.909] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.909] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.909] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.909] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.910] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.910] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.910] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.910] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.911] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.911] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.911] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.911] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.919] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.919] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.919] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.919] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.919] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.919] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.920] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.920] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.921] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.921] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.921] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.921] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.921] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.921] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.922] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.922] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.923] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.923] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.923] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.923] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.923] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.923] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.924] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.924] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.924] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.924] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.924] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.924] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.925] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.925] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.925] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.925] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.926] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.926] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.926] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.926] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.927] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.927] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.927] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.927] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.936] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.936] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.936] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.936] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.936] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.936] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.937] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.937] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.938] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.938] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.938] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.938] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.938] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.938] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.939] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.939] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.940] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.940] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.940] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.940] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.940] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.940] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.941] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.941] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.941] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.941] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.941] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.941] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.942] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.942] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.942] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.942] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.943] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.943] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.943] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.943] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.944] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.944] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.944] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.944] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.952] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.952] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.953] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.953] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.953] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.953] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.953] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.953] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.954] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.954] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.954] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.954] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.955] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.955] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.955] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.955] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.956] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.956] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.956] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.956] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.957] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.957] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.957] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.957] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.957] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.957] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.958] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.958] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.958] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.958] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.959] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.959] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.959] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.959] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.959] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.959] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.960] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.960] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.960] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.960] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.968] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.968] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.969] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.969] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.969] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.969] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.969] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.969] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.970] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.970] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.970] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.970] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.971] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.971] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.971] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.971] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.972] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.972] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.972] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.972] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.973] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.973] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.973] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.973] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.974] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.974] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.974] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.974] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.974] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.974] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.975] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.975] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.975] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.975] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.975] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.975] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.976] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.976] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.976] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.976] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:35.985] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:35.985] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:35.985] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:35.985] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:35.985] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:35.985] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.985] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:35.985] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:35.987] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:35.987] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:35.987] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:35.987] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:35.987] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:35.987] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:35.988] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:35.988] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:35.988] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:35.988] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:35.989] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:35.989] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:35.989] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:35.989] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:35.990] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:35.990] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:35.990] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:35.990] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:35.990] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:35.990] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:35.991] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:35.991] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:35.991] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:35.991] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:35.991] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:35.991] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:35.992] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:35.992] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:35.992] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:35.992] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:35.992] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:35.993] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.001] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.001] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.002] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.002] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.002] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.003] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.003] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.003] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.003] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.004] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.004] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.004] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.004] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.005] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.005] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.006] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.006] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.006] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.006] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.007] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.007] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.007] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.007] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.007] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.007] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.008] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.008] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.008] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.008] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.008] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.008] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.009] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.009] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.009] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.009] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.009] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.009] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.018] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.018] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.019] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.019] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.019] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.019] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.019] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.019] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.020] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.020] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.020] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.020] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.021] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.021] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.021] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.021] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.022] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.022] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.022] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.022] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.023] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.023] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.023] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.023] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.023] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.024] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.024] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.024] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.024] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.024] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.025] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.025] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.025] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.025] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.025] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.025] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.026] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.026] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.026] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.026] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.035] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.035] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.035] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.035] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.035] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.035] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.035] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.035] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.037] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.037] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.037] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.037] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.037] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.037] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.038] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.038] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.038] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.038] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.039] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.039] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.039] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.039] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.040] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.040] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.040] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.041] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.041] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.041] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.041] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.041] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.041] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.042] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.042] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.042] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.042] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.042] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.042] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.051] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.051] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.052] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.052] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.052] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.053] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.053] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.054] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.054] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.055] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.055] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.056] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.056] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.056] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.056] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.057] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.057] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.057] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.057] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.057] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.057] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.058] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.058] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.058] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.058] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.058] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.058] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.059] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.059] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.059] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.059] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.068] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.068] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.068] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.068] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.070] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.070] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.070] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.071] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.071] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.071] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.071] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.072] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.072] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.072] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.072] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.073] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.073] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.073] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.073] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.073] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.073] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.074] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.074] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.074] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.074] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.074] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.074] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.075] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.075] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.076] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.076] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.076] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.076] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.085] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.085] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.085] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.085] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.087] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.087] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.087] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.087] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.087] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.087] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.088] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.088] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.088] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.088] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.089] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.089] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.089] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.089] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.090] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.090] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.090] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.090] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.090] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.090] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.091] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.091] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.091] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.091] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.091] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.091] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.092] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.092] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.092] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.092] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.093] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.093] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.102] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.102] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.102] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.102] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.103] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.103] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.104] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.104] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.104] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.104] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.104] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.104] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.105] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.105] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.105] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.105] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.106] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.106] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.106] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.106] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.107] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.107] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.107] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.107] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.107] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.107] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.108] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.108] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.108] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.108] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.108] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.108] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.109] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.109] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.109] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.109] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.116] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.116] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.117] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.117] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.118] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.118] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.118] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.119] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.120] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.120] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.121] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.121] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.121] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.121] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.122] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.122] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.123] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.123] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.123] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.123] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.123] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.123] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.124] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.124] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.124] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.124] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.132] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.132] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.133] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.133] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.133] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.133] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.134] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.134] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.134] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.135] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.136] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.136] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.136] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.136] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.136] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.136] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.137] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.137] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.137] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.138] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.138] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.139] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.139] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.139] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.139] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.140] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.140] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.140] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.140] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.150] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.150] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.150] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.150] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.151] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.151] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.152] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.153] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.153] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.153] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.154] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.154] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.155] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.156] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.156] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.156] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.156] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.156] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.156] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.156] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.156] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.157] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.157] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.157] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.157] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.158] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.158] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.158] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.158] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.158] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.158] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.167] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.167] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.167] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.168] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.169] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.169] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.169] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.170] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.171] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.171] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.171] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.172] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.172] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.172] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.173] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.173] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.173] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.173] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.174] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.174] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.174] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.174] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.175] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.175] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.175] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.175] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:36.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:36.184] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:36.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:36.184] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:36.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:36.184] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:36.184] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:36.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:36.185] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:36.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:36.186] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:36.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:36.186] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:36.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:36.187] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:36.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:36.187] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:36.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:36.188] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:36.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:36.188] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:36.189] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:36.189] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:36.189] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:36.189] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:36.189] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:36.189] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:36.190] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:36.190] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:36.190] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:36.190] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:36.190] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:36.190] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:36.191] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:36.191] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:36.191] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:36.191] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:36.191] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:36.191] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:37.408] LOG: %cStart Phase SelectChallengePhase color:green;
+[07:33:41.910] LOG: %cStart Phase SelectStarterPhase color:green;
+[07:33:42.000] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.000] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.001] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.001] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.001] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.001] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.005] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.005] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.005] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.005] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.006] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.006] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.007] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.007] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.008] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.008] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.009] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.009] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.010] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.010] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.011] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.011] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.012] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.012] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.012] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.012] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.013] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.013] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.014] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.014] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.015] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.015] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.015] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.016] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.017] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.017] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.017] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.017] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.031] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.032] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.032] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.032] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.032] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.032] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.032] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.032] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.034] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.034] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.034] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.034] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.034] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.034] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.035] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.035] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.036] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.036] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.036] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.036] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.037] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.037] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.038] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.038] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.038] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.038] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.038] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.038] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.039] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.039] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.039] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.039] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.039] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.039] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.040] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.040] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.040] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.049] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.049] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.049] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.049] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.049] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.049] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.049] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.049] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.050] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.050] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.051] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.051] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.051] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.051] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.052] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.052] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.053] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.053] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.053] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.054] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.054] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.054] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.054] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.055] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.055] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.055] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.055] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.056] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.056] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.056] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.057] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.057] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.057] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.065] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.065] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.065] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.065] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.065] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.065] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.065] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.065] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.066] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.066] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.067] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.067] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.067] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.067] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.068] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.068] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.069] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.069] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.069] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.069] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.070] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.070] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.070] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.071] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.071] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.071] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.071] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.071] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.071] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.072] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.072] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.073] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.073] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.073] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.073] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.082] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.082] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.082] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.082] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.083] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.083] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.084] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.084] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.084] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.084] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.085] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.085] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.085] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.086] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.086] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.086] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.086] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.087] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.087] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.087] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.087] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.087] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.087] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.088] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.088] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.088] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.088] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.088] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.088] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.089] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.089] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.089] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.089] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.089] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.089] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.098] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.098] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.098] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.098] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.098] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.098] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.098] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.098] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.099] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.099] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.100] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.100] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.101] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.101] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.101] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.101] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.102] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.102] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.102] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.103] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.103] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.103] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.103] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.103] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.103] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.104] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.104] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.104] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.104] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.104] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.104] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.105] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.105] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.105] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.105] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.106] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.106] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.114] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.114] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.114] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.114] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.114] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.114] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.114] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.114] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.116] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.116] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.116] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.116] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.117] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.117] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.117] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.118] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.118] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.119] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.119] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.119] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.120] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.120] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.121] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.121] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.122] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.122] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.122] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.122] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.130] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.130] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.130] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.130] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.130] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.130] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.131] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.131] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.132] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.132] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.132] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.133] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.133] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.134] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.134] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.135] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.135] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.135] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.135] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.136] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.136] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.137] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.137] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.137] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.138] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.138] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.147] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.147] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.147] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.147] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.147] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.148] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.148] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.148] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.149] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.149] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.149] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.149] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.150] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.150] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.150] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.150] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.151] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.151] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.151] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.152] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.152] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.152] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.153] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.154] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.154] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.154] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.155] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.155] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.163] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.163] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.164] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.164] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.164] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.165] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.165] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.165] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.165] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.166] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.166] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.167] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.167] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.168] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.168] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.169] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.169] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.169] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.170] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.170] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.170] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.171] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.171] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.180] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.180] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.180] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.180] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.181] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.181] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.182] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.182] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.182] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.182] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.183] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.183] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.183] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.183] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.184] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.184] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.185] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.185] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.185] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.186] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.186] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.186] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.187] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.187] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.187] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.196] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.196] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.196] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.196] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.198] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.198] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.198] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.198] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.198] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.198] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.199] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.199] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.199] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.199] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.200] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.200] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.200] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.200] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.201] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.201] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.201] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.201] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.201] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.201] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.202] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.202] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.202] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.202] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.203] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.203] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.203] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.203] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.204] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.204] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.212] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.212] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.213] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.213] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.213] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.214] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.214] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.215] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.215] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.215] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.215] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.216] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.216] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.216] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.216] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.217] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.217] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.217] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.217] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.218] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.218] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.218] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.218] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.218] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.218] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.219] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.219] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.219] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.219] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.220] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.220] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.220] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.220] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.221] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.221] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.229] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.229] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.230] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.230] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.230] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.231] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.231] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.231] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.231] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.232] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.232] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.232] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.232] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.233] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.233] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.233] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.233] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.234] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.234] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.235] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.235] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.235] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.236] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.236] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.236] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.236] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.236] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.236] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.237] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.237] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.237] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.237] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.246] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.246] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.246] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.246] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.248] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.248] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.248] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.248] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.248] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.248] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.249] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.249] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.249] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.249] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.250] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.250] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.250] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.250] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.251] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.251] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.251] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.251] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.251] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.251] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.252] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.252] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.252] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.252] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.252] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.252] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.253] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.253] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.253] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.253] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.253] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.253] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.262] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.262] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.262] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.262] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.262] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.262] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.263] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.263] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.264] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.264] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.264] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.265] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.265] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.266] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.266] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.266] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.267] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.267] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.267] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.268] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.268] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.269] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.269] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.269] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.269] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.270] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.270] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.270] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.270] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.276] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.276] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.277] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.277] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.277] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.277] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.277] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.277] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.278] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.278] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.278] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.278] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.278] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.279] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.279] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.280] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.280] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.280] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.281] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.281] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.281] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.281] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.281] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.281] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.282] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.282] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.282] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.282] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.283] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.283] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.284] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.284] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.284] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.291] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.291] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.292] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.292] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.292] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.293] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.293] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.294] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.294] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.294] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.294] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.294] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.294] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.295] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.295] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.296] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.296] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.296] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.296] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.297] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.297] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.297] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.297] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.297] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.297] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.298] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.298] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.298] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.298] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.298] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.298] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.299] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.299] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.299] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.299] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.299] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.299] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.308] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.308] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.308] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.308] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.309] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.309] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.310] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.310] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.310] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.310] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.311] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.311] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.311] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.311] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.312] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.312] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.312] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.312] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.313] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.313] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.313] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.313] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.313] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.313] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.314] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.314] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.314] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.314] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.314] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.314] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.315] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.315] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.315] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.324] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.324] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.324] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.324] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.325] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.326] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.326] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.326] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.326] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.326] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.327] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.327] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.327] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.327] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.328] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.328] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.328] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.328] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.329] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.329] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.329] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.329] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.329] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.329] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.330] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.330] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.330] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.330] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.331] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.331] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.331] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.331] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.340] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.340] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.341] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.341] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.341] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.341] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.341] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.341] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.342] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.342] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.342] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.343] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.343] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.343] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.344] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.344] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.344] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.344] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.345] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.345] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.345] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.345] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.346] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.346] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.346] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.346] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.346] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.346] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.347] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.347] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.347] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.347] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.347] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.347] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.348] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.348] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.348] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.348] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.348] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.348] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:43.913] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:47.451] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:47.477] LOG: Getting Session Slot id: %d 0
+[07:33:47.479] LOG: Getting Session Slot id: %d 1
+[07:33:47.480] LOG: Getting Session Slot id: %d 2
+[07:33:47.482] LOG: Getting Session Slot id: %d 3
+[07:33:47.484] LOG: Getting Session Slot id: %d 4
+[07:33:47.816] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:47.816] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:48.014] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[07:33:48.014] LOG: Mega Hypno's variant icon does not exist. Replacing with default.
+[07:33:48.014] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[07:33:51.365] DEBUG: %cSending a request to delete session in slot %d color: blue 1
+[07:33:51.396] LOG: Wave Seed: tWtZjWEWfPsw6qdJ[YstLGMS 1
+[07:33:51.405] LOG: %cStart Phase EncounterPhase color:green;
+[07:33:51.409] LOG: Starting species pool tier: COMMON
+[07:33:51.420] LOG: Pokemon: Wild Yungoos | Species ID: 734 | Level: 2 | Nature: Rash (+SpAtk/-SpDef)
+[07:33:51.420] LOG: Stats (IVs): HP: 14 (29), Atk: 8 (14), Def: 6 (24), Spatk: 7 (6), Spdef: 5 (17), Spd: 6 (9)
+[07:33:51.420] LOG: Ability: Ambush | Passive Ability: Stakeout 
+[07:33:51.420] LOG: Moveset: ["Hyper Fang","Super Fang","Yawn","Pounce"]
+[07:33:52.468] DEBUG: Session data saved to slot 1!
+[07:33:55.053] LOG: Wave Seed: tWtZjWEWfPsw6qdJ[YstLGMS 1
+[07:33:55.480] LOG: %cStart Phase SummonPhase color:green;
+[07:33:55.771] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:33:55.773] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:33:56.877] LOG: %cStart Phase SwitchPhase color:green;
+[07:33:56.936] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:56.936] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:57.813] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:33:58.167] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:58.167] LOG: Ran PSP for: Snuglett
+[07:33:58.169] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:33:58.169] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:58.169] LOG: Ran PSP for: Yungoos
+[07:33:58.170] LOG: %cStart Phase TurnInitPhase color:green;
+[07:33:58.170] LOG: %cStart Phase CommandPhase color:green;
+[07:33:59.360] LOG: Move: ASTONISH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snuglett
+[07:33:59.362] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:33:59.364] LOG: Battle Seed: xWjCcq6EsZZ73GH7
+[07:33:59.365] LOG: %cStart Phase TurnStartPhase color:green;
+[07:33:59.368] LOG: %cStart Phase MovePhase color:green;
+[07:33:59.368] LOG: %cUser: Snuglett
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[07:33:59.369] LOG: %cStart Phase MessagePhase color:green;
+[07:33:59.466] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:59.766] LOG: crit stage: +0
+[07:33:59.774] LOG: Move: Astonish | Base damage: 4.346666666666667 | Power: 16 | Source attack: 11 | Target defense: 6
+[07:33:59.777] LOG: Move: Astonish | Attack damage: 8
+[07:33:59.783] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:59.807] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:34:00.107] LOG: crit stage: +0
+[07:34:00.115] LOG: Move: Astonish | Base damage: 4.346666666666667 | Power: 16 | Source attack: 11 | Target defense: 6
+[07:34:00.118] LOG: Move: Astonish | Attack damage: 2
+[07:34:00.125] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:34:00.147] LOG: %cStart Phase MessagePhase color:green;
+[07:34:00.363] LOG: %cStart Phase MessagePhase color:green;
+[07:34:00.579] LOG: %cStart Phase MoveEndPhase color:green;
+[07:34:00.580] LOG: %cStart Phase MovePhase color:green;
+[07:34:00.580] LOG: %cUser: Yungoos
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[07:34:00.581] LOG: %cStart Phase MessagePhase color:green;
+[07:34:00.829] LOG: %cStart Phase MoveEndPhase color:green;
+[07:34:00.830] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:34:00.830] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:34:00.830] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:34:00.830] LOG: %cStart Phase BerryPhase color:green;
+[07:34:00.832] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:34:00.833] LOG: %cStart Phase TurnEndPhase color:green;
+[07:34:00.836] LOG: %cStart Phase TurnInitPhase color:green;
+[07:34:00.836] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"sVsYiVDVeOrv5pcIZXrsKFLR","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":1606609966,"player":true,"species":214,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":24,"stats":[24,18,14,9,16,17],"ivs":[30,29,30,30,31,30],"nature":13,"moveset":[{"moveId":292,"ppUsed":0,"ppUp":0},{"moveId":331,"ppUsed":0,"ppUp":0},{"moveId":561,"ppUsed":0,"ppUp":0},{"moveId":333,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":214,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1675629603,"player":true,"species":70042,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":16,"stats":[16,11,8,10,10,15],"ivs":[15,19,26,30,27,23],"nature":18,"moveset":[{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":222,"ppUsed":0,"ppUp":0},{"moveId":865,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":70042,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[7],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1544472670,"player":true,"species":582,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,13,12,14],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":740,"ppUsed":0,"ppUp":0},{"moveId":694,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":582,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2709741605,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":1,"hp":22,"stats":[22,8,12,12,12,11],"ivs":[30,31,31,30,31,31],"nature":10,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1611257872,"player":true,"species":928,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,12,11,9],"ivs":[30,31,27,31,31,31],"nature":5,"moveset":[{"moveId":347,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":72,"ppUsed":0,"ppUp":0},{"moveId":816,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":928,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[14,5449,234],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2607653380,"player":true,"species":52,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,14,10,11,10,15],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0},{"moveId":541,"ppUsed":0,"ppUp":0},{"moveId":6,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":52,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}}],"endState":{"waveIndex":1,"money":1200,"party":[{"species":70042,"level":5,"hp":16,"maxHp":16},{"species":214,"level":5,"hp":24,"maxHp":24},{"species":582,"level":5,"hp":20,"maxHp":20},{"species":412,"level":5,"hp":22,"maxHp":22},{"species":928,"level":5,"hp":20,"maxHp":20},{"species":52,"level":5,"hp":20,"maxHp":20}]},"checkpoint":{"wave":1,"seed":"sVsYiVDVeOrv5pcIZXrsKFLR","party":[{"id":1606609966,"player":true,"species":214,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":24,"stats":[24,18,14,9,16,17],"ivs":[30,29,30,30,31,30],"nature":13,"moveset":[{"moveId":292,"ppUsed":0,"ppUp":0},{"moveId":331,"ppUsed":0,"ppUp":0},{"moveId":561,"ppUsed":0,"ppUp":0},{"moveId":333,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":214,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1675629603,"player":true,"species":70042,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":16,"stats":[16,11,8,10,10,15],"ivs":[15,19,26,30,27,23],"nature":18,"moveset":[{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":222,"ppUsed":0,"ppUp":0},{"moveId":865,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":70042,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[7],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1544472670,"player":true,"species":582,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,13,12,14],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":740,"ppUsed":0,"ppUp":0},{"moveId":694,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":582,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2709741605,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":1,"hp":22,"stats":[22,8,12,12,12,11],"ivs":[30,31,31,30,31,31],"nature":10,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1611257872,"player":true,"species":928,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,12,11,9],"ivs":[30,31,27,31,31,31],"nature":5,"moveset":[{"moveId":347,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":72,"ppUsed":0,"ppUp":0},{"moveId":816,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":928,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[14,5449,234],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2607653380,"player":true,"species":52,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,14,10,11,10,15],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0},{"moveId":541,"ppUsed":0,"ppUp":0},{"moveId":6,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":52,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1200,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
