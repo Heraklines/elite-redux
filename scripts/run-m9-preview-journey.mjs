@@ -19,10 +19,14 @@ const context = await browser.newContext({ serviceWorkers: "allow" });
 const page = await context.newPage();
 const consoleErrors = [];
 const requestFailures = [];
+const expectedLifecycleAborts = [];
+const expectedLifecycleConsoleErrors = [];
 const activeWorkerRequests = new Set();
+let lifecycleBoundary = false;
 page.on("console", message => {
   if (message.type() === "error") {
-    consoleErrors.push(message.text().slice(0, 256));
+    const bounded = message.text().slice(0, 256);
+    (lifecycleBoundary ? expectedLifecycleConsoleErrors : consoleErrors).push(bounded);
   }
 });
 page.on("request", request => {
@@ -34,11 +38,21 @@ page.on("requestfinished", request => {
   activeWorkerRequests.delete(request);
 });
 page.on("requestfailed", request => {
-  requestFailures.push({
+  const failure = {
     method: request.method(),
     origin: new URL(request.url()).origin,
     failure: request.failure()?.errorText.slice(0, 128) ?? "unknown",
-  });
+  };
+  if (
+    lifecycleBoundary
+    && failure.origin === workerOrigin
+    && failure.failure === "net::ERR_ABORTED"
+    && ["PUT", "DELETE"].includes(failure.method)
+  ) {
+    expectedLifecycleAborts.push(failure);
+  } else {
+    requestFailures.push(failure);
+  }
   activeWorkerRequests.delete(request);
 });
 
@@ -158,11 +172,12 @@ try {
   ) {
     throw new Error("preview save write did not read back at the same exact generation");
   }
-  await proveLeaseReleased(authorization, platform.default_save_slot);
+  const transitionLease = await proveLeaseReleased(authorization, platform.default_save_slot);
   const remainingActiveMs = minimumActiveMs - (Date.now() - journeyStartedAt);
   if (remainingActiveMs > 0) {
     await page.waitForTimeout(remainingActiveMs);
   }
+  lifecycleBoundary = true;
   await page.reload({ waitUntil: "load", timeout: 60_000 });
   try {
     await page.locator("canvas").waitFor({ state: "visible", timeout: 60_000 });
@@ -189,6 +204,7 @@ try {
     throw new Error("natural preview reload did not retain the exact save frontier");
   }
   await waitForWorkerIdle(activeWorkerRequests);
+  lifecycleBoundary = false;
 
   const performanceEvidence = await page.evaluate(() =>
     performance
@@ -197,6 +213,7 @@ try {
       .map(entry => ({ name: entry.name, duration_ms: Math.round(entry.duration * 1_000) / 1_000 })),
   );
   const browserClass = await page.evaluate(() => navigator.userAgent);
+  lifecycleBoundary = true;
   await page.close({ runBeforeUnload: true });
   const teardown = await proveLeaseReleased(authorization, platform.default_save_slot);
 
@@ -227,15 +244,24 @@ try {
     natural_reload_readback: true,
     hard_stop_failures: 0,
     teardown,
+    transition_lease: transitionLease,
+    lifecycle_abort_count: expectedLifecycleAborts.length,
+    lifecycle_console_error_count: expectedLifecycleConsoleErrors.length,
     performance: performanceEvidence,
     console_error_count: consoleErrors.length,
     request_failure_count: requestFailures.length,
   };
-  if (consoleErrors.length > 0 || requestFailures.length > 0 || teardown.lease_reacquired_after_close !== true) {
+  if (
+    consoleErrors.length > 0
+    || requestFailures.length > 0
+    || teardown.lease_reacquired_after_close !== true
+    || teardown.lease_available_after_ms > 5_000
+  ) {
     throw new Error(
       `live preview journey ended with browser errors, request failures, or an active lease: ${JSON.stringify({
         console_errors: consoleErrors.slice(-3),
         request_failures: requestFailures.slice(-3),
+        teardown,
       }).slice(0, 1_024)}`,
     );
   }
@@ -346,6 +372,7 @@ async function waitForSave(token, identity, timeoutMs) {
 }
 
 async function proveLeaseReleased(token, slot) {
+  const startedAt = Date.now();
   const deadline = Date.now() + 15_000;
   let response;
   do {
@@ -379,7 +406,11 @@ async function proveLeaseReleased(token, slot) {
     if (release.status !== 204 || release.redirected) {
       throw new Error("preview lease teardown probe could not release its lease");
     }
-    return { lease_reacquired_after_close: true, lease_released_after_probe: true };
+    return {
+      lease_reacquired_after_close: true,
+      lease_released_after_probe: true,
+      lease_available_after_ms: Date.now() - startedAt,
+    };
   } while (Date.now() < deadline);
   throw new Error("preview save lease remained held after the storage operation settled");
 }

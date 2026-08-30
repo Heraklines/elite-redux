@@ -105,6 +105,9 @@ jobs:
           test "$(jq -r .save_write_readback "$EVIDENCE")" = true
           test "$(jq -r .natural_reload_readback "$EVIDENCE")" = true
           test "$(jq -r .teardown.lease_reacquired_after_close "$EVIDENCE")" = true
+          test "$(jq -r .teardown.lease_available_after_ms "$EVIDENCE")" -le 5000
+          test "$(jq -r .console_error_count "$EVIDENCE")" = 0
+          test "$(jq -r .request_failure_count "$EVIDENCE")" = 0
       - name: Fetch immutable release, current policy, and health
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
