@@ -166,8 +166,6 @@ describe("M9 signed release control", () => {
       payload: runtimeAssignment,
       signature: await signEnvelope(pair, "er-m9:runtime-assignment-v1", runtimeAssignment),
     };
-    history.replaceState(null, "", "?runtime=legacy");
-    localStorage.setItem("runtime", "LEGACY_TRANSITION");
     const selected = await selectProductionRuntimeV1({
       sessionId: "session-1",
       now: 2,
