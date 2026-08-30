@@ -1,0 +1,52 @@
+name: Revoke M9 Preview Account
+
+on:
+  push:
+    branches: [ops/m9-r1-preview-validation]
+    paths: [.github/workflows/revoke-m9-preview-account.yml]
+  workflow_dispatch:
+    inputs:
+      session_token_hash:
+        description: SHA-256 of the domain-separated preview session token
+        required: true
+        type: string
+      explicit_confirmation:
+        description: Type REVOKE_M9_PREVIEW_ACCOUNT
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  revoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.explicit_confirmation == 'REVOKE_M9_PREVIEW_ACCOUNT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: m9-preview-save-worker
+    steps:
+      - uses: actions/checkout@v6
+      - name: Disable preview account and remove leases
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo '${{ inputs.session_token_hash }}' | grep -Eq '^[0-9a-f]{64}$'
+          cat > "$RUNNER_TEMP/revoke.sql" <<'SQL'
+          UPDATE rust_preview_accounts
+             SET disabled = 1
+           WHERE token_hash = '${{ inputs.session_token_hash }}';
+          DELETE FROM rust_preview_save_leases
+           WHERE account_id IN (
+             SELECT account_id FROM rust_preview_accounts
+              WHERE token_hash = '${{ inputs.session_token_hash }}'
+           );
+          SQL
+          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves --remote \
+            --config workers/er-m9-preview-save/wrangler.toml \
+            --file "$RUNNER_TEMP/revoke.sql"
+          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves --remote \
+            --config workers/er-m9-preview-save/wrangler.toml \
+            --command "SELECT disabled FROM rust_preview_accounts WHERE token_hash='${{ inputs.session_token_hash }}'" \
+            --json > "$RUNNER_TEMP/revoked.json"
+          jq -e '.[0].results == [{"disabled":1}]' "$RUNNER_TEMP/revoked.json" > /dev/null
