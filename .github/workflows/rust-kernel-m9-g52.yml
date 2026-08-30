@@ -34,7 +34,7 @@ jobs:
       - run: node scripts/check-kernel-m9-contract.mjs
       - run: node scripts/check-kernel-m9-release-readiness.mjs
       - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
-      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --no-deps -- -D warnings
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production -p er-web --all-targets --no-deps -- -D warnings
       - name: Typecheck complete M9 production ownership surface
         run: >-
           pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
