@@ -317,6 +317,9 @@ describe("M9 capability-isolated preview save Worker", () => {
       "fetch",
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         forwarded.push({ input: String(input), ...(init == null ? {} : { init }) });
+        if (init?.body instanceof ArrayBuffer) {
+          structuredClone(init.body, { transfer: [init.body] });
+        }
         return new Response(null, { status: 204 });
       }),
     );

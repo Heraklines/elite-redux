@@ -277,7 +277,7 @@ async function forwardHealthEvent(
       "x-er-preview-health-authorization": `Bearer ${env.M9_PREVIEW_HEALTH_SECRET}`,
       "x-er-preview-account": account.account_id,
     },
-    body: bytes.buffer,
+    body: Uint8Array.from(bytes).buffer,
   });
   bytes.fill(0);
   return response.status === 204
