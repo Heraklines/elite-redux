@@ -34,7 +34,7 @@ export async function installCompleteProductionReleaseV2(
         redirect: "error",
       });
       const verified = await verifyArtifactResponseV1(response, artifact);
-      await cache.put(artifact.url, verified);
+      await cache.put(releaseObjectUrl(artifact.url), verified);
     }
     await verifyCompleteProductionReleaseV2(cache, manifest);
     await recordRelease(storage, manifest);
@@ -85,7 +85,7 @@ export async function readVerifiedArtifactBytesV1(
   release: CompleteProductionReleaseV2,
   artifact: ArtifactIdentityV1,
 ): Promise<Uint8Array> {
-  const response = await release.cache.match(artifact.url);
+  const response = await release.cache.match(releaseObjectUrl(artifact.url));
   if (response == null) {
     throw new Error("verified production artifact is absent");
   }
@@ -137,7 +137,11 @@ export async function matchVerifiedProductionAssetV2(
   );
   for (const [releaseId] of releases) {
     const cache = await storage.open(`${RELEASE_PREFIX}${releaseId}`);
-    const response = await cache.match(request, { ignoreSearch: false, ignoreMethod: false, ignoreVary: false });
+    const response = await cache.match(releaseObjectUrl(new URL(request.url).pathname), {
+      ignoreSearch: false,
+      ignoreMethod: false,
+      ignoreVary: false,
+    });
     if (response != null) {
       return response;
     }
@@ -147,7 +151,7 @@ export async function matchVerifiedProductionAssetV2(
 
 async function verifyCompleteProductionReleaseV2(cache: Cache, manifest: ProductionReleaseManifestV2): Promise<void> {
   for (const artifact of Object.values(manifest.artifacts)) {
-    const response = await cache.match(artifact.url);
+    const response = await cache.match(releaseObjectUrl(artifact.url));
     if (response == null) {
       throw new Error("production release cache is incomplete");
     }
