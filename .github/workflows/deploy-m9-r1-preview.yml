@@ -96,9 +96,16 @@ jobs:
           --commit-hash "${{ inputs.platform_sha }}"
       - name: Verify preview release identity
         run: |
-          curl --fail --silent --show-error --max-time 30 \
-            https://m9-r1-internal.elite-redux.pages.dev/release.json \
-            > "$RUNNER_TEMP/release.json"
-          jq -e '.release_id == "${{ inputs.release_id }}" and .manifest_sha256 == "${{ inputs.manifest_sha256 }}"' \
-            "$RUNNER_TEMP/release.json" > /dev/null
+          for attempt in $(seq 1 12); do
+            curl --fail --silent --show-error --max-time 30 \
+              "https://m9-r1-internal.elite-redux.pages.dev/release.json?deployment=${GITHUB_RUN_ID}-${attempt}" \
+              > "$RUNNER_TEMP/release-candidate.json"
+            if jq -e '.release_id == "${{ inputs.release_id }}" and .manifest_sha256 == "${{ inputs.manifest_sha256 }}"' \
+              "$RUNNER_TEMP/release-candidate.json" > /dev/null; then
+              mv "$RUNNER_TEMP/release-candidate.json" "$RUNNER_TEMP/release.json"
+              break
+            fi
+            sleep 5
+          done
+          test -s "$RUNNER_TEMP/release.json"
           printf '%s\n' "M9 internal preview deployed without changing the production Pages branch"
