@@ -1,0 +1,119 @@
+name: M9 Preview Focused Qualification
+
+on:
+  push:
+    branches: [ci/m9-preview/**]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m9-preview-focused-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preview-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck preview ownership surface
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2024
+          --types node,vitest/globals --lib ES2024,DOM,WebWorker
+          workers/er-save-api/src/cloudflare-workers.d.ts
+          workers/er-telemetry/src/cloudflare-workers.d.ts
+          workers/er-m9-preview-save/src/index.ts
+          workers/er-telemetry/src/index.ts
+          src/rust-browser/production/configured-production-main.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          test/node/rust-browser/production/preview-save-backend.test.ts
+          test/node/rust-browser/production/preview-save-storage.test.ts
+          test/node/rust-browser/production/preview-backup-drill.test.ts
+          test/node/rust-browser/production/health-worker.test.ts
+          test/node/rust-browser/production/architecture.test.ts
+      - name: Check preview static ownership
+        run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          workers/er-m9-preview-save
+          workers/er-telemetry/src/m9-health.ts
+          src/rust-browser/production/configured-production-main.ts
+          src/rust-browser/production/platform-context.ts
+          src/rust-browser/production/preview-account.ts
+          src/rust-browser/production/preview-remote-lease.ts
+          src/rust-browser/production/preview-save-storage.ts
+          src/rust-browser/production/production-save-restore-worker.ts
+          src/rust-browser/production/release-cache-v2.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          test/node/rust-browser/production/preview-save-backend.test.ts
+          test/node/rust-browser/production/preview-save-storage.test.ts
+          test/node/rust-browser/production/preview-backup-drill.test.ts
+          test/node/rust-browser/production/health-worker.test.ts
+      - name: Run focused preview contracts
+        run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/production/preview-save-backend.test.ts
+          test/node/rust-browser/production/preview-save-storage.test.ts
+          test/node/rust-browser/production/preview-backup-drill.test.ts
+          test/node/rust-browser/production/health-worker.test.ts
+          test/node/rust-browser/production/architecture.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  sealed-preview-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build and inspect preview browser bundle
+        run: |
+          node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-preview" --authority rust
+          grep -R -q 'er-m9-preview-save.heraklines.workers.dev' "$RUNNER_TEMP/m9-preview"
+          grep -R -q 'RESTORE_PRODUCTION_SAVE_V2' "$RUNNER_TEMP/m9-preview"
+          ! grep -R -E 'MIGRATE_LEGACY|MIGRATE_PRODUCTION_SAVE_V2|pokerogue_sessionId' "$RUNNER_TEMP/m9-preview"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9-preview-focused-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/m9-preview
+          if-no-files-found: error
+          retention-days: 7
+
+  browser-save-reload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run browser save reload contract
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=chromium
+          test/browser/rust-browser/save-offline.spec.ts
