@@ -34,43 +34,18 @@
     "version": 1
   },
   "new-ability-11": {
-    "componentRules": [
-      {
-        "chance": 100,
-        "conditionLogic": "all",
-        "conditions": [
-          {
-            "kind": "holder-hp",
-            "maxPercent": 35
-          }
-        ],
-        "effects": [
-          {
-            "abilityId": 194,
-            "attrIndex": 0,
-            "attrType": "PostDamageForceSwitchAbAttr",
-            "parameterOverrides": {
-              "hpRatio": 0.35
-            }
-          }
-        ],
-        "hook": {
-          "abilityId": 5417,
-          "attrIndex": 0,
-          "attrType": "PassiveRecoveryAbAttr"
-        },
-        "key": "component-1",
-        "prerequisiteHooks": []
-      }
-    ],
-    "description": "needed to add the switch at 35% part of malicious empathy",
+    "componentRules": [],
+    "description": "Magic Bounce + Queenly Majesty\n\n",
     "flags": {},
     "generation": 9,
     "id": 20010,
-    "includes": [],
+    "includes": [
+      156,
+      214
+    ],
     "mechanics": [],
     "modifiers": [],
-    "name": "Used In Malicious Empathy",
+    "name": "Duplicity",
     "rules": [],
     "version": 1
   },
