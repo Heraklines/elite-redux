@@ -6455,5 +6455,455 @@
     "trainerEffect": "shadowaura",
     "victoryDialogue": "...",
     "weight": 30
+  },
+  "TRAINER_70038": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70038,
+    "maxWave": 170,
+    "minWave": 165,
+    "name": "E4",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 3,
+            "item": "FOCUS_BAND"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SHEER_COLD",
+          "SCALD",
+          "SIGNAL_BEAM",
+          "FREEZE_DRY"
+        ],
+        "shiny": {
+          "around": "icespikes"
+        },
+        "species": 10489,
+        "vitamins": {
+          "hp": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "SILK_SCARF"
+          },
+          {
+            "count": 1,
+            "item": "MULTI_LENS"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FREEZE_DRY",
+          "SPIKES",
+          "RAPID_SPIN",
+          "SELF_DESTRUCT"
+        ],
+        "species": 91,
+        "vitamins": {
+          "atk": 4,
+          "def": 1,
+          "hp": 3,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 778
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "insanity": {
+          "ability": 209,
+          "innates": [
+            5481,
+            259,
+            5084
+          ]
+        },
+        "level": null,
+        "moves": [
+          "BELLY_DRUM",
+          "BADDY_BAD",
+          "RLA",
+          "RECOVER"
+        ],
+        "sanityOff": true,
+        "shiny": {
+          "around": "auroraveil",
+          "name": "☠️",
+          "surface": "aurora"
+        },
+        "species": 10605,
+        "vitamins": {
+          "atk": 1,
+          "def": 2,
+          "hp": 2,
+          "spatk": 1,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 122
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "NEVER_MELT_ICE"
+          },
+          {
+            "count": 1,
+            "item": "SILK_SCARF"
+          },
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FREEZE_DRY",
+          "BOOMBURST",
+          "TRICK_ROOM",
+          "ENCORE"
+        ],
+        "species": 10010,
+        "vitamins": {
+          "def": 1,
+          "hp": 4,
+          "spatk": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 3,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 3,
+            "item": "ENIGMA_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLIZZARD",
+          "THUNDERBOLT",
+          "DEFOG",
+          "FLIP_TURN"
+        ],
+        "species": 10486,
+        "vitamins": {
+          "def": 2,
+          "hp": 2,
+          "spatk": 3,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "MIRACLE_SEED"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HYDRO_PUMP",
+          "CALM_MIND",
+          "ICE_BEAM",
+          "TAILWIND"
+        ],
+        "species": 245,
+        "vitamins": {
+          "def": 1,
+          "hp": 2,
+          "spatk": 3,
+          "spd": 3,
+          "spdef": 1
+        }
+      }
+    ],
+    "trainerClass": "LORELEI",
+    "weight": 100
+  },
+  "TRAINER_70039": {
+    "battleType": "double",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70039,
+    "maxWave": 180,
+    "minWave": 175,
+    "name": "E4",
+    "team": [
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_OMNI_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BLAZE_KICK",
+          "MEGA_KICK",
+          "RLA",
+          "HELPING_HAND"
+        ],
+        "species": 10491,
+        "vitamins": {
+          "atk": 3,
+          "spd": 3
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "BLACK_BELT"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "MULTI_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "BRICK_BREAK",
+          "BULLET_PUNCH",
+          "RLA",
+          "RLNA"
+        ],
+        "species": 10490,
+        "vitamins": {
+          "atk": 3,
+          "spd": 3
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 3,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "GRIP_CLAW"
+          },
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "DRAGON_DANCE",
+          "RLA",
+          "RLA",
+          "RLNA"
+        ],
+        "species": 10631,
+        "vitamins": {
+          "atk": 2,
+          "def": 2,
+          "hp": 2,
+          "spd": 4,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SOFT_SAND"
+          },
+          {
+            "count": 1,
+            "item": "LANSAT_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "PETAYA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "IRON_FANGS",
+          "KNOCK_OFF",
+          "STEALTH_ROCK",
+          "BULLDOZE"
+        ],
+        "species": 10109,
+        "vitamins": {
+          "def": 2,
+          "hp": 1,
+          "spd": 3,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "ER_FIGHTING_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HOLD_BACK",
+          "THUNDER_PUNCH",
+          "FIRE_PUNCH",
+          "BULLET_PUNCH"
+        ],
+        "species": 10484,
+        "vitamins": {
+          "atk": 3,
+          "def": 2,
+          "spd": 2
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10417
+        },
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "QUICK_CLAW"
+          },
+          {
+            "count": 1,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AQUA_JET",
+          "BULK_UP",
+          "SKULL_BASH"
+        ],
+        "species": 10417,
+        "vitamins": {
+          "atk": 2,
+          "def": 1,
+          "hp": 1,
+          "spatk": 2,
+          "spd": 2,
+          "spdef": 1
+        }
+      }
+    ],
+    "trainerClass": "BRUNO",
+    "weight": 100
   }
 }
