@@ -49,6 +49,23 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-12": {
+    "componentRules": [],
+    "description": "Deadeye + Hover + Archer",
+    "flags": {},
+    "generation": 9,
+    "id": 20011,
+    "includes": [
+      5418,
+      5201,
+      5113
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Celestial Bow",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
