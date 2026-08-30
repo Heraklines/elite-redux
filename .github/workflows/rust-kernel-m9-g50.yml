@@ -98,6 +98,7 @@ jobs:
       - run: |
           if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then cargo install wasm-bindgen-cli --version 0.2.127 --locked; fi
           node scripts/build-kernel-m8-web.mjs --out-dir "$RUNNER_TEMP/m9-web" --content rust/fixtures/m8/browser-reference/content-pack.json --identity rust/fixtures/m8/browser-reference/execution-identity.bin --session rust/fixtures/m8/browser-reference/session-start.json --authority-session rust/fixtures/m8/browser-reference/session-authority.json --replica-session rust/fixtures/m8/browser-reference/session-replica.json
+          cp rust/fixtures/m8/browser-reference/expected-terminal-digest.txt "$RUNNER_TEMP/m9-web/"
       - run: pnpm exec playwright install --with-deps chromium
       - env:
           M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
