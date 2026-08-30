@@ -126,7 +126,7 @@ describe("M9 copy-on-write save and co-op release control", () => {
       ...compatibility("release-1", ["release-2"]),
       save_namespace: "LEGACY_PRODUCTION_V1",
     } as unknown as ProductionCoopCompatibilityV1;
-    expect(() => choosePartyReleaseV1(left, mixedNamespace)).toThrow(/namespace/u);
+    expect(() => choosePartyReleaseV1(left, mixedNamespace)).toThrow(/incompatible/u);
   });
 });
 
