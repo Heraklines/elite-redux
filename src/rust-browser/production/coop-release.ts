@@ -1,8 +1,14 @@
 import type { BrowserKernelCompatibilityV1 } from "../adapters/signaling-adapter";
-import type { ProductionCoopCompatibilityV1, ProductionReleaseManifestV2, SessionRuntimePinV1 } from "./contracts";
+import {
+  type ProductionCoopCompatibilityV1,
+  type ProductionReleaseManifestV2,
+  RUST_PREVIEW_SAVE_NAMESPACE_V1,
+  type SessionRuntimePinV1,
+} from "./contracts";
 
 export interface PinnedCoopReleaseV1 {
   schema_version: 1;
+  save_namespace: typeof RUST_PREVIEW_SAVE_NAMESPACE_V1;
   party_id: string;
   release_id: string;
   kernel_generation: number;
@@ -18,6 +24,7 @@ export function productionCoopCompatibilityV1(
 ): ProductionCoopCompatibilityV1 {
   return {
     schema_version: 1,
+    save_namespace: RUST_PREVIEW_SAVE_NAMESPACE_V1,
     release_id: release.release_id,
     compatible_releases: [...new Set(compatibleReleases)].sort(),
     authority_runtime:
@@ -38,6 +45,7 @@ export function browserKernelCompatibilityV1(
   return {
     browser_worker_protocol: 1,
     frame_envelope_version: 1,
+    save_namespace: compatibility.save_namespace,
     authority_protocol: compatibility.authority_protocol,
     release_id: compatibility.release_id,
     compatible_releases: compatibility.compatible_releases,
@@ -57,6 +65,9 @@ export function choosePartyReleaseV1(
 ): string {
   if (
     left.authority_runtime !== right.authority_runtime
+    || left.save_namespace !== RUST_PREVIEW_SAVE_NAMESPACE_V1
+    || right.save_namespace !== RUST_PREVIEW_SAVE_NAMESPACE_V1
+    || left.save_namespace !== right.save_namespace
     || left.authority_protocol !== right.authority_protocol
     || left.mechanical_identity.mechanics_sha256 !== right.mechanical_identity.mechanics_sha256
     || left.content_hash !== right.content_hash
@@ -87,6 +98,7 @@ export function assertPinnedCoopReconnectV1(
 ): void {
   if (
     coop.schema_version !== 1
+    || coop.save_namespace !== RUST_PREVIEW_SAVE_NAMESPACE_V1
     || coop.release_id !== session.release_id
     || coop.kernel_generation !== session.kernel_generation.generation
     || !Number.isSafeInteger(nextConnectionGeneration)

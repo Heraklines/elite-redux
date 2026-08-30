@@ -15,6 +15,13 @@ binding = "DB"
 database_name = "er-saves"
 database_id = "b2fae947-6971-45e7-b287-d42648fd0a30"
 
+# Isolated M9 Rust preview saves. This database never contains or queries legacy
+# production session_saves rows. R1-R6 preview traffic uses only this binding.
+[[d1_databases]]
+binding = "M9_RUST_SAVES"
+database_name = "er-m9-rust-preview-saves"
+database_id = "9d410e94-8719-4a86-aa0b-c1cad2291e88"
+
 # Player-telemetry ML capture sink (#player-telemetry). Production uses its own
 # bucket; deploy-prod fails closed before mutation if the bucket is absent.
 #   npx wrangler r2 bucket create er-telemetry

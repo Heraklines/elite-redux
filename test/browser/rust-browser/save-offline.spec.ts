@@ -12,7 +12,7 @@ import { CloudSaveAdapterV1 } from "/src/rust-browser/adapters/cloud-save-adapte
 import { installAtomicReleaseCache, loadAtomicReleaseCache } from "/src/rust-browser/adapters/release-cache.ts";
 import { MobileInputAdapterV1 } from "/src/rust-browser/adapters/mobile-input-adapter.ts";
 import { RustBrowserTransportAdapterV1 } from "/src/rust-browser/adapters/transport-adapter.ts";
-const identity = { browser_worker_protocol: 1, frame_envelope_version: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
+const identity = { browser_worker_protocol: 1, frame_envelope_version: 1, save_namespace: "M9_RUST_PREVIEW_V1", authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
 const leftFrameKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
 const rightFrameKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
 const leftFramePublic = Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", leftFrameKeys.publicKey)));

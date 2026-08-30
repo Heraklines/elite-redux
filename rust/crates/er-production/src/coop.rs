@@ -2,13 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     MaterialSchemaSetV1, MechanicalCompatibilityIdentityV1, ProductionAuthorityRuntimeV1,
-    ProductionContractErrorV1, ProductionReleaseId,
+    ProductionContractErrorV1, ProductionReleaseId, RUST_PREVIEW_SAVE_NAMESPACE_V1,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductionCoopCompatibilityV1 {
     pub schema_version: u32,
+    pub save_namespace: String,
     pub release_id: ProductionReleaseId,
     pub compatible_releases: Vec<ProductionReleaseId>,
     pub authority_runtime: ProductionAuthorityRuntimeV1,
@@ -36,6 +37,7 @@ impl ProductionCoopCompatibilityV1 {
         self.release_id.validate("co-op release")?;
         self.mechanical_identity.validate()?;
         if self.schema_version != 1
+            || self.save_namespace != RUST_PREVIEW_SAVE_NAMESPACE_V1
             || !matches!(
                 self.authority_runtime,
                 ProductionAuthorityRuntimeV1::RustProduction
@@ -63,7 +65,8 @@ impl ProductionCoopCompatibilityV1 {
     }
 
     pub fn exactly_matches(&self, peer: &Self) -> bool {
-        self.authority_runtime == peer.authority_runtime
+        self.save_namespace == peer.save_namespace
+            && self.authority_runtime == peer.authority_runtime
             && self.authority_protocol == peer.authority_protocol
             && self.mechanical_identity == peer.mechanical_identity
             && self.content_hash == peer.content_hash

@@ -122,6 +122,11 @@ describe("M9 copy-on-write save and co-op release control", () => {
     expect(choosePartyReleaseV1(left, right)).toBe("release-1");
     right.content_hash = "different";
     expect(() => choosePartyReleaseV1(left, right)).toThrow(/incompatible/u);
+    const mixedNamespace = {
+      ...compatibility("release-1", ["release-2"]),
+      save_namespace: "LEGACY_PRODUCTION_V1",
+    } as unknown as ProductionCoopCompatibilityV1;
+    expect(() => choosePartyReleaseV1(left, mixedNamespace)).toThrow(/namespace/u);
   });
 });
 
@@ -136,6 +141,7 @@ async function migrationBackend(
     async migrateLegacy(options) {
       const envelope: ProductionSaveEnvelopeV2 = {
         envelope_version: 2,
+        save_namespace: "M9_RUST_PREVIEW_V1",
         slot: options.slot,
         pseudonymous_account_id: options.accountId,
         cloud_generation: options.cloudGeneration,
@@ -172,6 +178,7 @@ async function migrationBackend(
 function compatibility(releaseId: string, compatible: string[]): ProductionCoopCompatibilityV1 {
   return {
     schema_version: 1,
+    save_namespace: "M9_RUST_PREVIEW_V1",
     release_id: releaseId,
     compatible_releases: compatible,
     authority_runtime: "RUST_PRODUCTION",

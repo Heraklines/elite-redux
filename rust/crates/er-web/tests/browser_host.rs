@@ -57,12 +57,12 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
         request_id: safe(1)?,
         sequence: safe(1)?,
         request: BrowserRequestV1::Initialize(BrowserInitV1 {
-            mode: BrowserExecutionModeV1::RustLocalAuthority,
+            mode: BrowserExecutionModeV1::RustProductionAuthority,
             execution_identity_bytes: IDENTITY.to_vec(),
             session_start_bytes: SESSION.to_vec(),
             maximum_pending_requests: 8,
-            production_release_id: None,
-            production_generation: None,
+            production_release_id: Some("release-test".to_owned()),
+            production_generation: Some(safe(1)?),
         }),
     };
     let ready_bytes = er_canonical::canonical_bytes(&vec![initialize])?;
@@ -117,6 +117,51 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
             .map(|response| response.after_mechanical_digest.as_str()),
         Some(EXPECTED_DIGEST.trim())
     );
+    let storage = responses
+        .iter()
+        .filter_map(|response| match &response.response {
+            BrowserResponseV1::Effects(batch) => batch.effects.iter().find_map(|effect| {
+                if let BrowserEffectV1::StorageRequest(bytes) = effect {
+                    Some(bytes)
+                } else {
+                    None
+                }
+            }),
+            _ => None,
+        })
+        .next()
+        .ok_or("mechanical state change emitted no save request")?;
+    let storage_value: serde_json::Value = serde_json::from_slice(storage)?;
+    assert_eq!(storage_value["request_id"], 2);
+    assert_eq!(storage_value["operation"], "WRITE");
+    assert_eq!(storage_value["key"], "game-save-v1");
+    assert!(storage_value["expected_revision"].is_null());
+    assert!(
+        storage_value["bytes"]
+            .as_array()
+            .is_some_and(|bytes| !bytes.is_empty())
+    );
+    let storage_result = BrowserRequestEnvelopeV1 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
+        request_id: safe(4)?,
+        sequence: safe(4)?,
+        request: BrowserRequestV1::StorageResult {
+            request_id: safe(2)?,
+            bytes: er_canonical::canonical_bytes(&serde_json::json!({ "revision": 1 }))?,
+        },
+    };
+    let acknowledgement: Vec<BrowserResponseEnvelopeV1> = serde_json::from_slice(
+        &host.dispatch_batch_native(&er_canonical::canonical_bytes(&vec![storage_result])?)?,
+    )?;
+    assert!(acknowledgement.iter().all(|response| {
+        match &response.response {
+            BrowserResponseV1::Effects(batch) => !batch
+                .effects
+                .iter()
+                .any(|effect| matches!(effect, BrowserEffectV1::StorageRequest(_))),
+            _ => true,
+        }
+    }));
     let snapshot: er_kernel::snapshot_v6::RestorableKernelSnapshotV6 =
         serde_json::from_slice(&host.snapshot().map_err(|_| "native snapshot failed")?)?;
     assert_eq!(

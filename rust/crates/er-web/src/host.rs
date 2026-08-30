@@ -9,6 +9,7 @@ use er_game::m7_material::mechanical_digest;
 use er_kernel::game_kernel_v6::{GameKernelV6, KernelControlEffectV6};
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
 use er_protocol::EndpointRole;
+use er_save::GameSaveV1;
 use er_types::SafeU53;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -29,6 +30,12 @@ const MAXIMUM_LEDGER_ENTRIES: usize = 2_048;
 struct RetainedRequestV1 {
     fingerprint: String,
     response: BrowserResponseEnvelopeV1,
+}
+
+#[derive(Clone, Debug)]
+struct PendingSaveV1 {
+    request_id: SafeU53,
+    digest: String,
 }
 
 #[derive(Debug, Error)]
@@ -57,6 +64,10 @@ pub struct BrowserKernelHostV1 {
     accepted_sequence: SafeU53,
     retained: BTreeMap<SafeU53, RetainedRequestV1>,
     last_wakeup_micros: SafeU53,
+    last_persisted_save_digest: String,
+    pending_save: Option<PendingSaveV1>,
+    storage_revision: Option<SafeU53>,
+    preview_save_enabled: bool,
 }
 
 #[wasm_bindgen]
@@ -79,6 +90,8 @@ impl BrowserKernelHostV1 {
             .map_err(|error| js_error(BrowserWebErrorV1::Canonical(error.to_string())))?;
         let initial_snapshot_bytes = canonical_bytes(&kernel.snapshot())
             .map_err(|error| js_error(BrowserWebErrorV1::Canonical(error.to_string())))?;
+        let last_persisted_save_digest = mechanical_digest(kernel.state())
+            .map_err(|error| js_error(BrowserWebErrorV1::Kernel(error.to_string())))?;
         Ok(Self {
             kernel: Some(kernel),
             protocol_role,
@@ -87,6 +100,10 @@ impl BrowserKernelHostV1 {
             accepted_sequence: SafeU53::ZERO,
             retained: BTreeMap::new(),
             last_wakeup_micros: SafeU53::ZERO,
+            last_persisted_save_digest,
+            pending_save: None,
+            storage_revision: None,
+            preview_save_enabled: false,
         })
     }
 
@@ -112,6 +129,10 @@ impl BrowserKernelHostV1 {
         self.retained.clear();
         self.content_identity_bytes.fill(0);
         self.initial_snapshot_bytes.fill(0);
+        self.last_persisted_save_digest.clear();
+        self.pending_save = None;
+        self.storage_revision = None;
+        self.preview_save_enabled = false;
     }
 }
 
@@ -180,9 +201,22 @@ impl BrowserKernelHostV1 {
 
         let mut staged_kernel = self.kernel.clone().ok_or(BrowserWebErrorV1::Disposed)?;
         let mut staged_wakeup = self.last_wakeup_micros;
+        let mut staged_last_persisted_save_digest = self.last_persisted_save_digest.clone();
+        let mut staged_pending_save = self.pending_save.clone();
+        let mut staged_storage_revision = self.storage_revision;
         let mut responses = Vec::with_capacity(requests.len());
+        let mut staged_preview_save_enabled = self.preview_save_enabled;
         for request in &requests {
-            let response = process_request(
+            if let BrowserRequestV1::StorageResult { request_id, bytes } = &request.request {
+                accept_storage_result(
+                    *request_id,
+                    bytes,
+                    &mut staged_last_persisted_save_digest,
+                    &mut staged_pending_save,
+                    &mut staged_storage_revision,
+                )?;
+            }
+            let mut response = process_request(
                 &mut staged_kernel,
                 self.protocol_role,
                 &self.content_identity_bytes,
@@ -190,8 +224,27 @@ impl BrowserKernelHostV1 {
                 &mut staged_wakeup,
                 request,
             )?;
+            if let BrowserRequestV1::Initialize(init) = &request.request {
+                staged_preview_save_enabled = matches!(
+                    init.mode,
+                    BrowserExecutionModeV1::RustProductionAuthority
+                        | BrowserExecutionModeV1::RustCanaryAuthority
+                );
+            }
             let digest = mechanical_digest(staged_kernel.state())
                 .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?;
+            if staged_preview_save_enabled && !matches!(request.request, BrowserRequestV1::Dispose)
+            {
+                append_save_request(
+                    &staged_kernel,
+                    request.sequence,
+                    &mut response,
+                    &staged_last_persisted_save_digest,
+                    &digest,
+                    &mut staged_pending_save,
+                    staged_storage_revision,
+                )?;
+            }
             responses.push(BrowserResponseEnvelopeV1 {
                 version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
                 request_id: request.request_id,
@@ -210,6 +263,10 @@ impl BrowserKernelHostV1 {
             .ok_or(BrowserWebErrorV1::InvalidMessage)?;
         self.last_wakeup_micros = staged_wakeup;
         self.kernel = if disposed { None } else { Some(staged_kernel) };
+        self.last_persisted_save_digest = staged_last_persisted_save_digest;
+        self.pending_save = staged_pending_save;
+        self.storage_revision = staged_storage_revision;
+        self.preview_save_enabled = staged_preview_save_enabled;
         for ((request, fingerprint), response) in
             requests.into_iter().zip(fingerprints).zip(responses)
         {
@@ -231,9 +288,96 @@ impl BrowserKernelHostV1 {
             self.retained.clear();
             self.content_identity_bytes.fill(0);
             self.initial_snapshot_bytes.fill(0);
+            self.last_persisted_save_digest.clear();
+            self.pending_save = None;
+            self.storage_revision = None;
+            self.preview_save_enabled = false;
         }
         Ok(encoded)
     }
+}
+
+fn canonical_game_save(kernel: &GameKernelV6) -> Result<Vec<u8>, BrowserWebErrorV1> {
+    let state = kernel.state();
+    GameSaveV1::new(
+        &state.content_identity,
+        state.profile.clone(),
+        state.active_run.clone(),
+    )
+    .map_err(|error| BrowserWebErrorV1::Kernel(error.to_string()))?
+    .canonical_bytes()
+    .map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))
+}
+
+fn append_save_request(
+    kernel: &GameKernelV6,
+    request_id: SafeU53,
+    response: &mut BrowserResponseV1,
+    last_persisted_digest: &str,
+    current_mechanical_digest: &str,
+    pending: &mut Option<PendingSaveV1>,
+    storage_revision: Option<SafeU53>,
+) -> Result<(), BrowserWebErrorV1> {
+    let BrowserResponseV1::Effects(batch) = response else {
+        return Ok(());
+    };
+    if pending.is_some() {
+        return Ok(());
+    }
+    if current_mechanical_digest == last_persisted_digest {
+        return Ok(());
+    }
+    let bytes = canonical_game_save(kernel)?;
+    let request = json!({
+        "request_id": request_id,
+        "operation": "WRITE",
+        "key": "game-save-v1",
+        "expected_revision": storage_revision,
+        "bytes": bytes,
+    });
+    batch.effects.push(BrowserEffectV1::StorageRequest(
+        canonical_bytes(&request)
+            .map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))?,
+    ));
+    *pending = Some(PendingSaveV1 {
+        request_id,
+        digest: current_mechanical_digest.to_owned(),
+    });
+    Ok(())
+}
+
+fn accept_storage_result(
+    request_id: SafeU53,
+    bytes: &[u8],
+    last_persisted_digest: &mut String,
+    pending: &mut Option<PendingSaveV1>,
+    storage_revision: &mut Option<SafeU53>,
+) -> Result<(), BrowserWebErrorV1> {
+    let expected = pending.as_ref().ok_or(BrowserWebErrorV1::InvalidMessage)?;
+    if expected.request_id != request_id {
+        return Err(BrowserWebErrorV1::InvalidMessage);
+    }
+    let value: Value =
+        serde_json::from_slice(bytes).map_err(|_| BrowserWebErrorV1::InvalidMessage)?;
+    if canonical_bytes(&value).map_err(|error| BrowserWebErrorV1::Canonical(error.to_string()))?
+        != bytes
+    {
+        return Err(BrowserWebErrorV1::InvalidMessage);
+    }
+    let object = value.as_object().ok_or(BrowserWebErrorV1::InvalidMessage)?;
+    if object.len() != 1 {
+        return Err(BrowserWebErrorV1::InvalidMessage);
+    }
+    let revision = object
+        .get("revision")
+        .and_then(Value::as_u64)
+        .and_then(|value| SafeU53::new(value).ok())
+        .filter(|value| value.get() > 0)
+        .ok_or(BrowserWebErrorV1::InvalidMessage)?;
+    *last_persisted_digest = expected.digest.clone();
+    *storage_revision = Some(revision);
+    *pending = None;
+    Ok(())
 }
 
 fn process_request(

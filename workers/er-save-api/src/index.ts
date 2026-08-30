@@ -61,7 +61,7 @@ import {
   handleM9PlatformContext,
   handleM9ReleaseObject,
   handleM9RuntimeAssignment,
-  handleM9Save,
+  handleM9RustPreviewSave,
 } from "./m9-production";
 import {
   applyResultReport,
@@ -98,6 +98,8 @@ import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
 
 interface Env {
   DB: D1Database;
+  /** Completely isolated D1 for M9 Rust-preview saves; never aliases DB. */
+  M9_RUST_SAVES: D1Database;
   /**
    * Environment-isolated R2 bucket for the player-telemetry ML pipeline (#player-telemetry).
    * Staging and production bind different buckets. The optional type preserves fail-soft behavior
@@ -343,8 +345,10 @@ function corsHeaders(env: Env, origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": value,
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization,If-Match,X-Er-Release,X-Er-Save-Schema",
-    "Access-Control-Expose-Headers": "ETag,X-Er-Release-Id,X-Er-Save-Slot,X-Er-Save-Schema,X-Er-Save-Generation",
+    "Access-Control-Allow-Headers":
+      "Content-Type,Authorization,If-Match,X-Er-Release,X-Er-Save-Schema,X-Er-Save-Namespace",
+    "Access-Control-Expose-Headers":
+      "ETag,X-Er-Release-Id,X-Er-Save-Slot,X-Er-Save-Schema,X-Er-Save-Generation,X-Er-Save-Namespace,X-Er-Kernel-Generation,X-Er-Content-Identity,X-Er-Mechanics-Sha256,X-Er-Active-Model-Identity,X-Er-Payload-Sha256",
     "Access-Control-Max-Age": "86400",
   };
 }
@@ -5821,8 +5825,8 @@ export default {
       if (pathname === "/m9/runtime-assignment" && method === "POST") {
         return await handleM9RuntimeAssignment(request, auth, env, cors);
       }
-      if (pathname === "/m9/save" && (method === "GET" || method === "PUT")) {
-        return await handleM9Save(request, url, auth, env, cors);
+      if (pathname === "/m9/rust-save" && (method === "GET" || method === "PUT")) {
+        return await handleM9RustPreviewSave(request, url, auth, env, cors);
       }
       if (pathname === "/account/info" && method === "GET") {
         return await handleAccountInfo(auth, env, cors);

@@ -3,6 +3,7 @@ import { isUnknownRecord } from "../production/type-guards";
 export interface BrowserKernelCompatibilityV1 {
   browser_worker_protocol: 1;
   frame_envelope_version: 1;
+  save_namespace: "M9_RUST_PREVIEW_V1";
   authority_protocol: string;
   release_id: string;
   compatible_releases: string[];
@@ -48,6 +49,7 @@ export function assertCompatibleRustPeer(
   for (const key of [
     "browser_worker_protocol",
     "frame_envelope_version",
+    "save_namespace",
     "authority_protocol",
     "mechanical_identity",
     "content_hash",
@@ -76,6 +78,7 @@ function validateCompatibility(identity: BrowserKernelCompatibilityV1): void {
     identity.authority_runtime !== "RUST"
     || identity.browser_worker_protocol !== 1
     || identity.frame_envelope_version !== 1
+    || identity.save_namespace !== "M9_RUST_PREVIEW_V1"
     || identity.authority_protocol.length === 0
     || identity.release_id.length === 0
     || identity.compatible_releases.length > 16
@@ -99,6 +102,7 @@ function isBrowserKernelCompatibility(value: unknown): value is BrowserKernelCom
     value.authority_runtime === "RUST"
     && value.browser_worker_protocol === 1
     && value.frame_envelope_version === 1
+    && value.save_namespace === "M9_RUST_PREVIEW_V1"
     && typeof value.authority_protocol === "string"
     && typeof value.release_id === "string"
     && value.compatible_releases.every(release => typeof release === "string")

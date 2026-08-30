@@ -1,4 +1,4 @@
-import type { PlatformApiVersionSetV1 } from "./contracts";
+import { type PlatformApiVersionSetV1, RUST_PREVIEW_SAVE_NAMESPACE_V1 } from "./contracts";
 import { isUnknownRecord } from "./type-guards";
 
 const AUTHORIZATION = /^[A-Za-z0-9._~-]{16,8192}$/u;
@@ -10,6 +10,7 @@ const CONTEXT_KEYS: Readonly<Record<string, true>> = {
   entitlements_digest: true,
   server_api_versions: true,
   default_save_slot: true,
+  rust_save_namespace: true,
   telemetry_event_url: true,
 };
 
@@ -20,6 +21,7 @@ export interface AuthenticatedPlatformContextV1 {
   server_api_versions: PlatformApiVersionSetV1;
   default_save_slot: string;
   telemetry_event_url: string;
+  rust_save_namespace: typeof RUST_PREVIEW_SAVE_NAMESPACE_V1;
 }
 
 export function readProductionAccountAuthorizationV1(
@@ -79,6 +81,7 @@ function isAuthenticatedPlatformContext(value: unknown): value is AuthenticatedP
     || !SHA256.test(value.entitlements_digest)
     || typeof value.telemetry_event_url !== "string"
     || !isSecureTelemetryUrl(value.telemetry_event_url)
+    || value.rust_save_namespace !== RUST_PREVIEW_SAVE_NAMESPACE_V1
   ) {
     return false;
   }

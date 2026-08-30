@@ -1,4 +1,9 @@
-import type { ProductionReleaseManifestV2, ProductionSaveEnvelopeV2, SaveMigrationReceiptV1 } from "./contracts";
+import {
+  type ProductionReleaseManifestV2,
+  type ProductionSaveEnvelopeV2,
+  RUST_PREVIEW_SAVE_NAMESPACE_V1,
+  type SaveMigrationReceiptV1,
+} from "./contracts";
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const IDENTIFIER = /^[a-zA-Z0-9._:-]{1,128}$/u;
@@ -12,6 +17,7 @@ export async function validateProductionSaveEnvelopeV2(
 ): Promise<ProductionSaveEnvelopeV2> {
   if (
     envelope.envelope_version !== 2
+    || envelope.save_namespace !== RUST_PREVIEW_SAVE_NAMESPACE_V1
     || envelope.slot !== slot
     || envelope.pseudonymous_account_id !== accountId
     || !IDENTIFIER.test(envelope.slot)

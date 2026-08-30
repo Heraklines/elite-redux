@@ -5,8 +5,9 @@ use er_game::m7_content::{GameContentBundleV1, PreparedGameContentV1};
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
 use er_production::{
     LegacySaveBackupReferenceV1, LegacyTypeScriptSaveMigratorV1, MechanicalCompatibilityIdentityV1,
-    ProductionReleaseId, ProductionSaveEnvelopeV2, SaveGeneration, SaveRuntimeOriginV1, SaveSlotId,
-    prepare_copy_on_write_migration_v1, restore_game_save_to_kernel_snapshot_v1,
+    ProductionReleaseId, ProductionSaveEnvelopeV2, RUST_PREVIEW_SAVE_NAMESPACE_V1, SaveGeneration,
+    SaveRuntimeOriginV1, SaveSlotId, prepare_copy_on_write_migration_v1,
+    restore_game_save_to_kernel_snapshot_v1,
 };
 use er_save::GameSaveV1;
 use er_types::SafeU53;
@@ -71,6 +72,7 @@ pub fn migrate_production_save_v2_native(
         .map_err(|error| error.to_string())?;
     let envelope = ProductionSaveEnvelopeV2 {
         envelope_version: 2,
+        save_namespace: RUST_PREVIEW_SAVE_NAMESPACE_V1.to_owned(),
         slot: metadata.slot,
         pseudonymous_account_id: metadata.pseudonymous_account_id,
         cloud_generation: SaveGeneration(metadata.cloud_generation),

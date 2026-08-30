@@ -33,6 +33,10 @@ export interface RustPhaserKernelHostV1 {
   dispose(): Promise<void>;
 }
 
+export interface RustPhaserStorageHandlerV1 {
+  handleRequest(bytes: Uint8Array): Promise<Uint8Array>;
+}
+
 export async function startRustPhaserRoute(options: RustPhaserRouteOptionsV1): Promise<RustPhaserRouteSessionV1> {
   const mode = options.mode ?? BrowserExecutionModeV1.RUST_LOCAL_AUTHORITY;
   const host = await RustBrowserHost.create({
@@ -47,20 +51,55 @@ export async function startRustPhaserRoute(options: RustPhaserRouteOptionsV1): P
       },
     },
   });
-  return startRustPhaserHostV1(host, options.scene);
+  return startRustPhaserHostV1(host, options.scene, null);
 }
 
 export async function startRustPhaserHostV1(
   host: RustPhaserKernelHostV1,
   scene: Phaser.Scene,
+  storage: RustPhaserStorageHandlerV1 | null,
 ): Promise<RustPhaserRouteSessionV1> {
   const ui = new PhaserUiAdapterV1(scene);
   const battle = new PhaserBattleAdapterV1(scene);
   const surface = new PhaserSurfaceAdapterV1(scene);
   const trace = new PresentationSettlementTraceV1();
+  const acknowledgedStorageRequests = new Set<number>();
   let work = Promise.resolve();
   let disposed = false;
   let dispatch: (request: BrowserRequestV1) => Promise<BrowserResponseEnvelopeV1[]>;
+
+  const handleStorageEffect = async (effect: Extract<BrowserEffectV1, { kind: "STORAGE_REQUEST" }>): Promise<void> => {
+    if (storage == null) {
+      throw new Error("Rust Phaser route received storage work without an isolated save handler");
+    }
+    const request = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(effect.value))) as {
+      request_id?: unknown;
+    };
+    if (!Number.isSafeInteger(request.request_id) || Number(request.request_id) < 1) {
+      throw new Error("Rust Phaser route received an invalid storage request identity");
+    }
+    const requestId = Number(request.request_id);
+    const result = await storage.handleRequest(Uint8Array.from(effect.value));
+    try {
+      if (acknowledgedStorageRequests.has(requestId)) {
+        return;
+      }
+      await dispatch({
+        kind: "STORAGE_RESULT",
+        value: { request_id: requestId, bytes: Array.from(result) },
+      });
+      acknowledgedStorageRequests.add(requestId);
+      while (acknowledgedStorageRequests.size > 2_048) {
+        const first = acknowledgedStorageRequests.values().next().value;
+        if (first == null) {
+          break;
+        }
+        acknowledgedStorageRequests.delete(first);
+      }
+    } finally {
+      result.fill(0);
+    }
+  };
 
   const handleEffect = async (envelope: BrowserResponseEnvelopeV1, effect: BrowserEffectV1): Promise<void> => {
     if (effect.kind === "UI_CHANGED") {
@@ -75,6 +114,8 @@ export async function startRustPhaserHostV1(
       const outcome = await battle.present(bytes);
       trace.settle(cue.event_id, generation, outcome);
       await dispatch({ kind: "PRESENTATION_SETTLED", value: { event_id: cue.event_id, outcome } });
+    } else if (effect.kind === "STORAGE_REQUEST") {
+      await handleStorageEffect(effect);
     }
   };
 
@@ -133,6 +174,7 @@ export async function startRustPhaserHostV1(
       clock.dispose();
       await work.catch(() => undefined);
       disposed = true;
+      acknowledgedStorageRequests.clear();
       trace.dispose();
       battle.dispose();
       surface.dispose();

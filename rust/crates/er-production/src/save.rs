@@ -18,6 +18,7 @@ use crate::{
 };
 
 pub const PRODUCTION_SAVE_ENVELOPE_VERSION_V2: u32 = 2;
+pub const RUST_PREVIEW_SAVE_NAMESPACE_V1: &str = "M9_RUST_PREVIEW_V1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -44,6 +45,7 @@ pub struct SaveMigrationReceiptV1 {
 #[serde(deny_unknown_fields)]
 pub struct ProductionSaveEnvelopeV2 {
     pub envelope_version: u32,
+    pub save_namespace: String,
     pub slot: SaveSlotId,
     pub pseudonymous_account_id: String,
     pub cloud_generation: SaveGeneration,
@@ -142,6 +144,7 @@ impl ProductionSaveEnvelopeV2 {
         self.release_id.validate("save release")?;
         self.mechanical_identity.validate()?;
         if self.envelope_version != PRODUCTION_SAVE_ENVELOPE_VERSION_V2
+            || self.save_namespace != RUST_PREVIEW_SAVE_NAMESPACE_V1
             || self.kernel_generation == 0
             || self.authority_protocol != "er-coop-47"
             || self.save_schema == 0

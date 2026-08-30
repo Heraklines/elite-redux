@@ -13,6 +13,7 @@ interface M9R2Bucket {
 
 interface M9Env {
   DB: D1Database;
+  M9_RUST_SAVES: D1Database;
   M9_RELEASES: M9R2Bucket;
   M9_RELEASE_SIGNING_PRIVATE_KEY: string;
   M9_INTERNAL_ACCOUNTS?: string;
@@ -35,6 +36,57 @@ const PUBLIC_KEY = Uint8Array.from([
   125, 204, 207, 198, 76, 152, 199, 166, 208, 56, 189, 10, 100, 113, 89, 240, 107, 149, 135, 191, 77, 117, 18, 75, 237,
   22, 120, 8, 213, 169, 37, 142,
 ]);
+const RUST_PREVIEW_SAVE_NAMESPACE = "M9_RUST_PREVIEW_V1";
+const RUST_PREVIEW_ENVELOPE_KEYS: Readonly<Record<string, true>> = {
+  envelope_version: true,
+  save_namespace: true,
+  slot: true,
+  pseudonymous_account_id: true,
+  cloud_generation: true,
+  origin_runtime: true,
+  release_id: true,
+  kernel_generation: true,
+  mechanical_identity: true,
+  authority_protocol: true,
+  save_schema: true,
+  content_hash: true,
+  payload_hash: true,
+  payload: true,
+  migration: true,
+  legacy_backup: true,
+};
+const rustPreviewReleaseIdentities = new Map<string, RustPreviewReleaseIdentity>();
+
+interface RustPreviewSaveRow {
+  data: string;
+  revision: number;
+  release_id: string;
+  kernel_generation: number;
+  content_identity: string;
+  active_model_identity: string;
+  mechanics_sha256: string;
+  save_schema: number;
+  payload_sha256: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface RustPreviewEnvelopeIdentity {
+  kernelGeneration: number;
+  contentIdentity: string;
+  mechanicsSha256: string;
+  activeModelIdentity: string;
+  payloadSha256: string;
+}
+
+interface RustPreviewReleaseIdentity {
+  kernelGeneration: number;
+  saveSchema: number;
+  authorityProtocol: string;
+  contentIdentity: string;
+  mechanicsSha256: string;
+  activeModelIdentity: string;
+}
 const MAXIMUM_SAVE_BYTES = 268_435_456;
 
 export async function handleM9PlatformContext(
@@ -61,7 +113,8 @@ export async function handleM9PlatformContext(
         showdown_api: 1,
         achievement_api: 1,
       },
-      default_save_slot: "slot-0",
+      default_save_slot: "rust-slot-0",
+      rust_save_namespace: RUST_PREVIEW_SAVE_NAMESPACE,
       telemetry_event_url: telemetryEventUrl,
     },
     200,
@@ -213,91 +266,335 @@ export async function handleM9RuntimeAssignment(
   return json(signed, 200, cors);
 }
 
-export async function handleM9Save(
+export async function handleM9RustPreviewSave(
   request: Request,
   url: URL,
   auth: M9Auth,
   env: M9Env,
   cors: Record<string, string>,
 ): Promise<Response> {
-  const slotText = url.searchParams.get("slot") ?? "";
-  const match = /^slot-([0-4])$/u.exec(slotText);
+  const slot = url.searchParams.get("slot") ?? "";
   const releaseId = request.headers.get("x-er-release") ?? "";
+  const namespace = request.headers.get("x-er-save-namespace") ?? "";
   const saveSchema = Number(request.headers.get("x-er-save-schema"));
-  if (match == null || !identifier(releaseId) || !Number.isSafeInteger(saveSchema) || saveSchema < 1) {
-    return json({ error: "invalid production save identity" }, 400, cors);
+  if (
+    !/^rust-slot-[0-4]$/u.test(slot)
+    || !identifier(releaseId)
+    || namespace !== "M9_RUST_PREVIEW_V1"
+    || !Number.isSafeInteger(saveSchema)
+    || saveSchema < 1
+  ) {
+    return json({ error: "invalid Rust preview save identity" }, 400, cors);
   }
-  const slot = Number(match[1]);
-  const row = await env.DB.prepare("SELECT data, updated_at FROM session_saves WHERE user_id = ? AND slot = ?")
-    .bind(auth.uid, slot)
-    .first<{ data: string; updated_at: number }>();
+  const release = await rustPreviewReleaseIdentity(env, releaseId);
+  if (release == null || release.saveSchema !== saveSchema) {
+    return json({ error: "Rust preview release identity is unavailable or invalid" }, 503, cors);
+  }
+  const accountId = await pseudonymousAccount(auth.uid);
+  const row = await env.M9_RUST_SAVES.prepare(
+    `SELECT data, revision, release_id, kernel_generation, content_identity,
+            active_model_identity, mechanics_sha256, save_schema, payload_sha256, created_at, updated_at
+       FROM rust_preview_saves WHERE account_id = ? AND slot = ?`,
+  )
+    .bind(accountId, slot)
+    .first<RustPreviewSaveRow>();
   if (request.method === "GET") {
     if (row == null) {
-      return new Response(null, { status: 404, headers: cors });
+      return new Response(null, {
+        status: 404,
+        headers: {
+          ...cors,
+          "cache-control": "no-store",
+          "x-er-save-namespace": "M9_RUST_PREVIEW_V1",
+        },
+      });
     }
-    return saveResponse(row.data, row.updated_at, releaseId, slotText, saveSchema, cors);
+    if (
+      row.release_id !== releaseId
+      || row.save_schema !== saveSchema
+      || row.kernel_generation !== release.kernelGeneration
+      || row.content_identity !== release.contentIdentity
+      || row.mechanics_sha256 !== release.mechanicsSha256
+      || row.active_model_identity !== release.activeModelIdentity
+    ) {
+      return json({ error: "Rust preview save requires an explicit compatible-release migration" }, 409, cors);
+    }
+    return rustPreviewSaveResponse(row, slot, cors);
   }
   if (request.method !== "PUT") {
     return json({ error: "method not allowed" }, 405, cors);
   }
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength === 0 || bytes.byteLength > MAXIMUM_SAVE_BYTES) {
-    return json({ error: "save is empty or oversized" }, 413, cors);
+    return json({ error: "Rust preview save is empty or oversized" }, 413, cors);
   }
   let incoming: string;
+  let parsed: unknown;
   try {
     incoming = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    parsed = JSON.parse(incoming);
   } catch {
-    return json({ error: "save is not canonical UTF-8" }, 400, cors);
+    return json({ error: "Rust preview save is not canonical UTF-8 JSON" }, 400, cors);
+  }
+  if (canonical(parsed) !== incoming) {
+    return json({ error: "Rust preview save is not canonical JSON" }, 400, cors);
+  }
+  const nextRevision = (row?.revision ?? 0) + 1;
+  const identity = await rustPreviewEnvelopeIdentity(parsed, accountId, slot, releaseId, release, nextRevision);
+  if (identity == null) {
+    return json({ error: "Rust preview save envelope identity is invalid" }, 400, cors);
   }
   const expected = request.headers.get("if-match");
   const currentEtag = row == null ? null : await etag(row.data);
   if ((row == null && expected !== "*") || (row != null && expected !== currentEtag)) {
-    return json({ error: "save generation conflict" }, 412, cors);
+    return json({ error: "Rust preview save generation conflict" }, 412, cors);
   }
-  const generation = Math.max(Date.now(), (row?.updated_at ?? 0) + 1);
-  const result =
-    row == null
-      ? await env.DB.prepare(
-          "INSERT INTO session_saves (user_id, slot, data, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, slot) DO NOTHING",
-        )
-          .bind(auth.uid, slot, incoming, generation)
-          .run()
-      : await env.DB.prepare(
-          "UPDATE session_saves SET data = ?, updated_at = ? WHERE user_id = ? AND slot = ? AND data = ?",
-        )
-          .bind(incoming, generation, auth.uid, slot, row.data)
-          .run();
-  if ((result.meta.changes ?? 0) !== 1) {
-    return json({ error: "save compare-and-swap conflict" }, 409, cors);
+  const now = Date.now();
+  let changes = 0;
+  if (row == null) {
+    const result = await env.M9_RUST_SAVES.prepare(
+      `INSERT INTO rust_preview_saves (
+         account_id, slot, release_id, kernel_generation, content_identity,
+         active_model_identity, mechanics_sha256, save_schema, payload_sha256,
+         data, revision, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(account_id, slot) DO NOTHING`,
+    )
+      .bind(
+        accountId,
+        slot,
+        releaseId,
+        identity.kernelGeneration,
+        identity.contentIdentity,
+        identity.activeModelIdentity,
+        identity.mechanicsSha256,
+        saveSchema,
+        identity.payloadSha256,
+        incoming,
+        nextRevision,
+        now,
+        now,
+      )
+      .run();
+    changes = result.meta.changes ?? 0;
+  } else {
+    const results = await env.M9_RUST_SAVES.batch([
+      env.M9_RUST_SAVES.prepare(
+        `INSERT INTO rust_preview_save_backups (
+           account_id, slot, revision, release_id, kernel_generation, content_identity,
+           active_model_identity, mechanics_sha256, save_schema, payload_sha256,
+           data, created_at, replaced_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(account_id, slot, revision) DO NOTHING`,
+      ).bind(
+        accountId,
+        slot,
+        row.revision,
+        row.release_id,
+        row.kernel_generation,
+        row.content_identity,
+        row.active_model_identity,
+        row.mechanics_sha256,
+        row.save_schema,
+        row.payload_sha256,
+        row.data,
+        row.created_at,
+        now,
+      ),
+      env.M9_RUST_SAVES.prepare(
+        `UPDATE rust_preview_saves
+            SET release_id = ?, kernel_generation = ?, content_identity = ?,
+                active_model_identity = ?, mechanics_sha256 = ?, save_schema = ?,
+                payload_sha256 = ?, data = ?, revision = ?, updated_at = ?
+          WHERE account_id = ? AND slot = ? AND revision = ? AND payload_sha256 = ?`,
+      ).bind(
+        releaseId,
+        identity.kernelGeneration,
+        identity.contentIdentity,
+        identity.activeModelIdentity,
+        identity.mechanicsSha256,
+        saveSchema,
+        identity.payloadSha256,
+        incoming,
+        nextRevision,
+        now,
+        accountId,
+        slot,
+        row.revision,
+        row.payload_sha256,
+      ),
+    ]);
+    changes = results[1]?.meta.changes ?? 0;
   }
-  const readback = await env.DB.prepare("SELECT data, updated_at FROM session_saves WHERE user_id = ? AND slot = ?")
-    .bind(auth.uid, slot)
-    .first<{ data: string; updated_at: number }>();
-  if (readback == null || readback.data !== incoming || readback.updated_at !== generation) {
-    return json({ error: "save readback mismatch" }, 500, cors);
+  if (changes !== 1) {
+    return json({ error: "Rust preview save compare-and-swap conflict" }, 409, cors);
   }
-  return saveResponse(readback.data, readback.updated_at, releaseId, slotText, saveSchema, cors);
+  const readback = await env.M9_RUST_SAVES.prepare(
+    `SELECT data, revision, release_id, kernel_generation, content_identity,
+            active_model_identity, mechanics_sha256, save_schema, payload_sha256, created_at, updated_at
+       FROM rust_preview_saves WHERE account_id = ? AND slot = ?`,
+  )
+    .bind(accountId, slot)
+    .first<RustPreviewSaveRow>();
+  if (
+    readback == null
+    || readback.data !== incoming
+    || readback.revision !== nextRevision
+    || readback.payload_sha256 !== identity.payloadSha256
+    || readback.release_id !== releaseId
+    || readback.kernel_generation !== identity.kernelGeneration
+    || readback.content_identity !== identity.contentIdentity
+    || readback.active_model_identity !== identity.activeModelIdentity
+    || readback.mechanics_sha256 !== identity.mechanicsSha256
+    || readback.save_schema !== release.saveSchema
+  ) {
+    return json({ error: "Rust preview save readback mismatch" }, 500, cors);
+  }
+  return rustPreviewSaveResponse(readback, slot, cors);
 }
 
-async function saveResponse(
-  data: string,
-  generation: number,
-  releaseId: string,
+async function rustPreviewReleaseIdentity(env: M9Env, releaseId: string): Promise<RustPreviewReleaseIdentity | null> {
+  const cached = rustPreviewReleaseIdentities.get(releaseId);
+  if (cached != null) {
+    return cached;
+  }
+  const object = await env.M9_RELEASES.get(`manifests/${releaseId}.json`);
+  if (object == null) {
+    return null;
+  }
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  if (bytes.byteLength === 0 || bytes.byteLength > 131_072) {
+    return null;
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    return null;
+  }
+  if (!(await verifyEnvelope(value, "er-m9:release-manifest-v1"))) {
+    return null;
+  }
+  const payload = (value as SignedEnvelope).payload;
+  const mechanical = payload.mechanical_identity;
+  if (
+    payload.release_id !== releaseId
+    || !Number.isSafeInteger(payload.release_epoch)
+    || Number(payload.release_epoch) < 1
+    || !Number.isSafeInteger(payload.save_schema)
+    || Number(payload.save_schema) < 1
+    || payload.authority_protocol !== "er-coop-47"
+    || !isM9Record(mechanical)
+    || Object.keys(mechanical).length !== 5
+    || mechanical.schema_version !== 1
+    || typeof mechanical.mechanics_sha256 !== "string"
+    || !/^[0-9a-f]{64}$/u.test(mechanical.mechanics_sha256)
+    || typeof mechanical.content_hash !== "string"
+    || mechanical.content_hash.length === 0
+    || mechanical.content_hash.length > 256
+    || mechanical.authority_protocol !== "er-coop-47"
+    || typeof mechanical.active_model_identity !== "string"
+    || !identifier(mechanical.active_model_identity)
+  ) {
+    return null;
+  }
+  const identity = {
+    kernelGeneration: Number(payload.release_epoch),
+    saveSchema: Number(payload.save_schema),
+    authorityProtocol: "er-coop-47",
+    contentIdentity: mechanical.content_hash,
+    mechanicsSha256: mechanical.mechanics_sha256,
+    activeModelIdentity: mechanical.active_model_identity,
+  };
+  rustPreviewReleaseIdentities.set(releaseId, identity);
+  while (rustPreviewReleaseIdentities.size > 16) {
+    const first = rustPreviewReleaseIdentities.keys().next().value;
+    if (first == null) {
+      break;
+    }
+    rustPreviewReleaseIdentities.delete(first);
+  }
+  return identity;
+}
+
+async function rustPreviewEnvelopeIdentity(
+  value: unknown,
+  accountId: string,
   slot: string,
-  saveSchema: number,
+  releaseId: string,
+  release: RustPreviewReleaseIdentity,
+  nextRevision: number,
+): Promise<RustPreviewEnvelopeIdentity | null> {
+  if (
+    !isM9Record(value)
+    || Object.keys(value).some(key => RUST_PREVIEW_ENVELOPE_KEYS[key] !== true)
+    || value.envelope_version !== 2
+    || value.save_namespace !== RUST_PREVIEW_SAVE_NAMESPACE
+    || value.slot !== slot
+    || value.pseudonymous_account_id !== accountId
+    || value.cloud_generation !== nextRevision
+    || value.origin_runtime !== "RUST"
+    || value.release_id !== releaseId
+    || value.kernel_generation !== release.kernelGeneration
+    || value.authority_protocol !== release.authorityProtocol
+    || value.save_schema !== release.saveSchema
+    || value.content_hash !== release.contentIdentity
+    || typeof value.payload_hash !== "string"
+    || !/^[0-9a-f]{64}$/u.test(value.payload_hash)
+    || !Array.isArray(value.payload)
+    || value.payload.length === 0
+    || value.payload.length > MAXIMUM_SAVE_BYTES
+    || value.payload.some(byte => !Number.isSafeInteger(byte) || Number(byte) < 0 || Number(byte) > 255)
+    || value.migration !== null
+    || value.legacy_backup !== null
+    || !isM9Record(value.mechanical_identity)
+    || Object.keys(value.mechanical_identity).length !== 5
+    || value.mechanical_identity.schema_version !== 1
+    || value.mechanical_identity.mechanics_sha256 !== release.mechanicsSha256
+    || value.mechanical_identity.content_hash !== release.contentIdentity
+    || value.mechanical_identity.authority_protocol !== release.authorityProtocol
+    || value.mechanical_identity.active_model_identity !== release.activeModelIdentity
+  ) {
+    return null;
+  }
+  const payload = Uint8Array.from(value.payload as number[]);
+  try {
+    if ((await sha256(payload)) !== value.payload_hash) {
+      return null;
+    }
+  } finally {
+    payload.fill(0);
+  }
+  return {
+    kernelGeneration: Number(value.kernel_generation),
+    contentIdentity: value.content_hash,
+    mechanicsSha256: value.mechanical_identity.mechanics_sha256,
+    activeModelIdentity: value.mechanical_identity.active_model_identity,
+    payloadSha256: value.payload_hash,
+  };
+}
+
+async function rustPreviewSaveResponse(
+  row: RustPreviewSaveRow,
+  slot: string,
   cors: Record<string, string>,
 ): Promise<Response> {
-  return new Response(data, {
+  return new Response(row.data, {
     status: 200,
     headers: {
       ...cors,
       "content-type": "application/octet-stream",
-      etag: await etag(data),
-      "x-er-release-id": releaseId,
+      etag: await etag(row.data),
+      "x-er-save-namespace": RUST_PREVIEW_SAVE_NAMESPACE,
+      "x-er-release-id": row.release_id,
       "x-er-save-slot": slot,
-      "x-er-save-schema": String(saveSchema),
-      "x-er-save-generation": String(generation),
+      "x-er-save-schema": String(row.save_schema),
+      "x-er-save-generation": String(row.revision),
+      "x-er-kernel-generation": String(row.kernel_generation),
+      "x-er-content-identity": row.content_identity,
+      "x-er-payload-sha256": row.payload_sha256,
+      "x-er-mechanics-sha256": row.mechanics_sha256,
+      "x-er-active-model-identity": row.active_model_identity,
       "cache-control": "no-store",
     },
   });

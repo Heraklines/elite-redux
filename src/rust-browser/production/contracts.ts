@@ -3,6 +3,7 @@ import type { BrowserKernelGenerationIdentityV1 } from "../hot-reload/contracts"
 export const PRODUCTION_RELEASE_MANIFEST_VERSION_V2 = 2 as const;
 export const SIGNED_PRODUCTION_ENVELOPE_VERSION_V1 = 1 as const;
 export const PRODUCTION_AUTHORITY_PROTOCOL_V1 = "er-coop-47" as const;
+export const RUST_PREVIEW_SAVE_NAMESPACE_V1 = "M9_RUST_PREVIEW_V1" as const;
 
 export type ReleaseChannelV1 = "INTERNAL" | "PREVIEW" | "CANARY" | "STABLE" | "ROLLBACK" | "LEGACY_TRANSITION";
 export type ProductionAuthorityRuntimeV1 =
@@ -207,6 +208,7 @@ export interface SaveMigrationReceiptV1 {
 
 export interface ProductionSaveEnvelopeV2 {
   envelope_version: 2;
+  save_namespace: typeof RUST_PREVIEW_SAVE_NAMESPACE_V1;
   slot: string;
   pseudonymous_account_id: string;
   cloud_generation: number;
@@ -233,6 +235,7 @@ export interface SaveLeaseV1 {
 
 export interface ProductionCoopCompatibilityV1 {
   schema_version: 1;
+  save_namespace: typeof RUST_PREVIEW_SAVE_NAMESPACE_V1;
   release_id: string;
   compatible_releases: string[];
   authority_runtime: Exclude<ProductionAuthorityRuntimeV1, "LEGACY_TRANSITION">;

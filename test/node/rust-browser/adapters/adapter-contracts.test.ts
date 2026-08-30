@@ -21,6 +21,7 @@ import { PresentationSettlementTraceV1 } from "../../../../src/rust-browser/rend
 const identity: BrowserKernelCompatibilityV1 = {
   browser_worker_protocol: 1,
   frame_envelope_version: 1,
+  save_namespace: "M9_RUST_PREVIEW_V1",
   authority_protocol: "er-coop-47",
   release_id: "release-v1",
   compatible_releases: [],
@@ -208,6 +209,10 @@ describe("M8 browser adapters", () => {
     expect(assertCompatibleRustPeer(identity, encodeCompatibilityHandshake(identity))).toEqual(identity);
     const mixed = new TextEncoder().encode(JSON.stringify({ ...identity, authority_runtime: "TYPESCRIPT" }));
     expect(() => assertCompatibleRustPeer(identity, mixed)).toThrow(/mixed TypeScript\/Rust/u);
+    const mixedNamespace = new TextEncoder().encode(
+      JSON.stringify({ ...identity, save_namespace: "LEGACY_PRODUCTION_V1" }),
+    );
+    expect(() => assertCompatibleRustPeer(identity, mixedNamespace)).toThrow(/compatibility|namespace|malformed/u);
   });
 
   it("sends exactly one compatibility handshake when open is observed twice", async () => {

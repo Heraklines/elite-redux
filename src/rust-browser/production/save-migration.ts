@@ -128,6 +128,34 @@ export async function loadOrMigrateProductionSaveV1(
   }
 }
 
+export async function loadRustPreviewSaveV1(
+  options: ProductionSaveMigrationOptionsV1,
+): Promise<{ envelope: ProductionSaveEnvelopeV2; sessionStartBytes: Uint8Array }> {
+  const lease = await options.leases.acquire(options.slot, options.browserInstanceId, options.release.release_epoch);
+  try {
+    if (options.source.bytes.byteLength === 0 || options.source.bytes.byteLength > MAXIMUM_SAVE_BYTES) {
+      throw new Error("Rust preview save source is empty or oversized");
+    }
+    const envelope = tryDecodeProductionEnvelope(options.source.bytes);
+    if (
+      envelope == null
+      || envelope.origin_runtime !== "RUST"
+      || envelope.migration != null
+      || envelope.legacy_backup != null
+    ) {
+      throw new Error("Rust preview save cannot fall back to or migrate a legacy save");
+    }
+    await validateProductionSaveEnvelopeV2(envelope, options.release, options.accountId, options.slot);
+    const sessionStartBytes = await options.backend.restoreProductionSave({
+      envelope,
+      release: options.release,
+    });
+    return { envelope, sessionStartBytes };
+  } finally {
+    await options.leases.release(lease);
+  }
+}
+
 function tryDecodeProductionEnvelope(bytes: Uint8Array): ProductionSaveEnvelopeV2 | null {
   try {
     const value = decodeProductionSaveEnvelopeV2(bytes);
