@@ -296,7 +296,8 @@ export function renderProductionUnavailableV1(error: unknown): void {
   message.textContent =
     "The verified Rust preview release is unavailable. No game state was changed. Please try again later.";
   root.append(message);
-  console.error("Production Rust preview authority unavailable", error instanceof Error ? error.name : "UnknownError");
+  const detail = error instanceof Error ? `${error.name}: ${error.message.slice(0, 256)}` : "UnknownError";
+  console.error("Production Rust preview authority unavailable", detail);
 }
 
 interface VerifiedBrowserEntryModuleV1 {

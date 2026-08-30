@@ -68,6 +68,10 @@ export class ProductionSaveRestoreWorkerV1 implements RustProductionSaveRestoreB
       resolve(new Uint8Array(value.bytes));
     };
     worker.onerror = event => reject(new Error(event.message || "Rust production save restore Worker crashed"));
+    const glueMessage = Uint8Array.from(glue);
+    const wasmMessage = Uint8Array.from(wasm);
+    const contentMessage = Uint8Array.from(content);
+    const templateMessage = Uint8Array.from(template);
     try {
       worker.postMessage(
         {
@@ -77,22 +81,22 @@ export class ProductionSaveRestoreWorkerV1 implements RustProductionSaveRestoreB
           glue_sha256: manifest.artifacts.wasm_glue_js.sha256,
           wasm_sha256: manifest.artifacts.wasm.sha256,
           content_sha256: manifest.artifacts.content.sha256,
-          glue_bytes: glue.buffer,
-          wasm_bytes: wasm.buffer,
-          content_bytes: content.buffer,
+          glue_bytes: glueMessage.buffer,
+          wasm_bytes: wasmMessage.buffer,
+          content_bytes: contentMessage.buffer,
         },
-        [glue.buffer, wasm.buffer, content.buffer],
+        [glueMessage.buffer, wasmMessage.buffer, contentMessage.buffer],
       );
-      const source = Uint8Array.from(envelope);
+      const sourceMessage = Uint8Array.from(envelope);
       worker.postMessage(
         {
           kind: "RESTORE_PRODUCTION_SAVE_V2",
           release_id: manifest.release_id,
           generation: manifest.release_epoch,
-          envelope_bytes: source.buffer,
-          template_bytes: template.buffer,
+          envelope_bytes: sourceMessage.buffer,
+          template_bytes: templateMessage.buffer,
         },
-        [source.buffer, template.buffer],
+        [sourceMessage.buffer, templateMessage.buffer],
       );
       return await promise;
     } finally {
