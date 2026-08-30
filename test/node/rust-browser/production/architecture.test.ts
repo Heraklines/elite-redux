@@ -20,6 +20,9 @@ describe("M9 production authority architecture", () => {
     ]) {
       expect(main).not.toContain(forbidden);
     }
+    const configured = read("src/rust-browser/production/configured-production-main.ts");
+    expect(configured).toContain("get now()");
+    expect(configured).not.toContain("now: Date.now()");
     const selector = read("src/rust-browser/host/browser-runtime-selector.ts");
     expect(selector).toContain("RUST_PRODUCTION_AUTHORITY");
     expect(selector.indexOf("RUST_PRODUCTION_AUTHORITY")).toBeLessThan(selector.indexOf("new URLSearchParams"));

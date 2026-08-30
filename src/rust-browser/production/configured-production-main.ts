@@ -42,7 +42,9 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
   const pinStore = new IndexedDbSessionRuntimePinStoreV1();
   const session = await startProductionBootstrapV1({
     sessionId,
-    now: Date.now(),
+    get now() {
+      return Date.now();
+    },
     trustedKeys: PINNED_PRODUCTION_RELEASE_KEYS_V1,
     expectedAssignmentScopes: [
       { kind: "BROWSER_SESSION", value: { session_id: sessionId } },
