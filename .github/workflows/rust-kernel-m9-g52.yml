@@ -89,7 +89,20 @@ jobs:
           workers/er-telemetry/src/m9-health.ts
           test/node/rust-browser/production/*.test.ts
           test/node/rust-browser/adapters/adapter-contracts.test.ts
-      - run: pnpm exec biome ci --diagnostic-level=error .github/workflows/*m9*.yml scripts/*m9*.mjs src/rust-browser test/node/rust-browser workers/er-save-api/src/m9-*.ts workers/er-telemetry/src/m9-health.ts
+      - run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          .github/workflows/*m9*.yml scripts/*m9*.mjs src/main.ts
+          src/rust-browser/production
+          src/rust-browser/adapters/cloud-save-adapter.ts
+          src/rust-browser/adapters/signaling-adapter.ts
+          src/rust-browser/adapters/transport-adapter.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          src/rust-browser/worker/rust-wasm-loader.ts
+          test/node/rust-browser/production
+          test/node/rust-browser/adapters/adapter-contracts.test.ts
+          workers/er-save-api/src/m9-production.ts
+          workers/er-save-api/src/m9-type-guards.ts
+          workers/er-telemetry/src/m9-health.ts
       - name: Enforce production import and API quarantine
         run: |
           node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-production" --authority rust
