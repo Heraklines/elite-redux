@@ -217,15 +217,25 @@ jobs:
           name: m9-g52-web-${{ github.sha }}
           path: ${{ runner.temp }}/m9-web
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - name: Run cache offline input save and platform matrix
+      - name: Run cache and input platform matrix
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=${{ matrix.browser }}
+          test/browser/rust-browser/release-cache.spec.ts
+          test/browser/rust-browser/input-accessibility.spec.ts
+      - name: Run offline save and authenticated transport in a fresh browser process
         env:
           M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
         run: >-
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=${{ matrix.browser }}
           test/browser/rust-browser/save-offline.spec.ts
-          test/browser/rust-browser/release-cache.spec.ts
-          test/browser/rust-browser/input-accessibility.spec.ts
+      - name: Run mobile touch in a fresh browser process
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=${{ matrix.browser }}
           test/browser/rust-browser/mobile-profile.spec.ts
       - name: Run cross-engine Rust Wasm journey
         if: matrix.browser != 'firefox'
