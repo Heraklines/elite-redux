@@ -381,6 +381,16 @@
   "SPECIES_RIBOMBEE": {
     "hidden": 118
   },
+  "SPECIES_RIBOMBEE_REDUX_MEGA": {
+    "ability1": 20010,
+    "ability2": 20010,
+    "hidden": 20010,
+    "innates": [
+      20011,
+      5510,
+      84
+    ]
+  },
   "SPECIES_SALAMENCE_MEGA": {
     "innates": [
       5459,
