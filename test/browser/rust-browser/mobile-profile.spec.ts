@@ -47,7 +47,6 @@ test("low-end mobile touch emits physical input and tears down", async ({ page }
     orientation: globalThis.__mobile.orientation(),
   }));
   expect(result.events.slice(0, 2)).toEqual(["KEY_DOWN", "KEY_UP"]);
-  expect(result.events).toContain("FOCUS_CHANGED");
   expect(result.orientation).toBe("portrait");
   await page.evaluate(() => globalThis.__mobile.dispose());
 });

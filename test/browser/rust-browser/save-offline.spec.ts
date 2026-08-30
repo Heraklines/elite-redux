@@ -33,18 +33,26 @@ async function waitUntil(predicate) {
   tick();
   return promise;
 }
+function waitIce(connection) {
+  if (connection.iceGatheringState === "complete") return Promise.resolve();
+  const { promise, resolve } = Promise.withResolvers();
+  connection.addEventListener("icegatheringstatechange", () => {
+    if (connection.iceGatheringState === "complete") resolve();
+  });
+  return promise;
+}
 async function rtcPair(left, right, leftEvents, rightEvents, connectionGeneration) {
   const leftConnected = leftEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length;
   const rightConnected = rightEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length;
   const a = new RTCPeerConnection(); const b = new RTCPeerConnection();
-  a.onicecandidate = event => { if (event.candidate) b.addIceCandidate(event.candidate); };
-  b.onicecandidate = event => { if (event.candidate) a.addIceCandidate(event.candidate); };
   const contexts = frameContexts(connectionGeneration);
   b.ondatachannel = event => right.attach(event.channel, contexts.right);
   const channel = a.createDataChannel("rust-kernel", { ordered: true });
   const generation = left.attach(channel, contexts.left);
-  await a.setLocalDescription(await a.createOffer()); await b.setRemoteDescription(a.localDescription);
-  await b.setLocalDescription(await b.createAnswer()); await a.setRemoteDescription(b.localDescription);
+  await a.setLocalDescription(await a.createOffer()); await waitIce(a);
+  await b.setRemoteDescription(a.localDescription);
+  await b.setLocalDescription(await b.createAnswer()); await waitIce(b);
+  await a.setRemoteDescription(b.localDescription);
   await waitUntil(() => leftEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length > leftConnected && rightEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length > rightConnected);
   return { a, b, generation };
 }
