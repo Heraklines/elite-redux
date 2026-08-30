@@ -12,6 +12,9 @@ on:
       stable_release:
         required: true
         type: string
+      legacy_release:
+        required: false
+        type: string
       target_ring:
         required: true
         type: choice
@@ -50,9 +53,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/manifests/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/manifest.json" --remote
-          npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/health/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/health.json" --remote
+          npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/manifests/${{ inputs.stable_release }}.json" --file "$RUNNER_TEMP/stable.json" --remote
           if [ "${{ inputs.expected_current_policy_hash }}" != NONE ]; then
             npx --yes wrangler@4.127.1 r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/current.json" --remote
+            npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/health/${{ inputs.candidate_release }}.json" --file "$RUNNER_TEMP/health.json" --remote
             test "$(sha256sum "$RUNNER_TEMP/current.json" | cut -d' ' -f1)" = "${{ inputs.expected_current_policy_hash }}"
             node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/current.json"
             jq -r .payload "$RUNNER_TEMP/current.json" > "$RUNNER_TEMP/current-payload.json"
@@ -60,9 +64,40 @@ jobs:
             echo "CURRENT_ARGS=$CURRENT_ARGS" >> "$GITHUB_ENV"
           else
             test "${{ inputs.target_ring }}" = R0
+            NOW=$(($(date +%s) * 1000))
+            MANIFEST_HASH=$(sha256sum "$RUNNER_TEMP/manifest.json" | cut -d' ' -f1)
+            EMPTY_HASH=$(printf '[]' | sha256sum | cut -d' ' -f1)
+            NO_POLICY_HASH=$(printf 'M9_R0_NO_CURRENT_POLICY' | sha256sum | cut -d' ' -f1)
+            jq -n \
+              --arg release '${{ inputs.candidate_release }}' \
+              --arg policy "$NO_POLICY_HASH" \
+              --arg manifest "$MANIFEST_HASH" \
+              --arg aggregate "$EMPTY_HASH" \
+              --argjson start "$((NOW - 1))" \
+              --argjson end "$NOW" \
+              '{schema_version:1,release_id:$release,policy_hash:$policy,release_manifest_hash:$manifest,
+                input_event_aggregate_hash:$aggregate,window_start_ms:$start,window_end_ms:$end,
+                observed_sessions:0,observed_minutes:0,worker_initialization_failure_basis_points:0,
+                unrecoverable_kernel_fault_basis_points:0,deterministic_migration_failures:0,
+                cloud_save_regression_basis_points:0,coop_relative_regression_percent:0,
+                coop_absolute_regression_basis_points:0,input_latency_regression_percent:0,
+                crash_free_regression_basis_points:0,hard_stop:false,hard_stop_fingerprint:null}' \
+              > "$RUNNER_TEMP/health.json"
           fi
           node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
+          node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/stable.json"
           test "$(jq -r .payload.release_id "$RUNNER_TEMP/manifest.json")" = "${{ inputs.candidate_release }}"
+          test "$(jq -r .payload.release_id "$RUNNER_TEMP/stable.json")" = "${{ inputs.stable_release }}"
+          LEGACY='${{ inputs.legacy_release }}'
+          if [ -n "$LEGACY" ]; then
+            echo "$LEGACY" | grep -Eq '^[a-zA-Z0-9._:-]{1,128}$'
+            echo "LEGACY_ARGS=--legacy-release $LEGACY" >> "$GITHUB_ENV"
+          fi
+          if [ "${{ inputs.target_ring }}" = R0 ]; then
+            test "$LEGACY" = "${{ inputs.stable_release }}"
+            test "$(jq -r .payload.channel "$RUNNER_TEMP/stable.json")" = LEGACY_TRANSITION
+            test "$(jq -r .payload.channel "$RUNNER_TEMP/manifest.json")" != LEGACY_TRANSITION
+          fi
           test "$(jq -r .release_id "$RUNNER_TEMP/health.json")" = "${{ inputs.candidate_release }}"
           test "$(jq -r .release_manifest_hash "$RUNNER_TEMP/health.json")" = "$(sha256sum "$RUNNER_TEMP/manifest.json" | cut -d' ' -f1)"
           if [ "${{ inputs.expected_current_policy_hash }}" != NONE ]; then
@@ -78,7 +113,8 @@ jobs:
             --stable-release "${{ inputs.stable_release }}" \
             --health "$RUNNER_TEMP/health.json" \
             --output "$RUNNER_TEMP/policy-payload.json" \
-            $CURRENT_ARGS
+            $CURRENT_ARGS \
+            $LEGACY_ARGS
           node scripts/m9-sign-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy-payload.json" --output "$RUNNER_TEMP/policy.json" --key-id m9-prod-2026-01
           node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy.json"
       - name: Publish policy revision only
