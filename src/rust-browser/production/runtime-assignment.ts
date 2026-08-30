@@ -31,10 +31,15 @@ export async function verifySignedRuntimeAssignmentV1(
   envelope: SignedRuntimeAssignmentV1,
   keys: readonly TrustedBrowserReleaseKeyV1[],
   channel: ReleaseChannelV1,
+  expectedScopes: readonly RuntimeAssignmentScopeV1[],
   now = Date.now(),
 ): Promise<RuntimeAssignmentV1> {
+  if (expectedScopes.length === 0 || expectedScopes.length > 4) {
+    throw new Error("production assignment has no bounded expected sticky scope");
+  }
+  expectedScopes.forEach(validateScope);
   validateRuntimeAssignmentV1(envelope.payload, now);
-  return verifyEd25519EnvelopeV1({
+  const verified = await verifyEd25519EnvelopeV1({
     envelopeVersion: envelope.envelope_version,
     keyId: envelope.key_id,
     payload: envelope.payload,
@@ -43,6 +48,10 @@ export async function verifySignedRuntimeAssignmentV1(
     channel,
     trustedKeys: keys,
   });
+  if (!expectedScopes.some(scope => sameScope(scope, verified.sticky_scope))) {
+    throw new Error("signed production assignment belongs to another sticky scope");
+  }
+  return verified;
 }
 
 function validateScope(scope: RuntimeAssignmentScopeV1): void {
@@ -57,6 +66,29 @@ function validateScope(scope: RuntimeAssignmentScopeV1): void {
   if (!IDENTIFIER.test(value)) {
     throw new Error("production assignment sticky scope is invalid");
   }
+}
+
+function sameScope(expected: RuntimeAssignmentScopeV1, actual: RuntimeAssignmentScopeV1): boolean {
+  if (expected.kind !== actual.kind) {
+    return false;
+  }
+  const expectedValue =
+    expected.kind === "BROWSER_SESSION"
+      ? expected.value.session_id
+      : expected.kind === "GAME_RUN"
+        ? expected.value.run_id
+        : expected.kind === "ACCOUNT"
+          ? expected.value.pseudonymous_account_id
+          : expected.value.party_id;
+  const actualValue =
+    actual.kind === "BROWSER_SESSION"
+      ? actual.value.session_id
+      : actual.kind === "GAME_RUN"
+        ? actual.value.run_id
+        : actual.kind === "ACCOUNT"
+          ? actual.value.pseudonymous_account_id
+          : actual.value.party_id;
+  return expectedValue === actualValue;
 }
 
 function safePositive(value: number): boolean {

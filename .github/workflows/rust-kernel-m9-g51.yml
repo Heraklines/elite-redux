@@ -1,0 +1,135 @@
+name: Rust Kernel M9 G51 Observability Rollout
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m9-g51-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  observability-rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production --all-targets --no-deps -- -D warnings
+      - run: cargo test --manifest-path rust/Cargo.toml -p er-production
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-web --all-targets --no-deps -- -D warnings
+      - run: >-
+          cargo test --manifest-path rust/Cargo.toml -p er-web --test browser_host
+          staging_authority_material_is_applied_by_the_native_replica
+      - name: Typecheck M9C owned production surface
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2024
+          --types node,vitest/globals --lib ES2024,DOM,WebWorker
+          workers/er-telemetry/src/cloudflare-workers.d.ts
+          src/rust-browser/production/contracts.ts
+          src/rust-browser/production/health-event.ts
+          src/rust-browser/production/health-reporter.ts
+          src/rust-browser/production/repro-reporting.ts
+          src/rust-browser/production/rollout.ts
+          src/rust-browser/production/shadow-sampling.ts
+          src/rust-browser/production/coop-frame.ts
+          src/rust-browser/production/runtime-assignment.ts
+          src/rust-browser/production/runtime-selector.ts
+          src/rust-browser/adapters/signaling-adapter.ts
+          src/rust-browser/adapters/transport-adapter.ts
+          workers/er-telemetry/src/m9-health.ts
+          workers/er-telemetry/src/index.ts
+          test/node/rust-browser/production/rollout-health.test.ts
+      - name: Check M9C privacy and rollout source
+        run: >-
+          pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
+          src/rust-browser/production/health-event.ts
+          src/rust-browser/production/health-reporter.ts
+          src/rust-browser/production/repro-reporting.ts
+          src/rust-browser/production/rollout.ts
+          src/rust-browser/production/shadow-sampling.ts
+          src/rust-browser/production/coop-frame.ts
+          src/rust-browser/production/runtime-assignment.ts
+          src/rust-browser/production/runtime-selector.ts
+          src/rust-browser/adapters/signaling-adapter.ts
+          src/rust-browser/adapters/transport-adapter.ts
+          workers/er-telemetry/src/cloudflare-workers.d.ts
+          workers/er-telemetry/src/m9-health.ts
+          workers/er-telemetry/src/index.ts
+          scripts/m9-release-health.mjs
+          scripts/m9-rollout-policy.mjs
+          test/node/rust-browser/production/rollout-health.test.ts
+      - name: Run deterministic health and rollback incident drills
+        run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/production/rollout-health.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  architecture-negative:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-kernel-m9-contract.mjs
+      - run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/production/architecture.test.ts
+          test/node/rust-browser/production/release-control.test.ts
+          test/node/rust-browser/adapters/adapter-contracts.test.ts
+          --pool=forks --isolate --no-file-parallelism
+      - name: Reject telemetry secrets and unbounded production payloads
+        run: |
+          test -z "$(git grep -n -E 'console\.(log|error|warn).*?(token|cookie|authorization|capsule|save)' -- src/rust-browser/production workers/er-telemetry/src/m9-health.ts || true)"
+          test -z "$(git grep -n -E '(raw_save|raw_input_history|full_party|refresh_token)' -- src/rust-browser/production/health-*.ts workers/er-telemetry/src/m9-health.ts || true)"
+
+  browser-transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run authenticated public WebRTC and offline rejoin
+        run: >-
+          pnpm exec playwright test
+          test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
+          test/browser/rust-browser/save-offline.spec.ts
+          --project chromium --workers=1
+
+  g51-aggregate:
+    name: M9 G51 deterministic health and rollback qualification
+    needs: [observability-rollout, architecture-negative, browser-transport]
+    runs-on: ubuntu-latest
+    steps:
+      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed G51 health, privacy, hard-stop, shadow, and rollback drills"

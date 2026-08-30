@@ -93,7 +93,7 @@ export async function handleM9RuntimeAssignment(
     return json({ error: "active rollout ring invalid" }, 503, cors);
   }
   const account = await pseudonymousAccount(auth.uid);
-  const bucket = cohortBucket(String(payload.policy_id ?? ""), account);
+  const bucket = await cohortBucket(payload.policy_id, account);
   const internal = new Set(
     (env.M9_INTERNAL_ACCOUNTS ?? "")
       .split(",")
@@ -269,13 +269,14 @@ async function signEnvelope(payload: Record<string, unknown>, domain: string, pr
   return { envelope_version: 1, key_id: "m9-prod-2026-01", payload, signature: Array.from(new Uint8Array(signature)) };
 }
 
-function cohortBucket(policyId: string, account: string): number {
-  let hash = 2_166_136_261;
-  for (const byte of new TextEncoder().encode(`${policyId}:${account}`)) {
-    hash ^= byte;
-    hash = Math.imul(hash, 16_777_619) >>> 0;
+async function cohortBucket(policyId: unknown, account: string): Promise<number> {
+  if (typeof policyId !== "string" || policyId.length === 0) {
+    throw new Error("rollout policy identity is invalid");
   }
-  return hash % 10_000;
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${policyId}:${account}`)),
+  );
+  return ((digest[0] << 8) | digest[1]) % 10_000;
 }
 
 async function pseudonymousAccount(uid: number): Promise<string> {

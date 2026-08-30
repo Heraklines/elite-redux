@@ -218,6 +218,21 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
         })
         .collect::<Vec<_>>();
     assert!(!materials.is_empty());
+    let wrong_generation_request = vec![BrowserRequestEnvelopeV1 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V1,
+        request_id: safe(3)?,
+        sequence: safe(3)?,
+        request: BrowserRequestV1::NetworkFrame {
+            generation: safe(2)?,
+            bytes: materials[0].clone(),
+        },
+    }];
+    assert!(
+        replica
+            .dispatch_batch_native(&er_canonical::canonical_bytes(&wrong_generation_request)?)
+            .is_err(),
+        "authenticated adapter generation must match the Rust protocol frontier"
+    );
     let replica_requests = materials
         .into_iter()
         .enumerate()

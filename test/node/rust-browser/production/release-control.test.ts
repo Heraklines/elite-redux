@@ -171,11 +171,33 @@ describe("M9 signed release control", () => {
       sessionId: "session-1",
       now: 2,
       trustedKeys: trusted,
+      expectedAssignmentScopes: [{ kind: "BROWSER_SESSION", value: { session_id: "session-1" } }],
       loadPin: async () => null,
       loadRelease: async () => signedRelease,
       requestAssignment: async () => signedAssignment,
     });
     expect(selected.assignment?.authority).toBe("RUST_PRODUCTION");
+    const otherScope = {
+      ...runtimeAssignment,
+      sticky_scope: { kind: "BROWSER_SESSION", value: { session_id: "session-other" } } as const,
+    };
+    const signedOtherScope: SignedRuntimeAssignmentV1 = {
+      envelope_version: 1,
+      key_id: "test-key",
+      payload: otherScope,
+      signature: await signEnvelope(pair, "er-m9:runtime-assignment-v1", otherScope),
+    };
+    await expect(
+      selectProductionRuntimeV1({
+        sessionId: "session-1",
+        now: 2,
+        trustedKeys: trusted,
+        expectedAssignmentScopes: [{ kind: "BROWSER_SESSION", value: { session_id: "session-1" } }],
+        loadPin: async () => null,
+        loadRelease: async () => signedRelease,
+        requestAssignment: async () => signedOtherScope,
+      }),
+    ).rejects.toThrow(/another sticky scope/u);
     const tampered = structuredClone(signedRelease);
     tampered.payload.release_id = "release-attacker";
     await expect(verifySignedProductionManifestV1(tampered, trusted, 2)).rejects.toThrow(/invalid|signature/u);
@@ -198,6 +220,7 @@ describe("M9 signed release control", () => {
       sessionId: "session-1",
       now: 2,
       trustedKeys: trusted,
+      expectedAssignmentScopes: [{ kind: "BROWSER_SESSION", value: { session_id: "session-1" } }],
       loadPin: async () => existingPin,
       loadRelease: async () => signedPrevious,
       requestAssignment: async () => {

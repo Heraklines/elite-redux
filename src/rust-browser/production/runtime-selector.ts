@@ -1,5 +1,6 @@
 import type {
   ProductionReleaseManifestV2,
+  RuntimeAssignmentScopeV1,
   RuntimeAssignmentV1,
   SessionRuntimePinV1,
   SignedProductionManifestV1,
@@ -14,6 +15,7 @@ export interface ProductionRuntimeSelectionDependenciesV1 {
   sessionId: string;
   now: number;
   trustedKeys: readonly TrustedBrowserReleaseKeyV1[];
+  expectedAssignmentScopes: readonly RuntimeAssignmentScopeV1[];
   loadPin(sessionId: string): Promise<SessionRuntimePinV1 | null>;
   loadRelease(releaseId: string): Promise<SignedProductionManifestV1>;
   requestAssignment(): Promise<SignedRuntimeAssignmentV1>;
@@ -47,6 +49,7 @@ export async function selectProductionRuntimeV1(
     signedAssignment,
     dependencies.trustedKeys,
     release.channel,
+    dependencies.expectedAssignmentScopes,
     dependencies.now,
   );
   if (assignment.release_id !== release.release_id) {

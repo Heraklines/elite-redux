@@ -318,7 +318,10 @@ fn process_request(
                 envelope.sequence,
             )?))
         }
-        BrowserRequestV1::NetworkFrame { bytes, .. } => {
+        BrowserRequestV1::NetworkFrame { generation, bytes } => {
+            if *generation != protocol_generation(kernel)? {
+                return Err(BrowserWebErrorV1::Sequence);
+            }
             let role = kernel
                 .snapshot()
                 .protocol

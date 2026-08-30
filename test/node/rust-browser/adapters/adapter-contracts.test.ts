@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ConnectionGenerationV1 } from "../../../../src/rust-browser/adapters/connection-generation";
 import { installAtomicReleaseCache, loadAtomicReleaseCache } from "../../../../src/rust-browser/adapters/release-cache";
 import {
@@ -7,11 +7,20 @@ import {
   type BrowserKernelCompatibilityV1,
   encodeCompatibilityHandshake,
 } from "../../../../src/rust-browser/adapters/signaling-adapter";
+import type { VerifiedCoopTransportContextV1 } from "../../../../src/rust-browser/adapters/transport-adapter";
 import { RustBrowserTransportAdapterV1 } from "../../../../src/rust-browser/adapters/transport-adapter";
+import { encodeCanonicalJsonV1 } from "../../../../src/rust-browser/host/message-sequencer";
+import {
+  type CoopFrameBindingV1,
+  type CoopFrameParticipantBindingV1,
+  verifySignedCoopFrameBindingV1,
+} from "../../../../src/rust-browser/production/coop-frame";
+import type { TrustedBrowserReleaseKeyV1 } from "../../../../src/rust-browser/production/signature-verifier";
 import { PresentationSettlementTraceV1 } from "../../../../src/rust-browser/render/presentation-settlement";
 
 const identity: BrowserKernelCompatibilityV1 = {
   browser_worker_protocol: 1,
+  frame_envelope_version: 1,
   authority_protocol: "er-coop-47",
   release_id: "release-v1",
   compatible_releases: [],
@@ -26,6 +35,7 @@ const identity: BrowserKernelCompatibilityV1 = {
 
 class PairedChannel extends EventTarget {
   binaryType = "arraybuffer";
+  readonly ordered = true;
   readyState: RTCDataChannelState = "connecting";
   peer: PairedChannel | null = null;
   readonly sent: Uint8Array[] = [];
@@ -70,6 +80,86 @@ function pair(): [PairedChannel, PairedChannel] {
 async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
+}
+
+async function frameContexts(generation: number): Promise<{
+  left: VerifiedCoopTransportContextV1;
+  right: VerifiedCoopTransportContextV1;
+}> {
+  const leftKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+  const rightKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+  const participants: CoopFrameParticipantBindingV1[] = [
+    {
+      participant_id: "left",
+      seat_id: 0,
+      frame_public_key: Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", leftKeys.publicKey))),
+      connection_generation: generation,
+    },
+    {
+      participant_id: "right",
+      seat_id: 1,
+      frame_public_key: Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", rightKeys.publicKey))),
+      connection_generation: generation,
+    },
+  ];
+  const binding: CoopFrameBindingV1 = {
+    schema_version: 1,
+    binding_id: `binding-${generation}`,
+    party_id: "party-1",
+    session_id: "session-1",
+    release_id: identity.release_id,
+    authority_protocol: "er-coop-47",
+    authority_seat_id: 0,
+    participants,
+    issued_at: 1,
+    expires_at: Number.MAX_SAFE_INTEGER,
+  };
+  const releaseKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const publicKey = new Uint8Array(await crypto.subtle.exportKey("raw", releaseKeys.publicKey));
+  const trusted: TrustedBrowserReleaseKeyV1[] = [
+    {
+      key_id: "release-key",
+      public_key: Array.from(publicKey),
+      channels: ["STABLE"],
+      minimum_release_epoch: 1,
+      revoked: false,
+    },
+  ];
+  const prefix = new TextEncoder().encode("er-m9:coop-frame-binding-v1\0");
+  const canonical = encodeCanonicalJsonV1(binding);
+  const signedBytes = new Uint8Array(prefix.byteLength + canonical.byteLength);
+  signedBytes.set(prefix);
+  signedBytes.set(canonical, prefix.byteLength);
+  const signature = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, releaseKeys.privateKey, signedBytes));
+  const verifiedBinding = await verifySignedCoopFrameBindingV1({
+    envelope: {
+      envelope_version: 1,
+      key_id: "release-key",
+      payload: binding,
+      signature: Array.from(signature),
+    },
+    trustedKeys: trusted,
+    channel: "STABLE",
+    releaseId: identity.release_id,
+    now: 2,
+  });
+  canonical.fill(0);
+  signedBytes.fill(0);
+  signature.fill(0);
+  return {
+    left: {
+      binding: verifiedBinding,
+      local_participant_id: "left",
+      peer_participant_id: "right",
+      local_private_key: leftKeys.privateKey,
+    },
+    right: {
+      binding: verifiedBinding,
+      local_participant_id: "right",
+      peer_participant_id: "left",
+      local_private_key: rightKeys.privateKey,
+    },
+  };
 }
 
 class MemoryCache {
@@ -120,11 +210,12 @@ describe("M8 browser adapters", () => {
     expect(() => assertCompatibleRustPeer(identity, mixed)).toThrow(/mixed TypeScript\/Rust/u);
   });
 
-  it("sends exactly one compatibility handshake when open is observed twice", () => {
+  it("sends exactly one compatibility handshake when open is observed twice", async () => {
     const channel = new PairedChannel();
     channel.readyState = "open";
     const transport = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: () => undefined });
-    transport.attach(channel as unknown as RTCDataChannel);
+    const context = await frameContexts(1);
+    transport.attach(channel as unknown as RTCDataChannel, context.left);
     channel.dispatchEvent(new Event("open"));
     expect(channel.sent).toHaveLength(1);
     transport.dispose();
@@ -139,27 +230,82 @@ describe("M8 browser adapters", () => {
       compatibility: identity,
       emit: value => rightEvents.push(value),
     });
-    const leftGeneration = left.attach(leftChannel as unknown as RTCDataChannel);
-    right.attach(rightChannel as unknown as RTCDataChannel);
+    const firstContext = await frameContexts(1);
+    const leftGeneration = left.attach(leftChannel as unknown as RTCDataChannel, firstContext.left);
+    right.attach(rightChannel as unknown as RTCDataChannel, firstContext.right);
     leftChannel.open();
     rightChannel.open();
     await flushMicrotasks();
     expect(leftEvents.at(-1)).toMatchObject({ kind: "TRANSPORT_CHANGED", value: { connected: true } });
     expect(rightEvents.at(-1)).toMatchObject({ kind: "TRANSPORT_CHANGED", value: { connected: true } });
-    left.send(leftGeneration, Uint8Array.from([7, 8]));
-    await flushMicrotasks();
-    expect(rightEvents.at(-1)).toEqual({ kind: "NETWORK_FRAME", value: { generation: 1, bytes: [7, 8] } });
+    await left.send(leftGeneration, Uint8Array.from([7, 8]));
+    await vi.waitFor(() => {
+      expect(rightEvents.at(-1)).toEqual({ kind: "NETWORK_FRAME", value: { generation: 1, bytes: [7, 8] } });
+    });
 
     const [rejoinedLeft, rejoinedRight] = pair();
-    const nextGeneration = left.attach(rejoinedLeft as unknown as RTCDataChannel);
-    right.attach(rejoinedRight as unknown as RTCDataChannel);
+    const secondContext = await frameContexts(2);
+    const nextGeneration = left.attach(rejoinedLeft as unknown as RTCDataChannel, secondContext.left);
+    right.attach(rejoinedRight as unknown as RTCDataChannel, secondContext.right);
     rejoinedLeft.open();
     rejoinedRight.open();
     await flushMicrotasks();
-    expect(() => left.send(leftGeneration, Uint8Array.from([1]))).toThrow(/generation/u);
+    await expect(left.send(leftGeneration, Uint8Array.from([1]))).rejects.toThrow(/generation/u);
     expect(nextGeneration).toBe(2);
     left.dispose();
     right.dispose();
+  });
+
+  it("rejects raw, duplicated, and stale authenticated frames before Rust delivery", async () => {
+    const [leftChannel, rightChannel] = pair();
+    const rightEvents: Array<{ kind: string; value?: unknown }> = [];
+    const left = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: () => undefined });
+    const right = new RustBrowserTransportAdapterV1({
+      compatibility: identity,
+      emit: value => rightEvents.push(value),
+    });
+    const contexts = await frameContexts(1);
+    const generation = left.attach(leftChannel as unknown as RTCDataChannel, contexts.left);
+    right.attach(rightChannel as unknown as RTCDataChannel, contexts.right);
+    leftChannel.open();
+    rightChannel.open();
+    await flushMicrotasks();
+    await left.send(generation, Uint8Array.of(7, 8));
+    await vi.waitFor(() => {
+      expect(rightEvents.filter(value => value.kind === "NETWORK_FRAME")).toHaveLength(1);
+    });
+    const acceptedEnvelope = leftChannel.sent.at(-1);
+    if (acceptedEnvelope == null) {
+      throw new Error("authenticated test frame was not sent");
+    }
+    rightChannel.dispatchEvent(new MessageEvent("message", { data: Uint8Array.from(acceptedEnvelope).buffer }));
+    await vi.waitFor(() => {
+      expect(rightEvents.at(-1)).toMatchObject({ kind: "TRANSPORT_CHANGED", value: { connected: false } });
+    });
+    expect(rightEvents.filter(value => value.kind === "NETWORK_FRAME")).toHaveLength(1);
+
+    const [rawLeftChannel, rawRightChannel] = pair();
+    const rawEvents: Array<{ kind: string; value?: unknown }> = [];
+    const rawLeft = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: () => undefined });
+    const rawRight = new RustBrowserTransportAdapterV1({
+      compatibility: identity,
+      emit: value => rawEvents.push(value),
+    });
+    const rawContexts = await frameContexts(1);
+    rawLeft.attach(rawLeftChannel as unknown as RTCDataChannel, rawContexts.left);
+    rawRight.attach(rawRightChannel as unknown as RTCDataChannel, rawContexts.right);
+    rawLeftChannel.open();
+    rawRightChannel.open();
+    await flushMicrotasks();
+    rawRightChannel.dispatchEvent(new MessageEvent("message", { data: Uint8Array.of(1, 2, 3).buffer }));
+    await vi.waitFor(() => {
+      expect(rawEvents.at(-1)).toMatchObject({ kind: "TRANSPORT_CHANGED", value: { connected: false } });
+    });
+    expect(rawEvents.some(value => value.kind === "NETWORK_FRAME")).toBe(false);
+    left.dispose();
+    right.dispose();
+    rawLeft.dispose();
+    rawRight.dispose();
   });
 
   it("records exactly one generation-fenced settlement outcome", () => {

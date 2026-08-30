@@ -26,6 +26,10 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
     sessionId,
     now: Date.now(),
     trustedKeys: PINNED_PRODUCTION_RELEASE_KEYS_V1,
+    expectedAssignmentScopes: [
+      { kind: "BROWSER_SESSION", value: { session_id: sessionId } },
+      { kind: "ACCOUNT", value: { pseudonymous_account_id: platform.pseudonymous_account_id } },
+    ],
     caches,
     pinStore,
     loadPin: id => pinStore.load(id),

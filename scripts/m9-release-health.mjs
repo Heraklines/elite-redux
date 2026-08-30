@@ -9,6 +9,17 @@ for (let index = 2; index < process.argv.length; index += 2) {
 }
 const root = resolve(import.meta.dirname, "..");
 const input = JSON.parse(readFileSync(resolve(root, required("--input")), "utf8"));
+const releaseId = required("--release-id");
+const policyHash = required("--policy-hash");
+const releaseManifestHash = required("--manifest-hash");
+if (
+  input.release_id !== releaseId
+  || !/^[a-zA-Z0-9._:-]{1,128}$/u.test(releaseId)
+  || !/^[0-9a-f]{64}$/u.test(policyHash)
+  || !/^[0-9a-f]{64}$/u.test(releaseManifestHash)
+) {
+  throw new Error("M9 health decision identity is invalid");
+}
 const allowed = new Set([
   "schema_version",
   "release_id",
@@ -23,6 +34,9 @@ const allowed = new Set([
   "input_latency_regression_percent",
   "crash_free_regression_basis_points",
   "hard_stop_fingerprints",
+  "input_event_aggregate_hash",
+  "window_start_ms",
+  "window_end_ms",
 ]);
 if (Object.keys(input).some(key => !allowed.has(key))) {
   throw new Error("M9 health input contains a forbidden/unbounded field");
@@ -33,6 +47,12 @@ if (fingerprints.some(value => !/^[0-9a-f]{64}$/u.test(value))) {
 }
 const output = {
   schema_version: 1,
+  release_id: releaseId,
+  policy_hash: policyHash,
+  release_manifest_hash: releaseManifestHash,
+  input_event_aggregate_hash: digest(input.input_event_aggregate_hash),
+  window_start_ms: bounded(input.window_start_ms),
+  window_end_ms: bounded(input.window_end_ms),
   observed_sessions: bounded(input.observed_sessions),
   observed_minutes: bounded(input.observed_minutes),
   worker_initialization_failure_basis_points: rate(input.worker_initialization_failure_basis_points),
@@ -46,6 +66,9 @@ const output = {
   hard_stop: fingerprints.length > 0 || input.deterministic_migration_failures > 0,
   hard_stop_fingerprint: fingerprints[0] ?? null,
 };
+if (output.window_start_ms >= output.window_end_ms) {
+  throw new Error("M9 health window is invalid");
+}
 writeFileSync(resolve(root, required("--output")), `${JSON.stringify(output)}\n`);
 
 function bounded(value) {
@@ -67,6 +90,12 @@ function percent(value) {
     throw new Error("M9 health percent is invalid");
   }
   return result;
+}
+function digest(value) {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) {
+    throw new Error("M9 health digest is invalid");
+  }
+  return value;
 }
 function required(name) {
   const value = args.get(name);

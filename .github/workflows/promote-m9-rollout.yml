@@ -60,6 +60,11 @@ jobs:
           fi
           node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
           test "$(jq -r .payload.release_id "$RUNNER_TEMP/manifest.json")" = "${{ inputs.candidate_release }}"
+          test "$(jq -r .release_id "$RUNNER_TEMP/health.json")" = "${{ inputs.candidate_release }}"
+          test "$(jq -r .release_manifest_hash "$RUNNER_TEMP/health.json")" = "$(sha256sum "$RUNNER_TEMP/manifest.json" | cut -d' ' -f1)"
+          if [ "${{ inputs.expected_current_policy_hash }}" != NONE ]; then
+            test "$(jq -r .policy_hash "$RUNNER_TEMP/health.json")" = "${{ inputs.expected_current_policy_hash }}"
+          fi
       - name: Evaluate health and sign next policy
         env:
           M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}

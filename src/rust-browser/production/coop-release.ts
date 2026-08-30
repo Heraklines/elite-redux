@@ -37,6 +37,7 @@ export function browserKernelCompatibilityV1(
 ): BrowserKernelCompatibilityV1 {
   return {
     browser_worker_protocol: 1,
+    frame_envelope_version: 1,
     authority_protocol: compatibility.authority_protocol,
     release_id: compatibility.release_id,
     compatible_releases: compatibility.compatible_releases,

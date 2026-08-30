@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use crate::{
     FailureFingerprintV1, PlatformTimestamp, ProductionAuthorityRuntimeV1,
     ProductionContractErrorV1, ProductionReleaseId, ReleaseChannelV1, ReleaseSigningKeyId,
-    RollbackDirectiveId, RolloutPolicyId, RolloutRingId, TrustedReleaseKeyV1,
+    RollbackDirectiveId, RolloutPolicyId, RolloutRingId, TrustedReleaseKeyV1, valid_sha256,
 };
 
 const POLICY_DOMAIN_V1: &[u8] = b"er-m9:rollout-policy-v1\0";
@@ -167,11 +167,37 @@ pub struct SignedRollbackDirectiveV1 {
     pub signature: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RingHealthDecisionV1 {
     Promote,
     Pause,
     Halt,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseHealthDecisionEvidenceV1 {
+    pub schema_version: u32,
+    pub release_id: ProductionReleaseId,
+    pub ring: RolloutRingId,
+    pub policy_hash: String,
+    pub release_manifest_hash: String,
+    pub input_event_aggregate_hash: String,
+    pub window_start: PlatformTimestamp,
+    pub window_end: PlatformTimestamp,
+    pub decision: RingHealthDecisionV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseHealthDecisionIdentityV1 {
+    pub release_id: ProductionReleaseId,
+    pub policy_hash: String,
+    pub release_manifest_hash: String,
+    pub input_event_aggregate_hash: String,
+    pub window_start: PlatformTimestamp,
+    pub window_end: PlatformTimestamp,
 }
 
 impl ReleaseHealthSnapshotV1 {
@@ -220,6 +246,33 @@ impl ReleaseHealthSnapshotV1 {
         }
         Ok(RingHealthDecisionV1::Promote)
     }
+
+    pub fn decision_evidence(
+        &self,
+        ring: &RolloutRingV1,
+        identity: ReleaseHealthDecisionIdentityV1,
+    ) -> Result<ReleaseHealthDecisionEvidenceV1, ProductionContractErrorV1> {
+        identity.release_id.validate("health evidence release")?;
+        ring.ring.validate("health evidence ring")?;
+        if !valid_sha256(&identity.policy_hash)
+            || !valid_sha256(&identity.release_manifest_hash)
+            || !valid_sha256(&identity.input_event_aggregate_hash)
+            || identity.window_start.0 >= identity.window_end.0
+        {
+            return Err(ProductionContractErrorV1::Rollout("health evidence"));
+        }
+        Ok(ReleaseHealthDecisionEvidenceV1 {
+            schema_version: 1,
+            release_id: identity.release_id,
+            ring: ring.ring.clone(),
+            policy_hash: identity.policy_hash,
+            release_manifest_hash: identity.release_manifest_hash,
+            input_event_aggregate_hash: identity.input_event_aggregate_hash,
+            window_start: identity.window_start,
+            window_end: identity.window_end,
+            decision: self.evaluate(ring)?,
+        })
+    }
 }
 
 impl RolloutPolicyV1 {
@@ -258,7 +311,7 @@ impl RolloutPolicyV1 {
         u16::from_be_bytes([digest[0], digest[1]]) % 10_000
     }
 
-    fn signed_bytes(&self) -> Result<Vec<u8>, ProductionContractErrorV1> {
+    pub fn signed_bytes(&self) -> Result<Vec<u8>, ProductionContractErrorV1> {
         domain_bytes(POLICY_DOMAIN_V1, self)
     }
 }
@@ -282,7 +335,7 @@ impl SignedRolloutPolicyV1 {
 }
 
 impl RollbackDirectiveV1 {
-    fn signed_bytes(&self) -> Result<Vec<u8>, ProductionContractErrorV1> {
+    pub fn signed_bytes(&self) -> Result<Vec<u8>, ProductionContractErrorV1> {
         domain_bytes(ROLLBACK_DOMAIN_V1, self)
     }
 }

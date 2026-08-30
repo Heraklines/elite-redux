@@ -12,7 +12,15 @@ import { CloudSaveAdapterV1 } from "/src/rust-browser/adapters/cloud-save-adapte
 import { installAtomicReleaseCache, loadAtomicReleaseCache } from "/src/rust-browser/adapters/release-cache.ts";
 import { MobileInputAdapterV1 } from "/src/rust-browser/adapters/mobile-input-adapter.ts";
 import { RustBrowserTransportAdapterV1 } from "/src/rust-browser/adapters/transport-adapter.ts";
-const identity = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
+const identity = { browser_worker_protocol: 1, frame_envelope_version: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: "c1", material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
+const leftFrameKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+const rightFrameKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+const leftFramePublic = Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", leftFrameKeys.publicKey)));
+const rightFramePublic = Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", rightFrameKeys.publicKey)));
+function frameContexts(connectionGeneration) {
+  const binding = { schema_version: 1, binding_id: "binding-" + connectionGeneration, party_id: "party-1", session_id: "session-1", release_id: "m8-test", authority_protocol: "er-coop-47", authority_seat_id: 0, participants: [{ participant_id: "left", seat_id: 0, frame_public_key: leftFramePublic, connection_generation: connectionGeneration }, { participant_id: "right", seat_id: 1, frame_public_key: rightFramePublic, connection_generation: connectionGeneration }], issued_at: 1, expires_at: Number.MAX_SAFE_INTEGER };
+  return { left: { binding, local_participant_id: "left", peer_participant_id: "right", local_private_key: leftFrameKeys.privateKey }, right: { binding, local_participant_id: "right", peer_participant_id: "left", local_private_key: rightFrameKeys.privateKey } };
+}
 async function waitUntil(predicate) {
   const { promise, resolve, reject } = Promise.withResolvers();
   let frames = 0;
@@ -25,15 +33,16 @@ async function waitUntil(predicate) {
   tick();
   return promise;
 }
-async function rtcPair(left, right, leftEvents, rightEvents) {
+async function rtcPair(left, right, leftEvents, rightEvents, connectionGeneration) {
   const leftConnected = leftEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length;
   const rightConnected = rightEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length;
   const a = new RTCPeerConnection(); const b = new RTCPeerConnection();
   a.onicecandidate = event => { if (event.candidate) b.addIceCandidate(event.candidate); };
   b.onicecandidate = event => { if (event.candidate) a.addIceCandidate(event.candidate); };
-  b.ondatachannel = event => right.attach(event.channel);
+  const contexts = frameContexts(connectionGeneration);
+  b.ondatachannel = event => right.attach(event.channel, contexts.right);
   const channel = a.createDataChannel("rust-kernel", { ordered: true });
-  const generation = left.attach(channel);
+  const generation = left.attach(channel, contexts.left);
   await a.setLocalDescription(await a.createOffer()); await b.setRemoteDescription(a.localDescription);
   await b.setLocalDescription(await b.createAnswer()); await a.setRemoteDescription(b.localDescription);
   await waitUntil(() => leftEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length > leftConnected && rightEvents.filter(event => event.kind === "TRANSPORT_CHANGED" && event.value.connected).length > rightConnected);
@@ -62,12 +71,12 @@ async function rtcPair(left, right, leftEvents, rightEvents) {
   const leftEvents = []; const rightEvents = [];
   const left = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: event => leftEvents.push(event) });
   const right = new RustBrowserTransportAdapterV1({ compatibility: identity, emit: event => rightEvents.push(event) });
-  const first = await rtcPair(left, right, leftEvents, rightEvents);
-  left.send(first.generation, new Uint8Array([7,8]));
+  const first = await rtcPair(left, right, leftEvents, rightEvents, 1);
+  await left.send(first.generation, new Uint8Array([7,8]));
   await waitUntil(() => rightEvents.some(event => event.kind === "NETWORK_FRAME"));
   first.a.close(); first.b.close();
-  const second = await rtcPair(left, right, leftEvents, rightEvents);
-  let staleRejected = false; try { left.send(first.generation, new Uint8Array([1])); } catch { staleRejected = true; }
+  const second = await rtcPair(left, right, leftEvents, rightEvents, 2);
+  let staleRejected = false; try { await left.send(first.generation, new Uint8Array([1])); } catch { staleRejected = true; }
 
   globalThis.__m8PlatformResult = { revision, loaded: Array.from(loaded.bytes), conflict, cloudRevision, cloudLoaded: Array.from(cloudLoaded.bytes), cachedRelease: cached.manifest.release_id, inputKinds: inputEvents.map(event => event.value?.kind), frame: rightEvents.findLast(event => event.kind === "NETWORK_FRAME")?.value.bytes, staleRejected, rejoinGeneration: second.generation };
   second.a.close(); second.b.close(); left.dispose(); right.dispose(); mobile.dispose(); cloud.dispose(); await indexed.dispose();

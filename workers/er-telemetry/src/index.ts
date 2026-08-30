@@ -18,6 +18,7 @@
 // the denormalized columns + summary for direct SQL.
 // =============================================================================
 
+import { handleM9HealthRouteV1 } from "./m9-health";
 import { aggregateSpeciesSuggestions, parseSuggestionRow, type SuggestionRow } from "./species-suggestions";
 import { TELEMETRY_MAX_BODY, type TelemetryRow, validateTelemetryPayload } from "./telemetry-ingest";
 import { handleTournamentRoute } from "./tournament-routes";
@@ -42,6 +43,11 @@ interface Env {
   SAVE_API_URL?: string;
   /** Shared secret authenticating the tournament→save-api reward push (SAME as er-save-api's SHOWDOWN_GRANT_SECRET). */
   SHOWDOWN_GRANT_SECRET?: string;
+  M9_HEALTH_TOKEN?: string;
+  M9_BASELINE_CLOUD_SAVE_FAILURE_BP?: string;
+  M9_BASELINE_COOP_FAILURE_BP?: string;
+  M9_BASELINE_INPUT_P95_MICROS?: string;
+  M9_BASELINE_CRASH_FAILURE_BP?: string;
 }
 
 interface TokenPayload {
@@ -80,7 +86,7 @@ async function hmacSha256(data: Uint8Array, secret: string): Promise<Uint8Array>
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
   ]);
-  return new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, Uint8Array.from(data).buffer));
 }
 
 async function verifyToken(token: string, secret: string): Promise<TokenPayload | null> {
@@ -177,7 +183,7 @@ function corsHeaders(env: Env, origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": value,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Editor-Auth",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Editor-Auth,X-ER-Health-Idempotency-Key",
     "Access-Control-Max-Age": "86400",
   };
 }
@@ -344,6 +350,19 @@ export default {
           return text("Unauthorized.", 401, cors);
         }
         return await handleBattle(request, auth, env, cors);
+      }
+      if (url.pathname.startsWith("/m9/health/")) {
+        const auth = request.method === "POST" ? await authUser(request, env) : null;
+        const result = await handleM9HealthRouteV1({
+          request,
+          url,
+          authenticatedUid: auth?.uid ?? null,
+          env,
+          cors,
+        });
+        if (result != null) {
+          return result;
+        }
       }
       // PUBLIC read: popular-sets suggestions for one species (aggregate, no PII).
       if (url.pathname === "/telemetry/species-suggestions" && request.method === "GET") {

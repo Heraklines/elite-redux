@@ -31,13 +31,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          pnpm exec wrangler r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --remote
+          node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy.json"
           RELEASE='${{ inputs.release_id }}'
           if [ -z "$RELEASE" ]; then
-            pnpm exec wrangler r2 object get er-m9-releases/policies/current.json --file "$RUNNER_TEMP/policy.json" --remote
-            node scripts/verify-m9-signed-document.mjs --domain er-m9:rollout-policy-v1 --input "$RUNNER_TEMP/policy.json"
             RELEASE=$(jq -r .payload.candidate_release "$RUNNER_TEMP/policy.json")
           fi
+          pnpm exec wrangler r2 object get "er-m9-releases/manifests/${RELEASE}.json" --file "$RUNNER_TEMP/manifest.json" --remote
+          node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
+          test "$(jq -r .payload.release_id "$RUNNER_TEMP/manifest.json")" = "$RELEASE"
           echo "RELEASE_ID=$RELEASE" >> "$GITHUB_ENV"
+          echo "POLICY_HASH=$(sha256sum "$RUNNER_TEMP/policy.json" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          echo "MANIFEST_HASH=$(sha256sum "$RUNNER_TEMP/manifest.json" | cut -d' ' -f1)" >> "$GITHUB_ENV"
       - name: Fetch bounded telemetry aggregate
         env:
           M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
@@ -47,7 +52,12 @@ jobs:
             "https://er-telemetry.heraklines.workers.dev/m9/health/${RELEASE_ID}" \
             > "$RUNNER_TEMP/health-input.json"
           test "$(wc -c < "$RUNNER_TEMP/health-input.json")" -le 65536
-          node scripts/m9-release-health.mjs --input "$RUNNER_TEMP/health-input.json" --output "$RUNNER_TEMP/health.json"
+          node scripts/m9-release-health.mjs \
+            --input "$RUNNER_TEMP/health-input.json" \
+            --output "$RUNNER_TEMP/health.json" \
+            --release-id "$RELEASE_ID" \
+            --policy-hash "$POLICY_HASH" \
+            --manifest-hash "$MANIFEST_HASH"
       - name: Publish deterministic health snapshot
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

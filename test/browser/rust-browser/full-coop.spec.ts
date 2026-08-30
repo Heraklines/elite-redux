@@ -20,9 +20,10 @@ const identityBytes = new Uint8Array(await (await fetch("/m8-assets/execution-id
 const session = new Uint8Array(await (await fetch(role === "authority" ? "/m8-assets/session-authority.json" : "/m8-assets/session-replica.json")).arrayBuffer());
 const worker = new URL("/src/rust-browser/worker/rust-kernel-worker.ts", location.href); worker.searchParams.set("wasm", "/m8-assets/er_web.wasm"); worker.searchParams.set("wasm_sha256", manifest.assets["er_web.wasm"].sha256); worker.searchParams.set("content", "/m8-assets/content-pack.json"); worker.searchParams.set("content_sha256", manifest.assets["content-pack.json"].sha256);
 const host = await RustBrowserHost.create({ workerUrl: worker, initialize: { kind: "INITIALIZE", value: { mode: BrowserExecutionModeV1.RUST_STAGING_AUTHORITY, execution_identity_bytes: Array.from(identityBytes), session_start_bytes: Array.from(session), maximum_pending_requests: 64 } } });
-const compatibility = { browser_worker_protocol: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: manifest.assets["content-pack.json"].sha256, material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
+const compatibility = { browser_worker_protocol: 1, frame_envelope_version: 1, authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: manifest.assets["content-pack.json"].sha256, material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
+const frameKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]); const framePublicKey = Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", frameKeys.publicKey))); let frameContext = null;
 let work = Promise.resolve(); let received = 0; let pc; let generation = 0; let transportConnected = false;
-async function handle(responses) { for (const envelope of responses) if (envelope.response.kind === "EFFECTS") for (const effect of envelope.response.value.effects) if (effect.kind === "SEND_NETWORK_FRAME") transport.send(effect.value.generation, new Uint8Array(effect.value.bytes)); }
+async function handle(responses) { for (const envelope of responses) if (envelope.response.kind === "EFFECTS") for (const effect of envelope.response.value.effects) if (effect.kind === "SEND_NETWORK_FRAME") await transport.send(effect.value.generation, new Uint8Array(effect.value.bytes)); }
 function enqueue(request) {
   if (request.kind === "NETWORK_FRAME") received += 1;
   if (request.kind === "TRANSPORT_CHANGED") transportConnected = request.value.connected;
@@ -35,17 +36,18 @@ function enqueue(request) {
   });
 }
 const transport = new RustBrowserTransportAdapterV1({ compatibility, emit: enqueue }); const input = new BrowserRawInputAdapter({ emit: enqueue }); if (role === "authority") input.start();
+function bindFrameContext(binding) { frameContext = { binding, local_participant_id: role, peer_participant_id: role === "authority" ? "replica" : "authority", local_private_key: frameKeys.privateKey }; }
 function waitIce(connection) { if (connection.iceGatheringState === "complete") return Promise.resolve(); const { promise, resolve } = Promise.withResolvers(); connection.addEventListener("icegatheringstatechange", () => { if (connection.iceGatheringState === "complete") resolve(); }); return promise; }
 function waitUntil(predicate) { const { promise, resolve, reject } = Promise.withResolvers(); let frames = 0; const tick = () => { if (predicate()) { resolve(); return; } if (++frames > 600) { reject(new Error("co-op condition did not settle")); return; } requestAnimationFrame(tick); }; tick(); return promise; }
-async function offer() { pc = new RTCPeerConnection(); const channel = pc.createDataChannel("rust-authority", { ordered: true }); generation = transport.attach(channel); await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc); return pc.localDescription.sdp; }
-async function answer(sdp) { pc = new RTCPeerConnection(); pc.ondatachannel = event => { generation = transport.attach(event.channel); }; await pc.setRemoteDescription({ type: "offer", sdp }); await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc); return pc.localDescription.sdp; }
+async function offer() { if (frameContext == null) throw new Error("frame binding missing"); pc = new RTCPeerConnection(); const channel = pc.createDataChannel("rust-authority", { ordered: true }); generation = transport.attach(channel, frameContext); await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc); return pc.localDescription.sdp; }
+async function answer(sdp) { if (frameContext == null) throw new Error("frame binding missing"); pc = new RTCPeerConnection(); pc.ondatachannel = event => { generation = transport.attach(event.channel, frameContext); }; await pc.setRemoteDescription({ type: "offer", sdp }); await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc); return pc.localDescription.sdp; }
 async function accept(sdp) { await pc.setRemoteDescription({ type: "answer", sdp }); }
 async function connected() { await waitUntil(() => generation > 0 && transportConnected); return generation; }
-function rechannel() { transportConnected = false; const channel = pc.createDataChannel("rust-rejoin", { ordered: true }); generation = transport.attach(channel); return generation; }
+function rechannel() { if (frameContext == null) throw new Error("frame binding missing"); transportConnected = false; const channel = pc.createDataChannel("rust-rejoin", { ordered: true }); generation = transport.attach(channel, frameContext); return generation; }
 async function digest() { await work; const responses = await host.dispatch({ kind: "OBSERVE", value: { profile: "COOP_DIGEST" } }); await handle(responses); return responses.at(-1).after_mechanical_digest; }
 async function waitFrame() { await waitUntil(() => received > 0); await work; return received; }
 async function close() { input.dispose(); transport.dispose(); pc?.close(); await work.catch(() => undefined); await host.dispose(); }
-globalThis.__coop = { offer, answer, accept, connected, rechannel, digest, waitFrame, close };
+globalThis.__coop = { framePublicKey: () => framePublicKey, bindFrameContext, offer, answer, accept, connected, rechannel, digest, waitFrame, close };
 </script></body></html>`;
 
 test.beforeAll(async () => {
@@ -91,7 +93,34 @@ test.beforeAll(async () => {
   await server.listen();
 });
 test.afterAll(async () => server.close());
+async function installFrameBinding(authority: Page, replica: Page, generation: number) {
+  const [authorityKey, replicaKey] = await Promise.all([
+    authority.evaluate(() => globalThis.__coop.framePublicKey()),
+    replica.evaluate(() => globalThis.__coop.framePublicKey()),
+  ]);
+  const binding = {
+    schema_version: 1,
+    binding_id: "binding-" + generation,
+    party_id: "party-1",
+    session_id: "session-1",
+    release_id: "m8-test",
+    authority_protocol: "er-coop-47",
+    authority_seat_id: 0,
+    participants: [
+      { participant_id: "authority", seat_id: 0, frame_public_key: authorityKey, connection_generation: generation },
+      { participant_id: "replica", seat_id: 1, frame_public_key: replicaKey, connection_generation: generation },
+    ],
+    issued_at: 1,
+    expires_at: Number.MAX_SAFE_INTEGER,
+  };
+  await Promise.all([
+    authority.evaluate(value => globalThis.__coop.bindFrameContext(value), binding),
+    replica.evaluate(value => globalThis.__coop.bindFrameContext(value), binding),
+  ]);
+}
+
 async function connect(authority: Page, replica: Page) {
+  await installFrameBinding(authority, replica, 1);
   const offer = await authority.evaluate(() => globalThis.__coop.offer());
   const answer = await replica.evaluate(value => globalThis.__coop.answer(value), offer);
   await authority.evaluate(value => globalThis.__coop.accept(value), answer);
@@ -128,6 +157,7 @@ test("one Rust authority commits and a second-browser replica applies the same m
   expect(await authority.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
   expect(await replica.evaluate(() => globalThis.__coop.waitFrame())).toBeGreaterThan(0);
   expect(await replica.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
+  await installFrameBinding(authority, replica, firstGeneration + 1);
   const secondGeneration = await authority.evaluate(() => globalThis.__coop.rechannel());
   expect(secondGeneration).toBe(firstGeneration + 1);
   await Promise.all([
