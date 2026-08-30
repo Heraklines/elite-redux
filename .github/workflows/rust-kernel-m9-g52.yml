@@ -73,7 +73,6 @@ jobs:
           src/rust-browser/adapters/input-adapter.ts
           src/rust-browser/adapters/lifecycle-adapter.ts
           src/rust-browser/adapters/mobile-input-adapter.ts
-          src/rust-browser/adapters/presentation-adapter.ts
           src/rust-browser/adapters/signaling-adapter.ts
           src/rust-browser/adapters/storage-adapter.ts
           src/rust-browser/adapters/transport-adapter.ts

@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CloudSaveAdapterV1 } from "../../../../src/rust-browser/adapters/cloud-save-adapter";
 import { encodeCanonicalJsonV1 } from "../../../../src/rust-browser/host/message-sequencer";
 import type { BrowserKernelGenerationIdentityV1 } from "../../../../src/rust-browser/hot-reload/contracts";
 import type {
@@ -347,6 +348,36 @@ describe("M9 production health and rollout control", () => {
       authorization,
     });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends authenticated production cloud writes as PUT without cookie credentials", async () => {
+    const authorization = "a".repeat(32);
+    const fetch = vi.fn(async (_input: URL | RequestInfo, init?: RequestInit) => {
+      expect(init?.method).toBe("PUT");
+      expect(init?.credentials).toBe("omit");
+      expect((init?.headers as Record<string, string>).authorization).toBe(`Bearer ${authorization}`);
+      return new Response(null, {
+        status: 204,
+        headers: {
+          etag: "revision-2",
+          "x-er-release-id": "release-2",
+          "x-er-save-slot": "slot-0",
+          "x-er-save-schema": "1",
+          "x-er-save-generation": "2",
+        },
+      });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const cloud = new CloudSaveAdapterV1({
+      endpoint: new URL("https://save.example/m9/save"),
+      allowedOrigin: "https://save.example",
+      releaseIdentity: "release-2",
+      productionSaveSchema: 1,
+      requireProductionIdentity: true,
+      authorization,
+    });
+    await expect(cloud.compareAndSwap("slot-0", "revision-1", Uint8Array.of(1))).resolves.toBe("revision-2");
+    cloud.dispose();
   });
 });
 

@@ -84,6 +84,7 @@ export class CloudSaveAdapterV1 {
       throw new Error("cloud save bytes are empty or oversized");
     }
     const response = await fetch(this.#slot(slot), {
+      method: "PUT",
       credentials: this.#authorization == null ? "include" : "omit",
       cache: "no-store",
       headers: {
