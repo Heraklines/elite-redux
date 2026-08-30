@@ -1,6 +1,9 @@
 name: Publish M9 Immutable Release
 
 on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/publish-m9-release.yml]
   workflow_dispatch:
     inputs:
       build_run_id:

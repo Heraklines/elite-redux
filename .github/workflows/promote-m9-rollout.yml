@@ -1,6 +1,9 @@
 name: Promote M9 Rollout Policy
 
 on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/promote-m9-rollout.yml]
   workflow_dispatch:
     inputs:
       candidate_release:

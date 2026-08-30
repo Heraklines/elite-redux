@@ -1,6 +1,9 @@
 name: Build M9 Immutable Release
 
 on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/build-m9-release.yml]
   workflow_dispatch:
     inputs:
       candidate_sha:
@@ -49,6 +52,7 @@ permissions:
 
 jobs:
   build-once:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: m9-release-build

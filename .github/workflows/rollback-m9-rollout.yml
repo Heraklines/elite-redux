@@ -1,6 +1,9 @@
 name: Rollback M9 Rollout Policy
 
 on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/rollback-m9-rollout.yml]
   workflow_dispatch:
     inputs:
       affected_release:
