@@ -24,6 +24,31 @@ fn safe(value: u64) -> Result<SafeU53, er_types::SafeU53Error> {
 }
 
 #[test]
+fn browser_json_without_optional_production_fields_initializes_both_roles() -> TestResult {
+    for session in [AUTHORITY_SESSION, REPLICA_SESSION] {
+        let mut host = BrowserKernelHostV1::create(CONTENT, session)
+            .map_err(|_| "native browser host creation failed")?;
+        let bytes = er_canonical::canonical_bytes(&serde_json::json!([{
+            "version": 1,
+            "request_id": 1,
+            "sequence": 1,
+            "request": {
+                "kind": "INITIALIZE",
+                "value": {
+                    "mode": "RUST_STAGING_AUTHORITY",
+                    "execution_identity_bytes": IDENTITY,
+                    "session_start_bytes": session,
+                    "maximum_pending_requests": 64
+                }
+            }
+        }]))?;
+        host.dispatch_batch_native(&bytes)
+            .map_err(|error| format!("browser-shaped initialization failed: {error:?}"))?;
+    }
+    Ok(())
+}
+
+#[test]
 fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> TestResult {
     let mut host = BrowserKernelHostV1::create(CONTENT, SESSION)
         .map_err(|_| "native browser host creation failed")?;
