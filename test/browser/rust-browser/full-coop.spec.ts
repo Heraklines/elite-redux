@@ -10,7 +10,7 @@ if (fixtureRoot == null) {
 const fixture = resolve(fixtureRoot);
 const expectedDigest = readFileSync(resolve(fixture, "expected-terminal-digest.txt"), "utf8").trim();
 let server: ViteDevServer;
-const html = `<!doctype html><html><body><script type="module">
+const html = `<!doctype html><html><body><script>globalThis.addEventListener("error", event => { globalThis.__coopError = String(event.error?.stack ?? event.message); }); globalThis.addEventListener("unhandledrejection", event => { globalThis.__coopError = String(event.reason?.stack ?? event.reason); });</script><script type="module">
 import { RustBrowserHost } from "/src/rust-browser/host/rust-browser-host.ts";
 import { BrowserExecutionModeV1 } from "/src/rust-browser/contracts/browser-contracts.ts";
 import { BrowserRawInputAdapter } from "/src/rust-browser/adapters/input-adapter.ts";
@@ -115,9 +115,14 @@ test("one Rust authority commits and a second-browser replica applies the same m
     replica.goto(new URL("m8-full-coop.html?role=replica", address).href),
   ]);
   await Promise.all([
-    authority.waitForFunction(() => "__coop" in globalThis),
-    replica.waitForFunction(() => "__coop" in globalThis),
+    authority.waitForFunction(() => "__coop" in globalThis || "__coopError" in globalThis),
+    replica.waitForFunction(() => "__coop" in globalThis || "__coopError" in globalThis),
   ]);
+  const errors = await Promise.all([
+    authority.evaluate(() => globalThis.__coopError),
+    replica.evaluate(() => globalThis.__coopError),
+  ]);
+  expect(errors).toEqual([undefined, undefined]);
   const [firstGeneration] = await connect(authority, replica);
   await authority.keyboard.press("Space");
   expect(await authority.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
