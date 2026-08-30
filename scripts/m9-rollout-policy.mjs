@@ -28,13 +28,14 @@ const currentIndex = current == null ? -1 : rings.findIndex(value => value.ring 
 if (targetIndex < 0 || targetIndex !== currentIndex + 1) {
   throw new Error("M9 rollout promotion must advance exactly one ring");
 }
+const evidenceRing = rings[currentIndex < 0 ? targetIndex : currentIndex];
 if (health.hard_stop || health.hard_stop_fingerprint != null || health.deterministic_migration_failures !== 0) {
   throw new Error("M9 rollout is halted by a zero-tolerance health event");
 }
-const requiredHealth = rings[targetIndex].required_health;
+const requiredHealth = evidenceRing.required_health;
 if (
-  health.observed_sessions < rings[targetIndex].minimum_sessions
-  || health.observed_minutes < rings[targetIndex].minimum_duration_minutes
+  health.observed_sessions < evidenceRing.minimum_sessions
+  || health.observed_minutes < evidenceRing.minimum_duration_minutes
   || health.worker_initialization_failure_basis_points > requiredHealth.worker_initialization_failure_basis_points
   || health.unrecoverable_kernel_fault_basis_points > requiredHealth.unrecoverable_kernel_fault_basis_points
   || health.cloud_save_regression_basis_points > requiredHealth.cloud_save_regression_basis_points

@@ -11,6 +11,10 @@
 # 🔁 WHEN er-assets CHANGES: bump the SHA below to the new Heraklines/er-assets
 #    HEAD (`gh api repos/Heraklines/er-assets/commits/main --jq .sha`) and redeploy.
 #    Forgetting to bump = players won't see the new assets (but never a stale mix).
+/m9/*               https://er-save-api.heraklines.workers.dev/m9/:splat               200
+/__m9_manifests/*   https://er-save-api.heraklines.workers.dev/__m9_manifests/:splat   200
+/__m9_releases/*    https://er-save-api.heraklines.workers.dev/__m9_releases/:splat    200
+
 /images/*            https://cdn.jsdelivr.net/gh/Heraklines/er-assets@34275e401c6fcfd80474378dcf2438de8b2fd97a/images/:splat            302
 /audio/*             https://cdn.jsdelivr.net/gh/Heraklines/er-assets@34275e401c6fcfd80474378dcf2438de8b2fd97a/audio/:splat             302
 /battle-anims/*      https://cdn.jsdelivr.net/gh/Heraklines/er-assets@34275e401c6fcfd80474378dcf2438de8b2fd97a/battle-anims/:splat       302

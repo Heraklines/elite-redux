@@ -301,6 +301,39 @@ describe("M9 production health and rollout control", () => {
     writeFileSync(input, JSON.stringify({ ...aggregate, token: "forbidden" }));
     const rejected = spawnSync(process.execPath, [...argumentsBeforeOutput, second, ...argumentsAfterOutput]);
     expect(rejected.status).not.toBe(0);
+
+    const zeroHealth = join(directory, "zero-health.json");
+    const current = join(directory, "current.json");
+    const nextPolicy = join(directory, "next-policy.json");
+    writeFileSync(
+      zeroHealth,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(first, "utf8")),
+        observed_sessions: 0,
+        observed_minutes: 0,
+      }),
+    );
+    writeFileSync(current, JSON.stringify({ payload: { active_ring: "R0", policy_version: 1 } }));
+    const promotionArgs = [
+      resolve("scripts/m9-rollout-policy.mjs"),
+      "--target-ring",
+      "R1",
+      "--candidate-release",
+      "release-2",
+      "--stable-release",
+      "release-1",
+      "--health",
+      zeroHealth,
+      "--output",
+      nextPolicy,
+      "--current",
+      current,
+    ];
+    execFileSync(process.execPath, promotionArgs);
+    expect(JSON.parse(readFileSync(nextPolicy, "utf8")).active_ring).toBe("R1");
+    writeFileSync(current, JSON.stringify({ payload: { active_ring: "R1", policy_version: 2 } }));
+    promotionArgs[promotionArgs.indexOf("R1")] = "R2";
+    expect(spawnSync(process.execPath, promotionArgs).status).not.toBe(0);
   });
 
   it("keeps account authorization in the browser fetch boundary and out of health payloads", async () => {

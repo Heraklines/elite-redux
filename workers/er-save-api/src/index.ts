@@ -58,6 +58,12 @@ import {
 } from "./ghost-public-moderation";
 import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
+  handleM9PlatformContext,
+  handleM9ReleaseObject,
+  handleM9RuntimeAssignment,
+  handleM9Save,
+} from "./m9-production";
+import {
   applyResultReport,
   finalizeExpiredLoneReport,
   isStakeRecord,
@@ -89,11 +95,6 @@ import {
   seasonIdFromTime,
 } from "./showdown-rank";
 import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
-import {
-  handleM9PlatformContext,
-  handleM9RuntimeAssignment,
-  handleM9Save,
-} from "./m9-production";
 
 interface Env {
   DB: D1Database;
@@ -5799,6 +5800,13 @@ export default {
       // SHOWDOWN_GRANT_SECRET (X-Grant-Auth), NOT a session token. Placed in the unauthenticated block.
       if (pathname === "/showdown/tournament-grant" && method === "POST") {
         return await handleShowdownTournamentGrant(request, env, cors);
+      }
+
+      if (pathname.startsWith("/__m9_manifests/") || pathname.startsWith("/__m9_releases/")) {
+        const response = await handleM9ReleaseObject(request, url, env, cors);
+        if (response != null) {
+          return response;
+        }
       }
 
       // ---- authenticated ----

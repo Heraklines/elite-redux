@@ -69,6 +69,71 @@ export async function handleM9PlatformContext(
   );
 }
 
+export async function handleM9ReleaseObject(
+  request: Request,
+  url: URL,
+  env: M9Env,
+  cors: Record<string, string>,
+): Promise<Response | null> {
+  if (request.method !== "GET") {
+    return null;
+  }
+  const manifestMatch = /^\/__m9_manifests\/([a-zA-Z0-9._:-]{1,128})\.json$/u.exec(url.pathname);
+  if (manifestMatch != null) {
+    const object = await env.M9_RELEASES.get(`manifests/${manifestMatch[1]}.json`);
+    if (object == null) {
+      return json({ error: "release manifest unavailable" }, 404, cors);
+    }
+    const bytes = new Uint8Array(await object.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > 131_072) {
+      return json({ error: "release manifest invalid" }, 502, cors);
+    }
+    let envelope: unknown;
+    try {
+      envelope = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    } catch {
+      return json({ error: "release manifest invalid" }, 502, cors);
+    }
+    if (
+      !(await verifyEnvelope(envelope, "er-m9:release-manifest-v1"))
+      || (envelope as SignedEnvelope).payload.release_id !== manifestMatch[1]
+    ) {
+      return json({ error: "release manifest invalid" }, 502, cors);
+    }
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-cache",
+        ...cors,
+      },
+    });
+  }
+  const artifactMatch = /^\/__m9_releases\/([a-zA-Z0-9._:-]{1,128})\/([0-9a-f]{64})\/([a-zA-Z0-9._-]{1,128})$/u.exec(
+    url.pathname,
+  );
+  if (artifactMatch == null) {
+    return null;
+  }
+  const object = await env.M9_RELEASES.get(`${artifactMatch[1]}/${artifactMatch[2]}/${artifactMatch[3]}`);
+  if (object == null) {
+    return json({ error: "release artifact unavailable" }, 404, cors);
+  }
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  if (bytes.byteLength === 0 || bytes.byteLength > MAXIMUM_SAVE_BYTES || (await sha256(bytes)) !== artifactMatch[2]) {
+    return json({ error: "release artifact invalid" }, 502, cors);
+  }
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "content-type": releaseArtifactMediaType(artifactMatch[3]),
+      "cache-control": "public, max-age=31536000, immutable",
+      "content-length": String(bytes.byteLength),
+      ...cors,
+    },
+  });
+}
+
 export async function handleM9RuntimeAssignment(
   request: Request,
   auth: M9Auth,
@@ -316,6 +381,19 @@ function secureTelemetryEventUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function releaseArtifactMediaType(name: string): string {
+  if (name.endsWith(".js")) {
+    return "text/javascript";
+  }
+  if (name.endsWith(".wasm")) {
+    return "application/wasm";
+  }
+  if (name.endsWith(".json")) {
+    return "application/json";
+  }
+  return "application/octet-stream";
 }
 
 function json(value: unknown, status: number, headers: Record<string, string>): Response {
