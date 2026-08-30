@@ -1,0 +1,284 @@
+name: Rust Kernel M9 G52 Production Qualification
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m9-g52-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-static-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-kernel-m9-contract.mjs
+      - run: node scripts/check-kernel-m9-release-readiness.mjs
+      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --no-deps -- -D warnings
+      - name: Typecheck complete M9 production ownership surface
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2024
+          --types node,vitest/globals --lib ES2024,DOM,WebWorker
+          workers/er-telemetry/src/cloudflare-workers.d.ts
+          workers/er-save-api/src/cloudflare-workers.d.ts
+          src/rust-browser/production/contracts.ts
+          src/rust-browser/production/signature-verifier.ts
+          src/rust-browser/production/release-manifest.ts
+          src/rust-browser/production/runtime-assignment.ts
+          src/rust-browser/production/session-pin.ts
+          src/rust-browser/production/generation-registry.ts
+          src/rust-browser/production/runtime-selector.ts
+          src/rust-browser/production/release-cache-v2.ts
+          src/rust-browser/production/service-worker.ts
+          src/rust-browser/production/production-worker-host.ts
+          src/rust-browser/production/bootstrap.ts
+          src/rust-browser/production/browser-session.ts
+          src/rust-browser/production/configured-production-main.ts
+          src/rust-browser/production/save-envelope.ts
+          src/rust-browser/production/save-lease.ts
+          src/rust-browser/production/save-migration.ts
+          src/rust-browser/production/production-save-worker.ts
+          src/rust-browser/production/platform-context.ts
+          src/rust-browser/production/coop-release.ts
+          src/rust-browser/production/coop-frame.ts
+          src/rust-browser/production/health-event.ts
+          src/rust-browser/production/health-reporter.ts
+          src/rust-browser/production/repro-reporting.ts
+          src/rust-browser/production/rollout.ts
+          src/rust-browser/production/shadow-sampling.ts
+          src/rust-browser/production/type-guards.ts
+          src/rust-browser/adapters/cloud-save-adapter.ts
+          src/rust-browser/adapters/indexeddb-adapter.ts
+          src/rust-browser/adapters/input-adapter.ts
+          src/rust-browser/adapters/lifecycle-adapter.ts
+          src/rust-browser/adapters/mobile-input-adapter.ts
+          src/rust-browser/adapters/presentation-adapter.ts
+          src/rust-browser/adapters/signaling-adapter.ts
+          src/rust-browser/adapters/storage-adapter.ts
+          src/rust-browser/adapters/transport-adapter.ts
+          src/rust-browser/contracts/browser-contracts.ts
+          src/rust-browser/hot-reload/contracts.ts
+          src/rust-browser/hot-reload/generation-worker-host.ts
+          src/rust-browser/host/message-sequencer.ts
+          src/rust-browser/host/rust-browser-host.ts
+          src/rust-browser/worker/rust-kernel-worker.ts
+          src/rust-browser/worker/rust-wasm-loader.ts
+          workers/er-save-api/src/m9-production.ts
+          workers/er-save-api/src/m9-type-guards.ts
+          workers/er-telemetry/src/m9-health.ts
+          test/node/rust-browser/production/*.test.ts
+          test/node/rust-browser/adapters/adapter-contracts.test.ts
+      - run: pnpm exec biome ci --diagnostic-level=error .github/workflows/*m9*.yml scripts/*m9*.mjs src/rust-browser test/node/rust-browser workers/er-save-api/src/m9-*.ts workers/er-telemetry/src/m9-health.ts
+      - name: Enforce production import and API quarantine
+        run: |
+          node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-production" --authority rust
+          for forbidden in 'battle-scene' 'game-manager' 'loadDevTools' 'startUpdateChecker' 'window.location.reload' 'AuthorityResolutionPlan'; do
+            ! grep -R -E "$forbidden" "$RUNNER_TEMP/m9-production"
+          done
+          grep -R -q 'ATTACH_PRODUCTION_ARTIFACTS_V1' "$RUNNER_TEMP/m9-production"
+          ! grep -R -E 'reloadKernel|HOT_RELOAD|DEV_KERNEL' "$RUNNER_TEMP/m9-production"
+
+  rust-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-g52-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - working-directory: rust
+        run: >-
+          cargo test --workspace --all-targets --
+          --skip m3_audited_production_surface_matches_frozen_manifest
+
+  node-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run production selector artifact save co-op health generation and rollback contracts
+        run: >-
+          pnpm exec vitest run --config test/node/vitest.config.ts
+          test/node/rust-browser/production/*.test.ts
+          test/node/rust-browser/adapters/adapter-contracts.test.ts
+          test/node/rust-browser/release-contract.test.ts
+          test/node/rust-browser/shadow-isolation.test.ts
+          test/node/rust-browser/shadow-performance.test.ts
+          --pool=forks --isolate --no-file-parallelism
+
+  sealed-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-g52-wasm-${{ runner.os }}-${{ runner.arch }}-0.2.127-${{ hashFiles('rust/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
+      - run: |
+          if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then cargo install wasm-bindgen-cli --version 0.2.127 --locked; fi
+          node scripts/build-kernel-m8-web.mjs --out-dir "$RUNNER_TEMP/m9-web" --content rust/fixtures/m8/browser-reference/content-pack.json --identity rust/fixtures/m8/browser-reference/execution-identity.bin --session rust/fixtures/m8/browser-reference/session-start.json --authority-session rust/fixtures/m8/browser-reference/session-authority.json --replica-session rust/fixtures/m8/browser-reference/session-replica.json
+          cp rust/fixtures/m8/browser-reference/expected-terminal-digest.txt "$RUNNER_TEMP/m9-web/"
+          node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-browser-one" --authority rust
+          node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-browser-two" --authority rust
+          for file in bootstrap.js browser.js rust-kernel-worker.js service-worker.js; do cmp "$RUNNER_TEMP/m9-browser-one/$file" "$RUNNER_TEMP/m9-browser-two/$file"; done
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9-g52-web-${{ github.sha }}
+          path: ${{ runner.temp }}/m9-web
+          if-no-files-found: error
+          retention-days: 30
+
+  browser-matrix:
+    name: M9 production browser matrix (${{ matrix.browser }})
+    needs: sealed-bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v7
+        with:
+          name: m9-g52-web-${{ github.sha }}
+          path: ${{ runner.temp }}/m9-web
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Run cache offline input save and platform matrix
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=${{ matrix.browser }}
+          test/browser/rust-browser/save-offline.spec.ts
+          test/browser/rust-browser/release-cache.spec.ts
+          test/browser/rust-browser/input-accessibility.spec.ts
+          test/browser/rust-browser/mobile-profile.spec.ts
+      - name: Run cross-engine Rust Wasm journey
+        if: matrix.browser != 'firefox'
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=${{ matrix.browser }}
+          test/browser/rust-browser/rust-local.spec.ts
+      - name: Run Chromium solo co-op reconnect and Phaser journeys
+        if: matrix.browser == 'chromium'
+        env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=chromium
+          test/browser/rust-browser/full-solo.spec.ts
+          test/browser/rust-browser/rust-staging-entry.spec.ts
+          test/browser/rust-browser/full-coop.spec.ts
+          test/browser/rust-browser/adapters/phaser-adapter.spec.ts
+          test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m9-g52-browser-${{ matrix.browser }}-${{ github.sha }}
+          path: test-results/rust-browser
+          if-no-files-found: warn
+          retention-days: 30
+
+  performance-resource:
+    needs: sealed-bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v7
+        with:
+          name: m9-g52-web-${{ github.sha }}
+          path: ${{ runner.temp }}/m9-web
+      - run: pnpm exec playwright install --with-deps chromium
+      - env:
+          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts --project=chromium
+          test/browser/rust-browser/performance.spec.ts
+          --workers=1
+
+  g52-aggregate:
+    name: M9 exact-SHA production qualification
+    needs:
+      - source-static-security
+      - rust-regression
+      - node-contracts
+      - sealed-bundle
+      - browser-matrix
+      - performance-resource
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed immutable G52 production qualification"
