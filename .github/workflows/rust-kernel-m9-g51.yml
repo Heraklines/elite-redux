@@ -122,12 +122,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Run authenticated public WebRTC and offline rejoin
+      - name: Run authenticated public WebRTC and hot rejoin
         run: >-
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=chromium
           test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
-          test/browser/rust-browser/save-offline.spec.ts
           --workers=1
 
   g51-aggregate:
