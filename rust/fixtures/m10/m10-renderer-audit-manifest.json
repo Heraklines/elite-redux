@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "audit_source_sha": "35353204f52d3ed231ce0da17e7e44a81dff209f",
+  "preliminary_renderer_foundation_base": "a4a2b78206afa36d381a555a365cff2f85c28a5a",
+  "final_integration_base": "rust-kernel-m9-preview-final",
+  "status": "READ_ONLY_COMPLETE",
+  "lanes": [
+    {
+      "id": "M10-00A",
+      "name": "PHASER_SCENES",
+      "sources": ["src/scene-base.ts", "src/loading-scene.ts", "src/battle-scene.ts", "src/global-scene.ts", "src/pipelines/field-sprite.ts", "src/pipelines/sprite.ts", "src/pipelines/invert.ts", "src/data/battle-anims.ts"],
+      "finding": "BattleScene and globalScene own display objects, pipelines, cameras, effects and teardown; globalScene coupling is the primary migration risk."
+    },
+    {
+      "id": "M10-00B",
+      "name": "RUST_PRESENTATION",
+      "sources": ["rust/crates/er-battle/src/presentation.rs", "rust/crates/er-kernel/src/battle_presentation.rs", "rust/crates/er-kernel/src/snapshot.rs", "rust/contracts/m3-presentation-control.md", "src/data/elite-redux/coop/coop-presentation.ts", "src/data/elite-redux/coop/coop-field-presentation.ts"],
+      "finding": "Typed presentation plans, settlement tombstones and snapshot persistence exist; no first-class semantic scene-delta schema exists."
+    },
+    {
+      "id": "M10-00C",
+      "name": "LOGICAL_UI",
+      "sources": ["rust/contracts/m3-ui-navigation.md", "rust/crates/er-types/src/battle_ui.rs", "rust/crates/er-types/src/battle_control.rs", "rust/crates/er-kernel/src/ui_reducer.rs", "src/ui/handlers/title-ui-handler.ts", "src/ui/handlers/save-slot-select-ui-handler.ts", "src/ui/coop-lobby-stage.ts"],
+      "finding": "Rust owns exact battle navigation; startup, save, rewards, world, scenarios, terminal and lobby still lack Rust-native control DTO coverage."
+    },
+    {
+      "id": "M10-00D",
+      "name": "SPRITE_ASSETS",
+      "sources": ["src/loading-scene.ts", "src/battle-scene.ts", "src/data/pokemon-species.ts", "src/data/elite-redux/er-sprite-manifest.ts", "scripts/elite-redux/verify-assets.mjs", "deploy/cloudflare/_redirects"],
+      "finding": "Sprite assets span local PNGs, generated atlas metadata and an immutable er-assets CDN pin; current validation is structural rather than semantic."
+    },
+    {
+      "id": "M10-00E",
+      "name": "TEXT_ACCESSIBILITY",
+      "sources": ["src/ui/text.ts", "src/ui/handlers/form-modal-ui-handler.ts", "src/ui/handlers/showdown-editor-text-input.ts", "src/data/elite-redux/coop/coop-ui-mirror.ts", "test/blocked-instrumentation.md"],
+      "finding": "Text styling is centralized, but RTL, locale-aware breaking and an accessible semantic canvas mirror are missing; hidden DOM inputs require strict noncanonical boundaries."
+    },
+    {
+      "id": "M10-00F",
+      "name": "EFFECTS_SHINY_LAB",
+      "sources": ["src/data/elite-redux/er-shiny-lab-fx.ts", "src/data/elite-redux/er-shiny-lab-renderer.ts", "src/sprites/er-shiny-lab-sprite-fx.ts", "src/sprites/er-shiny-lab-name-fx.ts", "src/phases/shiny-sparkle-phase.ts"],
+      "finding": "Closed palette, surface and around registries plus seeded visual noise exist; mutable global effect and texture caches need renderer-generation ownership."
+    },
+    {
+      "id": "M10-00G",
+      "name": "MODEL_3D",
+      "sources": ["src/loading-scene.ts", "scripts/elite-redux/fetch-non-combat-assets.mjs", "scripts/render-sprite.mjs", "docs/local-asset-pack.md"],
+      "finding": "No GLB/glTF assets or model pipeline exist; M10 needs a new validated intake, geometry/material limits, LOD and sprite fallback."
+    },
+    {
+      "id": "M10-00H",
+      "name": "AUDIO",
+      "sources": ["src/scene-base.ts", "src/loading-scene.ts", "src/battle-scene.ts", "src/battle.ts", "src/data/elite-redux/er-ios.ts", "src/data/elite-redux/coop/coop-transport.ts"],
+      "finding": "BattleScene owns playback, caches and timers while co-op already treats cues as cosmetic; browser and iOS memory policies differ materially."
+    },
+    {
+      "id": "M10-00I",
+      "name": "WGPU_PLATFORM",
+      "sources": ["src/main.ts", "vite.config.ts", "rust/Cargo.toml", "rust/crates/er-wasm/src/lib.rs", "test/browser/coop-public-ui/public-ui-harness.mjs"],
+      "finding": "No WebGPU/wgpu backend exists; current hosts are Phaser WebGL, Canvas2D utilities and Wasm JSON bridges."
+    },
+    {
+      "id": "M10-00J",
+      "name": "DEVICE_LIFECYCLE",
+      "sources": ["src/data/elite-redux/coop/coop-runtime.ts", "src/data/elite-redux/coop/authority-v2/recovery.ts", "src/data/elite-redux/coop/authority-v2/lifecycle.ts", "src/data/elite-redux/coop/coop-webrtc-transport.ts"],
+      "finding": "Recovery fences, session pins and idempotent teardown exist; a GPU device-loss state machine and asset rebuild evidence are missing."
+    },
+    {
+      "id": "M10-00K",
+      "name": "RENDERER_RELOAD",
+      "sources": ["rust/crates/er-state/src/snapshot.rs", "rust/crates/er-game/src/snapshot.rs", "rust/crates/er-kernel/src/snapshot.rs", "rust/crates/er-sim/tests/m3_snapshot_continuation.rs", "src/handlers/message-ui-handler.ts", "src/phases/reload-session-phase.ts"],
+      "finding": "Canonical snapshots and generation guards provide the transactional skeleton; renderer, shader and asset generations need an independent unified contract."
+    },
+    {
+      "id": "M10-00L",
+      "name": "PERFORMANCE_SECURITY",
+      "sources": ["rust/fixtures/m3/m3-benchmark-manifest.json", "scripts/benchmark-kernel-m3.mjs", "src/data/elite-redux/coop/coop-renderer-gate.ts", "test/browser/coop-public-ui/public-ui-harness.mjs", ".github/workflows/coop-public-ui-journey.yml"],
+      "finding": "Benchmark and renderer-denylist primitives exist; M10 needs measured mobile classes, GPU instrumentation and accepted baseline artifacts."
+    }
+  ],
+  "freeze_blockers": [
+    "M9 preview-final tag absent",
+    "RenderSceneV2 and delta schemas absent",
+    "Non-battle Rust UI contracts incomplete",
+    "No WebGPU dependency or host exists",
+    "No 3D asset validation pipeline exists",
+    "No GPU device-loss contract exists",
+    "No measured M10 performance baseline exists"
+  ]
+}
