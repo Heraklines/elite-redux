@@ -65,8 +65,17 @@ function emptyDatabase(): D1Database {
         async run<T>() {
           return { results: [] as T[], meta: {} };
         },
+        async raw<T>() {
+          return [] as T[];
+        },
       };
       return statement;
+    },
+    async batch<T>() {
+      return [] as D1Result<T>[];
+    },
+    async exec() {
+      return { count: 0, duration: 0 };
     },
   };
 }
