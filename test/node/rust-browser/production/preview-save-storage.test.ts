@@ -14,9 +14,15 @@ class PreviewCloud implements DisposablePreviewCloudSaveV1 {
   disposed = false;
 
   async load(): Promise<CloudSaveValueV1 | null> {
-    return this.value == null
-      ? null
-      : { revision: this.value.revision, generation: this.value.generation, bytes: Uint8Array.from(this.value.bytes) };
+    if (this.value == null) {
+      return null;
+    }
+    const generation = this.value.generation;
+    return {
+      revision: this.value.revision,
+      bytes: Uint8Array.from(this.value.bytes),
+      ...(generation == null ? {} : { generation }),
+    };
   }
 
   async compareAndSwap(_slot: string, expectedRevision: string | null, bytes: Uint8Array): Promise<string> {
