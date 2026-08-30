@@ -59,10 +59,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
           M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
+          M9_INTERNAL_ACCOUNTS: ${{ secrets.M9_INTERNAL_ACCOUNTS }}
         run: |
           test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
           test -n "$M9_HEALTH_TOKEN"
+          test -n "$M9_INTERNAL_ACCOUNTS"
           printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx --yes wrangler@4.127.1 secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
+          printf '%s' "$M9_INTERNAL_ACCOUNTS" | npx --yes wrangler@4.127.1 secret put M9_INTERNAL_ACCOUNTS --config workers/er-save-api/wrangler.toml
           printf '%s' "$M9_HEALTH_TOKEN" | npx --yes wrangler@4.127.1 secret put M9_HEALTH_TOKEN --config workers/er-telemetry/wrangler.toml
       - name: Deploy exact save and runtime-assignment Worker
         env:

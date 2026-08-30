@@ -1,0 +1,104 @@
+name: Deploy M9 R1 Internal Preview
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/deploy-m9-r1-preview.yml]
+  workflow_dispatch:
+    inputs:
+      platform_sha:
+        required: true
+        type: string
+      g52_run_id:
+        required: true
+        type: number
+      release_id:
+        required: true
+        type: string
+      manifest_sha256:
+        required: true
+        type: string
+      exact_asset_sha:
+        required: true
+        type: string
+      explicit_confirmation:
+        description: Type DEPLOY_M9_R1_PREVIEW
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: deploy-m9-r1-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.explicit_confirmation == 'DEPLOY_M9_R1_PREVIEW'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: m9-r1-preview
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.platform_sha }}
+          fetch-depth: 0
+      - name: Verify exact successful G52 source
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number('${{ inputs.g52_run_id }}'),
+            });
+            if (run.data.head_sha !== '${{ inputs.platform_sha }}'
+                || run.data.conclusion !== 'success'
+                || run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
+              core.setFailed('M9 preview source lacks exact successful G52 evidence');
+            }
+      - name: Download and verify signed release shell
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.platform_sha }}"
+          echo '${{ inputs.release_id }}' | grep -Eq '^[a-zA-Z0-9._:-]{1,128}$'
+          echo '${{ inputs.manifest_sha256 }}' | grep -Eq '^[0-9a-f]{64}$'
+          echo '${{ inputs.exact_asset_sha }}' | grep -Eq '^[0-9a-f]{40}$'
+          mkdir -p "$RUNNER_TEMP/m9-shell"
+          npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/manifests/${{ inputs.release_id }}.json" --file "$RUNNER_TEMP/manifest.json" --remote
+          test "$(sha256sum "$RUNNER_TEMP/manifest.json" | cut -d' ' -f1)" = "${{ inputs.manifest_sha256 }}"
+          node scripts/verify-kernel-m9-release.mjs --manifest "$RUNNER_TEMP/manifest.json"
+          test "$(jq -r .payload.release_id "$RUNNER_TEMP/manifest.json")" = "${{ inputs.release_id }}"
+          for kind in bootstrap_js service_worker; do
+            URL=$(jq -r ".payload.artifacts.${kind}.url" "$RUNNER_TEMP/manifest.json")
+            KEY=${URL#/__m9_releases/}
+            NAME=$(basename "$URL")
+            npx --yes wrangler@4.127.1 r2 object get "er-m9-releases/${KEY}" --file "$RUNNER_TEMP/m9-shell/${NAME}" --remote
+          done
+          node scripts/prepare-m9-pages-shell.mjs \
+            --manifest "$RUNNER_TEMP/manifest.json" \
+            --bootstrap "$RUNNER_TEMP/m9-shell/bootstrap.js" \
+            --service-worker "$RUNNER_TEMP/m9-shell/service-worker.js" \
+            --asset-sha "${{ inputs.exact_asset_sha }}" \
+            --output "$RUNNER_TEMP/dist"
+      - name: Deploy immutable internal Pages preview only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          npx --yes wrangler@4.127.1 pages deploy "$RUNNER_TEMP/dist"
+          --project-name elite-redux
+          --branch m9-r1-internal
+          --commit-hash "${{ inputs.platform_sha }}"
+      - name: Verify preview release identity
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            https://m9-r1-internal.elite-redux.pages.dev/release.json \
+            > "$RUNNER_TEMP/release.json"
+          jq -e '.release_id == "${{ inputs.release_id }}" and .manifest_sha256 == "${{ inputs.manifest_sha256 }}"' \
+            "$RUNNER_TEMP/release.json" > /dev/null
+          printf '%s\n' "M9 internal preview deployed without changing the production Pages branch"
