@@ -137,6 +137,16 @@ jobs:
             [ "$ok" = "1" ] || { echo "Asset unavailable at exact pin: $f" >&2; exit 1; }
           done
 
+      - name: Configure M9 production Worker secrets
+        env:
+          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
+          M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
+        run: |
+          test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
+          test -n "$M9_HEALTH_TOKEN"
+          printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx wrangler secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
+          printf '%s' "$M9_HEALTH_TOKEN" | npx wrangler secret put M9_HEALTH_TOKEN --config workers/er-telemetry/wrangler.toml
+
       - name: Verify production telemetry prerequisites
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -150,12 +160,12 @@ jobs:
 
           npx wrangler secret list --config workers/er-save-api/wrangler.toml --format json \
             > "$RUNNER_TEMP/prod-save-secrets.json"
-          jq -e '[.[].name] | index("SESSION_SECRET") != null and index("SHOWDOWN_GRANT_SECRET") != null' \
+          jq -e '[.[].name] | index("SESSION_SECRET") != null and index("SHOWDOWN_GRANT_SECRET") != null and index("M9_RELEASE_SIGNING_PRIVATE_KEY") != null' \
             "$RUNNER_TEMP/prod-save-secrets.json" > /dev/null
 
           npx wrangler secret list --config workers/er-telemetry/wrangler.toml --format json \
             > "$RUNNER_TEMP/prod-tel-secrets.json"
-          jq -e '[.[].name] | index("SHOWDOWN_GRANT_SECRET") != null' \
+          jq -e '[.[].name] | index("SHOWDOWN_GRANT_SECRET") != null and index("M9_HEALTH_TOKEN") != null' \
             "$RUNNER_TEMP/prod-tel-secrets.json" > /dev/null
 
       - name: Build standalone bundle
@@ -195,12 +205,6 @@ jobs:
       - name: Refresh community suggestion achievement catalog
         run: node scripts/elite-redux/build-community-suggestion-achievements.mjs
 
-      - name: Configure M9 runtime assignment signer
-        env:
-          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
-        run: |
-          test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
-          printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx wrangler secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
 
       - name: Deploy cloud-save API (production)
         uses: cloudflare/wrangler-action@v3
@@ -208,6 +212,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config workers/er-save-api/wrangler.toml
+
 
       - name: Deploy tournament telemetry API (production)
         uses: cloudflare/wrangler-action@v3

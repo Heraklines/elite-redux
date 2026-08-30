@@ -20,6 +20,11 @@ import {
   type ProductionHealthEventV1,
   validateProductionHealthEventV1,
 } from "../../../../src/rust-browser/production/health-event";
+import { sendProductionHealthEventV1 } from "../../../../src/rust-browser/production/health-reporter";
+import {
+  loadAuthenticatedPlatformContextV1,
+  readProductionAccountAuthorizationV1,
+} from "../../../../src/rust-browser/production/platform-context";
 import { uploadAuthorizedProductionReproV1 } from "../../../../src/rust-browser/production/repro-reporting";
 import {
   ProductionRolloutControllerV1,
@@ -295,6 +300,53 @@ describe("M9 production health and rollout control", () => {
     writeFileSync(input, JSON.stringify({ ...aggregate, token: "forbidden" }));
     const rejected = spawnSync(process.execPath, [...argumentsBeforeOutput, second, ...argumentsAfterOutput]);
     expect(rejected.status).not.toBe(0);
+  });
+
+  it("keeps account authorization in the browser fetch boundary and out of health payloads", async () => {
+    const authorization = "a".repeat(32);
+    expect(readProductionAccountAuthorizationV1(`other=1; pokerogue_sessionId=${authorization}`)).toBe(authorization);
+    expect(() =>
+      readProductionAccountAuthorizationV1(
+        `pokerogue_sessionId=${authorization}; pokerogue_sessionId=${authorization}`,
+      ),
+    ).toThrow(/ambiguous/u);
+
+    const fetch = vi.fn(async (_input: URL | RequestInfo, init?: RequestInit) => {
+      expect((init?.headers as Record<string, string>).authorization).toBe(`Bearer ${authorization}`);
+      if (String(_input).includes("platform-context")) {
+        return new Response(
+          JSON.stringify({
+            schema_version: 1,
+            pseudonymous_account_id: "account-1",
+            entitlements_digest: "a".repeat(64),
+            server_api_versions: {
+              schema_version: 1,
+              save_api: 2,
+              telemetry_api: 1,
+              signaling_api: 33,
+              showdown_api: 1,
+              achievement_api: 1,
+            },
+            default_save_slot: "slot-0",
+            telemetry_event_url: "https://telemetry.example/m9/health/event",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      expect(init?.body).not.toContain(authorization);
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const platform = await loadAuthenticatedPlatformContextV1(authorization);
+    expect(platform.pseudonymous_account_id).toBe("account-1");
+    await sendProductionHealthEventV1({
+      endpoint: new URL(platform.telemetry_event_url),
+      allowedOrigin: "https://telemetry.example",
+      idempotencyKey: "bootstrap-1",
+      event: event(),
+      authorization,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });
 

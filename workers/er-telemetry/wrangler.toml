@@ -26,6 +26,7 @@ service = "er-save-api"
 #                                                   # tournaments via the editor page (X-Editor-Auth).
 #   npx wrangler secret put SHOWDOWN_GRANT_SECRET   # MUST equal er-save-api's SHOWDOWN_GRANT_SECRET
 #                                                   # (authenticates the server-to-server reward push).
+#   npx wrangler secret put M9_HEALTH_TOKEN          # Read access for bounded M9 rollout aggregates.
 # SESSION_SECRET is the SHARED HMAC key so the client's existing session token verifies here.
 
 [vars]

@@ -16,6 +16,7 @@ interface M9Env {
   M9_RELEASES: M9R2Bucket;
   M9_RELEASE_SIGNING_PRIVATE_KEY: string;
   M9_INTERNAL_ACCOUNTS?: string;
+  M9_TELEMETRY_URL?: string;
 }
 
 interface M9Auth {
@@ -38,9 +39,13 @@ const MAXIMUM_SAVE_BYTES = 268_435_456;
 
 export async function handleM9PlatformContext(
   auth: M9Auth,
-  _env: M9Env,
+  env: M9Env,
   cors: Record<string, string>,
 ): Promise<Response> {
+  const telemetryEventUrl = env.M9_TELEMETRY_URL ?? "https://er-telemetry.heraklines.workers.dev/m9/health/event";
+  if (!secureTelemetryEventUrl(telemetryEventUrl)) {
+    return json({ error: "production telemetry endpoint invalid" }, 503, cors);
+  }
   const account = await pseudonymousAccount(auth.uid);
   const entitlements = await sha256(new TextEncoder().encode(`m9-entitlements:${auth.uid}:v1`));
   return json(
@@ -57,6 +62,7 @@ export async function handleM9PlatformContext(
         achievement_api: 1,
       },
       default_save_slot: "slot-0",
+      telemetry_event_url: telemetryEventUrl,
     },
     200,
     cors,
@@ -294,6 +300,22 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 
 function identifier(value: string): boolean {
   return /^[a-zA-Z0-9._:-]{1,128}$/u.test(value);
+}
+
+function secureTelemetryEventUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:"
+      && url.username.length === 0
+      && url.password.length === 0
+      && url.search.length === 0
+      && url.hash.length === 0
+      && url.pathname === "/m9/health/event"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function json(value: unknown, status: number, headers: Record<string, string>): Response {

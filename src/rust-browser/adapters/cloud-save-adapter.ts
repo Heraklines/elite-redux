@@ -19,6 +19,7 @@ export interface CloudSaveAdapterOptionsV1 {
   releaseIdentity: string;
   productionSaveSchema?: number;
   requireProductionIdentity?: boolean;
+  authorization?: string;
 }
 
 export class CloudSaveAdapterV1 {
@@ -27,6 +28,7 @@ export class CloudSaveAdapterV1 {
   readonly #releaseIdentity: string;
   readonly #productionSaveSchema: number;
   readonly #requireProductionIdentity: boolean;
+  readonly #authorization: string | null;
   readonly #controller = new AbortController();
   #disposed = false;
 
@@ -37,6 +39,7 @@ export class CloudSaveAdapterV1 {
       || options.releaseIdentity.length === 0
       || !Number.isSafeInteger(schema)
       || schema < 1
+      || (options.authorization != null && !/^[A-Za-z0-9._~-]{16,8192}$/u.test(options.authorization))
     ) {
       throw new Error("cloud save endpoint, release, or schema identity is invalid");
     }
@@ -45,15 +48,17 @@ export class CloudSaveAdapterV1 {
     this.#releaseIdentity = options.releaseIdentity;
     this.#productionSaveSchema = schema;
     this.#requireProductionIdentity = options.requireProductionIdentity ?? false;
+    this.#authorization = options.authorization ?? null;
   }
 
   async load(slot: string): Promise<CloudSaveValueV1 | null> {
     this.#assertOpen();
     const response = await fetch(this.#slot(slot), {
-      credentials: "include",
+      credentials: this.#authorization == null ? "include" : "omit",
       cache: "no-store",
       headers: {
         accept: "application/octet-stream",
+        ...(this.#authorization == null ? {} : { authorization: `Bearer ${this.#authorization}` }),
         "x-er-release": this.#releaseIdentity,
         "x-er-save-schema": String(this.#productionSaveSchema),
       },
@@ -79,14 +84,14 @@ export class CloudSaveAdapterV1 {
       throw new Error("cloud save bytes are empty or oversized");
     }
     const response = await fetch(this.#slot(slot), {
-      method: "PUT",
-      credentials: "include",
+      credentials: this.#authorization == null ? "include" : "omit",
       cache: "no-store",
       headers: {
         "content-type": "application/octet-stream",
         "if-match": expectedRevision ?? "*",
         "x-er-release": this.#releaseIdentity,
         "x-er-save-schema": String(this.#productionSaveSchema),
+        ...(this.#authorization == null ? {} : { authorization: `Bearer ${this.#authorization}` }),
       },
       body: Uint8Array.from(bytes).buffer,
       signal: this.#controller.signal,

@@ -233,15 +233,13 @@ export class RustBrowserTransportAdapterV1 {
   #closed(channel: RTCDataChannel, generation: number): void {
     if (!this.#disposed && channel === this.#channel && this.#generations.accepts(generation)) {
       this.#emit({ kind: "TRANSPORT_CHANGED", value: { generation, connected: false } });
+      this.#detach(false);
     }
-    this.#detach(false);
   }
 
   #failCurrent(channel: RTCDataChannel | null, generation: number): void {
     if (!this.#disposed && channel != null && channel === this.#channel && this.#generations.accepts(generation)) {
       this.#emit({ kind: "TRANSPORT_CHANGED", value: { generation, connected: false } });
-    }
-    if (channel === this.#channel) {
       this.#detach(true);
     }
   }

@@ -35,6 +35,7 @@ export interface ProductionBootstrapDependenciesV1 extends ProductionRuntimeSele
 
 export interface ProductionBrowserSessionV1 {
   readonly selection: VerifiedProductionRuntimeSelectionV1;
+  readonly generation: BrowserKernelGenerationIdentityV1;
   disposePage(): Promise<void>;
   completeRun(): Promise<void>;
 }
@@ -83,7 +84,7 @@ async function startLegacySession(
   await retainProductionReleasePinV2(dependencies.caches, selection.release.release_id, pin.session_id);
   try {
     const legacy = await dependencies.startLegacyTransition(selection, release);
-    return lifecycle(selection, dependencies, legacy, null, true);
+    return lifecycle(selection, dependencies, legacy, pin.kernel_generation, null, true);
   } catch (error) {
     await cleanupCreatedPin(dependencies, selection, pin, created);
     throw error;
@@ -109,7 +110,7 @@ async function startRustSession(
     pinState = await ensurePin(dependencies, selection, host.identity, authority);
     await retainProductionReleasePinV2(dependencies.caches, selection.release.release_id, pinState.pin.session_id);
     const view = await dependencies.startRustView(host, selection, release);
-    return lifecycle(selection, dependencies, view, host, true);
+    return lifecycle(selection, dependencies, view, pinState.pin.kernel_generation, host, true);
   } catch (error) {
     await host?.dispose().catch(() => undefined);
     if (pinState != null) {
@@ -193,12 +194,14 @@ function lifecycle(
   selection: VerifiedProductionRuntimeSelectionV1,
   dependencies: ProductionBootstrapDependenciesV1,
   view: { dispose(): Promise<void> },
+  generation: BrowserKernelGenerationIdentityV1,
   host: ProductionWorkerHostV1 | null,
   hasPersistentPin: boolean,
 ): ProductionBrowserSessionV1 {
   let disposed = false;
   let terminal = false;
   return {
+    generation,
     selection,
     async disposePage() {
       if (!disposed) {

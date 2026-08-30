@@ -252,6 +252,10 @@ describe("M8 browser adapters", () => {
     await flushMicrotasks();
     await expect(left.send(leftGeneration, Uint8Array.from([1]))).rejects.toThrow(/generation/u);
     expect(nextGeneration).toBe(2);
+    await left.send(nextGeneration, Uint8Array.of(9));
+    await vi.waitFor(() => {
+      expect(rightEvents.at(-1)).toEqual({ kind: "NETWORK_FRAME", value: { generation: 2, bytes: [9] } });
+    });
     left.dispose();
     right.dispose();
   });

@@ -2,7 +2,9 @@ import { CloudSaveAdapterV1 } from "../adapters/cloud-save-adapter";
 import { startProductionBootstrapV1 } from "./bootstrap";
 import { getOrCreateBrowserGameSessionIdV1 } from "./browser-session";
 import type { SignedProductionManifestV1, SignedRuntimeAssignmentV1 } from "./contracts";
-import { loadAuthenticatedPlatformContextV1 } from "./platform-context";
+import type { ProductionHealthEventV1 } from "./health-event";
+import { sendProductionHealthEventV1 } from "./health-reporter";
+import { loadAuthenticatedPlatformContextV1, readProductionAccountAuthorizationV1 } from "./platform-context";
 import { ProductionSaveMigrationWorkerV1 } from "./production-save-worker";
 import {
   type CompleteProductionReleaseV2,
@@ -19,8 +21,9 @@ const MAXIMUM_MANIFEST_BYTES = 131_072;
 const MAXIMUM_ASSIGNMENT_BYTES = 65_536;
 
 export async function startConfiguredProductionMainV1(): Promise<void> {
+  const authorization = readProductionAccountAuthorizationV1();
   const sessionId = await getOrCreateBrowserGameSessionIdV1();
-  const platform = await loadAuthenticatedPlatformContextV1();
+  const platform = await loadAuthenticatedPlatformContextV1(authorization);
   const pinStore = new IndexedDbSessionRuntimePinStoreV1();
   const session = await startProductionBootstrapV1({
     sessionId,
@@ -48,9 +51,12 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
       const response = await fetch("/m9/runtime-assignment", {
         method: "POST",
         cache: "no-store",
-        credentials: "include",
+        credentials: "omit",
         redirect: "error",
-        headers: { "content-type": "application/json" },
+        headers: {
+          authorization: `Bearer ${authorization}`,
+          "content-type": "application/json",
+        },
         body: JSON.stringify({ schema_version: 1, browser_session_id: sessionId }),
       });
       return decodeBoundedSignedJsonV1<SignedRuntimeAssignmentV1>(
@@ -65,6 +71,7 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         releaseIdentity: release.manifest.release_id,
         productionSaveSchema: release.manifest.save_schema,
         requireProductionIdentity: true,
+        authorization,
       });
       const leases = new ProductionSaveLeaseManagerV1();
       try {
@@ -123,6 +130,27 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
       };
     },
   });
+  const healthEvent: ProductionHealthEventV1 = {
+    schema_version: 1,
+    release_id: session.generation.release_id,
+    kernel_generation: session.generation,
+    browser_class: productionBrowserClass(),
+    platform_class: productionPlatformClass(),
+    event: "BOOTSTRAP_SUCCESS",
+    failure_fingerprint: null,
+    performance: null,
+    hard_stop_rule: null,
+  };
+  queueMicrotask(() => {
+    sendProductionHealthEventV1({
+      endpoint: new URL(platform.telemetry_event_url),
+      allowedOrigin: new URL(platform.telemetry_event_url).origin,
+      idempotencyKey: `bootstrap-${session.generation.artifact_sha256.slice(0, 16)}-${session.generation.generation}`,
+      event: healthEvent,
+      authorization,
+      signal: AbortSignal.timeout(5_000),
+    }).catch(() => undefined);
+  });
   globalThis.addEventListener(
     "pagehide",
     () => {
@@ -130,6 +158,31 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
     },
     { once: true },
   );
+}
+
+function productionBrowserClass(): ProductionHealthEventV1["browser_class"] {
+  const agent = navigator.userAgent;
+  if (agent.includes("Firefox/")) {
+    return "FIREFOX";
+  }
+  if (agent.includes("AppleWebKit/") && !["Chrome/", "Chromium/", "Edg/"].some(name => agent.includes(name))) {
+    return "WEBKIT";
+  }
+  if (["Chrome/", "Chromium/", "Edg/"].some(name => agent.includes(name))) {
+    return "CHROMIUM";
+  }
+  return "UNKNOWN";
+}
+
+function productionPlatformClass(): ProductionHealthEventV1["platform_class"] {
+  const touch = navigator.maxTouchPoints > 0;
+  if (touch && globalThis.innerWidth <= 767) {
+    return "MOBILE";
+  }
+  if (touch && globalThis.innerWidth <= 1_280) {
+    return "TABLET";
+  }
+  return "DESKTOP";
 }
 
 export function renderProductionUnavailableV1(error: unknown): void {

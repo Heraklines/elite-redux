@@ -98,6 +98,7 @@ jobs:
           done
           grep -R -q 'ATTACH_PRODUCTION_ARTIFACTS_V1' "$RUNNER_TEMP/m9-production"
           ! grep -R -E 'reloadKernel|HOT_RELOAD|DEV_KERNEL' "$RUNNER_TEMP/m9-production"
+          ! grep -E 'pokerogue_sessionId|authorization|M9_HEALTH_TOKEN|M9_RELEASE_SIGNING_PRIVATE_KEY' "$RUNNER_TEMP/m9-production/rust-kernel-worker.js"
 
   rust-regression:
     runs-on: ubuntu-latest
