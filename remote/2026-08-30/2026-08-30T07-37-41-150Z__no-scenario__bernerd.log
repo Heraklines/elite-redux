@@ -1,0 +1,2071 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36
+platform: Linux armv81
+screen:   384x832 @2.8125x  devmem:8 GB
+boot:     boot-start@0ms -> ios-icons-deferred@926ms -> ios-bgm-deferred@927ms -> loading-complete@13314ms -> title-shown@18355ms -> ios-icons-bg-start@18355ms -> ios-icons-bg-done@46060ms
+lastSess: ok (reached title)
+mode:     4  wave:4
+seed:     sVsYiVDVeOrv5pcIZXrsKFLR
+party:    Snuglett(L7 10hp f0), Heracross(L6 27hp f0), Vanillite(L5 20hp f0), Burmy(L5 22hp f0), Smoliv(L5 20hp f0), Meowth(L5 20hp f0)
+enemy:    Snivy(L7), Fletchling(L6)
+
+----- COMMENT -----
+Due to Multiheaded, Multihit moves do less damage instead of their standard damage. Triple Dive unintentionally did LESS damage instead of MORE bc of Multiheaded
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:d45f186c7af7287a259ec4b1e4c200e213e0e9de:run-33251084223.1","source":"github","sha":"d45f186c7af7287a259ec4b1e4c200e213e0e9de","workflow":{"provider":"github-actions","runId":"33251084223","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[07:33:42.117] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.118] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.118] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.119] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.119] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.119] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.120] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.120] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.120] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.121] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.121] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.121] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.122] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.122] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.122] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.122] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.130] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.130] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.130] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.130] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.130] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.130] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.131] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.131] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.132] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.132] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.132] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.132] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.133] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.133] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.134] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.134] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.134] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.135] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.135] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.135] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.135] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.135] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.136] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.136] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.137] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.137] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.137] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.138] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.138] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.147] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.147] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.147] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.147] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.147] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.148] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.148] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.148] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.149] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.149] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.149] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.149] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.150] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.150] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.150] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.150] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.151] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.151] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.151] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.151] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.152] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.152] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.152] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.152] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.153] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.154] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.154] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.154] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.155] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.155] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.163] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.163] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.164] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.164] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.164] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.164] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.165] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.165] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.165] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.165] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.166] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.166] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.167] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.167] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.168] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.168] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.169] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.169] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.169] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.170] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.170] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.170] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.171] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.171] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.180] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.180] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.180] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.180] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.181] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.181] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.182] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.182] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.182] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.182] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.183] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.183] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.183] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.183] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.184] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.184] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.184] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.185] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.185] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.185] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.185] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.186] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.186] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.186] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.186] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.187] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.187] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.187] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.196] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.196] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.196] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.196] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.196] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.198] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.198] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.198] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.198] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.198] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.198] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.199] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.199] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.199] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.199] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.200] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.200] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.200] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.200] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.201] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.201] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.201] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.201] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.201] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.201] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.202] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.202] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.202] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.202] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.203] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.203] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.203] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.203] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.204] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.204] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.212] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.212] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.213] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.213] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.213] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.214] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.214] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.215] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.215] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.215] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.215] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.216] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.216] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.216] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.216] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.217] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.217] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.217] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.217] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.218] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.218] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.218] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.218] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.218] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.218] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.219] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.219] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.219] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.219] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.220] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.220] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.220] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.220] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.221] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.221] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.229] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.229] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.230] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.230] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.230] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.230] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.231] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.231] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.231] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.231] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.232] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.232] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.232] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.232] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.233] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.233] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.233] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.233] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.234] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.234] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.234] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.235] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.235] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.235] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.235] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.236] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.236] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.236] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.236] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.236] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.236] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.237] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.237] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.237] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.237] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.246] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.246] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.246] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.246] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.246] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.248] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.248] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.248] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.248] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.248] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.248] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.249] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.249] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.249] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.249] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.250] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.250] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.250] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.250] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.251] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.251] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.251] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.251] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.251] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.251] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.252] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.252] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.252] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.252] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.252] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.252] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.253] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.253] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.253] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.253] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.253] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.253] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.262] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.262] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.262] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.262] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.262] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.262] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.263] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.263] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.264] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.264] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.264] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.265] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.265] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.266] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.266] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.266] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.267] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.267] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.267] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.268] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.268] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.269] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.269] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.269] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.269] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.270] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.270] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.270] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.270] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.276] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.276] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.277] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.277] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.277] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.277] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.277] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.277] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.278] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.278] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.278] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.278] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.278] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.279] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.279] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.280] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.280] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.280] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.281] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.281] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.281] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.281] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.281] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.281] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.282] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.282] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.282] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.282] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.283] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.283] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.284] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.284] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.284] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.291] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.291] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.292] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.292] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.292] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.293] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.293] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.294] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.294] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.294] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.294] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.294] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.294] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.295] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.295] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.296] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.296] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.296] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.296] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.297] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.297] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.297] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.297] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.297] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.297] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.298] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.298] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.298] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.298] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.298] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.298] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.299] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.299] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.299] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.299] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.299] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.299] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.308] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.308] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.308] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.308] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.308] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.309] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.309] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.310] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.310] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.310] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.310] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.311] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.311] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.311] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.311] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.312] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.312] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.312] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.312] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.313] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.313] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.313] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.313] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.313] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.313] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.314] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.314] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.314] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.314] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.314] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.314] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.315] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.315] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.315] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.324] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.324] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.324] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.324] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.324] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.325] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.326] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.326] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.326] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.326] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.326] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.327] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.327] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.327] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.327] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.328] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.328] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.328] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.328] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.329] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.329] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.329] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.329] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.329] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.329] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.330] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.330] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.330] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.330] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.331] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.331] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.331] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.331] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.331] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:42.340] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 27_2
+[07:33:42.340] LOG: Sandshrew's variant icon does not exist. Replacing with default.
+[07:33:42.341] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 66_2
+[07:33:42.341] LOG: Machop's variant icon does not exist. Replacing with default.
+[07:33:42.341] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 74_2
+[07:33:42.341] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.341] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 96_3
+[07:33:42.341] LOG: Drowzee's variant icon does not exist. Replacing with default.
+[07:33:42.342] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 270_2
+[07:33:42.342] LOG: Lotad's variant icon does not exist. Replacing with default.
+[07:33:42.342] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 318_3
+[07:33:42.343] LOG: Carvanha's variant icon does not exist. Replacing with default.
+[07:33:42.343] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 343_2
+[07:33:42.343] LOG: Baltoy's variant icon does not exist. Replacing with default.
+[07:33:42.344] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 431_3
+[07:33:42.344] LOG: Glameow's variant icon does not exist. Replacing with default.
+[07:33:42.344] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 506_2
+[07:33:42.344] LOG: Lillipup's variant icon does not exist. Replacing with default.
+[07:33:42.345] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 574_2
+[07:33:42.345] LOG: Gothita's variant icon does not exist. Replacing with default.
+[07:33:42.345] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 627_2
+[07:33:42.345] LOG: Rufflet's variant icon does not exist. Replacing with default.
+[07:33:42.346] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 725_2
+[07:33:42.346] LOG: Litten's variant icon does not exist. Replacing with default.
+[07:33:42.346] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 744_2
+[07:33:42.346] LOG: Rockruff's variant icon does not exist. Replacing with default.
+[07:33:42.346] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 749_2
+[07:33:42.346] LOG: Mudbray's variant icon does not exist. Replacing with default.
+[07:33:42.347] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 831_2
+[07:33:42.347] LOG: Wooloo's variant icon does not exist. Replacing with default.
+[07:33:42.347] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 878_2
+[07:33:42.347] LOG: Cufant's variant icon does not exist. Replacing with default.
+[07:33:42.347] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:42.347] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:42.348] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 985_3
+[07:33:42.348] LOG: Scream Tail's variant icon does not exist. Replacing with default.
+[07:33:42.348] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2074_2
+[07:33:42.348] LOG: Geodude's variant icon does not exist. Replacing with default.
+[07:33:42.348] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 2088_2
+[07:33:42.348] LOG: Grimer's variant icon does not exist. Replacing with default.
+[07:33:43.913] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:47.451] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:47.477] LOG: Getting Session Slot id: %d 0
+[07:33:47.479] LOG: Getting Session Slot id: %d 1
+[07:33:47.480] LOG: Getting Session Slot id: %d 2
+[07:33:47.482] LOG: Getting Session Slot id: %d 3
+[07:33:47.484] LOG: Getting Session Slot id: %d 4
+[07:33:47.816] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:47.816] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:48.014] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[07:33:48.014] LOG: Mega Hypno's variant icon does not exist. Replacing with default.
+[07:33:48.014] WARN: Texture "%s" has no frame "%s" __MISSING 0001.png
+[07:33:51.365] DEBUG: %cSending a request to delete session in slot %d color: blue 1
+[07:33:51.396] LOG: Wave Seed: tWtZjWEWfPsw6qdJ[YstLGMS 1
+[07:33:51.405] LOG: %cStart Phase EncounterPhase color:green;
+[07:33:51.409] LOG: Starting species pool tier: COMMON
+[07:33:51.420] LOG: Pokemon: Wild Yungoos | Species ID: 734 | Level: 2 | Nature: Rash (+SpAtk/-SpDef)
+[07:33:51.420] LOG: Stats (IVs): HP: 14 (29), Atk: 8 (14), Def: 6 (24), Spatk: 7 (6), Spdef: 5 (17), Spd: 6 (9)
+[07:33:51.420] LOG: Ability: Ambush | Passive Ability: Stakeout 
+[07:33:51.420] LOG: Moveset: ["Hyper Fang","Super Fang","Yawn","Pounce"]
+[07:33:52.468] DEBUG: Session data saved to slot 1!
+[07:33:55.053] LOG: Wave Seed: tWtZjWEWfPsw6qdJ[YstLGMS 1
+[07:33:55.480] LOG: %cStart Phase SummonPhase color:green;
+[07:33:55.771] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:33:55.773] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:33:56.877] LOG: %cStart Phase SwitchPhase color:green;
+[07:33:56.936] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:33:56.936] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:33:57.813] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:33:58.167] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:58.167] LOG: Ran PSP for: Snuglett
+[07:33:58.169] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:33:58.169] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:58.169] LOG: Ran PSP for: Yungoos
+[07:33:58.170] LOG: %cStart Phase TurnInitPhase color:green;
+[07:33:58.170] LOG: %cStart Phase CommandPhase color:green;
+[07:33:59.360] LOG: Move: ASTONISH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snuglett
+[07:33:59.362] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:33:59.364] LOG: Battle Seed: xWjCcq6EsZZ73GH7
+[07:33:59.365] LOG: %cStart Phase TurnStartPhase color:green;
+[07:33:59.368] LOG: %cStart Phase MovePhase color:green;
+[07:33:59.368] LOG: %cUser: Snuglett
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[07:33:59.369] LOG: %cStart Phase MessagePhase color:green;
+[07:33:59.466] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:59.766] LOG: crit stage: +0
+[07:33:59.774] LOG: Move: Astonish | Base damage: 4.346666666666667 | Power: 16 | Source attack: 11 | Target defense: 6
+[07:33:59.777] LOG: Move: Astonish | Attack damage: 8
+[07:33:59.783] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:59.807] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:34:00.107] LOG: crit stage: +0
+[07:34:00.115] LOG: Move: Astonish | Base damage: 4.346666666666667 | Power: 16 | Source attack: 11 | Target defense: 6
+[07:34:00.118] LOG: Move: Astonish | Attack damage: 2
+[07:34:00.125] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:34:00.147] LOG: %cStart Phase MessagePhase color:green;
+[07:34:00.363] LOG: %cStart Phase MessagePhase color:green;
+[07:34:00.579] LOG: %cStart Phase MoveEndPhase color:green;
+[07:34:00.580] LOG: %cStart Phase MovePhase color:green;
+[07:34:00.580] LOG: %cUser: Yungoos
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[07:34:00.581] LOG: %cStart Phase MessagePhase color:green;
+[07:34:00.829] LOG: %cStart Phase MoveEndPhase color:green;
+[07:34:00.830] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:34:00.830] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:34:00.830] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:34:00.830] LOG: %cStart Phase BerryPhase color:green;
+[07:34:00.832] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:34:00.833] LOG: %cStart Phase TurnEndPhase color:green;
+[07:34:00.836] LOG: %cStart Phase TurnInitPhase color:green;
+[07:34:00.836] LOG: %cStart Phase CommandPhase color:green;
+[07:34:26.144] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:34:26.144] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:34:31.568] LOG: Move: TRIPLE_AXEL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Snuglett
+[07:34:31.570] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:34:31.574] LOG: Battle Seed: xWjCcq6EsZZ73GH7
+[07:34:31.575] LOG: %cStart Phase TurnStartPhase color:green;
+[07:34:31.575] LOG: %cStart Phase MovePhase color:green;
+[07:34:31.575] LOG: %cUser: Snuglett
+Move: TRIPLE_AXEL
+Use Mode: NORMAL color:orchid
+[07:34:31.576] LOG: %cStart Phase MessagePhase color:green;
+[07:34:31.692] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:34:32.039] LOG: crit stage: +0
+[07:34:32.044] LOG: Move: Triple Axel | Base damage: 3.1733333333333333 | Power: 8 | Source attack: 11 | Target defense: 6
+[07:34:32.046] LOG: Move: Triple Axel | Attack damage: 4
+[07:34:32.050] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:34:32.062] LOG: %cStart Phase MessagePhase color:green;
+[07:34:32.262] LOG: %cStart Phase FaintPhase color:green;
+[07:34:33.739] LOG: %cStart Phase MessagePhase color:green;
+[07:34:33.868] LOG: %cStart Phase VictoryPhase color:green;
+[07:34:33.869] LOG: %cStart Phase ExpPhase color:green;
+[07:34:34.089] LOG: %cStart Phase MoveEndPhase color:green;
+[07:34:34.089] LOG: %cStart Phase TurnInitPhase color:green;
+[07:34:34.089] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:34:34.089] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:34:34.090] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:34:34.090] LOG: %cStart Phase BerryPhase color:green;
+[07:34:34.090] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:34:34.090] LOG: %cStart Phase TurnEndPhase color:green;
+[07:34:34.091] LOG: %cStart Phase BattleEndPhase color:green;
+[07:34:34.091] LOG: Battle Score: 10 (2 Turns x0.84)
+[07:34:34.091] LOG: Total Score: 10
+[07:34:34.105] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:34:34.105] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:34:34.106] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:34:34.106] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:34:34.106] LOG: %cStart Phase MessagePhase color:green;
+[07:34:34.302] LOG: %cStart Phase EggLapsePhase color:green;
+[07:34:34.303] LOG: %cStart Phase EggLapsePhase color:green;
+[07:34:35.396] LOG: %cStart Phase MessagePhase color:green;
+[07:34:36.441] LOG: %cStart Phase EggSummaryPhase color:green;
+[07:34:36.441] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.442] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.443] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.444] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.445] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:36.446] LOG: [coop:account] account-write scope OPEN (egg-hatch) depth=1
+[07:34:56.478] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:34:56.478] LOG: Wave Seed: tWtZjWEWfPsw6qdJ[YstLGMS 1
+[07:34:58.714] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:35:00.792] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:35:00.792] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:35:05.393] LOG: %cStart Phase NewBattlePhase color:green;
+[07:35:05.393] LOG: Wave Seed: uXu[kXFXgQtx7reK\ZtuMHNT 2
+[07:35:05.394] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:35:05.396] LOG: Starting species pool tier: COMMON
+[07:35:05.412] LOG: Pokemon: Wild Cottonee | Species ID: 546 | Level: 3 | Nature: Hasty (+Spd/-Def)
+[07:35:05.413] LOG: Stats (IVs): HP: 15 (11), Atk: 7 (31), Def: 7 (6), Spatk: 7 (24), Spdef: 8 (22), Spd: 10 (9)
+[07:35:05.413] LOG: Ability: Guilt Trip | Passive Ability: Infiltrator 
+[07:35:05.413] LOG: Moveset: ["Mega Drain","Tickle","Fairy Wind","Stun Spore"]
+[07:35:05.413] LOG: Starting species pool tier: UNCOMMON
+[07:35:05.424] LOG: Pokemon: Wild Cherubi | Species ID: 420 | Level: 4 | Nature: Bold (+Def/-Atk)
+[07:35:05.424] LOG: Stats (IVs): HP: 18 (16), Atk: 9 (9), Def: 9 (2), Spatk: 11 (28), Spdef: 9 (4), Spd: 10 (16)
+[07:35:05.424] LOG: Ability: Pastel Veil | Passive Ability: Overgrow 
+[07:35:05.424] LOG: Moveset: ["Mega Drain","Growth","Bullet Seed","Lucky Chant"]
+[07:35:06.338] DEBUG: Session data saved to slot 1!
+[07:35:06.339] LOG: Wave Seed: uXu[kXFXgQtx7reK\ZtuMHNT 2
+[07:35:06.799] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:35:06.882] LOG: %cStart Phase SummonPhase color:green;
+[07:35:07.179] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:35:07.853] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:35:08.062] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:35:08.064] LOG: Applied X Speed 
+[07:35:08.065] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:08.065] LOG: Ran PSP for: Heracross
+[07:35:08.066] LOG: Applied X Speed 
+[07:35:08.067] LOG: Applied X Speed 
+[07:35:08.069] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:08.069] LOG: Ran PSP for: Cottonee
+[07:35:08.070] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:08.070] LOG: Ran PSP for: Cherubi
+[07:35:08.072] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:08.073] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:08.237] LOG: %cStart Phase MovePhase color:green;
+[07:35:08.237] LOG: %cUser: Cherubi
+Move: SAFEGUARD
+Use Mode: INDIRECT color:orchid
+[07:35:08.238] LOG: Applied X Speed 
+[07:35:08.240] LOG: Applied X Speed 
+[07:35:08.241] LOG: Applied X Speed 
+[07:35:08.242] LOG: Applied X Speed 
+[07:35:08.243] LOG: Applied X Speed 
+[07:35:08.246] LOG: Applied X Speed 
+[07:35:08.249] LOG: %cStart Phase MessagePhase color:green;
+[07:35:08.362] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:08.381] WARN: Texture "%s" has no frame "%s" PRAS- Safeguard 1
+[07:35:08.480] WARN: Texture "%s" has no frame "%s" PRAS- Safeguard 1
+[07:35:08.480] WARN: Texture "%s" has no frame "%s" PRAS- Safeguard 1
+[07:35:08.836] LOG: %cStart Phase MessagePhase color:green;
+[07:35:09.088] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:09.089] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:09.144] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:09.307] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:09.373] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:09.373] LOG: %cStart Phase CommandPhase color:green;
+[07:35:13.150] LOG: Move: TRIPLE_DIVE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Snuglett
+[07:35:13.152] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:13.868] LOG: %cStart Phase CommandPhase color:green;
+[07:35:16.359] LOG: Move: ARM_THRUST Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Heracross
+[07:35:16.361] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:16.946] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:16.952] LOG: Battle Seed: By57kizzT6aJnvVt
+[07:35:16.953] LOG: Applied X Speed 
+[07:35:16.953] LOG: Applied X Speed 
+[07:35:16.953] LOG: Applied X Speed 
+[07:35:16.954] LOG: Applied X Speed 
+[07:35:16.954] LOG: Applied X Speed 
+[07:35:16.954] LOG: Applied X Speed 
+[07:35:16.954] LOG: Applied X Speed 
+[07:35:16.954] LOG: Applied X Speed 
+[07:35:16.955] LOG: Applied X Speed 
+[07:35:16.956] LOG: Applied X Speed 
+[07:35:16.956] LOG: Applied X Speed 
+[07:35:16.956] LOG: Applied X Speed 
+[07:35:16.956] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:16.958] LOG: %cStart Phase TurnStartPhase color:green;
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.959] LOG: Applied X Speed 
+[07:35:16.960] LOG: Applied X Speed 
+[07:35:16.960] LOG: Applied X Speed 
+[07:35:16.960] LOG: Applied X Speed 
+[07:35:16.960] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: %cStart Phase MovePhase color:green;
+[07:35:16.961] LOG: %cUser: Heracross
+Move: ARM_THRUST
+Use Mode: NORMAL color:orchid
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.961] LOG: Applied X Speed 
+[07:35:16.962] LOG: Applied X Speed 
+[07:35:16.962] LOG: Applied X Speed 
+[07:35:16.962] LOG: Applied X Speed 
+[07:35:16.962] LOG: Applied X Speed 
+[07:35:16.962] LOG: Applied X Speed 
+[07:35:16.963] LOG: Applied X Speed 
+[07:35:16.963] LOG: Applied X Speed 
+[07:35:16.963] LOG: Applied X Speed 
+[07:35:16.963] LOG: %cStart Phase MessagePhase color:green;
+[07:35:17.054] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:17.272] LOG: crit stage: +1
+[07:35:17.277] LOG: Move: Arm Thrust | Base damage: 3.8220408163265307 | Power: 8.857142857142858 | Source attack: 18 | Target defense: 7
+[07:35:17.279] LOG: Move: Arm Thrust | Attack damage: 10
+[07:35:17.282] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:17.306] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:17.573] LOG: crit stage: +1
+[07:35:17.580] LOG: Move: Arm Thrust | Base damage: 3.8220408163265307 | Power: 8.857142857142858 | Source attack: 18 | Target defense: 7
+[07:35:17.582] LOG: Move: Arm Thrust | Attack damage: 9
+[07:35:17.584] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:17.604] LOG: %cStart Phase MessagePhase color:green;
+[07:35:17.834] LOG: %cStart Phase MessagePhase color:green;
+[07:35:18.039] LOG: %cStart Phase FaintPhase color:green;
+[07:35:18.042] LOG: Applied X Speed 
+[07:35:18.043] LOG: Applied X Speed 
+[07:35:18.045] LOG: Applied X Speed 
+[07:35:18.046] LOG: Applied X Speed 
+[07:35:18.907] LOG: Applied X Speed 
+[07:35:18.910] LOG: Applied X Speed 
+[07:35:18.914] LOG: Applied X Speed 
+[07:35:18.917] LOG: Applied X Speed 
+[07:35:18.917] LOG: %cStart Phase MessagePhase color:green;
+[07:35:19.076] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:19.249] LOG: Applied X Speed 
+[07:35:19.249] LOG: Applied X Speed 
+[07:35:19.249] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:35:19.432] LOG: %cStart Phase MessagePhase color:green;
+[07:35:19.690] LOG: Applied X Speed 
+[07:35:19.692] LOG: Applied X Speed 
+[07:35:19.692] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:35:19.875] LOG: %cStart Phase MessagePhase color:green;
+[07:35:20.139] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:35:20.309] LOG: %cStart Phase MessagePhase color:green;
+[07:35:20.536] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:35:20.734] LOG: %cStart Phase MessagePhase color:green;
+[07:35:20.954] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:20.990] LOG: %cStart Phase VictoryPhase color:green;
+[07:35:20.991] LOG: %cStart Phase ExpPhase color:green;
+[07:35:21.197] LOG: %cStart Phase ExpPhase color:green;
+[07:35:21.447] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:21.449] LOG: Applied X Speed 
+[07:35:21.451] LOG: %cStart Phase MovePhase color:green;
+[07:35:21.451] LOG: %cUser: Snuglett
+Move: TRIPLE_DIVE
+Use Mode: NORMAL color:orchid
+[07:35:21.452] LOG: Applied X Speed 
+[07:35:21.453] LOG: Applied X Speed 
+[07:35:21.455] LOG: Applied X Speed 
+[07:35:21.456] LOG: Applied X Speed 
+[07:35:21.458] LOG: Applied X Speed 
+[07:35:21.459] LOG: Applied X Speed 
+[07:35:21.460] LOG: Applied X Speed 
+[07:35:21.461] LOG: Applied X Speed 
+[07:35:21.462] LOG: %cStart Phase MessagePhase color:green;
+[07:35:21.596] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:21.607] LOG: %cStart Phase MessagePhase color:green;
+[07:35:21.830] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:21.832] LOG: %cStart Phase MovePhase color:green;
+[07:35:21.832] LOG: %cUser: Cherubi
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[07:35:21.833] LOG: Applied X Speed 
+[07:35:21.834] LOG: Applied X Speed 
+[07:35:21.836] LOG: Applied X Speed 
+[07:35:21.837] LOG: Applied X Speed 
+[07:35:21.840] LOG: Applied X Speed 
+[07:35:21.841] LOG: Applied X Speed 
+[07:35:21.842] LOG: Applied X Speed 
+[07:35:21.843] LOG: Applied X Speed 
+[07:35:21.844] LOG: %cStart Phase MessagePhase color:green;
+[07:35:21.971] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:21.977] LOG: Applied X Speed 
+[07:35:21.979] LOG: Applied X Speed 
+[07:35:22.631] LOG: crit stage: +0
+[07:35:22.635] LOG: Move: Mega Drain | Base damage: 4.104457142857143 | Power: 26.571428571428573 | Source attack: 11 | Target defense: 10
+[07:35:22.638] LOG: Move: Mega Drain | Attack damage: 5
+[07:35:22.640] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:22.656] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:35:22.656] LOG: %cStart Phase MessagePhase color:green;
+[07:35:22.887] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:22.888] LOG: %cStart Phase MovePhase color:green;
+[07:35:22.888] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:22.889] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:35:22.889] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:35:22.889] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:35:22.889] LOG: %cStart Phase BerryPhase color:green;
+[07:35:22.890] LOG: Applied X Speed 
+[07:35:22.892] LOG: Applied X Speed 
+[07:35:22.894] LOG: Applied X Speed 
+[07:35:22.897] LOG: Applied X Speed 
+[07:35:22.898] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:35:22.899] LOG: Applied X Speed 
+[07:35:22.901] LOG: Applied X Speed 
+[07:35:22.902] LOG: Applied X Speed 
+[07:35:22.904] LOG: Applied X Speed 
+[07:35:22.904] LOG: %cStart Phase TurnEndPhase color:green;
+[07:35:22.908] LOG: Applied X Speed 
+[07:35:22.910] LOG: Applied X Speed 
+[07:35:22.911] LOG: Applied X Speed 
+[07:35:22.912] LOG: Applied X Speed 
+[07:35:22.913] LOG: Applied X Speed 
+[07:35:22.914] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:22.914] LOG: %cStart Phase CommandPhase color:green;
+[07:35:23.751] LOG: Move: TRIPLE_DIVE Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Snuglett
+[07:35:23.753] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:24.101] LOG: %cStart Phase CommandPhase color:green;
+[07:35:25.201] LOG: Move: BULLET_SEED Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Heracross
+[07:35:25.204] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:25.401] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:25.404] LOG: Battle Seed: By57kizzT6aJnvVt
+[07:35:25.405] LOG: %cStart Phase TurnStartPhase color:green;
+[07:35:25.405] LOG: Applied X Speed 
+[07:35:25.405] LOG: Applied X Speed 
+[07:35:25.405] LOG: Applied X Speed 
+[07:35:25.405] LOG: Applied X Speed 
+[07:35:25.405] LOG: Applied X Speed 
+[07:35:25.406] LOG: Applied X Speed 
+[07:35:25.406] LOG: Applied X Speed 
+[07:35:25.406] LOG: Applied X Speed 
+[07:35:25.406] LOG: Applied X Speed 
+[07:35:25.406] LOG: Applied X Speed 
+[07:35:25.407] LOG: Applied X Speed 
+[07:35:25.407] LOG: Applied X Speed 
+[07:35:25.407] LOG: Applied X Speed 
+[07:35:25.407] LOG: Applied X Speed 
+[07:35:25.407] LOG: %cStart Phase MovePhase color:green;
+[07:35:25.407] LOG: %cUser: Heracross
+Move: BULLET_SEED
+Use Mode: NORMAL color:orchid
+[07:35:25.407] LOG: Applied X Speed 
+[07:35:25.407] LOG: Applied X Speed 
+[07:35:25.408] LOG: Applied X Speed 
+[07:35:25.408] LOG: Applied X Speed 
+[07:35:25.408] LOG: Applied X Speed 
+[07:35:25.408] LOG: Applied X Speed 
+[07:35:25.409] LOG: Applied X Speed 
+[07:35:25.409] LOG: Applied X Speed 
+[07:35:25.409] LOG: Applied X Speed 
+[07:35:25.409] LOG: Applied X Speed 
+[07:35:25.409] LOG: %cStart Phase MessagePhase color:green;
+[07:35:25.539] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:25.889] LOG: crit stage: +0
+[07:35:25.895] LOG: Move: Bullet Seed | Base damage: 2.8857142857142857 | Power: 11.071428571428573 | Source attack: 9 | Target defense: 9
+[07:35:25.897] LOG: Move: Bullet Seed | Attack damage: 5
+[07:35:25.899] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:25.936] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:26.299] LOG: crit stage: +0
+[07:35:26.304] LOG: Move: Bullet Seed | Base damage: 2.8857142857142857 | Power: 11.071428571428573 | Source attack: 9 | Target defense: 9
+[07:35:26.306] LOG: Move: Bullet Seed | Attack damage: 5
+[07:35:26.308] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:26.330] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:26.663] LOG: crit stage: +0
+[07:35:26.667] LOG: Move: Bullet Seed | Base damage: 2.8857142857142857 | Power: 11.071428571428573 | Source attack: 9 | Target defense: 9
+[07:35:26.668] LOG: Move: Bullet Seed | Attack damage: 5
+[07:35:26.669] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:26.698] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:27.037] LOG: crit stage: +0
+[07:35:27.040] LOG: Move: Bullet Seed | Base damage: 2.8857142857142857 | Power: 11.071428571428573 | Source attack: 9 | Target defense: 9
+[07:35:27.042] LOG: Move: Bullet Seed | Attack damage: 5
+[07:35:27.043] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:27.062] LOG: %cStart Phase MessagePhase color:green;
+[07:35:27.279] LOG: %cStart Phase MessagePhase color:green;
+[07:35:27.479] LOG: %cStart Phase FaintPhase color:green;
+[07:35:27.482] LOG: Applied X Speed 
+[07:35:27.483] LOG: Applied X Speed 
+[07:35:28.365] LOG: Applied X Speed 
+[07:35:28.366] LOG: Applied X Speed 
+[07:35:28.367] LOG: %cStart Phase MessagePhase color:green;
+[07:35:28.641] LOG: %cStart Phase VictoryPhase color:green;
+[07:35:28.643] LOG: Applied X Speed 
+[07:35:28.644] LOG: %cStart Phase ExpPhase color:green;
+[07:35:28.964] LOG: %cStart Phase LevelUpPhase color:green;
+[07:35:28.965] LOG: %cStart Phase ExpPhase color:green;
+[07:35:29.335] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:29.335] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:29.335] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:29.335] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:35:29.335] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:35:29.335] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:35:29.335] LOG: %cStart Phase BerryPhase color:green;
+[07:35:29.336] LOG: Applied X Speed 
+[07:35:29.337] LOG: Applied X Speed 
+[07:35:29.337] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:35:29.338] LOG: Applied X Speed 
+[07:35:29.339] LOG: Applied X Speed 
+[07:35:29.339] LOG: %cStart Phase TurnEndPhase color:green;
+[07:35:29.341] LOG: Applied X Speed 
+[07:35:29.342] LOG: Applied X Speed 
+[07:35:29.343] LOG: %cStart Phase BattleEndPhase color:green;
+[07:35:29.343] LOG: Battle Score: 34 (2 Turns x0.84)
+[07:35:29.343] LOG: Total Score: 44
+[07:35:29.354] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:29.538] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:29.590] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:29.590] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:29.590] LOG: %cStart Phase MessagePhase color:green;
+[07:35:29.786] LOG: %cStart Phase EggLapsePhase color:green;
+[07:35:29.786] LOG: %cStart Phase EggLapsePhase color:green;
+[07:35:29.786] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:35:29.786] LOG: Wave Seed: uXu[kXFXgQtx7reK\ZtuMHNT 2
+[07:35:29.790] LOG: Applied X Speed 
+[07:35:29.792] LOG: Applied X Speed 
+[07:35:29.793] LOG: Applied X Speed 
+[07:35:29.794] LOG: Applied X Speed 
+[07:35:29.796] LOG: Applied X Speed 
+[07:35:29.797] LOG: Applied X Speed 
+[07:35:29.798] LOG: Applied X Speed 
+[07:35:29.799] LOG: Applied X Speed 
+[07:35:29.800] LOG: Applied X Speed 
+[07:35:29.800] LOG: Applied X Speed 
+[07:35:29.801] LOG: Applied X Speed 
+[07:35:29.802] LOG: Applied X Speed 
+[07:35:29.803] LOG: Applied X Speed 
+[07:35:29.804] LOG: Applied X Speed 
+[07:35:29.805] LOG: Applied X Speed 
+[07:35:29.805] LOG: Applied X Speed 
+[07:35:29.806] LOG: Applied X Speed 
+[07:35:29.807] LOG: Applied X Speed 
+[07:35:29.808] LOG: Applied X Speed 
+[07:35:29.808] LOG: Applied X Speed 
+[07:35:29.809] LOG: Applied X Speed 
+[07:35:29.810] LOG: Applied X Speed 
+[07:35:29.811] LOG: Applied X Speed 
+[07:35:29.811] LOG: Applied X Speed 
+[07:35:33.501] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:35:33.501] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:35:36.447] LOG: %cStart Phase NewBattlePhase color:green;
+[07:35:36.447] LOG: Wave Seed: vYv\lYGYhRuy8sfL][uvNIOU 3
+[07:35:36.450] LOG: %cStart Phase MessagePhase color:green;
+[07:35:36.747] LOG: Applied X Speed 
+[07:35:36.747] LOG: Applied X Speed 
+[07:35:36.747] LOG: %cStart Phase ReturnPhase color:green;
+[07:35:36.781] LOG: Applied X Speed 
+[07:35:36.783] LOG: Applied X Speed 
+[07:35:36.863] LOG: %cStart Phase ReturnPhase color:green;
+[07:35:36.898] LOG: Applied X Speed 
+[07:35:36.899] LOG: Applied X Speed 
+[07:35:36.962] LOG: %cStart Phase ShowTrainerPhase color:green;
+[07:35:37.063] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:35:37.066] LOG: COMMON
+[07:35:37.067] LOG: Rattata
+[07:35:37.082] LOG: Pokemon: Foe Rattata | Species ID: 19 | Level: 4 | Nature: Docile (-)
+[07:35:37.082] LOG: Stats (IVs): HP: 16 (30), Atk: 10 (22), Def: 8 (10), Spatk: 7 (3), Spdef: 8 (31), Spd: 11 (4)
+[07:35:37.082] LOG: Ability: Normalize | Passive Ability: Guts 
+[07:35:37.082] LOG: Moveset: ["Quick Attack","Fire Fang","Ice Fang","Scary Face"]
+[07:35:37.082] LOG: COMMON
+[07:35:37.082] LOG: Zigzagoon
+[07:35:37.091] LOG: Pokemon: Foe Zigzagoon | Species ID: 263 | Level: 4 | Nature: Hardy (-)
+[07:35:37.091] LOG: Stats (IVs): HP: 17 (20), Atk: 10 (30), Def: 9 (11), Spatk: 7 (14), Spdef: 9 (13), Spd: 11 (13)
+[07:35:37.091] LOG: Ability: Scrappy | Passive Ability: Pickup 
+[07:35:37.091] LOG: Moveset: ["Growl","Stomping Tantrum","Mud Sport","Odor Sleuth"]
+[07:35:37.356] LOG: Generated AI funcs
+[07:35:37.412] DEBUG: Session data saved to slot 1!
+[07:35:37.413] LOG: Wave Seed: vYv\lYGYhRuy8sfL][uvNIOU 3
+[07:35:37.634] LOG: Lass Alice
+[07:35:37.634] LOG: Dialogue dialogue:lass.encounter.3 skipped
+[07:35:37.692] LOG: Lass Alice
+[07:35:38.236] LOG: %cStart Phase SummonPhase color:green;
+[07:35:38.236] LOG: Alice
+[07:35:38.496] LOG: %cStart Phase SummonPhase color:green;
+[07:35:38.496] LOG: Alice
+[07:35:38.804] LOG: %cStart Phase SummonPhase color:green;
+[07:35:39.088] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:35:39.091] LOG: %cStart Phase SummonPhase color:green;
+[07:35:39.387] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:35:39.391] LOG: Applied X Speed 
+[07:35:39.393] LOG: Applied X Speed 
+[07:35:39.396] LOG: Applied X Speed 
+[07:35:39.397] LOG: Applied X Speed 
+[07:35:39.400] LOG: Applied X Speed 
+[07:35:39.402] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:39.402] LOG: Ran PSP for: Heracross
+[07:35:39.403] LOG: Applied X Speed 
+[07:35:39.404] LOG: Applied X Speed 
+[07:35:39.406] LOG: Applied X Speed 
+[07:35:39.409] LOG: Applied X Speed 
+[07:35:39.409] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:39.409] LOG: Ran PSP for: Snuglett
+[07:35:39.410] LOG: Applied X Speed 
+[07:35:39.411] LOG: Applied X Speed 
+[07:35:39.413] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:39.413] LOG: Ran PSP for: Zigzagoon
+[07:35:39.415] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:39.416] LOG: %cStart Phase PostSummonPhase color:green;
+[07:35:39.416] LOG: Ran PSP for: Rattata
+[07:35:39.417] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:39.417] LOG: %cStart Phase CommandPhase color:green;
+[07:35:40.777] LOG: Move: ASTONISH Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Snuglett
+[07:35:40.780] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:41.085] LOG: %cStart Phase CommandPhase color:green;
+[07:35:42.785] LOG: Move: ICICLE_SPEAR Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Heracross
+[07:35:42.787] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:43.451] LOG: %cStart Phase CommandPhase color:green;
+[07:35:44.168] LOG: Move: BULLET_SEED Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Heracross
+[07:35:44.171] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:44.742] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:44.745] LOG: Applied X Speed 
+[07:35:44.745] LOG: Applied X Speed 
+[07:35:44.748] LOG: Battle Seed: UWeVzMF6EN4bu010
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.748] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.749] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.750] LOG: Applied X Speed 
+[07:35:44.751] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:44.751] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.751] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:44.752] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.752] LOG: Applied X Speed 
+[07:35:44.754] LOG: Applied X Speed 
+[07:35:44.754] LOG: Applied X Speed 
+[07:35:44.754] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:44.754] LOG: Applied X Speed 
+[07:35:44.754] LOG: Applied X Speed 
+[07:35:44.754] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:44.754] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:44.754] LOG: Applied X Speed 
+[07:35:44.754] LOG: Applied X Speed 
+[07:35:44.754] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:44.755] LOG: %cStart Phase TurnStartPhase color:green;
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.755] LOG: Applied X Speed 
+[07:35:44.756] LOG: Applied X Speed 
+[07:35:44.756] LOG: Applied X Speed 
+[07:35:44.756] LOG: Applied X Speed 
+[07:35:44.756] LOG: Applied X Speed 
+[07:35:44.756] LOG: Applied X Speed 
+[07:35:44.756] LOG: Applied X Speed 
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.757] LOG: %cStart Phase MovePhase color:green;
+[07:35:44.757] LOG: %cUser: Snuglett
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.757] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.758] LOG: Applied X Speed 
+[07:35:44.759] LOG: Applied X Speed 
+[07:35:44.759] LOG: Applied X Speed 
+[07:35:44.759] LOG: Applied X Speed 
+[07:35:44.759] LOG: Applied X Speed 
+[07:35:44.759] LOG: Applied X Speed 
+[07:35:44.759] LOG: %cStart Phase MessagePhase color:green;
+[07:35:44.846] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:45.108] LOG: crit stage: +0
+[07:35:45.117] LOG: Move: Astonish | Base damage: 4.564571428571428 | Power: 19.428571428571427 | Source attack: 12 | Target defense: 8
+[07:35:45.121] LOG: Move: Astonish | Attack damage: 8
+[07:35:45.129] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:45.146] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:45.435] LOG: crit stage: +0
+[07:35:45.440] LOG: Move: Astonish | Base damage: 4.564571428571428 | Power: 19.428571428571427 | Source attack: 12 | Target defense: 8
+[07:35:45.443] LOG: Move: Astonish | Attack damage: 1
+[07:35:45.449] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:45.465] LOG: %cStart Phase MessagePhase color:green;
+[07:35:45.688] LOG: %cStart Phase MessagePhase color:green;
+[07:35:45.887] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:45.890] LOG: Applied X Speed 
+[07:35:45.895] LOG: Applied X Speed 
+[07:35:45.895] LOG: %cStart Phase MovePhase color:green;
+[07:35:45.895] LOG: %cUser: Heracross
+Move: BULLET_SEED
+Use Mode: NORMAL color:orchid
+[07:35:45.898] LOG: Applied X Speed 
+[07:35:45.900] LOG: Applied X Speed 
+[07:35:45.902] LOG: Applied X Speed 
+[07:35:45.903] LOG: Applied X Speed 
+[07:35:45.905] LOG: Applied X Speed 
+[07:35:45.909] LOG: Applied X Speed 
+[07:35:45.911] LOG: Applied X Speed 
+[07:35:45.915] LOG: Applied X Speed 
+[07:35:45.916] LOG: Applied X Speed 
+[07:35:45.917] LOG: Applied X Speed 
+[07:35:45.918] LOG: Applied X Speed 
+[07:35:45.919] LOG: Applied X Speed 
+[07:35:45.922] LOG: Applied X Speed 
+[07:35:45.924] LOG: Applied X Speed 
+[07:35:45.925] LOG: %cStart Phase MessagePhase color:green;
+[07:35:46.038] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:46.331] LOG: crit stage: +0
+[07:35:46.335] LOG: Move: Bullet Seed | Base damage: 4.185714285714285 | Power: 12.142857142857142 | Source attack: 18 | Target defense: 8
+[07:35:46.336] LOG: Move: Bullet Seed | Attack damage: 3
+[07:35:46.338] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:46.356] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:46.688] LOG: crit stage: +0
+[07:35:46.692] LOG: Move: Bullet Seed | Base damage: 4.185714285714285 | Power: 12.142857142857142 | Source attack: 18 | Target defense: 8
+[07:35:46.693] LOG: Move: Bullet Seed | Attack damage: 3
+[07:35:46.695] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:46.742] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:47.055] LOG: crit stage: +0
+[07:35:47.058] LOG: Move: Bullet Seed | Base damage: 4.185714285714285 | Power: 12.142857142857142 | Source attack: 18 | Target defense: 8
+[07:35:47.059] LOG: Move: Bullet Seed | Attack damage: 4
+[07:35:47.061] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:47.089] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:47.447] LOG: crit stage: +0
+[07:35:47.453] LOG: Move: Bullet Seed | Base damage: 4.185714285714285 | Power: 12.142857142857142 | Source attack: 18 | Target defense: 8
+[07:35:47.455] LOG: Move: Bullet Seed | Attack damage: 3
+[07:35:47.457] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:47.481] LOG: %cStart Phase MessagePhase color:green;
+[07:35:47.687] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:47.690] LOG: %cStart Phase MovePhase color:green;
+[07:35:47.690] LOG: %cUser: Zigzagoon
+Move: STOMPING_TANTRUM
+Use Mode: NORMAL color:orchid
+[07:35:47.693] LOG: Applied X Speed 
+[07:35:47.695] LOG: Applied X Speed 
+[07:35:47.697] LOG: Applied X Speed 
+[07:35:47.699] LOG: Applied X Speed 
+[07:35:47.700] LOG: Applied X Speed 
+[07:35:47.703] LOG: Applied X Speed 
+[07:35:47.705] LOG: Applied X Speed 
+[07:35:47.710] LOG: Applied X Speed 
+[07:35:47.711] LOG: Applied X Speed 
+[07:35:47.712] LOG: Applied X Speed 
+[07:35:47.713] LOG: Applied X Speed 
+[07:35:47.714] LOG: Applied X Speed 
+[07:35:47.717] LOG: Applied X Speed 
+[07:35:47.719] LOG: Applied X Speed 
+[07:35:47.720] LOG: %cStart Phase MessagePhase color:green;
+[07:35:47.837] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:47.840] LOG: Applied X Speed 
+[07:35:47.841] LOG: Applied X Speed 
+[07:35:48.534] LOG: crit stage: +0
+[07:35:48.539] LOG: Move: Stomping Tantrum | Base damage: 5.205714285714286 | Power: 36.42857142857143 | Source attack: 11 | Target defense: 9
+[07:35:48.542] LOG: Move: Stomping Tantrum | Attack damage: 4
+[07:35:48.544] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:48.564] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:48.565] LOG: %cStart Phase MovePhase color:green;
+[07:35:48.565] LOG: %cUser: Rattata
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[07:35:48.566] LOG: %cStart Phase MessagePhase color:green;
+[07:35:48.779] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:48.780] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:35:48.780] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:35:48.780] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:35:48.780] LOG: %cStart Phase BerryPhase color:green;
+[07:35:48.782] LOG: Applied X Speed 
+[07:35:48.785] LOG: Applied X Speed 
+[07:35:48.788] LOG: Applied X Speed 
+[07:35:48.789] LOG: Applied X Speed 
+[07:35:48.791] LOG: Applied X Speed 
+[07:35:48.795] LOG: Applied X Speed 
+[07:35:48.797] LOG: Applied X Speed 
+[07:35:48.799] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:35:48.800] LOG: Applied X Speed 
+[07:35:48.801] LOG: Applied X Speed 
+[07:35:48.802] LOG: Applied X Speed 
+[07:35:48.803] LOG: Applied X Speed 
+[07:35:48.804] LOG: Applied X Speed 
+[07:35:48.806] LOG: Applied X Speed 
+[07:35:48.809] LOG: Applied X Speed 
+[07:35:48.811] LOG: %cStart Phase TurnEndPhase color:green;
+[07:35:48.812] LOG: Applied X Speed 
+[07:35:48.813] LOG: Applied X Speed 
+[07:35:48.814] LOG: Applied X Speed 
+[07:35:48.815] LOG: Applied X Speed 
+[07:35:48.816] LOG: Applied X Speed 
+[07:35:48.818] LOG: Applied X Speed 
+[07:35:48.821] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:48.821] LOG: %cStart Phase CommandPhase color:green;
+[07:35:50.677] LOG: Move: TRIPLE_AXEL Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Snuglett
+[07:35:50.679] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:51.835] LOG: %cStart Phase CommandPhase color:green;
+[07:35:52.951] LOG: Move: ICICLE_SPEAR Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Heracross
+[07:35:52.953] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:35:53.459] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:53.460] LOG: Applied X Speed 
+[07:35:53.460] LOG: Applied X Speed 
+[07:35:53.464] LOG: Battle Seed: UWeVzMF6EN4bu010
+[07:35:53.464] LOG: Applied X Speed 
+[07:35:53.464] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.465] LOG: Applied X Speed 
+[07:35:53.466] LOG: Applied X Speed 
+[07:35:53.466] LOG: Applied X Speed 
+[07:35:53.466] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.467] LOG: Applied X Speed 
+[07:35:53.468] LOG: Applied X Speed 
+[07:35:53.468] LOG: Applied X Speed 
+[07:35:53.468] LOG: Applied X Speed 
+[07:35:53.468] LOG: Applied X Speed 
+[07:35:53.468] LOG: Applied X Speed 
+[07:35:53.468] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:53.469] LOG: Applied X Speed 
+[07:35:53.469] LOG: Applied X Speed 
+[07:35:53.469] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:53.469] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:53.469] LOG: Applied X Speed 
+[07:35:53.469] LOG: Applied X Speed 
+[07:35:53.469] LOG: Applied X Speed 
+[07:35:53.469] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.470] LOG: Applied X Speed 
+[07:35:53.471] LOG: Applied X Speed 
+[07:35:53.471] LOG: Applied X Speed 
+[07:35:53.471] WARN: BattlerTag ER_FEAR is missing a score!
+[07:35:53.471] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:35:53.471] LOG: Applied X Speed 
+[07:35:53.471] LOG: Applied X Speed 
+[07:35:53.472] LOG: Applied X Speed 
+[07:35:53.472] LOG: Applied X Speed 
+[07:35:53.473] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:53.473] LOG: Applied X Speed 
+[07:35:53.473] LOG: Applied X Speed 
+[07:35:53.473] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:53.473] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:53.473] LOG: Applied X Speed 
+[07:35:53.473] LOG: Applied X Speed 
+[07:35:53.473] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[07:35:53.473] LOG: %cStart Phase TurnStartPhase color:green;
+[07:35:53.473] LOG: Applied X Speed 
+[07:35:53.473] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.474] LOG: Applied X Speed 
+[07:35:53.475] LOG: Applied X Speed 
+[07:35:53.475] LOG: Applied X Speed 
+[07:35:53.475] LOG: Applied X Speed 
+[07:35:53.476] LOG: Applied X Speed 
+[07:35:53.476] LOG: Applied X Speed 
+[07:35:53.476] LOG: Applied X Speed 
+[07:35:53.476] LOG: Applied X Speed 
+[07:35:53.476] LOG: %cStart Phase MovePhase color:green;
+[07:35:53.476] LOG: %cUser: Heracross
+Move: ICICLE_SPEAR
+Use Mode: NORMAL color:orchid
+[07:35:53.476] LOG: Applied X Speed 
+[07:35:53.476] LOG: Applied X Speed 
+[07:35:53.477] LOG: Applied X Speed 
+[07:35:53.477] LOG: Applied X Speed 
+[07:35:53.477] LOG: Applied X Speed 
+[07:35:53.477] LOG: Applied X Speed 
+[07:35:53.477] LOG: Applied X Speed 
+[07:35:53.478] LOG: Applied X Speed 
+[07:35:53.478] LOG: Applied X Speed 
+[07:35:53.478] LOG: Applied X Speed 
+[07:35:53.478] LOG: Applied X Speed 
+[07:35:53.478] LOG: Applied X Speed 
+[07:35:53.478] LOG: %cStart Phase MessagePhase color:green;
+[07:35:53.587] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:53.931] LOG: crit stage: +0
+[07:35:53.934] LOG: Move: Icicle Spear | Base damage: 4.185714285714285 | Power: 12.142857142857142 | Source attack: 18 | Target defense: 8
+[07:35:53.936] LOG: Move: Icicle Spear | Attack damage: 4
+[07:35:53.937] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:53.945] LOG: %cStart Phase MessagePhase color:green;
+[07:35:54.154] LOG: %cStart Phase FaintPhase color:green;
+[07:35:54.156] LOG: Applied X Speed 
+[07:35:54.158] LOG: Applied X Speed 
+[07:35:54.161] LOG: Applied X Speed 
+[07:35:54.163] LOG: Applied X Speed 
+[07:35:54.233] LOG: Applied X Speed 
+[07:35:54.234] LOG: Applied X Speed 
+[07:35:54.236] LOG: Applied X Speed 
+[07:35:54.237] LOG: Applied X Speed 
+[07:35:54.238] LOG: %cStart Phase MessagePhase color:green;
+[07:35:54.393] LOG: %cStart Phase VictoryPhase color:green;
+[07:35:54.393] LOG: %cStart Phase ExpPhase color:green;
+[07:35:54.637] LOG: %cStart Phase ExpPhase color:green;
+[07:35:54.947] LOG: %cStart Phase LevelUpPhase color:green;
+[07:35:54.948] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:54.949] LOG: Applied X Speed 
+[07:35:54.951] LOG: %cStart Phase MovePhase color:green;
+[07:35:54.951] LOG: %cUser: Snuglett
+Move: TRIPLE_AXEL
+Use Mode: NORMAL color:orchid
+[07:35:54.953] LOG: Applied X Speed 
+[07:35:54.954] LOG: Applied X Speed 
+[07:35:54.955] LOG: Applied X Speed 
+[07:35:54.956] LOG: Applied X Speed 
+[07:35:54.958] LOG: Applied X Speed 
+[07:35:54.959] LOG: Applied X Speed 
+[07:35:54.960] LOG: Applied X Speed 
+[07:35:54.961] LOG: Applied X Speed 
+[07:35:54.961] LOG: %cStart Phase MessagePhase color:green;
+[07:35:55.096] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:55.382] LOG: crit stage: +0
+[07:35:55.391] LOG: Move: Triple Axel | Base damage: 3.282285714285714 | Power: 9.714285714285714 | Source attack: 12 | Target defense: 8
+[07:35:55.394] LOG: Move: Triple Axel | Attack damage: 7
+[07:35:55.398] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:55.405] LOG: %cStart Phase MessagePhase color:green;
+[07:35:55.631] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:35:55.926] LOG: crit stage: +0
+[07:35:55.931] LOG: Move: Triple Axel | Base damage: 4.564571428571428 | Power: 19.428571428571427 | Source attack: 12 | Target defense: 8
+[07:35:55.933] LOG: Move: Triple Axel | Attack damage: 1
+[07:35:55.936] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:35:55.954] LOG: %cStart Phase MessagePhase color:green;
+[07:35:56.154] LOG: %cStart Phase FaintPhase color:green;
+[07:35:56.157] LOG: Applied X Speed 
+[07:35:56.159] LOG: Applied X Speed 
+[07:35:56.238] LOG: Applied X Speed 
+[07:35:56.239] LOG: Applied X Speed 
+[07:35:56.239] LOG: %cStart Phase MessagePhase color:green;
+[07:35:56.478] LOG: %cStart Phase VictoryPhase color:green;
+[07:35:56.480] LOG: %cStart Phase ExpPhase color:green;
+[07:35:56.782] LOG: %cStart Phase LevelUpPhase color:green;
+[07:35:56.783] LOG: %cStart Phase ExpPhase color:green;
+[07:35:56.948] LOG: %cStart Phase MoveEndPhase color:green;
+[07:35:56.949] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:56.949] LOG: %cStart Phase TurnInitPhase color:green;
+[07:35:56.949] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:35:56.949] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:35:56.949] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:35:56.949] LOG: %cStart Phase BerryPhase color:green;
+[07:35:56.951] LOG: Applied X Speed 
+[07:35:56.952] LOG: Applied X Speed 
+[07:35:56.953] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:35:56.955] LOG: Applied X Speed 
+[07:35:56.956] LOG: Applied X Speed 
+[07:35:56.956] LOG: %cStart Phase TurnEndPhase color:green;
+[07:35:56.957] LOG: Applied X Speed 
+[07:35:56.958] LOG: Applied X Speed 
+[07:35:56.959] LOG: %cStart Phase BattleEndPhase color:green;
+[07:35:56.959] LOG: Battle Score: 38 (2 Turns x0.84)
+[07:35:56.959] LOG: Total Score: 82
+[07:35:56.973] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:57.133] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:57.173] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:35:57.173] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:35:57.173] LOG: %cStart Phase MessagePhase color:green;
+[07:35:57.332] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[07:35:57.332] LOG: Lass Alice
+[07:35:57.333] LOG: Lass Alice
+[07:35:57.551] LOG: Dialogue dialogue:lass.victory.3 skipped
+[07:35:57.552] LOG: %cStart Phase MoneyRewardPhase color:green;
+[07:35:57.810] LOG: %cStart Phase EggLapsePhase color:green;
+[07:35:57.810] LOG: %cStart Phase EggLapsePhase color:green;
+[07:35:57.810] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:35:57.810] LOG: Wave Seed: vYv\lYGYhRuy8sfL][uvNIOU 3
+[07:35:57.814] LOG: Applied X Speed 
+[07:35:57.816] LOG: Applied X Speed 
+[07:35:57.818] LOG: Applied X Speed 
+[07:35:57.820] LOG: Applied X Speed 
+[07:35:57.822] LOG: Applied X Speed 
+[07:35:57.823] LOG: Applied X Speed 
+[07:35:57.824] LOG: Applied X Speed 
+[07:35:57.825] LOG: Applied X Speed 
+[07:35:57.826] LOG: Applied X Speed 
+[07:35:57.826] LOG: Applied X Speed 
+[07:35:57.828] LOG: Applied X Speed 
+[07:35:57.829] LOG: Applied X Speed 
+[07:35:57.830] LOG: Applied X Speed 
+[07:35:57.831] LOG: Applied X Speed 
+[07:35:57.831] LOG: Applied X Speed 
+[07:35:57.832] LOG: Applied X Speed 
+[07:35:57.833] LOG: Applied X Speed 
+[07:35:57.833] LOG: Applied X Speed 
+[07:35:57.834] LOG: Applied X Speed 
+[07:35:57.834] LOG: Applied X Speed 
+[07:35:57.835] LOG: Applied X Speed 
+[07:35:57.836] LOG: Applied X Speed 
+[07:35:57.837] LOG: Applied X Speed 
+[07:35:57.837] LOG: Applied X Speed 
+[07:36:01.620] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 928_3
+[07:36:01.620] LOG: Smoliv's variant icon does not exist. Replacing with default.
+[07:36:09.420] LOG: %cStart Phase NewBattlePhase color:green;
+[07:36:09.420] LOG: Wave Seed: wZw]mZHZiSvz9tgM^\vwOJPV 4
+[07:36:09.422] LOG: Applied X Speed 
+[07:36:09.423] LOG: Applied X Speed 
+[07:36:09.423] LOG: %cStart Phase ReturnPhase color:green;
+[07:36:09.483] LOG: Applied X Speed 
+[07:36:09.485] LOG: Applied X Speed 
+[07:36:09.563] LOG: %cStart Phase ReturnPhase color:green;
+[07:36:09.598] LOG: Applied X Speed 
+[07:36:09.599] LOG: Applied X Speed 
+[07:36:09.680] LOG: %cStart Phase ShowTrainerPhase color:green;
+[07:36:09.796] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:36:09.808] LOG: Pokemon: Foe Snivy | Species ID: 495 | Level: 7 | Nature: Lonely (+Atk/-Def)
+[07:36:09.808] LOG: Stats (IVs): HP: 24 (5), Atk: 14 (25), Def: 12 (18), Spatk: 13 (3), Spdef: 14 (13), Spd: 14 (17)
+[07:36:09.808] LOG: Ability: Chloroplast | Passive Ability: Overgrow 
+[07:36:09.808] LOG: Moveset: ["Vine Whip","Slam","Glare","Wrap"]
+[07:36:09.816] LOG: Pokemon: Foe Fletchling | Species ID: 661 | Level: 6 | Nature: Naughty (+Atk/-SpDef)
+[07:36:09.816] LOG: Stats (IVs): HP: 21 (12), Atk: 14 (4), Def: 10 (28), Spatk: 9 (24), Spdef: 9 (15), Spd: 13 (16)
+[07:36:09.816] LOG: Ability: Big Pecks | Passive Ability: Flock 
+[07:36:09.816] LOG: Moveset: ["Flail","Air Cutter","Peck","Growl"]
+[07:36:10.535] LOG: Generated AI funcs
+[07:36:10.611] DEBUG: Session data saved to slot 1!
+[07:36:10.611] LOG: Wave Seed: wZw]mZHZiSvz9tgM^\vwOJPV 4
+[07:36:10.839] LOG: Rival Ivy
+[07:36:10.839] LOG: Dialogue dialogue:rivalFemale.encounter.1 skipped
+[07:36:10.873] LOG: Rival Ivy
+[07:36:11.306] LOG: %cStart Phase SummonPhase color:green;
+[07:36:11.306] LOG: Ivy
+[07:36:11.588] LOG: %cStart Phase SummonPhase color:green;
+[07:36:11.588] LOG: Ivy
+[07:36:11.879] LOG: %cStart Phase SummonPhase color:green;
+[07:36:12.170] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:36:12.172] LOG: %cStart Phase SummonPhase color:green;
+[07:36:12.471] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:36:12.473] LOG: Applied X Speed 
+[07:36:12.473] LOG: Applied X Speed 
+[07:36:12.474] LOG: Applied X Speed 
+[07:36:12.475] LOG: Applied X Speed 
+[07:36:12.476] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:12.476] LOG: Ran PSP for: Heracross
+[07:36:12.476] LOG: Applied X Speed 
+[07:36:12.477] LOG: Applied X Speed 
+[07:36:12.479] LOG: Applied X Speed 
+[07:36:12.482] LOG: Applied X Speed 
+[07:36:12.482] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:12.482] LOG: Ran PSP for: Snuglett
+[07:36:12.483] LOG: Applied X Speed 
+[07:36:12.484] LOG: Applied X Speed 
+[07:36:12.485] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:12.485] LOG: Ran PSP for: Snivy
+[07:36:12.487] LOG: %cStart Phase PostSummonPhase color:green;
+[07:36:12.487] LOG: Ran PSP for: Fletchling
+[07:36:12.488] LOG: %cStart Phase TurnInitPhase color:green;
+[07:36:12.488] LOG: %cStart Phase CommandPhase color:green;
+[07:36:16.210] LOG: Move: TRIPLE_DIVE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Snuglett
+[07:36:16.212] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:36:16.541] LOG: %cStart Phase CommandPhase color:green;
+[07:36:17.834] LOG: Move: MAT_BLOCK Move targets: {"targets":[1,0],"multiple":true} 
+Player Pokemon: Heracross
+[07:36:17.837] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:36:18.210] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:36:18.211] LOG: Applied X Speed 
+[07:36:18.211] LOG: Applied X Speed 
+[07:36:18.214] LOG: Applied X Speed 
+[07:36:18.215] LOG: Applied X Speed 
+[07:36:18.218] LOG: Applied X Speed 
+[07:36:18.218] LOG: Applied X Speed 
+[07:36:18.218] LOG: Applied X Speed 
+[07:36:18.219] LOG: Applied X Speed 
+[07:36:18.219] LOG: Battle Seed: asxW5Ssd3B3rwZau
+[07:36:18.219] LOG: Applied X Speed 
+[07:36:18.220] LOG: Applied X Speed 
+[07:36:18.220] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:36:18.220] LOG: Applied X Speed 
+[07:36:18.220] LOG: Applied X Speed 
+[07:36:18.225] LOG: %cStart Phase TurnStartPhase color:green;
+[07:36:18.225] LOG: Applied X Speed 
+[07:36:18.225] LOG: Applied X Speed 
+[07:36:18.226] LOG: Applied X Speed 
+[07:36:18.226] LOG: Applied X Speed 
+[07:36:18.226] LOG: Applied X Speed 
+[07:36:18.226] LOG: Applied X Speed 
+[07:36:18.226] LOG: Applied X Speed 
+[07:36:18.227] LOG: Applied X Speed 
+[07:36:18.227] LOG: Applied X Speed 
+[07:36:18.227] LOG: Applied X Speed 
+[07:36:18.227] LOG: Applied X Speed 
+[07:36:18.227] LOG: Applied X Speed 
+[07:36:18.228] LOG: Applied X Speed 
+[07:36:18.228] LOG: Applied X Speed 
+[07:36:18.229] LOG: Applied X Speed 
+[07:36:18.229] LOG: Applied X Speed 
+[07:36:18.229] LOG: Applied X Speed 
+[07:36:18.229] LOG: Applied X Speed 
+[07:36:18.229] LOG: Applied X Speed 
+[07:36:18.229] LOG: %cStart Phase MovePhase color:green;
+[07:36:18.229] LOG: %cUser: Heracross
+Move: MAT_BLOCK
+Use Mode: NORMAL color:orchid
+[07:36:18.230] LOG: Applied X Speed 
+[07:36:18.230] LOG: Applied X Speed 
+[07:36:18.230] LOG: Applied X Speed 
+[07:36:18.230] LOG: Applied X Speed 
+[07:36:18.230] LOG: Applied X Speed 
+[07:36:18.230] LOG: Applied X Speed 
+[07:36:18.231] LOG: Applied X Speed 
+[07:36:18.231] LOG: %cStart Phase MessagePhase color:green;
+[07:36:18.341] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:18.371] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[07:36:18.372] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[07:36:18.372] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[07:36:18.372] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[07:36:18.372] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[07:36:18.373] WARN: Texture "%s" has no frame "%s" PRAS- Mat Block 1
+[07:36:18.795] LOG: %cStart Phase MessagePhase color:green;
+[07:36:19.096] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:19.099] LOG: Applied X Speed 
+[07:36:19.106] LOG: Applied X Speed 
+[07:36:19.107] LOG: %cStart Phase MovePhase color:green;
+[07:36:19.108] LOG: %cUser: Snuglett
+Move: TRIPLE_DIVE
+Use Mode: NORMAL color:orchid
+[07:36:19.111] LOG: Applied X Speed 
+[07:36:19.113] LOG: Applied X Speed 
+[07:36:19.115] LOG: Applied X Speed 
+[07:36:19.116] LOG: Applied X Speed 
+[07:36:19.118] LOG: Applied X Speed 
+[07:36:19.120] LOG: Applied X Speed 
+[07:36:19.124] LOG: Applied X Speed 
+[07:36:19.128] LOG: Applied X Speed 
+[07:36:19.129] LOG: Applied X Speed 
+[07:36:19.130] LOG: Applied X Speed 
+[07:36:19.131] LOG: Applied X Speed 
+[07:36:19.132] LOG: Applied X Speed 
+[07:36:19.134] LOG: Applied X Speed 
+[07:36:19.137] LOG: Applied X Speed 
+[07:36:19.138] LOG: %cStart Phase MessagePhase color:green;
+[07:36:19.232] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:19.791] LOG: crit stage: +0
+[07:36:19.799] LOG: Move: Triple Dive | Base damage: 3.184 | Power: 10.571428571428571 | Source attack: 14 | Target defense: 12
+[07:36:19.801] LOG: Move: Triple Dive | Attack damage: 5
+[07:36:19.806] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:19.824] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:20.399] LOG: crit stage: +0
+[07:36:20.407] LOG: Move: Triple Dive | Base damage: 3.184 | Power: 10.571428571428571 | Source attack: 14 | Target defense: 12
+[07:36:20.411] LOG: Move: Triple Dive | Attack damage: 1
+[07:36:20.415] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:20.433] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:21.031] LOG: crit stage: +0
+[07:36:21.036] LOG: Move: Triple Dive | Base damage: 3.184 | Power: 10.571428571428571 | Source attack: 14 | Target defense: 12
+[07:36:21.039] LOG: Move: Triple Dive | Attack damage: 1
+[07:36:21.044] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:36:21.055] LOG: %cStart Phase MessagePhase color:green;
+[07:36:21.262] LOG: %cStart Phase MessagePhase color:green;
+[07:36:21.467] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:21.469] LOG: %cStart Phase MovePhase color:green;
+[07:36:21.469] LOG: %cUser: Snivy
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[07:36:21.473] LOG: Applied X Speed 
+[07:36:21.474] LOG: Applied X Speed 
+[07:36:21.476] LOG: Applied X Speed 
+[07:36:21.477] LOG: Applied X Speed 
+[07:36:21.479] LOG: Applied X Speed 
+[07:36:21.482] LOG: Applied X Speed 
+[07:36:21.485] LOG: Applied X Speed 
+[07:36:21.490] LOG: Applied X Speed 
+[07:36:21.491] LOG: Applied X Speed 
+[07:36:21.492] LOG: Applied X Speed 
+[07:36:21.493] LOG: Applied X Speed 
+[07:36:21.494] LOG: Applied X Speed 
+[07:36:21.496] LOG: Applied X Speed 
+[07:36:21.498] LOG: Applied X Speed 
+[07:36:21.499] LOG: %cStart Phase MessagePhase color:green;
+[07:36:21.596] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:21.599] LOG: %cStart Phase MessagePhase color:green;
+[07:36:22.191] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:22.191] LOG: %cStart Phase MovePhase color:green;
+[07:36:22.191] LOG: %cUser: Fletchling
+Move: AIR_CUTTER
+Use Mode: NORMAL color:orchid
+[07:36:22.193] LOG: Applied X Speed 
+[07:36:22.193] LOG: Applied X Speed 
+[07:36:22.194] LOG: Applied X Speed 
+[07:36:22.194] LOG: Applied X Speed 
+[07:36:22.195] LOG: Applied X Speed 
+[07:36:22.196] LOG: Applied X Speed 
+[07:36:22.197] LOG: Applied X Speed 
+[07:36:22.198] LOG: %cStart Phase MessagePhase color:green;
+[07:36:22.270] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:36:22.271] LOG: %cStart Phase MessagePhase color:green;
+[07:36:22.542] LOG: %cStart Phase MessagePhase color:green;
+[07:36:22.825] LOG: %cStart Phase MoveEndPhase color:green;
+[07:36:22.825] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:36:22.825] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:36:22.825] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:36:22.825] LOG: %cStart Phase BerryPhase color:green;
+[07:36:22.826] LOG: Applied X Speed 
+[07:36:22.827] LOG: Applied X Speed 
+[07:36:22.827] LOG: Applied X Speed 
+[07:36:22.827] LOG: Applied X Speed 
+[07:36:22.829] LOG: Applied X Speed 
+[07:36:22.829] LOG: Applied X Speed 
+[07:36:22.830] LOG: Applied X Speed 
+[07:36:22.831] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:36:22.832] LOG: Applied X Speed 
+[07:36:22.832] LOG: Applied X Speed 
+[07:36:22.832] LOG: Applied X Speed 
+[07:36:22.833] LOG: Applied X Speed 
+[07:36:22.833] LOG: Applied X Speed 
+[07:36:22.834] LOG: Applied X Speed 
+[07:36:22.835] LOG: Applied X Speed 
+[07:36:22.835] LOG: %cStart Phase TurnEndPhase color:green;
+[07:36:22.836] LOG: Applied X Speed 
+[07:36:22.837] LOG: Applied X Speed 
+[07:36:22.837] LOG: Applied X Speed 
+[07:36:22.837] LOG: Applied X Speed 
+[07:36:22.838] LOG: Applied X Speed 
+[07:36:22.839] LOG: %cStart Phase TurnInitPhase color:green;
+[07:36:22.839] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"sVsYiVDVeOrv5pcIZXrsKFLR","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":1606609966,"player":true,"species":214,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":24,"stats":[27,21,15,9,18,19],"ivs":[30,29,30,30,31,30],"nature":13,"moveset":[{"moveId":292,"ppUsed":0,"ppUp":0},{"moveId":331,"ppUsed":0,"ppUp":0},{"moveId":561,"ppUsed":0,"ppUp":0},{"moveId":333,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":214,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[1,11],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1675629603,"player":true,"species":70042,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":16,"stats":[19,14,10,12,13,19],"ivs":[15,19,26,30,27,23],"nature":18,"moveset":[{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":222,"ppUsed":0,"ppUp":0},{"moveId":865,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":70042,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[7,14,10],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1544472670,"player":true,"species":582,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,13,12,14],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":740,"ppUsed":0,"ppUp":0},{"moveId":694,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":582,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2709741605,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":1,"hp":22,"stats":[22,8,12,12,12,11],"ivs":[30,31,31,30,31,31],"nature":10,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1611257872,"player":true,"species":928,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,12,11,9],"ivs":[30,31,27,31,31,31],"nature":5,"moveset":[{"moveId":347,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":72,"ppUsed":0,"ppUp":0},{"moveId":816,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":928,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[14,5449,234],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2607653380,"player":true,"species":52,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,14,10,11,10,15],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0},{"moveId":541,"ppUsed":0,"ppUp":0},{"moveId":6,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":52,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0,"target":2}},{"type":"command","wave":1,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":0,"kind":"reroll","choice":-2},{"type":"interaction","seq":1,"kind":"reward","choice":2},{"type":"interaction","seq":2,"kind":"reward","choice":0},{"type":"command","wave":2,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3}},{"type":"command","wave":2,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":2,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3}},{"type":"command","wave":2,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"interaction","seq":3,"kind":"reward","choice":2},{"type":"interaction","seq":4,"kind":"reward","choice":2},{"type":"command","wave":3,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":3,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":3}},{"type":"command","wave":3,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":3,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":3,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":3}},{"type":"interaction","seq":5,"kind":"reward","choice":4},{"type":"interaction","seq":6,"kind":"reward","choice":3},{"type":"command","wave":4,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":3}},{"type":"command","wave":4,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2,"target":1}}],"endState":{"waveIndex":4,"money":1350,"party":[{"species":70042,"level":7,"hp":10,"maxHp":19},{"species":214,"level":6,"hp":27,"maxHp":27},{"species":582,"level":5,"hp":20,"maxHp":20},{"species":412,"level":5,"hp":22,"maxHp":22},{"species":928,"level":5,"hp":20,"maxHp":20},{"species":52,"level":5,"hp":20,"maxHp":20}]},"checkpoint":{"wave":1,"seed":"sVsYiVDVeOrv5pcIZXrsKFLR","party":[{"id":1606609966,"player":true,"species":214,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":24,"stats":[27,21,15,9,18,19],"ivs":[30,29,30,30,31,30],"nature":13,"moveset":[{"moveId":292,"ppUsed":0,"ppUp":0},{"moveId":331,"ppUsed":0,"ppUp":0},{"moveId":561,"ppUsed":0,"ppUp":0},{"moveId":333,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":214,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[1,11],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1675629603,"player":true,"species":70042,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":false,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":16,"stats":[19,14,10,12,13,19],"ivs":[15,19,26,30,27,23],"nature":18,"moveset":[{"moveId":310,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":222,"ppUsed":0,"ppUp":0},{"moveId":865,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":70042,"metWave":-1,"luck":0,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[7,14,10],"fusionShiny":false,"fusionLuck":0,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1544472670,"player":true,"species":582,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,13,12,14],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":740,"ppUsed":0,"ppUp":0},{"moveId":694,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":347,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":582,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":14,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2709741605,"player":true,"species":412,"formIndex":0,"abilityIndex":1,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":1,"hp":22,"stats":[22,8,12,12,12,11],"ivs":[30,31,31,30,31,31],"nature":10,"moveset":[{"moveId":564,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":455,"ppUsed":0,"ppUp":0},{"moveId":456,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":412,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1611257872,"player":true,"species":928,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,9,11,12,11,9],"ivs":[30,31,27,31,31,31],"nature":5,"moveset":[{"moveId":347,"ppUsed":0,"ppUp":0},{"moveId":414,"ppUsed":0,"ppUp":0},{"moveId":72,"ppUsed":0,"ppUp":0},{"moveId":816,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":928,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[14,5449,234],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2607653380,"player":true,"species":52,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":20,"stats":[20,14,10,11,10,15],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":252,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0},{"moveId":541,"ppUsed":0,"ppUp":0},{"moveId":6,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":52,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erPerpetualMotionStreak":0,"erPerpetualMotionPending":false,"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"erAbilityProvenance":[],"erSoulHarvestFaintCount":0,"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[],"erAvalancheAbilityOverrides":{}},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1200,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
