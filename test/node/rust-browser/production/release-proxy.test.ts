@@ -10,16 +10,11 @@ describe("M9 content-addressed release proxy", () => {
   it("serves only digest-matching immutable artifacts", async () => {
     const bytes = Uint8Array.of(1, 2, 3);
     const digest = await sha256(bytes);
-    const objects = new Map<string, StoredObject>([
-      [`release-1/${digest}/kernel.wasm`, stored(bytes)],
-    ]);
+    const objects = new Map<string, StoredObject>([[`release-1/${digest}/kernel.wasm`, stored(bytes)]]);
     const url = new URL(`https://save.example/__m9_releases/release-1/${digest}/kernel.wasm`);
-    const response = await handleM9ReleaseObject(
-      new Request(url),
-      url,
-      environment(objects),
-      { "access-control-allow-origin": "https://game.example" },
-    );
+    const response = await handleM9ReleaseObject(new Request(url), url, environment(objects), {
+      "access-control-allow-origin": "https://game.example",
+    });
     if (response == null) {
       throw new Error("release artifact route was not admitted");
     }
@@ -30,12 +25,9 @@ describe("M9 content-addressed release proxy", () => {
 
     const corrupt = new URL(`https://save.example/__m9_releases/release-1/${"0".repeat(64)}/kernel.wasm`);
     objects.set(`release-1/${"0".repeat(64)}/kernel.wasm`, stored(bytes));
-    await expect(handleM9ReleaseObject(
-      new Request(corrupt),
-      corrupt,
-      environment(objects),
-      {},
-    )).resolves.toMatchObject({ status: 502 });
+    await expect(handleM9ReleaseObject(new Request(corrupt), corrupt, environment(objects), {})).resolves.toMatchObject(
+      { status: 502 },
+    );
   });
 
   it("rejects unsigned manifests and ignores unrelated paths", async () => {
@@ -43,19 +35,13 @@ describe("M9 content-addressed release proxy", () => {
       ["manifests/release-1.json", stored(new TextEncoder().encode(JSON.stringify({ payload: {} })))],
     ]);
     const manifest = new URL("https://save.example/__m9_manifests/release-1.json");
-    await expect(handleM9ReleaseObject(
-      new Request(manifest),
-      manifest,
-      environment(objects),
-      {},
-    )).resolves.toMatchObject({ status: 502 });
+    await expect(
+      handleM9ReleaseObject(new Request(manifest), manifest, environment(objects), {}),
+    ).resolves.toMatchObject({ status: 502 });
     const unrelated = new URL("https://save.example/account/info");
-    await expect(handleM9ReleaseObject(
-      new Request(unrelated),
-      unrelated,
-      environment(objects),
-      {},
-    )).resolves.toBeNull();
+    await expect(
+      handleM9ReleaseObject(new Request(unrelated), unrelated, environment(objects), {}),
+    ).resolves.toBeNull();
   });
 });
 
