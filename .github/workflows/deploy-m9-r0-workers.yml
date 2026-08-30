@@ -1,0 +1,89 @@
+name: Deploy M9 R0 Platform Workers
+
+on:
+  push:
+    branches: [arch/rust-kernel-m9-production]
+    paths: [.github/workflows/deploy-m9-r0-workers.yml]
+  workflow_dispatch:
+    inputs:
+      platform_sha:
+        description: Exact G52-qualified M9 platform source SHA
+        required: true
+        type: string
+      g52_run_id:
+        description: Exact successful G52 run for platform_sha
+        required: true
+        type: number
+      explicit_confirmation:
+        description: Type DEPLOY_M9_R0_WORKERS
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: deploy-m9-r0-workers
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.explicit_confirmation == 'DEPLOY_M9_R0_WORKERS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: m9-r0-workers
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.platform_sha }}
+          fetch-depth: 0
+      - name: Verify exact G52-qualified platform source
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number('${{ inputs.g52_run_id }}'),
+            });
+            if (run.data.head_sha !== '${{ inputs.platform_sha }}'
+                || run.data.conclusion !== 'success'
+                || run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
+              core.setFailed('M9 worker deployment source lacks exact successful G52 evidence');
+            }
+      - run: test "$(git rev-parse HEAD)" = "${{ inputs.platform_sha }}"
+      - name: Configure production-only M9 secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
+          M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
+        run: |
+          test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
+          test -n "$M9_HEALTH_TOKEN"
+          printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx --yes wrangler@4.127.1 secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
+          printf '%s' "$M9_HEALTH_TOKEN" | npx --yes wrangler@4.127.1 secret put M9_HEALTH_TOKEN --config workers/er-telemetry/wrangler.toml
+      - name: Deploy exact save and runtime-assignment Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-save-api/wrangler.toml
+      - name: Deploy exact bounded-health Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config workers/er-telemetry/wrangler.toml
+      - name: Verify bounded production health endpoint
+        env:
+          M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            --header "Authorization: Bearer ${M9_HEALTH_TOKEN}" \
+            https://er-telemetry.heraklines.workers.dev/m9/health/r0-platform-smoke \
+            > "$RUNNER_TEMP/m9-health-smoke.json"
+          jq -e '.schema_version == 1 and .release_id == "r0-platform-smoke" and .hard_stop_fingerprints == []' \
+            "$RUNNER_TEMP/m9-health-smoke.json" > /dev/null
+          printf '%s\n' "M9 R0 Workers deployed from ${{ inputs.platform_sha }} with G52 run ${{ inputs.g52_run_id }}"
