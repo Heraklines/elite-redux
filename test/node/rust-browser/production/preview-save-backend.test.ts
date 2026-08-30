@@ -223,6 +223,7 @@ describe("M9 capability-isolated preview save Worker", () => {
     expect(first.status).toBe(200);
     expect(first.headers.get("x-er-save-generation")).toBe("1");
     expect(first.headers.get("x-er-preview-database-identity")).toBe(DATABASE_IDENTITY);
+    expect((await first.arrayBuffer()).byteLength).toBe(0);
     const firstEtag = first.headers.get("etag") ?? "";
 
     const secondBody = canonicalText(await envelope(account.account_id, "rust-slot-0", 2, Uint8Array.of(4, 5)));

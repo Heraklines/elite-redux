@@ -601,7 +601,7 @@ async function rustPreviewSave(
   ) {
     return json({ error: "Rust preview save readback mismatch" }, 500, cors);
   }
-  return previewSaveResponse(readback, slot, env, cors);
+  return previewSaveWriteResponse(readback, slot, env, cors);
 }
 
 async function validLease(
@@ -763,24 +763,45 @@ async function previewSaveResponse(
 ): Promise<Response> {
   return new Response(row.data, {
     status: 200,
-    headers: {
-      ...cors,
-      "content-type": "application/octet-stream",
-      etag: await etag(row.data),
-      "x-er-save-namespace": PREVIEW_NAMESPACE,
-      "x-er-release-id": row.release_id,
-      "x-er-save-slot": slot,
-      "x-er-save-schema": String(row.save_schema),
-      "x-er-save-generation": String(row.revision),
-      "x-er-kernel-generation": String(row.kernel_generation),
-      "x-er-content-identity": row.content_identity,
-      "x-er-payload-sha256": row.payload_sha256,
-      "x-er-mechanics-sha256": row.mechanics_sha256,
-      "x-er-active-model-identity": row.active_model_identity,
-      "x-er-preview-database-identity": env.M9_PREVIEW_DATABASE_IDENTITY_HASH,
-      "cache-control": "no-store",
-    },
+    headers: await previewSaveHeaders(row, slot, env, cors),
   });
+}
+
+async function previewSaveWriteResponse(
+  row: PreviewSaveRow,
+  slot: string,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  return new Response(null, {
+    status: 200,
+    headers: await previewSaveHeaders(row, slot, env, cors),
+  });
+}
+
+async function previewSaveHeaders(
+  row: PreviewSaveRow,
+  slot: string,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Record<string, string>> {
+  return {
+    ...cors,
+    "content-type": "application/octet-stream",
+    etag: await etag(row.data),
+    "x-er-save-namespace": PREVIEW_NAMESPACE,
+    "x-er-release-id": row.release_id,
+    "x-er-save-slot": slot,
+    "x-er-save-schema": String(row.save_schema),
+    "x-er-save-generation": String(row.revision),
+    "x-er-kernel-generation": String(row.kernel_generation),
+    "x-er-content-identity": row.content_identity,
+    "x-er-payload-sha256": row.payload_sha256,
+    "x-er-mechanics-sha256": row.mechanics_sha256,
+    "x-er-active-model-identity": row.active_model_identity,
+    "x-er-preview-database-identity": env.M9_PREVIEW_DATABASE_IDENTITY_HASH,
+    "cache-control": "no-store",
+  };
 }
 
 async function decodeSignedObject(object: PreviewR2Object, domain: string): Promise<SignedEnvelope | null> {

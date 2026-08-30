@@ -76,7 +76,8 @@ describe("M9 production authority architecture", () => {
     expect(main).not.toContain("loadOrMigrateProductionSaveV1");
     expect(main).not.toContain("ProductionSaveMigrationWorkerV1");
     const releaseCache = read("src/rust-browser/production/release-cache-v2.ts");
-    expect(releaseCache).toContain("cache.put(releaseObjectUrl(artifact.url)");
+    expect(releaseCache).toContain("cache.put(artifact.url, artifact.response)");
+    expect(releaseCache).toContain("Promise.allSettled(promises)");
     expect(releaseCache).toContain("cache.match(releaseObjectUrl(artifact.url)");
     expect(releaseCache).toContain('"x-er-source-url": expectedUrl');
     expect(releaseCache).toContain("new Response(responseBody");

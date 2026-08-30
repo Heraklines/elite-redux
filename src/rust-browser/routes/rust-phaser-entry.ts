@@ -66,7 +66,7 @@ export async function startRustPhaserHostV1(
   const acknowledgedStorageRequests = new Set<number>();
   let work = Promise.resolve();
   let disposed = false;
-  let dispatch: (request: BrowserRequestV1) => Promise<BrowserResponseEnvelopeV1[]>;
+  let dispatch: (request: BrowserRequestV1, inputStartedAt?: number) => Promise<BrowserResponseEnvelopeV1[]>;
 
   const handleStorageEffect = async (effect: Extract<BrowserEffectV1, { kind: "STORAGE_REQUEST" }>): Promise<void> => {
     if (storage == null) {
@@ -103,9 +103,13 @@ export async function startRustPhaserHostV1(
 
   const handleEffect = async (envelope: BrowserResponseEnvelopeV1, effect: BrowserEffectV1): Promise<void> => {
     if (effect.kind === "UI_CHANGED") {
+      const startedAt = performance.now();
       ui.render(Uint8Array.from(effect.value));
+      recordBoundedMeasure("er:m9:main-thread-adapter", startedAt, performance.now());
     } else if (effect.kind === "PRESENTATION_SCENE_CHANGED") {
+      const startedAt = performance.now();
       surface.render(Uint8Array.from(effect.value));
+      recordBoundedMeasure("er:m9:main-thread-adapter", startedAt, performance.now());
     } else if (effect.kind === "PRESENTATION") {
       const bytes = Uint8Array.from(effect.value);
       const cue = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as { event_id: string };
@@ -119,7 +123,8 @@ export async function startRustPhaserHostV1(
     }
   };
 
-  const handle = async (responses: readonly BrowserResponseEnvelopeV1[]): Promise<void> => {
+  const handle = async (responses: readonly BrowserResponseEnvelopeV1[], inputStartedAt?: number): Promise<void> => {
+    let inputEffectObserved = false;
     for (const envelope of responses) {
       if (envelope.response.kind === "FAULT") {
         throw new Error(`${envelope.response.value.code}: ${envelope.response.value.message}`);
@@ -128,23 +133,32 @@ export async function startRustPhaserHostV1(
         continue;
       }
       for (const effect of envelope.response.value.effects) {
+        if (
+          inputStartedAt != null
+          && !inputEffectObserved
+          && ["UI_CHANGED", "PRESENTATION_SCENE_CHANGED", "PRESENTATION"].includes(effect.kind)
+        ) {
+          inputEffectObserved = true;
+          recordBoundedMeasure("er:m9:input-to-effect", inputStartedAt, performance.now());
+        }
         await handleEffect(envelope, effect);
       }
       clock.schedule(envelope.response.value.next_wakeup_micros);
     }
   };
 
-  dispatch = async (request: BrowserRequestV1): Promise<BrowserResponseEnvelopeV1[]> => {
+  dispatch = async (request: BrowserRequestV1, inputStartedAt?: number): Promise<BrowserResponseEnvelopeV1[]> => {
     if (disposed) {
       throw new Error("Rust Phaser route is disposed");
     }
     const responses = await host.dispatch(request);
-    await handle(responses);
+    await handle(responses, inputStartedAt);
     return responses;
   };
 
   const enqueue = (request: BrowserRequestV1): void => {
-    work = work.then(() => dispatch(request)).then(() => undefined);
+    const inputStartedAt = request.kind === "RAW_INPUT" ? performance.now() : undefined;
+    work = work.then(() => dispatch(request, inputStartedAt)).then(() => undefined);
   };
 
   const clock = new BrowserClockAdapter({ emit: enqueue });
@@ -182,4 +196,11 @@ export async function startRustPhaserHostV1(
       await host.dispose();
     },
   };
+}
+
+function recordBoundedMeasure(name: string, startedAt: number, endedAt: number): void {
+  if (performance.getEntriesByName(name, "measure").length >= 512) {
+    performance.clearMeasures(name);
+  }
+  performance.measure(name, { start: startedAt, end: endedAt });
 }

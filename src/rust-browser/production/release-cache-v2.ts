@@ -27,15 +27,18 @@ export async function installCompleteProductionReleaseV2(
   await storage.delete(cacheName);
   const cache = await storage.open(cacheName);
   try {
-    for (const artifact of Object.values(manifest.artifacts)) {
-      const response = await fetch(releaseObjectUrl(artifact.url), {
-        cache: "no-store",
-        credentials: "omit",
-        redirect: "error",
-      });
-      const verified = await verifyArtifactResponseV1(response, artifact);
-      await cache.put(releaseObjectUrl(artifact.url), verified);
-    }
+    const verifiedArtifacts = await settleAllOrThrow(
+      Object.values(manifest.artifacts).map(async artifact => {
+        const url = releaseObjectUrl(artifact.url);
+        const response = await fetch(url, {
+          cache: "no-store",
+          credentials: "omit",
+          redirect: "error",
+        });
+        return { url, response: await verifyArtifactResponseV1(response, artifact) };
+      }),
+    );
+    await settleAllOrThrow(verifiedArtifacts.map(artifact => cache.put(artifact.url, artifact.response)));
     await verifyCompleteProductionReleaseV2(cache, manifest);
     await recordRelease(storage, manifest);
     await evictUnpinnedReleasesV2(storage, manifest.release_id);
@@ -150,13 +153,24 @@ export async function matchVerifiedProductionAssetV2(
 }
 
 async function verifyCompleteProductionReleaseV2(cache: Cache, manifest: ProductionReleaseManifestV2): Promise<void> {
-  for (const artifact of Object.values(manifest.artifacts)) {
-    const response = await cache.match(releaseObjectUrl(artifact.url));
-    if (response == null) {
-      throw new Error("production release cache is incomplete");
-    }
-    await verifyArtifactResponseV1(response, artifact);
+  await settleAllOrThrow(
+    Object.values(manifest.artifacts).map(async artifact => {
+      const response = await cache.match(releaseObjectUrl(artifact.url));
+      if (response == null) {
+        throw new Error("production release cache is incomplete");
+      }
+      await verifyArtifactResponseV1(response, artifact);
+    }),
+  );
+}
+
+async function settleAllOrThrow<T>(promises: readonly Promise<T>[]): Promise<T[]> {
+  const settled = await Promise.allSettled(promises);
+  const failure = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failure != null) {
+    throw failure.reason;
   }
+  return settled.map(result => (result as PromiseFulfilledResult<T>).value);
 }
 
 async function verifyArtifactResponseV1(response: Response, artifact: ArtifactIdentityV1): Promise<Response> {

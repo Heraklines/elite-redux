@@ -33,13 +33,16 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
   }
 
   static async create(options: ProductionWorkerHostOptionsV1): Promise<ProductionWorkerHostV1> {
+    const startedAt = performance.now();
     const manifest = options.release.manifest;
     const worker = await materializeVerifiedArtifactUrlV1(options.release, manifest.artifacts.worker_js);
+    const workerUrlReadyAt = performance.now();
     const [glueBytes, wasmBytes, contentBytes] = await Promise.all([
       readVerifiedArtifactBytesV1(options.release, manifest.artifacts.wasm_glue_js),
       readVerifiedArtifactBytesV1(options.release, manifest.artifacts.wasm),
       readVerifiedArtifactBytesV1(options.release, manifest.artifacts.content),
     ]);
+    const artifactsReadyAt = performance.now();
     const identity = generationIdentity(manifest, options.sessionId);
     const executionIdentityBytes = contentIdentityBytes(contentBytes);
     const initialize: BrowserRequestV1 & { kind: "INITIALIZE" } = {
@@ -76,6 +79,11 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
           );
         },
       });
+      const readyAt = performance.now();
+      recordBoundedMeasure("er:m9:worker-url-materialization", startedAt, workerUrlReadyAt);
+      recordBoundedMeasure("er:m9:worker-artifact-read", workerUrlReadyAt, artifactsReadyAt);
+      recordBoundedMeasure("er:m9:worker-initialization", artifactsReadyAt, readyAt);
+      recordBoundedMeasure("er:m9:warm-worker-ready", startedAt, readyAt);
       return new ProductionWorkerHostV1(identity, host, worker.revoke);
     } catch (error) {
       worker.revoke();
@@ -105,6 +113,13 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
       this.#revokeWorker();
     }
   }
+}
+
+function recordBoundedMeasure(name: string, startedAt: number, endedAt: number): void {
+  if (performance.getEntriesByName(name, "measure").length >= 512) {
+    performance.clearMeasures(name);
+  }
+  performance.measure(name, { start: startedAt, end: endedAt });
 }
 
 function generationIdentity(
