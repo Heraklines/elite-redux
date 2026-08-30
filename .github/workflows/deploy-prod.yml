@@ -137,14 +137,11 @@ jobs:
             [ "$ok" = "1" ] || { echo "Asset unavailable at exact pin: $f" >&2; exit 1; }
           done
 
-      - name: Configure M9 production Worker secrets
+      - name: Configure M9 production telemetry secret
         env:
-          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
           M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
         run: |
-          test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
           test -n "$M9_HEALTH_TOKEN"
-          printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx wrangler secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
           printf '%s' "$M9_HEALTH_TOKEN" | npx wrangler secret put M9_HEALTH_TOKEN --config workers/er-telemetry/wrangler.toml
 
       - name: Verify production telemetry prerequisites
@@ -160,7 +157,7 @@ jobs:
 
           npx wrangler secret list --config workers/er-save-api/wrangler.toml --format json \
             > "$RUNNER_TEMP/prod-save-secrets.json"
-          jq -e '[.[].name] | index("SESSION_SECRET") != null and index("SHOWDOWN_GRANT_SECRET") != null and index("M9_RELEASE_SIGNING_PRIVATE_KEY") != null' \
+          jq -e '[.[].name] | index("SESSION_SECRET") != null and index("SHOWDOWN_GRANT_SECRET") != null' \
             "$RUNNER_TEMP/prod-save-secrets.json" > /dev/null
 
           npx wrangler secret list --config workers/er-telemetry/wrangler.toml --format json \

@@ -42,6 +42,8 @@ jobs:
           --types node,vitest/globals --lib ES2024,DOM,WebWorker
           workers/er-telemetry/src/cloudflare-workers.d.ts
           workers/er-save-api/src/cloudflare-workers.d.ts
+          workers/er-m9-preview-save/src/index.ts
+          workers/er-m9-preview-save/src/type-guards.ts
           src/rust-browser/production/contracts.ts
           src/rust-browser/production/signature-verifier.ts
           src/rust-browser/production/release-manifest.ts
@@ -55,6 +57,10 @@ jobs:
           src/rust-browser/production/bootstrap.ts
           src/rust-browser/production/browser-session.ts
           src/rust-browser/production/configured-production-main.ts
+          src/rust-browser/production/preview-account.ts
+          src/rust-browser/production/preview-remote-lease.ts
+          src/rust-browser/production/preview-save-storage.ts
+          src/rust-browser/production/production-save-restore-worker.ts
           src/rust-browser/production/save-envelope.ts
           src/rust-browser/production/save-lease.ts
           src/rust-browser/production/save-migration.ts
@@ -101,6 +107,7 @@ jobs:
           test/node/rust-browser/adapters/adapter-contracts.test.ts
           workers/er-save-api/src/m9-production.ts
           workers/er-save-api/src/m9-type-guards.ts
+          workers/er-m9-preview-save/src
           workers/er-telemetry/src/m9-health.ts
       - name: Enforce production import and API quarantine
         run: |
@@ -108,6 +115,17 @@ jobs:
           for forbidden in 'battle-scene' 'game-manager' 'loadDevTools' 'startUpdateChecker' 'window.location.reload' 'AuthorityResolutionPlan'; do
             ! grep -R -E "$forbidden" "$RUNNER_TEMP/m9-production"
           done
+          ! grep -R -E 'MIGRATE_LEGACY|MIGRATE_PRODUCTION_SAVE_V2|pokerogue_sessionId' "$RUNNER_TEMP/m9-production"
+          node <<'NODE'
+          const { readFileSync } = require('node:fs');
+          const preview = readFileSync('workers/er-m9-preview-save/wrangler.toml', 'utf8');
+          const legacy = readFileSync('workers/er-save-api/wrangler.toml', 'utf8');
+          if (!/binding\\s*=\\s*\"RUST_PREVIEW_DB\"/.test(preview)
+              || /binding\\s*=\\s*\"DB\"/.test(preview)
+              || /RUST_PREVIEW_DB|M9_RUST_SAVES/.test(legacy)) {
+            throw new Error('M9 preview and legacy D1 capabilities are not physically separated');
+          }
+          NODE
           grep -R -q 'ATTACH_PRODUCTION_ARTIFACTS_V1' "$RUNNER_TEMP/m9-production"
           ! grep -R -E 'reloadKernel|HOT_RELOAD|DEV_KERNEL' "$RUNNER_TEMP/m9-production"
           ! grep -E 'pokerogue_sessionId|authorization|M9_HEALTH_TOKEN|M9_RELEASE_SIGNING_PRIVATE_KEY' "$RUNNER_TEMP/m9-production/rust-kernel-worker.js"
@@ -182,6 +200,8 @@ jobs:
           if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then cargo install wasm-bindgen-cli --version 0.2.127 --locked; fi
           node scripts/build-kernel-m8-web.mjs --out-dir "$RUNNER_TEMP/m9-web" --content rust/fixtures/m8/browser-reference/content-pack.json --identity rust/fixtures/m8/browser-reference/execution-identity.bin --session rust/fixtures/m8/browser-reference/session-start.json --authority-session rust/fixtures/m8/browser-reference/session-authority.json --replica-session rust/fixtures/m8/browser-reference/session-replica.json
           cp rust/fixtures/m8/browser-reference/expected-terminal-digest.txt "$RUNNER_TEMP/m9-web/"
+          grep -q 'restore_production_save_v2' "$RUNNER_TEMP/m9-web/er_web.js"
+          ! grep -q 'migrate_production_save_v2' "$RUNNER_TEMP/m9-web/er_web.js"
           node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-browser-one" --authority rust
           node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-browser-two" --authority rust
           for file in bootstrap.js browser.js rust-kernel-worker.js service-worker.js; do cmp "$RUNNER_TEMP/m9-browser-one/$file" "$RUNNER_TEMP/m9-browser-two/$file"; done

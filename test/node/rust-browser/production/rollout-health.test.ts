@@ -338,10 +338,10 @@ describe("M9 production health and rollout control", () => {
 
   it("keeps account authorization in the browser fetch boundary and out of health payloads", async () => {
     const authorization = "a".repeat(32);
-    expect(readProductionAccountAuthorizationV1(`other=1; pokerogue_sessionId=${authorization}`)).toBe(authorization);
+    expect(readProductionAccountAuthorizationV1(`other=1; er_m9_preview_session=${authorization}`)).toBe(authorization);
     expect(() =>
       readProductionAccountAuthorizationV1(
-        `pokerogue_sessionId=${authorization}; pokerogue_sessionId=${authorization}`,
+        `er_m9_preview_session=${authorization}; er_m9_preview_session=${authorization}`,
       ),
     ).toThrow(/ambiguous/u);
 
@@ -351,7 +351,7 @@ describe("M9 production health and rollout control", () => {
         return new Response(
           JSON.stringify({
             schema_version: 1,
-            pseudonymous_account_id: "account-1",
+            pseudonymous_account_id: "rust-preview:account-1",
             entitlements_digest: "a".repeat(64),
             server_api_versions: {
               schema_version: 1,
@@ -363,7 +363,15 @@ describe("M9 production health and rollout control", () => {
             },
             default_save_slot: "rust-slot-0",
             rust_save_namespace: "M9_RUST_PREVIEW_V1",
-            telemetry_event_url: "https://telemetry.example/m9/health/event",
+            preview_only: true,
+            imports: {
+              legacy_save: false,
+              legacy_achievements: false,
+              legacy_unlocks: false,
+              legacy_profile: false,
+            },
+            preview_database_identity_hash: "b".repeat(64),
+            telemetry_event_url: "https://er-m9-preview-save.heraklines.workers.dev/api/m9/health/event",
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
@@ -373,10 +381,10 @@ describe("M9 production health and rollout control", () => {
     });
     vi.stubGlobal("fetch", fetch);
     const platform = await loadAuthenticatedPlatformContextV1(authorization);
-    expect(platform.pseudonymous_account_id).toBe("account-1");
+    expect(platform.pseudonymous_account_id).toBe("rust-preview:account-1");
     await sendProductionHealthEventV1({
       endpoint: new URL(platform.telemetry_event_url),
-      allowedOrigin: "https://telemetry.example",
+      allowedOrigin: "https://er-m9-preview-save.heraklines.workers.dev",
       idempotencyKey: "bootstrap-1",
       event: event(),
       authorization,

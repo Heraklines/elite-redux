@@ -5,7 +5,6 @@ on:
     branches: [arch/rust-kernel-m9-production]
     paths:
       - .github/workflows/deploy-m9-r0-workers.yml
-      - workers/er-save-api/m9-rust-preview-schema.sql
       - workers/er-save-api/src/**
       - workers/er-save-api/wrangler.toml
   workflow_dispatch:
@@ -57,49 +56,15 @@ jobs:
               core.setFailed('M9 worker deployment source lacks exact successful G52 evidence');
             }
       - run: test "$(git rev-parse HEAD)" = "${{ inputs.platform_sha }}"
-      - name: Initialize only the isolated Rust preview save database
+      - name: Configure bounded-health secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          node <<'NODE'
-          const { readFileSync } = require("node:fs");
-          const config = readFileSync("workers/er-save-api/wrangler.toml", "utf8");
-          const blocks = [...config.matchAll(/\[\[d1_databases\]\]([\s\S]*?)(?=\n\[\[|$)/g)].map(match => match[1]);
-          const binding = name => blocks.find(block => new RegExp(`binding\\s*=\\s*\"${name}\"`).test(block));
-          const id = block => /database_id\s*=\s*\"([^\"]+)\"/.exec(block ?? "")?.[1];
-          const legacy = id(binding("DB"));
-          const preview = id(binding("M9_RUST_SAVES"));
-          if (preview !== "9d410e94-8719-4a86-aa0b-c1cad2291e88" || legacy == null || legacy === preview) {
-            throw new Error("Rust preview save D1 binding is missing, unexpected, or aliases the legacy save database");
-          }
-          NODE
-          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves \
-            --remote \
-            --config workers/er-save-api/wrangler.toml \
-            --file workers/er-save-api/m9-rust-preview-schema.sql
-          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves \
-            --remote \
-            --config workers/er-save-api/wrangler.toml \
-            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('rust_preview_saves','rust_preview_save_backups') ORDER BY name" \
-            --json > "$RUNNER_TEMP/m9-rust-preview-tables.json"
-          jq -e '.[0].results | map(.name) == ["rust_preview_save_backups", "rust_preview_saves"]' \
-            "$RUNNER_TEMP/m9-rust-preview-tables.json" > /dev/null
-      - name: Configure production-only M9 secrets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          M9_RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.M9_RELEASE_SIGNING_PRIVATE_KEY }}
           M9_HEALTH_TOKEN: ${{ secrets.M9_HEALTH_TOKEN }}
-          M9_INTERNAL_ACCOUNTS: ${{ secrets.M9_INTERNAL_ACCOUNTS }}
         run: |
-          test -n "$M9_RELEASE_SIGNING_PRIVATE_KEY"
           test -n "$M9_HEALTH_TOKEN"
-          test -n "$M9_INTERNAL_ACCOUNTS"
-          printf '%s' "$M9_RELEASE_SIGNING_PRIVATE_KEY" | npx --yes wrangler@4.127.1 secret put M9_RELEASE_SIGNING_PRIVATE_KEY --config workers/er-save-api/wrangler.toml
-          printf '%s' "$M9_INTERNAL_ACCOUNTS" | npx --yes wrangler@4.127.1 secret put M9_INTERNAL_ACCOUNTS --config workers/er-save-api/wrangler.toml
           printf '%s' "$M9_HEALTH_TOKEN" | npx --yes wrangler@4.127.1 secret put M9_HEALTH_TOKEN --config workers/er-telemetry/wrangler.toml
-      - name: Deploy exact save and runtime-assignment Worker
+      - name: Deploy exact legacy save and release-object Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

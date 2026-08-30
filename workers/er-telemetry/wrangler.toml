@@ -27,6 +27,7 @@ service = "er-save-api"
 #   npx wrangler secret put SHOWDOWN_GRANT_SECRET   # MUST equal er-save-api's SHOWDOWN_GRANT_SECRET
 #                                                   # (authenticates the server-to-server reward push).
 #   npx wrangler secret put M9_HEALTH_TOKEN          # Read access for bounded M9 rollout aggregates.
+#   npx wrangler secret put M9_PREVIEW_HEALTH_SECRET # Shared only with the preview-only Worker.
 # SESSION_SECRET is the SHARED HMAC key so the client's existing session token verifies here.
 
 [vars]

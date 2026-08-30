@@ -6,6 +6,11 @@ export interface CloudSaveValueV1 {
   generation?: number;
 }
 
+export interface CloudSaveLeaseIdentityV1 {
+  token: string;
+  holder: string;
+}
+
 export class CloudSaveConflictV1 extends Error {
   constructor() {
     super("cloud save compare-and-swap conflict");
@@ -25,6 +30,8 @@ export interface CloudSaveAdapterOptionsV1 {
   contentIdentity?: string;
   mechanicsSha256?: string;
   activeModelIdentity?: string;
+  previewOnly?: boolean;
+  previewDatabaseIdentity?: string;
 }
 
 export class CloudSaveAdapterV1 {
@@ -39,6 +46,7 @@ export class CloudSaveAdapterV1 {
   readonly #contentIdentity: string | null;
   readonly #mechanicsSha256: string | null;
   readonly #activeModelIdentity: string | null;
+  readonly #previewDatabaseIdentity: string | null;
   readonly #controller = new AbortController();
   #disposed = false;
 
@@ -50,6 +58,11 @@ export class CloudSaveAdapterV1 {
       || !Number.isSafeInteger(schema)
       || schema < 1
       || !validOptionalCloudIdentity(options)
+      || (options.previewOnly === true
+        && (options.endpoint.pathname !== "/api/m9/rust-save"
+          || options.saveNamespace !== "M9_RUST_PREVIEW_V1"
+          || options.authorization == null))
+      || (options.previewDatabaseIdentity != null && !/^[0-9a-f]{64}$/u.test(options.previewDatabaseIdentity))
     ) {
       throw new Error("cloud save endpoint, release, or schema identity is invalid");
     }
@@ -64,6 +77,7 @@ export class CloudSaveAdapterV1 {
     this.#contentIdentity = options.contentIdentity ?? null;
     this.#mechanicsSha256 = options.mechanicsSha256 ?? null;
     this.#activeModelIdentity = options.activeModelIdentity ?? null;
+    this.#previewDatabaseIdentity = options.previewDatabaseIdentity ?? null;
   }
 
   async load(slot: string): Promise<CloudSaveValueV1 | null> {
@@ -94,10 +108,21 @@ export class CloudSaveAdapterV1 {
     };
   }
 
-  async compareAndSwap(slot: string, expectedRevision: string | null, bytes: Uint8Array): Promise<string> {
+  async compareAndSwap(
+    slot: string,
+    expectedRevision: string | null,
+    bytes: Uint8Array,
+    lease?: CloudSaveLeaseIdentityV1,
+  ): Promise<string> {
     this.#assertOpen();
     if (bytes.byteLength === 0 || bytes.byteLength > MAXIMUM_CLOUD_SAVE_BYTES) {
       throw new Error("cloud save bytes are empty or oversized");
+    }
+    if (
+      lease != null
+      && (!/^[A-Za-z0-9_-]{16,512}$/u.test(lease.token) || !/^[a-zA-Z0-9._:-]{1,128}$/u.test(lease.holder))
+    ) {
+      throw new Error("cloud save lease identity is invalid");
     }
     const response = await fetch(this.#slot(slot), {
       method: "PUT",
@@ -110,6 +135,7 @@ export class CloudSaveAdapterV1 {
         "x-er-save-schema": String(this.#productionSaveSchema),
         ...(this.#authorization == null ? {} : { authorization: `Bearer ${this.#authorization}` }),
         ...(this.#saveNamespace == null ? {} : { "x-er-save-namespace": this.#saveNamespace }),
+        ...(lease == null ? {} : { "x-er-preview-lease": lease.token, "x-er-preview-holder": lease.holder }),
       },
       body: Uint8Array.from(bytes).buffer,
       signal: this.#controller.signal,
@@ -165,6 +191,8 @@ export class CloudSaveAdapterV1 {
       || (this.#mechanicsSha256 != null && response.headers.get("x-er-mechanics-sha256") !== this.#mechanicsSha256)
       || (this.#activeModelIdentity != null
         && response.headers.get("x-er-active-model-identity") !== this.#activeModelIdentity)
+      || (this.#previewDatabaseIdentity != null
+        && response.headers.get("x-er-preview-database-identity") !== this.#previewDatabaseIdentity)
     ) {
       throw new Error("cloud save response is cross-release, cross-slot, or wrong mechanical identity");
     }

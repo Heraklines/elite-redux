@@ -10,7 +10,8 @@ pub use production_save::*;
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
+#[cfg(feature = "legacy-save-migration")]
+#[cfg_attr(feature = "legacy-save-migration", wasm_bindgen)]
 pub fn migrate_production_save_v2(
     content_bytes: &[u8],
     legacy_bytes: &[u8],

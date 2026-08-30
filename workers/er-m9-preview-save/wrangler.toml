@@ -1,0 +1,24 @@
+name = "er-m9-preview-save"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "RUST_PREVIEW_DB"
+database_name = "er-m9-rust-preview-saves"
+database_id = "9d410e94-8719-4a86-aa0b-c1cad2291e88"
+
+[[r2_buckets]]
+binding = "M9_RELEASES"
+bucket_name = "er-m9-releases"
+
+[vars]
+M9_PREVIEW_ONLY_WORKER = "true"
+M9_LEGACY_MIGRATION_ENABLED = "false"
+M9_PREVIEW_DATABASE_IDENTITY_HASH = "b860cac56eb16855e2a46fc6ba2f458666f06d0ab4e04ca4c83f0e3962afd36e"
+M9_TELEMETRY_URL = "https://er-telemetry.heraklines.workers.dev/m9/health/event"
+ALLOWED_ORIGIN = "https://m9-r1-internal.elite-redux.pages.dev"
+
+# Secrets:
+#   M9_RELEASE_SIGNING_PRIVATE_KEY
+#   M9_PREVIEW_INVITE_SECRET
+#   M9_PREVIEW_HEALTH_SECRET

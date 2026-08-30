@@ -63,35 +63,55 @@ describe("M9 production authority architecture", () => {
     expect(read(".github/workflows/rollback-m9-rollout.yml")).not.toContain("pnpm build");
   });
 
-  it("routes Rust preview saves only through the isolated namespace", () => {
+  it("routes Rust preview saves through a capability-isolated Worker", () => {
     const main = read("src/rust-browser/production/configured-production-main.ts");
-    expect(main).toContain('new URL("/m9/rust-save"');
+    expect(main).toContain('new URL("/api/m9/rust-save", M9_PREVIEW_WORKER_ORIGIN_V1)');
+    expect(main).toContain("PreviewRemoteLeaseClientV1");
     expect(main).toContain("RUST_PREVIEW_SAVE_NAMESPACE_V1");
     expect(main).toContain("loadRustPreviewSaveV1");
-    expect(main).not.toContain('new URL("/m9/save"');
+    expect(main).not.toContain('new URL("/m9/rust-save"');
     expect(main).not.toContain("loadOrMigrateProductionSaveV1");
+    expect(main).not.toContain("ProductionSaveMigrationWorkerV1");
 
-    const backend = read("workers/er-save-api/src/m9-production.ts");
-    const isolatedHandler = backend.slice(
-      backend.indexOf("export async function handleM9RustPreviewSave"),
-      backend.indexOf("async function verifyEnvelope"),
-    );
-    expect(isolatedHandler).toContain("env.M9_RUST_SAVES");
-    expect(isolatedHandler).not.toContain("env.DB");
-    expect(isolatedHandler).not.toContain("session_saves");
-    expect(isolatedHandler).not.toContain("DELETE FROM");
+    const previewBackend = read("workers/er-m9-preview-save/src/index.ts");
+    expect(previewBackend).toContain("env.RUST_PREVIEW_DB");
+    expect(previewBackend).toContain("M9_PREVIEW_ONLY_WORKER");
+    expect(previewBackend).toContain("M9_LEGACY_MIGRATION_ENABLED");
+    for (const forbidden of ["env.DB", "session_saves", "/savedata/", "/account/info", "pokerogue_sessionId"]) {
+      expect(previewBackend).not.toContain(forbidden);
+    }
 
-    const config = read("workers/er-save-api/wrangler.toml");
-    expect(config).toContain('binding = "DB"');
-    expect(config).toContain('database_id = "b2fae947-6971-45e7-b287-d42648fd0a30"');
-    expect(config).toContain('binding = "M9_RUST_SAVES"');
-    expect(config).toContain('database_id = "9d410e94-8719-4a86-aa0b-c1cad2291e88"');
-    const schema = read("workers/er-save-api/m9-rust-preview-schema.sql");
-    expect(schema).toContain("rust_preview_saves");
-    expect(schema).toContain("rust_preview_save_backups");
+    const previewConfig = read("workers/er-m9-preview-save/wrangler.toml");
+    expect(previewConfig).toContain('binding = "RUST_PREVIEW_DB"');
+    expect(previewConfig).toContain('database_id = "9d410e94-8719-4a86-aa0b-c1cad2291e88"');
+    expect(previewConfig).not.toContain('binding = "DB"');
+    expect(previewConfig).toContain('M9_PREVIEW_ONLY_WORKER = "true"');
+    expect(previewConfig).toContain('M9_LEGACY_MIGRATION_ENABLED = "false"');
+
+    const legacyConfig = read("workers/er-save-api/wrangler.toml");
+    expect(legacyConfig).toContain('binding = "DB"');
+    expect(legacyConfig).not.toContain("RUST_PREVIEW_DB");
+    expect(legacyConfig).not.toContain("M9_RUST_SAVES");
+    const legacySource = read("workers/er-save-api/src/index.ts");
+    expect(legacySource).not.toContain('pathname === "/m9/rust-save"');
+
+    const schema = read("workers/er-m9-preview-save/schema.sql");
+    for (const table of [
+      "rust_preview_accounts",
+      "rust_preview_saves",
+      "rust_preview_save_backups",
+      "rust_preview_save_leases",
+    ]) {
+      expect(schema).toContain(table);
+    }
     expect(schema).not.toContain("session_saves");
-    const deployment = read(".github/workflows/deploy-m9-r0-workers.yml");
-    expect(deployment).toContain("er-m9-rust-preview-saves");
-    expect(deployment).toContain("legacy === preview");
+
+    const worker = read("src/rust-browser/worker/rust-kernel-worker.ts");
+    expect(worker).toContain("RESTORE_PRODUCTION_SAVE_V2");
+    expect(worker).not.toContain("MIGRATE_LEGACY");
+    expect(worker).not.toContain("MIGRATE_PRODUCTION_SAVE_V2");
+    const deployment = read(".github/workflows/deploy-m9-preview-save-worker.yml");
+    expect(deployment).toContain("Prove capability-only Worker configuration");
+    expect(deployment).toContain("Prove legacy database sentinel unchanged");
   });
 });

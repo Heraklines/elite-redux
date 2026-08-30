@@ -47,14 +47,11 @@ describe("M9 content-addressed release proxy", () => {
 
 function environment(objects: Map<string, StoredObject>) {
   return {
-    DB: {} as D1Database,
-    M9_RUST_SAVES: {} as D1Database,
     M9_RELEASES: {
       async get(key: string) {
         return objects.get(key) ?? null;
       },
     },
-    M9_RELEASE_SIGNING_PRIVATE_KEY: "unused",
   };
 }
 

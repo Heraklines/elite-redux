@@ -15,12 +15,6 @@ binding = "DB"
 database_name = "er-saves"
 database_id = "b2fae947-6971-45e7-b287-d42648fd0a30"
 
-# Isolated M9 Rust preview saves. This database never contains or queries legacy
-# production session_saves rows. R1-R6 preview traffic uses only this binding.
-[[d1_databases]]
-binding = "M9_RUST_SAVES"
-database_name = "er-m9-rust-preview-saves"
-database_id = "9d410e94-8719-4a86-aa0b-c1cad2291e88"
 
 # Player-telemetry ML capture sink (#player-telemetry). Production uses its own
 # bucket; deploy-prod fails closed before mutation if the bucket is absent.
@@ -39,7 +33,6 @@ bucket_name = "er-m9-releases"
 #   npx wrangler secret put SHOWDOWN_GRANT_SECRET   # MUST equal er-telemetry's SHOWDOWN_GRANT_SECRET —
 #                                                   # authenticates the tournament worker's server-to-server
 #                                                   # reward push (POST /showdown/tournament-grant).
-#   npx wrangler secret put M9_RELEASE_SIGNING_PRIVATE_KEY
 # SESSION_SECRET is read from the encrypted secret store, not from [vars].
 
 [vars]
@@ -47,7 +40,6 @@ bucket_name = "er-m9-releases"
 # any origin. For a locked-down deploy set this to your Pages URL, e.g.
 # "https://elite-redux.pages.dev".
 ALLOWED_ORIGIN = "*"
-M9_TELEMETRY_URL = "https://er-telemetry.heraklines.workers.dev/m9/health/event"
 # Minimum lengths enforced server-side at registration.
 MIN_USERNAME_LENGTH = "3"
 MIN_PASSWORD_LENGTH = "6"

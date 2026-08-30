@@ -9,8 +9,15 @@ import {
 import type { ProductionHealthEventV1 } from "./health-event";
 import { sendProductionHealthEventV1 } from "./health-reporter";
 import { loadAuthenticatedPlatformContextV1, readProductionAccountAuthorizationV1 } from "./platform-context";
+import {
+  bootstrapRustPreviewAccountV1,
+  M9_PREVIEW_WORKER_ORIGIN_V1,
+  PreviewAuthorizationRequiredV1,
+  persistRustPreviewAuthorizationV1,
+} from "./preview-account";
+import { PreviewRemoteLeaseClientV1 } from "./preview-remote-lease";
 import { RustPreviewSaveStorageV1 } from "./preview-save-storage";
-import { ProductionSaveMigrationWorkerV1 } from "./production-save-worker";
+import { ProductionSaveRestoreWorkerV1 } from "./production-save-restore-worker";
 import {
   type CompleteProductionReleaseV2,
   materializeVerifiedArtifactUrlV1,
@@ -55,7 +62,7 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
       );
     },
     async requestAssignment() {
-      const response = await fetch("/m9/runtime-assignment", {
+      const response = await fetch(`${M9_PREVIEW_WORKER_ORIGIN_V1}/api/m9/runtime-assignment`, {
         method: "POST",
         cache: "no-store",
         credentials: "omit",
@@ -73,8 +80,8 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
     },
     async prepareSessionStart(_selection, release) {
       const cloud = new CloudSaveAdapterV1({
-        endpoint: new URL("/m9/rust-save", globalThis.location.origin),
-        allowedOrigin: globalThis.location.origin,
+        endpoint: new URL("/api/m9/rust-save", M9_PREVIEW_WORKER_ORIGIN_V1),
+        allowedOrigin: M9_PREVIEW_WORKER_ORIGIN_V1,
         releaseIdentity: release.manifest.release_id,
         productionSaveSchema: release.manifest.save_schema,
         requireProductionIdentity: true,
@@ -84,6 +91,8 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         contentIdentity: release.manifest.mechanical_identity.content_hash,
         mechanicsSha256: release.manifest.mechanical_identity.mechanics_sha256,
         activeModelIdentity: release.manifest.mechanical_identity.active_model_identity,
+        previewOnly: true,
+        previewDatabaseIdentity: platform.preview_database_identity_hash,
       });
       const leases = new ProductionSaveLeaseManagerV1();
       try {
@@ -100,7 +109,7 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
           cloud,
           source,
           leases,
-          backend: new ProductionSaveMigrationWorkerV1(release),
+          backend: new ProductionSaveRestoreWorkerV1(release),
           release: release.manifest,
           accountId: platform.pseudonymous_account_id,
           slot: platform.default_save_slot,
@@ -117,8 +126,8 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         throw new Error("Rust preview save frontier was not prepared");
       }
       const cloud = new CloudSaveAdapterV1({
-        endpoint: new URL("/m9/rust-save", globalThis.location.origin),
-        allowedOrigin: globalThis.location.origin,
+        endpoint: new URL("/api/m9/rust-save", M9_PREVIEW_WORKER_ORIGIN_V1),
+        allowedOrigin: M9_PREVIEW_WORKER_ORIGIN_V1,
         releaseIdentity: release.manifest.release_id,
         productionSaveSchema: release.manifest.save_schema,
         requireProductionIdentity: true,
@@ -128,8 +137,11 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         contentIdentity: release.manifest.mechanical_identity.content_hash,
         mechanicsSha256: release.manifest.mechanical_identity.mechanics_sha256,
         activeModelIdentity: release.manifest.mechanical_identity.active_model_identity,
+        previewOnly: true,
+        previewDatabaseIdentity: platform.preview_database_identity_hash,
       });
       const leases = new ProductionSaveLeaseManagerV1();
+      const remoteLeases = new PreviewRemoteLeaseClientV1(authorization);
       let storage: RustPreviewSaveStorageV1 | null = null;
       let entry: VerifiedBrowserEntryV1 | null = null;
       try {
@@ -140,6 +152,7 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         storage = new RustPreviewSaveStorageV1({
           cloud,
           leases,
+          remoteLeases,
           release: release.manifest,
           accountId: platform.pseudonymous_account_id,
           slot: platform.default_save_slot,
@@ -166,27 +179,14 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
         if (storage == null) {
           cloud.dispose();
           leases.dispose();
+          remoteLeases.dispose();
         }
         entry?.revoke();
         throw error;
       }
     },
-    async startLegacyTransition(selection, release) {
-      const entry = await loadVerifiedBrowserEntry(release);
-      if (typeof entry.module.startVerifiedLegacyTransitionV1 !== "function") {
-        entry.revoke();
-        throw new Error("verified legacy browser entry has no transition start function");
-      }
-      const view = await entry.module.startVerifiedLegacyTransitionV1(selection);
-      return {
-        async dispose() {
-          try {
-            await view.dispose();
-          } finally {
-            entry.revoke();
-          }
-        },
-      };
+    async startLegacyTransition() {
+      throw new Error("legacy transition is unavailable in the Rust preview-only release");
     },
   });
   const healthEvent: ProductionHealthEventV1 = {
@@ -247,13 +247,50 @@ function productionPlatformClass(): ProductionHealthEventV1["platform_class"] {
 export function renderProductionUnavailableV1(error: unknown): void {
   const root = document.querySelector("#app") ?? document.body;
   root.replaceChildren();
+  if (error instanceof PreviewAuthorizationRequiredV1) {
+    const form = document.createElement("form");
+    form.dataset.previewAuthorization = "required";
+    const label = document.createElement("label");
+    label.textContent = "Internal Rust preview invite";
+    const input = document.createElement("input");
+    input.type = "password";
+    input.name = "preview-invite";
+    input.autocomplete = "one-time-code";
+    input.required = true;
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.textContent = "Create fresh Rust preview account";
+    const status = document.createElement("p");
+    status.setAttribute("role", "status");
+    label.append(input);
+    form.append(label, submit, status);
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      submit.disabled = true;
+      status.textContent = "Creating isolated preview account…";
+      bootstrapRustPreviewAccountV1(input.value, `bootstrap-${crypto.randomUUID()}`)
+        .then(account => {
+          persistRustPreviewAuthorizationV1(account.session_token);
+          input.value = "";
+          globalThis.location.reload();
+        })
+        .catch(bootstrapError => {
+          input.value = "";
+          submit.disabled = false;
+          status.textContent =
+            bootstrapError instanceof Error ? bootstrapError.message : "Preview account bootstrap failed";
+        });
+    });
+    root.append(form);
+    return;
+  }
   const message = document.createElement("main");
   message.setAttribute("role", "alert");
   message.dataset.productionAuthority = "unavailable";
   message.textContent =
-    "The verified Rust game release is unavailable. No game state was changed. Please try again later.";
+    "The verified Rust preview release is unavailable. No game state was changed. Please try again later.";
   root.append(message);
-  console.error("Production Rust authority unavailable", error instanceof Error ? error.name : "UnknownError");
+  console.error("Production Rust preview authority unavailable", error instanceof Error ? error.name : "UnknownError");
 }
 
 interface VerifiedBrowserEntryModuleV1 {

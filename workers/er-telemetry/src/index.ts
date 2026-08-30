@@ -44,6 +44,7 @@ interface Env {
   /** Shared secret authenticating the tournament→save-api reward push (SAME as er-save-api's SHOWDOWN_GRANT_SECRET). */
   SHOWDOWN_GRANT_SECRET?: string;
   M9_HEALTH_TOKEN?: string;
+  M9_PREVIEW_HEALTH_SECRET?: string;
   M9_BASELINE_CLOUD_SAVE_FAILURE_BP?: string;
   M9_BASELINE_COOP_FAILURE_BP?: string;
   M9_BASELINE_INPUT_P95_MICROS?: string;

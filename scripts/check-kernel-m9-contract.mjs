@@ -43,7 +43,9 @@ for (const required of [
   'production_default_after_cutover = "RUST_PRODUCTION"',
   'signature_algorithm = "ED25519"',
   "build once; promote identical bytes",
-  "copy-on-write migration",
+  "historical migration deferred to M9-LM",
+  "legacy_migration_enabled = false",
+  'preview_worker_binding = "RUST_PREVIEW_DB"',
   "mixed authority peers forbidden",
 ]) {
   if (!lock.includes(required)) {
@@ -63,6 +65,8 @@ for (const path of [
   "rust/fixtures/m9/m9-coop-rollout-map.json",
   "rust/fixtures/m9/m9-release-artifact-map.json",
   "rust/fixtures/m9/m9-rollout-baseline.json",
+  "rust/fixtures/m9/m9-r1-release-under-test.json",
+  "rust/fixtures/m10/m10-renderer-audit-manifest.json",
 ]) {
   if (read(path).trim().length === 0) {
     fail(`missing audit output ${path}`);

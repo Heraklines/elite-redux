@@ -5,6 +5,7 @@ import {
   type ProductionSaveEnvelopeV2,
   RUST_PREVIEW_SAVE_NAMESPACE_V1,
 } from "./contracts";
+import type { PreviewRemoteLeaseCoordinatorV1, PreviewRemoteLeaseV1 } from "./preview-remote-lease";
 import { validateProductionSaveEnvelopeV2 } from "./save-envelope";
 import type { ProductionCloudSaveV1, ProductionSaveLeaseCoordinatorV1 } from "./save-migration";
 
@@ -31,6 +32,7 @@ export interface DisposablePreviewSaveLeaseCoordinatorV1 extends ProductionSaveL
 export interface RustPreviewSaveStorageOptionsV1 {
   cloud: DisposablePreviewCloudSaveV1;
   leases: DisposablePreviewSaveLeaseCoordinatorV1;
+  remoteLeases: PreviewRemoteLeaseCoordinatorV1;
   release: ProductionReleaseManifestV2;
   accountId: string;
   slot: string;
@@ -46,6 +48,7 @@ interface RetainedStorageResultV1 {
 export class RustPreviewSaveStorageV1 {
   readonly #cloud: DisposablePreviewCloudSaveV1;
   readonly #leases: DisposablePreviewSaveLeaseCoordinatorV1;
+  readonly #remoteLeases: PreviewRemoteLeaseCoordinatorV1;
   readonly #release: ProductionReleaseManifestV2;
   readonly #accountId: string;
   readonly #slot: string;
@@ -58,7 +61,8 @@ export class RustPreviewSaveStorageV1 {
 
   constructor(options: RustPreviewSaveStorageOptionsV1) {
     if (
-      !/^[a-zA-Z0-9._:-]{1,128}$/u.test(options.accountId)
+      !options.accountId.startsWith("rust-preview:")
+      || !/^[a-zA-Z0-9._:-]{1,128}$/u.test(options.accountId)
       || !/^rust-slot-[0-4]$/u.test(options.slot)
       || !/^[a-zA-Z0-9._:-]{1,128}$/u.test(options.browserInstanceId)
       || (options.source != null
@@ -68,6 +72,7 @@ export class RustPreviewSaveStorageV1 {
     }
     this.#cloud = options.cloud;
     this.#leases = options.leases;
+    this.#remoteLeases = options.remoteLeases;
     this.#release = options.release;
     this.#accountId = options.accountId;
     this.#slot = options.slot;
@@ -101,7 +106,9 @@ export class RustPreviewSaveStorageV1 {
       throw new Error("Rust preview save generation is exhausted");
     }
     const lease = await this.#leases.acquire(this.#slot, this.#browserInstanceId, this.#release.release_epoch);
+    let remoteLease: PreviewRemoteLeaseV1 | null = null;
     try {
+      remoteLease = await this.#remoteLeases.acquire(this.#slot, this.#browserInstanceId);
       const payloadHash = await sha256(payload);
       const envelope: ProductionSaveEnvelopeV2 = {
         envelope_version: 2,
@@ -124,7 +131,10 @@ export class RustPreviewSaveStorageV1 {
       await validateProductionSaveEnvelopeV2(envelope, this.#release, this.#accountId, this.#slot);
       const encoded = encodeCanonicalJsonV1(envelope);
       try {
-        const revision = await this.#cloud.compareAndSwap(this.#slot, this.#cloudRevision, encoded);
+        const revision = await this.#cloud.compareAndSwap(this.#slot, this.#cloudRevision, encoded, {
+          token: remoteLease.lease_token,
+          holder: remoteLease.holder,
+        });
         this.#cloudRevision = revision;
         this.#cloudGeneration = nextGeneration;
         const readback = await this.#cloud.load(this.#slot);
@@ -152,6 +162,9 @@ export class RustPreviewSaveStorageV1 {
       return result;
     } finally {
       payload.fill(0);
+      if (remoteLease != null) {
+        await this.#remoteLeases.release(remoteLease).catch(() => undefined);
+      }
       await this.#leases.release(lease);
     }
   }
@@ -167,6 +180,7 @@ export class RustPreviewSaveStorageV1 {
     this.#retained.clear();
     this.#cloud.dispose();
     this.#leases.dispose();
+    this.#remoteLeases.dispose();
   }
 
   #assertOpen(): void {

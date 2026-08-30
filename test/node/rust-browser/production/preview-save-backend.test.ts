@@ -1,259 +1,353 @@
 /// <reference path="../../../../workers/er-save-api/src/cloudflare-workers.d.ts" />
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeCanonicalJsonV1 } from "../../../../src/rust-browser/host/message-sequencer";
-import { handleM9RustPreviewSave } from "../../../../workers/er-save-api/src/m9-production";
+import previewWorker from "../../../../workers/er-m9-preview-save/src/index";
 
-interface PreviewRow {
-  account_id: string;
-  slot: string;
-  release_id: string;
-  kernel_generation: number;
-  content_identity: string;
-  active_model_identity: string;
-  mechanics_sha256: string;
-  save_schema: number;
-  payload_sha256: string;
-  data: string;
-  revision: number;
-  created_at: number;
-  updated_at: number;
-}
+class SqliteD1 implements D1Database {
+  readonly database = new DatabaseSync(":memory:");
 
-class PreviewDatabase implements D1Database {
-  readonly rows = new Map<string, PreviewRow>();
-  readonly backups: PreviewRow[] = [];
+  constructor() {
+    const schema = readFileSync(
+      resolve(import.meta.dirname, "../../../../workers/er-m9-preview-save/schema.sql"),
+      "utf8",
+    );
+    this.database.exec("PRAGMA foreign_keys = ON");
+    this.database.exec(schema);
+  }
 
   prepare(query: string): D1PreparedStatement {
-    return new PreviewStatement(this, query);
+    return new SqliteD1Statement(this.database, query);
   }
 
   async batch<T>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
-    const results: D1Result<T>[] = [];
-    for (const statement of statements) {
-      results.push(await statement.run<T>());
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const results: D1Result<T>[] = [];
+      for (const statement of statements) {
+        results.push(await statement.run<T>());
+      }
+      this.database.exec("COMMIT");
+      return results;
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
     }
-    return results;
   }
 
-  async exec(): Promise<{ count: number; duration: number }> {
+  async exec(query: string): Promise<{ count: number; duration: number }> {
+    this.database.exec(query);
     return { count: 0, duration: 0 };
   }
 }
 
-class PreviewStatement implements D1PreparedStatement {
-  readonly #database: PreviewDatabase;
+class SqliteD1Statement implements D1PreparedStatement {
+  readonly #database: DatabaseSync;
   readonly #query: string;
-  #values: unknown[] = [];
+  #values: SQLInputValue[] = [];
 
-  constructor(database: PreviewDatabase, query: string) {
+  constructor(database: DatabaseSync, query: string) {
     this.#database = database;
     this.#query = query;
   }
 
   bind(...values: unknown[]): D1PreparedStatement {
-    this.#values = values;
+    this.#values = values.map(toSqlValue);
     return this;
   }
 
-  async first<T>(): Promise<T | null> {
-    if (!this.#query.includes("FROM rust_preview_saves")) {
+  async first<T>(column?: string): Promise<T | null> {
+    const row = this.#database.prepare(this.#query).get(...this.#values) as Record<string, unknown> | undefined;
+    if (row == null) {
       return null;
     }
-    return (this.#database.rows.get(key(String(this.#values[0]), String(this.#values[1]))) ?? null) as T | null;
+    return (column == null ? row : row[column]) as T;
   }
 
   async all<T>(): Promise<D1Result<T>> {
-    return { results: [], meta: {} };
+    const rows = this.#database.prepare(this.#query).all(...this.#values) as T[];
+    return { results: rows, meta: {} };
   }
 
   async run<T>(): Promise<D1Result<T>> {
-    if (this.#query.includes("CREATE TABLE")) {
-      return result<T>(0);
-    }
-    if (this.#query.includes("INSERT INTO rust_preview_saves")) {
-      const row = rowFromInsert(this.#values);
-      const rowKey = key(row.account_id, row.slot);
-      if (this.#database.rows.has(rowKey)) {
-        return result<T>(0);
-      }
-      this.#database.rows.set(rowKey, row);
-      return result<T>(1);
-    }
-    if (this.#query.includes("INSERT INTO rust_preview_save_backups")) {
-      const row = rowFromBackup(this.#values);
-      if (
-        !this.#database.backups.some(
-          value => value.account_id === row.account_id && value.slot === row.slot && value.revision === row.revision,
-        )
-      ) {
-        this.#database.backups.push(row);
-      }
-      return result<T>(1);
-    }
-    if (this.#query.includes("UPDATE rust_preview_saves")) {
-      const accountId = String(this.#values[10]);
-      const slot = String(this.#values[11]);
-      const existing = this.#database.rows.get(key(accountId, slot));
-      if (existing == null || existing.revision !== this.#values[12] || existing.payload_sha256 !== this.#values[13]) {
-        return result<T>(0);
-      }
-      this.#database.rows.set(key(accountId, slot), {
-        ...existing,
-        release_id: String(this.#values[0]),
-        kernel_generation: Number(this.#values[1]),
-        content_identity: String(this.#values[2]),
-        active_model_identity: String(this.#values[3]),
-        mechanics_sha256: String(this.#values[4]),
-        save_schema: Number(this.#values[5]),
-        payload_sha256: String(this.#values[6]),
-        data: String(this.#values[7]),
-        revision: Number(this.#values[8]),
-        updated_at: Number(this.#values[9]),
-      });
-      return result<T>(1);
-    }
-    throw new Error(`unexpected preview D1 statement: ${this.#query}`);
+    const result = this.#database.prepare(this.#query).run(...this.#values);
+    return { results: [], meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
   }
 
   async raw<T>(): Promise<T[]> {
-    return [];
+    return this.#database.prepare(this.#query).all(...this.#values) as T[];
   }
 }
 
-class LegacyDatabase implements D1Database {
-  prepare(): D1PreparedStatement {
-    throw new Error("legacy DB must never be accessed by the Rust preview save route");
-  }
-  async batch<T>(): Promise<D1Result<T>[]> {
-    throw new Error("legacy DB must never be accessed by the Rust preview save route");
-  }
-  async exec(): Promise<{ count: number; duration: number }> {
-    throw new Error("legacy DB must never be accessed by the Rust preview save route");
-  }
+interface TestEnv {
+  RUST_PREVIEW_DB: D1Database;
+  M9_RELEASES: { get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null> };
+  M9_RELEASE_SIGNING_PRIVATE_KEY: string;
+  M9_PREVIEW_INVITE_SECRET: string;
+  M9_PREVIEW_ONLY_WORKER: string;
+  M9_PREVIEW_HEALTH_SECRET: string;
+  M9_LEGACY_MIGRATION_ENABLED: string;
+  M9_PREVIEW_DATABASE_IDENTITY_HASH: string;
+  M9_TELEMETRY_URL: string;
+  ALLOWED_ORIGIN: string;
 }
 
-describe("M9 isolated Rust preview save backend", () => {
-  afterEach(() => vi.restoreAllMocks());
+const ORIGIN = "https://m9-r1-internal.elite-redux.pages.dev";
+const WORKER = "https://er-m9-preview-save.heraklines.workers.dev";
+const INVITE = "preview-invite-secret-000000000000";
+const DATABASE_IDENTITY = "b860cac56eb16855e2a46fc6ba2f458666f06d0ab4e04ca4c83f0e3962afd36e";
 
-  it("starts absent without legacy fallback and preserves CAS backups", async () => {
+describe("M9 capability-isolated preview save Worker", () => {
+  let database: SqliteD1;
+  let environment: TestEnv;
+
+  beforeEach(() => {
+    database = new SqliteD1();
+    environment = testEnv(database);
     vi.spyOn(globalThis.crypto.subtle, "verify").mockResolvedValue(true);
-    const preview = new PreviewDatabase();
-    const environment = env(preview);
-    const accountId = await account(7);
-    const getUrl = new URL("https://save.example/m9/rust-save?slot=rust-slot-0");
-    const missing = await handleM9RustPreviewSave(
-      request(getUrl, "GET"),
-      getUrl,
-      { uid: 7, u: "preview" },
-      environment,
-      {},
-    );
-    expect(missing.status).toBe(404);
-    expect(missing.headers.get("x-er-save-namespace")).toBe("M9_RUST_PREVIEW_V1");
+  });
 
-    const firstEnvelope = await envelope(accountId, 1, Uint8Array.of(1, 2, 3));
-    const firstBytes = canonicalText(firstEnvelope);
-    const first = await handleM9RustPreviewSave(
-      request(getUrl, "PUT", firstBytes, "*"),
-      getUrl,
-      { uid: 7, u: "preview" },
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("fails closed without the sole preview D1 capability or with a legacy DB capability", async () => {
+    const missing = { ...environment, RUST_PREVIEW_DB: undefined } as unknown as TestEnv;
+    const missingResponse = await previewWorker.fetch(new Request(`${WORKER}/api/m9/platform-context`), missing);
+    expect(missingResponse.status).toBe(503);
+
+    const forbidden = { ...environment, DB: database } as TestEnv & { DB: D1Database };
+    const forbiddenResponse = await previewWorker.fetch(new Request(`${WORKER}/api/m9/platform-context`), forbidden);
+    expect(forbiddenResponse.status).toBe(503);
+
+    const wrongIdentity = { ...environment, M9_PREVIEW_DATABASE_IDENTITY_HASH: "0".repeat(64) };
+    const wrongIdentityResponse = await previewWorker.fetch(
+      new Request(`${WORKER}/api/m9/platform-context`),
+      wrongIdentity,
+    );
+    expect(wrongIdentityResponse.status).toBe(503);
+  });
+
+  it("creates a fresh domain-separated account with every legacy import disabled", async () => {
+    const account = await bootstrap(environment);
+    expect(account.account_id).toMatch(/^rust-preview:[0-9a-f]{32}$/u);
+    expect(account.session_token).toMatch(/^[A-Za-z0-9_-]{32,}$/u);
+    expect(account.imports).toEqual({
+      legacy_save: false,
+      legacy_achievements: false,
+      legacy_unlocks: false,
+      legacy_profile: false,
+    });
+
+    const context = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/api/m9/platform-context`, account.session_token),
       environment,
-      {},
+    );
+    expect(context.status).toBe(200);
+    expect(await context.json()).toMatchObject({
+      pseudonymous_account_id: account.account_id,
+      default_save_slot: "rust-slot-0",
+      rust_save_namespace: "M9_RUST_PREVIEW_V1",
+      preview_only: true,
+      preview_database_identity_hash: DATABASE_IDENTITY,
+    });
+  });
+
+  it("signs R1 assignments only for fresh preview accounts", async () => {
+    const keys = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+    const privateKey = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keys.privateKey));
+    environment.M9_RELEASE_SIGNING_PRIVATE_KEY = base64(privateKey);
+    const account = await bootstrap(environment);
+    const response = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/api/m9/runtime-assignment`, account.session_token, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ schema_version: 1, browser_session_id: "browser-session-1" }),
+      }),
+      environment,
+    );
+    expect(response.status).toBe(200);
+    const value = (await response.json()) as {
+      payload: {
+        release_id: string;
+        authority: string;
+        cohort: string;
+        sticky_scope: { value: { pseudonymous_account_id: string } };
+      };
+    };
+    expect(value.payload).toMatchObject({
+      release_id: "release-1",
+      authority: "RUST_CANARY",
+      cohort: "R1_PREVIEW_ONLY",
+      sticky_scope: { value: { pseudonymous_account_id: account.account_id } },
+    });
+  });
+
+  it("rejects every legacy route and cannot resolve a legacy account token", async () => {
+    const account = await bootstrap(environment);
+    const legacyRoute = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/savedata/session/get`, account.session_token),
+      environment,
+    );
+    expect(legacyRoute.status).toBe(404);
+
+    const legacyIdentity = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/api/m9/platform-context`, "legacy-account-token-000000000000000000"),
+      environment,
+    );
+    expect(legacyIdentity.status).toBe(401);
+  });
+
+  it("requires a live lease, preserves CAS, and backs up before overwrite", async () => {
+    const account = await bootstrap(environment);
+    const url = `${WORKER}/api/m9/rust-save?slot=rust-slot-0`;
+    const missing = await previewWorker.fetch(saveRequest(url, account.session_token, "GET"), environment);
+    expect(missing.status).toBe(404);
+
+    const firstBody = canonicalText(await envelope(account.account_id, "rust-slot-0", 1, Uint8Array.of(1, 2, 3)));
+    const unleased = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", firstBody, "*"),
+      environment,
+    );
+    expect(unleased.status).toBe(409);
+
+    const firstLease = await acquireLease(environment, account.session_token, "rust-slot-0", "browser-a");
+    const first = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", firstBody, "*", firstLease.lease_token, "browser-a"),
+      environment,
     );
     expect(first.status).toBe(200);
     expect(first.headers.get("x-er-save-generation")).toBe("1");
-    const firstEtag = first.headers.get("etag");
-    expect(firstEtag).not.toBeNull();
+    expect(first.headers.get("x-er-preview-database-identity")).toBe(DATABASE_IDENTITY);
+    const firstEtag = first.headers.get("etag") ?? "";
 
-    const secondEnvelope = await envelope(accountId, 2, Uint8Array.of(4, 5));
-    const secondBytes = canonicalText(secondEnvelope);
-    const stale = await handleM9RustPreviewSave(
-      request(getUrl, "PUT", secondBytes, '"stale"'),
-      getUrl,
-      { uid: 7, u: "preview" },
+    const secondBody = canonicalText(await envelope(account.account_id, "rust-slot-0", 2, Uint8Array.of(4, 5)));
+    const secondLease = await acquireLease(environment, account.session_token, "rust-slot-0", "browser-a");
+    const stale = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", secondBody, '"stale"', secondLease.lease_token, "browser-a"),
       environment,
-      {},
     );
     expect(stale.status).toBe(412);
-    expect(preview.backups).toHaveLength(0);
+    expect(backupCount(database)).toBe(0);
 
-    const updated = await handleM9RustPreviewSave(
-      request(getUrl, "PUT", secondBytes, firstEtag ?? ""),
-      getUrl,
-      { uid: 7, u: "preview" },
+    const updated = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", secondBody, firstEtag, secondLease.lease_token, "browser-a"),
       environment,
-      {},
     );
     expect(updated.status).toBe(200);
     expect(updated.headers.get("x-er-save-generation")).toBe("2");
-    expect(preview.backups).toHaveLength(1);
-    expect(preview.backups[0].data).toBe(firstBytes);
+    expect(backupCount(database)).toBe(1);
+    const backup = database.database
+      .prepare("SELECT data, revision FROM rust_preview_save_backups WHERE account_id = ? AND slot = ?")
+      .get(account.account_id, "rust-slot-0") as { data: string; revision: number };
+    expect(backup).toEqual({ data: firstBody, revision: 1 });
   });
 
-  it("rejects legacy or cross-namespace envelopes without writing", async () => {
-    vi.spyOn(globalThis.crypto.subtle, "verify").mockResolvedValue(true);
-    const preview = new PreviewDatabase();
-    const environment = env(preview);
-    const accountId = await account(9);
-    const url = new URL("https://save.example/m9/rust-save?slot=rust-slot-0");
-    const value = await envelope(accountId, 1, Uint8Array.of(9));
-    const legacy = { ...value, save_namespace: "LEGACY_PRODUCTION_V1", origin_runtime: "LEGACY_TYPE_SCRIPT" };
-    const response = await handleM9RustPreviewSave(
-      request(url, "PUT", canonicalText(legacy), "*"),
-      url,
-      { uid: 9, u: "preview" },
+  it("rejects expired leases and lets exactly one concurrent first write commit", async () => {
+    const account = await bootstrap(environment);
+    const slot = "rust-slot-1";
+    const url = `${WORKER}/api/m9/rust-save?slot=${slot}`;
+    const lease = await acquireLease(environment, account.session_token, slot, "browser-race");
+    database.database
+      .prepare("UPDATE rust_preview_save_leases SET expires_at = 0 WHERE account_id = ? AND slot = ?")
+      .run(account.account_id, slot);
+    const body = canonicalText(await envelope(account.account_id, slot, 1, Uint8Array.of(8)));
+    const expired = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", body, "*", lease.lease_token, "browser-race"),
       environment,
-      {},
     );
-    expect(response.status).toBe(400);
-    expect(preview.rows.size).toBe(0);
-    const migrated = {
-      ...value,
-      migration: {
-        schema_version: 1,
-        source_runtime: "LEGACY_TYPE_SCRIPT",
-        source_schema: 1,
-        source_hash: "b".repeat(64),
-        target_runtime: "RUST",
-        target_schema: 1,
-        target_hash: value.payload_hash,
-        migrator_id: "disabled-migrator",
-        validation_digest: "c".repeat(64),
-      },
-      legacy_backup: "legacy-backup",
-    };
-    const migratedResponse = await handleM9RustPreviewSave(
-      request(url, "PUT", canonicalText(migrated), "*"),
-      url,
-      { uid: 9, u: "preview" },
+    expect(expired.status).toBe(409);
+
+    const live = await acquireLease(environment, account.session_token, slot, "browser-race");
+    const [left, right] = await Promise.all([
+      previewWorker.fetch(
+        saveRequest(url, account.session_token, "PUT", body, "*", live.lease_token, "browser-race"),
+        environment,
+      ),
+      previewWorker.fetch(
+        saveRequest(url, account.session_token, "PUT", body, "*", live.lease_token, "browser-race"),
+        environment,
+      ),
+    ]);
+    expect([left.status, right.status].sort()).toEqual([200, 409]);
+    const committed = database.database
+      .prepare("SELECT COUNT(*) AS count FROM rust_preview_saves WHERE account_id = ? AND slot = ?")
+      .get(account.account_id, slot) as { count: number };
+    expect(committed.count).toBe(1);
+  });
+
+  it("rejects cross-release identity and leaves the old value complete across retry", async () => {
+    const account = await bootstrap(environment);
+    const slot = "rust-slot-2";
+    const url = `${WORKER}/api/m9/rust-save?slot=${slot}`;
+    const lease = await acquireLease(environment, account.session_token, slot, "browser-restart");
+    const body = await envelope(account.account_id, slot, 1, Uint8Array.of(7, 7));
+    const wrong = canonicalText({
+      ...body,
+      mechanical_identity: { ...body.mechanical_identity, active_model_identity: "wrong-model" },
+    });
+    const rejected = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", wrong, "*", lease.lease_token, "browser-restart"),
       environment,
-      {},
     );
-    expect(migratedResponse.status).toBe(400);
-    expect(preview.rows.size).toBe(0);
-    const wrongMechanics = {
-      ...value,
-      mechanical_identity: { ...value.mechanical_identity, active_model_identity: "model-other" },
-    };
-    const wrongMechanicsResponse = await handleM9RustPreviewSave(
-      request(url, "PUT", canonicalText(wrongMechanics), "*"),
-      url,
-      { uid: 9, u: "preview" },
+    expect(rejected.status).toBe(400);
+    expect(saveCount(database)).toBe(0);
+
+    const valid = canonicalText(body);
+    const committed = await previewWorker.fetch(
+      saveRequest(url, account.session_token, "PUT", valid, "*", lease.lease_token, "browser-restart"),
       environment,
-      {},
     );
-    expect(wrongMechanicsResponse.status).toBe(400);
-    expect(preview.rows.size).toBe(0);
+    expect(committed.status).toBe(200);
+    const stored = database.database
+      .prepare("SELECT data, revision FROM rust_preview_saves WHERE account_id = ? AND slot = ?")
+      .get(account.account_id, slot) as { data: string; revision: number };
+    expect(stored).toEqual({ data: valid, revision: 1 });
+  });
+
+  it("forwards health events without exposing the browser preview token", async () => {
+    const account = await bootstrap(environment);
+    const forwarded: Array<{ input: string; init?: RequestInit }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        forwarded.push({ input: String(input), ...(init == null ? {} : { init }) });
+        return new Response(null, { status: 204 });
+      }),
+    );
+    const response = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/api/m9/health/event`, account.session_token, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-er-health-idempotency-key": "preview-health-1",
+        },
+        body: JSON.stringify({ schema_version: 1, event: "BOOTSTRAP_SUCCESS" }),
+      }),
+      environment,
+    );
+    expect(response.status).toBe(204);
+    expect(forwarded).toHaveLength(1);
+    expect(forwarded[0].input).toBe("https://er-telemetry.heraklines.workers.dev/m9/health/event");
+    const headers = new Headers(forwarded[0].init?.headers);
+    expect(headers.get("x-er-preview-health-authorization")).toBe(`Bearer ${"h".repeat(32)}`);
+    expect(headers.get("x-er-preview-account")).toBe(account.account_id);
+    expect(headers.get("authorization")).toBeNull();
+    expect(JSON.stringify(forwarded[0])).not.toContain(account.session_token);
   });
 });
 
-function env(preview: D1Database) {
+function testEnv(database: D1Database): TestEnv {
   const manifest = canonicalText({
     envelope_version: 1,
     key_id: "m9-prod-2026-01",
     payload: {
       release_id: "release-1",
+      channel: "INTERNAL",
       release_epoch: 1,
       save_schema: 1,
       authority_protocol: "er-coop-47",
@@ -267,44 +361,117 @@ function env(preview: D1Database) {
     },
     signature: Array.from({ length: 64 }, () => 1),
   });
+  const policy = canonicalText({
+    envelope_version: 1,
+    key_id: "m9-prod-2026-01",
+    payload: {
+      active_ring: "R1",
+      candidate_release: "release-1",
+      policy_version: 1,
+      expires_at: Date.now() + 86_400_000,
+    },
+    signature: Array.from({ length: 64 }, () => 2),
+  });
   return {
-    DB: new LegacyDatabase(),
-    M9_RUST_SAVES: preview,
+    RUST_PREVIEW_DB: database,
     M9_RELEASES: {
-      async get() {
+      async get(key: string) {
+        const value = key === "manifests/release-1.json" ? manifest : key === "policies/current.json" ? policy : null;
+        if (value == null) {
+          return null;
+        }
         return {
           async arrayBuffer() {
-            return new TextEncoder().encode(manifest).buffer;
-          },
-          async text() {
-            return manifest;
+            return new TextEncoder().encode(value).buffer;
           },
         };
       },
     },
-    M9_RELEASE_SIGNING_PRIVATE_KEY: "unused",
+    M9_RELEASE_SIGNING_PRIVATE_KEY: "u".repeat(64),
+    M9_PREVIEW_INVITE_SECRET: INVITE,
+    M9_PREVIEW_ONLY_WORKER: "true",
+    M9_PREVIEW_HEALTH_SECRET: "h".repeat(32),
+    M9_LEGACY_MIGRATION_ENABLED: "false",
+    M9_PREVIEW_DATABASE_IDENTITY_HASH: DATABASE_IDENTITY,
+    M9_TELEMETRY_URL: "https://er-telemetry.heraklines.workers.dev/m9/health/event",
+    ALLOWED_ORIGIN: ORIGIN,
   };
 }
 
-function request(url: URL, method: "GET" | "PUT", body?: string, etag?: string): Request {
-  return new Request(url, {
-    method,
-    headers: {
-      "x-er-release": "release-1",
-      "x-er-save-schema": "1",
-      "x-er-save-namespace": "M9_RUST_PREVIEW_V1",
-      ...(etag == null ? {} : { "if-match": etag }),
-    },
-    ...(body == null ? {} : { body }),
-  });
+async function bootstrap(environment: TestEnv) {
+  const response = await previewWorker.fetch(
+    new Request(`${WORKER}/api/m9/preview-account`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${INVITE}`,
+        "content-type": "application/json",
+        origin: ORIGIN,
+      },
+      body: JSON.stringify({ schema_version: 1, browser_instance_id: `test-${crypto.randomUUID()}` }),
+    }),
+    environment,
+  );
+  expect(response.status).toBe(201);
+  return (await response.json()) as {
+    account_id: string;
+    session_token: string;
+    imports: Record<string, boolean>;
+  };
 }
 
-async function envelope(accountId: string, generation: number, payload: Uint8Array) {
+async function acquireLease(
+  environment: TestEnv,
+  token: string,
+  slot: string,
+  holder: string,
+): Promise<{ lease_token: string }> {
+  const response = await previewWorker.fetch(
+    authorizedRequest(`${WORKER}/api/m9/lease`, token, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ schema_version: 1, slot, holder, duration_ms: 10_000 }),
+    }),
+    environment,
+  );
+  expect(response.status).toBe(200);
+  return (await response.json()) as { lease_token: string };
+}
+
+function authorizedRequest(url: string, token: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${token}`);
+  headers.set("origin", ORIGIN);
+  return new Request(url, { ...init, headers });
+}
+
+function saveRequest(
+  url: string,
+  token: string,
+  method: "GET" | "PUT",
+  body?: string,
+  etag?: string,
+  leaseToken?: string,
+  holder?: string,
+): Request {
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${token}`,
+    origin: ORIGIN,
+    "x-er-release": "release-1",
+    "x-er-save-schema": "1",
+    "x-er-save-namespace": "M9_RUST_PREVIEW_V1",
+    ...(etag == null ? {} : { "if-match": etag }),
+    ...(leaseToken == null ? {} : { "x-er-preview-lease": leaseToken }),
+    ...(holder == null ? {} : { "x-er-preview-holder": holder }),
+  };
+  return new Request(url, { method, headers, ...(body == null ? {} : { body }) });
+}
+
+async function envelope(accountId: string, slot: string, generation: number, payload: Uint8Array) {
   const payloadHash = await hash(payload);
   return {
     envelope_version: 2,
     save_namespace: "M9_RUST_PREVIEW_V1",
-    slot: "rust-slot-0",
+    slot,
     pseudonymous_account_id: accountId,
     cloud_generation: generation,
     origin_runtime: "RUST",
@@ -327,59 +494,43 @@ async function envelope(accountId: string, generation: number, payload: Uint8Arr
   };
 }
 
-async function account(uid: number): Promise<string> {
-  return `account-${(await hash(new TextEncoder().encode(`m9-account:${uid}`))).slice(0, 32)}`;
+function canonicalText(value: unknown): string {
+  return new TextDecoder().decode(encodeCanonicalJsonV1(value));
 }
 
 async function hash(bytes: Uint8Array): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer));
   return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
 }
-
-function canonicalText(value: unknown): string {
-  return new TextDecoder().decode(encodeCanonicalJsonV1(value));
+function base64(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes));
 }
 
-function key(accountId: string, slot: string): string {
-  return `${accountId}:${slot}`;
+function toSqlValue(value: unknown): SQLInputValue {
+  if (
+    value === null
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "bigint"
+    || value instanceof Uint8Array
+  ) {
+    return value;
+  }
+  throw new Error("preview test D1 binding received an unsupported value");
 }
 
-function result<T>(changes: number): D1Result<T> {
-  return { results: [], meta: { changes } };
+function backupCount(database: SqliteD1): number {
+  return countFromQuery(database, "SELECT COUNT(*) AS count FROM rust_preview_save_backups");
 }
 
-function rowFromInsert(values: unknown[]): PreviewRow {
-  return {
-    account_id: String(values[0]),
-    slot: String(values[1]),
-    release_id: String(values[2]),
-    kernel_generation: Number(values[3]),
-    content_identity: String(values[4]),
-    active_model_identity: String(values[5]),
-    mechanics_sha256: String(values[6]),
-    save_schema: Number(values[7]),
-    payload_sha256: String(values[8]),
-    data: String(values[9]),
-    revision: Number(values[10]),
-    created_at: Number(values[11]),
-    updated_at: Number(values[12]),
-  };
+function saveCount(database: SqliteD1): number {
+  return countFromQuery(database, "SELECT COUNT(*) AS count FROM rust_preview_saves");
 }
 
-function rowFromBackup(values: unknown[]): PreviewRow {
-  return {
-    account_id: String(values[0]),
-    slot: String(values[1]),
-    revision: Number(values[2]),
-    release_id: String(values[3]),
-    kernel_generation: Number(values[4]),
-    content_identity: String(values[5]),
-    active_model_identity: String(values[6]),
-    mechanics_sha256: String(values[7]),
-    save_schema: Number(values[8]),
-    payload_sha256: String(values[9]),
-    data: String(values[10]),
-    created_at: Number(values[11]),
-    updated_at: Number(values[12]),
-  };
+function countFromQuery(database: SqliteD1, query: string): number {
+  const value: unknown = database.database.prepare(query).get();
+  if (value == null || typeof value !== "object" || !("count" in value) || typeof value.count !== "number") {
+    throw new Error("preview test count query returned an invalid row");
+  }
+  return value.count;
 }

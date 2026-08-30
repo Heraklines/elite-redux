@@ -1,0 +1,101 @@
+name: M9 Preview Save Backup Export and Restore Drill
+
+on:
+  push:
+    branches: [ops/m9-r1-preview-validation]
+    paths:
+      - .github/workflows/m9-preview-backup-drill.yml
+      - scripts/m9-preview-backup-drill.mjs
+  workflow_dispatch:
+    inputs:
+      account_id:
+        description: Domain-separated Rust preview account ID
+        required: true
+        type: string
+      slot:
+        required: true
+        type: choice
+        options: [rust-slot-0, rust-slot-1, rust-slot-2, rust-slot-3, rust-slot-4]
+      backup_revision:
+        required: true
+        type: number
+      explicit_confirmation:
+        description: Type DRILL_M9_PREVIEW_BACKUP
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    if: github.event_name == 'workflow_dispatch' && inputs.explicit_confirmation == 'DRILL_M9_PREVIEW_BACKUP'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: m9-preview-save-worker
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate drill identity
+        run: |
+          echo '${{ inputs.account_id }}' | grep -Eq '^rust-preview:[0-9a-f]{32}$'
+          echo '${{ inputs.backup_revision }}' | grep -Eq '^[1-9][0-9]*$'
+      - name: Export immutable backup row
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves --remote \
+            --config workers/er-m9-preview-save/wrangler.toml \
+            --command "SELECT release_id,kernel_generation,content_identity,active_model_identity,mechanics_sha256,save_schema,payload_sha256,data,revision,created_at,replaced_at FROM rust_preview_save_backups WHERE account_id='${{ inputs.account_id }}' AND slot='${{ inputs.slot }}' AND revision=${{ inputs.backup_revision }}" \
+            --json > "$RUNNER_TEMP/backup.json"
+          jq -e '.[0].results | length == 1' "$RUNNER_TEMP/backup.json" > /dev/null
+          sha256sum "$RUNNER_TEMP/backup.json" > "$RUNNER_TEMP/backup.sha256"
+      - name: Prepare isolated restore drill
+        run: |
+          node scripts/m9-preview-backup-drill.mjs \
+            --mode prepare \
+            --input "$RUNNER_TEMP/backup.json" \
+            --expected "$RUNNER_TEMP/expected.json" \
+            --output "$RUNNER_TEMP/restore.sql" \
+            --cleanup "$RUNNER_TEMP/cleanup.sql" \
+            --run-id "$GITHUB_RUN_ID"
+      - name: Restore backup into disabled drill account
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves --remote \
+            --config workers/er-m9-preview-save/wrangler.toml \
+            --file "$RUNNER_TEMP/restore.sql"
+          npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves --remote \
+            --config workers/er-m9-preview-save/wrangler.toml \
+            --command "SELECT release_id,kernel_generation,content_identity,active_model_identity,mechanics_sha256,save_schema,payload_sha256,data,revision,created_at,updated_at FROM rust_preview_saves WHERE account_id='rust-preview:restore-drill-${GITHUB_RUN_ID}' AND slot='rust-slot-4'" \
+            --json > "$RUNNER_TEMP/readback.json"
+          node scripts/m9-preview-backup-drill.mjs \
+            --mode verify \
+            --input "$RUNNER_TEMP/readback.json" \
+            --expected "$RUNNER_TEMP/expected.json" \
+            > "$RUNNER_TEMP/verified.json"
+      - name: Remove disabled drill account
+        if: always()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -s "$RUNNER_TEMP/cleanup.sql" ]; then
+            npx --yes wrangler@4.127.1 d1 execute er-m9-rust-preview-saves --remote \
+              --config workers/er-m9-preview-save/wrangler.toml \
+              --file "$RUNNER_TEMP/cleanup.sql"
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m9-preview-backup-drill-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/backup.json
+            ${{ runner.temp }}/backup.sha256
+            ${{ runner.temp }}/expected.json
+            ${{ runner.temp }}/readback.json
+            ${{ runner.temp }}/verified.json
+          if-no-files-found: error
+          retention-days: 30

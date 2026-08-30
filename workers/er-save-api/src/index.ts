@@ -57,12 +57,7 @@ import {
   moderateGhostUsername,
 } from "./ghost-public-moderation";
 import { extractLeaderboardStats } from "./leaderboard-stats";
-import {
-  handleM9PlatformContext,
-  handleM9ReleaseObject,
-  handleM9RuntimeAssignment,
-  handleM9RustPreviewSave,
-} from "./m9-production";
+import { handleM9ReleaseObject } from "./m9-production";
 import {
   applyResultReport,
   finalizeExpiredLoneReport,
@@ -98,8 +93,6 @@ import { handleTelemetryIngest, type TelemetryR2Bucket } from "./telemetry";
 
 interface Env {
   DB: D1Database;
-  /** Completely isolated D1 for M9 Rust-preview saves; never aliases DB. */
-  M9_RUST_SAVES: D1Database;
   /**
    * Environment-isolated R2 bucket for the player-telemetry ML pipeline (#player-telemetry).
    * Staging and production bind different buckets. The optional type preserves fail-soft behavior
@@ -108,10 +101,6 @@ interface Env {
   TELEMETRY?: TelemetryR2Bucket;
   /** Signed M9 release manifests, rollout policy, health, and rollback directives. */
   M9_RELEASES: R2Bucket;
-  /** Ed25519 PKCS#8 private key used only for short-lived runtime assignments. */
-  M9_RELEASE_SIGNING_PRIVATE_KEY: string;
-  /** Optional comma-separated internal/preview account allowlist. */
-  M9_INTERNAL_ACCOUNTS?: string;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
   SESSION_SECRET: string;
   /** Shared only with the co-op signaling Worker; signs short-lived identity tickets. */
@@ -5819,15 +5808,6 @@ export default {
         return text("Unauthorized.", 401, cors);
       }
 
-      if (pathname === "/m9/platform-context" && method === "GET") {
-        return await handleM9PlatformContext(auth, env, cors);
-      }
-      if (pathname === "/m9/runtime-assignment" && method === "POST") {
-        return await handleM9RuntimeAssignment(request, auth, env, cors);
-      }
-      if (pathname === "/m9/rust-save" && (method === "GET" || method === "PUT")) {
-        return await handleM9RustPreviewSave(request, url, auth, env, cors);
-      }
       if (pathname === "/account/info" && method === "GET") {
         return await handleAccountInfo(auth, env, cors);
       }

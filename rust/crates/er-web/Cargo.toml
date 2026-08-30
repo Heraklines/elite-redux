@@ -8,6 +8,10 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = []
+legacy-save-migration = []
+
 [dependencies]
 er-canonical = { path = "../er-canonical" }
 er-dev-types = { path = "../er-dev-types" }

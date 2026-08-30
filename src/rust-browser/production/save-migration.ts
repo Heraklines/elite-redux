@@ -1,4 +1,4 @@
-import type { CloudSaveValueV1 } from "../adapters/cloud-save-adapter";
+import type { CloudSaveLeaseIdentityV1, CloudSaveValueV1 } from "../adapters/cloud-save-adapter";
 import type { ProductionReleaseManifestV2, ProductionSaveEnvelopeV2, SaveLeaseV1 } from "./contracts";
 import { decodeProductionSaveEnvelopeV2, validateProductionSaveEnvelopeV2 } from "./save-envelope";
 
@@ -6,7 +6,14 @@ const DATABASE = "er-m9-save-migration-v1";
 const STORE = "records";
 const MAXIMUM_SAVE_BYTES = 268_435_456;
 
-export interface RustProductionSaveMigrationBackendV1 {
+export interface RustProductionSaveRestoreBackendV1 {
+  restoreProductionSave(options: {
+    envelope: ProductionSaveEnvelopeV2;
+    release: ProductionReleaseManifestV2;
+  }): Promise<Uint8Array>;
+}
+
+export interface RustProductionSaveMigrationBackendV1 extends RustProductionSaveRestoreBackendV1 {
   migrateLegacy(options: {
     sourceBytes: Uint8Array;
     release: ProductionReleaseManifestV2;
@@ -15,15 +22,16 @@ export interface RustProductionSaveMigrationBackendV1 {
     cloudGeneration: number;
     legacyBackupReference: string;
   }): Promise<{ envelope: ProductionSaveEnvelopeV2; sessionStartBytes: Uint8Array }>;
-  restoreProductionSave(options: {
-    envelope: ProductionSaveEnvelopeV2;
-    release: ProductionReleaseManifestV2;
-  }): Promise<Uint8Array>;
 }
 
 export interface ProductionCloudSaveV1 {
   load(slot: string): Promise<CloudSaveValueV1 | null>;
-  compareAndSwap(slot: string, expectedRevision: string | null, bytes: Uint8Array): Promise<string>;
+  compareAndSwap(
+    slot: string,
+    expectedRevision: string | null,
+    bytes: Uint8Array,
+    lease?: CloudSaveLeaseIdentityV1,
+  ): Promise<string>;
 }
 export interface ProductionSaveLeaseCoordinatorV1 {
   acquire(slot: string, holder: string, generation: number): Promise<SaveLeaseV1>;
@@ -67,6 +75,11 @@ export interface ProductionSaveMigrationOptionsV1 {
   slot: string;
   browserInstanceId: string;
   evidenceStore?: ProductionMigrationEvidenceStoreV1;
+}
+
+export interface ProductionSaveRestoreOptionsV1
+  extends Omit<ProductionSaveMigrationOptionsV1, "backend" | "evidenceStore"> {
+  backend: RustProductionSaveRestoreBackendV1;
 }
 
 export async function loadOrMigrateProductionSaveV1(
@@ -129,7 +142,7 @@ export async function loadOrMigrateProductionSaveV1(
 }
 
 export async function loadRustPreviewSaveV1(
-  options: ProductionSaveMigrationOptionsV1,
+  options: ProductionSaveRestoreOptionsV1,
 ): Promise<{ envelope: ProductionSaveEnvelopeV2; sessionStartBytes: Uint8Array }> {
   const lease = await options.leases.acquire(options.slot, options.browserInstanceId, options.release.release_epoch);
   try {

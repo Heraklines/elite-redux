@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { CloudSaveValueV1 } from "../../../../src/rust-browser/adapters/cloud-save-adapter";
+import type {
+  CloudSaveLeaseIdentityV1,
+  CloudSaveValueV1,
+} from "../../../../src/rust-browser/adapters/cloud-save-adapter";
 import { encodeCanonicalJsonV1 } from "../../../../src/rust-browser/host/message-sequencer";
 import type { ProductionReleaseManifestV2, SaveLeaseV1 } from "../../../../src/rust-browser/production/contracts";
+import type {
+  PreviewRemoteLeaseCoordinatorV1,
+  PreviewRemoteLeaseV1,
+} from "../../../../src/rust-browser/production/preview-remote-lease";
 import {
   type DisposablePreviewCloudSaveV1,
   type DisposablePreviewSaveLeaseCoordinatorV1,
@@ -25,7 +32,15 @@ class PreviewCloud implements DisposablePreviewCloudSaveV1 {
     };
   }
 
-  async compareAndSwap(_slot: string, expectedRevision: string | null, bytes: Uint8Array): Promise<string> {
+  async compareAndSwap(
+    _slot: string,
+    expectedRevision: string | null,
+    bytes: Uint8Array,
+    lease?: CloudSaveLeaseIdentityV1,
+  ): Promise<string> {
+    if (lease?.holder !== "instance-preview" || lease.token.length < 16) {
+      throw new Error("test cloud requires a remote lease");
+    }
     if (expectedRevision !== this.value?.revision && !(expectedRevision == null && this.value == null)) {
       throw new Error("test cloud CAS conflict");
     }
@@ -64,17 +79,46 @@ class PreviewLeases implements DisposablePreviewSaveLeaseCoordinatorV1 {
   }
 }
 
+class PreviewRemoteLeases implements PreviewRemoteLeaseCoordinatorV1 {
+  acquired = 0;
+  released = 0;
+  disposed = false;
+
+  async acquire(slot: string, holder: string): Promise<PreviewRemoteLeaseV1> {
+    this.acquired += 1;
+    return {
+      schema_version: 1,
+      slot,
+      holder,
+      generation: this.acquired,
+      expires_at: Date.now() + 10_000,
+      lease_token: `remote-lease-token-${this.acquired}`,
+    };
+  }
+
+  async release(): Promise<void> {
+    this.released += 1;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+  }
+}
+
 describe("Rust preview production storage", () => {
   it("writes only Rust preview envelopes, readbacks, leases, and deduplicates request identities", async () => {
     const cloud = new PreviewCloud();
     const leases = new PreviewLeases();
-    const storage = createStorage(cloud, leases, null);
+    const remoteLeases = new PreviewRemoteLeases();
+    const storage = createStorage(cloud, leases, remoteLeases, null);
 
     const first = await storage.handleRequest(writeRequest(7, null, Uint8Array.of(1, 2, 3)));
     expect(JSON.parse(new TextDecoder().decode(first))).toEqual({ revision: 1 });
     expect(cloud.writes).toBe(1);
     expect(leases.acquired).toBe(1);
     expect(leases.released).toBe(1);
+    expect(remoteLeases.acquired).toBe(1);
+    expect(remoteLeases.released).toBe(1);
     const committed = JSON.parse(new TextDecoder().decode(cloud.value?.bytes)) as Record<string, unknown>;
     expect(committed).toMatchObject({
       save_namespace: "M9_RUST_PREVIEW_V1",
@@ -91,22 +135,27 @@ describe("Rust preview production storage", () => {
     expect(duplicate).toEqual(first);
     expect(cloud.writes).toBe(1);
     expect(leases.acquired).toBe(1);
+    expect(remoteLeases.acquired).toBe(1);
 
     await storage.handleRequest(writeRequest(8, 1, Uint8Array.of(4, 5)));
     expect(cloud.writes).toBe(2);
     expect(cloud.value?.generation).toBe(2);
     expect(leases.acquired).toBe(2);
     expect(leases.released).toBe(2);
+    expect(remoteLeases.acquired).toBe(2);
+    expect(remoteLeases.released).toBe(2);
 
     storage.dispose();
     expect(cloud.disposed).toBe(true);
     expect(leases.disposed).toBe(true);
+    expect(remoteLeases.disposed).toBe(true);
   });
 
   it("rejects delete/read operations and preserves a conflicting cloud frontier", async () => {
     const cloud = new PreviewCloud();
     const leases = new PreviewLeases();
-    const storage = createStorage(cloud, leases, null);
+    const remoteLeases = new PreviewRemoteLeases();
+    const storage = createStorage(cloud, leases, remoteLeases, null);
     const invalid = encodeCanonicalJsonV1({
       request_id: 1,
       operation: "DELETE",
@@ -129,13 +178,15 @@ describe("Rust preview production storage", () => {
 function createStorage(
   cloud: PreviewCloud,
   leases: PreviewLeases,
+  remoteLeases: PreviewRemoteLeases,
   source: CloudSaveValueV1 | null,
 ): RustPreviewSaveStorageV1 {
   return new RustPreviewSaveStorageV1({
     cloud,
     leases,
+    remoteLeases,
     release: release(),
-    accountId: "account-preview",
+    accountId: "rust-preview:account-preview",
     slot: "rust-slot-0",
     browserInstanceId: "instance-preview",
     source,

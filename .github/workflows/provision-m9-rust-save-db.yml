@@ -2,7 +2,7 @@ name: Provision M9 Rust Preview Save Database
 
 on:
   push:
-    branches: [arch/rust-kernel-m9-production]
+    branches: [arch/rust-kernel-m9-production, ops/m9-r1-preview-validation]
     paths: [.github/workflows/provision-m9-rust-save-db.yml]
   workflow_dispatch:
     inputs:
@@ -23,7 +23,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.explicit_confirmation == 'PROVISION_ISOLATED_M9_RUST_SAVES'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: m9-r0-workers
+    environment: m9-preview-save-worker
     steps:
       - name: Create or locate isolated Rust preview D1
         env:
@@ -48,5 +48,5 @@ jobs:
             UUID=$(jq -r .result.uuid "$RUNNER_TEMP/created.json")
           fi
           echo "$UUID" | grep -Eq '^[0-9a-f-]{36}$'
-          printf 'M9_RUST_SAVES_DATABASE_ID=%s\n' "$UUID"
+          printf 'RUST_PREVIEW_DB_DATABASE_ID=%s\n' "$UUID"
           printf 'No legacy save database or table was read or modified.\n'

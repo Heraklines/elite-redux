@@ -59,6 +59,7 @@ const GENERATION_KEYS: Readonly<Record<string, true>> = {
 export interface M9HealthEnvV1 {
   DB: D1Database;
   M9_HEALTH_TOKEN?: string;
+  M9_PREVIEW_HEALTH_SECRET?: string;
   M9_BASELINE_CLOUD_SAVE_FAILURE_BP?: string;
   M9_BASELINE_COOP_FAILURE_BP?: string;
   M9_BASELINE_INPUT_P95_MICROS?: string;
@@ -137,7 +138,8 @@ async function ingestEvent(
   env: M9HealthEnvV1,
   cors: Record<string, string>,
 ): Promise<Response> {
-  if (uid == null) {
+  const actorIdentity = authenticatedActorIdentity(request, uid, env);
+  if (actorIdentity == null) {
     return response({ error: "unauthorized" }, 401, cors);
   }
   const idempotencyKey = request.headers.get("x-er-health-idempotency-key") ?? "";
@@ -163,7 +165,7 @@ async function ingestEvent(
     return response({ error: "invalid event" }, 400, cors);
   }
   await ensureHealthTable(env.DB);
-  const sessionHash = await sha256(`m9-health-session:${uid}:${event.kernel_generation.session_id}`);
+  const sessionHash = await sha256(`m9-health-session:${actorIdentity}:${event.kernel_generation.session_id}`);
   await env.DB.prepare(
     `INSERT OR IGNORE INTO m9_health_events (
        session_hash, idempotency_key, release_id, kernel_generation, event_kind,
@@ -183,6 +185,20 @@ async function ingestEvent(
     )
     .run();
   return new Response(null, { status: 204, headers: cors });
+}
+
+function authenticatedActorIdentity(request: Request, uid: number | null, env: M9HealthEnvV1): string | null {
+  if (uid != null) {
+    return `legacy:${uid}`;
+  }
+  const previewAccount = request.headers.get("x-er-preview-account") ?? "";
+  if (
+    !/^rust-preview:[0-9a-f]{32}$/u.test(previewAccount)
+    || !constantTimeToken(request.headers.get("x-er-preview-health-authorization"), env.M9_PREVIEW_HEALTH_SECRET)
+  ) {
+    return null;
+  }
+  return previewAccount;
 }
 
 async function readAggregate(
