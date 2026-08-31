@@ -1519,7 +1519,8 @@ fn map_target_selection_error(source: TargetSelectionError) -> BattleResolveErro
         | TargetSelectionError::NearOtherNotCanonical { .. }
         | TargetSelectionError::SlotOutsideCapacity { .. }
         | TargetSelectionError::SameSide { .. }
-        | TargetSelectionError::AllEnemiesNotCanonical => {
+        | TargetSelectionError::AllEnemiesNotCanonical
+        | TargetSelectionError::UnsupportedTarget { .. } => {
             map_legality_command(BattleCommandError::AdmissionSourceMismatch)
         }
     }

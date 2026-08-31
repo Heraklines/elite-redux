@@ -88,6 +88,8 @@ pub enum TargetSelectionError {
         "all-near-enemies target selection does not exactly match the canonical active opposing candidates"
     )]
     AllEnemiesNotCanonical,
+    #[error("move target {target:?} requires the GameKernelV7 target resolver")]
+    UnsupportedTarget { target: MoveTarget },
 }
 
 /// Fail-closed errors for the action-level boundary.
@@ -408,11 +410,20 @@ fn validate_targets(
     targets: &[FieldSlot],
     move_target: MoveTarget,
 ) -> Result<(), TargetSelectionError> {
+    if !matches!(
+        move_target,
+        MoveTarget::NearOther | MoveTarget::AllNearEnemies
+    ) {
+        return Err(TargetSelectionError::UnsupportedTarget {
+            target: move_target,
+        });
+    }
     let actor_side = source_slot.side;
     if targets.is_empty() {
         return Err(match move_target {
             MoveTarget::NearOther => TargetSelectionError::Empty,
             MoveTarget::AllNearEnemies => TargetSelectionError::AllEnemiesCount,
+            target => TargetSelectionError::UnsupportedTarget { target },
         });
     }
     if move_target == MoveTarget::NearOther && targets.len() != 1 {
@@ -457,6 +468,7 @@ fn validate_targets(
                 return Err(TargetSelectionError::AllEnemiesNotCanonical);
             }
         }
+        target => return Err(TargetSelectionError::UnsupportedTarget { target }),
     }
     Ok(())
 }
@@ -474,6 +486,12 @@ fn structural_target_candidates(
     actor_slot: FieldSlot,
     target_kind: MoveTarget,
 ) -> Vec<FieldSlot> {
+    if !matches!(
+        target_kind,
+        MoveTarget::NearOther | MoveTarget::AllNearEnemies
+    ) {
+        return Vec::new();
+    }
     let mut candidates = battle
         .field
         .slots

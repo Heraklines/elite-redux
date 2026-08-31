@@ -12,3 +12,4 @@ pub mod m6;
 pub mod m7;
 pub mod m7_world;
 pub mod m9;
+pub mod m9e_full_content;

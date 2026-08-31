@@ -22,7 +22,7 @@ pub const PRESENTATION_CONTENT_SCHEMA_VERSION_V1: u32 = 1;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LevelMoveDefinitionV1 {
-    pub level: u16,
+    pub level: i16,
     pub move_id: MoveId,
 }
 
@@ -223,9 +223,11 @@ impl BootstrapContentPackV1 {
             if starter.cost == 0
                 || starter.cost > self.maximum_starter_cost
                 || starter.level_moves.is_empty()
-                || starter.level_moves.windows(2).any(|pair| {
-                    (pair[0].level, pair[0].move_id) >= (pair[1].level, pair[1].move_id)
-                })
+                || starter
+                    .level_moves
+                    .iter()
+                    .enumerate()
+                    .any(|(index, value)| starter.level_moves[index + 1..].contains(value))
                 || species.form_ids.iter().all(|form| {
                     form.as_str()
                         != format!("{}:{}", starter.species_id.get().get(), starter.form_index)

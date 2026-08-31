@@ -688,16 +688,30 @@ fn legal_target_selections(
     definition: &MoveDefinition,
 ) -> Vec<BattleTargetSelection> {
     let candidates = canonical_target_candidates(battle, actor_slot, definition.target);
-    match definition.target {
-        MoveTarget::NearOther if candidates.len() == 1 => {
-            vec![BattleTargetSelection::Implicit]
-        }
-        MoveTarget::NearOther => candidates
-            .into_iter()
-            .map(|target| BattleTargetSelection::Selected(vec![target]))
-            .collect(),
-        MoveTarget::AllNearEnemies if candidates.is_empty() => Vec::new(),
-        MoveTarget::AllNearEnemies => vec![BattleTargetSelection::Selected(candidates)],
+    if matches!(
+        definition.target,
+        MoveTarget::UserSide
+            | MoveTarget::EnemySide
+            | MoveTarget::BothSides
+            | MoveTarget::Party
+            | MoveTarget::Curse
+    ) {
+        return vec![BattleTargetSelection::Implicit];
+    }
+    if single_target_kind(definition.target) {
+        return match candidates.as_slice() {
+            [] => Vec::new(),
+            [_] => vec![BattleTargetSelection::Implicit],
+            _ => candidates
+                .into_iter()
+                .map(|target| BattleTargetSelection::Selected(vec![target]))
+                .collect(),
+        };
+    }
+    if candidates.is_empty() {
+        Vec::new()
+    } else {
+        vec![BattleTargetSelection::Selected(candidates)]
     }
 }
 
@@ -711,13 +725,33 @@ pub(crate) fn canonical_target_candidates(
         .slots
         .iter()
         .filter_map(|entry| {
-            if entry.slot == actor_slot
-                || !slot_within_format_capacity(battle, entry.slot)
-                || !are_adjacent(battle, actor_slot, entry.slot)
-            {
+            if !slot_within_format_capacity(battle, entry.slot) {
                 return None;
             }
-            if target_kind == MoveTarget::AllNearEnemies && entry.slot.side == actor_slot.side {
+            let is_actor = entry.slot == actor_slot;
+            let same_side = entry.slot.side == actor_slot.side;
+            let near = is_actor || are_adjacent(battle, actor_slot, entry.slot);
+            let allowed = match target_kind {
+                MoveTarget::User => is_actor,
+                MoveTarget::Other | MoveTarget::AllOthers => !is_actor,
+                MoveTarget::NearOther | MoveTarget::AllNearOthers => !is_actor && near,
+                MoveTarget::NearEnemy
+                | MoveTarget::AllNearEnemies
+                | MoveTarget::RandomNearEnemy => !same_side && near,
+                MoveTarget::AllEnemies => !same_side,
+                MoveTarget::Attacker => !is_actor,
+                MoveTarget::NearAlly => same_side && !is_actor && near,
+                MoveTarget::Ally => same_side && !is_actor,
+                MoveTarget::UserOrNearAlly => same_side && near,
+                MoveTarget::UserAndAllies => same_side,
+                MoveTarget::All => true,
+                MoveTarget::UserSide
+                | MoveTarget::EnemySide
+                | MoveTarget::BothSides
+                | MoveTarget::Party
+                | MoveTarget::Curse => false,
+            };
+            if !allowed {
                 return None;
             }
             let occupant = entry.occupant?;
@@ -727,6 +761,21 @@ pub(crate) fn canonical_target_candidates(
         .collect::<Vec<_>>();
     candidates.sort_unstable();
     candidates
+}
+
+const fn single_target_kind(target: MoveTarget) -> bool {
+    matches!(
+        target,
+        MoveTarget::User
+            | MoveTarget::Other
+            | MoveTarget::NearOther
+            | MoveTarget::NearEnemy
+            | MoveTarget::RandomNearEnemy
+            | MoveTarget::Attacker
+            | MoveTarget::NearAlly
+            | MoveTarget::Ally
+            | MoveTarget::UserOrNearAlly
+    )
 }
 
 fn slot_within_format_capacity(battle: &BattleState, slot: FieldSlot) -> bool {

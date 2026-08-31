@@ -345,7 +345,7 @@ pub struct TypeChartEntry {
     pub multiplier: SingleTypeMultiplier,
 }
 
-/// Errors raised when a selected type chart is malformed or not exact.
+/// Errors raised when a selected or complete type chart is malformed.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum TypeChartError {
     #[error("expected {expected} type-chart entries, found {actual}")]
@@ -364,7 +364,7 @@ pub enum TypeChartError {
     DefinitionMismatch,
 }
 
-/// The exact selected non-neutral type chart.
+/// Canonically ordered non-neutral type effectiveness entries.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TypeChart {
@@ -372,19 +372,20 @@ pub struct TypeChart {
 }
 
 impl TypeChart {
-    /// Constructs and validates the exact selected non-neutral table.
+    /// Constructs and validates either the frozen selected chart or the complete chart.
     pub fn new(entries: Vec<TypeChartEntry>) -> Result<Self, TypeChartError> {
         let chart = Self { entries };
         chart.validate()?;
         Ok(chart)
     }
 
-    /// Validates non-neutrality, uniqueness, canonical order, and exact values.
+    /// Validates non-neutrality, uniqueness, canonical order, and scope-specific closure.
     pub fn validate(&self) -> Result<(), TypeChartError> {
-        let expected = canonical_type_chart_entries();
-        if self.entries.len() != expected.len() {
+        let selected = canonical_type_chart_entries();
+        const COMPLETE_ENTRY_COUNT: usize = 120;
+        if self.entries.len() != selected.len() && self.entries.len() != COMPLETE_ENTRY_COUNT {
             return Err(TypeChartError::WrongLength {
-                expected: expected.len(),
+                expected: selected.len(),
                 actual: self.entries.len(),
             });
         }
@@ -410,7 +411,7 @@ impl TypeChart {
             }
         }
 
-        if self.entries != expected {
+        if self.entries.len() == selected.len() && self.entries != selected {
             return Err(TypeChartError::DefinitionMismatch);
         }
         Ok(())
