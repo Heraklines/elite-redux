@@ -54,10 +54,21 @@ jobs:
               repo: context.repo.repo,
               run_id: Number('${{ inputs.g52_run_id }}'),
             });
-            if (run.data.head_sha !== '${{ inputs.platform_sha }}'
-                || run.data.conclusion !== 'success'
-                || run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
-              core.setFailed('M9 preview source lacks exact successful G52 evidence');
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.data.id,
+              per_page: 100,
+            });
+            const binding = jobs.filter(job => job.name === 'candidate-binding');
+            const regression = jobs.filter(job => job.name === 'rust-regression');
+            if (run.data.conclusion !== 'success'
+                || run.data.name !== 'Rust Kernel M9 G52 Production Qualification'
+                || regression.length !== 1
+                || regression[0].conclusion !== 'success'
+                || (run.data.head_sha !== '${{ inputs.platform_sha }}'
+                  && (binding.length !== 1 || binding[0].conclusion !== 'success'))) {
+              core.setFailed('M9 preview source lacks bound successful G52 evidence');
             }
       - name: Download and verify signed release shell
         env:
