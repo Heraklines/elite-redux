@@ -200,8 +200,18 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/m9-rust-correctness"
           START_MS=$(date +%s%3N)
+          cargo test --locked -p er-sim --test m2_network \
+            all_faults_compose_deterministically_with_reconnect_staleness -- --exact
+          cargo test --locked -p er-sim --test m3_raw_key_local \
+            raw_singles_complete_a_real_turn_and_settle_every_presentation -- --exact
+          cargo test --locked -p er-sim --test m4_raw_key_local \
+            physical_keys_commit_crossroads_and_select_biome -- --exact
+          CONTRACTS_DONE_MS=$(date +%s%3N)
           cargo test --workspace --locked --lib --bins --tests -- \
-            --skip m3_audited_production_surface_matches_frozen_manifest
+            --skip m3_audited_production_surface_matches_frozen_manifest \
+            --skip all_faults_compose_deterministically_with_reconnect_staleness \
+            --skip raw_singles_complete_a_real_turn_and_settle_every_presentation \
+            --skip physical_keys_commit_crossroads_and_select_biome
           TESTS_DONE_MS=$(date +%s%3N)
           cargo test --workspace --locked --doc
           DOCS_DONE_MS=$(date +%s%3N)
@@ -211,12 +221,14 @@ jobs:
             --arg candidate "${{ inputs.candidate_sha }}" \
             --arg deps_cache_hit "$DEPS_CACHE_HIT" \
             --arg target_cache_hit "$TARGET_CACHE_HIT" \
-            --argjson tests_ms "$((TESTS_DONE_MS - START_MS))" \
+            --argjson benchmark_contracts_ms "$((CONTRACTS_DONE_MS - START_MS))" \
+            --argjson tests_ms "$((TESTS_DONE_MS - CONTRACTS_DONE_MS))" \
             --argjson doctests_ms "$((DOCS_DONE_MS - TESTS_DONE_MS))" \
             --argjson examples_ms "$((END_MS - DOCS_DONE_MS))" \
             --argjson total_ms "$((END_MS - START_MS))" \
             '{schema_version:1,candidate_sha:$candidate,profile:"test",target:"x86_64-unknown-linux-gnu",
               dependency_cache_hit:$deps_cache_hit,compiled_cache_hit:$target_cache_hit,
+              benchmark_contract_tests:3,benchmark_contracts_ms:$benchmark_contracts_ms,
               correctness_tests_ms:$tests_ms,doctests_ms:$doctests_ms,example_check_ms:$examples_ms,total_ms:$total_ms}' \
             > "$RUNNER_TEMP/m9-rust-correctness/timing.json"
       - uses: actions/upload-artifact@v6
