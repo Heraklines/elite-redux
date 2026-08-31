@@ -179,6 +179,9 @@
       5025
     ]
   },
+  "SPECIES_FALINKS_CONVERGENT": {
+    "ability2": 116
+  },
   "SPECIES_FLYGON_REDUX_B": {
     "hidden": 26,
     "innates": [
