@@ -234,7 +234,7 @@
         "prerequisiteHooks": []
       }
     ],
-    "description": "Describe the complete battle effect.",
+    "description": "Trigger 50 BP Steam Eruption after landing a fire or water move.",
     "flags": {},
     "generation": 9,
     "id": 20018,
