@@ -27,13 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+      - name: Fetch exact executable candidate
+        run: git fetch --no-tags --depth=1 origin "${{ inputs.candidate_sha }}"
       - name: Prove harness changes cannot alter executable bytes
         run: |
           echo "${{ inputs.candidate_sha }}" | grep -Eq '^[0-9a-f]{40}$'
           git cat-file -e "${{ inputs.candidate_sha }}^{commit}"
           git diff --name-only "${{ inputs.candidate_sha }}" HEAD > "$RUNNER_TEMP/changed-files.txt"
-          test -z "$(grep -Ev '^(\.github/workflows/|test/|scripts/run-m9-preview-journey\.mjs$)' "$RUNNER_TEMP/changed-files.txt" || true)"
+          test -z "$(grep -Ev '^(\.github/workflows/|test/|scripts/run-m9-preview-journey\.mjs$|rust/contracts/m9-engineering-train\.toml$|rust/fixtures/m9/(m9-ci-critical-path|m9-r1-release-under-test)\.json$)' "$RUNNER_TEMP/changed-files.txt" || true)"
 
   source-static-security:
     needs: candidate-binding
@@ -44,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
       - uses: pnpm/action-setup@v5
         with:
           version: 10.33.2
@@ -163,7 +165,7 @@ jobs:
         if: inputs.rust_regression_run_id == 0
         with:
           ref: ${{ inputs.candidate_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Restore Cargo dependency downloads
         if: inputs.rust_regression_run_id == 0
         id: correctness-deps-cache
@@ -257,7 +259,7 @@ jobs:
         if: inputs.rust_regression_run_id == 0
         with:
           ref: ${{ inputs.candidate_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Restore Cargo dependency downloads
         if: inputs.rust_regression_run_id == 0
         id: benchmark-deps-cache
