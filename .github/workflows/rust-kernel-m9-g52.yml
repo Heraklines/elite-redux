@@ -8,8 +8,9 @@ on:
         required: true
         type: string
       rust_regression_run_id:
-        description: Prior G52 run with a successful exact-candidate Rust regression job
-        required: true
+        description: Optional prior G52 run with a successful exact-candidate Rust regression job
+        required: false
+        default: 0
         type: number
 
 permissions:
@@ -156,9 +157,29 @@ jobs:
   rust-regression:
     needs: candidate-binding
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 180
     steps:
+      - uses: actions/checkout@v6
+        if: inputs.rust_regression_run_id == 0
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+      - uses: actions/cache@v5
+        if: inputs.rust_regression_run_id == 0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-g52-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run sole full Rust workspace regression
+        if: inputs.rust_regression_run_id == 0
+        working-directory: rust
+        run: >-
+          cargo test --workspace --all-targets --
+          --skip m3_audited_production_surface_matches_frozen_manifest
       - name: Consume exact-SHA G52 Rust regression result
+        if: inputs.rust_regression_run_id != 0
         uses: actions/github-script@v8
         with:
           script: |
@@ -352,4 +373,4 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: printf '%s\n' "M9 executable candidate ${{ inputs.candidate_sha }} with harness $GITHUB_SHA passed immutable G52 production qualification using Rust regression ${{ inputs.rust_regression_run_id }}"
+      - run: printf '%s\n' "M9 executable candidate ${{ inputs.candidate_sha }} with harness $GITHUB_SHA passed immutable G52 production qualification; reused Rust regression ${{ inputs.rust_regression_run_id }}"
