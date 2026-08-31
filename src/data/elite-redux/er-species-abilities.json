@@ -9,9 +9,12 @@
     ]
   },
   "SPECIES_ALTARIA_MEGA": {
+    "ability1": 20013,
+    "ability2": 20013,
+    "hidden": 20013,
     "innates": [
       20012,
-      5382,
+      144,
       5391
     ]
   },
