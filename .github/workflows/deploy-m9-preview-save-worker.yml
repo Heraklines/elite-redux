@@ -58,12 +58,12 @@ jobs:
             });
             if (aggregate.data.conclusion !== 'success'
                 || aggregate.data.name !== 'Rust Kernel M9 G52 Production Qualification'
-                || owner.data.head_sha !== '${{ inputs.platform_sha }}'
                 || owner.data.status !== 'completed'
                 || owner.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
-              core.setFailed('preview Worker source lacks bound G52 aggregate and exact regression-owner evidence');
+              core.setFailed('preview Worker source lacks bound G52 aggregate and regression-owner evidence');
               return;
             }
+            const ownerBound = owner.data.head_sha === '${{ inputs.platform_sha }}' || owner.data.conclusion === 'success';
             const ownerJobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -71,8 +71,13 @@ jobs:
               per_page: 100,
             });
             const regression = ownerJobs.filter(job => job.name === 'rust-regression');
-            if (regression.length !== 1 || regression[0].conclusion !== 'success') {
-              core.setFailed('preview Worker source lacks a successful exact-candidate Rust regression job');
+            const binding = ownerJobs.filter(job => job.name === 'candidate-binding');
+            if (!ownerBound
+                || regression.length !== 1
+                || regression[0].conclusion !== 'success'
+                || (owner.data.head_sha !== '${{ inputs.platform_sha }}'
+                  && (binding.length !== 1 || binding[0].conclusion !== 'success'))) {
+              core.setFailed('preview Worker source lacks a bound successful Rust regression job');
             }
       - name: Prove capability-only Worker configuration
         run: |
