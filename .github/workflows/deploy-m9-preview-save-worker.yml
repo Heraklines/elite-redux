@@ -7,16 +7,29 @@ on:
   workflow_dispatch:
     inputs:
       platform_sha:
-        description: Exact G52-qualified preview platform source SHA
+        description: Exact preview platform source SHA
         required: true
         type: string
-      g52_run_id:
-        description: Exact successful G52 run for platform_sha
+      qualification_mode:
+        description: G52 for qualified deployment; FOCUSED_PREQUAL for isolated live-browser validation
         required: true
+        default: G52
+        type: choice
+        options: [G52, FOCUSED_PREQUAL]
+      focused_run_id:
+        description: Exact candidate focused run; required for FOCUSED_PREQUAL
+        required: false
+        default: 0
+        type: number
+      g52_run_id:
+        description: Successful G52 aggregate run; required for G52
+        required: false
+        default: 0
         type: number
       rust_regression_run_id:
-        description: Exact-candidate G52 run that owns the successful Rust regression job
-        required: true
+        description: G52 run that owns the successful Rust regression job; required for G52
+        required: false
+        default: 0
         type: number
       explicit_confirmation:
         description: Type DEPLOY_M9_PREVIEW_ONLY_SAVE_WORKER
@@ -46,6 +59,37 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
+            if ('${{ inputs.qualification_mode }}' === 'FOCUSED_PREQUAL') {
+              const focused = await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: Number('${{ inputs.focused_run_id }}'),
+              });
+              if (focused.data.name !== 'M9 Preview Focused Qualification'
+                  || focused.data.head_sha !== '${{ inputs.platform_sha }}'
+                  || focused.data.status !== 'completed') {
+                core.setFailed('preview Worker prequalification lacks an exact completed focused run');
+                return;
+              }
+              const focusedJobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: focused.data.id,
+                per_page: 100,
+              });
+              for (const required of [
+                'preview-static',
+                'candidate-source-bundle',
+                'immutable-release-inspection',
+                'browser-save-reload',
+              ]) {
+                const matches = focusedJobs.filter(job => job.name === required);
+                if (matches.length !== 1 || matches[0].conclusion !== 'success') {
+                  core.setFailed(`preview Worker prequalification job ${required} is missing or non-successful`);
+                }
+              }
+              return;
+            }
             const aggregate = await github.rest.actions.getWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
