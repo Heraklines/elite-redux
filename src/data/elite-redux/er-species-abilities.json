@@ -218,6 +218,16 @@
       29
     ]
   },
+  "SPECIES_GARCHOMP_MEGA_REDUX": {
+    "ability1": 20016,
+    "ability2": 20016,
+    "hidden": 20016,
+    "innates": [
+      20017,
+      5096,
+      5301
+    ]
+  },
   "SPECIES_GARDEVOIR_MEGA": {
     "ability1": 5625,
     "ability2": 5625,
