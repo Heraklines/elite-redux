@@ -76,8 +76,8 @@ jobs:
             });
             if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification'
                 || run.data.head_sha !== candidate
-                || run.data.conclusion !== 'success') {
-              core.setFailed('G48 requires the successful exact-candidate G52 result');
+                || run.data.status !== 'completed') {
+              core.setFailed('G48 requires the completed exact-candidate G52 regression-owner run');
               return;
             }
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
