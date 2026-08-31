@@ -275,9 +275,6 @@ async function forwardHealthEvent(
   try {
     response = await env.M9_TELEMETRY.fetch(telemetryEventUrl, {
       method: "POST",
-      cache: "no-store",
-      credentials: "omit",
-      redirect: "error",
       headers: {
         "content-type": "application/json",
         "x-er-health-idempotency-key": idempotencyKey,

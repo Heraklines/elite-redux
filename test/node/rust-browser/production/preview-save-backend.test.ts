@@ -344,6 +344,9 @@ describe("M9 capability-isolated preview save Worker", () => {
     expect(headers.get("x-er-preview-health-authorization")).toBe(`Bearer ${"h".repeat(32)}`);
     expect(headers.get("x-er-preview-account")).toBe(account.account_id);
     expect(headers.get("authorization")).toBeNull();
+    expect(forwarded[0].init).not.toHaveProperty("cache");
+    expect(forwarded[0].init).not.toHaveProperty("credentials");
+    expect(forwarded[0].init).not.toHaveProperty("redirect");
     environment.M9_TELEMETRY = {
       async fetch() {
         throw new TypeError("service unavailable");
