@@ -6,6 +6,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_render_model::PresentationSceneV1;
+use er_types::battle_ids::BattlePresentationEventId;
+use er_types::battle_ui::PresentationSettlementOutcome;
+use er_types::{KernelInput, SeatId};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -300,6 +303,32 @@ impl PresentationGenerationFenceV1 {
         Ok(())
     }
 
+    pub fn begin_kernel_event(
+        &mut self,
+        generation: u64,
+        event_id: &BattlePresentationEventId,
+    ) -> Result<(), RendererErrorV2> {
+        self.begin(generation, kernel_event_key(event_id))
+    }
+
+    pub fn settle_kernel_event(
+        &mut self,
+        generation: u64,
+        endpoint: SeatId,
+        event_id: BattlePresentationEventId,
+        outcome: PresentationSettlementOutcome,
+    ) -> Result<KernelInput, RendererErrorV2> {
+        outcome
+            .validate()
+            .map_err(|_| RendererErrorV2::InvalidSettlement)?;
+        self.settle(generation, &kernel_event_key(&event_id))?;
+        Ok(KernelInput::BattlePresentationOutcome {
+            endpoint,
+            event_id,
+            outcome,
+        })
+    }
+
     pub fn advance(&mut self, next_generation: u64) -> Result<(), RendererErrorV2> {
         if !self.pending.is_empty()
             || next_generation
@@ -331,10 +360,20 @@ pub enum RendererErrorV2 {
     Encoding,
     #[error("presentation generation fence rejected the operation")]
     PresentationFence,
+    #[error("presentation settlement outcome is invalid")]
+    InvalidSettlement,
 }
 
 pub fn scene_generation_from_presentation_v1(scene: &PresentationSceneV1) -> u64 {
     scene.generation
+}
+
+fn kernel_event_key(event_id: &BattlePresentationEventId) -> String {
+    format!(
+        "{}/{}",
+        event_id.operation_id.as_str(),
+        event_id.sequence.get()
+    )
 }
 
 fn validate_scene(scene: &RenderSceneV2) -> Result<(), RendererErrorV2> {
@@ -503,5 +542,45 @@ mod tests {
         );
         fence.settle(7, "event:1").expect("settlement succeeds");
         fence.advance(8).expect("advance succeeds");
+    }
+
+    #[test]
+    fn generation_fence_emits_the_real_kernel_settlement_input() {
+        let endpoint = SeatId::new(er_types::SafeU53::new(1).expect("seat is safe"));
+        let event_id = BattlePresentationEventId::new(
+            er_types::OperationId::new("battle/1/wave/1/turn/1/result")
+                .expect("operation ID is valid"),
+            er_types::SafeU53::new(3).expect("sequence is safe"),
+        );
+        let mut fence = PresentationGenerationFenceV1::new(9);
+        fence
+            .begin_kernel_event(9, &event_id)
+            .expect("kernel event begins");
+
+        assert_eq!(
+            fence.settle_kernel_event(
+                8,
+                endpoint,
+                event_id.clone(),
+                PresentationSettlementOutcome::Settled,
+            ),
+            Err(RendererErrorV2::PresentationFence)
+        );
+        let input = fence
+            .settle_kernel_event(
+                9,
+                endpoint,
+                event_id.clone(),
+                PresentationSettlementOutcome::Settled,
+            )
+            .expect("current generation settles");
+        assert_eq!(
+            input,
+            KernelInput::BattlePresentationOutcome {
+                endpoint,
+                event_id,
+                outcome: PresentationSettlementOutcome::Settled,
+            }
+        );
     }
 }

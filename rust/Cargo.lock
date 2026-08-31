@@ -543,6 +543,7 @@ name = "er-renderer"
 version = "0.1.0"
 dependencies = [
  "er-render-model",
+ "er-types",
  "serde",
  "serde_json",
  "sha2",
