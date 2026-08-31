@@ -472,6 +472,13 @@
       118
     ]
   },
+  "SPECIES_VOLCANION": {
+    "innates": [
+      5114,
+      5369,
+      18
+    ]
+  },
   "SPECIES_YVELTAL_MEGA": {
     "ability1": 5144,
     "ability2": 5144,
