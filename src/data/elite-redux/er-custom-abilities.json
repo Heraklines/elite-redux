@@ -194,6 +194,57 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-19": {
+    "componentRules": [
+      {
+        "chance": 100,
+        "conditionLogic": "all",
+        "conditions": [],
+        "effects": [
+          {
+            "abilityId": 5489,
+            "attrIndex": 0,
+            "attrType": "PostAttackScriptedMoveAbAttr",
+            "parameterOverrides": {
+              "opts.moveId": 592,
+              "opts.typeFilter": [
+                9
+              ]
+            }
+          },
+          {
+            "abilityId": 5673,
+            "attrIndex": 0,
+            "attrType": "PostAttackScriptedMoveAbAttr",
+            "parameterOverrides": {
+              "opts.moveId": 592,
+              "opts.power": 50,
+              "opts.typeFilter": [
+                10
+              ]
+            }
+          }
+        ],
+        "hook": {
+          "abilityId": 5161,
+          "attrIndex": 0,
+          "attrType": "AbsorbantAbAttr"
+        },
+        "key": "component-1",
+        "prerequisiteHooks": []
+      }
+    ],
+    "description": "Describe the complete battle effect.",
+    "flags": {},
+    "generation": 9,
+    "id": 20018,
+    "includes": [],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "External Combustion",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
