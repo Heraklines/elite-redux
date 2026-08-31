@@ -394,6 +394,16 @@
   "SPECIES_PHANTOWL": {
     "ability2": 5123
   },
+  "SPECIES_PRIMARINA_MEGA": {
+    "ability1": 20015,
+    "ability2": 20015,
+    "hidden": 20015,
+    "innates": [
+      5154,
+      41,
+      5450
+    ]
+  },
   "SPECIES_RELICANTH_MEGA": {
     "innates": [
       20009,
