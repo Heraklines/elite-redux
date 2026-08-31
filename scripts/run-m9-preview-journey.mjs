@@ -55,7 +55,7 @@ page.on("requestfailed", request => {
 let authorization = "";
 try {
   const journeyStartedAt = Date.now();
-  const navigationStartedAt = performance.now();
+  const freshAccountStartedAt = performance.now();
   await page.goto(previewUrl.href, { waitUntil: "load", timeout: 60_000 });
   await page.locator("form[data-preview-authorization=required]").waitFor({ state: "visible", timeout: 30_000 });
   await page.locator('input[name="preview-invite"]').fill(invite);
@@ -65,9 +65,10 @@ try {
   ]);
   await page.locator("canvas").waitFor({ state: "visible", timeout: 60_000 });
   await page.waitForFunction(() => document.querySelectorAll("canvas").length === 1, undefined, { timeout: 60_000 });
+  const coldReadyMs = rounded(await page.evaluate(() => performance.now()));
+  const freshAccountBootstrapMs = rounded(performance.now() - freshAccountStartedAt);
   await waitForPreviewHealthResource(page);
   await waitForWorkerIdle(activeWorkerRequests);
-  const coldReadyMs = rounded(performance.now() - navigationStartedAt);
 
   authorization = await page.evaluate(() => {
     const value = document.cookie
@@ -231,6 +232,7 @@ try {
     active_duration_ms: Date.now() - journeyStartedAt,
     minimum_active_duration_ms: minimumActiveMs,
     cold_ready_ms: coldReadyMs,
+    fresh_account_bootstrap_ms: freshAccountBootstrapMs,
     browser_class: browserClass.includes("Chrome/") ? "CHROMIUM" : "UNKNOWN",
     platform_class: "DESKTOP",
     imports_disabled: true,
