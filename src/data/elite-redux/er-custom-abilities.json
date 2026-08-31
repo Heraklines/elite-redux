@@ -121,6 +121,22 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-15": {
+    "componentRules": [],
+    "description": "Fort Knox + Magic Guard",
+    "flags": {},
+    "generation": 9,
+    "id": 20014,
+    "includes": [
+      98,
+      5079
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Mystic Fortification",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
