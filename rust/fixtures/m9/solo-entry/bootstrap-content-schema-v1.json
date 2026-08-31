@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "schema_id": "M9_BOOTSTRAP_CONTENT_V1",
+  "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "target_game_content_bundle_schema_version": 2,
+  "canonical_order": [
+    "mode_id",
+    "species_id",
+    "form_index",
+    "ability_index",
+    "move_slot"
+  ],
+  "bootstrap_content": {
+    "mode_policies": {
+      "key": "mode_id",
+      "fields": [
+        "mode_id",
+        "supported",
+        "cooperative",
+        "challenge_selection",
+        "starting_level",
+        "maximum_starter_cost",
+        "maximum_starters",
+        "starting_biome_id",
+        "starting_route_id",
+        "starting_money"
+      ]
+    },
+    "starters": {
+      "key": [
+        "species_id",
+        "form_index"
+      ],
+      "fields": [
+        "species_id",
+        "form_index",
+        "starter_cost",
+        "typing",
+        "base_stats",
+        "active_ability_id",
+        "passive_ability_ids",
+        "level_moves"
+      ]
+    },
+    "level_move": {
+      "fields": [
+        "learn_level",
+        "move_id"
+      ],
+      "ordering": [
+        "learn_level",
+        "move_id"
+      ]
+    },
+    "initial_loadout": {
+      "fields": [
+        "species_id",
+        "form_index",
+        "level",
+        "ability_index",
+        "move_ids"
+      ],
+      "maximum_moves": 4,
+      "selection_policy": "PINNED_TYPESCRIPT_GENERATE_MOVESET_ORACLE",
+      "rng_stream": "RUN",
+      "unsupported_behavior": "FAIL_INITIALIZATION"
+    }
+  },
+  "typescript_oracle_sources": [
+    {
+      "path": "src/data/balance/starters.ts",
+      "exports": [
+        "speciesStarterCosts"
+      ],
+      "maps_to": "starters.starter_cost"
+    },
+    {
+      "path": "src/data/balance/pokemon-level-moves.ts",
+      "exports": [
+        "pokemonSpeciesLevelMoves",
+        "pokemonFormLevelMoves"
+      ],
+      "maps_to": "starters.level_moves"
+    },
+    {
+      "path": "src/data/pokemon-species.ts",
+      "exports": [
+        "PokemonSpecies",
+        "PokemonSpeciesForm"
+      ],
+      "maps_to": "starters.typing, starters.base_stats, starters ability slots and form identity"
+    },
+    {
+      "path": "src/ai/ai-moveset-gen.ts",
+      "exports": [
+        "generateMoveset"
+      ],
+      "maps_to": "initial_loadout.selection_policy and RNG audit"
+    },
+    {
+      "path": "src/field/pokemon.ts",
+      "exports": [
+        "Pokemon.generateAndPopulateMoveset",
+        "Pokemon.getLevelMoves"
+      ],
+      "maps_to": "initial loadout construction order"
+    },
+    {
+      "path": "src/data/daily-seed/daily-run.ts",
+      "exports": [
+        "DailyRunStartersEvent"
+      ],
+      "maps_to": "mode-specific starting level and generated starter policy"
+    }
+  ],
+  "platform_owned_fields": [
+    "save_slots",
+    "automatic_coop_save_slot",
+    "local_is_host"
+  ],
+  "required_oracle_fixture_fields": [
+    "input_profile_digest",
+    "seed",
+    "raw_key_events",
+    "selections",
+    "rng_draws",
+    "initial_party",
+    "initial_control",
+    "initial_state_digest"
+  ],
+  "capability_policy": {
+    "reachable_species_must_be_present": true,
+    "reachable_moves_must_be_present": true,
+    "reachable_abilities_must_be_present": true,
+    "missing_learnset_fails_initialization": true,
+    "unsupported_move_or_ability_fails_initialization": true
+  }
+}
