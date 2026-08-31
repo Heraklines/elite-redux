@@ -539,6 +539,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-renderer"
+version = "0.1.0"
+dependencies = [
+ "er-render-model",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "er-repro"
 version = "0.1.0"
 dependencies = [
