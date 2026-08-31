@@ -1,13 +1,20 @@
 name: Rust Kernel M9 G49 Release Control
 
 on:
-  push:
-    branches: [arch/rust-kernel-m9-production]
   workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact executable candidate already exercised by G52
+        required: true
+        type: string
+      g52_run_id:
+        description: Successful exact-SHA G52 run that owns the full Rust workspace regression
+        required: true
+        type: number
 
 permissions:
+  actions: read
   contents: read
-
 concurrency:
   group: rust-kernel-m9-g49-${{ github.ref }}
   cancel-in-progress: false
@@ -21,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.candidate_sha }}
           fetch-depth: 0
       - uses: pnpm/action-setup@v5
         with:
@@ -76,6 +84,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v5
         with:
           version: 10.33.2
@@ -97,24 +108,41 @@ jobs:
 
   inherited-regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/cache@v5
+      - name: Consume exact-SHA G52 Rust regression result
+        uses: actions/github-script@v8
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            rust/target
-          key: m9-g49-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - working-directory: rust
-        run: >-
-          cargo test --workspace --all-targets --
-          --skip m3_audited_production_surface_matches_frozen_manifest
-
+          script: |
+            const candidate = '${{ inputs.candidate_sha }}';
+            if (!/^[0-9a-f]{40}$/.test(candidate)) {
+              core.setFailed('G49 candidate SHA is invalid');
+              return;
+            }
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number('${{ inputs.g52_run_id }}'),
+            });
+            if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification'
+                || run.data.head_sha !== candidate
+                || run.data.conclusion !== 'success') {
+              core.setFailed('G49 requires the successful exact-candidate G52 result');
+              return;
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.data.id,
+              per_page: 100,
+            });
+            const regression = jobs.filter(job => job.name === 'rust-regression');
+            if (regression.length !== 1 || regression[0].conclusion !== 'success') {
+              core.setFailed('G52 Rust regression result is missing or non-successful');
+            }
   g49-aggregate:
     name: M9 G49 signed release-control qualification
     needs: [release-control, production-graph, inherited-regression]
     runs-on: ubuntu-latest
     steps:
-      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed G49 signed release, assignment, pinning, cache, and legacy separation"
+      - run: printf '%s\n' "M9 exact SHA ${{ inputs.candidate_sha }} passed G49 release control and consumed G52 Rust regression ${{ inputs.g52_run_id }}"
