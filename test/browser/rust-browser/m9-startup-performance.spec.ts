@@ -120,3 +120,63 @@ test("startup stages produce bounded cold and warm distributions", async ({ page
   expect(result.errors[2]).toContain("identity or start time");
   expect(result.errors[3]).toContain("duplicated");
 });
+
+test("constrained mobile frame save and memory harness stays bounded", async ({ browser, browserName }) => {
+  test.skip(browserName !== "chromium", "CDP resource constraints are Chromium-specific");
+  const address = server.resolvedUrls?.local[0];
+  if (address == null) {
+    throw new Error("Vite did not publish the startup performance fixture");
+  }
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.goto(new URL("m9-startup-performance.html", address).href);
+  const beforeHeap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number };
+  const probe = await page.evaluate(async () => {
+    const frameTimes: number[] = [];
+    await new Promise<void>(resolveFrameProbe => {
+      const frame = (timestamp: number) => {
+        frameTimes.push(timestamp);
+        if (frameTimes.length === 30) {
+          resolveFrameProbe();
+          return;
+        }
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+    const saveBytes = new Uint8Array(1_048_576);
+    saveBytes[0] = 17;
+    saveBytes[saveBytes.length - 1] = 29;
+    const cloneStartedAt = performance.now();
+    const cloned = structuredClone(saveBytes);
+    const cloneMs = performance.now() - cloneStartedAt;
+    return {
+      frame_count: frameTimes.length,
+      maximum_frame_gap_ms: Math.max(
+        ...frameTimes.slice(1).map((timestamp, index) => timestamp - (frameTimes[index] ?? timestamp)),
+      ),
+      save_bytes: cloned.byteLength,
+      save_boundary_checksum: (cloned[0] ?? 0) + (cloned.at(-1) ?? 0),
+      save_clone_ms: cloneMs,
+    };
+  });
+  const afterHeap = (await cdp.send("Runtime.getHeapUsage")) as { usedSize: number };
+  const heapGrowthBytes = Math.max(0, afterHeap.usedSize - beforeHeap.usedSize);
+
+  expect(probe).toMatchObject({
+    frame_count: 30,
+    save_bytes: 1_048_576,
+    save_boundary_checksum: 46,
+  });
+  expect(probe.maximum_frame_gap_ms).toBeLessThan(500);
+  expect(probe.save_clone_ms).toBeLessThan(2_000);
+  expect(heapGrowthBytes).toBeLessThan(67_108_864);
+  await context.close();
+});
