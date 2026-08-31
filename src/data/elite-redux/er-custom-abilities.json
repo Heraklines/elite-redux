@@ -145,6 +145,23 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-16": {
+    "componentRules": [],
+    "description": "Presto + Liquid Voice + Amplifier",
+    "flags": {},
+    "generation": 9,
+    "id": 20015,
+    "includes": [
+      5468,
+      204,
+      5115
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Siren's Song",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
