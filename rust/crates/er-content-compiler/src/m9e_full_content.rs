@@ -11,14 +11,20 @@ use er_content::pack::m6_pack::{
 };
 use er_content::pack::{TypeChart, TypeChartEntry};
 use er_content::species::SpeciesBaseStats;
-use er_types::battle_ids::{AbilityId, MoveId, SpeciesId};
+use er_game::m7_content::PreparedGameContentV1;
+use er_game::m9e_content_v2::{
+    BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1, BootstrapContentPackV1, BootstrapModeDefinitionV2,
+    LevelMoveDefinitionV1, StarterDefinitionV2,
+};
+use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
 use er_types::battle_model::{
     EffectChance, MoveAccuracy, MoveCategory, MoveFlag, MovePower, MoveTarget, PokemonType,
     PokemonTyping, SingleTypeMultiplier,
 };
+use er_types::run_ids::BiomeId;
 use er_types::{
     BehaviorSourceId, BehaviorUnitId, BespokeMechanicId, CatalogHash, FormId, MechanicsProgramId,
-    SafeU53,
+    RunDifficultyV1, SafeU53,
 };
 use serde::Deserialize;
 use thiserror::Error;
@@ -36,6 +42,7 @@ pub const M9_ENGINEERING_ORACLE_SHA: &str = "399d5d368f0b5642ebf8f45bd8a5e73350f
 struct CompleteBattleDefinitionsV1 {
     schema_version: u32,
     oracle_sha: String,
+    modes: Vec<CompleteModeV1>,
     species: Vec<CompleteSpeciesV1>,
     moves: Vec<CompleteMoveV1>,
     abilities: Vec<CompleteAbilityV1>,
@@ -44,9 +51,29 @@ struct CompleteBattleDefinitionsV1 {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct CompleteModeV1 {
+    mode_id: u64,
+    key: String,
+    starting_level: u16,
+    starting_money: u64,
+    starting_biome_id: u64,
+    challenge_selection: bool,
+    cooperative: bool,
+    supported: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CompleteSpeciesV1 {
     species_id: u64,
     canonical_form_index: u16,
+    starter_cost: Option<u16>,
+    #[serde(rename = "growth_rate")]
+    _growth_rate: u16,
+    #[serde(rename = "catch_rate")]
+    _catch_rate: u16,
+    #[serde(rename = "base_friendship")]
+    _base_friendship: u16,
     passive_ability_ids: Vec<u64>,
     level_moves: Vec<CompleteLevelMoveV1>,
     forms: Vec<CompleteFormV1>,
@@ -245,6 +272,113 @@ pub fn build_m9_engineering_battle_pack_v1(
         },
     )
     .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))
+}
+
+pub fn build_m9_engineering_bootstrap_content_v1(
+    definitions_bytes: &[u8],
+    core: &PreparedGameContentV1,
+) -> Result<BootstrapContentPackV1, FullContentBuildErrorV1> {
+    let definitions: CompleteBattleDefinitionsV1 = serde_json::from_slice(definitions_bytes)
+        .map_err(|error| FullContentBuildErrorV1::Json(error.to_string()))?;
+    if definitions.schema_version != 1
+        || definitions.oracle_sha != M9_ENGINEERING_ORACLE_SHA
+        || core.bundle().oracle_sha.as_str() != M9_ENGINEERING_ORACLE_SHA
+        || definitions.modes.is_empty()
+    {
+        return Err(FullContentBuildErrorV1::Identity);
+    }
+    ensure_sorted_unique(definitions.modes.iter().map(|mode| mode.mode_id))?;
+    let modes = definitions
+        .modes
+        .into_iter()
+        .map(|mode| {
+            let id = GameModeId::new(
+                SafeU53::new(mode.mode_id)
+                    .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+            );
+            let route = core
+                .bundle()
+                .world
+                .modes
+                .iter()
+                .find(|candidate| candidate.id == id)
+                .map(|candidate| candidate.route)
+                .ok_or_else(|| {
+                    FullContentBuildErrorV1::Definition(format!(
+                        "world content is missing mode {}",
+                        mode.mode_id
+                    ))
+                })?;
+            Ok(BootstrapModeDefinitionV2 {
+                mode: id,
+                key: mode.key,
+                starting_level: mode.starting_level,
+                starting_money: SafeU53::new(mode.starting_money)
+                    .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+                starting_biome: BiomeId::new(
+                    SafeU53::new(mode.starting_biome_id)
+                        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+                ),
+                initial_route: route,
+                challenge_selection: mode.challenge_selection,
+                cooperative: mode.cooperative,
+                supported: mode.supported,
+            })
+        })
+        .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+    let mut starters = definitions
+        .species
+        .into_iter()
+        .filter_map(|species| {
+            species.starter_cost.map(|cost| {
+                let species_id = SpeciesId::try_from_u64(species.species_id)
+                    .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
+                let level_moves = species
+                    .level_moves
+                    .into_iter()
+                    .map(|entry| {
+                        Ok(LevelMoveDefinitionV1 {
+                            level: entry.level,
+                            move_id: MoveId::try_from_u64(entry.move_id).map_err(|error| {
+                                FullContentBuildErrorV1::Definition(error.to_string())
+                            })?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+                Ok(StarterDefinitionV2 {
+                    species_id,
+                    form_index: species.canonical_form_index,
+                    cost,
+                    ability_index: 0,
+                    level_moves,
+                })
+            })
+        })
+        .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+    starters.sort_by_key(|starter| (starter.species_id, starter.form_index));
+    let mut pack = BootstrapContentPackV1 {
+        schema_version: BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1,
+        oracle_sha: core.bundle().oracle_sha.clone(),
+        content_hash: CatalogHash::parse("0".repeat(64))
+            .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+        modes,
+        starters,
+        choices: Vec::new(),
+        difficulties: vec![
+            RunDifficultyV1::Youngster,
+            RunDifficultyV1::Ace,
+            RunDifficultyV1::Elite,
+            RunDifficultyV1::Hell,
+        ],
+        maximum_starter_cost: 10,
+        maximum_starters: 6,
+    };
+    pack.content_hash = pack
+        .recompute_hash()
+        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
+    pack.validate(core)
+        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
+    Ok(pack)
 }
 
 fn build_species(

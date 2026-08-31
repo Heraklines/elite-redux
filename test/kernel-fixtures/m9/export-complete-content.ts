@@ -1,7 +1,10 @@
+import { getGameMode } from "#app/game-mode";
+import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
 import { getTypeDamageMultiplier } from "#data/type";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
+import { GameModes } from "#enums/game-modes";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveTarget } from "#enums/move-target";
@@ -94,6 +97,10 @@ function speciesDefinitions() {
       return {
         species_id: species.speciesId,
         canonical_form_index: 0,
+        starter_cost: speciesStarterCosts[species.speciesId] ?? null,
+        growth_rate: species.growthRate,
+        catch_rate: species.catchRate,
+        base_friendship: species.baseFriendship,
         passive_ability_ids: [...species.getPassiveAbilities(0)],
         level_moves: species.getLevelMoves().map(([level, moveId]) => ({ level, move_id: moveId })),
         forms,
@@ -145,6 +152,24 @@ function typeChart() {
   }
   return entries;
 }
+function modeDefinitions() {
+  return Object.values(GameModes)
+    .filter((value): value is GameModes => typeof value === "number")
+    .map(modeId => {
+      const mode = getGameMode(modeId);
+      return {
+        mode_id: modeId,
+        key: enumName(GameModes, modeId, "game mode"),
+        starting_level: mode.getStartingLevel(),
+        starting_money: mode.getStartingMoney(),
+        starting_biome_id: mode.getStartingBiome(),
+        challenge_selection: Boolean(mode.isChallenge),
+        cooperative: Boolean(mode.isCoop),
+        supported: true,
+      };
+    })
+    .toSorted((left, right) => left.mode_id - right.mode_id);
+}
 
 test("export complete pinned battle definitions", async () => {
   if (OUTPUT == null) {
@@ -174,6 +199,7 @@ test("export complete pinned battle definitions", async () => {
   const output = {
     schema_version: 1,
     oracle_sha: ORACLE_SHA,
+    modes: modeDefinitions(),
     species: speciesDefinitions(),
     moves: moveDefinitions(),
     abilities: abilityDefinitions(),
