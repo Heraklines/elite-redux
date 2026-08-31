@@ -45,6 +45,11 @@ try {
   errors.push(String(error));
 }
 try {
+  new M9StartupJourneyRecorderV1({ journeyId: "bad-mode", mode: "HOT", startedAtMs: 0 });
+} catch (error) {
+  errors.push(String(error));
+}
+try {
   suite.add(cold);
 } catch (error) {
   errors.push(String(error));
@@ -109,8 +114,9 @@ test("startup stages produce bounded cold and warm distributions", async ({ page
     cold: { samples: 3, total: { p50_ms: 3199, p95_ms: 3200 } },
     warm: { samples: 3, total: { p50_ms: 121, p95_ms: 132 } },
   });
-  expect(result.errors).toHaveLength(3);
+  expect(result.errors).toHaveLength(4);
   expect(result.errors[0]).toContain("out of order");
   expect(result.errors[1]).toContain("invalid or unbounded");
-  expect(result.errors[2]).toContain("duplicated");
+  expect(result.errors[2]).toContain("identity or start time");
+  expect(result.errors[3]).toContain("duplicated");
 });

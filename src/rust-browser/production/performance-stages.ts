@@ -64,7 +64,11 @@ export class M9StartupJourneyRecorderV1 {
   readonly #samples: M9StartupStageSampleV1[] = [];
 
   constructor(options: { journeyId: string; mode: M9StartupModeV1; startedAtMs: number }) {
-    if (!JOURNEY_ID.test(options.journeyId) || !validTime(options.startedAtMs)) {
+    if (
+      !JOURNEY_ID.test(options.journeyId)
+      || (options.mode !== "COLD" && options.mode !== "WARM")
+      || !validTime(options.startedAtMs)
+    ) {
       throw new Error("M9 startup journey identity or start time is invalid");
     }
     this.#journeyId = options.journeyId;
@@ -133,6 +137,7 @@ function validateSnapshot(snapshot: M9StartupJourneySnapshotV1): void {
   if (
     snapshot.schema_version !== M9_STARTUP_PERFORMANCE_SCHEMA_V1
     || !JOURNEY_ID.test(snapshot.journey_id)
+    || (snapshot.mode !== "COLD" && snapshot.mode !== "WARM")
     || !validTime(snapshot.started_at_ms)
     || !validDuration(snapshot.total_ms)
     || snapshot.stages.length !== M9_STARTUP_STAGES_V1.length
@@ -191,7 +196,7 @@ function percentile(sorted: number[], percentileValue: number): number {
 }
 
 function validTime(value: number): boolean {
-  return Number.isFinite(value) && value >= 0;
+  return Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
 }
 
 function validDuration(value: number): boolean {
