@@ -36,7 +36,7 @@ pub enum M9VerticalKernelErrorV1 {
     #[error("M9 new-run material application failed: {0}")]
     Material(String),
     #[error("M9 runtime construction failed: {0}")]
-    Runtime(String),
+    KernelState(String),
 }
 
 #[derive(Clone, Debug)]
@@ -109,16 +109,16 @@ impl M9VerticalSliceKernelV1 {
                     }
                     M9VerticalControlV1::MoveSelect => {
                         let runtime = self.runtime.as_mut().ok_or_else(|| {
-                            M9VerticalKernelErrorV1::Runtime("runtime missing".to_owned())
+                            M9VerticalKernelErrorV1::KernelState("runtime missing".to_owned())
                         })?;
                         let policy = self.enemy_policy.as_ref().ok_or_else(|| {
-                            M9VerticalKernelErrorV1::Runtime("enemy policy missing".to_owned())
+                            M9VerticalKernelErrorV1::KernelState("enemy policy missing".to_owned())
                         })?;
                         let prepared =
                             resolve_m9_vertical_turn(runtime, policy, self.policy_cursor)?;
                         self.policy_cursor =
                             self.policy_cursor.checked_add(1).ok_or_else(|| {
-                                M9VerticalKernelErrorV1::Runtime(
+                                M9VerticalKernelErrorV1::KernelState(
                                     "enemy policy cursor overflowed".to_owned(),
                                 )
                             })?;
@@ -131,7 +131,7 @@ impl M9VerticalSliceKernelV1 {
                     }
                     M9VerticalControlV1::Reward => {
                         let runtime = self.runtime.as_ref().ok_or_else(|| {
-                            M9VerticalKernelErrorV1::Runtime("runtime missing".to_owned())
+                            M9VerticalKernelErrorV1::KernelState("runtime missing".to_owned())
                         })?;
                         let next = settle_m9_victory_and_start_next_encounter(
                             runtime.state(),
@@ -140,13 +140,13 @@ impl M9VerticalSliceKernelV1 {
                         let policy = scripted_enemy_policy_for_m9(&next)?;
                         self.runtime =
                             Some(GameRuntimeV5::new(next, self.content.clone()).map_err(
-                                |error| M9VerticalKernelErrorV1::Runtime(error.to_string()),
+                                |error| M9VerticalKernelErrorV1::KernelState(error.to_string()),
                             )?);
                         self.enemy_policy = Some(policy);
                         self.policy_cursor = 0;
                         self.completed_battles =
                             self.completed_battles.checked_add(1).ok_or_else(|| {
-                                M9VerticalKernelErrorV1::Runtime(
+                                M9VerticalKernelErrorV1::KernelState(
                                     "completed battle count overflowed".to_owned(),
                                 )
                             })?;
@@ -201,7 +201,7 @@ impl M9VerticalSliceKernelV1 {
         let policy = scripted_enemy_policy_for_m9(&state)?;
         self.runtime = Some(
             GameRuntimeV5::new(state, self.content.clone())
-                .map_err(|error| M9VerticalKernelErrorV1::Runtime(error.to_string()))?,
+                .map_err(|error| M9VerticalKernelErrorV1::KernelState(error.to_string()))?,
         );
         self.enemy_policy = Some(policy);
         self.control = M9VerticalControlV1::CommandRoot;
