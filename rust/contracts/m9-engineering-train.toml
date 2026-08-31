@@ -1,0 +1,80 @@
+schema_version = 1
+engineering_base_sha = "e05df5b1ac881e8d8f1619e7b4faad01f4db1879"
+deployed_release_sha = "244a2c0161ebe7a7f6f686e62a99773db075cca2"
+browser_harness_sha = "d8b3ab62ce6e1618a2f46642da9b54234b955381"
+public_production_default = "UNCHANGED"
+legacy_save_access = "FORBIDDEN"
+rollout_change = "FORBIDDEN"
+
+[integration_owner]
+owner = "M9_ENGINEERING_INTEGRATOR"
+exclusive = [
+  "rust/Cargo.toml",
+  "rust/contracts/m9-engineering-train.toml",
+  "rust/fixtures/m9/m9-r1-release-under-test.json",
+  "src/rust-browser/production/configured-production-main.ts",
+  "scripts/build-kernel-m9-browser.mjs"
+]
+
+[ci_feedback]
+status = "READY_IMPLEMENTATION"
+exclusive = [
+  ".github/workflows/rust-kernel-m9-g52.yml",
+  ".github/workflows/m9-preview-focused.yml",
+  "scripts/run-m9-preview-journey.mjs",
+  "rust/fixtures/m9/m9-ci-critical-path.json"
+]
+
+[solo_entry]
+status = "READY_IMPLEMENTATION"
+exclusive = [
+  "rust/fixtures/m9/solo-entry/**",
+  "rust/crates/er-sim/tests/m9_solo_entry.rs",
+  "test/browser/rust-browser/m9-solo-entry.spec.ts"
+]
+
+[coop_entry]
+status = "READY_IMPLEMENTATION"
+exclusive = [
+  "rust/fixtures/m9/coop-entry/**",
+  "rust/crates/er-sim/tests/m9_coop_entry.rs",
+  "test/browser/rust-browser/m9-coop-entry.spec.ts"
+]
+
+[offline_save]
+status = "READY_IMPLEMENTATION"
+exclusive = [
+  "src/rust-browser/production/offline-save-state.ts",
+  "test/node/rust-browser/production/offline-save-state.test.ts",
+  "test/browser/rust-browser/m9-multipage-save.spec.ts"
+]
+
+[renderer_foundation]
+status = "READY_IMPLEMENTATION"
+exclusive = [
+  "rust/crates/er-renderer/**",
+  "rust/fixtures/m10/renderer-foundation/**"
+]
+
+[startup_performance]
+status = "READY_IMPLEMENTATION"
+exclusive = [
+  "src/rust-browser/production/performance-stages.ts",
+  "test/browser/rust-browser/m9-startup-performance.spec.ts",
+  "rust/fixtures/m9/m9-startup-performance.json"
+]
+
+[external_acceptance]
+status = "WAITING_EXTERNAL_ACCEPTANCE"
+items = [
+  "human_preview_cohort",
+  "real_observation_window"
+]
+
+[deferred_public_release]
+status = "DEFERRED_PUBLIC_RELEASE"
+items = [
+  "public_rollout",
+  "legacy_save_migration",
+  "g53_attestation"
+]

@@ -75,7 +75,9 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => server.close());
 
-test("Rust owns a complete raw-key Phaser solo run", async ({ page }, testInfo) => {
+// BRIDGE_SMOKE: proves raw input crosses the Worker/Wasm/Phaser boundary and reaches terminal UI.
+// It is not natural-start, battle, progression, reward, or campaign evidence.
+test("Rust bridge smoke reaches terminal UI through one raw key", async ({ page }, testInfo) => {
   const address = server.resolvedUrls?.local[0];
   if (address == null) {
     throw new Error("Vite did not publish Rust Phaser route");
