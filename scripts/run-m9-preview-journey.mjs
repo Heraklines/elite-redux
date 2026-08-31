@@ -11,7 +11,9 @@ const invite = requiredSecret("M9_PREVIEW_INVITE_SECRET");
 const expectedRelease = requiredIdentifier("M9_EXPECTED_RELEASE_ID");
 const expectedManifestHash = requiredSha256("M9_EXPECTED_MANIFEST_SHA256");
 const expectedDatabaseIdentity = requiredSha256("M9_EXPECTED_PREVIEW_DATABASE_SHA256");
-const minimumActiveMs = boundedInteger(process.env.M9_MINIMUM_ACTIVE_MS ?? "60000", 1_000, 300_000);
+const journeyMode = parseJourneyMode(process.env.M9_JOURNEY_MODE ?? "functional");
+const minimumActiveMs =
+  journeyMode === "SOAK" ? boundedInteger(process.env.M9_MINIMUM_ACTIVE_MS ?? "60000", 1_000, 300_000) : 0;
 const outputPath = resolve(process.env.M9_EVIDENCE_OUTPUT ?? "m9-preview-journey-evidence.json");
 
 const browser = await chromium.launch({ headless: true });
@@ -58,6 +60,16 @@ try {
   const freshAccountStartedAt = performance.now();
   await page.goto(previewUrl.href, { waitUntil: "load", timeout: 60_000 });
   await page.locator("form[data-preview-authorization=required]").waitFor({ state: "visible", timeout: 30_000 });
+  if (journeyMode === "COLD_START") {
+    await page.evaluate(async () => {
+      for (const cacheName of await caches.keys()) {
+        await caches.delete(cacheName);
+      }
+      for (const registration of await navigator.serviceWorker.getRegistrations()) {
+        await registration.unregister();
+      }
+    });
+  }
   await page.locator('input[name="preview-invite"]').fill(invite);
   await Promise.all([
     page.waitForNavigation({ waitUntil: "load", timeout: 60_000 }),
@@ -217,6 +229,7 @@ try {
 
   const evidence = {
     schema_version: 1,
+    journey_mode: journeyMode.toLowerCase().replace("_", "-"),
     release_id: expectedRelease,
     release_sha: manifest.payload.integration_sha,
     release_manifest_hash: expectedManifestHash,
@@ -270,6 +283,7 @@ try {
   console.log(
     JSON.stringify({
       release_id: evidence.release_id,
+      journey_mode: evidence.journey_mode,
       save_generation: evidence.save_generation,
       active_duration_ms: evidence.active_duration_ms,
       cold_ready_ms: evidence.cold_ready_ms,
@@ -513,6 +527,14 @@ function requiredUrl(value) {
     throw new Error("M9 preview URL must be an unauthenticated HTTPS origin");
   }
   return url;
+}
+
+function parseJourneyMode(value) {
+  const normalized = value.trim().toUpperCase().replaceAll("-", "_");
+  if (!["FUNCTIONAL", "COLD_START", "SOAK"].includes(normalized)) {
+    throw new Error("M9 preview journey mode is invalid");
+  }
+  return normalized;
 }
 
 function boundedInteger(value, minimum, maximum) {

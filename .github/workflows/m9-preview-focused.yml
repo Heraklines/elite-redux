@@ -4,6 +4,13 @@ on:
   push:
     branches: [ci/m9-preview/**]
   workflow_dispatch:
+    inputs:
+      journey_mode:
+        description: Functional is fast; cold-start resets browser state; soak retains real elapsed time
+        required: true
+        default: functional
+        type: choice
+        options: [functional, cold-start, soak]
 
 permissions:
   contents: read
@@ -178,6 +185,7 @@ jobs:
         env:
           M9_PREVIEW_INVITE_SECRET: ${{ secrets.M9_PREVIEW_INVITE_SECRET }}
           M9_PREVIEW_URL: https://m9-r1-internal.elite-redux.pages.dev
+          M9_JOURNEY_MODE: ${{ inputs.journey_mode || 'functional' }}
           M9_MINIMUM_ACTIVE_MS: 60000
           M9_EVIDENCE_OUTPUT: ${{ runner.temp }}/m9-preview-journey/evidence.json
         run: node scripts/run-m9-preview-journey.mjs
