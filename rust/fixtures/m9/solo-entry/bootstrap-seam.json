@@ -5,6 +5,12 @@
   "content_artifact_sha256": "f3edf3dd08a5ae991759ae58c9a6a975cad5b72c5f11426439065a67c675e710",
   "content_hash": "blake3-v1:8b690916ed4637d0871ce9428a911e2a8ab632269c6edbaec97be544f436fb58",
   "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "deployed_content_counts": {
+    "species": 0,
+    "moves": 0,
+    "abilities": 0,
+    "run_programs": 3
+  },
   "proven_boundary": "RAW_KEYS_COMPLETE_RUN_BOOTSTRAP_MACHINE_V1",
   "blocked_boundary": "PRODUCTION_BOOTSTRAP_CATALOG_AND_NEW_RUN_STATE_CONSTRUCTOR",
   "blocking_api": "NewRunMaterialV1::prepare construct closure",
