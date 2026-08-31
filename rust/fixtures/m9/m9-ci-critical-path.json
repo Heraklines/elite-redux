@@ -18,12 +18,17 @@
     "correctness_command": "cargo test --workspace --all-targets -- --skip m3_audited_production_surface_matches_frozen_manifest"
   },
   "after": {
-    "run_id": 33367838927,
-    "run_conclusion": "failure",
-    "failure_scope": "source-static-security shallow ancestry setup; both measured Rust jobs succeeded",
+    "measurement_run_id": 33367838927,
+    "measurement_run_conclusion": "failure",
+    "measurement_failure_scope": "source-static-security shallow ancestry setup; both measured Rust jobs succeeded",
     "candidate_sha": "244a2c0161ebe7a7f6f686e62a99773db075cca2",
-    "harness_sha": "dcc778ef33ccdfeecc2c5eed4006ac9911084166",
-    "critical_path_ms": 616000,
+    "measurement_harness_sha": "dcc778ef33ccdfeecc2c5eed4006ac9911084166",
+    "measured_critical_path_ms": 616000,
+    "qualification_run_id": 33370487522,
+    "qualification_conclusion": "success",
+    "qualification_harness_sha": "fb8d27be9545f19e96e91f7bf56d093ea77ae19f",
+    "qualification_duration_ms": 494000,
+    "qualification_reused_measurement_run_id": 33367838927,
     "rust_correctness": {
       "job_id": 99412265988,
       "job_ms": 575000,
