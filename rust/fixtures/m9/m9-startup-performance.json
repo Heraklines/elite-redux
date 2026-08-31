@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "release_id": "m9-rust-244a2c0161",
+  "release_sha": "244a2c0161ebe7a7f6f686e62a99773db075cca2",
+  "release_manifest_hash": "92d731b7d52fee9aa224a341bab683a8ec24b9ec17168c20da61c30fe286ebfc",
+  "wasm_hash": "5ae2bd6773a29bb577d89702b2af2a406e807e10c1846c181390713164e35b4c",
+  "content_artifact_hash": "f3edf3dd08a5ae991759ae58c9a6a975cad5b72c5f11426439065a67c675e710",
+  "ceilings_ms": {
+    "cold_desktop_ready": 3000,
+    "cold_mobile_ready": 6000,
+    "warm_worker_ready": 750
+  },
+  "observed_ms": {
+    "cold_desktop_ready": 3197.6,
+    "warm_worker_ready": 144.2
+  },
+  "observed_status": {
+    "cold_desktop_ready": "EXCEEDS_CEILING_BY_197_6_MS",
+    "warm_worker_ready": "WITHIN_CEILING"
+  },
+  "required_stages": [
+    "AUTHENTICATION_READY",
+    "PLATFORM_CONTEXT_READY",
+    "ASSIGNMENT_VERIFIED",
+    "MANIFEST_VERIFIED",
+    "ARTIFACT_DOWNLOAD_READY",
+    "WASM_COMPILED",
+    "WASM_INSTANTIATED",
+    "CONTENT_READY",
+    "SAVE_READY",
+    "SESSION_READY",
+    "FIRST_CONTROL_READY"
+  ],
+  "stage_observations": null,
+  "stage_observation_status": "UNMEASURED_UNTIL_PRODUCTION_HOOKS_ARE_WIRED",
+  "sample_policy": {
+    "maximum_samples": 256,
+    "maximum_journey_ms": 600000,
+    "required_statistics": ["minimum", "p50", "p95", "maximum", "sample_count"]
+  }
+}
