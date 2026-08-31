@@ -1,4 +1,5 @@
 //! M7 Pokémon lifecycle and progression content.
+pub mod content_v2;
 pub mod lifecycle;
 pub mod material;
 pub mod oracle_surface;
