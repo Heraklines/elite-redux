@@ -212,19 +212,11 @@ pub fn convert_pokemon(
     };
 
     // Status
-    let status_value = field(ts, "status")?;
-    let status = if status_value.is_null() {
-        StatusState {
-            kind: StatusKind::None,
-            toxic_turn_count: 0,
-            sleep_turns_remaining: None,
-        }
-    } else {
-        StatusState {
-            kind: StatusKind::None,
-            toxic_turn_count: 0,
-            sleep_turns_remaining: None,
-        }
+    let _status_value = field(ts, "status")?;
+    let status = StatusState {
+        kind: StatusKind::None,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: None,
     };
 
     // Moveset

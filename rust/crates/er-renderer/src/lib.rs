@@ -483,10 +483,10 @@ fn validate_scene(scene: &RenderSceneV2) -> Result<(), RendererErrorV2> {
             }
             RenderPrimitiveV2::Panel { .. } => {}
         }
-        if let Some(parent) = &node.parent {
-            if parent == id || !scene.nodes.contains_key(parent) {
-                return Err(RendererErrorV2::UnknownNode);
-            }
+        if let Some(parent) = &node.parent
+            && (parent == id || !scene.nodes.contains_key(parent))
+        {
+            return Err(RendererErrorV2::UnknownNode);
         }
         let mut visited = BTreeSet::new();
         let mut cursor = node.parent.as_ref();

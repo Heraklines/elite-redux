@@ -162,8 +162,9 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
             _ => true,
         }
     }));
+    let snapshot_bytes = host.snapshot().map_err(|_| "native snapshot failed")?;
     let snapshot: er_kernel::snapshot_v6::RestorableKernelSnapshotV6 =
-        serde_json::from_slice(&host.snapshot().map_err(|_| "native snapshot failed")?)?;
+        serde_json::from_slice(&snapshot_bytes)?;
     assert_eq!(
         snapshot
             .game_state
@@ -171,6 +172,14 @@ fn native_browser_host_reaches_the_frozen_terminal_digest_from_raw_keys() -> Tes
             .as_ref()
             .map(|run| run.outcome),
         Some(RunOutcome::Victory)
+    );
+    let restored = BrowserKernelHostV1::create(CONTENT, &snapshot_bytes)
+        .map_err(|_| "saved browser snapshot did not restore")?;
+    assert_eq!(
+        restored
+            .snapshot()
+            .map_err(|_| "restored snapshot failed")?,
+        snapshot_bytes
     );
     host.dispose();
     Ok(())
@@ -305,8 +314,9 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
             .map(|response| response.after_mechanical_digest.as_str()),
         Some(EXPECTED_DIGEST.trim())
     );
+    let replica_snapshot_bytes = replica.snapshot().map_err(|_| "replica snapshot failed")?;
     let snapshot: er_kernel::snapshot_v6::RestorableKernelSnapshotV6 =
-        serde_json::from_slice(&replica.snapshot().map_err(|_| "replica snapshot failed")?)?;
+        serde_json::from_slice(&replica_snapshot_bytes)?;
     assert_eq!(
         snapshot
             .game_state
@@ -314,6 +324,14 @@ fn staging_authority_material_is_applied_by_the_native_replica() -> TestResult {
             .as_ref()
             .map(|run| run.outcome),
         Some(RunOutcome::Victory)
+    );
+    let reconnected_replica = BrowserKernelHostV1::create(CONTENT, &replica_snapshot_bytes)
+        .map_err(|_| "replica reconnect snapshot did not restore")?;
+    assert_eq!(
+        reconnected_replica
+            .snapshot()
+            .map_err(|_| "reconnected replica snapshot failed")?,
+        replica_snapshot_bytes
     );
     authority.dispose();
     replica.dispose();
