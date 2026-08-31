@@ -286,9 +286,19 @@ async function forwardHealthEvent(
   } catch (error) {
     return json({ error: "preview telemetry forwarding failed", cause_code: healthForwardingCause(error) }, 502, cors);
   }
-  return response.status === 204
-    ? new Response(null, { status: 204, headers: cors })
-    : json({ error: "preview telemetry ingestion failed" }, 502, cors);
+  if (response.status === 204) {
+    return new Response(null, { status: 204, headers: cors });
+  }
+  const upstream = await response.text().catch(() => "");
+  return json(
+    {
+      error: "preview telemetry ingestion failed",
+      upstream_status: response.status,
+      cause_code: healthForwardingCause(upstream),
+    },
+    502,
+    cors,
+  );
 }
 
 async function runtimeAssignment(
@@ -916,7 +926,12 @@ function identifier(value: string): boolean {
 }
 
 function healthForwardingCause(error: unknown): string {
-  const value = error instanceof Error ? `${error.name}:${error.message}` : "UnknownError";
+  const value =
+    typeof error === "string"
+      ? `Upstream:${error}`
+      : error instanceof Error
+        ? `${error.name}:${error.message}`
+        : "UnknownError";
   return value.replace(/[^a-zA-Z0-9 .:_-]/gu, "_").slice(0, 160);
 }
 

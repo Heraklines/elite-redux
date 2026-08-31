@@ -349,6 +349,31 @@ describe("M9 capability-isolated preview save Worker", () => {
     expect(forwarded[0].init).not.toHaveProperty("redirect");
     environment.M9_TELEMETRY = {
       async fetch() {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const upstreamRejected = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/api/m9/health/event`, account.session_token, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-er-health-idempotency-key": "preview-health-2",
+        },
+        body: JSON.stringify({ schema_version: 1, event: "BOOTSTRAP_SUCCESS" }),
+      }),
+      environment,
+    );
+    expect(upstreamRejected.status).toBe(502);
+    expect(await upstreamRejected.json()).toMatchObject({
+      error: "preview telemetry ingestion failed",
+      upstream_status: 401,
+      cause_code: expect.stringContaining("unauthorized"),
+    });
+    environment.M9_TELEMETRY = {
+      async fetch() {
         throw new TypeError("service unavailable");
       },
     };
@@ -357,7 +382,7 @@ describe("M9 capability-isolated preview save Worker", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-er-health-idempotency-key": "preview-health-2",
+          "x-er-health-idempotency-key": "preview-health-3",
         },
         body: JSON.stringify({ schema_version: 1, event: "BOOTSTRAP_SUCCESS" }),
       }),
