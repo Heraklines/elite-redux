@@ -16,6 +16,7 @@ pub mod m7_progression_control;
 pub mod m7_run_executor;
 pub mod m7_runtime;
 pub mod m9_new_run;
+pub mod m9e_content_v2;
 // The local adapter remains production source while its kernel integration
 // seam is staged; its contract tests include this source directly.
 #[allow(dead_code)]
