@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type {
-  CloudSaveLeaseIdentityV1,
-  CloudSaveValueV1,
+import {
+  CloudSaveConflictV1,
+  type CloudSaveLeaseIdentityV1,
+  type CloudSaveValueV1,
 } from "../../../../src/rust-browser/adapters/cloud-save-adapter";
 import { encodeCanonicalJsonV1 } from "../../../../src/rust-browser/host/message-sequencer";
 import type { ProductionReleaseManifestV2, SaveLeaseV1 } from "../../../../src/rust-browser/production/contracts";
@@ -18,6 +19,7 @@ import {
 class PreviewCloud implements DisposablePreviewCloudSaveV1 {
   value: CloudSaveValueV1 | null = null;
   writes = 0;
+  loseNextResponse = false;
   disposed = false;
 
   async load(): Promise<CloudSaveValueV1 | null> {
@@ -42,7 +44,7 @@ class PreviewCloud implements DisposablePreviewCloudSaveV1 {
       throw new Error("test cloud requires a remote lease");
     }
     if (expectedRevision !== this.value?.revision && !(expectedRevision == null && this.value == null)) {
-      throw new Error("test cloud CAS conflict");
+      throw new CloudSaveConflictV1();
     }
     const envelope = JSON.parse(new TextDecoder().decode(bytes)) as { cloud_generation: number };
     const revision = `"revision-${envelope.cloud_generation}"`;
@@ -52,6 +54,10 @@ class PreviewCloud implements DisposablePreviewCloudSaveV1 {
       bytes: Uint8Array.from(bytes),
     };
     this.writes += 1;
+    if (this.loseNextResponse) {
+      this.loseNextResponse = false;
+      throw new Error("simulated response loss");
+    }
     return revision;
   }
 
@@ -151,6 +157,35 @@ describe("Rust preview production storage", () => {
     expect(remoteLeases.disposed).toBe(true);
   });
 
+  it("reconciles an exact committed write after its response is lost", async () => {
+    const cloud = new PreviewCloud();
+    const leases = new PreviewLeases();
+    const remoteLeases = new PreviewRemoteLeases();
+    const storage = createStorage(cloud, leases, remoteLeases, null);
+    const request = writeRequest(11, null, Uint8Array.of(8, 9));
+    cloud.loseNextResponse = true;
+
+    await expect(storage.handleRequest(request)).rejects.toThrow("simulated response loss");
+    expect(storage.saveStateSnapshot()).toMatchObject({
+      phase: "AMBIGUOUS",
+      cloud_revision: null,
+      cloud_generation: 0,
+      request: { request_id: 11 },
+    });
+    expect(cloud.writes).toBe(1);
+
+    const reconciled = await storage.handleRequest(request);
+    expect(JSON.parse(new TextDecoder().decode(reconciled))).toEqual({ revision: 1 });
+    expect(storage.saveStateSnapshot()).toMatchObject({
+      phase: "CLEAN",
+      cloud_revision: '"revision-1"',
+      cloud_generation: 1,
+      request: null,
+    });
+    expect(cloud.writes).toBe(1);
+    storage.dispose();
+  });
+
   it("rejects delete/read operations and preserves a conflicting cloud frontier", async () => {
     const cloud = new PreviewCloud();
     const leases = new PreviewLeases();
@@ -167,7 +202,10 @@ describe("Rust preview production storage", () => {
     expect(cloud.writes).toBe(0);
 
     cloud.value = { revision: '"other-tab"', generation: 1, bytes: Uint8Array.of(9) };
-    await expect(storage.handleRequest(writeRequest(2, null, Uint8Array.of(2)))).rejects.toThrow("CAS conflict");
+    await expect(storage.handleRequest(writeRequest(2, null, Uint8Array.of(2)))).rejects.toThrow(
+      "cloud save compare-and-swap conflict",
+    );
+    expect(storage.saveStateSnapshot().phase).toBe("CONFLICT");
     expect(cloud.writes).toBe(0);
     expect(cloud.value.bytes).toEqual(Uint8Array.of(9));
     expect(leases.released).toBe(1);
