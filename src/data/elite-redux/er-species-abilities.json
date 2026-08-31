@@ -109,6 +109,16 @@
     "ability2": 192,
     "hidden": 118
   },
+  "SPECIES_CLEFABLE_MEGA_Y": {
+    "ability1": 20013,
+    "ability2": 20013,
+    "hidden": 20013,
+    "innates": [
+      20012,
+      144,
+      20014
+    ]
+  },
   "SPECIES_COMBEE": {
     "ability1": 155,
     "hidden": 118
