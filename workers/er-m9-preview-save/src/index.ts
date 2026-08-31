@@ -10,9 +10,14 @@ interface PreviewR2Bucket {
   get(key: string): Promise<PreviewR2Object | null>;
 }
 
+interface PreviewServiceBinding {
+  fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>;
+}
+
 interface Env {
   RUST_PREVIEW_DB: D1Database;
   M9_RELEASES: PreviewR2Bucket;
+  M9_TELEMETRY: PreviewServiceBinding;
   M9_RELEASE_SIGNING_PRIVATE_KEY: string;
   M9_PREVIEW_INVITE_SECRET: string;
   M9_PREVIEW_HEALTH_SECRET: string;
@@ -266,7 +271,7 @@ async function forwardHealthEvent(
   if (!/^[a-zA-Z0-9._:-]{1,128}$/u.test(idempotencyKey) || bytes.byteLength === 0 || bytes.byteLength > 32_768) {
     return json({ error: "invalid preview health event" }, 400, cors);
   }
-  const response = await fetch(telemetryEventUrl, {
+  const response = await env.M9_TELEMETRY.fetch(telemetryEventUrl, {
     method: "POST",
     cache: "no-store",
     credentials: "omit",

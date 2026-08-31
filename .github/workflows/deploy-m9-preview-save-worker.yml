@@ -86,6 +86,7 @@ jobs:
               || !/binding\s*=\s*"RUST_PREVIEW_DB"/.test(blocks[0])
               || !/database_id\s*=\s*"9d410e94-8719-4a86-aa0b-c1cad2291e88"/.test(blocks[0])
               || /binding\s*=\s*"DB"/.test(config)
+              || !/\[\[services\]\][\s\S]*binding\s*=\s*"M9_TELEMETRY"[\s\S]*service\s*=\s*"er-telemetry"/.test(config)
               || !/M9_PREVIEW_ONLY_WORKER\s*=\s*"true"/.test(config)
               || !/M9_PREVIEW_DATABASE_IDENTITY_HASH\s*=\s*"b860cac56eb16855e2a46fc6ba2f458666f06d0ab4e04ca4c83f0e3962afd36e"/.test(config)
               || !/M9_LEGACY_MIGRATION_ENABLED\s*=\s*"false"/.test(config)) {

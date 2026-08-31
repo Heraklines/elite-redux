@@ -11,6 +11,10 @@ database_id = "9d410e94-8719-4a86-aa0b-c1cad2291e88"
 binding = "M9_RELEASES"
 bucket_name = "er-m9-releases"
 
+[[services]]
+binding = "M9_TELEMETRY"
+service = "er-telemetry"
+
 [vars]
 M9_PREVIEW_ONLY_WORKER = "true"
 M9_LEGACY_MIGRATION_ENABLED = "false"

@@ -85,6 +85,7 @@ class SqliteD1Statement implements D1PreparedStatement {
 interface TestEnv {
   RUST_PREVIEW_DB: D1Database;
   M9_RELEASES: { get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null> };
+  M9_TELEMETRY: { fetch(input: string | URL | Request, init?: RequestInit): Promise<Response> };
   M9_RELEASE_SIGNING_PRIVATE_KEY: string;
   M9_PREVIEW_INVITE_SECRET: string;
   M9_PREVIEW_ONLY_WORKER: string;
@@ -392,6 +393,9 @@ function testEnv(database: D1Database): TestEnv {
           },
         };
       },
+    },
+    M9_TELEMETRY: {
+      fetch: (input, init) => fetch(input, init),
     },
     M9_RELEASE_SIGNING_PRIVATE_KEY: "u".repeat(64),
     M9_PREVIEW_INVITE_SECRET: INVITE,
