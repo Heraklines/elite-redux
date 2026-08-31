@@ -125,6 +125,6 @@ describe("M9 production authority architecture", () => {
     expect(worker).not.toContain("MIGRATE_PRODUCTION_SAVE_V2");
     const deployment = read(".github/workflows/deploy-m9-preview-save-worker.yml");
     expect(deployment).toContain("Prove capability-only Worker configuration");
-    expect(deployment).toContain("Prove legacy database sentinel unchanged");
+    expect(deployment).toContain("Prove capability-isolated deploy left legacy schema untouched");
   });
 });

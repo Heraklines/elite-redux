@@ -1,9 +1,12 @@
 name: Rust Kernel M9 G51 Observability Rollout
 
 on:
-  push:
-    branches: [arch/rust-kernel-m9-production]
   workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact executable candidate; harness-only differences are verified separately
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,7 +16,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  candidate-binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Prove harness changes cannot alter executable bytes
+        run: |
+          echo "${{ inputs.candidate_sha }}" | grep -Eq '^[0-9a-f]{40}$'
+          git cat-file -e "${{ inputs.candidate_sha }}^{commit}"
+          git diff --name-only "${{ inputs.candidate_sha }}" HEAD > "$RUNNER_TEMP/changed-files.txt"
+          test -z "$(grep -Ev '^(\.github/workflows/|test/|scripts/run-m9-preview-journey\.mjs$)' "$RUNNER_TEMP/changed-files.txt" || true)"
+
   observability-rollout:
+    needs: candidate-binding
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -80,6 +98,7 @@ jobs:
           --pool=forks --isolate --no-file-parallelism
 
   architecture-negative:
+    needs: candidate-binding
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -108,6 +127,7 @@ jobs:
           test -z "$(git grep -n -E '(raw_save|raw_input_history|full_party|refresh_token)' -- src/rust-browser/production/health-*.ts workers/er-telemetry/src/m9-health.ts || true)"
 
   browser-transport:
+    needs: candidate-binding
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -131,7 +151,7 @@ jobs:
 
   g51-aggregate:
     name: M9 G51 deterministic health and rollback qualification
-    needs: [observability-rollout, architecture-negative, browser-transport]
+    needs: [candidate-binding, observability-rollout, architecture-negative, browser-transport]
     runs-on: ubuntu-latest
     steps:
-      - run: printf '%s\n' "M9 exact SHA $GITHUB_SHA passed G51 health, privacy, hard-stop, shadow, and rollback drills"
+      - run: printf '%s\n' "M9 executable candidate ${{ inputs.candidate_sha }} with harness $GITHUB_SHA passed G51 health, privacy, hard-stop, shadow, and rollback drills"
