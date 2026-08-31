@@ -277,9 +277,8 @@ async function forwardHealthEvent(
       "x-er-preview-health-authorization": `Bearer ${env.M9_PREVIEW_HEALTH_SECRET}`,
       "x-er-preview-account": account.account_id,
     },
-    body: Uint8Array.from(bytes).buffer,
+    body: bytes,
   });
-  bytes.fill(0);
   return response.status === 204
     ? new Response(null, { status: 204, headers: cors })
     : json({ error: "preview telemetry ingestion failed" }, 502, cors);
