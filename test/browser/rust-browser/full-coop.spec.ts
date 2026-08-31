@@ -22,14 +22,15 @@ const worker = new URL("/src/rust-browser/worker/rust-kernel-worker.ts", locatio
 const host = await RustBrowserHost.create({ workerUrl: worker, initialize: { kind: "INITIALIZE", value: { mode: BrowserExecutionModeV1.RUST_STAGING_AUTHORITY, execution_identity_bytes: Array.from(identityBytes), session_start_bytes: Array.from(session), maximum_pending_requests: 64 } } });
 const compatibility = { browser_worker_protocol: 1, frame_envelope_version: 1, save_namespace: "M9_RUST_PREVIEW_V1", authority_protocol: "er-coop-47", release_id: "m8-test", compatible_releases: [], mechanical_identity: "m1", content_hash: manifest.assets["content-pack.json"].sha256, material_schema: 5, save_schema: 1, browser_kernel_abi: 1, active_model_identity: "model-1", authority_runtime: "RUST" };
 const frameKeys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]); const framePublicKey = Array.from(new Uint8Array(await crypto.subtle.exportKey("raw", frameKeys.publicKey))); let frameContext = null;
-let work = Promise.resolve(); let received = 0; let pc; let generation = 0; let transportConnected = false;
-async function handle(responses) { for (const envelope of responses) if (envelope.response.kind === "EFFECTS") for (const effect of envelope.response.value.effects) if (effect.kind === "SEND_NETWORK_FRAME") await transport.send(effect.value.generation, new Uint8Array(effect.value.bytes)); }
+let work = Promise.resolve(); let received = 0; let staleFrameRejections = 0; let pc; let activeChannel; let generation = 0; let transportConnected = false;
+async function handle(responses, disconnectedTransition = false) { for (const envelope of responses) if (envelope.response.kind === "EFFECTS") for (const effect of envelope.response.value.effects) if (effect.kind === "SEND_NETWORK_FRAME") { try { await transport.send(effect.value.generation, new Uint8Array(effect.value.bytes)); } catch (error) { if (!disconnectedTransition && effect.value.generation === generation) throw new Error("current-generation send failed effect=" + effect.value.generation + " current=" + generation + " connected=" + transportConnected + " cause=" + String(error)); staleFrameRejections += 1; } } }
 function enqueue(request) {
+  const disconnectedTransition = request.kind === "TRANSPORT_CHANGED" && !request.value.connected;
   if (request.kind === "NETWORK_FRAME") received += 1;
   if (request.kind === "TRANSPORT_CHANGED") transportConnected = request.value.connected;
   work = work.then(async () => {
     try {
-      await handle(await host.dispatch(request));
+      await handle(await host.dispatch(request), disconnectedTransition);
     } catch (error) {
       throw new Error(role + ":" + request.kind + ":" + String(error));
     }
@@ -39,15 +40,17 @@ const transport = new RustBrowserTransportAdapterV1({ compatibility, emit: enque
 function bindFrameContext(binding) { frameContext = { binding, local_participant_id: role, peer_participant_id: role === "authority" ? "replica" : "authority", local_private_key: frameKeys.privateKey }; }
 function waitIce(connection) { if (connection.iceGatheringState === "complete") return Promise.resolve(); const { promise, resolve } = Promise.withResolvers(); connection.addEventListener("icegatheringstatechange", () => { if (connection.iceGatheringState === "complete") resolve(); }); return promise; }
 function waitUntil(predicate) { const { promise, resolve, reject } = Promise.withResolvers(); let frames = 0; const tick = () => { if (predicate()) { resolve(); return; } if (++frames > 600) { reject(new Error("co-op condition did not settle")); return; } requestAnimationFrame(tick); }; tick(); return promise; }
-async function offer() { if (frameContext == null) throw new Error("frame binding missing"); pc = new RTCPeerConnection(); const channel = pc.createDataChannel("rust-authority", { ordered: true }); generation = transport.attach(channel, frameContext); await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc); return pc.localDescription.sdp; }
-async function answer(sdp) { if (frameContext == null) throw new Error("frame binding missing"); pc = new RTCPeerConnection(); pc.ondatachannel = event => { generation = transport.attach(event.channel, frameContext); }; await pc.setRemoteDescription({ type: "offer", sdp }); await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc); return pc.localDescription.sdp; }
+async function offer() { if (frameContext == null) throw new Error("frame binding missing"); pc = new RTCPeerConnection(); activeChannel = pc.createDataChannel("rust-authority", { ordered: true }); generation = transport.attach(activeChannel, frameContext); await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc); return pc.localDescription.sdp; }
+async function answer(sdp) { if (frameContext == null) throw new Error("frame binding missing"); pc = new RTCPeerConnection(); pc.ondatachannel = event => { activeChannel = event.channel; generation = transport.attach(activeChannel, frameContext); }; await pc.setRemoteDescription({ type: "offer", sdp }); await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc); return pc.localDescription.sdp; }
 async function accept(sdp) { await pc.setRemoteDescription({ type: "answer", sdp }); }
 async function connected() { await waitUntil(() => generation > 0 && transportConnected); return generation; }
-function rechannel() { if (frameContext == null) throw new Error("frame binding missing"); transportConnected = false; const channel = pc.createDataChannel("rust-rejoin", { ordered: true }); generation = transport.attach(channel, frameContext); return generation; }
+async function disconnect() { activeChannel?.close(); await waitUntil(() => !transportConnected); }
+async function disconnected() { await waitUntil(() => !transportConnected); }
+function rechannel() { if (frameContext == null) throw new Error("frame binding missing"); activeChannel = pc.createDataChannel("rust-rejoin", { ordered: true }); generation = transport.attach(activeChannel, frameContext); return generation; }
 async function digest() { await work; const responses = await host.dispatch({ kind: "OBSERVE", value: { profile: "COOP_DIGEST" } }); await handle(responses); return responses.at(-1).after_mechanical_digest; }
 async function waitFrame() { await waitUntil(() => received > 0); await work; return received; }
 async function close() { input.dispose(); transport.dispose(); pc?.close(); await work.catch(() => undefined); await host.dispose(); }
-globalThis.__coop = { framePublicKey: () => framePublicKey, bindFrameContext, offer, answer, accept, connected, rechannel, digest, waitFrame, close };
+globalThis.__coop = { framePublicKey: () => framePublicKey, bindFrameContext, offer, answer, accept, connected, disconnect, disconnected, staleFrames: () => staleFrameRejections, rechannel, digest, waitFrame, close };
 </script></body></html>`;
 
 test.beforeAll(async () => {
@@ -157,9 +160,25 @@ test("one Rust authority commits and a second-browser replica applies the same m
   expect(await authority.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
   expect(await replica.evaluate(() => globalThis.__coop.waitFrame())).toBeGreaterThan(0);
   expect(await replica.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
+  await Promise.all([
+    authority.evaluate(() => globalThis.__coop.disconnect()),
+    replica.evaluate(() => globalThis.__coop.disconnected()),
+  ]);
   await installFrameBinding(authority, replica, firstGeneration + 1);
   const secondGeneration = await authority.evaluate(() => globalThis.__coop.rechannel());
   expect(secondGeneration).toBe(firstGeneration + 1);
+  const reconnectedGenerations = await Promise.all([
+    authority.evaluate(() => globalThis.__coop.connected()),
+    replica.evaluate(() => globalThis.__coop.connected()),
+  ]);
+  expect(reconnectedGenerations).toEqual([secondGeneration, secondGeneration]);
+  expect(await authority.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
+  expect(await replica.evaluate(() => globalThis.__coop.digest())).toBe(expectedDigest);
+  const staleFrameRejections = await Promise.all([
+    authority.evaluate(() => globalThis.__coop.staleFrames()),
+    replica.evaluate(() => globalThis.__coop.staleFrames()),
+  ]);
+  expect(staleFrameRejections[0] + staleFrameRejections[1]).toBeGreaterThan(0);
   await Promise.all([
     authority.evaluate(() => globalThis.__coop.close()),
     replica.evaluate(() => globalThis.__coop.close()),
