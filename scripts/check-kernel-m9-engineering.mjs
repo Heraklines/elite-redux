@@ -59,10 +59,18 @@ if (
   || v7.decision !== "CLEAN_V7_CUTOVER"
   || v7.kernel_schema_version !== 7
   || v7.snapshot_schema_version !== 7
+  || v7.game_state_schema_version !== 6
+  || v7.material_schema_version !== 6
+  || v7.save_schema_version !== 2
   || v7.content_bundle_schema_version !== 2
+  || v7.progression_content_schema_version !== 2
+  || v7.world_content_schema_version !== 2
+  || v7.scenario_content_schema_version !== 2
+  || v7.ai_content_schema_version !== 2
   || v7.browser_initialization_schema_version !== 2
   || v7.production_owner !== "GameKernelV7"
   || v7.cutover_rules?.v6_production_fallback !== false
+  || v7.cutover_rules?.domain_v1_production_fallback !== false
 ) {
   fail("V7 engineering contract is absent or ambiguous");
 }
