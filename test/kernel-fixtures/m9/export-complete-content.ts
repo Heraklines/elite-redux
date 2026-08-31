@@ -1,6 +1,6 @@
 import { getGameMode } from "#app/game-mode";
 import { speciesStarterCosts } from "#balance/starters";
-import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
+import { allAbilities, allBiomes, allMoves, allSpecies } from "#data/data-lists";
 import { getTypeDamageMultiplier } from "#data/type";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
@@ -171,6 +171,53 @@ function modeDefinitions() {
     .toSorted((left, right) => left.mode_id - right.mode_id);
 }
 
+function biomeDefinitions() {
+  return [...allBiomes.values()]
+    .filter(biome => biome != null)
+    .map(biome => {
+      const pokemonPools = Object.entries(biome.pokemonPool)
+        .flatMap(([tier, times]) =>
+          Object.entries(times)
+            .filter(([, species]) => species.length > 0)
+            .map(([timeOfDay, species]) => ({
+              tier: Number(tier),
+              time_of_day: Number(timeOfDay),
+              species: [...species],
+            })),
+        )
+        .toSorted((left, right) => left.tier - right.tier || left.time_of_day - right.time_of_day);
+      const trainerPools = Object.entries(biome.trainerPool)
+        .filter(([, trainers]) => trainers.length > 0)
+        .map(([tier, trainers]) => ({ tier: Number(tier), trainer_types: [...trainers] }))
+        .toSorted((left, right) => left.tier - right.tier);
+      const weatherPool = Object.entries(biome.weatherPool)
+        .filter(([, weight]) => weight > 0)
+        .map(([code, weight]) => ({ code: Number(code), weight }))
+        .toSorted((left, right) => left.code - right.code);
+      const terrainPool = Object.entries(biome.terrainPool)
+        .filter(([, weight]) => weight > 0)
+        .map(([code, weight]) => ({ code: Number(code), weight }))
+        .toSorted((left, right) => left.code - right.code);
+      const links = biome.biomeLinks
+        .map(link => ({
+          biome_id: Array.isArray(link) ? link[0] : link,
+          weight: Array.isArray(link) ? link[1] : 1,
+        }))
+        .toSorted((left, right) => left.biome_id - right.biome_id);
+      return {
+        biome_id: biome.biomeId,
+        key: `biome/${biome.biomeId}`,
+        pokemon_pools: pokemonPools,
+        trainer_pools: trainerPools,
+        trainer_chance_denominator: biome.trainerChance,
+        weather_pool: weatherPool,
+        terrain_pool: terrainPool,
+        links,
+      };
+    })
+    .toSorted((left, right) => left.biome_id - right.biome_id);
+}
+
 test("export complete pinned battle definitions", async () => {
   if (OUTPUT == null) {
     throw new Error("M9_COMPLETE_CONTENT_OUTPUT is required");
@@ -200,6 +247,7 @@ test("export complete pinned battle definitions", async () => {
     schema_version: 1,
     oracle_sha: ORACLE_SHA,
     modes: modeDefinitions(),
+    biomes: biomeDefinitions(),
     species: speciesDefinitions(),
     moves: moveDefinitions(),
     abilities: abilityDefinitions(),

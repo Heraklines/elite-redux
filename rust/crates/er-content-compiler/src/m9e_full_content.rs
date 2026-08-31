@@ -1,6 +1,6 @@
 //! M9-E complete pinned battle-definition and semantic-closure compiler.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use er_content::m6_catalog::{CatalogResolution, SemanticCatalogV1};
 use er_content::pack::m6_pack::{
@@ -11,7 +11,6 @@ use er_content::pack::m6_pack::{
 };
 use er_content::pack::{TypeChart, TypeChartEntry};
 use er_content::species::SpeciesBaseStats;
-use er_game::m7_content::PreparedGameContentV1;
 use er_game::m9e_content_v2::{
     BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1, BootstrapContentPackV1, BootstrapModeDefinitionV2,
     LevelMoveDefinitionV1, StarterDefinitionV2,
@@ -25,6 +24,10 @@ use er_types::run_ids::BiomeId;
 use er_types::{
     BehaviorSourceId, BehaviorUnitId, BespokeMechanicId, CatalogHash, FormId, MechanicsProgramId,
     RunDifficultyV1, SafeU53,
+};
+use er_world::content_v2::{
+    BiomeDefinitionV2, BiomeLinkV2, BiomeSpeciesPoolV2, BiomeTrainerPoolV2, GameModeDefinitionV2,
+    WORLD_CONTENT_PACK_SCHEMA_VERSION_V2, WeightedOracleCodeV2, WorldContentPackV2,
 };
 use serde::Deserialize;
 use thiserror::Error;
@@ -43,6 +46,7 @@ struct CompleteBattleDefinitionsV1 {
     schema_version: u32,
     oracle_sha: String,
     modes: Vec<CompleteModeV1>,
+    biomes: Vec<CompleteBiomeV2>,
     species: Vec<CompleteSpeciesV1>,
     moves: Vec<CompleteMoveV1>,
     abilities: Vec<CompleteAbilityV1>,
@@ -60,6 +64,48 @@ struct CompleteModeV1 {
     challenge_selection: bool,
     cooperative: bool,
     supported: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompleteBiomeV2 {
+    biome_id: u64,
+    key: String,
+    pokemon_pools: Vec<CompletePokemonPoolV2>,
+    trainer_pools: Vec<CompleteTrainerPoolV2>,
+    trainer_chance_denominator: u32,
+    weather_pool: Vec<CompleteWeightedCodeV2>,
+    terrain_pool: Vec<CompleteWeightedCodeV2>,
+    links: Vec<CompleteBiomeLinkV2>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompletePokemonPoolV2 {
+    tier: i16,
+    time_of_day: i16,
+    species: Vec<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompleteTrainerPoolV2 {
+    tier: i16,
+    trainer_types: Vec<u32>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompleteWeightedCodeV2 {
+    code: u16,
+    weight: u32,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompleteBiomeLinkV2 {
+    biome_id: u64,
+    weight: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -274,15 +320,145 @@ pub fn build_m9_engineering_battle_pack_v1(
     .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))
 }
 
+pub fn build_m9_engineering_world_content_v2(
+    definitions_bytes: &[u8],
+    known_species: &BTreeSet<SpeciesId>,
+) -> Result<WorldContentPackV2, FullContentBuildErrorV1> {
+    let definitions: CompleteBattleDefinitionsV1 = serde_json::from_slice(definitions_bytes)
+        .map_err(|error| FullContentBuildErrorV1::Json(error.to_string()))?;
+    if definitions.schema_version != 1
+        || definitions.oracle_sha != M9_ENGINEERING_ORACLE_SHA
+        || definitions.modes.is_empty()
+        || definitions.biomes.is_empty()
+    {
+        return Err(FullContentBuildErrorV1::Identity);
+    }
+    ensure_sorted_unique(definitions.modes.iter().map(|mode| mode.mode_id))?;
+    ensure_sorted_unique(definitions.biomes.iter().map(|biome| biome.biome_id))?;
+    let modes = definitions
+        .modes
+        .into_iter()
+        .map(|mode| {
+            Ok(GameModeDefinitionV2 {
+                id: GameModeId::new(
+                    SafeU53::new(mode.mode_id)
+                        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+                ),
+                key: mode.key,
+                starting_level: mode.starting_level,
+                starting_money: SafeU53::new(mode.starting_money)
+                    .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+                starting_biome: BiomeId::new(
+                    SafeU53::new(mode.starting_biome_id)
+                        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+                ),
+                challenge_selection: mode.challenge_selection,
+                cooperative: mode.cooperative,
+                supported: mode.supported,
+            })
+        })
+        .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+    let biomes = definitions
+        .biomes
+        .into_iter()
+        .map(|biome| {
+            let pokemon_pools = biome
+                .pokemon_pools
+                .into_iter()
+                .map(|pool| {
+                    Ok(BiomeSpeciesPoolV2 {
+                        tier: pool.tier,
+                        time_of_day: pool.time_of_day,
+                        species: pool
+                            .species
+                            .into_iter()
+                            .map(SpeciesId::try_from_u64)
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_err(|error| {
+                                FullContentBuildErrorV1::Definition(error.to_string())
+                            })?,
+                    })
+                })
+                .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+            let trainer_pools = biome
+                .trainer_pools
+                .into_iter()
+                .map(|pool| BiomeTrainerPoolV2 {
+                    tier: pool.tier,
+                    trainer_types: pool.trainer_types,
+                })
+                .collect();
+            let weather_pool = biome
+                .weather_pool
+                .into_iter()
+                .map(|entry| WeightedOracleCodeV2 {
+                    code: entry.code,
+                    weight: entry.weight,
+                })
+                .collect();
+            let terrain_pool = biome
+                .terrain_pool
+                .into_iter()
+                .map(|entry| WeightedOracleCodeV2 {
+                    code: entry.code,
+                    weight: entry.weight,
+                })
+                .collect();
+            let links = biome
+                .links
+                .into_iter()
+                .map(|link| {
+                    Ok(BiomeLinkV2 {
+                        biome: BiomeId::new(SafeU53::new(link.biome_id).map_err(|error| {
+                            FullContentBuildErrorV1::Definition(error.to_string())
+                        })?),
+                        weight: link.weight,
+                    })
+                })
+                .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+            Ok(BiomeDefinitionV2 {
+                id: BiomeId::new(
+                    SafeU53::new(biome.biome_id)
+                        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+                ),
+                key: biome.key,
+                pokemon_pools,
+                trainer_pools,
+                trainer_chance_denominator: biome.trainer_chance_denominator,
+                weather_pool,
+                terrain_pool,
+                links,
+            })
+        })
+        .collect::<Result<Vec<_>, FullContentBuildErrorV1>>()?;
+    let mut pack = WorldContentPackV2 {
+        schema_version: WORLD_CONTENT_PACK_SCHEMA_VERSION_V2,
+        oracle_sha: er_types::OracleSha::parse(M9_ENGINEERING_ORACLE_SHA)
+            .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+        content_hash: CatalogHash::parse("0".repeat(64))
+            .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
+        modes,
+        biomes,
+    };
+    pack.content_hash = pack
+        .recompute_hash()
+        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
+    pack.validate(known_species)
+        .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
+    Ok(pack)
+}
+
 pub fn build_m9_engineering_bootstrap_content_v1(
     definitions_bytes: &[u8],
-    core: &PreparedGameContentV1,
+    battle: &BattleContentPackV3,
+    world: &WorldContentPackV2,
 ) -> Result<BootstrapContentPackV1, FullContentBuildErrorV1> {
     let definitions: CompleteBattleDefinitionsV1 = serde_json::from_slice(definitions_bytes)
         .map_err(|error| FullContentBuildErrorV1::Json(error.to_string()))?;
     if definitions.schema_version != 1
         || definitions.oracle_sha != M9_ENGINEERING_ORACLE_SHA
-        || core.bundle().oracle_sha.as_str() != M9_ENGINEERING_ORACLE_SHA
+        || battle.oracle_sha.as_str() != M9_ENGINEERING_ORACLE_SHA
+        || world.oracle_sha.as_str() != M9_ENGINEERING_ORACLE_SHA
         || definitions.modes.is_empty()
     {
         return Err(FullContentBuildErrorV1::Identity);
@@ -296,19 +472,7 @@ pub fn build_m9_engineering_bootstrap_content_v1(
                 SafeU53::new(mode.mode_id)
                     .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
             );
-            let route = core
-                .bundle()
-                .world
-                .modes
-                .iter()
-                .find(|candidate| candidate.id == id)
-                .map(|candidate| candidate.route)
-                .ok_or_else(|| {
-                    FullContentBuildErrorV1::Definition(format!(
-                        "world content is missing mode {}",
-                        mode.mode_id
-                    ))
-                })?;
+
             Ok(BootstrapModeDefinitionV2 {
                 mode: id,
                 key: mode.key,
@@ -319,7 +483,7 @@ pub fn build_m9_engineering_bootstrap_content_v1(
                     SafeU53::new(mode.starting_biome_id)
                         .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
                 ),
-                initial_route: route,
+
                 challenge_selection: mode.challenge_selection,
                 cooperative: mode.cooperative,
                 supported: mode.supported,
@@ -358,7 +522,7 @@ pub fn build_m9_engineering_bootstrap_content_v1(
     starters.sort_by_key(|starter| (starter.species_id, starter.form_index));
     let mut pack = BootstrapContentPackV1 {
         schema_version: BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1,
-        oracle_sha: core.bundle().oracle_sha.clone(),
+        oracle_sha: battle.oracle_sha.clone(),
         content_hash: CatalogHash::parse("0".repeat(64))
             .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?,
         modes,
@@ -376,7 +540,7 @@ pub fn build_m9_engineering_bootstrap_content_v1(
     pack.content_hash = pack
         .recompute_hash()
         .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
-    pack.validate(core)
+    pack.validate(battle, world)
         .map_err(|error| FullContentBuildErrorV1::Definition(error.to_string()))?;
     Ok(pack)
 }

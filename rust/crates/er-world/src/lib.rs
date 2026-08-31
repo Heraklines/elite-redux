@@ -1,4 +1,5 @@
 //! Deterministic M7 modes, routes, encounters, trainers, and bosses.
+pub mod content_v2;
 pub mod runtime;
 
 use std::collections::{BTreeMap, BTreeSet};

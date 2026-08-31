@@ -741,6 +741,7 @@ dependencies = [
 name = "er-world"
 version = "0.1.0"
 dependencies = [
+ "er-canonical",
  "er-state",
  "er-types",
  "serde",

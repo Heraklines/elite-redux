@@ -4,12 +4,14 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use er_canonical::content_digest;
+use er_content::pack::m6_pack::BattleContentPackV3;
 use er_types::battle_ids::{GameModeId, MoveId, SpeciesId};
-use er_types::run_ids::{BiomeId, RouteNodeId};
+use er_types::run_ids::BiomeId;
 use er_types::{
     CatalogHash, GameContentBundleHash, OracleSha, RunDifficultyV1, SafeU53, SetupChoiceIdV1,
     SetupChoiceValueV1,
 };
+use er_world::content_v2::WorldContentPackV2;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -44,7 +46,7 @@ pub struct BootstrapModeDefinitionV2 {
     pub starting_level: u16,
     pub starting_money: SafeU53,
     pub starting_biome: BiomeId,
-    pub initial_route: RouteNodeId,
+
     pub challenge_selection: bool,
     pub cooperative: bool,
     pub supported: bool,
@@ -96,6 +98,7 @@ pub struct GameContentBundleV2 {
     pub schema_version: u32,
     pub oracle_sha: OracleSha,
     pub core: Arc<GameContentBundleV1>,
+    pub world_v2: Arc<WorldContentPackV2>,
     pub bootstrap: Arc<BootstrapContentPackV1>,
     pub presentation: Arc<PresentationContentPackV1>,
     pub content_hash: GameContentBundleHash,
@@ -148,6 +151,7 @@ struct BundleHashView<'a> {
     schema_version: u32,
     oracle_sha: &'a OracleSha,
     core_hash: &'a GameContentBundleHash,
+    world_v2_hash: &'a CatalogHash,
     bootstrap_hash: &'a CatalogHash,
     presentation_hash: &'a CatalogHash,
 }
@@ -168,9 +172,14 @@ impl BootstrapContentPackV1 {
         CatalogHash::parse(digest).map_err(|error| GameContentV2Error::Hash(error.to_string()))
     }
 
-    pub fn validate(&self, core: &PreparedGameContentV1) -> Result<(), GameContentV2Error> {
+    pub fn validate(
+        &self,
+        battle: &BattleContentPackV3,
+        world: &WorldContentPackV2,
+    ) -> Result<(), GameContentV2Error> {
         if self.schema_version != BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1
-            || self.oracle_sha != core.bundle().oracle_sha
+            || self.oracle_sha != battle.oracle_sha
+            || self.oracle_sha != world.oracle_sha
             || self.content_hash != self.recompute_hash()?
             || self.modes.is_empty()
             || self.starters.is_empty()
@@ -188,25 +197,17 @@ impl BootstrapContentPackV1 {
         {
             return Err(GameContentV2Error::Bootstrap);
         }
-        let bundle = core.bundle();
         for mode in &self.modes {
             if mode.key.is_empty()
                 || mode.starting_level == 0
-                || bundle
-                    .world
+                || world
                     .modes
                     .iter()
                     .all(|candidate| candidate.id != mode.mode)
-                || bundle
-                    .world
+                || world
                     .biomes
                     .iter()
                     .all(|candidate| candidate.id != mode.starting_biome)
-                || bundle
-                    .world
-                    .routes
-                    .iter()
-                    .all(|candidate| candidate.id != mode.initial_route)
             {
                 return Err(GameContentV2Error::CrossReference);
             }
@@ -214,8 +215,7 @@ impl BootstrapContentPackV1 {
         for starter in &self.starters {
             let species_index = usize::try_from(starter.species_id.get().get())
                 .map_err(|_| GameContentV2Error::CrossReference)?;
-            let species = bundle
-                .battle
+            let species = battle
                 .species
                 .get(species_index)
                 .and_then(Option::as_ref)
@@ -235,7 +235,7 @@ impl BootstrapContentPackV1 {
                 || starter.level_moves.iter().any(|entry| {
                     usize::try_from(entry.move_id.get().get())
                         .ok()
-                        .and_then(|index| bundle.battle.moves.get(index))
+                        .and_then(|index| battle.moves.get(index))
                         .and_then(Option::as_ref)
                         .is_none()
                 })
@@ -303,6 +303,7 @@ impl GameContentBundleV2 {
             oracle_sha: &self.oracle_sha,
             core_hash: &self.core.content_hash,
             bootstrap_hash: &self.bootstrap.content_hash,
+            world_v2_hash: &self.world_v2.content_hash,
             presentation_hash: &self.presentation.content_hash,
         })
         .map_err(|error| GameContentV2Error::Hash(error.to_string()))?;
@@ -313,15 +314,27 @@ impl GameContentBundleV2 {
     pub fn validate(&self) -> Result<(), GameContentV2Error> {
         if self.schema_version != GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2
             || self.oracle_sha != self.core.oracle_sha
+            || self.oracle_sha != self.world_v2.oracle_sha
             || self.oracle_sha != self.bootstrap.oracle_sha
             || self.oracle_sha != self.presentation.oracle_sha
             || self.content_hash != self.recompute_hash()?
         {
             return Err(GameContentV2Error::Identity);
         }
-        let core = PreparedGameContentV1::prepare(self.core.clone())
+        PreparedGameContentV1::prepare(self.core.clone())
             .map_err(|error| GameContentV2Error::Core(error.to_string()))?;
-        self.bootstrap.validate(&core)?;
+        let known_species = self
+            .core
+            .battle
+            .species
+            .iter()
+            .flatten()
+            .map(|species| species.id)
+            .collect::<BTreeSet<_>>();
+        self.world_v2
+            .validate(&known_species)
+            .map_err(|error| GameContentV2Error::Core(error.to_string()))?;
+        self.bootstrap.validate(&self.core.battle, &self.world_v2)?;
         self.presentation.validate(&self.oracle_sha)?;
         Ok(())
     }
