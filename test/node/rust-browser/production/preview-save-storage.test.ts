@@ -6,6 +6,7 @@ import {
 } from "../../../../src/rust-browser/adapters/cloud-save-adapter";
 import { encodeCanonicalJsonV1 } from "../../../../src/rust-browser/host/message-sequencer";
 import type { ProductionReleaseManifestV2, SaveLeaseV1 } from "../../../../src/rust-browser/production/contracts";
+import type { OfflineSaveStateSnapshotV1 } from "../../../../src/rust-browser/production/offline-save-state";
 import type {
   PreviewRemoteLeaseCoordinatorV1,
   PreviewRemoteLeaseV1,
@@ -186,6 +187,38 @@ describe("Rust preview production storage", () => {
     storage.dispose();
   });
 
+  it("restores an ambiguous immutable request after process close without a second cloud write", async () => {
+    const cloud = new PreviewCloud();
+    const storage = createStorage(cloud, new PreviewLeases(), new PreviewRemoteLeases(), null);
+    const request = writeRequest(12, null, Uint8Array.of(10, 11));
+    cloud.loseNextResponse = true;
+
+    await expect(storage.handleRequest(request)).rejects.toThrow("simulated response loss");
+    storage.dispose();
+    const closedSnapshot = storage.saveStateSnapshot();
+    expect(closedSnapshot).toMatchObject({ phase: "CLOSED", closed_from: "AMBIGUOUS" });
+
+    const reopenedCloud = new PreviewCloud();
+    reopenedCloud.value = cloud.value;
+    const reopened = createStorage(
+      reopenedCloud,
+      new PreviewLeases(),
+      new PreviewRemoteLeases(),
+      reopenedCloud.value,
+      closedSnapshot,
+    );
+    const reconciled = await reopened.handleRequest(request);
+
+    expect(JSON.parse(new TextDecoder().decode(reconciled))).toEqual({ revision: 1 });
+    expect(reopenedCloud.writes).toBe(0);
+    expect(reopened.saveStateSnapshot()).toMatchObject({
+      phase: "CLEAN",
+      cloud_revision: '"revision-1"',
+      cloud_generation: 1,
+    });
+    reopened.dispose();
+  });
+
   it("rejects delete/read operations and preserves a conflicting cloud frontier", async () => {
     const cloud = new PreviewCloud();
     const leases = new PreviewLeases();
@@ -218,6 +251,7 @@ function createStorage(
   leases: PreviewLeases,
   remoteLeases: PreviewRemoteLeases,
   source: CloudSaveValueV1 | null,
+  offlineStateSnapshot?: OfflineSaveStateSnapshotV1,
 ): RustPreviewSaveStorageV1 {
   return new RustPreviewSaveStorageV1({
     cloud,
@@ -228,6 +262,7 @@ function createStorage(
     slot: "rust-slot-0",
     browserInstanceId: "instance-preview",
     source,
+    ...(offlineStateSnapshot == null ? {} : { offlineStateSnapshot }),
   });
 }
 

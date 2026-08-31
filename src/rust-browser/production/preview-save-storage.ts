@@ -43,6 +43,7 @@ export interface RustPreviewSaveStorageOptionsV1 {
   slot: string;
   browserInstanceId: string;
   source: CloudSaveValueV1 | null;
+  offlineStateSnapshot?: OfflineSaveStateSnapshotV1;
 }
 
 interface RetainedStorageResultV1 {
@@ -83,9 +84,28 @@ export class RustPreviewSaveStorageV1 {
     this.#accountId = options.accountId;
     this.#slot = options.slot;
     this.#browserInstanceId = options.browserInstanceId;
-    this.#cloudRevision = options.source?.revision ?? null;
-    this.#cloudGeneration = options.source?.generation ?? 0;
-    this.#offlineState = new OfflineSaveStateMachineV1(this.#cloudRevision, this.#cloudGeneration);
+    const sourceRevision = options.source?.revision ?? null;
+    const sourceGeneration = options.source?.generation ?? 0;
+    if (options.offlineStateSnapshot == null) {
+      this.#cloudRevision = sourceRevision;
+      this.#cloudGeneration = sourceGeneration;
+      this.#offlineState = new OfflineSaveStateMachineV1(sourceRevision, sourceGeneration);
+    } else {
+      const restored = OfflineSaveStateMachineV1.restore(options.offlineStateSnapshot);
+      if (restored.snapshot().phase === "CLOSED") {
+        restored.reopen();
+      }
+      const recovered = restored.snapshot();
+      if (
+        recovered.phase === "CLEAN"
+        && (recovered.cloud_revision !== sourceRevision || recovered.cloud_generation !== sourceGeneration)
+      ) {
+        throw new Error("Rust preview restored clean save frontier differs from loaded cloud state");
+      }
+      this.#cloudRevision = recovered.cloud_revision;
+      this.#cloudGeneration = recovered.cloud_generation;
+      this.#offlineState = restored;
+    }
   }
 
   async handleRequest(bytes: Uint8Array): Promise<Uint8Array> {
