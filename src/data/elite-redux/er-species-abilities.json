@@ -166,6 +166,13 @@
       5010
     ]
   },
+  "SPECIES_DREDWOOD": {
+    "innates": [
+      5075,
+      5283,
+      5245
+    ]
+  },
   "SPECIES_DUSTOX": {
     "hidden": 118
   },
