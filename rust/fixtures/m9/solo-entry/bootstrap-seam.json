@@ -10,6 +10,7 @@
   "blocking_api": "NewRunMaterialV1::prepare construct closure",
   "required_cutover": [
     "derive BootstrapCatalogV1 from PreparedGameContentV1 plus authenticated save slots",
+    "compile starter loadouts and learnsets required to construct PokemonStateV5 from StarterSelectionV1",
     "construct GameStateV5 and initial GameControlPlanV2 without a caller-authored closure",
     "serialize and apply NewRunMaterialV1 through the production authority path"
   ],
