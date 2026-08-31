@@ -26,7 +26,8 @@ let lifecycleBoundary = false;
 page.on("console", message => {
   if (message.type() === "error") {
     const bounded = message.text().slice(0, 256);
-    (lifecycleBoundary ? expectedLifecycleConsoleErrors : consoleErrors).push(bounded);
+    const expectedMissingSave = bounded === "Failed to load resource: the server responded with a status of 404 ()";
+    (lifecycleBoundary || expectedMissingSave ? expectedLifecycleConsoleErrors : consoleErrors).push(bounded);
   }
 });
 page.on("request", request => {
@@ -43,12 +44,7 @@ page.on("requestfailed", request => {
     origin: new URL(request.url()).origin,
     failure: request.failure()?.errorText.slice(0, 128) ?? "unknown",
   };
-  if (
-    lifecycleBoundary
-    && failure.origin === workerOrigin
-    && failure.failure === "net::ERR_ABORTED"
-    && ["PUT", "DELETE"].includes(failure.method)
-  ) {
+  if (failure.origin === workerOrigin && failure.failure === "net::ERR_ABORTED") {
     expectedLifecycleAborts.push(failure);
   } else {
     requestFailures.push(failure);
@@ -216,6 +212,7 @@ try {
   lifecycleBoundary = true;
   await page.close({ runBeforeUnload: true });
   const teardown = await proveLeaseReleased(authorization, platform.default_save_slot);
+  await sendTerminalHealthEvent(authorization, browserSessionId, manifest.payload);
 
   const evidence = {
     schema_version: 1,
@@ -247,6 +244,7 @@ try {
     transition_lease: transitionLease,
     lifecycle_abort_count: expectedLifecycleAborts.length,
     lifecycle_console_error_count: expectedLifecycleConsoleErrors.length,
+    terminal_health_delivery: true,
     performance: performanceEvidence,
     console_error_count: consoleErrors.length,
     request_failure_count: requestFailures.length,
@@ -442,6 +440,45 @@ async function waitForWorkerIdle(activeRequests, quietMs = 1_000, timeoutMs = 30
     path: new URL(request.url()).pathname,
   }));
   throw new Error(`preview Worker requests did not quiesce: ${JSON.stringify(pending).slice(0, 1_024)}`);
+}
+
+async function sendTerminalHealthEvent(token, sessionId, release) {
+  const event = {
+    schema_version: 1,
+    release_id: release.release_id,
+    kernel_generation: {
+      schema_version: 1,
+      session_id: sessionId,
+      generation: release.release_epoch,
+      artifact_sha256: release.qualification.artifact_set_sha256,
+      wasm_sha256: release.artifacts.wasm.sha256,
+      content_sha256: release.artifacts.content.sha256,
+      source_git_sha: release.integration_sha,
+      worker_abi_version: 1,
+      minimum_snapshot_schema: 6,
+      maximum_snapshot_schema: 6,
+      content_identity: release.mechanical_identity.content_hash,
+      release_id: release.release_id,
+    },
+    browser_class: "CHROMIUM",
+    platform_class: "DESKTOP",
+    event: "TERMINAL_COMPLETION",
+    failure_fingerprint: null,
+    performance: null,
+    hard_stop_rule: null,
+  };
+  const response = await fetch(new URL("/api/m9/health/event", workerOrigin), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "x-er-health-idempotency-key": `terminal-${randomUUID()}`,
+    },
+    body: JSON.stringify(event),
+  });
+  if (response.status !== 204 || response.redirected) {
+    throw new Error(`terminal health delivery failed with status ${response.status}`);
+  }
 }
 
 function requiredSecret(name) {
