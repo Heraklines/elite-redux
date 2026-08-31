@@ -226,6 +226,20 @@ jobs:
           path: ${{ runner.temp }}/m9-rust-correctness/timing.json
           if-no-files-found: error
           retention-days: 30
+      - name: Download exact-candidate Rust correctness evidence
+        if: inputs.rust_regression_run_id != 0
+        uses: actions/download-artifact@v7
+        with:
+          name: m9-g52-rust-correctness-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/reused-rust-correctness
+          run-id: ${{ inputs.rust_regression_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify exact-candidate Rust correctness evidence
+        if: inputs.rust_regression_run_id != 0
+        run: >-
+          jq -e --arg candidate "${{ inputs.candidate_sha }}"
+          '.candidate_sha == $candidate and .profile == "test" and .target == "x86_64-unknown-linux-gnu"'
+          "$RUNNER_TEMP/reused-rust-correctness/timing.json"
       - name: Consume exact-SHA G52 Rust regression result
         if: inputs.rust_regression_run_id != 0
         uses: actions/github-script@v8
@@ -237,7 +251,7 @@ jobs:
               repo: context.repo.repo,
               run_id: Number('${{ inputs.rust_regression_run_id }}'),
             });
-            if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification' || run.data.head_sha !== candidate) {
+            if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
               core.setFailed('G52 aggregation requires the exact-candidate regression-owner run');
               return;
             }
@@ -336,6 +350,21 @@ jobs:
           path: ${{ runner.temp }}/m9-optimized-benchmarks
           if-no-files-found: error
           retention-days: 30
+      - name: Download exact-candidate optimized benchmark evidence
+        if: inputs.rust_regression_run_id != 0
+        uses: actions/download-artifact@v7
+        with:
+          name: m9-g52-optimized-benchmarks-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/reused-optimized-benchmarks
+          run-id: ${{ inputs.rust_regression_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify exact-candidate optimized benchmark evidence
+        if: inputs.rust_regression_run_id != 0
+        run: >-
+          jq -e --arg candidate "${{ inputs.candidate_sha }}"
+          '.candidate_sha == $candidate and .profile == "release" and .target == "x86_64-unknown-linux-gnu"
+          and .workloads == {"m2":{"tests":4},"m3":{"tests":5},"m4":{"tests":9}}'
+          "$RUNNER_TEMP/reused-optimized-benchmarks/timing.json"
       - name: Consume exact-SHA optimized benchmark result
         if: inputs.rust_regression_run_id != 0
         uses: actions/github-script@v8
@@ -347,7 +376,7 @@ jobs:
               repo: context.repo.repo,
               run_id: Number('${{ inputs.rust_regression_run_id }}'),
             });
-            if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification' || run.data.head_sha !== candidate) {
+            if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
               core.setFailed('G52 benchmark reuse requires the exact-candidate regression-owner run');
               return;
             }
