@@ -53,6 +53,20 @@ if ((adapter.match(/KernelInput::BattlePresentationOutcome/gu) ?? []).length !==
   fail("renderer settlement translation is not confined to the adapter and its focused test");
 }
 
+const v7 = JSON.parse(read("rust/fixtures/m9/m9-engineering-v7-contract.json"));
+if (
+  v7.schema_version !== 1
+  || v7.decision !== "CLEAN_V7_CUTOVER"
+  || v7.kernel_schema_version !== 7
+  || v7.snapshot_schema_version !== 7
+  || v7.content_bundle_schema_version !== 2
+  || v7.browser_initialization_schema_version !== 2
+  || v7.production_owner !== "GameKernelV7"
+  || v7.cutover_rules?.v6_production_fallback !== false
+) {
+  fail("V7 engineering contract is absent or ambiguous");
+}
+
 const coverage = JSON.parse(read("rust/fixtures/m9/m9-browser-control-coverage.json"));
 const expectedControls = [
   "TITLE",
@@ -91,7 +105,7 @@ if (
 }
 
 console.log(
-  `M9-E static ownership: generic BrowserKernelHostV1, ${expectedControls.length} controls, renderer settlement adapter isolated`,
+  `M9-E static ownership: V7 cutover frozen, generic BrowserKernelHostV1, ${expectedControls.length} controls, renderer settlement adapter isolated`,
 );
 
 function collectFiles(relative) {
