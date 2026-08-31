@@ -81,6 +81,14 @@
             "parameterOverrides": {
               "opts.moveId": 476
             }
+          },
+          {
+            "abilityId": 5389,
+            "attrIndex": 1,
+            "attrType": "PostSummonScriptedMoveAbAttr",
+            "parameterOverrides": {
+              "opts.moveId": 600
+            }
           }
         ],
         "hook": {
