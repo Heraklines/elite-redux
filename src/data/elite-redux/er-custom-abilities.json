@@ -67,6 +67,44 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-13": {
+    "componentRules": [
+      {
+        "chance": 100,
+        "conditionLogic": "all",
+        "conditions": [],
+        "effects": [
+          {
+            "abilityId": 5940,
+            "attrIndex": 6,
+            "attrType": "PostSummonScriptedMoveAbAttr",
+            "parameterOverrides": {
+              "opts.moveId": 476
+            }
+          }
+        ],
+        "hook": {
+          "abilityId": 5946,
+          "attrIndex": 2,
+          "attrType": "OmniformAbAttr"
+        },
+        "key": "component-1",
+        "prerequisiteHooks": []
+      }
+    ],
+    "description": "Rage powder on entry + Unaware",
+    "flags": {},
+    "generation": 9,
+    "id": 20012,
+    "includes": [
+      109
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "blasé Powder",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
