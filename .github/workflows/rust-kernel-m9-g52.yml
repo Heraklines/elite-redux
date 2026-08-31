@@ -46,9 +46,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 128
       - name: Fetch frozen M8.1 contract tag
-        run: git fetch --no-tags --depth=1 origin refs/tags/rust-kernel-m81-final:refs/tags/rust-kernel-m81-final
+        run: git fetch --no-tags origin refs/tags/rust-kernel-m81-final:refs/tags/rust-kernel-m81-final
       - uses: pnpm/action-setup@v5
         with:
           version: 10.33.2
