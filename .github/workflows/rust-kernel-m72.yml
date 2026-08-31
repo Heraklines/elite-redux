@@ -68,6 +68,25 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('rust/fixtures/m72/m72-slice-manifest.json','utf8'))"
           node -e "JSON.parse(require('fs').readFileSync('rust/fixtures/m72/architecture-manifest.json','utf8'))"
 
+  m9-solo-entry:
+    name: M9 raw-key natural solo bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m9-solo-entry-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run raw-key natural solo bootstrap contract
+        working-directory: rust
+        run: cargo test --locked -p er-sim --test m9_solo_entry
+
   m72-g35-aggregate:
     name: M7.2 G35 contract aggregate
     needs:
