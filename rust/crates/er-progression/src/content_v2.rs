@@ -9,7 +9,7 @@ use er_types::{CatalogHash, EvolutionId, InventoryItemId, OracleSha};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{CaptureBallDefinitionV1, GrowthRateDefinitionV1, NatureDefinitionV1};
+use crate::{GrowthRateDefinitionV1, NatureDefinitionV1};
 
 pub const PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V2: u32 = 2;
 
@@ -54,6 +54,16 @@ pub struct EvolutionDefinitionV2 {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct CaptureBallDefinitionV2 {
+    pub item: InventoryItemId,
+    pub registry_key: String,
+    pub catch_multiplier_numerator: u32,
+    pub catch_multiplier_denominator: u32,
+    pub guaranteed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpeciesProgressionDefinitionV2 {
     pub species: SpeciesId,
     pub form: u16,
@@ -74,7 +84,7 @@ pub struct ProgressionContentPackV2 {
     pub content_hash: CatalogHash,
     pub growth_rates: Vec<GrowthRateDefinitionV1>,
     pub natures: Vec<NatureDefinitionV1>,
-    pub capture_balls: Vec<CaptureBallDefinitionV1>,
+    pub capture_balls: Vec<CaptureBallDefinitionV2>,
     pub species: Vec<SpeciesProgressionDefinitionV2>,
     pub evolutions: Vec<EvolutionDefinitionV2>,
 }
@@ -99,7 +109,7 @@ struct ProgressionHashView<'a> {
     oracle_sha: &'a OracleSha,
     growth_rates: &'a [GrowthRateDefinitionV1],
     natures: &'a [NatureDefinitionV1],
-    capture_balls: &'a [CaptureBallDefinitionV1],
+    capture_balls: &'a [CaptureBallDefinitionV2],
     species: &'a [SpeciesProgressionDefinitionV2],
     evolutions: &'a [EvolutionDefinitionV2],
 }

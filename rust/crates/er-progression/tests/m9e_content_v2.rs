@@ -2,10 +2,10 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 use er_progression::content_v2::{
-    LevelMoveV2, PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V2, ProgressionContentPackV2,
-    SpeciesProgressionDefinitionV2,
+    CaptureBallDefinitionV2, LevelMoveV2, PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V2,
+    ProgressionContentPackV2, SpeciesProgressionDefinitionV2,
 };
-use er_progression::{CaptureBallDefinitionV1, GrowthRateDefinitionV1, NatureDefinitionV1};
+use er_progression::{GrowthRateDefinitionV1, NatureDefinitionV1};
 use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::run_ids::{Experience, GrowthRateId, NatureId};
 use er_types::{CatalogHash, InventoryItemId, OracleSha, SafeU53};
@@ -32,11 +32,12 @@ fn pack() -> Result<ProgressionContentPackV2, Box<dyn Error>> {
             increased_stat: None,
             decreased_stat: None,
         }],
-        capture_balls: vec![CaptureBallDefinitionV1 {
+        capture_balls: vec![CaptureBallDefinitionV2 {
             item: InventoryItemId::new(safe(1)),
             registry_key: "POKEBALL".to_owned(),
             catch_multiplier_numerator: 1,
             catch_multiplier_denominator: 1,
+            guaranteed: false,
         }],
         species: vec![SpeciesProgressionDefinitionV2 {
             species,
