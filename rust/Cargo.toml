@@ -16,6 +16,7 @@ members = [
     "crates/er-save",
     "crates/er-model",
     "crates/er-render-model",
+    "crates/er-renderer",
     "crates/er-impact",
     "crates/er-env",
     "crates/er-devplane",
