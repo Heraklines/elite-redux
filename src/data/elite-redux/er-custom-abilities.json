@@ -105,6 +105,22 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-14": {
+    "componentRules": [],
+    "description": "Fairy aura + Giant Wings",
+    "flags": {},
+    "generation": 9,
+    "id": 20013,
+    "includes": [
+      187,
+      5108
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Fairy Wings",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
