@@ -20,10 +20,10 @@ er-game = { path = "../er-game" }
 er-kernel = { path = "../er-kernel" }
 er-protocol = { path = "../er-protocol" }
 er-production = { path = "../er-production" }
+er-renderer = { path = "../er-renderer" }
 er-save = { path = "../er-save" }
 er-repro = { path = "../er-repro" }
 er-types = { path = "../er-types" }
-er-wasm = { path = "../er-wasm" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

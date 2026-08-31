@@ -59,6 +59,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node scripts/check-kernel-m9-contract.mjs
+      - run: node scripts/check-kernel-m9-engineering.mjs
       - run: node scripts/check-kernel-m9-release-readiness.mjs
       - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
       - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production -p er-web --all-targets --no-deps -- -D warnings
@@ -121,7 +122,6 @@ jobs:
           workers/er-telemetry/src/m9-health.ts
           test/node/rust-browser/production/*.test.ts
           test/node/rust-browser/adapters/adapter-contracts.test.ts
-          test/browser/rust-browser/m9-real-solo.spec.ts
           test/browser/rust-browser/m9-startup-performance.spec.ts
       - run: >-
           pnpm exec biome ci --diagnostic-level=error --no-errors-on-unmatched
@@ -134,7 +134,6 @@ jobs:
           src/rust-browser/worker/rust-wasm-loader.ts
           test/node/rust-browser/production
           test/node/rust-browser/adapters/adapter-contracts.test.ts
-          test/browser/rust-browser/m9-real-solo.spec.ts
           test/browser/rust-browser/m9-startup-performance.spec.ts
           workers/er-save-api/src/m9-production.ts
           workers/er-save-api/src/m9-type-guards.ts
@@ -459,11 +458,8 @@ jobs:
           if ! wasm-bindgen --version 2>/dev/null | grep -Fxq 'wasm-bindgen 0.2.127'; then cargo install wasm-bindgen-cli --version 0.2.127 --locked; fi
           node scripts/build-kernel-m8-web.mjs --out-dir "$RUNNER_TEMP/m9-web" --content rust/fixtures/m8/browser-reference/content-pack.json --identity rust/fixtures/m8/browser-reference/execution-identity.bin --session rust/fixtures/m8/browser-reference/session-start.json --authority-session rust/fixtures/m8/browser-reference/session-authority.json --replica-session rust/fixtures/m8/browser-reference/session-replica.json
           cp rust/fixtures/m8/browser-reference/expected-terminal-digest.txt "$RUNNER_TEMP/m9-web/"
-          cp rust/fixtures/m9/solo-entry/content-pack.json "$RUNNER_TEMP/m9-web/m9-content-pack.json"
-          cp rust/fixtures/m9/solo-entry/starter-oracle-v1.json "$RUNNER_TEMP/m9-web/starter-oracle-v1.json"
           grep -q 'restore_production_save_v2' "$RUNNER_TEMP/m9-web/er_web.js"
-          grep -q 'run_m9_production_slice' "$RUNNER_TEMP/m9-web/er_web.js"
-          grep -q 'M9ProductionSliceSessionV1' "$RUNNER_TEMP/m9-web/er_web.js"
+          ! grep -Eq 'M9VerticalSliceKernelV1|M9ProductionSliceSessionV1|run_m9_production_slice|scripted_enemy_policy_for_m9' "$RUNNER_TEMP/m9-web/er_web.js"
           ! grep -q 'migrate_production_save_v2' "$RUNNER_TEMP/m9-web/er_web.js"
           node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-browser-one" --authority rust
           node scripts/build-kernel-m9-browser.mjs --out-dir "$RUNNER_TEMP/m9-browser-two" --authority rust
@@ -517,7 +513,6 @@ jobs:
           if [ "$PLAYWRIGHT_BROWSER" = "chromium" ]; then
             FILES+=(
               test/browser/rust-browser/full-solo.spec.ts
-              test/browser/rust-browser/m9-real-solo.spec.ts
               test/browser/rust-browser/full-coop.spec.ts
               test/browser/rust-browser/adapters/phaser-adapter.spec.ts
               test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts

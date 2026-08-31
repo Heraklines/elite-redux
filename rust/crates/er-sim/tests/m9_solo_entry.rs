@@ -13,11 +13,11 @@ use er_game::m72_bootstrap::{
     BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapMachineV1, RunBootstrapStageV1,
 };
 use er_game::m72_new_run_material::apply_serialized_new_run_material_v1;
-use er_kernel::m9_vertical::{M9VerticalControlV1, M9VerticalSliceKernelV1};
 use er_state::m7_state::{
     DexState, GAME_STATE_SCHEMA_VERSION_V5, GameStateV5, PROFILE_STATE_SCHEMA_VERSION_V1,
     ProfileStateV1, ProfileStatistics,
 };
+use er_testkit::m9_vertical::{M9VerticalControlV1, M9VerticalSliceKernelV1};
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1, BattleTargetSelection,
     CommandSet, player_command_operation_id, turn_result_operation_id,

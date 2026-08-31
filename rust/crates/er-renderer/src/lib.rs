@@ -6,9 +6,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_render_model::PresentationSceneV1;
-use er_types::battle_ids::BattlePresentationEventId;
-use er_types::battle_ui::PresentationSettlementOutcome;
-use er_types::{KernelInput, SeatId};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -270,76 +267,172 @@ impl OffscreenRendererV1 {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RenderSceneGenerationV1(u64);
+
+impl RenderSceneGenerationV1 {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RendererGenerationIdentityV1(String);
+
+impl RendererGenerationIdentityV1 {
+    pub fn new(value: impl Into<String>) -> Result<Self, RendererErrorV2> {
+        let value = value.into();
+        if value.is_empty()
+            || value.len() > 128
+            || !value.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':' | b'.')
+            })
+        {
+            return Err(RendererErrorV2::Generation);
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PresentationEventIdV1 {
+    pub operation_id: String,
+    pub sequence: u64,
+}
+
+impl PresentationEventIdV1 {
+    pub fn new(operation_id: impl Into<String>, sequence: u64) -> Result<Self, RendererErrorV2> {
+        let operation_id = operation_id.into();
+        if operation_id.is_empty()
+            || operation_id.len() > 256
+            || !operation_id.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':' | b'.' | b'/')
+            })
+        {
+            return Err(RendererErrorV2::PresentationFence);
+        }
+        Ok(Self {
+            operation_id,
+            sequence,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PresentationOutcomeV2 {
+    Settled,
+    IntentionallySkipped,
+    Failed { reason: String },
+}
+
+impl PresentationOutcomeV2 {
+    fn validate(&self) -> Result<(), RendererErrorV2> {
+        if matches!(self, Self::Failed { reason } if reason.is_empty() || reason.len() > 512) {
+            return Err(RendererErrorV2::InvalidSettlement);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RendererPresentationSettlementV1 {
+    pub event_id: PresentationEventIdV1,
+    pub scene_generation: RenderSceneGenerationV1,
+    pub renderer_generation: RendererGenerationIdentityV1,
+    pub outcome: PresentationOutcomeV2,
+}
+
+impl RendererPresentationSettlementV1 {
+    pub fn validate(&self) -> Result<(), RendererErrorV2> {
+        self.outcome.validate()?;
+        PresentationEventIdV1::new(self.event_id.operation_id.clone(), self.event_id.sequence)?;
+        RendererGenerationIdentityV1::new(self.renderer_generation.as_str())?;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PresentationGenerationFenceV1 {
-    generation: u64,
-    pending: BTreeSet<String>,
+    scene_generation: RenderSceneGenerationV1,
+    renderer_generation: RendererGenerationIdentityV1,
+    pending: BTreeSet<PresentationEventIdV1>,
 }
 
 impl PresentationGenerationFenceV1 {
-    pub fn new(generation: u64) -> Self {
+    pub fn new(
+        scene_generation: RenderSceneGenerationV1,
+        renderer_generation: RendererGenerationIdentityV1,
+    ) -> Self {
         Self {
-            generation,
+            scene_generation,
+            renderer_generation,
             pending: BTreeSet::new(),
         }
     }
 
     pub fn begin(
         &mut self,
-        generation: u64,
-        event_id: impl Into<String>,
+        scene_generation: RenderSceneGenerationV1,
+        event_id: PresentationEventIdV1,
     ) -> Result<(), RendererErrorV2> {
-        let event_id = event_id.into();
-        if generation != self.generation || event_id.is_empty() || !self.pending.insert(event_id) {
+        if scene_generation != self.scene_generation || !self.pending.insert(event_id) {
             return Err(RendererErrorV2::PresentationFence);
         }
         Ok(())
     }
 
-    pub fn settle(&mut self, generation: u64, event_id: &str) -> Result<(), RendererErrorV2> {
-        if generation != self.generation || !self.pending.remove(event_id) {
+    pub fn settle(
+        &mut self,
+        scene_generation: RenderSceneGenerationV1,
+        renderer_generation: &RendererGenerationIdentityV1,
+        event_id: PresentationEventIdV1,
+        outcome: PresentationOutcomeV2,
+    ) -> Result<RendererPresentationSettlementV1, RendererErrorV2> {
+        outcome.validate()?;
+        if scene_generation != self.scene_generation
+            || renderer_generation != &self.renderer_generation
+            || !self.pending.remove(&event_id)
+        {
             return Err(RendererErrorV2::PresentationFence);
         }
-        Ok(())
-    }
-
-    pub fn begin_kernel_event(
-        &mut self,
-        generation: u64,
-        event_id: &BattlePresentationEventId,
-    ) -> Result<(), RendererErrorV2> {
-        self.begin(generation, kernel_event_key(event_id))
-    }
-
-    pub fn settle_kernel_event(
-        &mut self,
-        generation: u64,
-        endpoint: SeatId,
-        event_id: BattlePresentationEventId,
-        outcome: PresentationSettlementOutcome,
-    ) -> Result<KernelInput, RendererErrorV2> {
-        outcome
-            .validate()
-            .map_err(|_| RendererErrorV2::InvalidSettlement)?;
-        self.settle(generation, &kernel_event_key(&event_id))?;
-        Ok(KernelInput::BattlePresentationOutcome {
-            endpoint,
+        let settlement = RendererPresentationSettlementV1 {
             event_id,
+            scene_generation,
+            renderer_generation: renderer_generation.clone(),
             outcome,
-        })
+        };
+        settlement.validate()?;
+        Ok(settlement)
     }
 
-    pub fn advance(&mut self, next_generation: u64) -> Result<(), RendererErrorV2> {
+    pub fn advance(
+        &mut self,
+        next_generation: RenderSceneGenerationV1,
+    ) -> Result<(), RendererErrorV2> {
         if !self.pending.is_empty()
-            || next_generation
+            || next_generation.get()
                 != self
-                    .generation
+                    .scene_generation
+                    .get()
                     .checked_add(1)
                     .ok_or(RendererErrorV2::Generation)?
         {
             return Err(RendererErrorV2::PresentationFence);
         }
-        self.generation = next_generation;
+        self.scene_generation = next_generation;
         Ok(())
     }
 }
@@ -366,14 +459,6 @@ pub enum RendererErrorV2 {
 
 pub fn scene_generation_from_presentation_v1(scene: &PresentationSceneV1) -> u64 {
     scene.generation
-}
-
-fn kernel_event_key(event_id: &BattlePresentationEventId) -> String {
-    format!(
-        "{}/{}",
-        event_id.operation_id.as_str(),
-        event_id.sequence.get()
-    )
 }
 
 fn validate_scene(scene: &RenderSceneV2) -> Result<(), RendererErrorV2> {
@@ -534,52 +619,56 @@ mod tests {
 
     #[test]
     fn presentation_fence_rejects_stale_settlement() {
-        let mut fence = PresentationGenerationFenceV1::new(7);
-        fence.begin(7, "event:1").expect("begin succeeds");
+        let scene = RenderSceneGenerationV1::new(7);
+        let renderer =
+            RendererGenerationIdentityV1::new("renderer:1").expect("renderer identity is valid");
+        let event =
+            PresentationEventIdV1::new("battle/1/wave/1/turn/1/result", 1).expect("event is valid");
+        let mut fence = PresentationGenerationFenceV1::new(scene, renderer.clone());
+        fence.begin(scene, event.clone()).expect("begin succeeds");
         assert_eq!(
-            fence.settle(6, "event:1"),
-            Err(RendererErrorV2::PresentationFence)
-        );
-        fence.settle(7, "event:1").expect("settlement succeeds");
-        fence.advance(8).expect("advance succeeds");
-    }
-
-    #[test]
-    fn generation_fence_emits_the_real_kernel_settlement_input() {
-        let endpoint = SeatId::new(er_types::SafeU53::new(1).expect("seat is safe"));
-        let event_id = BattlePresentationEventId::new(
-            er_types::OperationId::new("battle/1/wave/1/turn/1/result")
-                .expect("operation ID is valid"),
-            er_types::SafeU53::new(3).expect("sequence is safe"),
-        );
-        let mut fence = PresentationGenerationFenceV1::new(9);
-        fence
-            .begin_kernel_event(9, &event_id)
-            .expect("kernel event begins");
-
-        assert_eq!(
-            fence.settle_kernel_event(
-                8,
-                endpoint,
-                event_id.clone(),
-                PresentationSettlementOutcome::Settled,
+            fence.settle(
+                RenderSceneGenerationV1::new(6),
+                &renderer,
+                event.clone(),
+                PresentationOutcomeV2::Settled,
             ),
             Err(RendererErrorV2::PresentationFence)
         );
-        let input = fence
-            .settle_kernel_event(
-                9,
-                endpoint,
-                event_id.clone(),
-                PresentationSettlementOutcome::Settled,
+        fence
+            .settle(scene, &renderer, event, PresentationOutcomeV2::Settled)
+            .expect("settlement succeeds");
+        fence
+            .advance(RenderSceneGenerationV1::new(8))
+            .expect("advance succeeds");
+    }
+    #[test]
+    fn generation_fence_emits_renderer_owned_settlement() {
+        let scene = RenderSceneGenerationV1::new(9);
+        let renderer =
+            RendererGenerationIdentityV1::new("renderer:primary").expect("identity is valid");
+        let event = PresentationEventIdV1::new("battle/1/wave/1/turn/1/result", 3)
+            .expect("event identity is valid");
+        let mut fence = PresentationGenerationFenceV1::new(scene, renderer.clone());
+        fence
+            .begin(scene, event.clone())
+            .expect("presentation event begins");
+
+        let settlement = fence
+            .settle(
+                scene,
+                &renderer,
+                event.clone(),
+                PresentationOutcomeV2::Settled,
             )
             .expect("current generation settles");
         assert_eq!(
-            input,
-            KernelInput::BattlePresentationOutcome {
-                endpoint,
-                event_id,
-                outcome: PresentationSettlementOutcome::Settled,
+            settlement,
+            RendererPresentationSettlementV1 {
+                event_id: event,
+                scene_generation: scene,
+                renderer_generation: renderer,
+                outcome: PresentationOutcomeV2::Settled,
             }
         );
     }
