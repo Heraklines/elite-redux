@@ -95,6 +95,10 @@ function postProtocolFault(code: string, message: string, requestId = 0, sequenc
   postBytes(encoder.encode(JSON.stringify(responses)));
 }
 
+function postStartupStage(stage: "WASM_COMPILED" | "WASM_INSTANTIATED" | "CONTENT_READY"): void {
+  workerObjectPort.postMessage({ kind: "M9_STARTUP_STAGE_V1", stage });
+}
+
 function parseBatch(buffer: ArrayBuffer): BrowserRequestEnvelopeV1[] {
   const parsed: unknown = JSON.parse(decoder.decode(buffer));
   if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAXIMUM_BROWSER_BATCH_REQUESTS_V1) {
@@ -162,18 +166,20 @@ async function initialize(first: BrowserRequestEnvelopeV1): Promise<void> {
       zeroizeProductionArtifacts(artifacts);
       throw new Error("production Worker execution identity is cross-release");
     }
-    if ((await sha256(artifacts.contentBytes)) !== artifacts.contentSha256) {
-      zeroizeProductionArtifacts(artifacts);
-      throw new Error("production content digest mismatch");
-    }
     try {
       module = await loadRustWasmModuleFromVerifiedBytesV1({
         glueBytes: artifacts.glueBytes,
         glueSha256: artifacts.glueSha256,
         wasmBytes: artifacts.wasmBytes,
         wasmSha256: artifacts.wasmSha256,
+        onCompiled: () => postStartupStage("WASM_COMPILED"),
+        onInstantiated: () => postStartupStage("WASM_INSTANTIATED"),
       });
+      if ((await sha256(artifacts.contentBytes)) !== artifacts.contentSha256) {
+        throw new Error("production content digest mismatch");
+      }
       contentBytes = Uint8Array.from(artifacts.contentBytes);
+      postStartupStage("CONTENT_READY");
     } finally {
       zeroizeProductionArtifacts(artifacts);
     }

@@ -69,10 +69,21 @@ impl ValidatedSemanticCatalog {
     /// unit closure; derives the deterministic semantic-catalog digest from
     /// the validated catalog alone.
     pub fn new(input: SemanticCatalogInput) -> Result<Self, CatalogValidationError> {
+        Self::new_for_oracle(input, M6_ORACLE_SHA)
+    }
+
+    /// Validates a semantic catalog against an explicitly pinned oracle SHA.
+    ///
+    /// This is the production refresh seam for later immutable oracle cuts;
+    /// callers must provide a compile-time constant, never catalog-authored data.
+    pub fn new_for_oracle(
+        input: SemanticCatalogInput,
+        expected_oracle_sha: &'static str,
+    ) -> Result<Self, CatalogValidationError> {
         input.catalog.validate()?;
-        if input.catalog.oracle_sha != M6_ORACLE_SHA {
+        if input.catalog.oracle_sha != expected_oracle_sha {
             return Err(CatalogValidationError::OracleShaMismatch {
-                expected: M6_ORACLE_SHA,
+                expected: expected_oracle_sha,
                 actual: input.catalog.oracle_sha.clone(),
             });
         }

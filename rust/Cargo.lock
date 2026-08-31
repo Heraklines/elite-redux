@@ -731,6 +731,7 @@ dependencies = [
  "er-repro",
  "er-save",
  "er-types",
+ "er-wasm",
  "serde",
  "serde_json",
  "thiserror",

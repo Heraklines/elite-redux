@@ -5,6 +5,7 @@ pub mod m3_schema;
 pub mod m4_schema;
 pub mod m6_parity;
 pub mod m7_parity;
+pub mod m9_parity;
 
 use er_canonical::{canonicalize, canonicalize_value, fixture_digest};
 use er_types::KernelTrace;

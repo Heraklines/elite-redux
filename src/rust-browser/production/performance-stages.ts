@@ -5,18 +5,23 @@ export const M9_STARTUP_MAXIMUM_SAMPLES = 256;
 export const M9_STARTUP_STAGES_V1 = [
   "AUTHENTICATION_READY",
   "PLATFORM_CONTEXT_READY",
-  "ASSIGNMENT_VERIFIED",
   "MANIFEST_VERIFIED",
+  "ASSIGNMENT_VERIFIED",
   "ARTIFACT_DOWNLOAD_READY",
+  "SAVE_READY",
   "WASM_COMPILED",
   "WASM_INSTANTIATED",
   "CONTENT_READY",
-  "SAVE_READY",
   "SESSION_READY",
   "FIRST_CONTROL_READY",
 ] as const;
 
 export type M9StartupStageV1 = (typeof M9_STARTUP_STAGES_V1)[number];
+
+export interface M9StartupStageSinkV1 {
+  record(stage: M9StartupStageV1, atMs: number): void;
+  classify(mode: M9StartupModeV1): void;
+}
 export type M9StartupModeV1 = "COLD" | "WARM";
 
 export interface M9StartupStageSampleV1 {
@@ -59,21 +64,28 @@ const JOURNEY_ID = /^[a-zA-Z0-9._:-]{1,128}$/u;
 
 export class M9StartupJourneyRecorderV1 {
   readonly #journeyId: string;
-  readonly #mode: M9StartupModeV1;
+  #mode: M9StartupModeV1 | null;
   readonly #startedAtMs: number;
   readonly #samples: M9StartupStageSampleV1[] = [];
 
-  constructor(options: { journeyId: string; mode: M9StartupModeV1; startedAtMs: number }) {
+  constructor(options: { journeyId: string; mode?: M9StartupModeV1; startedAtMs: number }) {
     if (
       !JOURNEY_ID.test(options.journeyId)
-      || (options.mode !== "COLD" && options.mode !== "WARM")
+      || (options.mode != null && options.mode !== "COLD" && options.mode !== "WARM")
       || !validTime(options.startedAtMs)
     ) {
       throw new Error("M9 startup journey identity or start time is invalid");
     }
     this.#journeyId = options.journeyId;
-    this.#mode = options.mode;
+    this.#mode = options.mode ?? null;
     this.#startedAtMs = options.startedAtMs;
+  }
+
+  classify(mode: M9StartupModeV1): void {
+    if ((mode !== "COLD" && mode !== "WARM") || (this.#mode != null && this.#mode !== mode)) {
+      throw new Error("M9 startup journey mode is invalid or already classified");
+    }
+    this.#mode = mode;
   }
 
   record(stage: M9StartupStageV1, atMs: number): void {
@@ -94,8 +106,8 @@ export class M9StartupJourneyRecorderV1 {
   }
 
   snapshot(): M9StartupJourneySnapshotV1 {
-    if (this.#samples.length !== M9_STARTUP_STAGES_V1.length) {
-      throw new Error("M9 startup journey is incomplete");
+    if (this.#samples.length !== M9_STARTUP_STAGES_V1.length || this.#mode == null) {
+      throw new Error("M9 startup journey is incomplete or unclassified");
     }
     return {
       schema_version: M9_STARTUP_PERFORMANCE_SCHEMA_V1,

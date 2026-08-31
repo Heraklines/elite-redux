@@ -10,6 +10,7 @@ import {
   M9StartupJourneyRecorderV1,
   M9StartupPerformanceSuiteV1,
 } from "/src/rust-browser/production/performance-stages.ts";
+import { loadRustWasmModuleFromVerifiedBytesV1 } from "/src/rust-browser/worker/rust-wasm-loader.ts";
 
 function completeJourney(journeyId, mode, startedAtMs, deltas) {
   const recorder = new M9StartupJourneyRecorderV1({ journeyId, mode, startedAtMs });
@@ -20,6 +21,27 @@ function completeJourney(journeyId, mode, startedAtMs, deltas) {
   });
   return recorder.snapshot();
 }
+
+async function sha256(bytes) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+const glueBytes = new TextEncoder().encode(
+  'export default async ({ module_or_path }) => { await WebAssembly.instantiate(module_or_path, {}); }'
+  + '; export const BrowserKernelHostV1 = { create() { return {}; } };'
+  + '; export function restore_production_save_v2() { return new Uint8Array([1]); }',
+);
+const wasmBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+const loaderStages = [];
+await loadRustWasmModuleFromVerifiedBytesV1({
+  glueBytes,
+  glueSha256: await sha256(glueBytes),
+  wasmBytes,
+  wasmSha256: await sha256(wasmBytes),
+  onCompiled: () => loaderStages.push("WASM_COMPILED"),
+  onInstantiated: () => loaderStages.push("WASM_INSTANTIATED"),
+});
 
 const suite = new M9StartupPerformanceSuiteV1();
 const cold = completeJourney("cold-1", "COLD", 100, [50, 300, 100, 100, 700, 500, 300, 400, 300, 300, 148]);
@@ -54,7 +76,7 @@ try {
 } catch (error) {
   errors.push(String(error));
 }
-globalThis.__m9Startup = { cold, warm, summary: suite.summary(), errors };
+globalThis.__m9Startup = { cold, warm, summary: suite.summary(), errors, loaderStages };
 </script></body></html>`;
 
 test.beforeAll(async () => {
@@ -101,6 +123,7 @@ test("startup stages produce bounded cold and warm distributions", async ({ page
               warm: { samples: number; total: { p50_ms: number; p95_ms: number } };
             };
             errors: string[];
+            loaderStages: string[];
           };
         }
       ).__m9Startup,
@@ -115,6 +138,7 @@ test("startup stages produce bounded cold and warm distributions", async ({ page
     warm: { samples: 3, total: { p50_ms: 121, p95_ms: 132 } },
   });
   expect(result.errors).toHaveLength(4);
+  expect(result.loaderStages).toEqual(["WASM_COMPILED", "WASM_INSTANTIATED"]);
   expect(result.errors[0]).toContain("out of order");
   expect(result.errors[1]).toContain("invalid or unbounded");
   expect(result.errors[2]).toContain("identity or start time");

@@ -238,6 +238,7 @@ mod tests {
             owner_seat: None,
             species_id: SpeciesId::new(SafeU53::new(1).expect("species")),
             form_index: 0,
+            gender: None,
             level: 5,
             experience: Experience::new(SafeU53::ZERO),
             types: PokemonTyping {

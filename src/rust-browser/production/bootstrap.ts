@@ -64,9 +64,15 @@ async function loadOrInstallRelease(
   selection: VerifiedProductionRuntimeSelectionV1,
 ): Promise<CompleteProductionReleaseV2> {
   try {
-    return await loadCompleteProductionReleaseV2(dependencies.caches, selection.release);
+    const release = await loadCompleteProductionReleaseV2(dependencies.caches, selection.release);
+    dependencies.startup?.classify("WARM");
+    dependencies.startup?.record("ARTIFACT_DOWNLOAD_READY", performance.now());
+    return release;
   } catch {
-    return installCompleteProductionReleaseV2(dependencies.caches, selection.release);
+    const release = await installCompleteProductionReleaseV2(dependencies.caches, selection.release);
+    dependencies.startup?.classify("COLD");
+    dependencies.startup?.record("ARTIFACT_DOWNLOAD_READY", performance.now());
+    return release;
   }
 }
 
@@ -98,6 +104,7 @@ async function startRustSession(
   authority: Exclude<ProductionAuthorityRuntimeV1, "LEGACY_TRANSITION">,
 ): Promise<ProductionBrowserSessionV1> {
   const sessionStart = await dependencies.prepareSessionStart(selection, release);
+  dependencies.startup?.record("SAVE_READY", performance.now());
   let host: ProductionWorkerHostV1 | null = null;
   let pinState: EnsuredPinV1 | null = null;
   try {
@@ -106,10 +113,13 @@ async function startRustSession(
       sessionId: dependencies.sessionId,
       authority,
       sessionStartBytes: sessionStart,
+      startup: dependencies.startup,
     });
+    dependencies.startup?.record("SESSION_READY", performance.now());
     pinState = await ensurePin(dependencies, selection, host.identity, authority);
     await retainProductionReleasePinV2(dependencies.caches, selection.release.release_id, pinState.pin.session_id);
     const view = await dependencies.startRustView(host, selection, release);
+    dependencies.startup?.record("FIRST_CONTROL_READY", performance.now());
     return lifecycle(selection, dependencies, view, pinState.pin.kernel_generation, host, true);
   } catch (error) {
     await host?.dispose().catch(() => undefined);

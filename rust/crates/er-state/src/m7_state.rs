@@ -185,6 +185,8 @@ pub struct PokemonStateV5 {
     pub moves: [Option<MoveSlotState>; 4],
     pub abilities: AbilityLoadout,
     pub ivs: [Iv; 6],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gender: Option<u8>,
     pub nature: er_types::run_ids::NatureId,
     pub effective_nature: er_types::run_ids::NatureId,
     pub friendship: u16,

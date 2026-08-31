@@ -6,6 +6,7 @@ import type {
   SignedProductionManifestV1,
   SignedRuntimeAssignmentV1,
 } from "./contracts";
+import type { M9StartupStageSinkV1 } from "./performance-stages";
 import { verifySignedProductionManifestV1 } from "./release-manifest";
 import { verifySignedRuntimeAssignmentV1 } from "./runtime-assignment";
 import { validateSessionRuntimePinV1 } from "./session-pin";
@@ -19,6 +20,7 @@ export interface ProductionRuntimeSelectionDependenciesV1 {
   loadPin(sessionId: string): Promise<SessionRuntimePinV1 | null>;
   loadRelease(releaseId: string): Promise<SignedProductionManifestV1>;
   requestAssignment(): Promise<SignedRuntimeAssignmentV1>;
+  startup?: M9StartupStageSinkV1;
 }
 
 export interface VerifiedProductionRuntimeSelectionV1 {
@@ -38,13 +40,16 @@ export async function selectProductionRuntimeV1(
     }
     const signedRelease = await dependencies.loadRelease(existing.release_id);
     const release = await verifySignedProductionManifestV1(signedRelease, dependencies.trustedKeys, dependencies.now);
+    dependencies.startup?.record("MANIFEST_VERIFIED", performance.now());
     assertPinRelease(existing, release);
+    dependencies.startup?.record("ASSIGNMENT_VERIFIED", performance.now());
     return { release, assignment: null, existingPin: existing };
   }
 
   const signedAssignment = await dependencies.requestAssignment();
   const signedRelease = await dependencies.loadRelease(signedAssignment.payload.release_id);
   const release = await verifySignedProductionManifestV1(signedRelease, dependencies.trustedKeys, dependencies.now);
+  dependencies.startup?.record("MANIFEST_VERIFIED", performance.now());
   const assignment = await verifySignedRuntimeAssignmentV1(
     signedAssignment,
     dependencies.trustedKeys,
@@ -52,6 +57,7 @@ export async function selectProductionRuntimeV1(
     dependencies.expectedAssignmentScopes,
     dependencies.now,
   );
+  dependencies.startup?.record("ASSIGNMENT_VERIFIED", performance.now());
   if (assignment.release_id !== release.release_id) {
     throw new Error("signed assignment and release identity differ");
   }

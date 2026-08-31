@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "source_count": 12,
+  "behavior_unit_count": 18,
+  "rng_site_count": 0,
+  "bespoke_cluster_count": 4,
+  "resolutions": {
+    "BESPOKE_GAP": 7,
+    "RESOLVED_INTRINSIC": 10,
+    "RESOLVED_OPERANDS": 1
+  },
+  "reachable_species": [
+    1,
+    16
+  ],
+  "reachable_moves": [
+    22,
+    28,
+    64,
+    211,
+    314
+  ],
+  "reachable_active_abilities": [
+    62,
+    5006
+  ],
+  "reachable_passive_abilities": [
+    51,
+    5097,
+    5210
+  ]
+}

@@ -3,17 +3,24 @@ import { encodeCanonicalJsonV1 } from "../host/message-sequencer";
 import type { BrowserKernelGenerationIdentityV1, BrowserKernelGenerationV1 } from "../hot-reload/contracts";
 import { GenerationWorkerHostV1 } from "../hot-reload/generation-worker-host";
 import type { ProductionAuthorityRuntimeV1, ProductionReleaseManifestV2 } from "./contracts";
+import type { M9StartupStageSinkV1, M9StartupStageV1 } from "./performance-stages";
 import {
   type CompleteProductionReleaseV2,
   materializeVerifiedArtifactUrlV1,
   readVerifiedArtifactBytesV1,
 } from "./release-cache-v2";
 
+interface M9StartupWorkerStageV1 {
+  kind: "M9_STARTUP_STAGE_V1";
+  stage: Extract<M9StartupStageV1, "WASM_COMPILED" | "WASM_INSTANTIATED" | "CONTENT_READY">;
+}
+
 export interface ProductionWorkerHostOptionsV1 {
   release: CompleteProductionReleaseV2;
   sessionId: string;
   authority: ProductionAuthorityRuntimeV1;
   sessionStartBytes: Uint8Array;
+  startup: M9StartupStageSinkV1 | undefined;
 }
 
 export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
@@ -57,12 +64,44 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
       },
     };
     executionIdentityBytes.fill(0);
+    let removeStartupListener = (): void => undefined;
+    let startupStagesSeen = 0;
+    const startupStagesReady = Promise.withResolvers<void>();
+    const startupTimeout =
+      options.startup == null
+        ? null
+        : Number(
+            globalThis.setTimeout(
+              () => startupStagesReady.reject(new Error("M9 Worker startup stages timed out")),
+              30_000,
+            ),
+          );
+    if (options.startup == null) {
+      startupStagesReady.resolve();
+    }
+    const recordStartupStage = (event: MessageEvent<unknown>): void => {
+      if (!isM9StartupWorkerStageV1(event.data) || options.startup == null) {
+        return;
+      }
+      try {
+        options.startup.record(event.data.stage, performance.now());
+        startupStagesSeen += 1;
+        if (startupStagesSeen === 3) {
+          startupStagesReady.resolve();
+        }
+      } catch (error) {
+        startupStagesReady.reject(error);
+      }
+    };
+    let host: GenerationWorkerHostV1 | null = null;
     try {
-      const host = await GenerationWorkerHostV1.create({
+      host = await GenerationWorkerHostV1.create({
         identity,
         workerUrl: new URL(worker.url),
         initialize,
         configureWorker(created) {
+          created.addEventListener("message", recordStartupStage);
+          removeStartupListener = () => created.removeEventListener("message", recordStartupStage);
           created.postMessage(
             {
               kind: "ATTACH_PRODUCTION_ARTIFACTS_V1",
@@ -79,6 +118,7 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
           );
         },
       });
+      await startupStagesReady.promise;
       const readyAt = performance.now();
       recordBoundedMeasure("er:m9:worker-url-materialization", startedAt, workerUrlReadyAt);
       recordBoundedMeasure("er:m9:worker-artifact-read", workerUrlReadyAt, artifactsReadyAt);
@@ -86,11 +126,17 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
       recordBoundedMeasure("er:m9:warm-worker-ready", startedAt, readyAt);
       return new ProductionWorkerHostV1(identity, host, worker.revoke);
     } catch (error) {
+      await host?.dispose().catch(() => undefined);
       worker.revoke();
       glueBytes.fill(0);
       wasmBytes.fill(0);
       contentBytes.fill(0);
       throw error;
+    } finally {
+      if (startupTimeout != null) {
+        globalThis.clearTimeout(startupTimeout);
+      }
+      removeStartupListener();
     }
   }
 
@@ -113,6 +159,19 @@ export class ProductionWorkerHostV1 implements BrowserKernelGenerationV1 {
       this.#revokeWorker();
     }
   }
+}
+
+function isM9StartupWorkerStageV1(value: unknown): value is M9StartupWorkerStageV1 {
+  if (
+    typeof value !== "object"
+    || value == null
+    || (value as Partial<M9StartupWorkerStageV1>).kind !== "M9_STARTUP_STAGE_V1"
+  ) {
+    return false;
+  }
+  return ["WASM_COMPILED", "WASM_INSTANTIATED", "CONTENT_READY"].includes(
+    (value as Partial<M9StartupWorkerStageV1>).stage ?? "",
+  );
 }
 
 function recordBoundedMeasure(name: string, startedAt: number, endedAt: number): void {

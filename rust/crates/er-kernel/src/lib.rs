@@ -9,6 +9,7 @@ pub mod game_kernel_v6;
 pub mod input_router;
 pub mod kernel;
 pub mod m6_kernel_v5;
+pub mod m9_vertical;
 pub mod snapshot;
 pub mod snapshot_v3;
 pub mod snapshot_v4;

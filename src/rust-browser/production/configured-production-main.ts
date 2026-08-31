@@ -8,6 +8,7 @@ import {
 } from "./contracts";
 import type { ProductionHealthEventV1 } from "./health-event";
 import { sendProductionHealthEventV1 } from "./health-reporter";
+import { M9StartupJourneyRecorderV1 } from "./performance-stages";
 import { loadAuthenticatedPlatformContextV1, readProductionAccountAuthorizationV1 } from "./platform-context";
 import {
   bootstrapRustPreviewAccountV1,
@@ -34,13 +35,20 @@ const MAXIMUM_MANIFEST_BYTES = 131_072;
 const MAXIMUM_ASSIGNMENT_BYTES = 65_536;
 
 export async function startConfiguredProductionMainV1(): Promise<void> {
+  const startup = new M9StartupJourneyRecorderV1({
+    journeyId: `startup-${crypto.randomUUID()}`,
+    startedAtMs: performance.now(),
+  });
   const authorization = readProductionAccountAuthorizationV1();
+  startup.record("AUTHENTICATION_READY", performance.now());
   const sessionId = await getOrCreateBrowserGameSessionIdV1();
   const browserInstanceId = `instance-${crypto.randomUUID()}`;
   let preparedSaveFrontier: Pick<CloudSaveValueV1, "revision" | "generation"> | null | undefined;
   const platform = await loadAuthenticatedPlatformContextV1(authorization);
+  startup.record("PLATFORM_CONTEXT_READY", performance.now());
   const pinStore = new IndexedDbSessionRuntimePinStoreV1();
   const session = await startProductionBootstrapV1({
+    startup,
     sessionId,
     get now() {
       return Date.now();
@@ -195,6 +203,7 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
       throw new Error("legacy transition is unavailable in the Rust preview-only release");
     },
   });
+  const startupSnapshot = startup.snapshot();
   const healthEvent: ProductionHealthEventV1 = {
     schema_version: 1,
     release_id: session.generation.release_id,
@@ -203,7 +212,14 @@ export async function startConfiguredProductionMainV1(): Promise<void> {
     platform_class: productionPlatformClass(),
     event: "BOOTSTRAP_SUCCESS",
     failure_fingerprint: null,
-    performance: null,
+    performance: {
+      samples: 1,
+      median_micros: Math.round(startupSnapshot.total_ms * 1_000),
+      p95_micros: Math.round(startupSnapshot.total_ms * 1_000),
+      p99_micros: Math.round(startupSnapshot.total_ms * 1_000),
+      maximum_micros: Math.round(startupSnapshot.total_ms * 1_000),
+      memory_bytes: 0,
+    },
     hard_stop_rule: null,
   };
   queueMicrotask(() => {

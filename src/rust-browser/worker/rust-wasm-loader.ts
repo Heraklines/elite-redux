@@ -7,7 +7,7 @@ export interface RustWasmHostV1 {
 }
 
 export interface RustWasmModuleV1 {
-  default(input: { module_or_path: Uint8Array<ArrayBuffer> }): Promise<unknown>;
+  default(input: { module_or_path: WebAssembly.Module | Uint8Array<ArrayBuffer> }): Promise<unknown>;
   BrowserKernelHostV1: {
     create(contentBytes: Uint8Array, initBytes: Uint8Array): RustWasmHostV1;
   };
@@ -42,7 +42,8 @@ export async function loadRustWasmModule(url: URL, expectedSha256: string): Prom
   const glue = await import(/* @vite-ignore */ glueUrl.href);
   const typed = validateModule(glue);
   try {
-    await typed.default({ module_or_path: Uint8Array.from(bytes) });
+    const compiled = await WebAssembly.compile(bytes);
+    await typed.default({ module_or_path: compiled });
   } finally {
     bytes.fill(0);
   }
@@ -54,6 +55,8 @@ export async function loadRustWasmModuleFromVerifiedBytesV1(options: {
   glueSha256: string;
   wasmBytes: Uint8Array;
   wasmSha256: string;
+  onCompiled?: () => void;
+  onInstantiated?: () => void;
 }): Promise<RustWasmModuleV1> {
   if (
     !SHA256.test(options.glueSha256)
@@ -73,7 +76,10 @@ export async function loadRustWasmModuleFromVerifiedBytesV1(options: {
   try {
     const glue = await import(/* @vite-ignore */ glueUrl);
     const typed = validateModule(glue);
-    await typed.default({ module_or_path: wasmCopy });
+    const compiled = await WebAssembly.compile(wasmCopy);
+    options.onCompiled?.();
+    await typed.default({ module_or_path: compiled });
+    options.onInstantiated?.();
     return typed;
   } finally {
     URL.revokeObjectURL(glueUrl);

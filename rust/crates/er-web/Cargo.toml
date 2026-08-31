@@ -23,6 +23,7 @@ er-production = { path = "../er-production" }
 er-save = { path = "../er-save" }
 er-repro = { path = "../er-repro" }
 er-types = { path = "../er-types" }
+er-wasm = { path = "../er-wasm" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
