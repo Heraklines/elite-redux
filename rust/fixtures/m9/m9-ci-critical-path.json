@@ -17,7 +17,43 @@
     },
     "correctness_command": "cargo test --workspace --all-targets -- --skip m3_audited_production_surface_matches_frozen_manifest"
   },
-  "after": null,
+  "after": {
+    "run_id": 33367838927,
+    "run_conclusion": "failure",
+    "failure_scope": "source-static-security shallow ancestry setup; both measured Rust jobs succeeded",
+    "candidate_sha": "244a2c0161ebe7a7f6f686e62a99773db075cca2",
+    "harness_sha": "dcc778ef33ccdfeecc2c5eed4006ac9911084166",
+    "critical_path_ms": 616000,
+    "rust_correctness": {
+      "job_id": 99412265988,
+      "job_ms": 575000,
+      "checkout_ms": 35000,
+      "dependency_cache_restore_ms": 1000,
+      "compiled_cache_restore_ms": 0,
+      "correctness_tests_ms": 442248,
+      "doctests_ms": 6575,
+      "example_check_ms": 72,
+      "measured_command_total_ms": 448895,
+      "compiled_cache_save_ms": 85000,
+      "dependency_cache_save_ms": 2000
+    },
+    "optimized_benchmarks": {
+      "job_id": 99412266007,
+      "job_ms": 548000,
+      "checkout_ms": 8000,
+      "dependency_cache_restore_ms": 1000,
+      "compiled_cache_restore_ms": 0,
+      "m2_benchmark_ms": 348801,
+      "m3_benchmark_ms": 74933,
+      "m4_runtime_benchmark_ms": 102764,
+      "measured_command_total_ms": 526498,
+      "compiled_cache_save_ms": 5000,
+      "dependency_cache_save_ms": 2000,
+      "workload_tests": 18
+    },
+    "correctness_command": "cargo test --workspace --locked --lib --bins --tests -- --skip m3_audited_production_surface_matches_frozen_manifest",
+    "performance_command": "cargo test --locked --release -p er-sim --bench <m2_benchmark|m3_benchmark|m4_runtime_benchmark> -- --nocapture --test-threads=1"
+  },
   "measurement_policy": {
     "correctness": "locked explicit lib/bin/integration targets in the test profile",
     "doctests": "locked workspace doctests",
