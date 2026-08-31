@@ -8,6 +8,13 @@
       92
     ]
   },
+  "SPECIES_ALTARIA_MEGA": {
+    "innates": [
+      20012,
+      5382,
+      5391
+    ]
+  },
   "SPECIES_AMAURA": {
     "ability1": 116,
     "ability2": 174,
