@@ -1,10 +1,15 @@
-import type { CloudSaveValueV1 } from "../adapters/cloud-save-adapter";
+import { CloudSaveConflictV1, type CloudSaveValueV1 } from "../adapters/cloud-save-adapter";
 import { encodeCanonicalJsonV1 } from "../host/message-sequencer";
 import {
   type ProductionReleaseManifestV2,
   type ProductionSaveEnvelopeV2,
   RUST_PREVIEW_SAVE_NAMESPACE_V1,
 } from "./contracts";
+import {
+  type OfflineSaveRequestIdentityV1,
+  OfflineSaveStateMachineV1,
+  type OfflineSaveStateSnapshotV1,
+} from "./offline-save-state";
 import type { PreviewRemoteLeaseCoordinatorV1, PreviewRemoteLeaseV1 } from "./preview-remote-lease";
 import { validateProductionSaveEnvelopeV2 } from "./save-envelope";
 import type { ProductionCloudSaveV1, ProductionSaveLeaseCoordinatorV1 } from "./save-migration";
@@ -57,6 +62,7 @@ export class RustPreviewSaveStorageV1 {
   #cloudRevision: string | null;
   #cloudGeneration: number;
   #kernelRevision: number | null = null;
+  readonly #offlineState: OfflineSaveStateMachineV1;
   #disposed = false;
 
   constructor(options: RustPreviewSaveStorageOptionsV1) {
@@ -79,6 +85,7 @@ export class RustPreviewSaveStorageV1 {
     this.#browserInstanceId = options.browserInstanceId;
     this.#cloudRevision = options.source?.revision ?? null;
     this.#cloudGeneration = options.source?.generation ?? 0;
+    this.#offlineState = new OfflineSaveStateMachineV1(this.#cloudRevision, this.#cloudGeneration);
   }
 
   async handleRequest(bytes: Uint8Array): Promise<Uint8Array> {
@@ -88,16 +95,11 @@ export class RustPreviewSaveStorageV1 {
     }
     const fingerprint = await sha256(bytes);
     const request = decodeWriteRequest(bytes);
-    const retained = this.#retained.get(request.request_id);
+    const retained = this.#retainedResult(request.request_id, fingerprint);
     if (retained != null) {
-      if (retained.fingerprint !== fingerprint) {
-        throw new Error("Rust preview storage request identity was reused with different bytes");
-      }
-      return Uint8Array.from(retained.bytes);
+      return retained;
     }
-    if (this.#kernelRevision != null && request.expected_revision !== this.#kernelRevision) {
-      throw new Error("Rust preview storage request has a stale kernel revision");
-    }
+    this.#assertKernelRevision(request.expected_revision);
 
     const payload = Uint8Array.from(request.bytes);
     const nextGeneration = this.#cloudGeneration + 1;
@@ -130,22 +132,22 @@ export class RustPreviewSaveStorageV1 {
       };
       await validateProductionSaveEnvelopeV2(envelope, this.#release, this.#accountId, this.#slot);
       const encoded = encodeCanonicalJsonV1(envelope);
+      const requestIdentity: OfflineSaveRequestIdentityV1 = {
+        request_id: request.request_id,
+        request_fingerprint: fingerprint,
+        payload_sha256: await sha256(encoded),
+        expected_cloud_revision: this.#cloudRevision,
+        expected_kernel_revision: request.expected_revision,
+        next_cloud_generation: nextGeneration,
+      };
+      const alreadyCommitted = await this.#prepareOfflineRequest(requestIdentity, encoded);
       try {
-        const revision = await this.#cloud.compareAndSwap(this.#slot, this.#cloudRevision, encoded, {
-          token: remoteLease.lease_token,
-          holder: remoteLease.holder,
-        });
-        this.#cloudRevision = revision;
-        this.#cloudGeneration = nextGeneration;
-        const readback = await this.#cloud.load(this.#slot);
-        if (
-          readback == null
-          || readback.revision !== revision
-          || readback.generation !== nextGeneration
-          || !equalBytes(readback.bytes, encoded)
-        ) {
-          throw new Error("Rust preview save readback differs from committed bytes");
+        if (!alreadyCommitted) {
+          await this.#commitPendingRequest(requestIdentity, encoded, remoteLease);
         }
+      } catch (error) {
+        this.#recordWriteFailure(requestIdentity, error);
+        throw error;
       } finally {
         encoded.fill(0);
       }
@@ -169,6 +171,101 @@ export class RustPreviewSaveStorageV1 {
     }
   }
 
+  #retainedResult(requestId: number, fingerprint: string): Uint8Array | null {
+    const retained = this.#retained.get(requestId);
+    if (retained == null) {
+      return null;
+    }
+    if (retained.fingerprint !== fingerprint) {
+      throw new Error("Rust preview storage request identity was reused with different bytes");
+    }
+    return Uint8Array.from(retained.bytes);
+  }
+
+  #assertKernelRevision(expectedRevision: number | null): void {
+    if (this.#kernelRevision != null && expectedRevision !== this.#kernelRevision) {
+      throw new Error("Rust preview storage request has a stale kernel revision");
+    }
+  }
+
+  async #prepareOfflineRequest(request: OfflineSaveRequestIdentityV1, encoded: Uint8Array): Promise<boolean> {
+    const offline = this.#offlineState.snapshot();
+    if (offline.phase !== "AMBIGUOUS") {
+      this.#offlineState.begin(request);
+      return false;
+    }
+    const observed = await this.#cloud.load(this.#slot);
+    if (observed == null) {
+      if (offline.cloud_revision == null && offline.cloud_generation === 0) {
+        this.#offlineState.retry(request.request_id, request.request_fingerprint);
+        return false;
+      }
+      this.#offlineState.markConflict(request.request_id, request.request_fingerprint);
+      throw new CloudSaveConflictV1();
+    }
+    const reconciliation = this.#offlineState.reconcile(request.request_id, request.request_fingerprint, {
+      revision: observed.revision,
+      generation: Number(observed.generation),
+      payload_sha256: await sha256(observed.bytes),
+    });
+    if (reconciliation === "ACKNOWLEDGED") {
+      if (!equalBytes(observed.bytes, encoded)) {
+        throw new Error("Rust preview reconciled save differs from the immutable request image");
+      }
+      this.#cloudRevision = observed.revision;
+      this.#cloudGeneration = Number(observed.generation);
+      return true;
+    }
+    if (reconciliation === "RETRY") {
+      this.#offlineState.retry(request.request_id, request.request_fingerprint);
+      return false;
+    }
+    throw new CloudSaveConflictV1();
+  }
+
+  async #commitPendingRequest(
+    request: OfflineSaveRequestIdentityV1,
+    encoded: Uint8Array,
+    remoteLease: PreviewRemoteLeaseV1,
+  ): Promise<void> {
+    const revision = await this.#cloud.compareAndSwap(this.#slot, this.#cloudRevision, encoded, {
+      token: remoteLease.lease_token,
+      holder: remoteLease.holder,
+    });
+    const readback = await this.#cloud.load(this.#slot);
+    if (
+      readback == null
+      || readback.revision !== revision
+      || readback.generation !== request.next_cloud_generation
+      || !equalBytes(readback.bytes, encoded)
+    ) {
+      throw new Error("Rust preview save readback differs from committed bytes");
+    }
+    this.#offlineState.acknowledge(
+      request.request_id,
+      request.request_fingerprint,
+      revision,
+      request.next_cloud_generation,
+    );
+    this.#cloudRevision = revision;
+    this.#cloudGeneration = request.next_cloud_generation;
+  }
+
+  #recordWriteFailure(request: OfflineSaveRequestIdentityV1, error: unknown): void {
+    if (this.#offlineState.snapshot().phase !== "PENDING") {
+      return;
+    }
+    if (error instanceof CloudSaveConflictV1) {
+      this.#offlineState.markConflict(request.request_id, request.request_fingerprint);
+    } else {
+      this.#offlineState.markAmbiguous(request.request_id, request.request_fingerprint);
+    }
+  }
+
+  saveStateSnapshot(): OfflineSaveStateSnapshotV1 {
+    return this.#offlineState.snapshot();
+  }
+
   dispose(): void {
     if (this.#disposed) {
       return;
@@ -178,6 +275,7 @@ export class RustPreviewSaveStorageV1 {
       result.bytes.fill(0);
     }
     this.#retained.clear();
+    this.#offlineState.close();
     this.#cloud.dispose();
     this.#leases.dispose();
     this.#remoteLeases.dispose();
