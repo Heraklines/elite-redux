@@ -480,38 +480,29 @@ jobs:
           name: m9-g52-web-${{ github.sha }}
           path: ${{ runner.temp }}/m9-web
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - name: Run cache and input platform matrix
+      - name: Run browser contracts with isolated contexts in one worker browser
         env:
           M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
-        run: >-
-          pnpm exec playwright test --config playwright.rust-browser.config.ts
-          --project=${{ matrix.browser }}
-          test/browser/rust-browser/release-cache.spec.ts
-          test/browser/rust-browser/input-accessibility.spec.ts
-      - name: Run mobile touch in a fresh browser process
-        run: >-
-          pnpm exec playwright test --config playwright.rust-browser.config.ts
-          --project=${{ matrix.browser }}
-          test/browser/rust-browser/mobile-profile.spec.ts
-      - name: Run cross-engine Rust Wasm journey
-        if: matrix.browser != 'firefox'
-        env:
-          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
-        run: >-
-          pnpm exec playwright test --config playwright.rust-browser.config.ts
-          --project=${{ matrix.browser }}
-          test/browser/rust-browser/rust-local.spec.ts
-      - name: Run Chromium solo co-op reconnect and Phaser journeys
-        if: matrix.browser == 'chromium'
-        env:
-          M8_RUST_BROWSER_FIXTURE_DIR: ${{ runner.temp }}/m9-web
-        run: >-
-          pnpm exec playwright test --config playwright.rust-browser.config.ts
-          --project=chromium
-          test/browser/rust-browser/full-solo.spec.ts
-          test/browser/rust-browser/full-coop.spec.ts
-          test/browser/rust-browser/adapters/phaser-adapter.spec.ts
-          test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
+          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+        run: |
+          FILES=(
+            test/browser/rust-browser/release-cache.spec.ts
+            test/browser/rust-browser/input-accessibility.spec.ts
+            test/browser/rust-browser/mobile-profile.spec.ts
+          )
+          if [ "$PLAYWRIGHT_BROWSER" != "firefox" ]; then
+            FILES+=(test/browser/rust-browser/rust-local.spec.ts)
+          fi
+          if [ "$PLAYWRIGHT_BROWSER" = "chromium" ]; then
+            FILES+=(
+              test/browser/rust-browser/full-solo.spec.ts
+              test/browser/rust-browser/full-coop.spec.ts
+              test/browser/rust-browser/adapters/phaser-adapter.spec.ts
+              test/browser/rust-browser/adapters/webrtc-two-browser.spec.ts
+            )
+          fi
+          pnpm exec playwright test --config playwright.rust-browser.config.ts \
+            --project="$PLAYWRIGHT_BROWSER" "${FILES[@]}"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
