@@ -23,9 +23,14 @@ function completeJourney(journeyId, mode, startedAtMs, deltas) {
 
 const suite = new M9StartupPerformanceSuiteV1();
 const cold = completeJourney("cold-1", "COLD", 100, [50, 300, 100, 100, 700, 500, 300, 400, 300, 300, 148]);
+const cold2 = completeJourney("cold-2", "COLD", 200, [50, 300, 100, 100, 700, 500, 300, 400, 300, 300, 149]);
+const cold3 = completeJourney("cold-3", "COLD", 300, [50, 300, 100, 100, 700, 500, 300, 400, 300, 300, 150]);
 const warm = completeJourney("warm-1", "WARM", 1000, [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]);
-suite.add(cold);
-suite.add(warm);
+const warm2 = completeJourney("warm-2", "WARM", 2000, [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11]);
+const warm3 = completeJourney("warm-3", "WARM", 3000, [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]);
+for (const journey of [cold, cold2, cold3, warm, warm2, warm3]) {
+  suite.add(journey);
+}
 const errors = [];
 try {
   const outOfOrder = new M9StartupJourneyRecorderV1({ journeyId: "bad-order", mode: "COLD", startedAtMs: 0 });
@@ -87,8 +92,8 @@ test("startup stages produce bounded cold and warm distributions", async ({ page
             warm: { total_ms: number };
             summary: {
               total_samples: number;
-              cold: { samples: number; total: { p95_ms: number } };
-              warm: { samples: number; total: { p95_ms: number } };
+              cold: { samples: number; total: { p50_ms: number; p95_ms: number } };
+              warm: { samples: number; total: { p50_ms: number; p95_ms: number } };
             };
             errors: string[];
           };
@@ -100,9 +105,9 @@ test("startup stages produce bounded cold and warm distributions", async ({ page
   expect(result.cold.stages).toHaveLength(11);
   expect(result.warm.total_ms).toBe(110);
   expect(result.summary).toMatchObject({
-    total_samples: 2,
-    cold: { samples: 1, total: { p95_ms: 3198 } },
-    warm: { samples: 1, total: { p95_ms: 110 } },
+    total_samples: 6,
+    cold: { samples: 3, total: { p50_ms: 3199, p95_ms: 3200 } },
+    warm: { samples: 3, total: { p50_ms: 121, p95_ms: 132 } },
   });
   expect(result.errors).toHaveLength(3);
   expect(result.errors[0]).toContain("out of order");
