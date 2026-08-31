@@ -157,27 +157,71 @@ jobs:
   rust-regression:
     needs: candidate-binding
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
         if: inputs.rust_regression_run_id == 0
         with:
           ref: ${{ inputs.candidate_sha }}
           fetch-depth: 0
-      - uses: actions/cache@v5
+      - name: Restore Cargo dependency downloads
         if: inputs.rust_regression_run_id == 0
+        id: correctness-deps-cache
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/target
-          key: m9-g52-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - name: Run sole full Rust workspace regression
+          key: m9-g52-cargo-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m9-g52-cargo-deps-${{ runner.os }}-${{ runner.arch }}-
+      - name: Restore correctness compiled artifacts
+        if: inputs.rust_regression_run_id == 0
+        id: correctness-target-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            rust/target/debug/.fingerprint
+            rust/target/debug/build
+            rust/target/debug/deps
+          key: m9-g52-target-${{ runner.os }}-${{ runner.arch }}-x86_64-unknown-linux-gnu-test-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}-${{ inputs.candidate_sha }}
+          restore-keys: |
+            m9-g52-target-${{ runner.os }}-${{ runner.arch }}-x86_64-unknown-linux-gnu-test-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}-
+      - name: Run locked Rust correctness targets
         if: inputs.rust_regression_run_id == 0
         working-directory: rust
-        run: >-
-          cargo test --workspace --all-targets --
-          --skip m3_audited_production_surface_matches_frozen_manifest
+        env:
+          DEPS_CACHE_HIT: ${{ steps.correctness-deps-cache.outputs.cache-hit }}
+          TARGET_CACHE_HIT: ${{ steps.correctness-target-cache.outputs.cache-hit }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/m9-rust-correctness"
+          START_MS=$(date +%s%3N)
+          cargo test --workspace --locked --lib --bins --tests -- \
+            --skip m3_audited_production_surface_matches_frozen_manifest
+          TESTS_DONE_MS=$(date +%s%3N)
+          cargo test --workspace --locked --doc
+          DOCS_DONE_MS=$(date +%s%3N)
+          cargo check --workspace --locked --examples
+          END_MS=$(date +%s%3N)
+          jq -n \
+            --arg candidate "${{ inputs.candidate_sha }}" \
+            --arg deps_cache_hit "$DEPS_CACHE_HIT" \
+            --arg target_cache_hit "$TARGET_CACHE_HIT" \
+            --argjson tests_ms "$((TESTS_DONE_MS - START_MS))" \
+            --argjson doctests_ms "$((DOCS_DONE_MS - TESTS_DONE_MS))" \
+            --argjson examples_ms "$((END_MS - DOCS_DONE_MS))" \
+            --argjson total_ms "$((END_MS - START_MS))" \
+            '{schema_version:1,candidate_sha:$candidate,profile:"test",target:"x86_64-unknown-linux-gnu",
+              dependency_cache_hit:$deps_cache_hit,compiled_cache_hit:$target_cache_hit,
+              correctness_tests_ms:$tests_ms,doctests_ms:$doctests_ms,example_check_ms:$examples_ms,total_ms:$total_ms}' \
+            > "$RUNNER_TEMP/m9-rust-correctness/timing.json"
+      - uses: actions/upload-artifact@v6
+        if: inputs.rust_regression_run_id == 0
+        with:
+          name: m9-g52-rust-correctness-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/m9-rust-correctness/timing.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Consume exact-SHA G52 Rust regression result
         if: inputs.rust_regression_run_id != 0
         uses: actions/github-script@v8
@@ -202,6 +246,116 @@ jobs:
             const regression = jobs.filter(job => job.name === 'rust-regression');
             if (regression.length !== 1 || regression[0].conclusion !== 'success') {
               core.setFailed('Exact-candidate Rust regression result is missing or non-successful');
+            }
+
+  optimized-benchmarks:
+    needs: candidate-binding
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        if: inputs.rust_regression_run_id == 0
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+      - name: Restore Cargo dependency downloads
+        if: inputs.rust_regression_run_id == 0
+        id: benchmark-deps-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9-g52-cargo-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m9-g52-cargo-deps-${{ runner.os }}-${{ runner.arch }}-
+      - name: Restore optimized benchmark artifacts
+        if: inputs.rust_regression_run_id == 0
+        id: benchmark-target-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            rust/target/release/.fingerprint
+            rust/target/release/build
+            rust/target/release/deps
+          key: m9-g52-target-${{ runner.os }}-${{ runner.arch }}-x86_64-unknown-linux-gnu-release-bench-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}-${{ inputs.candidate_sha }}
+          restore-keys: |
+            m9-g52-target-${{ runner.os }}-${{ runner.arch }}-x86_64-unknown-linux-gnu-release-bench-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}-
+      - name: Run optimized historical throughput workloads
+        if: inputs.rust_regression_run_id == 0
+        working-directory: rust
+        env:
+          DEPS_CACHE_HIT: ${{ steps.benchmark-deps-cache.outputs.cache-hit }}
+          TARGET_CACHE_HIT: ${{ steps.benchmark-target-cache.outputs.cache-hit }}
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/m9-optimized-benchmarks"
+          START_MS=$(date +%s%3N)
+          M2_START_MS=$START_MS
+          cargo test --locked --release -p er-sim --bench m2_benchmark -- --nocapture --test-threads=1 \
+            | tee "$RUNNER_TEMP/m9-optimized-benchmarks/m2.log"
+          M2_END_MS=$(date +%s%3N)
+          test "$(grep -c 'M2_BENCHMARK_RESULT ' "$RUNNER_TEMP/m9-optimized-benchmarks/m2.log")" -eq 4
+          cargo test --locked --release -p er-sim --bench m3_benchmark -- --nocapture --test-threads=1 \
+            | tee "$RUNNER_TEMP/m9-optimized-benchmarks/m3.log"
+          M3_END_MS=$(date +%s%3N)
+          test "$(grep -c 'M3_BENCHMARK_RESULT ' "$RUNNER_TEMP/m9-optimized-benchmarks/m3.log")" -eq 5
+          cargo test --locked --release -p er-sim --bench m4_runtime_benchmark -- --nocapture --test-threads=1 \
+            | tee "$RUNNER_TEMP/m9-optimized-benchmarks/m4.log"
+          END_MS=$(date +%s%3N)
+          for marker in \
+            run-surface-raw-key-events-100000 \
+            two-client-wave-transitions-1000 \
+            reward-market-cycles-1000 \
+            biome-transitions-1000 \
+            wave-transitions-10000; do
+            test "$(grep -c "\"id\":\"$marker\"" "$RUNNER_TEMP/m9-optimized-benchmarks/m4.log")" -eq 1
+          done
+          test "$(grep -c '"id":"complete-runs-200-waves-100"' "$RUNNER_TEMP/m9-optimized-benchmarks/m4.log")" -eq 4
+          jq -n \
+            --arg candidate "${{ inputs.candidate_sha }}" \
+            --arg deps_cache_hit "$DEPS_CACHE_HIT" \
+            --arg target_cache_hit "$TARGET_CACHE_HIT" \
+            --argjson m2_ms "$((M2_END_MS - M2_START_MS))" \
+            --argjson m3_ms "$((M3_END_MS - M2_END_MS))" \
+            --argjson m4_ms "$((END_MS - M3_END_MS))" \
+            --argjson total_ms "$((END_MS - START_MS))" \
+            '{schema_version:1,candidate_sha:$candidate,profile:"release",target:"x86_64-unknown-linux-gnu",
+              dependency_cache_hit:$deps_cache_hit,compiled_cache_hit:$target_cache_hit,
+              workloads:{m2:{tests:4},m3:{tests:5},m4:{tests:9}},
+              m2_ms:$m2_ms,m3_ms:$m3_ms,m4_ms:$m4_ms,total_ms:$total_ms}' \
+            > "$RUNNER_TEMP/m9-optimized-benchmarks/timing.json"
+      - uses: actions/upload-artifact@v6
+        if: inputs.rust_regression_run_id == 0
+        with:
+          name: m9-g52-optimized-benchmarks-${{ inputs.candidate_sha }}
+          path: ${{ runner.temp }}/m9-optimized-benchmarks
+          if-no-files-found: error
+          retention-days: 30
+      - name: Consume exact-SHA optimized benchmark result
+        if: inputs.rust_regression_run_id != 0
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const candidate = '${{ inputs.candidate_sha }}';
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number('${{ inputs.rust_regression_run_id }}'),
+            });
+            if (run.data.name !== 'Rust Kernel M9 G52 Production Qualification' || run.data.head_sha !== candidate) {
+              core.setFailed('G52 benchmark reuse requires the exact-candidate regression-owner run');
+              return;
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.data.id,
+              per_page: 100,
+            });
+            const benchmark = jobs.filter(job => job.name === 'optimized-benchmarks');
+            if (benchmark.length !== 1 || benchmark[0].conclusion !== 'success') {
+              core.setFailed('Exact-candidate optimized benchmark result is missing or non-successful');
             }
   node-contracts:
     needs: candidate-binding
@@ -366,6 +520,7 @@ jobs:
       - candidate-binding
       - source-static-security
       - rust-regression
+      - optimized-benchmarks
       - node-contracts
       - sealed-bundle
       - browser-matrix

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "before": {
+    "run_id": 33354085477,
+    "rust_job_id": 99372915079,
+    "rust_job_ms": 1954000,
+    "workspace_step_ms": 1751000,
+    "cache_restore_ms": 142000,
+    "cache_restored_bytes": 6300000000,
+    "chromium_job_ms": 105000,
+    "chromium_gameplay_step_ms": 30000,
+    "historical_benchmarks": {
+      "m2_benchmark_ms": 770000,
+      "m3_benchmark_ms": 320000,
+      "m4_runtime_benchmark_ms": 276000,
+      "combined_ms": 1366000
+    },
+    "correctness_command": "cargo test --workspace --all-targets -- --skip m3_audited_production_surface_matches_frozen_manifest"
+  },
+  "after": null,
+  "measurement_policy": {
+    "correctness": "locked explicit lib/bin/integration targets in the test profile",
+    "doctests": "locked workspace doctests",
+    "examples": "locked workspace example compilation",
+    "performance": "explicit #[test]-based benchmark targets in the release profile with one test thread",
+    "timing_parts": [
+      "dependency_cache",
+      "compiled_cache",
+      "correctness_tests",
+      "doctests",
+      "examples",
+      "m2_benchmark",
+      "m3_benchmark",
+      "m4_runtime_benchmark",
+      "overall_critical_path"
+    ]
+  }
+}
