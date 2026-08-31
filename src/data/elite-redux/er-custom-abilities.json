@@ -162,6 +162,22 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-17": {
+    "componentRules": [],
+    "description": "Rough Skin + Multiscale",
+    "flags": {},
+    "generation": 9,
+    "id": 20016,
+    "includes": [
+      24,
+      136
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Samehada",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-2": {
     "componentRules": [],
     "description": "Air blower + Dark aura",
