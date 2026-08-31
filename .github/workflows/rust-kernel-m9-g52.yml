@@ -489,6 +489,7 @@ jobs:
             test/browser/rust-browser/release-cache.spec.ts
             test/browser/rust-browser/input-accessibility.spec.ts
             test/browser/rust-browser/mobile-profile.spec.ts
+            test/browser/rust-browser/save-offline.spec.ts
           )
           if [ "$PLAYWRIGHT_BROWSER" != "firefox" ]; then
             FILES+=(test/browser/rust-browser/rust-local.spec.ts)
