@@ -14,6 +14,10 @@ on:
         description: Exact successful G52 run for platform_sha
         required: true
         type: number
+      rust_regression_run_id:
+        description: Exact-candidate G52 run that owns the successful Rust regression job
+        required: true
+        type: number
       explicit_confirmation:
         description: Type DEPLOY_M9_PREVIEW_ONLY_SAVE_WORKER
         required: true
@@ -42,15 +46,33 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const run = await github.rest.actions.getWorkflowRun({
+            const aggregate = await github.rest.actions.getWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: Number('${{ inputs.g52_run_id }}'),
             });
-            if (run.data.head_sha !== '${{ inputs.platform_sha }}'
-                || run.data.conclusion !== 'success'
-                || run.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
-              core.setFailed('preview Worker source lacks exact successful G52 evidence');
+            const owner = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number('${{ inputs.rust_regression_run_id }}'),
+            });
+            if (aggregate.data.conclusion !== 'success'
+                || aggregate.data.name !== 'Rust Kernel M9 G52 Production Qualification'
+                || owner.data.head_sha !== '${{ inputs.platform_sha }}'
+                || owner.data.status !== 'completed'
+                || owner.data.name !== 'Rust Kernel M9 G52 Production Qualification') {
+              core.setFailed('preview Worker source lacks bound G52 aggregate and exact regression-owner evidence');
+              return;
+            }
+            const ownerJobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: owner.data.id,
+              per_page: 100,
+            });
+            const regression = ownerJobs.filter(job => job.name === 'rust-regression');
+            if (regression.length !== 1 || regression[0].conclusion !== 'success') {
+              core.setFailed('preview Worker source lacks a successful exact-candidate Rust regression job');
             }
       - name: Prove capability-only Worker configuration
         run: |
