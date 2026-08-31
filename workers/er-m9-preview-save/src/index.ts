@@ -271,19 +271,24 @@ async function forwardHealthEvent(
   if (!/^[a-zA-Z0-9._:-]{1,128}$/u.test(idempotencyKey) || bytes.byteLength === 0 || bytes.byteLength > 32_768) {
     return json({ error: "invalid preview health event" }, 400, cors);
   }
-  const response = await env.M9_TELEMETRY.fetch(telemetryEventUrl, {
-    method: "POST",
-    cache: "no-store",
-    credentials: "omit",
-    redirect: "error",
-    headers: {
-      "content-type": "application/json",
-      "x-er-health-idempotency-key": idempotencyKey,
-      "x-er-preview-health-authorization": `Bearer ${env.M9_PREVIEW_HEALTH_SECRET}`,
-      "x-er-preview-account": account.account_id,
-    },
-    body: bytes,
-  });
+  let response: Response;
+  try {
+    response = await env.M9_TELEMETRY.fetch(telemetryEventUrl, {
+      method: "POST",
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      headers: {
+        "content-type": "application/json",
+        "x-er-health-idempotency-key": idempotencyKey,
+        "x-er-preview-health-authorization": `Bearer ${env.M9_PREVIEW_HEALTH_SECRET}`,
+        "x-er-preview-account": account.account_id,
+      },
+      body: bytes,
+    });
+  } catch (error) {
+    return json({ error: "preview telemetry forwarding failed", cause_code: healthForwardingCause(error) }, 502, cors);
+  }
   return response.status === 204
     ? new Response(null, { status: 204, headers: cors })
     : json({ error: "preview telemetry ingestion failed" }, 502, cors);
@@ -911,6 +916,11 @@ function validSlot(slot: string): boolean {
 
 function identifier(value: string): boolean {
   return /^[a-zA-Z0-9._:-]{1,128}$/u.test(value);
+}
+
+function healthForwardingCause(error: unknown): string {
+  const value = error instanceof Error ? `${error.name}:${error.message}` : "UnknownError";
+  return value.replace(/[^a-zA-Z0-9 .:_-]/gu, "_").slice(0, 160);
 }
 
 function secureTelemetryUrl(value: string): boolean {

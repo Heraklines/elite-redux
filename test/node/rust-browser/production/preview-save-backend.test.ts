@@ -344,6 +344,28 @@ describe("M9 capability-isolated preview save Worker", () => {
     expect(headers.get("x-er-preview-health-authorization")).toBe(`Bearer ${"h".repeat(32)}`);
     expect(headers.get("x-er-preview-account")).toBe(account.account_id);
     expect(headers.get("authorization")).toBeNull();
+    environment.M9_TELEMETRY = {
+      async fetch() {
+        throw new TypeError("service unavailable");
+      },
+    };
+    const failed = await previewWorker.fetch(
+      authorizedRequest(`${WORKER}/api/m9/health/event`, account.session_token, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-er-health-idempotency-key": "preview-health-2",
+        },
+        body: JSON.stringify({ schema_version: 1, event: "BOOTSTRAP_SUCCESS" }),
+      }),
+      environment,
+    );
+    expect(failed.status).toBe(502);
+    expect(failed.headers.get("access-control-allow-origin")).toBe(ORIGIN);
+    expect(await failed.json()).toEqual({
+      error: "preview telemetry forwarding failed",
+      cause_code: "TypeError:service unavailable",
+    });
     expect(JSON.stringify(forwarded[0])).not.toContain(account.session_token);
   });
 });
