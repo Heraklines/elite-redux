@@ -15,7 +15,7 @@ macro_rules! fixture {
 }
 
 const BATTLE: &[u8] = fixture!("m9/engineering/battle-content-pack-v3.json");
-const LEGACY_SEED: &[u8] = fixture!("m9/solo-entry/content-pack.json");
+const RUN: &[u8] = fixture!("m9/engineering/run-content-pack-v3.json");
 const PROGRESSION: &[u8] = fixture!("m9/engineering/progression-content-pack-v2.json");
 const WORLD: &[u8] = fixture!("m9/engineering/world-content-pack-v2.json");
 const SCENARIOS: &[u8] = fixture!("m9/engineering/scenario-content-pack-v2.json");
@@ -29,7 +29,7 @@ const BUNDLE: &[u8] = fixture!("m9/engineering/game-content-bundle-v2.json");
 fn build() -> Result<er_game::m9e_content_v2::GameContentBundleV2, Box<dyn Error>> {
     Ok(build_m9_engineering_bundle_v2(
         BATTLE,
-        LEGACY_SEED,
+        RUN,
         PROGRESSION,
         WORLD,
         SCENARIOS,

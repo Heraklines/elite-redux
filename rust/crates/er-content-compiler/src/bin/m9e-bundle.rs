@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let [
         _,
         battle,
-        legacy_seed,
+        run,
         progression,
         world,
         scenarios,
@@ -21,11 +21,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         manifest_path,
     ] = args.as_slice()
     else {
-        return Err("usage: m9e-bundle <battle> <legacy-seed> <progression> <world> <scenarios> <ai> <bootstrap> <presentation> <catalog> <implementations> <bundle> <manifest>".into());
+        return Err("usage: m9e-bundle <battle> <run> <progression> <world> <scenarios> <ai> <bootstrap> <presentation> <catalog> <implementations> <bundle> <manifest>".into());
     };
     let bundle = build_m9_engineering_bundle_v2(
         &read(battle)?,
-        &read(legacy_seed)?,
+        &read(run)?,
         &read(progression)?,
         &read(world)?,
         &read(scenarios)?,

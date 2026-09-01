@@ -7,8 +7,8 @@ use er_ai::content_v2::AiPolicyPackV2;
 use er_canonical::content_digest;
 use er_content::pack::m6_pack::load_battle_content_pack_v3;
 use er_game::m7_content::{
-    GameBehaviorClassificationV1, GameContentBundleV1, META_CONTENT_PACK_SCHEMA_VERSION_V1,
-    MetaContentPackV1, RunContentPackV3,
+    GameBehaviorClassificationV1, META_CONTENT_PACK_SCHEMA_VERSION_V1, MetaContentPackV1,
+    RunContentPackV3,
 };
 use er_game::m9e_content_v2::{
     BootstrapContentPackV1, GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2, GameContentBundleV2,
@@ -103,7 +103,7 @@ pub enum BundleBuildErrorV2 {
 #[allow(clippy::too_many_arguments)]
 pub fn build_m9_engineering_bundle_v2(
     battle_bytes: &[u8],
-    legacy_seed_bytes: &[u8],
+    run_bytes: &[u8],
     progression_bytes: &[u8],
     world_bytes: &[u8],
     scenario_bytes: &[u8],
@@ -115,7 +115,7 @@ pub fn build_m9_engineering_bundle_v2(
 ) -> Result<GameContentBundleV2, BundleBuildErrorV2> {
     let battle = load_battle_content_pack_v3(battle_bytes)
         .map_err(|error| BundleBuildErrorV2::Decode(error.to_string()))?;
-    let legacy: GameContentBundleV1 = decode(legacy_seed_bytes)?;
+    let run: RunContentPackV3 = decode(run_bytes)?;
     let progression: ProgressionContentPackV2 = decode(progression_bytes)?;
     let world: WorldContentPackV2 = decode(world_bytes)?;
     let scenarios: ScenarioContentPackV2 = decode(scenario_bytes)?;
@@ -124,7 +124,8 @@ pub fn build_m9_engineering_bundle_v2(
     let presentation: PresentationContentPackV1 = decode(presentation_bytes)?;
     let catalog: BehaviorCatalogV1 = decode(behavior_catalog_bytes)?;
     let implementations: BehaviorImplementationDocumentV2 = decode(implementation_bytes)?;
-    if legacy.oracle_sha != battle.oracle_sha
+    if run.oracle_sha != battle.oracle_sha
+        || run.battle_content_hash != battle.content_hash
         || catalog.schema_version != 1
         || catalog.oracle_sha != M9_BUNDLE_ORACLE_SHA
         || catalog.oracle_tree_sha.is_empty()
@@ -138,27 +139,6 @@ pub fn build_m9_engineering_bundle_v2(
     {
         return Err(BundleBuildErrorV2::Identity);
     }
-    let mut programs = legacy.run.programs.clone();
-    let run_sources = catalog
-        .behaviors
-        .iter()
-        .filter(|behavior| behavior.domain == "RUN_META")
-        .take(programs.len())
-        .map(|behavior| GameBehaviorUnitId::parse(behavior.id.clone()))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| BundleBuildErrorV2::Identity)?;
-    if run_sources.len() != programs.len() {
-        return Err(BundleBuildErrorV2::Identity);
-    }
-    for (program, source) in programs.iter_mut().zip(run_sources) {
-        program.source = source;
-    }
-    let run = RunContentPackV3::new(
-        battle.oracle_sha.clone(),
-        battle.content_hash.clone(),
-        programs,
-    )
-    .map_err(|error| BundleBuildErrorV2::Validation(error.to_string()))?;
     let meta = complete_meta(catalog, implementations)?;
     let mut bundle = GameContentBundleV2 {
         schema_version: GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2,
