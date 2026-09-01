@@ -1548,6 +1548,9 @@ fn execution_input(action: &GameActionV1) -> GameDomainExecutionInputV1 {
                 | er_types::SaveActionV1::Load { .. }
                 | er_types::SaveActionV1::Delete { .. },
         } => GameDomainExecutionInputV1::SaveGeneration(safe_one()),
+        GameActionV1::Capture {
+            action: er_types::CaptureActionV1::Attempt { .. },
+        } => GameDomainExecutionInputV1::CaptureDraw(0),
         _ => GameDomainExecutionInputV1::None,
     }
 }
