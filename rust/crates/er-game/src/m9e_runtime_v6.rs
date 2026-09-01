@@ -175,6 +175,95 @@ impl GameRuntimeV6 {
         &self.material_ledger
     }
 
+    pub fn navigate_control(
+        &mut self,
+        direction: er_types::ui_menu::NavigationDirection,
+    ) -> Result<(), GameRuntimeV6Error> {
+        let state = self.state.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+        let run = state
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        if !run.control.actionable {
+            return Err(GameRuntimeV6Error::Action);
+        }
+        let menu = run
+            .control
+            .menu
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let next = menu
+            .navigation
+            .iter()
+            .find(|edge| edge.from == menu.selected_option_id && edge.direction == direction)
+            .map(|edge| edge.to.clone())
+            .ok_or(GameRuntimeV6Error::Action)?;
+        menu.selected_option_id = next;
+        state
+            .validate_with(self.content.as_ref())
+            .map_err(|_| GameRuntimeV6Error::Invalid)
+    }
+
+    pub fn selected_action(
+        &self,
+    ) -> Result<(GameActionV1, GameActionContextV1), GameRuntimeV6Error> {
+        let run = self
+            .state
+            .as_ref()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or(GameRuntimeV6Error::Action)?;
+        if !run.control.actionable {
+            return Err(GameRuntimeV6Error::Action);
+        }
+        let menu = run
+            .control
+            .menu
+            .as_ref()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let action = menu
+            .selected_action()
+            .cloned()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let context = run
+            .control
+            .action_context
+            .clone()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        Ok((action, context))
+    }
+
+    pub fn cancel_action(&self) -> Result<(GameActionV1, GameActionContextV1), GameRuntimeV6Error> {
+        let run = self
+            .state
+            .as_ref()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or(GameRuntimeV6Error::Action)?;
+        if !run.control.actionable {
+            return Err(GameRuntimeV6Error::Action);
+        }
+        let menu = run
+            .control
+            .menu
+            .as_ref()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let action = match &menu.cancel {
+            er_types::GameMenuCancelV2::Select { option_id } => menu
+                .options
+                .iter()
+                .find(|option| option.option_id == *option_id && option.visible && option.enabled)
+                .map(|option| option.action.clone())
+                .ok_or(GameRuntimeV6Error::Action)?,
+            er_types::GameMenuCancelV2::Back { action }
+            | er_types::GameMenuCancelV2::Close { action } => (**action).clone(),
+            er_types::GameMenuCancelV2::Disabled => return Err(GameRuntimeV6Error::Action),
+        };
+        let context = run
+            .control
+            .action_context
+            .clone()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        Ok((action, context))
+    }
     pub fn execute(
         &mut self,
         action: GameActionV1,

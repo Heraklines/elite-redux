@@ -19,6 +19,7 @@ pub mod m9_new_run;
 pub mod m9e_content_v2;
 pub mod m9e_internal_event_v2;
 pub mod m9e_material_v6;
+pub mod m9e_new_run_v6;
 pub mod m9e_runtime_v6;
 // The local adapter remains production source while its kernel integration
 // seam is staged; its contract tests include this source directly.
