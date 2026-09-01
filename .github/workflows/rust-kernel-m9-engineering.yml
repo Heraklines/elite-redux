@@ -73,12 +73,15 @@ jobs:
           src/rust-browser/contracts/browser-contracts-v2.ts
           src/rust-browser/routes/browser-effects-v2.ts
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
+          test/browser/rust-browser/m9e-v7-corrective.spec.ts
       - run: >-
           pnpm exec biome ci --diagnostic-level=error
           scripts/check-kernel-m9-engineering.mjs
           src/rust-browser/contracts/browser-contracts-v2.ts
           src/rust-browser/routes/browser-effects-v2.ts
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
+          scripts/build-kernel-m9e-v7-web.mjs
+          test/browser/rust-browser/m9e-v7-corrective.spec.ts
 
   browser-contract:
     name: Browser V2 typed effect contract
@@ -190,6 +193,15 @@ jobs:
         with:
           ref: ${{ env.CANDIDATE_SHA }}
           fetch-depth: 1
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: actions/cache@v5
         with:
           path: |
@@ -199,6 +211,13 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
       - run: node scripts/build-kernel-m9e-v7-web.mjs --out-dir "$RUNNER_TEMP/m9e-v7-web"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run real V7 browser journey
+        env:
+          M9E_V7_WEB_DIR: ${{ runner.temp }}/m9e-v7-web
+        run: >-
+          pnpm exec playwright test --config playwright.rust-browser.config.ts
+          --project=chromium test/browser/rust-browser/m9e-v7-corrective.spec.ts --workers=1
       - uses: actions/upload-artifact@v6
         with:
           name: m9e-v7-web-${{ env.CANDIDATE_SHA }}

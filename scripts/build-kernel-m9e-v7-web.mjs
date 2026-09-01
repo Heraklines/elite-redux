@@ -33,11 +33,11 @@ execFileSync(
   { cwd: ROOT, stdio: "inherit", env },
 );
 const wasmInput = resolve(ROOT, "rust/target/wasm32-unknown-unknown/release/er_web.wasm");
-execFileSync(
-  "wasm-bindgen",
-  [wasmInput, "--target", "web", "--out-dir", out, "--out-name", "er_web"],
-  { cwd: ROOT, stdio: "inherit", env },
-);
+execFileSync("wasm-bindgen", [wasmInput, "--target", "web", "--out-dir", out, "--out-name", "er_web"], {
+  cwd: ROOT,
+  stdio: "inherit",
+  env,
+});
 copyFileSync(
   resolve(ROOT, "rust/fixtures/m9/engineering/game-content-bundle-v2.json"),
   resolve(out, "game-content-bundle-v2.json"),
