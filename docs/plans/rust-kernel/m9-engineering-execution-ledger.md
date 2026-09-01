@@ -1,11 +1,11 @@
 # M9 Engineering Execution Ledger
 
-Updated: 2026-08-20
+Updated: 2026-09-01
 
 ## Frozen baseline
 
 - Branch: `arch/rust-kernel-m9-engineering`
-- Current HEAD: `81097c72b2f91d332390c8476a476f6256de8bcb`
+- Implementation tip entering qualification-ledger update: `2ac1edc063421578cf95c1cb5e8b40853d91d4ab`
 - Expected base: `06341375ee2d206ed246c0504789ed853039fd6c`
 - TypeScript oracle: `399d5d368f0b5642ebf8f45bd8a5e73350fa4de7`
 - Architecture: `CLEAN_V7_CUTOVER`
@@ -41,6 +41,13 @@ Updated: 2026-08-20
 | `d43844b03851012efcbe2a277ab4e294a23b5cfa` | Direct GameContentBundleV2 and prepared indexes |
 | `41ea0ff0b78cebfdab2d9cb3bb6fe01a23d4c233` | Removed V1 bundle fallback from compiler and production content |
 | `81097c72b2f91d332390c8476a476f6256de8bcb` | Fresh-process bundle byte-determinism proof |
+| `e460cd9893` through `dbf0b14766` | Hardened V6 allocator, material, and Snapshot V7 invariants |
+| `dcf388f6c1` through `e9b4f09b10` | Common material applier and closed Runtime V6 domain dispatch |
+| `f24fefb270` through `2cc21981cb` | Bounded InternalEventV2 and sole production GameKernelV7 owner |
+| `fc72d8154e` through `184257e607` | Authority AI, battle command collection, and generic V7 proposal/replica flow |
+| `107e66d98d` through `ebbce0f05f` | BrowserKernelHostV2, ten typed adapters, and V7 production import closure |
+| `04a0477e80` through `2d0c980169` | Raw solo/co-op/domain journeys, reconnect fencing, save restoration for all 24 controls, and native/Wasm eventwise parity |
+| `ea2ce29dcd` through `2ac1edc063` | Permanent browser adapter contract and dedicated 29-shard exact-SHA qualification workflow |
 
 Additional integrated foundations: complete battle content, world V2, bootstrap V1, progression V2 schema, closed evolution conditions, GameStateV6, and V5-to-V6 state migration.
 
@@ -73,31 +80,30 @@ All active ownership is held by the integration owner in this worktree; no paral
 | Populate presentation mappings | integration owner | COMPLETE | none |
 | Assemble direct GameContentBundleV2 | integration owner | COMPLETE | none |
 | Remove production V1 content fallbacks | integration owner | COMPLETE | none |
-| Harden GameStateV6 allocators/identity validation | integration owner | READY_IMPLEMENTATION | none |
-| Harden GameMaterialV6 ledger/evidence/bounds | integration owner | READY_IMPLEMENTATION | none |
-| Complete snapshot V7 lifecycle/migration | integration owner | READY_IMPLEMENTATION | none |
-| Implement GameRuntimeV6/dispatcher | integration owner | DEPENDS_ON_IMPLEMENTATION | direct GameContentBundleV2 and hardened material |
-| Implement GameInternalEventV2 | integration owner | DEPENDS_ON_IMPLEMENTATION | GameRuntimeV6 |
-| Implement GameKernelV7 | integration owner | DEPENDS_ON_IMPLEMENTATION | runtime and internal events |
-| Implement authority AI/battle collection/co-op | integration owner | DEPENDS_ON_IMPLEMENTATION | GameKernelV7 and AI V2 |
-| Implement BrowserKernelHostV2/effects | integration owner | DEPENDS_ON_IMPLEMENTATION | GameKernelV7 |
-| Action/control witnesses, journeys and parity | integration owner | DEPENDS_ON_IMPLEMENTATION | kernel/browser/co-op paths |
-| Exact-SHA workflow and qualification | integration owner | DEPENDS_ON_IMPLEMENTATION | all engineering implementation and proofs |
+| Harden GameStateV6 allocators/identity validation | integration owner | COMPLETE | none |
+| Harden GameMaterialV6 ledger/evidence/bounds | integration owner | COMPLETE | none |
+| Complete snapshot V7 lifecycle/migration | integration owner | COMPLETE | none |
+| Implement GameRuntimeV6/dispatcher | integration owner | COMPLETE | none |
+| Implement GameInternalEventV2 | integration owner | COMPLETE | none |
+| Implement GameKernelV7 | integration owner | COMPLETE | none |
+| Implement authority AI/battle collection/co-op | integration owner | COMPLETE | none |
+| Implement BrowserKernelHostV2/effects | integration owner | COMPLETE | none |
+| Action/control witnesses, journeys and parity | integration owner | COMPLETE | none |
+| Exact-SHA workflow and qualification | integration owner | WORKFLOW_READY | push exact candidate and require aggregate green |
 
 ## Closure status
 
-- Action-family coverage: 0/14 V7 production executor witnesses complete; existing V5/V6 domain logic is reusable but not yet closed through Runtime V6.
-- Control-family coverage: existing M9 control manifest reports 24/24 structural entries; V7 producer/raw-input/material/snapshot/Wasm/co-op witnesses remain incomplete.
-- Content-domain closure: battle, run, progression, world, scenario, AI, meta, bootstrap, presentation, and direct bundle complete; fresh-process bundle output is 2/2 byte-identical.
-- Migration: V5 state to V6 state foundation present; allocator minima, V6 kernel snapshot, developer-plane snapshot, save, and end-to-end V7 continuation proofs pending.
-- Native/Wasm: prior M9 slice parity was green at historical SHA `bfd6fdd4f89806b084f5a801f5adbbf44b8abf94`; generic V7 eventwise parity pending.
-- Focused tests at current HEAD: save V2 2/2; progression 1/1; scenario 2/2; AI 2/2; presentation/bundle 7/7; pinned progression/scenario/AI exporters each passed twice in fresh processes; bundle compiler passed twice in fresh processes.
-- Current failing tests: none in exercised focused lanes; qualification has not run.
+- Action-family coverage: 14/14 V7 production executor families have raw-control or browser-host witnesses through the one Runtime V6 dispatcher.
+- Control-family coverage: 24/24 controls survive canonical GameSaveV2 encode/decode and GameKernelV7 restoration; presentation mappings remain 24/24.
+- Content-domain closure: battle, run, progression, world, scenario, AI, meta, bootstrap, presentation, and the direct V2 bundle are complete; fresh-process bundle output is 2/2 byte-identical.
+- Migration: V5-to-V6 state migration, V6-to-V7 snapshot migration, allocator minima, material ledger, pending effects, save, and V7 continuation checks are implemented.
+- Native/Wasm: the V7 raw-input report is locked to digest `13aee334c66c6e0da239f0c4f56317ccc039af6362d340a7b56c753c92b7c1c3`; native execution is green and the wasm32 test binary compiles locally. Hosted wasm execution remains part of the exact-SHA gate.
+- Focused tests at current HEAD: V7 natural solo terminal, natural co-op proposal/material/recovery, four domain journeys including 24-control save reload, Snapshot V7, BrowserHostV2, browser effect routing, and native eventwise parity are green. Static ownership, TypeScript, Biome, and Rust formatting checks are green on the exercised surface.
+- Current failing tests: none in exercised focused lanes; the complete 29-shard qualification has not yet run.
 
 ## Current next ready tasks
 
-1. Harden GameStateV6 allocator minima and direct PreparedGameContentV2 identity validation.
-2. Harden GameMaterialV6 typed evidence, bounds, revision checks, and applied-material ledger.
-3. Complete snapshot V7 lifecycle and migrations.
-4. Implement GameRuntimeV6 and the closed GameActionDispatcherV1 over the direct bundle.
-5. Build InternalEventV2, Kernel V7, browser/co-op paths, journeys, parity, and exact-SHA qualification in dependency order.
+1. Push the immutable candidate containing this ledger and workflow to `origin/arch/rust-kernel-m9-engineering`.
+2. Require `Rust Kernel M9 Engineering Qualification` to finish green at that exact SHA, including all 29 Rust shards, independent static checks, browser contract, wasm32 execution, and aggregate.
+3. If any shard is red, classify exact artifacts, repair one incremental candidate, update this ledger, and rerun the whole exact-SHA gate.
+4. Create `rust-kernel-m9-engineering-final` only after the aggregate is green at the exact tagged SHA.
