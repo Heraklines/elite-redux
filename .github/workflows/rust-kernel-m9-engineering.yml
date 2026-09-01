@@ -207,7 +207,10 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: m9e-browser-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+            rust/target
+          key: m9e-browser-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}-${{ env.CANDIDATE_SHA }}
+          restore-keys: |
+            m9e-browser-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}-
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
       - run: node scripts/build-kernel-m9e-v7-web.mjs --out-dir "$RUNNER_TEMP/m9e-v7-web"
@@ -219,9 +222,12 @@ jobs:
           pnpm exec playwright test --config playwright.rust-browser.config.ts
           --project=chromium test/browser/rust-browser/m9e-v7-corrective.spec.ts --workers=1
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: m9e-v7-web-${{ env.CANDIDATE_SHA }}
-          path: ${{ runner.temp }}/m9e-v7-web
+          path: |
+            ${{ runner.temp }}/m9e-v7-web
+            test-results/rust-browser
           if-no-files-found: error
           retention-days: 30
 

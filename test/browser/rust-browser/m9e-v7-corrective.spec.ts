@@ -17,8 +17,10 @@ test.setTimeout(300_000);
 const html = `<!doctype html><html><body><div id="status">loading</div><script type="module">
 const status = document.querySelector("#status");
 try {
+status.textContent = "importing-module";
 // Dynamic import keeps Wasm bootstrap failures observable; static import errors occur before the harness can report them.
 const { default: init, BrowserKernelHostV2 } = await import("/m9e-assets/er_web.js");
+status.textContent = "initializing-wasm";
 const encoder = new TextEncoder(); const decoder = new TextDecoder();
 const canonical = value => {
   if (Array.isArray(value)) return value.map(canonical);
@@ -27,8 +29,10 @@ const canonical = value => {
 };
 const bytes = value => encoder.encode(JSON.stringify(canonical(value)));
 await init("/m9e-assets/er_web_bg.wasm");
+status.textContent = "loading-content";
 const bundle = new Uint8Array(await (await fetch("/m9e-assets/game-content-bundle-v2.json")).arrayBuffer());
 const solo = !new URLSearchParams(location.search).has("coop");
+status.textContent = solo ? "preparing-content" : "ready";
 const host = solo ? new BrowserKernelHostV2(bundle) : null; let sequence = 0; let requestId = 1;
 const send = async request => {
   if (host == null) throw new Error("solo browser host is unavailable");
@@ -41,6 +45,7 @@ const send = async request => {
   }
   return response.response;
 };
+if (solo) status.textContent = "initializing-kernel";
 if (solo) await send({ kind: "INITIALIZE", initialization: { kind: "NATURAL_START", context: {
   local_seat: 1, role: "AUTHORITY", protocol: null,
   scheduler: { disposed: false, next_timer_id: null, pauses: [], timers: [] }
