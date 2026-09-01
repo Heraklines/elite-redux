@@ -60,6 +60,22 @@ for (const kind of ["keydown", "keyup"]) document.addEventListener(kind, event =
   pending = pending.then(() => send(kind === "keydown" ? { kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: { code: key(event.code), printable: false, browser_repeat: event.repeat, focus: "GAME" } } } : { kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: key(event.code) } } }));
 });
 const snapshot = async () => (await send({ kind: "SNAPSHOT" })).snapshot;
+const control = snapshot => snapshot.lifecycle.kind === "BOOTSTRAP" ? snapshot.lifecycle.value.control : snapshot.lifecycle.kind === "ACTIVE" ? snapshot.lifecycle.value.active_run.control : snapshot.lifecycle.value.control;
+const domPress = async code => {
+  document.dispatchEvent(new KeyboardEvent("keydown", { code }));
+  document.dispatchEvent(new KeyboardEvent("keyup", { code }));
+  await pending;
+};
+const navigate = async option => {
+  const first = await snapshot();
+  const bound = (control(first).menu?.options.length ?? 0) + 1;
+  for (let index = 0; index < bound; index++) {
+    const current = await snapshot();
+    if (control(current).menu?.selected_option_id === option) return;
+    await domPress("ArrowDown");
+  }
+  throw new Error("browser option is unreachable: " + option);
+};
 const createClient = async (snapshot, seat, role) => {
   const clientHost = new BrowserKernelHostV2(bundle); let clientSequence = 0; let clientRequest = 1;
   const clientSend = async request => {
@@ -94,7 +110,7 @@ const coop = async () => {
   const replicaAfter = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
   return { converged: JSON.stringify(canonical(authorityAfter.lifecycle)) === JSON.stringify(canonical(replicaAfter.lifecycle)), turnAdvanced: authorityAfter.lifecycle.value.active_run.battle.turn > initialTurn };
 };
-globalThis.__m9eV7 = { idle: () => pending, snapshot, send, coop };
+globalThis.__m9eV7 = { idle: () => pending, snapshot, send, navigate, coop };
 status.textContent = "ready";
 } catch (error) {
   status.textContent = "error: " + (error instanceof Error ? error.stack : String(error));
@@ -127,6 +143,7 @@ declare global {
     idle: () => Promise<void>;
     snapshot: () => Promise<SnapshotWire>;
     send: (request: unknown) => Promise<ResponseWire>;
+    navigate: (option: string) => Promise<void>;
     coop: () => Promise<CoopResult>;
   };
 }
@@ -222,14 +239,7 @@ test("natural V7 browser startup reaches the real battle command", async ({ page
   await press(page, "Space");
   await press(page, "Space");
   await press(page, "Space");
-  for (let index = 0; index < 800; index++) {
-    const snapshot = await page.evaluate(() => globalThis.__m9eV7.snapshot());
-    const menu = currentControl(snapshot).menu;
-    if (menu?.selected_option_id === "bootstrap/starter/confirm") {
-      break;
-    }
-    await press(page, "ArrowDown");
-  }
+  await page.evaluate(() => globalThis.__m9eV7.navigate("bootstrap/starter/confirm"));
   await press(page, "Space");
   await press(page, "Space");
   await press(page, "Space");
