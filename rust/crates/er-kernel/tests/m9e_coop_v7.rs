@@ -389,3 +389,141 @@ fn natural_coop_raw_proposal_converges_and_generation_is_fenced() -> Result<(), 
     assert!(authority.admit_game_proposal(&stale).is_err());
     Ok(())
 }
+
+#[test]
+fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(1));
+    let authority_protocol =
+        initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)?;
+    let replica_protocol =
+        initial_battle_protocol_snapshot_v2(&replica_protocol(host, guest, generation)?, guest)?;
+    let cooperative_mode = content
+        .bundle()
+        .bootstrap
+        .modes
+        .iter()
+        .find(|mode| mode.cooperative && mode.supported)
+        .ok_or("supported cooperative mode missing")?;
+    let mut authority = GameKernelV7::natural_start(
+        profile()?,
+        "m9e-two-human-battle".to_owned(),
+        host,
+        vec!["m9e-coop-slot".to_owned()],
+        true,
+        content.clone(),
+        scheduler(),
+        Some(authority_protocol),
+    )?;
+    press(&mut authority, PhysicalKey::Space)?;
+    navigate_down_to(
+        &mut authority,
+        &format!("bootstrap/mode/{}", cooperative_mode.mode.get()),
+    )?;
+    press(&mut authority, PhysicalKey::Space)?;
+    navigate_down_to(&mut authority, "bootstrap/challenge/done")?;
+    press(&mut authority, PhysicalKey::Space)?;
+    press(&mut authority, PhysicalKey::Space)?;
+    navigate_down_to(&mut authority, "bootstrap/starter/confirm")?;
+    press(&mut authority, PhysicalKey::Space)?;
+    press(&mut authority, PhysicalKey::Space)?;
+    press(&mut authority, PhysicalKey::Space)?;
+    press(&mut authority, PhysicalKey::Space)?;
+
+    let initial_state = authority
+        .state()
+        .cloned()
+        .ok_or("authority state missing")?;
+    let initial_battle = initial_state
+        .active_run
+        .as_ref()
+        .and_then(|run| run.battle.as_ref())
+        .ok_or("cooperative battle missing")?;
+    assert_eq!(initial_battle.format.player_capacity, 2);
+    assert_eq!(initial_battle.format.enemy_capacity, 2);
+    let initial_turn = initial_battle.turn;
+    let revision = authority
+        .snapshot()?
+        .material_ledger
+        .next_authority_revision;
+    let mut replica = GameKernelV7::from_active(
+        initial_state,
+        revision,
+        guest,
+        GameKernelRoleV7::Replica,
+        content,
+        input(),
+        scheduler(),
+        Some(replica_protocol),
+    )?;
+
+    press(&mut authority, PhysicalKey::Space)
+        .map_err(|error| format!("host Fight navigation failed: {error}"))?;
+    let retained = press(&mut authority, PhysicalKey::Space)
+        .map_err(|error| format!("host command retention failed: {error}"))?;
+    let retained_material = retained
+        .effects
+        .iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(retained_material.len(), 1);
+    let retained_battle = authority
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .ok_or("retained battle missing")?;
+    assert_eq!(retained_battle.turn, initial_turn);
+    assert_eq!(retained_battle.command_state.frontier.len(), 1);
+    assert_eq!(
+        authority
+            .current_control()
+            .and_then(|control| control.owner_seat),
+        Some(guest)
+    );
+    replica
+        .apply_authority_material(&retained_material[0])
+        .map_err(|error| format!("retention replica apply failed: {error}"))?;
+    assert_eq!(replica.state(), authority.state());
+
+    press(&mut replica, PhysicalKey::Space)
+        .map_err(|error| format!("guest Fight navigation failed: {error}"))?;
+    let proposal_step = press(&mut replica, PhysicalKey::Space)
+        .map_err(|error| format!("guest proposal failed: {error}"))?;
+    let proposal = proposal_step
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::ProposalReady { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        })
+        .ok_or("guest command proposal missing")?;
+    let resolved = authority
+        .admit_game_proposal(&proposal)
+        .map_err(|error| format!("guest command admission failed: {error}"))?;
+    let turn_material = resolved
+        .effects
+        .iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(turn_material.len(), 1);
+    let resolved_turn = authority
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .map(|battle| battle.turn)
+        .ok_or("resolved battle missing")?;
+    assert!(resolved_turn > initial_turn);
+    replica.apply_authority_material(&turn_material[0])?;
+    assert_eq!(replica.state(), authority.state());
+    assert_eq!(replica.current_control(), authority.current_control());
+    assert!(authority.admit_game_proposal(&proposal)?.effects.is_empty());
+    Ok(())
+}

@@ -15,7 +15,7 @@ use er_game::m9e_material_v6::{
     AppliedGameMaterialLedgerV1, GameMaterialApplyOutcomeV6, GamePlatformEffectV2,
     GamePresentationEffectV2,
 };
-use er_game::m9e_new_run_v6::construct_natural_run_v6;
+use er_game::m9e_new_run_v6::{construct_natural_run_v6, expand_cooperative_topology_v6};
 use er_game::m9e_runtime_v6::{
     GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeSnapshotV6, GameRuntimeV6,
 };
@@ -27,6 +27,9 @@ use er_protocol::snapshot::ProposalFingerprintSnapshotV2;
 use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2};
 use er_state::m7_state::ProfileStateV1;
 use er_state::m9e_state_v6::GameStateV6;
+use er_types::battle_command::{
+    AcceptedBattleCommand, BattleCommandProposalV1, CommandAdmissionSource, CommandFrontierStatus,
+};
 use er_types::battle_ids::MenuInstanceId;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::ui_menu::NavigationDirection;
@@ -524,11 +527,13 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.normalize_local_battle_leaf()?;
         let runtime = self.active_runtime_mut()?;
         let outcome = runtime.apply_material_bytes(bytes).map_err(runtime_error)?;
         if outcome == GameMaterialApplyOutcomeV6::Applied {
             self.advance_replay_sequence()?;
         }
+        self.synchronize_menu_allocator()?;
         let mut step = GameKernelStepV7::default();
         if let Some(control) = self.current_control().cloned() {
             step.effects.push(GameKernelEffectV7::UiChanged(control));
@@ -575,7 +580,7 @@ impl GameKernelV7 {
             .proposal
             .validate()
             .map_err(|_| GameKernelV7Error::Invalid)?;
-        let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        let protocol = self.protocol.clone().ok_or(GameKernelV7Error::Invalid)?;
         if envelope.proposal.context.authority_seat
             != protocol.frame_context.context.authority_seat_id
             || !protocol.connections.iter().any(|connection| {
@@ -607,6 +612,11 @@ impl GameKernelV7 {
             self.current_control(),
             envelope.sender_seat,
             &envelope.proposal,
+        ) && !battle_proposal_is_rooted_in_control(
+            self.state(),
+            self.current_control(),
+            envelope.sender_seat,
+            &envelope.proposal,
         ) {
             return Err(GameKernelV7Error::Invalid);
         }
@@ -615,43 +625,44 @@ impl GameKernelV7 {
         if admission.disposed || admission.fingerprints.len() >= capacity {
             return Err(GameKernelV7Error::Invalid);
         }
+        let action_context = envelope.proposal.context;
+        let operation_id = action_context.operation_id.clone();
         let action = envelope.proposal.action;
         if matches!(action, GameActionV1::Battle { .. }) {
-            return Err(GameKernelV7Error::Invalid);
+            let mut staged = self.clone();
+            let step = staged.collect_battle_action(
+                action,
+                action_context,
+                envelope.sender_seat,
+                CommandAdmissionSource::AuthorityRemoteProposal,
+            )?;
+            remember_proposal_fingerprint(
+                staged.protocol.as_mut().ok_or(GameKernelV7Error::Invalid)?,
+                operation_id,
+                fingerprint,
+            )?;
+            staged.validate()?;
+            *self = staged;
+            return Ok(step);
         }
         let context = GameActionDispatchContextV1 {
-            action: envelope.proposal.context.clone(),
+            action: action_context,
             input: execution_input(&action),
             authority: true,
         };
         let mut staged_runtime = self.active_runtime()?.clone();
         let step = execute_action_transaction(&mut staged_runtime, action, context)?;
-        let mut staged_protocol = protocol.clone();
-        let staged_admission = staged_protocol
-            .proposal_admission
-            .as_mut()
-            .ok_or(GameKernelV7Error::Invalid)?;
-        staged_admission
-            .fingerprints
-            .push(ProposalFingerprintSnapshotV2 {
-                operation_id: envelope.proposal.context.operation_id,
-                fingerprint,
-            });
-        staged_admission
-            .fingerprints
-            .sort_by(|left, right| left.operation_id.cmp(&right.operation_id));
-        staged_protocol
-            .validate()
-            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let mut staged_protocol = protocol;
+        remember_proposal_fingerprint(&mut staged_protocol, operation_id, fingerprint)?;
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged_runtime);
+        self.synchronize_menu_allocator()?;
         self.protocol = Some(staged_protocol);
         self.advance_replay_sequence()?;
         let mut step = step;
         self.synchronize_terminal(&mut step)?;
         Ok(step)
     }
-
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
         self.input_router
             .validate()
@@ -694,6 +705,21 @@ impl GameKernelV7 {
         let bootstrap = bootstrap.clone();
         let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        let cooperative = candidate
+            .active_run
+            .as_ref()
+            .and_then(|run| self.content.world.mode(run.mode))
+            .is_some_and(|mode| mode.cooperative);
+        if cooperative
+            && let Some(partner) = self
+                .protocol
+                .as_ref()
+                .and_then(|protocol| protocol.connections.first())
+                .map(|connection| connection.peer_seat)
+        {
+            expand_cooperative_topology_v6(&mut candidate, self.content.as_ref(), partner)
+                .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        }
         let command_instance = self.allocate_menu_instance()?;
         let command_control = command_root_control(
             &candidate,
@@ -728,6 +754,7 @@ impl GameKernelV7 {
         )?;
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+        self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         let mut step = step;
         self.synchronize_terminal(&mut step)?;
@@ -896,12 +923,17 @@ impl GameKernelV7 {
             } => {
                 let instance = self.allocate_menu_instance()?;
                 let revision = self.active_runtime()?.next_authority_revision();
-                let control = move_select_control(
+                let mut control = move_select_control(
                     self.state().ok_or(GameKernelV7Error::Invalid)?,
                     self.local_seat,
                     instance,
                     revision,
                 )?;
+                control
+                    .action_context
+                    .as_mut()
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .authority_seat = action_context.authority_seat;
                 self.active_runtime_mut()?
                     .install_control(control.clone())
                     .map_err(runtime_error)?;
@@ -915,12 +947,17 @@ impl GameKernelV7 {
             } => {
                 let instance = self.allocate_menu_instance()?;
                 let revision = self.active_runtime()?.next_authority_revision();
-                let control = switch_select_control(
+                let mut control = switch_select_control(
                     self.state().ok_or(GameKernelV7Error::Invalid)?,
                     self.local_seat,
                     instance,
                     revision,
                 )?;
+                control
+                    .action_context
+                    .as_mut()
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .authority_seat = action_context.authority_seat;
                 self.active_runtime_mut()?
                     .install_control(control.clone())
                     .map_err(runtime_error)?;
@@ -977,6 +1014,7 @@ impl GameKernelV7 {
         let step = execute_action_transaction(&mut staged, action, context)?;
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
+        self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         let mut step = step;
         self.synchronize_terminal(&mut step)?;
@@ -988,12 +1026,31 @@ impl GameKernelV7 {
         action: GameActionV1,
         action_context: GameActionContextV1,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.collect_battle_action(
+            action,
+            action_context,
+            self.local_seat,
+            CommandAdmissionSource::AuthorityLocalInternal,
+        )
+    }
+
+    fn collect_battle_action(
+        &mut self,
+        action: GameActionV1,
+        action_context: GameActionContextV1,
+        command_seat: SeatId,
+        source: CommandAdmissionSource,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let state = self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
-        let (battle, actor, field) = local_battle_actor(&state, self.local_seat)?;
-        let menu = state
+        let (battle, actor, field) = local_battle_actor(&state, command_seat)?;
+        let run = state
             .active_run
             .as_ref()
-            .and_then(|run| run.control.menu.as_ref())
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let menu = run
+            .control
+            .menu
+            .as_ref()
             .ok_or(GameKernelV7Error::Invalid)?;
         let command = match &action {
             GameActionV1::Battle {
@@ -1019,12 +1076,12 @@ impl GameKernelV7 {
             }
             _ => return Err(GameKernelV7Error::Invalid),
         };
-        let proposal = er_types::battle_command::BattleCommandProposalV1::new(
+        let proposal = BattleCommandProposalV1::new(
             action_context.operation_id.clone(),
             battle.battle_id,
             battle.wave,
             battle.turn,
-            self.local_seat,
+            command_seat,
             actor,
             field,
             command,
@@ -1032,48 +1089,123 @@ impl GameKernelV7 {
             menu.control_id.clone(),
         )
         .map_err(|_| GameKernelV7Error::Invalid)?;
-        let mut entries = vec![er_types::battle_command::AcceptedBattleCommand::human(
-            proposal,
-        )];
-        entries.extend(self.prepare_authority_ai_commands()?);
-        entries.sort_by_key(|entry| entry.field_slot());
-        let commands = er_types::battle_command::CommandSet::new(entries)
-            .map_err(|_| GameKernelV7Error::Invalid)?;
-        let authority = er_battle::m7_resolver::TurnAuthorityContextV1 {
-            authority_seat: self.local_seat,
-            revision: action_context.authority_revision,
+        if battle.command_state.frontier.iter().any(|entry| {
+            entry.operation_id == proposal.operation_id
+                || entry.field_slot == proposal.field_slot
+                || entry.actor == proposal.actor
+        }) {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let mut required = battle
+            .field
+            .slots
+            .iter()
+            .filter(|slot| slot.slot.side == er_types::battle_ids::BattleSide::Player)
+            .filter_map(|slot| {
+                let actor = slot.occupant?;
+                let owner = run
+                    .party
+                    .iter()
+                    .find(|pokemon| pokemon.id == actor && !pokemon.fainted)?
+                    .owner_seat?;
+                Some((slot.slot, owner))
+            })
+            .collect::<Vec<_>>();
+        required.sort_by_key(|(slot, _)| *slot);
+        let mut entries = battle
+            .command_state
+            .frontier
+            .iter()
+            .filter_map(|entry| match &entry.status {
+                CommandFrontierStatus::Retained { command, .. }
+                | CommandFrontierStatus::Admitted { command, .. } => Some(command.clone()),
+                CommandFrontierStatus::Pending => None,
+            })
+            .collect::<Vec<_>>();
+        entries.push(AcceptedBattleCommand::human(proposal.clone()));
+        let human_complete = required.iter().all(|(_, seat)| {
+            entries
+                .iter()
+                .any(|entry| accepted_command_owner(entry) == Some(*seat))
+        });
+        let input = if human_complete {
+            entries.extend(self.prepare_authority_ai_commands()?);
+            entries.sort_by_key(|entry| entry.field_slot());
+            let commands = er_types::battle_command::CommandSet::new(entries)
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+            GameDomainExecutionInputV1::BattleTurn {
+                commands,
+                authority: er_battle::m7_resolver::TurnAuthorityContextV1 {
+                    authority_seat: action_context.authority_seat,
+                    revision: action_context.authority_revision,
+                },
+            }
+        } else {
+            let next_owner = required
+                .iter()
+                .map(|(_, seat)| *seat)
+                .find(|seat| {
+                    !entries
+                        .iter()
+                        .any(|entry| accepted_command_owner(entry) == Some(*seat))
+                })
+                .ok_or(GameKernelV7Error::Invalid)?;
+            GameDomainExecutionInputV1::BattleCommandRetention {
+                proposal,
+                source,
+                next_owner,
+            }
         };
+        let mut canonical_state = state;
+        if canonical_state
+            .active_run
+            .as_ref()
+            .is_some_and(|run| run.control.kind != GameControlKindV2::BattleCommand)
+        {
+            let root_value = action_context
+                .menu_instance
+                .get()
+                .get()
+                .checked_sub(1)
+                .ok_or(GameKernelV7Error::Invalid)?;
+            let root_instance = MenuInstanceId::new(
+                SafeU53::new(root_value).map_err(|_| GameKernelV7Error::Invalid)?,
+            );
+            let mut root_control = command_root_control(
+                &canonical_state,
+                command_seat,
+                root_instance,
+                action_context.authority_revision,
+            )?;
+            root_control
+                .action_context
+                .as_mut()
+                .ok_or(GameKernelV7Error::Invalid)?
+                .authority_seat = action_context.authority_seat;
+            canonical_state
+                .active_run
+                .as_mut()
+                .ok_or(GameKernelV7Error::Invalid)?
+                .control = root_control;
+        }
+        let runtime_snapshot = self.active_runtime()?.snapshot();
+        let mut staged = GameRuntimeV6::from_snapshot(
+            GameRuntimeSnapshotV6 {
+                state: Some(canonical_state),
+                material_ledger: runtime_snapshot.material_ledger,
+            },
+            self.content.clone(),
+        )
+        .map_err(runtime_error)?;
         let context = GameActionDispatchContextV1 {
             action: action_context,
-            input: GameDomainExecutionInputV1::BattleTurn {
-                commands,
-                authority,
-            },
+            input,
             authority: true,
         };
-        let mut staged = self.active_runtime()?.clone();
         let mut step = execute_action_transaction(&mut staged, action, context)?;
-        if staged
-            .state()
-            .and_then(|state| state.active_run.as_ref())
-            .is_some_and(|run| {
-                matches!(run.outcome, RunOutcome::InProgress) && run.battle.is_some()
-            })
-        {
-            let instance = self.allocate_menu_instance()?;
-            let control = command_root_control(
-                staged.state().ok_or(GameKernelV7Error::Invalid)?,
-                self.local_seat,
-                instance,
-                staged.next_authority_revision(),
-            )?;
-            staged
-                .install_control(control.clone())
-                .map_err(runtime_error)?;
-            step.effects.push(GameKernelEffectV7::UiChanged(control));
-        }
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
+        self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         self.synchronize_terminal(&mut step)?;
         Ok(step)
@@ -1164,6 +1296,59 @@ impl GameKernelV7 {
             GameKernelLifecycleV7::Active(runtime) => Ok(runtime),
             _ => Err(GameKernelV7Error::Invalid),
         }
+    }
+
+    fn normalize_local_battle_leaf(&mut self) -> Result<(), GameKernelV7Error> {
+        let Some(control) = self.current_control().cloned() else {
+            return Ok(());
+        };
+        if !matches!(
+            control.kind,
+            GameControlKindV2::BattleMove
+                | GameControlKindV2::BattleTarget
+                | GameControlKindV2::BattleSwitch
+        ) {
+            return Ok(());
+        }
+        let context = control
+            .action_context
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let root_value = context
+            .menu_instance
+            .get()
+            .get()
+            .checked_sub(1)
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let root_instance =
+            MenuInstanceId::new(SafeU53::new(root_value).map_err(|_| GameKernelV7Error::Invalid)?);
+        let mut root = command_root_control(
+            self.state().ok_or(GameKernelV7Error::Invalid)?,
+            self.local_seat,
+            root_instance,
+            control.revision,
+        )?;
+        root.action_context
+            .as_mut()
+            .ok_or(GameKernelV7Error::Invalid)?
+            .authority_seat = context.authority_seat;
+        self.active_runtime_mut()?
+            .install_control(root)
+            .map_err(runtime_error)
+    }
+
+    fn synchronize_menu_allocator(&mut self) -> Result<(), GameKernelV7Error> {
+        let Some(instance) = self
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .map(|menu| menu.instance_id)
+        else {
+            return Ok(());
+        };
+        if instance >= self.next_menu_instance_id {
+            self.next_menu_instance_id = next_menu_after(instance)?;
+        }
+        Ok(())
     }
 
     fn allocate_menu_instance(&mut self) -> Result<MenuInstanceId, GameKernelV7Error> {
@@ -1444,6 +1629,13 @@ fn switch_select_control(
     .map_err(|_| GameKernelV7Error::Invalid)
 }
 
+fn accepted_command_owner(command: &AcceptedBattleCommand) -> Option<SeatId> {
+    match command {
+        AcceptedBattleCommand::Human { proposal, .. } => Some(proposal.owner_seat),
+        AcceptedBattleCommand::ScriptedEnemy { .. } => None,
+    }
+}
+
 fn local_battle_actor(
     state: &GameStateV6,
     seat: SeatId,
@@ -1555,11 +1747,97 @@ fn execution_input(action: &GameActionV1) -> GameDomainExecutionInputV1 {
                 | er_types::SaveActionV1::Load { .. }
                 | er_types::SaveActionV1::Delete { .. },
         } => GameDomainExecutionInputV1::SaveGeneration(safe_one()),
+
         GameActionV1::Capture {
             action: er_types::CaptureActionV1::Attempt { .. },
         } => GameDomainExecutionInputV1::CaptureDraw(0),
         _ => GameDomainExecutionInputV1::None,
     }
+}
+fn battle_proposal_is_rooted_in_control(
+    state: Option<&GameStateV6>,
+    control: Option<&GameControlPlanV2>,
+    sender: SeatId,
+    proposal: &GameProposalV1,
+) -> bool {
+    let (Some(state), Some(control)) = (state, control) else {
+        return false;
+    };
+    let Some(root_context) = control.action_context.as_ref() else {
+        return false;
+    };
+    if control.kind != GameControlKindV2::BattleCommand
+        || !control.actionable
+        || control.owner_seat != Some(sender)
+        || proposal.context.operation_id != root_context.operation_id
+        || proposal.context.authority_seat != root_context.authority_seat
+        || proposal.context.authority_revision != root_context.authority_revision
+        || proposal.context.menu_instance <= root_context.menu_instance
+    {
+        return false;
+    }
+    let Ok((_, actor, _)) = local_battle_actor(state, sender) else {
+        return false;
+    };
+    match &proposal.action {
+        GameActionV1::Battle {
+            action:
+                er_types::BattleUiActionV1::SelectMove {
+                    actor: selected,
+                    move_slot,
+                },
+        } if *selected == actor => state
+            .active_run
+            .as_ref()
+            .and_then(|run| run.party.iter().find(|pokemon| pokemon.id == actor))
+            .and_then(|pokemon| pokemon.moves.get(usize::from(move_slot.get())))
+            .is_some_and(Option::is_some),
+        GameActionV1::Battle {
+            action:
+                er_types::BattleUiActionV1::SelectSwitch {
+                    actor: selected,
+                    party_slot,
+                },
+        } if *selected == actor => state
+            .active_run
+            .as_ref()
+            .and_then(|run| {
+                run.party
+                    .get(usize::from(party_slot.get()))
+                    .map(|pokemon| (run, pokemon))
+            })
+            .is_some_and(|(run, pokemon)| {
+                pokemon.owner_seat == Some(sender)
+                    && !pokemon.fainted
+                    && run.battle.as_ref().is_some_and(|battle| {
+                        !battle
+                            .field
+                            .slots
+                            .iter()
+                            .any(|slot| slot.occupant == Some(pokemon.id))
+                    })
+            }),
+        _ => false,
+    }
+}
+
+fn remember_proposal_fingerprint(
+    protocol: &mut ProtocolRuntimeSnapshotV2,
+    operation_id: OperationId,
+    fingerprint: String,
+) -> Result<(), GameKernelV7Error> {
+    let admission = protocol
+        .proposal_admission
+        .as_mut()
+        .ok_or(GameKernelV7Error::Invalid)?;
+    admission.fingerprints.push(ProposalFingerprintSnapshotV2 {
+        operation_id,
+        fingerprint,
+    });
+    admission
+        .fingerprints
+        .sort_by(|left, right| left.operation_id.cmp(&right.operation_id));
+    protocol.validate().map_err(|_| GameKernelV7Error::Invalid)
 }
 
 fn proposal_is_rooted_in_control(

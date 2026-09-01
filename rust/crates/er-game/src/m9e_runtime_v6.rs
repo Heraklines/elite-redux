@@ -7,19 +7,27 @@ use er_progression::lifecycle::{release_stored_pokemon, reorder_party, transfer_
 use er_progression::progression::{fuse_pokemon, replace_move};
 use er_rng::audit::RngDraw;
 use er_save::m9e_save_v2::GameSaveV2;
-use er_state::m7_state::GameStateV5;
+use er_state::m7_state::{GameStateV5, ProgressionTaskKindV2, ProgressionTaskV2};
 use er_state::m9e_state_v6::GameStateV6;
-use er_types::battle_command::CommandSet;
+use er_types::battle_command::{
+    AcceptedBattleCommand, BattleCommandOffer, BattleCommandProposalV1, CommandAdmissionSource,
+    CommandFrontierEntry, CommandFrontierStatus, CommandSet, OfferedMoveCommand,
+    OfferedSwitchCommand,
+};
+use er_types::battle_ids::MenuInstanceId;
 use er_types::battle_model::BattleOutcome;
+use er_types::run_ids::Experience;
 use er_types::{
     BootstrapActionV1, CaptureActionV1, EvolutionActionV1, FusionActionV1, GameActionContextV1,
-    GameActionV1, GameContentIdentity, GameControlKindV2, GameControlPlanV2, InventoryActionV1,
-    PartyActionV1, PresentationEventId, ProgressionActionV1, RewardActionV1, RunOutcome, SafeU53,
-    SaveActionV1, ScenarioGameActionV1, TerminalActionV1, WorldActionV1,
+    GameActionV1, GameContentIdentity, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
+    InventoryActionV1, OperationId, PartyActionV1, PresentationEventId, ProgressionActionV1,
+    RewardActionV1, RunOutcome, SafeU53, SaveActionV1, ScenarioGameActionV1, TerminalActionV1,
+    WorldActionV1,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::m7_progression_control::generic_vertical_control_v2;
 use crate::m7_run_executor::{RunExecutionContextV1, execute_run_program_hook_v1};
 use crate::m9e_content_v2::{
     PreparedGameContentV2, PresentationCueFamilyV1, PresentationSemanticIdV1,
@@ -30,6 +38,7 @@ use crate::m9e_material_v6::{
     GamePlatformEffectV2, GamePresentationEffectV2, GameTransitionMaterialV6,
     apply_game_material_v6, empty_game_state_digest, game_state_digest,
 };
+use crate::m9e_new_run_v6::advance_to_next_encounter_v6;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InventoryUseEffectV1 {
@@ -42,6 +51,11 @@ pub enum InventoryUseEffectV1 {
 pub enum GameDomainExecutionInputV1 {
     None,
     BootstrapCandidate(GameStateV6),
+    BattleCommandRetention {
+        proposal: BattleCommandProposalV1,
+        source: CommandAdmissionSource,
+        next_owner: er_types::SeatId,
+    },
     BattleTurn {
         commands: CommandSet,
         authority: TurnAuthorityContextV1,
@@ -348,7 +362,11 @@ impl GameActionDispatcherV1 {
                 .and_then(|state| state.active_run.as_ref())
                 .is_some_and(|run| {
                     run.control.actionable
-                        && run.control.action_context.as_ref() != Some(&context.action)
+                        && !control_accepts_action_context(
+                            &run.control,
+                            &context.action,
+                            &context.input,
+                        )
                 })
         {
             return Err(GameRuntimeV6Error::Invalid);
@@ -483,7 +501,9 @@ fn execute_domain(
                 ..Default::default()
             })
         }
-        GameActionV1::Battle { action } => execute_battle(before, content, action, &context.input),
+        GameActionV1::Battle { action } => {
+            execute_battle(before, content, action, &context.action, &context.input)
+        }
         GameActionV1::Party { action } => execute_party(before, action, &context.input),
         GameActionV1::MoveLearning { action } => {
             execute_move_learning(before, action, &context.input)
@@ -501,13 +521,15 @@ fn execute_domain(
             &context.input,
         ),
         GameActionV1::Progression { action } => {
-            execute_progression(before, content, action, &context.input)
+            execute_progression(before, content, action, &context.action, &context.input)
         }
         GameActionV1::Evolution { action } => {
             execute_evolution(before, content, action, &context.input)
         }
         GameActionV1::Inventory { action } => execute_inventory(before, action, &context.input),
-        GameActionV1::Reward { action } => execute_reward(before, action, &context.input),
+        GameActionV1::Reward { action } => {
+            execute_reward(before, content, action, &context.action, &context.input)
+        }
     }
 }
 
@@ -536,9 +558,78 @@ fn execute_battle(
     before: Option<&GameStateV6>,
     content: &PreparedGameContentV2,
     action: &er_types::BattleUiActionV1,
+    action_context: &GameActionContextV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     let before = require_state(before)?;
+    if let GameDomainExecutionInputV1::BattleCommandRetention {
+        proposal,
+        source,
+        next_owner,
+    } = input
+    {
+        proposal.validate().map_err(|error| {
+            GameRuntimeV6Error::Domain(format!("battle retention proposal: {error}"))
+        })?;
+        let mut candidate = before.clone();
+        let offer = battle_command_offer(&candidate, proposal.actor).map_err(|error| {
+            GameRuntimeV6Error::Domain(format!("battle retention offer: {error}"))
+        })?;
+        let accepted = AcceptedBattleCommand::human(proposal.clone());
+        let run = candidate
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let battle = run.battle.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+        if battle.battle_id != proposal.battle_id
+            || battle.wave != proposal.wave
+            || battle.turn != proposal.turn
+            || battle.command_state.frontier.iter().any(|entry| {
+                entry.operation_id == proposal.operation_id
+                    || entry.field_slot == proposal.field_slot
+                    || entry.actor == proposal.actor
+            })
+        {
+            return Err(GameRuntimeV6Error::Action);
+        }
+        battle.command_state.frontier.push(
+            CommandFrontierEntry::new(
+                proposal.operation_id.clone(),
+                Some(proposal.owner_seat),
+                proposal.actor,
+                proposal.field_slot,
+                offer,
+                CommandFrontierStatus::Retained {
+                    command: accepted,
+                    source: *source,
+                },
+            )
+            .map_err(|error| {
+                GameRuntimeV6Error::Domain(format!("battle retention frontier: {error}"))
+            })?,
+        );
+        battle
+            .command_state
+            .frontier
+            .sort_by_key(|entry| entry.field_slot);
+        battle.command_state.validate().map_err(|error| {
+            GameRuntimeV6Error::Domain(format!("battle retention state: {error}"))
+        })?;
+        install_battle_command_control(
+            &mut candidate,
+            *next_owner,
+            action_context.authority_seat,
+            safe_increment(action_context.authority_revision)?,
+            action_context.menu_instance,
+        )
+        .map_err(|error| {
+            GameRuntimeV6Error::Domain(format!("battle retention control: {error}"))
+        })?;
+        return Ok(DomainExecutionV1 {
+            candidate: Some(candidate),
+            ..Default::default()
+        });
+    }
     if let er_types::BattleUiActionV1::SelectReplacement {
         occurrence,
         field,
@@ -596,22 +687,260 @@ fn execute_battle(
     let outcome = transition.outcome;
     let rng_audit = transition.rng_audit;
     let mut candidate = adopt_v5(before, transition.after_state)?;
-    if !matches!(outcome, BattleOutcome::Ongoing) {
-        let run = candidate
-            .active_run
-            .as_mut()
-            .ok_or(GameRuntimeV6Error::Action)?;
-        run.outcome = match outcome {
-            BattleOutcome::Victory => RunOutcome::Victory,
-            BattleOutcome::Defeat => RunOutcome::Defeat,
-            BattleOutcome::Ongoing => RunOutcome::InProgress,
-        };
+    match outcome {
+        BattleOutcome::Victory => {
+            prepare_post_battle_progression(&mut candidate, content, action_context)?;
+        }
+        BattleOutcome::Defeat => {
+            candidate
+                .active_run
+                .as_mut()
+                .ok_or(GameRuntimeV6Error::Action)?
+                .outcome = RunOutcome::Defeat;
+        }
+        BattleOutcome::Ongoing => {
+            install_battle_command_control(
+                &mut candidate,
+                action_context.authority_seat,
+                action_context.authority_seat,
+                safe_increment(action_context.authority_revision)?,
+                action_context.menu_instance,
+            )
+            .map_err(|error| {
+                GameRuntimeV6Error::Domain(format!("next battle command control: {error}"))
+            })?;
+        }
     }
     Ok(DomainExecutionV1 {
         candidate: Some(candidate),
         rng_audit,
         ..Default::default()
     })
+}
+
+fn battle_command_offer(
+    state: &GameStateV6,
+    actor: er_types::battle_ids::PokemonId,
+) -> Result<BattleCommandOffer, GameRuntimeV6Error> {
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let battle = run.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let pokemon = run
+        .party
+        .iter()
+        .find(|pokemon| pokemon.id == actor && !pokemon.fainted)
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let fight = pokemon
+        .moves
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| {
+            slot.as_ref()?;
+            let move_slot =
+                er_types::battle_ids::MoveSlotIndex::new(u8::try_from(index).ok()?).ok()?;
+            OfferedMoveCommand::new(
+                move_slot,
+                vec![er_types::battle_command::BattleTargetSelection::implicit()],
+            )
+            .ok()
+        })
+        .collect::<Vec<_>>();
+    let switches = run
+        .party
+        .iter()
+        .enumerate()
+        .filter(|(_, candidate)| {
+            candidate.owner_seat == pokemon.owner_seat
+                && !candidate.fainted
+                && !battle
+                    .field
+                    .slots
+                    .iter()
+                    .any(|slot| slot.occupant == Some(candidate.id))
+        })
+        .filter_map(|(index, candidate)| {
+            Some(OfferedSwitchCommand::new(
+                er_types::battle_ids::PartyIndex::new(u8::try_from(index).ok()?).ok()?,
+                candidate.id,
+            ))
+        })
+        .collect::<Vec<_>>();
+    BattleCommandOffer::new(fight, switches).map_err(|_| GameRuntimeV6Error::Action)
+}
+
+fn prepare_post_battle_progression(
+    candidate: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+    action_context: &GameActionContextV1,
+) -> Result<(), GameRuntimeV6Error> {
+    let tasks = {
+        let run = candidate
+            .active_run
+            .as_ref()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        if !run.progression_queue.tasks.is_empty() {
+            return Err(GameRuntimeV6Error::Action);
+        }
+        run.party
+            .iter()
+            .filter(|pokemon| !pokemon.fainted && pokemon.level < 100)
+            .filter_map(|pokemon| {
+                let species = content
+                    .progression
+                    .species(pokemon.species_id, pokemon.form_index)?;
+                let growth = content.progression.growth_rate(species.growth_rate)?;
+                let threshold = growth
+                    .experience_by_level
+                    .get(usize::from(pokemon.level) + 1)?;
+                let amount = threshold
+                    .get()
+                    .get()
+                    .checked_sub(pokemon.experience.get().get())?;
+                (amount > 0).then_some((pokemon.id, amount))
+            })
+            .collect::<Vec<_>>()
+    };
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    run.outcome = RunOutcome::InProgress;
+    for (pokemon, amount) in tasks {
+        let sequence = run.progression_queue.next_sequence;
+        run.progression_queue.next_sequence = safe_increment(sequence)?;
+        run.progression_queue.tasks.push(ProgressionTaskV2 {
+            sequence,
+            pokemon,
+            kind: ProgressionTaskKindV2::GrantExperience(Experience::new(safe_from_u64(amount)?)),
+        });
+    }
+    candidate.profile.statistics.battles_won =
+        safe_increment(candidate.profile.statistics.battles_won)?;
+    install_progression_or_reward_control(
+        candidate,
+        content,
+        action_context.authority_seat,
+        safe_increment(action_context.authority_revision)?,
+        action_context.menu_instance,
+    )
+}
+
+fn install_progression_or_reward_control(
+    candidate: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+    owner: er_types::SeatId,
+    revision: SafeU53,
+    base_instance: MenuInstanceId,
+) -> Result<(), GameRuntimeV6Error> {
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let current_instance = run
+        .control
+        .menu
+        .as_ref()
+        .map(|menu| menu.instance_id)
+        .or_else(|| {
+            run.control
+                .action_context
+                .as_ref()
+                .map(|context| context.menu_instance)
+        })
+        .unwrap_or(base_instance);
+    let menu_instance = MenuInstanceId::new(safe_increment(current_instance.get())?);
+    let (kind, operation, control_id, entries) =
+        if let Some(task) = run.progression_queue.tasks.first() {
+            (
+                GameControlKindV2::Progression,
+                OperationId::new(format!(
+                    "progression/wave/{}/task/{}",
+                    run.wave.get().get(),
+                    task.sequence.get()
+                ))
+                .map_err(|_| GameRuntimeV6Error::Invalid)?,
+                "m9e/progression",
+                vec![(
+                    format!("progression/task/{}/accept", task.sequence.get()),
+                    GameActionV1::Progression {
+                        action: ProgressionActionV1::AcceptTask {
+                            sequence: task.sequence,
+                        },
+                    },
+                )],
+            )
+        } else {
+            let mut entries = reward_offer(content, run.world.encounter_sequence)?
+                .into_iter()
+                .enumerate()
+                .map(|(ordinal, (_, registry_key))| {
+                    Ok((
+                        format!("reward/item/{registry_key}"),
+                        GameActionV1::Reward {
+                            action: RewardActionV1::Select {
+                                option_ordinal: u32::try_from(ordinal)
+                                    .map_err(|_| GameRuntimeV6Error::Invalid)?,
+                            },
+                        },
+                    ))
+                })
+                .collect::<Result<Vec<_>, GameRuntimeV6Error>>()?;
+            entries.push((
+                "reward/reroll".to_owned(),
+                GameActionV1::Reward {
+                    action: RewardActionV1::Reroll,
+                },
+            ));
+            entries.push((
+                "reward/decline".to_owned(),
+                GameActionV1::Reward {
+                    action: RewardActionV1::Decline,
+                },
+            ));
+            (
+                GameControlKindV2::Reward,
+                OperationId::new(format!(
+                    "reward/wave/{}/offer/{}",
+                    run.wave.get().get(),
+                    run.world.encounter_sequence.get()
+                ))
+                .map_err(|_| GameRuntimeV6Error::Invalid)?,
+                "m9e/reward",
+                entries,
+            )
+        };
+    run.control = generic_vertical_control_v2(
+        menu_instance,
+        revision,
+        owner,
+        operation,
+        kind,
+        control_id,
+        &entries,
+        GameMenuCancelV2::Disabled,
+    )
+    .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    Ok(())
+}
+
+fn reward_offer(
+    content: &PreparedGameContentV2,
+    sequence: SafeU53,
+) -> Result<Vec<(er_types::InventoryItemId, String)>, GameRuntimeV6Error> {
+    let balls = &content.progression.pack().capture_balls;
+    if balls.is_empty() {
+        return Err(GameRuntimeV6Error::Invalid);
+    }
+    let offset =
+        usize::try_from(sequence.get()).map_err(|_| GameRuntimeV6Error::Invalid)? % balls.len();
+    Ok((0..balls.len().min(3))
+        .map(|ordinal| {
+            let ball = &balls[(offset + ordinal) % balls.len()];
+            (ball.item, ball.registry_key.clone())
+        })
+        .collect())
 }
 
 fn execute_party(
@@ -983,6 +1312,7 @@ fn execute_progression(
     before: Option<&GameStateV6>,
     content: &PreparedGameContentV2,
     action: &ProgressionActionV1,
+    action_context: &GameActionContextV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     require_none_input(input)?;
@@ -1026,18 +1356,27 @@ fn execute_progression(
             }
         }
     }
-    let run = candidate
-        .active_run
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let index = run
-        .progression_queue
-        .tasks
-        .iter()
-        .position(|task| task.sequence == sequence)
-        .ok_or(GameRuntimeV6Error::Action)?;
-    run.progression_queue.tasks.remove(index);
-    run.progression_queue.active_index = None;
+    {
+        let run = candidate
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let index = run
+            .progression_queue
+            .tasks
+            .iter()
+            .position(|task| task.sequence == sequence)
+            .ok_or(GameRuntimeV6Error::Action)?;
+        run.progression_queue.tasks.remove(index);
+        run.progression_queue.active_index = None;
+    }
+    install_progression_or_reward_control(
+        &mut candidate,
+        content,
+        action_context.authority_seat,
+        safe_increment(action_context.authority_revision)?,
+        action_context.menu_instance,
+    )?;
     Ok(DomainExecutionV1 {
         candidate: Some(candidate),
         ..Default::default()
@@ -1145,73 +1484,187 @@ fn execute_inventory(
 
 fn execute_reward(
     before: Option<&GameStateV6>,
+    content: &PreparedGameContentV2,
     action: &RewardActionV1,
+    action_context: &GameActionContextV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
+    require_none_input(input)?;
     let mut candidate = require_state(before)?.clone();
-    let run = candidate
-        .active_run
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Action)?;
+    let mut advance = false;
     match action {
         RewardActionV1::Reroll => {
-            require_none_input(input)?;
+            let run = candidate
+                .active_run
+                .as_mut()
+                .ok_or(GameRuntimeV6Error::Action)?;
             run.world.encounter_sequence = safe_increment(run.world.encounter_sequence)?;
         }
         RewardActionV1::ToggleLock { option_ordinal } => {
-            require_none_input(input)?;
-            run.flags.insert(
-                er_types::RunFlagId::new(safe_from_u64(u64::from(*option_ordinal) + 1)?),
-                true,
-            );
+            let run = candidate
+                .active_run
+                .as_mut()
+                .ok_or(GameRuntimeV6Error::Action)?;
+            let flag = er_types::RunFlagId::new(safe_from_u64(u64::from(*option_ordinal) + 1)?);
+            let next = !run.flags.get(&flag).copied().unwrap_or(false);
+            run.flags.insert(flag, next);
         }
         RewardActionV1::Select { option_ordinal } => {
-            let GameDomainExecutionInputV1::RewardGrant {
-                item,
-                registry_key,
-                count,
-            } = input
-            else {
-                return Err(GameRuntimeV6Error::Invalid);
+            let offered = {
+                let run = candidate
+                    .active_run
+                    .as_ref()
+                    .ok_or(GameRuntimeV6Error::Action)?;
+                reward_offer(content, run.world.encounter_sequence)?
             };
-            if registry_key.is_empty() || *count == 0 {
-                return Err(GameRuntimeV6Error::Action);
-            }
+            let (item, registry_key) = offered
+                .get(usize::try_from(*option_ordinal).map_err(|_| GameRuntimeV6Error::Action)?)
+                .cloned()
+                .ok_or(GameRuntimeV6Error::Action)?;
+            let run = candidate
+                .active_run
+                .as_mut()
+                .ok_or(GameRuntimeV6Error::Action)?;
             if let Some(entry) = run
                 .inventory
                 .entries
                 .iter_mut()
-                .find(|entry| entry.item == *item)
+                .find(|entry| entry.item == item)
             {
-                if entry.registry_key != *registry_key {
+                if entry.registry_key != registry_key {
                     return Err(GameRuntimeV6Error::Action);
                 }
                 entry.count = entry
                     .count
-                    .checked_add(*count)
+                    .checked_add(1)
                     .ok_or(GameRuntimeV6Error::Invalid)?;
             } else {
                 run.inventory
                     .entries
                     .push(er_state::m7_state::InventoryEntryV1 {
-                        item: *item,
-                        registry_key: registry_key.clone(),
-                        count: *count,
+                        item,
+                        registry_key,
+                        count: 1,
                     });
                 run.inventory.entries.sort_by_key(|entry| entry.item);
             }
-            run.world.encounter_sequence = safe_increment(run.world.encounter_sequence)?;
-            run.flags.insert(
-                er_types::RunFlagId::new(safe_from_u64(u64::from(*option_ordinal) + 1)?),
-                false,
-            );
+            advance = true;
         }
-        RewardActionV1::Decline => require_none_input(input)?,
+        RewardActionV1::Decline => advance = true,
     }
-    Ok(DomainExecutionV1 {
-        candidate: Some(candidate),
-        ..Default::default()
-    })
+    let next_revision = safe_increment(action_context.authority_revision)?;
+    if advance {
+        let (mut next, rng_audit) = advance_to_next_encounter_v6(&candidate, content)
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        install_battle_command_control(
+            &mut next,
+            action_context.authority_seat,
+            action_context.authority_seat,
+            next_revision,
+            action_context.menu_instance,
+        )?;
+        Ok(DomainExecutionV1 {
+            candidate: Some(next),
+            rng_audit,
+            ..Default::default()
+        })
+    } else {
+        install_progression_or_reward_control(
+            &mut candidate,
+            content,
+            action_context.authority_seat,
+            next_revision,
+            action_context.menu_instance,
+        )?;
+        Ok(DomainExecutionV1 {
+            candidate: Some(candidate),
+            ..Default::default()
+        })
+    }
+}
+
+fn install_battle_command_control(
+    candidate: &mut GameStateV6,
+    owner: er_types::SeatId,
+    authority: er_types::SeatId,
+    revision: SafeU53,
+    base_instance: MenuInstanceId,
+) -> Result<(), GameRuntimeV6Error> {
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let battle = run.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let field = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| {
+            slot.slot.side == er_types::battle_ids::BattleSide::Player
+                && slot.occupant.is_some_and(|pokemon| {
+                    run.party.iter().any(|candidate| {
+                        candidate.id == pokemon && candidate.owner_seat == Some(owner)
+                    })
+                })
+        })
+        .ok_or_else(|| {
+            GameRuntimeV6Error::Domain(format!(
+                "battle command owner {} has no active field actor",
+                owner.get().get()
+            ))
+        })?;
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        field.slot,
+        owner,
+    )
+    .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    let current_instance = run
+        .control
+        .menu
+        .as_ref()
+        .map(|menu| menu.instance_id)
+        .or_else(|| {
+            run.control
+                .action_context
+                .as_ref()
+                .map(|context| context.menu_instance)
+        })
+        .unwrap_or(base_instance);
+    let menu_instance = MenuInstanceId::new(safe_increment(current_instance.get())?);
+    let mut control = generic_vertical_control_v2(
+        menu_instance,
+        revision,
+        owner,
+        operation,
+        GameControlKindV2::BattleCommand,
+        "m9e/battle/command",
+        &[
+            (
+                "battle/command/fight".to_owned(),
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::OpenFight,
+                },
+            ),
+            (
+                "battle/command/party".to_owned(),
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::OpenParty,
+                },
+            ),
+        ],
+        GameMenuCancelV2::Disabled,
+    )
+    .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    control
+        .action_context
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Invalid)?
+        .authority_seat = authority;
+    run.control = control;
+    Ok(())
 }
 
 fn action_domain(
@@ -1225,7 +1678,11 @@ fn action_domain(
             action: er_types::BattleUiActionV1::SelectReplacement { .. },
         } => GameActionDomainV2::BattleReplacement,
         GameActionV1::Battle { .. } => {
-            if !matches!(input, GameDomainExecutionInputV1::BattleTurn { .. }) {
+            if !matches!(
+                input,
+                GameDomainExecutionInputV1::BattleTurn { .. }
+                    | GameDomainExecutionInputV1::BattleCommandRetention { .. }
+            ) {
                 return Err(GameRuntimeV6Error::Invalid);
             }
             GameActionDomainV2::BattleTurn
@@ -1681,6 +2138,28 @@ fn capture_threshold(
 
 fn require_state(state: Option<&GameStateV6>) -> Result<&GameStateV6, GameRuntimeV6Error> {
     state.ok_or(GameRuntimeV6Error::Invalid)
+}
+
+fn control_accepts_action_context(
+    control: &GameControlPlanV2,
+    context: &GameActionContextV1,
+    input: &GameDomainExecutionInputV1,
+) -> bool {
+    if control.action_context.as_ref() == Some(context) {
+        return true;
+    }
+    let Some(root) = control.action_context.as_ref() else {
+        return false;
+    };
+    matches!(
+        input,
+        GameDomainExecutionInputV1::BattleCommandRetention { .. }
+            | GameDomainExecutionInputV1::BattleTurn { .. }
+    ) && control.kind == GameControlKindV2::BattleCommand
+        && context.operation_id == root.operation_id
+        && context.authority_seat == root.authority_seat
+        && context.authority_revision == root.authority_revision
+        && context.menu_instance > root.menu_instance
 }
 
 fn require_none_input(input: &GameDomainExecutionInputV1) -> Result<(), GameRuntimeV6Error> {

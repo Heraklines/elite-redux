@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
 use er_state::field::{FieldSlotState, FieldState};
 use er_state::m7_state::{
@@ -241,6 +242,296 @@ pub fn construct_natural_run_v6(
         .validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     Ok(state)
+}
+
+pub fn expand_cooperative_topology_v6(
+    state: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+    partner_seat: SeatId,
+) -> Result<(), NaturalRunV6Error> {
+    state
+        .validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let (mode_id, biome_id, player_species, enemy_species) = {
+        let run = state
+            .active_run
+            .as_ref()
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        let mode = content
+            .world
+            .mode(run.mode)
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        if !mode.cooperative
+            || run
+                .party
+                .iter()
+                .any(|pokemon| pokemon.owner_seat == Some(partner_seat))
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        let battle = run.battle.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+        if battle.format != BattleFormat::single() || battle.enemy_party.len() != 1 {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        (
+            run.mode,
+            run.world.biome,
+            run.party
+                .first()
+                .map(|pokemon| pokemon.species_id)
+                .ok_or(NaturalRunV6Error::Invalid)?,
+            battle.enemy_party[0].species_id,
+        )
+    };
+    let mode = content
+        .world
+        .mode(mode_id)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let partner_starter = content
+        .bundle()
+        .bootstrap
+        .starters
+        .iter()
+        .find(|starter| starter.species_id != player_species)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let biome = content
+        .world
+        .biome(biome_id)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let partner_enemy_species = biome
+        .pokemon_pools
+        .iter()
+        .flat_map(|pool| pool.species.iter().copied())
+        .find(|species| *species != enemy_species)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let partner_id = state
+        .identities
+        .allocate_pokemon_id()
+        .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let partner = pokemon(
+        content,
+        partner_id,
+        Some(partner_seat),
+        partner_starter.species_id,
+        partner_starter.form_index,
+        mode.starting_level,
+    )?;
+    let partner_enemy_id = state
+        .identities
+        .allocate_pokemon_id()
+        .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let partner_enemy = pokemon(
+        content,
+        partner_enemy_id,
+        None,
+        partner_enemy_species,
+        0,
+        mode.starting_level,
+    )?;
+    let run = state
+        .active_run
+        .as_mut()
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let battle = run.battle.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
+    let player_id = run
+        .party
+        .first()
+        .map(|pokemon| pokemon.id)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let enemy_id = battle
+        .enemy_party
+        .first()
+        .map(|pokemon| pokemon.id)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    run.party.push(partner);
+    battle.enemy_party.push(partner_enemy);
+    battle.format = BattleFormat::forced_coop_doubles();
+    battle.field = FieldState::new_for_format(
+        &battle.format,
+        vec![
+            FieldSlotState::new(
+                FieldSlot::new(BattleSide::Player, 0).map_err(|_| NaturalRunV6Error::Invalid)?,
+                Some(player_id),
+            ),
+            FieldSlotState::new(
+                FieldSlot::new(BattleSide::Player, 1).map_err(|_| NaturalRunV6Error::Invalid)?,
+                Some(partner_id),
+            ),
+            FieldSlotState::new(
+                FieldSlot::new(BattleSide::Enemy, 0).map_err(|_| NaturalRunV6Error::Invalid)?,
+                Some(enemy_id),
+            ),
+            FieldSlotState::new(
+                FieldSlot::new(BattleSide::Enemy, 1).map_err(|_| NaturalRunV6Error::Invalid)?,
+                Some(partner_enemy_id),
+            ),
+        ],
+    )
+    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    state
+        .validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))
+}
+
+pub fn advance_to_next_encounter_v6(
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<(GameStateV6, Vec<RngDraw>), NaturalRunV6Error> {
+    state
+        .validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let mut next = state.clone();
+    let (previous, next_wave_value, biome_id, mode_id, run_rng, run_seed, player_id) = {
+        let run = next.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+        let previous = run.battle.clone().ok_or(NaturalRunV6Error::Invalid)?;
+        if previous.outcome != BattleOutcome::Victory
+            || previous.enemy_party.iter().any(|pokemon| !pokemon.fainted)
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        let next_wave_value = run
+            .wave
+            .get()
+            .get()
+            .checked_add(1)
+            .ok_or(NaturalRunV6Error::Exhausted)?;
+        let player_id = run
+            .party
+            .iter()
+            .find(|pokemon| !pokemon.fainted)
+            .map(|pokemon| pokemon.id)
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        (
+            previous,
+            next_wave_value,
+            run.world.biome,
+            run.mode,
+            run.run_rng.clone(),
+            run.seed.clone(),
+            player_id,
+        )
+    };
+    let next_wave = WaveIndex::new(safe(next_wave_value)?)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let biome = content
+        .world
+        .biome(biome_id)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let mut candidates = biome
+        .pokemon_pools
+        .iter()
+        .filter(|pool| pool.tier == 0 && pool.time_of_day == -1)
+        .flat_map(|pool| pool.species.iter().copied())
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        candidates.extend(
+            biome
+                .pokemon_pools
+                .iter()
+                .flat_map(|pool| pool.species.iter().copied()),
+        );
+    }
+    candidates.sort_unstable();
+    candidates.dedup();
+    if candidates.is_empty() {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let mut rng = RngRuntime::from_states(run_rng, None)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let selected = rng
+        .run_pick_index(
+            candidates.len(),
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let enemy_species = candidates[selected];
+    let mode = content
+        .world
+        .mode(mode_id)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let level_gain = u16::try_from((next_wave_value.saturating_sub(1)) / 2)
+        .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let level = mode
+        .starting_level
+        .checked_add(level_gain)
+        .ok_or(NaturalRunV6Error::Exhausted)?;
+    let enemy_id = next
+        .identities
+        .allocate_pokemon_id()
+        .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let enemy = pokemon(content, enemy_id, None, enemy_species, 0, level)?;
+    let battle_id = next
+        .identities
+        .allocate_battle_id()
+        .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let format = BattleFormat::single();
+    let player_slot =
+        FieldSlot::new(BattleSide::Player, 0).map_err(|_| NaturalRunV6Error::Invalid)?;
+    let enemy_slot =
+        FieldSlot::new(BattleSide::Enemy, 0).map_err(|_| NaturalRunV6Error::Invalid)?;
+    let field = FieldState::new_for_format(
+        &format,
+        vec![
+            FieldSlotState::new(player_slot, Some(player_id)),
+            FieldSlotState::new(enemy_slot, Some(enemy.id)),
+        ],
+    )
+    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let battle_seed = format!("{run_seed}:battle:{next_wave_value}");
+    let battle_rng = rng
+        .initialize_battle(&battle_seed, next_wave)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let audit = rng.audit_entries().to_vec();
+    let run = next.active_run.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
+    run.run_rng = rng.run_state();
+    run.wave = next_wave;
+    run.world.encounter_sequence = safe(
+        run.world
+            .encounter_sequence
+            .get()
+            .checked_add(1)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
+    )?;
+    run.battle = Some(BattleStateV5 {
+        schema_version: BATTLE_STATE_SCHEMA_VERSION_V5,
+        battle_id,
+        wave: next_wave,
+        wave_seed: battle_seed,
+        turn: battle_rng.turn,
+        format,
+        authority_seat: previous.authority_seat,
+        enemy_party: vec![enemy],
+        field,
+        weather: WeatherState {
+            kind: WeatherKind::None,
+            remaining_turns: 0,
+        },
+        terrain: TerrainState {
+            kind: TerrainKind::None,
+            remaining_turns: 0,
+        },
+        arena_conditions: Vec::new(),
+        global_ability_suppression: GlobalAbilitySuppressionState {
+            ignore_abilities: false,
+            source: None,
+        },
+        battle_rng,
+        command_state: CommandCollectionState {
+            frontier: Vec::new(),
+            tombstones: Vec::new(),
+        },
+        mechanics: MechanicStateStoreV2::default(),
+        faint_queue: Vec::new(),
+        next_faint_occurrence: FaintOccurrenceId::new(safe(1)?),
+        outcome: BattleOutcome::Ongoing,
+    });
+    if next.profile.statistics.highest_wave < next_wave {
+        next.profile.statistics.highest_wave = next_wave;
+    }
+    next.validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    Ok((next, audit))
 }
 
 fn pokemon(
