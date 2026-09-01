@@ -1,4 +1,5 @@
 //! Versioned canonical M7 save and replay schemas.
+pub mod m9e_save_v2;
 pub mod mode_save;
 pub mod oracle_replay;
 pub mod profile;
