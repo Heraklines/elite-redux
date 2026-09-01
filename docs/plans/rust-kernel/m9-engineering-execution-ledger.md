@@ -48,6 +48,7 @@ Updated: 2026-09-01
 | `107e66d98d` through `ebbce0f05f` | BrowserKernelHostV2, ten typed adapters, and V7 production import closure |
 | `04a0477e80` through `2d0c980169` | Raw solo/co-op/domain journeys, reconnect fencing, save restoration for all 24 controls, and native/Wasm eventwise parity |
 | `ea2ce29dcd` through `2ac1edc063` | Permanent browser adapter contract and dedicated 29-shard exact-SHA qualification workflow |
+| `6f76059c65` | Repaired first hosted-gate roots: bounded browser wire variants, calibrated production Clippy, and M9-safe simulator API audit |
 
 Additional integrated foundations: complete battle content, world V2, bootstrap V1, progression V2 schema, closed evolution conditions, GameStateV6, and V5-to-V6 state migration.
 
@@ -99,7 +100,13 @@ All active ownership is held by the integration owner in this worktree; no paral
 - Migration: V5-to-V6 state migration, V6-to-V7 snapshot migration, allocator minima, material ledger, pending effects, save, and V7 continuation checks are implemented.
 - Native/Wasm: the V7 raw-input report is locked to digest `13aee334c66c6e0da239f0c4f56317ccc039af6362d340a7b56c753c92b7c1c3`; native execution is green and the wasm32 test binary compiles locally. Hosted wasm execution remains part of the exact-SHA gate.
 - Focused tests at current HEAD: V7 natural solo terminal, natural co-op proposal/material/recovery, four domain journeys including 24-control save reload, Snapshot V7, BrowserHostV2, browser effect routing, and native eventwise parity are green. Static ownership, TypeScript, Biome, and Rust formatting checks are green on the exercised surface.
-- Current failing tests: none in exercised focused lanes; the complete 29-shard qualification has not yet run.
+- Current failing tests: run `33484904634` at exact SHA `c6b047d239e3c9909b68854f95daaf147db20e04` exposed two roots; both are repaired in `6f76059c65`, and the replacement exact-SHA qualification is pending.
+
+## Qualification attempts
+
+| Attempt | Candidate | Run | Result | Classified roots |
+|---|---|---|---|---|
+| 1 | `c6b047d239e3c9909b68854f95daaf147db20e04` | `33484904634` | RED | Static used an uncalibrated workspace-wide Clippy scope; simulator ran a historical M3 ancestry audit and its token audit falsely rejected the production `GameRuntimeV6` identifier. All other 30 pre-aggregate jobs were green. |
 
 ## Current next ready tasks
 
