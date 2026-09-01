@@ -382,7 +382,7 @@ fn compile_known_option_effects(
     let callback_sha = option
         .callbacks
         .iter()
-        .find(|callback| callback.slot == ScenarioCallbackSlotV2::OptionPhase)?
+        .find(|callback| callback.slot == ScenarioCallbackSlotV2::OptionApply)?
         .sha256
         .as_str();
     if callback_has_no_canonical_effects(callback_sha) {
