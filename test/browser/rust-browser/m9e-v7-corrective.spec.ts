@@ -186,8 +186,9 @@ function serveAsset(name: string, response: ServerResponse) {
 
 test.beforeAll(async () => {
   server = createServer((request, response) => {
-    if (request.url?.startsWith("/m9e-assets/")) {
-      serveAsset(request.url.slice(13), response);
+    const assetPrefix = "/m9e-assets/";
+    if (request.url?.startsWith(assetPrefix)) {
+      serveAsset(request.url.slice(assetPrefix.length), response);
       return;
     }
     if (request.url === "/m9e-v7.html" || request.url?.startsWith("/m9e-v7.html?")) {
@@ -227,7 +228,12 @@ async function openFixture(page: Page, path: string) {
   page.once("pageerror", onPageError);
   try {
     await page.goto(new URL(path, address).href);
-    await Promise.race([expect(page.locator("#status")).toHaveText("ready", { timeout: 240_000 }), pageError]);
+    const status = page.locator("#status");
+    await Promise.race([expect(status).toHaveText(/^(?:ready|error:)/u, { timeout: 240_000 }), pageError]);
+    const text = await status.textContent();
+    if (text !== "ready") {
+      throw new Error(text ?? "browser fixture status missing");
+    }
   } finally {
     page.off("pageerror", onPageError);
   }
