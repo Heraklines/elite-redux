@@ -1,5 +1,7 @@
 //! Atomic execution of closed RunProgramV1 operations.
 
+use std::sync::Arc;
+
 use er_state::m7_state::{
     GameStateV5, InventoryEntryV1, RunModifierInstanceV2, RunStateV3,
     SCENARIO_RUNTIME_SCHEMA_VERSION_V1, ScenarioRuntimeStateV1, StoredPokemonV1,
@@ -15,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::m7_content::PreparedGameContentV1;
+use crate::m9e_content_v2::PreparedGameContentV2;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct RunExecutionContextV1 {
@@ -55,24 +58,72 @@ pub enum RunExecutionError {
     UnreachableOperation,
 }
 
+pub trait RunExecutionContentV1 {
+    fn run_programs(&self) -> &[RunProgramV1];
+    fn run_program(&self, id: RunProgramId) -> Option<&RunProgramV1>;
+    fn scenario_entry(&self, id: er_types::ScenarioId) -> Option<er_types::ScenarioNodeId>;
+}
+
+impl RunExecutionContentV1 for PreparedGameContentV1 {
+    fn run_programs(&self) -> &[RunProgramV1] {
+        &self.run.pack().programs
+    }
+
+    fn run_program(&self, id: RunProgramId) -> Option<&RunProgramV1> {
+        self.run.program(id)
+    }
+
+    fn scenario_entry(&self, id: er_types::ScenarioId) -> Option<er_types::ScenarioNodeId> {
+        self.scenarios.graph(id).map(|graph| graph.entry)
+    }
+}
+
+impl RunExecutionContentV1 for PreparedGameContentV2 {
+    fn run_programs(&self) -> &[RunProgramV1] {
+        &self.run.pack().programs
+    }
+
+    fn run_program(&self, id: RunProgramId) -> Option<&RunProgramV1> {
+        self.run.program(id)
+    }
+
+    fn scenario_entry(&self, id: er_types::ScenarioId) -> Option<er_types::ScenarioNodeId> {
+        self.scenarios.scenario(id).map(|scenario| scenario.entry)
+    }
+}
+
+impl<T: RunExecutionContentV1> RunExecutionContentV1 for Arc<T> {
+    fn run_programs(&self) -> &[RunProgramV1] {
+        self.as_ref().run_programs()
+    }
+
+    fn run_program(&self, id: RunProgramId) -> Option<&RunProgramV1> {
+        self.as_ref().run_program(id)
+    }
+
+    fn scenario_entry(&self, id: er_types::ScenarioId) -> Option<er_types::ScenarioNodeId> {
+        self.as_ref().scenario_entry(id)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct RunOperationDispatcherV1;
 
 impl RunOperationDispatcherV1 {
-    fn execute(
+    fn execute<C: RunExecutionContentV1>(
         program: &RunProgramV1,
         operation: &RunOperation,
         state: &mut GameStateV5,
         context: &RunExecutionContextV1,
-        content: &PreparedGameContentV1,
+        content: &C,
     ) -> Result<(), RunExecutionError> {
         dispatch_operation(program, operation, state, context, content)
     }
 }
 
-pub fn execute_run_hook_v1(
+pub fn execute_run_hook_v1<C: RunExecutionContentV1>(
     before: &GameStateV5,
-    content: &PreparedGameContentV1,
+    content: &C,
     hook: RunHook,
     context: RunExecutionContextV1,
 ) -> Result<RunExecutionTransitionV1, RunExecutionError> {
@@ -81,7 +132,7 @@ pub fn execute_run_hook_v1(
         .map_err(|error| RunExecutionError::State(error.to_string()))?;
     let mut after = before.clone();
     let mut evidence = Vec::new();
-    for program in &content.run.pack().programs {
+    for program in content.run_programs() {
         execute_program_bindings(program, hook, &context, content, &mut after, &mut evidence)?;
     }
     finish_transition(after, evidence)
@@ -91,9 +142,9 @@ pub fn execute_run_hook_v1(
 ///
 /// Menus bind an option to a numeric `RunProgramId`; adapters only deliver raw input and never
 /// interpret the selected program.
-pub fn execute_run_program_hook_v1(
+pub fn execute_run_program_hook_v1<C: RunExecutionContentV1>(
     before: &GameStateV5,
-    content: &PreparedGameContentV1,
+    content: &C,
     program_id: RunProgramId,
     hook: RunHook,
     context: RunExecutionContextV1,
@@ -102,8 +153,7 @@ pub fn execute_run_program_hook_v1(
         .validate()
         .map_err(|error| RunExecutionError::State(error.to_string()))?;
     let program = content
-        .run
-        .program(program_id)
+        .run_program(program_id)
         .ok_or(RunExecutionError::UnknownProgram(program_id))?;
     let mut after = before.clone();
     let mut evidence = Vec::new();
@@ -111,11 +161,11 @@ pub fn execute_run_program_hook_v1(
     finish_transition(after, evidence)
 }
 
-fn execute_program_bindings(
+fn execute_program_bindings<C: RunExecutionContentV1>(
     program: &RunProgramV1,
     hook: RunHook,
     context: &RunExecutionContextV1,
-    content: &PreparedGameContentV1,
+    content: &C,
     after: &mut GameStateV5,
     evidence: &mut Vec<RunOperationEvidenceV1>,
 ) -> Result<(), RunExecutionError> {
@@ -208,12 +258,12 @@ fn evaluate_condition(
     }
 }
 
-fn dispatch_operation(
+fn dispatch_operation<C: RunExecutionContentV1>(
     program: &RunProgramV1,
     operation: &RunOperation,
     state: &mut GameStateV5,
     context: &RunExecutionContextV1,
-    content: &PreparedGameContentV1,
+    content: &C,
 ) -> Result<(), RunExecutionError> {
     match operation {
         RunOperation::AddMoney { amount } => {
@@ -382,9 +432,8 @@ fn dispatch_operation(
             run.control.menu = None;
         }
         RunOperation::OpenScenario { scenario } => {
-            let graph = content
-                .scenarios
-                .graph(*scenario)
+            let entry = content
+                .scenario_entry(*scenario)
                 .ok_or(RunExecutionError::Operation)?;
             state
                 .active_run
@@ -393,7 +442,7 @@ fn dispatch_operation(
                 .scenario = Some(ScenarioRuntimeStateV1 {
                 schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
                 scenario: *scenario,
-                node: graph.entry,
+                node: entry,
                 flags: Default::default(),
                 visit_count: SafeU53::ZERO,
             });

@@ -14,6 +14,7 @@ er-rng = { path = "../er-rng" }
 er-progression = { path = "../er-progression" }
 er-run = { path = "../er-run" }
 er-scenario = { path = "../er-scenario" }
+er-save = { path = "../er-save" }
 er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 er-world = { path = "../er-world" }

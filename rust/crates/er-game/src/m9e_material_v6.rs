@@ -415,8 +415,8 @@ fn variant_matches_transition(
 
 fn action_matches_domain(action: Option<&GameActionV1>, domain: GameActionDomainV2) -> bool {
     match (action, domain) {
-        (None, GameActionDomainV2::NewRun) => true,
-        (Some(GameActionV1::ExecuteRunProgram { .. }), GameActionDomainV2::RunProgram)
+        (Some(GameActionV1::Bootstrap { .. }), GameActionDomainV2::NewRun)
+        | (Some(GameActionV1::ExecuteRunProgram { .. }), GameActionDomainV2::RunProgram)
         | (Some(GameActionV1::Battle { .. }), GameActionDomainV2::BattleTurn)
         | (Some(GameActionV1::Battle { .. }), GameActionDomainV2::BattleReplacement)
         | (Some(GameActionV1::Capture { .. }), GameActionDomainV2::Capture)

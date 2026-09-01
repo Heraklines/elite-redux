@@ -386,6 +386,7 @@ dependencies = [
  "er-progression",
  "er-rng",
  "er-run",
+ "er-save",
  "er-scenario",
  "er-state",
  "er-types",

@@ -16,8 +16,8 @@ use er_state::m9e_state_v6::{
 };
 use er_types::battle_ids::WaveIndex;
 use er_types::{
-    GAME_CONTROL_PLAN_SCHEMA_VERSION_V2, GameControlKindV2, GameControlPlanV2, OperationId,
-    SafeU53, SeatId,
+    BootstrapActionV1, GAME_CONTROL_PLAN_SCHEMA_VERSION_V2, GameActionV1, GameControlKindV2,
+    GameControlPlanV2, OperationId, SafeU53, SeatId,
 };
 
 const BUNDLE: &[u8] =
@@ -72,7 +72,9 @@ fn new_run_material(
         authority_seat: SeatId::new(safe(1)),
         authority_revision,
         content_identity: content.identity().clone(),
-        accepted_action: None,
+        accepted_action: Some(GameActionV1::Bootstrap {
+            action: BootstrapActionV1::Confirm,
+        }),
         before_digest: empty_game_state_digest()?,
         after_digest: game_state_digest(&after_state)?,
         mutations: vec![GameMutationEvidenceV2 {

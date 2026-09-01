@@ -284,6 +284,10 @@ impl PreparedProgressionContentV2 {
             .get(&id)
             .and_then(|index| self.pack.capture_balls.get(*index))
     }
+
+    pub fn growth_rate(&self, id: GrowthRateId) -> Option<&GrowthRateDefinitionV1> {
+        self.pack.growth_rates.iter().find(|entry| entry.id == id)
+    }
 }
 
 fn validate_condition(
