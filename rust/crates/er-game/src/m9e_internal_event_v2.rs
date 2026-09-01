@@ -83,7 +83,10 @@ pub enum GameInternalEventV2 {
     TerminalReached(TerminalState),
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GameInternalEventKindV2 {
     ControlSelected,
     ControlCancelled,

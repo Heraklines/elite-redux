@@ -63,7 +63,7 @@ pub struct GameProposalEnvelopeV2 {
     pub proposal: GameProposalV1,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum GameKernelEffectV7 {
     UiChanged(GameControlPlanV2),
     ProposalReady {
@@ -79,7 +79,7 @@ pub enum GameKernelEffectV7 {
     Terminal(TerminalState),
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GameKernelStepV7 {
     pub effects: Vec<GameKernelEffectV7>,
     pub internal_events: Vec<GameInternalEventKindV2>,
