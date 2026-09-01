@@ -20,6 +20,22 @@ const env = { ...process.env, SOURCE_DATE_EPOCH: "0" };
 execFileSync(
   "cargo",
   [
+    "run",
+    "--manifest-path",
+    "rust/Cargo.toml",
+    "--locked",
+    "-p",
+    "er-web",
+    "--example",
+    "m9e_v7_browser_fixtures",
+    "--",
+    out,
+  ],
+  { cwd: ROOT, stdio: "inherit", env },
+);
+execFileSync(
+  "cargo",
+  [
     "build",
     "--manifest-path",
     "rust/Cargo.toml",
@@ -42,7 +58,13 @@ copyFileSync(
   resolve(ROOT, "rust/fixtures/m9/engineering/game-content-bundle-v2.json"),
   resolve(out, "game-content-bundle-v2.json"),
 );
-const files = ["er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json"];
+const files = [
+  "er_web.js",
+  "er_web_bg.wasm",
+  "game-content-bundle-v2.json",
+  "coop-authority-snapshot.json",
+  "coop-replica-snapshot.json",
+];
 const assets = Object.fromEntries(
   files.map(file => {
     const bytes = readFileSync(resolve(out, file));

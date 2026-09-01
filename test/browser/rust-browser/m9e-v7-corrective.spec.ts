@@ -46,7 +46,41 @@ for (const kind of ["keydown", "keyup"]) document.addEventListener(kind, event =
   pending = pending.then(() => send(kind === "keydown" ? { kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: { code: key(event.code), printable: false, browser_repeat: event.repeat, focus: "GAME" } } } : { kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: key(event.code) } } }));
 });
 const snapshot = async () => (await send({ kind: "SNAPSHOT" })).snapshot;
-globalThis.__m9eV7 = { idle: () => pending, snapshot, send };
+const createClient = async (snapshot, seat, role) => {
+  const clientHost = new BrowserKernelHostV2(bundle); let clientSequence = 0; let clientRequest = 1;
+  const clientSend = async request => {
+    const envelope = { request, request_id: clientRequest++, sequence: clientSequence++, version: 2 };
+    const response = JSON.parse(decoder.decode(clientHost.process(bytes(envelope)))).response;
+    if (response.kind === "EFFECTS") for (const effect of response.batch.effects) if (effect.kind === "PRESENTATION") await clientSend({ kind: "PRESENTATION_SETTLED", event_id: effect.effect.event_id, outcome: { kind: "SETTLED" } });
+    return response;
+  };
+  await clientSend({ kind: "INITIALIZE", initialization: { kind: "SNAPSHOT", context: { local_seat: seat, role, protocol: null, scheduler: { disposed: false, next_timer_id: null, pauses: [], timers: [] } }, snapshot } });
+  return { send: clientSend };
+};
+const rawPress = async client => {
+  await client.send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: { code: { kind: "SPACE" }, printable: false, browser_repeat: false, focus: "GAME" } } });
+  return client.send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } });
+};
+const networkBytes = response => response.batch.effects.find(effect => effect.kind === "SEND_NETWORK_FRAME")?.bytes;
+const coop = async () => {
+  const authoritySnapshot = await (await fetch("/m9e-assets/coop-authority-snapshot.json")).json();
+  const replicaSnapshot = await (await fetch("/m9e-assets/coop-replica-snapshot.json")).json();
+  const authority = await createClient(authoritySnapshot, 1, "AUTHORITY");
+  const replica = await createClient(replicaSnapshot, 2, "REPLICA");
+  const initialTurn = authoritySnapshot.lifecycle.value.active_run.battle.turn;
+  await rawPress(authority); const retained = await rawPress(authority);
+  const retainedBytes = networkBytes(retained); if (retainedBytes == null) throw new Error("retention material missing");
+  await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: retainedBytes });
+  await rawPress(replica); const proposal = await rawPress(replica);
+  const proposalBytes = networkBytes(proposal); if (proposalBytes == null) throw new Error("guest proposal missing");
+  const resolved = await authority.send({ kind: "NETWORK_FRAME", generation: 1, bytes: proposalBytes });
+  const materialBytes = networkBytes(resolved); if (materialBytes == null) throw new Error("turn material missing");
+  await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: materialBytes });
+  const authorityAfter = (await authority.send({ kind: "SNAPSHOT" })).snapshot;
+  const replicaAfter = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
+  return { converged: JSON.stringify(canonical(authorityAfter.lifecycle)) === JSON.stringify(canonical(replicaAfter.lifecycle)), turnAdvanced: authorityAfter.lifecycle.value.active_run.battle.turn > initialTurn };
+};
+globalThis.__m9eV7 = { idle: () => pending, snapshot, send, coop };
 document.querySelector("#status").textContent = "ready";
 </script></body></html>`;
 
@@ -66,11 +100,17 @@ interface ResponseWire {
   kind: string;
 }
 
+interface CoopResult {
+  converged: boolean;
+  turnAdvanced: boolean;
+}
+
 declare global {
   var __m9eV7: {
     idle: () => Promise<void>;
     snapshot: () => Promise<SnapshotWire>;
     send: (request: unknown) => Promise<ResponseWire>;
+    coop: () => Promise<CoopResult>;
   };
 }
 
@@ -170,4 +210,16 @@ test("natural V7 browser startup reaches the real battle command", async ({ page
   expect(lifecycle.value.active_run.battle).not.toBeNull();
   const advanced = await page.evaluate(() => globalThis.__m9eV7.send({ kind: "ADVANCE_TIME", milliseconds: 16 }));
   expect(advanced.kind).toBe("EFFECTS");
+});
+
+test("two V7 browser hosts wait for both humans and converge one turn", async ({ page }) => {
+  const address = server.resolvedUrls?.local[0];
+  if (address == null) {
+    throw new Error("Vite URL missing");
+  }
+  await page.goto(new URL("m9e-v7.html", address).href);
+  await expect(page.locator("#status")).toHaveText("ready", { timeout: 30_000 });
+  const result = await page.evaluate(() => globalThis.__m9eV7.coop());
+  expect(result.turnAdvanced).toBe(true);
+  expect(result.converged).toBe(true);
 });
