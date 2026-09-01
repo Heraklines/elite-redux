@@ -29,6 +29,13 @@ use crate::m9e_material_v6::{
     apply_game_material_v6, empty_game_state_digest, game_state_digest,
 };
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InventoryUseEffectV1 {
+    Heal { amount: u32 },
+    CureStatus,
+    GrantHeldItem { registry_key: String },
+}
+
 #[derive(Clone, Debug)]
 pub enum GameDomainExecutionInputV1 {
     None,
@@ -39,12 +46,20 @@ pub enum GameDomainExecutionInputV1 {
     },
     CaptureDraw(u32),
     SaveGeneration(SafeU53),
+    InventoryUse(InventoryUseEffectV1),
+    InventoryTransferKey(String),
+    RewardGrant {
+        item: er_types::InventoryItemId,
+        registry_key: String,
+        count: u32,
+    },
 }
 
 #[derive(Clone, Debug)]
 pub struct GameActionDispatchContextV1 {
     pub action: GameActionContextV1,
     pub input: GameDomainExecutionInputV1,
+    pub authority: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,11 +125,13 @@ impl GameRuntimeV6 {
                 .validate_with(content.as_ref())
                 .map_err(|_| GameRuntimeV6Error::Invalid)?;
         }
+        let material_ledger =
+            AppliedGameMaterialLedgerV1::new(next_authority_revision).map_err(material_error)?;
+        validate_runtime_frontier(state.as_ref(), &material_ledger)?;
         Ok(Self {
             state,
             content,
-            material_ledger: AppliedGameMaterialLedgerV1::new(next_authority_revision)
-                .map_err(material_error)?,
+            material_ledger,
         })
     }
 
@@ -131,6 +148,7 @@ impl GameRuntimeV6 {
                 .validate_with(content.as_ref())
                 .map_err(|_| GameRuntimeV6Error::Invalid)?;
         }
+        validate_runtime_frontier(snapshot.state.as_ref(), &snapshot.material_ledger)?;
         Ok(Self {
             state: snapshot.state,
             content,
@@ -207,8 +225,15 @@ impl GameActionDispatcherV1 {
         context: GameActionDispatchContextV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
         action.validate().map_err(|_| GameRuntimeV6Error::Action)?;
-        if context.action.operation_id.as_str().is_empty()
+        if !context.authority
+            || context.action.operation_id.as_str().is_empty()
             || context.action.authority_revision != ledger.next_authority_revision
+            || before
+                .and_then(|state| state.active_run.as_ref())
+                .is_some_and(|run| {
+                    run.control.actionable
+                        && run.control.action_context.as_ref() != Some(&context.action)
+                })
         {
             return Err(GameRuntimeV6Error::Invalid);
         }
@@ -667,19 +692,19 @@ fn execute_terminal(
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     require_none_input(input)?;
     let mut candidate = require_state(before)?.clone();
-    let run = candidate
-        .active_run
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Action)?;
     match action {
         TerminalActionV1::ConfirmOutcome { outcome } => {
+            let run = candidate
+                .active_run
+                .as_mut()
+                .ok_or(GameRuntimeV6Error::Action)?;
             run.outcome = match outcome {
                 BattleOutcome::Victory => RunOutcome::Victory,
                 BattleOutcome::Defeat => RunOutcome::Defeat,
                 BattleOutcome::Ongoing => return Err(GameRuntimeV6Error::Action),
             };
         }
-        TerminalActionV1::ReturnToTitle => run.outcome = RunOutcome::Defeat,
+        TerminalActionV1::ReturnToTitle => candidate.active_run = None,
     }
     Ok(DomainExecutionV1 {
         candidate: Some(candidate),
@@ -906,46 +931,72 @@ fn execute_inventory(
     action: &InventoryActionV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
-    require_none_input(input)?;
     let mut candidate = require_state(before)?.clone();
-    let run = candidate
-        .active_run
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Action)?;
+    let mut output = DomainExecutionV1::default();
     match action {
         InventoryActionV1::Discard { item, count } => {
+            require_none_input(input)?;
             if *count == 0 {
                 return Err(GameRuntimeV6Error::Action);
             }
-            let index = run
-                .inventory
-                .entries
-                .iter()
-                .position(|entry| entry.item == *item && entry.count >= *count)
-                .ok_or(GameRuntimeV6Error::Action)?;
-            run.inventory.entries[index].count -= *count;
-            if run.inventory.entries[index].count == 0 {
-                run.inventory.entries.remove(index);
+            remove_inventory(&mut candidate, *item, *count)?;
+        }
+        InventoryActionV1::Use { item, target } => {
+            let GameDomainExecutionInputV1::InventoryUse(effect) = input else {
+                return Err(GameRuntimeV6Error::Invalid);
+            };
+            remove_inventory(&mut candidate, *item, 1)?;
+            let target = target.ok_or(GameRuntimeV6Error::Action)?;
+            match effect {
+                InventoryUseEffectV1::Heal { amount } => {
+                    let pokemon = persistent_pokemon_mut(&mut candidate, target)?;
+                    pokemon.hp = pokemon.hp.saturating_add(*amount).min(pokemon.max_hp);
+                    pokemon.fainted = pokemon.hp == 0;
+                }
+                InventoryUseEffectV1::CureStatus => {
+                    persistent_pokemon_mut(&mut candidate, target)?.status =
+                        er_types::battle_model::StatusState {
+                            kind: er_types::battle_model::StatusKind::None,
+                            toxic_turn_count: 0,
+                            sleep_turns_remaining: None,
+                        };
+                }
+                InventoryUseEffectV1::GrantHeldItem { registry_key } => {
+                    if registry_key.is_empty() {
+                        return Err(GameRuntimeV6Error::Action);
+                    }
+                    let instance = candidate
+                        .identities
+                        .allocate_held_item_instance_id()
+                        .map_err(|_| GameRuntimeV6Error::Invalid)?;
+                    let pokemon = persistent_pokemon_mut(&mut candidate, target)?;
+                    pokemon
+                        .held_items
+                        .push(er_state::m7_state::HeldItemOwnershipStateV1 {
+                            instance_id: instance,
+                            registry_key: registry_key.clone(),
+                            source_ordinal: er_types::SourceOrdinal::ZERO,
+                            stack_count: 1,
+                        });
+                    pokemon.held_items.sort_by_key(|item| item.instance_id);
+                    output
+                        .allocated_identities
+                        .push((GameIdentityDomainV1::ModifierInstance, instance.get()));
+                }
             }
         }
-        InventoryActionV1::Use { item, .. } => {
-            let index = run
-                .inventory
-                .entries
-                .iter()
-                .position(|entry| entry.item == *item && entry.count > 0)
-                .ok_or(GameRuntimeV6Error::Action)?;
-            run.inventory.entries[index].count -= 1;
-            if run.inventory.entries[index].count == 0 {
-                run.inventory.entries.remove(index);
+        InventoryActionV1::Transfer { source, target, .. } => {
+            let GameDomainExecutionInputV1::InventoryTransferKey(registry_key) = input else {
+                return Err(GameRuntimeV6Error::Invalid);
+            };
+            if registry_key.is_empty() || source == target {
+                return Err(GameRuntimeV6Error::Action);
             }
+            transfer_one_held_item(&mut candidate, *source, *target, registry_key)?;
         }
-        InventoryActionV1::Transfer { .. } => return Err(GameRuntimeV6Error::Action),
     }
-    Ok(DomainExecutionV1 {
-        candidate: Some(candidate),
-        ..Default::default()
-    })
+    output.candidate = Some(candidate);
+    Ok(output)
 }
 
 fn execute_reward(
@@ -953,7 +1004,6 @@ fn execute_reward(
     action: &RewardActionV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
-    require_none_input(input)?;
     let mut candidate = require_state(before)?.clone();
     let run = candidate
         .active_run
@@ -961,22 +1011,58 @@ fn execute_reward(
         .ok_or(GameRuntimeV6Error::Action)?;
     match action {
         RewardActionV1::Reroll => {
+            require_none_input(input)?;
             run.world.encounter_sequence = safe_increment(run.world.encounter_sequence)?;
         }
         RewardActionV1::ToggleLock { option_ordinal } => {
+            require_none_input(input)?;
             run.flags.insert(
                 er_types::RunFlagId::new(safe_from_u64(u64::from(*option_ordinal) + 1)?),
                 true,
             );
         }
         RewardActionV1::Select { option_ordinal } => {
+            let GameDomainExecutionInputV1::RewardGrant {
+                item,
+                registry_key,
+                count,
+            } = input
+            else {
+                return Err(GameRuntimeV6Error::Invalid);
+            };
+            if registry_key.is_empty() || *count == 0 {
+                return Err(GameRuntimeV6Error::Action);
+            }
+            if let Some(entry) = run
+                .inventory
+                .entries
+                .iter_mut()
+                .find(|entry| entry.item == *item)
+            {
+                if entry.registry_key != *registry_key {
+                    return Err(GameRuntimeV6Error::Action);
+                }
+                entry.count = entry
+                    .count
+                    .checked_add(*count)
+                    .ok_or(GameRuntimeV6Error::Invalid)?;
+            } else {
+                run.inventory
+                    .entries
+                    .push(er_state::m7_state::InventoryEntryV1 {
+                        item: *item,
+                        registry_key: registry_key.clone(),
+                        count: *count,
+                    });
+                run.inventory.entries.sort_by_key(|entry| entry.item);
+            }
             run.world.encounter_sequence = safe_increment(run.world.encounter_sequence)?;
             run.flags.insert(
                 er_types::RunFlagId::new(safe_from_u64(u64::from(*option_ordinal) + 1)?),
                 false,
             );
         }
-        RewardActionV1::Decline => {}
+        RewardActionV1::Decline => require_none_input(input)?,
     }
     Ok(DomainExecutionV1 {
         candidate: Some(candidate),
@@ -1315,6 +1401,61 @@ fn choose_full_party_destination(
     Ok(candidate)
 }
 
+fn remove_inventory(
+    state: &mut GameStateV6,
+    item: er_types::InventoryItemId,
+    count: u32,
+) -> Result<(), GameRuntimeV6Error> {
+    let run = state
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let index = run
+        .inventory
+        .entries
+        .iter()
+        .position(|entry| entry.item == item && entry.count >= count)
+        .ok_or(GameRuntimeV6Error::Action)?;
+    run.inventory.entries[index].count -= count;
+    if run.inventory.entries[index].count == 0 {
+        run.inventory.entries.remove(index);
+    }
+    Ok(())
+}
+
+fn transfer_one_held_item(
+    state: &mut GameStateV6,
+    source: er_types::battle_ids::PokemonId,
+    target: er_types::battle_ids::PokemonId,
+    registry_key: &str,
+) -> Result<(), GameRuntimeV6Error> {
+    let run = state
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let source_index = run
+        .party
+        .iter()
+        .position(|pokemon| pokemon.id == source)
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let target_index = run
+        .party
+        .iter()
+        .position(|pokemon| pokemon.id == target)
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let held_index = run.party[source_index]
+        .held_items
+        .iter()
+        .position(|item| item.registry_key == registry_key)
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let held_item = run.party[source_index].held_items.remove(held_index);
+    run.party[target_index].held_items.push(held_item);
+    run.party[target_index]
+        .held_items
+        .sort_by_key(|item| item.instance_id);
+    Ok(())
+}
+
 fn persistent_pokemon_mut(
     state: &mut GameStateV6,
     pokemon_id: er_types::battle_ids::PokemonId,
@@ -1398,6 +1539,19 @@ fn safe_from_u64(value: u64) -> Result<SafeU53, GameRuntimeV6Error> {
 
 fn safe_one() -> SafeU53 {
     SafeU53::new(1).unwrap_or(SafeU53::MAX)
+}
+
+fn validate_runtime_frontier(
+    state: Option<&GameStateV6>,
+    ledger: &AppliedGameMaterialLedgerV1,
+) -> Result<(), GameRuntimeV6Error> {
+    if state
+        .and_then(|state| state.active_run.as_ref())
+        .is_some_and(|run| run.control.revision >= ledger.next_authority_revision)
+    {
+        return Err(GameRuntimeV6Error::Invalid);
+    }
+    Ok(())
 }
 
 fn material_error(error: crate::m9e_material_v6::GameMaterialV6Error) -> GameRuntimeV6Error {

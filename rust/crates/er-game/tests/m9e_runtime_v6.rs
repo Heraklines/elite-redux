@@ -69,6 +69,7 @@ fn context(
             menu_instance: MenuInstanceId::new(safe(1)),
         },
         input,
+        authority: true,
     })
 }
 
@@ -101,6 +102,32 @@ fn bootstrap_candidate_is_serialized_and_installed_through_the_common_applier()
         replica.apply_material_bytes(&prepared.material_bytes)?,
         GameMaterialApplyOutcomeV6::DuplicateApplied
     );
+    Ok(())
+}
+
+#[test]
+fn replica_cannot_dispatch_canonical_actions() -> Result<(), Box<dyn Error>> {
+    let content = prepared()?;
+    let candidate = state(&content)?;
+    let mut replica = GameRuntimeV6::new(None, content, safe(1))?;
+    let mut rejected = context(
+        "new-run/1",
+        1,
+        GameDomainExecutionInputV1::BootstrapCandidate(candidate),
+    )?;
+    rejected.authority = false;
+    assert!(
+        replica
+            .execute(
+                GameActionV1::Bootstrap {
+                    action: BootstrapActionV1::Confirm,
+                },
+                rejected,
+            )
+            .is_err()
+    );
+    assert!(replica.state().is_none());
+    assert!(replica.material_ledger().records.is_empty());
     Ok(())
 }
 
