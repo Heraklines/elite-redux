@@ -633,6 +633,61 @@ fn message_in_a_bottle_applies_source_map_effects() -> Result<(), Box<dyn Error>
     assert!(run.scenario.is_none());
     Ok(())
 }
+
+#[test]
+fn lost_at_sea_applies_source_party_damage() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let scenario_id = ScenarioId::try_from_u64(10)?;
+    let scenario = content
+        .scenarios
+        .scenario(scenario_id)
+        .ok_or("lost at sea scenario missing")?;
+    let choice_node = scenario
+        .nodes
+        .iter()
+        .find_map(|entry| {
+            matches!(
+                entry.node,
+                er_scenario::content_v2::ScenarioNodeV2::Choice { .. }
+            )
+            .then_some(entry.id)
+        })
+        .ok_or("lost at sea choice missing")?;
+    let mut initial = natural_state(&content)?;
+    let run = initial.active_run.as_mut().ok_or("run missing")?;
+    let maximum_hp = run.party[0].max_hp;
+    run.scenario = Some(ScenarioRuntimeStateV2 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
+        scenario: scenario_id,
+        node: choice_node,
+        stage: ScenarioRuntimeStageV2::Choice,
+        selected_option: None,
+        primary_target: None,
+        secondary_target: None,
+        locals: Default::default(),
+        reserved_pokemon: Vec::new(),
+        visit_count: SafeU53::ZERO,
+    });
+    let (kernel, _) = execute(
+        initial,
+        content,
+        GameControlKindV2::Scenario,
+        "scenario/lost-at-sea/wander",
+        GameActionV1::Scenario {
+            action: ScenarioGameActionV1::Choose {
+                node: choice_node,
+                option_ordinal: 2,
+            },
+        },
+    )?;
+    let run = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run missing")?;
+    assert_eq!(run.party[0].hp, maximum_hp - maximum_hp / 4);
+    assert!(run.scenario.is_none());
+    Ok(())
+}
 #[test]
 fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Result<(), Box<dyn Error>>
 {

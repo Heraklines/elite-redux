@@ -1246,18 +1246,25 @@ fn apply_scenario_program(
             0,
             "36655e9af0ef2718fc59812babf5584af44146d289918d3c5037e4f59eb36a8d",
         ) => {
-            for pokemon in &mut run.party {
-                pokemon.hp = pokemon.max_hp;
-                pokemon.fainted = false;
-                pokemon.status = er_types::battle_model::StatusState {
-                    kind: er_types::battle_model::StatusKind::None,
-                    toxic_turn_count: 0,
-                    sleep_turns_remaining: None,
-                };
-                for move_slot in pokemon.moves.iter_mut().flatten() {
-                    move_slot.pp_used = 0;
-                }
-            }
+            restore_scenario_party(run);
+            Ok(())
+        }
+        (
+            ScenarioProgramHandlerV2::GroupA,
+            4,
+            1,
+            "fa50234acea6f6652b11515d3b8910cbfcddf7c4a4dd76963dadac0d0e658731",
+        ) => {
+            restore_scenario_party(run);
+            Ok(())
+        }
+        (
+            ScenarioProgramHandlerV2::GroupA,
+            10,
+            2,
+            "c11b99dfc3c2dde19a351130662c85c66f8075ee5b0212c3453c7dd2fc29cf10",
+        ) => {
+            damage_scenario_party_quarter(run);
             Ok(())
         }
         (
@@ -1299,6 +1306,32 @@ fn apply_scenario_program(
             "scenario option program {}/{} is not implemented",
             program.scenario, program.option_index
         ))),
+    }
+}
+
+fn restore_scenario_party(run: &mut er_state::m7_state::RunStateV3) {
+    for pokemon in &mut run.party {
+        pokemon.hp = pokemon.max_hp;
+        pokemon.fainted = false;
+        pokemon.status = er_types::battle_model::StatusState {
+            kind: er_types::battle_model::StatusKind::None,
+            toxic_turn_count: 0,
+            sleep_turns_remaining: None,
+        };
+        for move_slot in pokemon.moves.iter_mut().flatten() {
+            move_slot.pp_used = 0;
+        }
+    }
+}
+
+fn damage_scenario_party_quarter(run: &mut er_state::m7_state::RunStateV3) {
+    for pokemon in &mut run.party {
+        if pokemon.fainted || pokemon.hp == 0 {
+            continue;
+        }
+        let damage = pokemon.max_hp / 4;
+        pokemon.hp = pokemon.hp.saturating_sub(damage).max(1);
+        pokemon.fainted = false;
     }
 }
 
