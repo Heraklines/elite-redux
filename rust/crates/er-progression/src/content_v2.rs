@@ -184,7 +184,6 @@ impl ProgressionContentPackV2 {
         for definition in &self.species {
             if !known_species.contains(&definition.species)
                 || !growth_ids.contains(&definition.growth_rate)
-                || definition.level_moves.is_empty()
                 || has_duplicates(&definition.level_moves)
                 || has_duplicates(&definition.reminder_moves)
                 || has_duplicates(&definition.tm_moves)

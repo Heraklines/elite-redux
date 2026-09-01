@@ -322,6 +322,7 @@ dependencies = [
  "er-content",
  "er-game",
  "er-mechanics",
+ "er-progression",
  "er-types",
  "er-world",
  "serde",
