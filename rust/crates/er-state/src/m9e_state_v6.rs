@@ -183,6 +183,11 @@ impl GameStateV6 {
                 .party
                 .iter()
                 .chain(run.storage.iter().map(|stored| &stored.pokemon))
+                .chain(
+                    run.scenario
+                        .iter()
+                        .flat_map(|scenario| &scenario.reserved_pokemon),
+                )
                 .chain(run.battle.iter().flat_map(|battle| &battle.enemy_party))
             {
                 validate_pokemon_content(pokemon, content)?;
@@ -237,6 +242,11 @@ impl IdentityMaxima {
         for stored in &run.storage {
             observe_max(&mut self.storage_slot, stored.slot.get());
             self.observe_pokemon(&stored.pokemon);
+        }
+        if let Some(scenario) = &run.scenario {
+            for pokemon in &scenario.reserved_pokemon {
+                self.observe_pokemon(pokemon);
+            }
         }
         for modifier in &run.modifiers {
             observe_max(&mut self.modifier, modifier.id.get());

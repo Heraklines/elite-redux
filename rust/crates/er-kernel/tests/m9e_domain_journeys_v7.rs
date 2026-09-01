@@ -18,8 +18,8 @@ use er_state::m7_state::{
     SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioLocalValueV2, ScenarioRuntimeStageV2,
     ScenarioRuntimeStateV2,
 };
-use er_state::m9e_state_v6::GameStateV6;
-use er_types::battle_ids::{MenuInstanceId, WaveIndex};
+use er_state::m9e_state_v6::{GameIdentityAllocatorStateV1, GameStateV6};
+use er_types::battle_ids::{MenuInstanceId, PokemonId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
 use er_types::{
@@ -477,6 +477,19 @@ fn scenario_choices_apply_source_compiled_graph_effects() -> Result<(), Box<dyn 
         duplicate_reserved.active_run.as_ref().unwrap().validate(),
         Err(M7StateError::DuplicatePokemon(_))
     ));
+    let mut identity_reservation = initial.clone();
+    let reserved_id = PokemonId::new(identity_reservation.identities.next_pokemon_id);
+    let mut reserved = identity_reservation.active_run.as_ref().unwrap().party[0].clone();
+    reserved.id = reserved_id;
+    identity_reservation
+        .active_run
+        .as_mut()
+        .and_then(|run| run.scenario.as_mut())
+        .ok_or("scenario missing")?
+        .reserved_pokemon
+        .push(reserved);
+    let derived = GameIdentityAllocatorStateV1::derive(identity_reservation.active_run.as_ref())?;
+    assert!(derived.next_pokemon_id.get() > reserved_id.get().get());
     let (restored_kernel, _) = execute(
         initial.clone(),
         content.clone(),
