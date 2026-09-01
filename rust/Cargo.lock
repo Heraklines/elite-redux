@@ -318,6 +318,7 @@ dependencies = [
 name = "er-content-compiler"
 version = "0.1.0"
 dependencies = [
+ "er-ai",
  "er-canonical",
  "er-content",
  "er-game",
