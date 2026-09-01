@@ -1,0 +1,34 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:ab83981e107f636233aecf4f8df14e410497fea9:run-33068663411.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   2423x1015 @1.4199999570846558x  devmem:32 GB
+boot:     boot-start@0ms -> loading-complete@7544ms -> title-shown@10014ms
+lastSess: ok (reached title)
+mode:     0  wave:null  difficulty:ace
+seed:     gqmto6IMJJcoDbYE8j9APYEq
+party:    
+
+----- DESCRIPTION -----
+Farrellite Freeze Game #3
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:ab83981e107f636233aecf4f8df14e410497fea9:run-33068663411.1","source":"github","sha":"ab83981e107f636233aecf4f8df14e410497fea9","workflow":{"provider":"github-actions","runId":"33068663411","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"hotfix/prod-ghost-moderation-20260827"},"deployment":null}
+
+----- CONSOLE -----
+[22:35:15.093] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[22:35:15.654] LOG: [ER] build {"version":1,"id":"github:ab83981e107f636233aecf4f8df14e410497fea9:run-33068663411.1","source":"github","sha":"ab83981e107f636233aecf4f8df14e410497fea9","workflow":{"provider":"github-actions","runId":"33068663411","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"hotfix/prod-ghost-moderation-20260827"},"deployment":null}
+[22:35:22.062] DEBUG: Destroying loading scene
+[22:35:22.062] DEBUG: Destroyed loading scene
+[22:35:22.144] LOG: Seed: gqmto6IMJJcoDbYE8j9APYEq
+[22:35:22.145] LOG: Wave Seed: gqmto6IMJJcoDbYE8j9APYEq 0
+[22:35:23.424] LOG: %cStart Phase LoginPhase color:green;
+[22:35:23.776] LOG: Client Session: qWDB3a9jWQjDljnDIv4QQW8zZAsPeFGR
+[22:35:24.524] LOG: %cStart Phase TitlePhase color:green;
+[22:35:24.524] LOG: Getting Session Slot id: %d 0
+[22:35:24.763] LOG: use seasonal splash messages true
+
+----- REPLAY TRACE (JSON) -----
+(none)
