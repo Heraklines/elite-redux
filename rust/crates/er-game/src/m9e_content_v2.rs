@@ -9,6 +9,7 @@ use er_content::pack::m6_pack::BattleContentPackV3;
 use er_content::pack::m6_prepared::{PreparedBattleContentV3, prepare_content};
 use er_progression::content_v2::{PreparedProgressionContentV2, ProgressionContentPackV2};
 use er_scenario::content_v2::{PreparedScenarioContentV2, ScenarioContentPackV2};
+use er_state::m9e_state_v6::GameStateV6ContentContext;
 use er_types::battle_ids::{GameModeId, MoveId, SpeciesId};
 use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::run_ids::BiomeId;
@@ -671,5 +672,27 @@ impl PreparedGameContentV2 {
         self.presentation
             .get(&semantic)
             .and_then(|index| self.bundle.presentation.mappings.get(*index))
+    }
+}
+
+impl GameStateV6ContentContext for PreparedGameContentV2 {
+    fn identity(&self) -> &GameContentIdentityV2 {
+        &self.identity
+    }
+
+    fn has_mode(&self, mode: GameModeId) -> bool {
+        self.world.mode(mode).is_some()
+    }
+
+    fn has_species_form(&self, species: SpeciesId, form: u16) -> bool {
+        self.progression.species(species, form).is_some()
+    }
+
+    fn has_move(&self, move_id: MoveId) -> bool {
+        usize::try_from(move_id.get().get())
+            .ok()
+            .and_then(|index| self.bundle.battle.moves.get(index))
+            .and_then(Option::as_ref)
+            .is_some()
     }
 }

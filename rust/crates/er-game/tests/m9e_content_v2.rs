@@ -4,8 +4,14 @@ use std::sync::Arc;
 use er_game::m9e_content_v2::{
     GameContentBundleV2, PreparedGameContentV2, PresentationSemanticIdV1,
 };
-use er_types::battle_ids::{MoveId, SpeciesId};
-use er_types::{AiPolicyId, GameControlKindV2, SafeU53, ScenarioId};
+use er_state::m7_state::{
+    DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
+};
+use er_state::m9e_state_v6::{
+    GAME_STATE_SCHEMA_VERSION_V6, GameIdentityAllocatorStateV1, GameStateV6,
+};
+use er_types::battle_ids::{MoveId, SpeciesId, WaveIndex};
+use er_types::{AiPolicyId, CatalogHash, GameControlKindV2, SafeU53, ScenarioId};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -68,5 +74,39 @@ fn direct_bundle_rejects_legacy_core_fields() -> Result<(), Box<dyn Error>> {
         .expect("bundle is an object")
         .insert("core".to_owned(), serde_json::json!({}));
     assert!(serde_json::from_value::<GameContentBundleV2>(value).is_err());
+    Ok(())
+}
+
+#[test]
+fn state_v6_validates_the_complete_content_identity() -> Result<(), Box<dyn Error>> {
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let prepared = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let state = GameStateV6 {
+        schema_version: GAME_STATE_SCHEMA_VERSION_V6,
+        content_identity: prepared.identity().clone(),
+        identities: GameIdentityAllocatorStateV1::derive(None)?,
+        profile: ProfileStateV1 {
+            schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
+            unlocks: Vec::new(),
+            achievements: Vec::new(),
+            challenges: Vec::new(),
+            flags: Default::default(),
+            statistics: ProfileStatistics {
+                runs_started: SafeU53::ZERO,
+                runs_won: SafeU53::ZERO,
+                runs_lost: SafeU53::ZERO,
+                battles_won: SafeU53::ZERO,
+                pokemon_captured: SafeU53::ZERO,
+                highest_wave: WaveIndex::new(safe(1))?,
+            },
+            dex: DexState::default(),
+        },
+        active_run: None,
+    };
+    state.validate_with(&prepared)?;
+
+    let mut wrong = state;
+    wrong.content_identity.run_hash = CatalogHash::parse("0".repeat(64))?;
+    assert!(wrong.validate_with(&prepared).is_err());
     Ok(())
 }
