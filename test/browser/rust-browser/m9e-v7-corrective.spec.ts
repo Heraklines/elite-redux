@@ -73,7 +73,7 @@ const createClient = async (snapshot, seat, role) => {
 };
 const rawPress = async client => {
   await client.send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: { code: { kind: "SPACE" }, printable: false, browser_repeat: false, focus: "GAME" } } });
-  return client.send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } });
+  return client.send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } } });
 };
 const networkBytes = response => response.batch.effects.find(effect => effect.kind === "SEND_NETWORK_FRAME")?.bytes;
 const coop = async () => {
@@ -201,10 +201,24 @@ async function press(page: Page, key: string) {
   await page.evaluate(() => globalThis.__m9eV7.idle());
 }
 
+async function openFixture(page: Page, path: string) {
+  let rejectPageError: (reason: unknown) => void = () => undefined;
+  const pageError = new Promise<never>((_resolve, reject) => {
+    rejectPageError = reject;
+  });
+  const onPageError = (error: Error) => rejectPageError(error);
+  page.once("pageerror", onPageError);
+  try {
+    await page.goto(new URL(path, address).href);
+    await Promise.race([expect(page.locator("#status")).toHaveText("ready", { timeout: 240_000 }), pageError]);
+  } finally {
+    page.off("pageerror", onPageError);
+  }
+}
+
 // Real Chromium -> DOM keyboard -> canonical BrowserRequestV2 -> BrowserKernelHostV2 -> GameKernelV7.
 test("natural V7 browser startup reaches the real battle command", async ({ page }) => {
-  await page.goto(new URL("m9e-v7.html", address).href);
-  await expect(page.locator("#status")).toHaveText("ready", { timeout: 240_000 });
+  await openFixture(page, "m9e-v7.html");
   await press(page, "Space");
   await press(page, "Space");
   await press(page, "Space");
@@ -233,8 +247,7 @@ test("natural V7 browser startup reaches the real battle command", async ({ page
 });
 
 test("two V7 browser hosts wait for both humans and converge one turn", async ({ page }) => {
-  await page.goto(new URL("m9e-v7.html?coop", address).href);
-  await expect(page.locator("#status")).toHaveText("ready", { timeout: 240_000 });
+  await openFixture(page, "m9e-v7.html?coop");
   const result = await page.evaluate(() => globalThis.__m9eV7.coop());
   expect(result.turnAdvanced).toBe(true);
   expect(result.converged).toBe(true);
