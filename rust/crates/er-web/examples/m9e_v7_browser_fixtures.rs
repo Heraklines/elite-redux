@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelV7};
+use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
-use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
 use er_protocol::recovery::RecoveryTransactionConfig;
@@ -173,14 +173,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let host = SeatId::new(safe(1)?);
     let guest = SeatId::new(safe(2)?);
     let generation = ConnectionGeneration::new(safe(1)?);
-    let authority_protocol = initial_battle_protocol_snapshot_v2(
-        &authority_config(host, guest, generation)?,
-        host,
-    )?;
-    let replica_protocol = initial_battle_protocol_snapshot_v2(
-        &replica_config(host, guest, generation)?,
-        guest,
-    )?;
+    let authority_protocol =
+        initial_battle_protocol_snapshot_v2(&authority_config(host, guest, generation)?, host)?;
+    let replica_protocol =
+        initial_battle_protocol_snapshot_v2(&replica_config(host, guest, generation)?, guest)?;
     let cooperative_mode = content
         .bundle()
         .bootstrap
@@ -213,7 +209,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     press(&mut authority, PhysicalKey::Space)?;
     press(&mut authority, PhysicalKey::Space)?;
     let authority_snapshot = authority.snapshot()?;
-    let state = authority.state().cloned().ok_or("authority state missing")?;
+    let state = authority
+        .state()
+        .cloned()
+        .ok_or("authority state missing")?;
     let revision = authority_snapshot.material_ledger.next_authority_revision;
     let replica = GameKernelV7::from_active(
         state,

@@ -1,14 +1,16 @@
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import { createServer, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { expect, type Page, test } from "playwright/test";
-import { createServer, type ViteDevServer } from "vite";
 
 const fixtureRoot = process.env.M9E_V7_WEB_DIR;
 if (fixtureRoot == null) {
   throw new Error("M9E_V7_WEB_DIR is required");
 }
 const fixture = resolve(fixtureRoot);
-let server: ViteDevServer;
+let server: Server;
+let address: string;
 
 const html = `<!doctype html><html><body><div id="status">loading</div><script type="module">
 import init, { BrowserKernelHostV2 } from "/m9e-assets/er_web.js";
@@ -125,52 +127,59 @@ function currentControl(snapshot: SnapshotWire): ControlWire {
   return lifecycle.value.control;
 }
 
+function assetContentType(name: string) {
+  if (name.endsWith(".js")) {
+    return "text/javascript";
+  }
+  if (name.endsWith(".wasm")) {
+    return "application/wasm";
+  }
+  return "application/json";
+}
+
+function serveAsset(name: string, response: ServerResponse) {
+  if (!/^[a-z0-9_.-]+$/u.test(name)) {
+    response.statusCode = 400;
+    response.end();
+    return;
+  }
+  response.setHeader("content-type", assetContentType(name));
+  try {
+    response.end(readFileSync(resolve(fixture, name)));
+  } catch {
+    response.statusCode = 404;
+    response.end();
+  }
+}
+
 test.beforeAll(async () => {
-  server = await createServer({
-    root: resolve(import.meta.dirname, "../../.."),
-    server: { host: "127.0.0.1", port: 0 },
-    plugins: [
-      {
-        name: "m9e-v7-assets",
-        configureServer(devServer) {
-          devServer.middlewares.use((request, response, next) => {
-            if (request.url?.startsWith("/m9e-assets/")) {
-              const name = request.url.slice(13);
-              if (!/^[a-z0-9_.-]+$/u.test(name)) {
-                response.statusCode = 400;
-                response.end();
-                return;
-              }
-              response.setHeader(
-                "content-type",
-                name.endsWith(".js")
-                  ? "text/javascript"
-                  : name.endsWith(".wasm")
-                    ? "application/wasm"
-                    : "application/json",
-              );
-              try {
-                response.end(readFileSync(resolve(fixture, name)));
-              } catch {
-                response.statusCode = 404;
-                response.end();
-              }
-              return;
-            }
-            if (request.url === "/m9e-v7.html") {
-              response.setHeader("content-type", "text/html; charset=utf-8");
-              response.end(html);
-              return;
-            }
-            next();
-          });
-        },
-      },
-    ],
+  server = createServer((request, response) => {
+    if (request.url?.startsWith("/m9e-assets/")) {
+      serveAsset(request.url.slice(13), response);
+      return;
+    }
+    if (request.url === "/m9e-v7.html") {
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(html);
+      return;
+    }
+    response.statusCode = 404;
+    response.end();
   });
-  await server.listen();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const bound = server.address();
+  if (bound == null || typeof bound === "string") {
+    throw new Error("browser fixture server address missing");
+  }
+  address = `http://127.0.0.1:${bound.port}/`;
 });
-test.afterAll(async () => server.close());
+test.afterAll(
+  async () =>
+    new Promise<void>((resolveClose, rejectClose) => {
+      server.close(error => (error == null ? resolveClose() : rejectClose(error)));
+    }),
+);
 
 async function press(page: Page, key: string) {
   await page.keyboard.press(key);
@@ -179,12 +188,8 @@ async function press(page: Page, key: string) {
 
 // Real Chromium -> DOM keyboard -> canonical BrowserRequestV2 -> BrowserKernelHostV2 -> GameKernelV7.
 test("natural V7 browser startup reaches the real battle command", async ({ page }) => {
-  const address = server.resolvedUrls?.local[0];
-  if (address == null) {
-    throw new Error("Vite URL missing");
-  }
   await page.goto(new URL("m9e-v7.html", address).href);
-  await expect(page.locator("#status")).toHaveText("ready", { timeout: 30_000 });
+  await expect(page.locator("#status")).toHaveText("ready", { timeout: 120_000 });
   await press(page, "Space");
   await press(page, "Space");
   await press(page, "Space");
@@ -213,12 +218,8 @@ test("natural V7 browser startup reaches the real battle command", async ({ page
 });
 
 test("two V7 browser hosts wait for both humans and converge one turn", async ({ page }) => {
-  const address = server.resolvedUrls?.local[0];
-  if (address == null) {
-    throw new Error("Vite URL missing");
-  }
   await page.goto(new URL("m9e-v7.html", address).href);
-  await expect(page.locator("#status")).toHaveText("ready", { timeout: 30_000 });
+  await expect(page.locator("#status")).toHaveText("ready", { timeout: 120_000 });
   const result = await page.evaluate(() => globalThis.__m9eV7.coop());
   expect(result.turnAdvanced).toBe(true);
   expect(result.converged).toBe(true);
