@@ -14,14 +14,16 @@ use er_types::battle_model::BattleOutcome;
 use er_types::{
     BootstrapActionV1, CaptureActionV1, EvolutionActionV1, FusionActionV1, GameActionContextV1,
     GameActionV1, GameContentIdentity, GameControlKindV2, GameControlPlanV2, InventoryActionV1,
-    PartyActionV1, ProgressionActionV1, RewardActionV1, RunOutcome, SafeU53, SaveActionV1,
-    ScenarioGameActionV1, TerminalActionV1, WorldActionV1,
+    PartyActionV1, PresentationEventId, ProgressionActionV1, RewardActionV1, RunOutcome, SafeU53,
+    SaveActionV1, ScenarioGameActionV1, TerminalActionV1, WorldActionV1,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::m7_run_executor::{RunExecutionContextV1, execute_run_program_hook_v1};
-use crate::m9e_content_v2::PreparedGameContentV2;
+use crate::m9e_content_v2::{
+    PreparedGameContentV2, PresentationCueFamilyV1, PresentationSemanticIdV1,
+};
 use crate::m9e_material_v6::{
     AppliedGameMaterialLedgerV1, GameActionDomainV2, GameIdentityDomainV1,
     GameMaterialApplyOutcomeV6, GameMaterialV6, GameMutationEvidenceV2, GameMutationKindV2,
@@ -352,7 +354,19 @@ impl GameActionDispatcherV1 {
             return Err(GameRuntimeV6Error::Invalid);
         }
         let domain = action_domain(&action, &context.input)?;
-        let execution = execute_domain(before, content, &action, &context)?;
+        let mut execution = execute_domain(before, content, &action, &context)?;
+        if execution.presentation.is_empty() {
+            let semantic = PresentationSemanticIdV1::Cue(domain_cue(domain));
+            let mapping = content
+                .presentation(semantic)
+                .ok_or(GameRuntimeV6Error::Invalid)?;
+            execution.presentation.push(GamePresentationEffectV2 {
+                event_id: PresentationEventId::new(context.action.authority_revision),
+                semantic,
+                blocking: mapping.blocking,
+                skip: mapping.skip,
+            });
+        }
         let mut candidate = execution.candidate.ok_or(GameRuntimeV6Error::Invalid)?;
         let next_control = normalize_next_control(
             &mut candidate,
@@ -1215,6 +1229,28 @@ fn action_domain(
         GameActionV1::Save { .. } => GameActionDomainV2::SaveControl,
         GameActionV1::Terminal { .. } => GameActionDomainV2::Terminal,
     })
+}
+
+fn domain_cue(domain: GameActionDomainV2) -> PresentationCueFamilyV1 {
+    match domain {
+        GameActionDomainV2::NewRun | GameActionDomainV2::World => PresentationCueFamilyV1::World,
+        GameActionDomainV2::BattleTurn | GameActionDomainV2::BattleReplacement => {
+            PresentationCueFamilyV1::Move
+        }
+        GameActionDomainV2::RunProgram | GameActionDomainV2::Progression => {
+            PresentationCueFamilyV1::Progression
+        }
+        GameActionDomainV2::Capture => PresentationCueFamilyV1::Capture,
+        GameActionDomainV2::Party => PresentationCueFamilyV1::Switch,
+        GameActionDomainV2::MoveLearning => PresentationCueFamilyV1::Progression,
+        GameActionDomainV2::Evolution => PresentationCueFamilyV1::Evolution,
+        GameActionDomainV2::Fusion => PresentationCueFamilyV1::Fusion,
+        GameActionDomainV2::Inventory => PresentationCueFamilyV1::HeldItem,
+        GameActionDomainV2::Reward => PresentationCueFamilyV1::Reward,
+        GameActionDomainV2::Scenario => PresentationCueFamilyV1::Scenario,
+        GameActionDomainV2::SaveControl => PresentationCueFamilyV1::Save,
+        GameActionDomainV2::Terminal => PresentationCueFamilyV1::Terminal,
+    }
 }
 
 fn material_for_domain(

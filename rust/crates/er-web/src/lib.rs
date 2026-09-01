@@ -1,12 +1,16 @@
 //! Browser/Wasm host for the Elite Redux Rust kernel.
 
 pub mod contracts;
+pub mod contracts_v2;
 pub mod host;
+pub mod host_v2;
 pub mod production_save;
 pub mod renderer_settlement;
 
 pub use contracts::*;
+pub use contracts_v2::*;
 pub use host::*;
+pub use host_v2::*;
 pub use production_save::*;
 pub use renderer_settlement::*;
 

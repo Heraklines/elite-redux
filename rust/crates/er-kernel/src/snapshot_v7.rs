@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use er_ai::authority_v2::{AuthorityAiSnapshotV2, AuthorityAiV2};
 use er_game::m9e_content_v2::{PreparedGameContentV2, PresentationSemanticIdV1};
@@ -63,8 +63,8 @@ pub struct CoreGameKernelSnapshotV7 {
     pub scheduler: KernelSchedulerSnapshotV2,
     pub next_menu_instance_id: MenuInstanceId,
     pub protocol: Option<ProtocolRuntimeSnapshotV2>,
-    pub pending_presentations: BTreeMap<PresentationEventId, PendingPresentationV3>,
-    pub pending_platform: BTreeMap<PlatformRequestId, PendingPlatformRequestV2>,
+    pub pending_presentations: Vec<PendingPresentationV3>,
+    pub pending_platform: Vec<PendingPlatformRequestV2>,
     pub material_ledger: AppliedGameMaterialLedgerV1,
     pub replay_sequence: SafeU53,
     pub prepared_transaction: Option<QuiescentPreparedTransaction>,
@@ -85,15 +85,21 @@ impl CoreGameKernelSnapshotV7 {
             || self.prepared_transaction.is_some()
             || self.pending_presentations.len() > MAX_PENDING_PRESENTATIONS_V7
             || self.pending_platform.len() > MAX_PENDING_PLATFORM_REQUESTS_V7
-            || self.pending_presentations.iter().any(|(id, pending)| {
-                *id != pending.event_id
-                    || *id == PresentationEventId::ZERO
+            || self
+                .pending_presentations
+                .windows(2)
+                .any(|pair| pair[0].event_id >= pair[1].event_id)
+            || self.pending_presentations.iter().any(|pending| {
+                pending.event_id == PresentationEventId::ZERO
                     || content.presentation(pending.semantic).is_none()
             })
-            || self.pending_platform.iter().any(|(id, pending)| {
-                *id != pending.request_id
-                    || *id == PlatformRequestId::ZERO
-                    || platform_request_id(&pending.effect) != *id
+            || self
+                .pending_platform
+                .windows(2)
+                .any(|pair| pair[0].request_id >= pair[1].request_id)
+            || self.pending_platform.iter().any(|pending| {
+                pending.request_id == PlatformRequestId::ZERO
+                    || platform_request_id(&pending.effect) != pending.request_id
                     || !valid_platform_effect(&pending.effect)
             })
         {
@@ -194,8 +200,8 @@ impl CoreGameKernelSnapshotV7 {
             input_router: source.input_router,
             scheduler: source.scheduler,
             protocol: source.protocol,
-            pending_presentations: BTreeMap::new(),
-            pending_platform: BTreeMap::new(),
+            pending_presentations: Vec::new(),
+            pending_platform: Vec::new(),
             material_ledger: AppliedGameMaterialLedgerV1::new(next_revision)
                 .map_err(|_| SnapshotV7Error::Migration)?,
             authority_ai: None,
@@ -218,8 +224,8 @@ fn validate_active_state(
         .map_err(|_| SnapshotV7Error::Invalid)?;
     if snapshot
         .pending_platform
-        .keys()
-        .any(|request| request.get() >= state.identities.next_platform_request_id)
+        .iter()
+        .any(|pending| pending.request_id.get() >= state.identities.next_platform_request_id)
     {
         return Err(SnapshotV7Error::Invalid);
     }

@@ -22,6 +22,7 @@ er-protocol = { path = "../er-protocol" }
 er-production = { path = "../er-production" }
 er-renderer = { path = "../er-renderer" }
 er-save = { path = "../er-save" }
+er-state = { path = "../er-state" }
 er-repro = { path = "../er-repro" }
 er-types = { path = "../er-types" }
 serde.workspace = true

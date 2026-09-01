@@ -47,7 +47,8 @@ use crate::snapshot_v7::{
     GameKernelLifecycleSnapshotV7, PendingPlatformRequestV2, PendingPresentationV3,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GameKernelRoleV7 {
     Authority,
     Replica,
@@ -261,8 +262,16 @@ impl GameKernelV7 {
             input_router: snapshot.input_router,
             scheduler: snapshot.scheduler,
             protocol: snapshot.protocol,
-            pending_presentations: snapshot.pending_presentations,
-            pending_platform: snapshot.pending_platform,
+            pending_presentations: snapshot
+                .pending_presentations
+                .into_iter()
+                .map(|pending| (pending.event_id, pending))
+                .collect(),
+            pending_platform: snapshot
+                .pending_platform
+                .into_iter()
+                .map(|pending| (pending.request_id, pending))
+                .collect(),
             replay_sequence: snapshot.replay_sequence,
         };
         value.validate()?;
@@ -312,8 +321,8 @@ impl GameKernelV7 {
             scheduler: self.scheduler.clone(),
             next_menu_instance_id: self.next_menu_instance_id,
             protocol: self.protocol.clone(),
-            pending_presentations: self.pending_presentations.clone(),
-            pending_platform: self.pending_platform.clone(),
+            pending_presentations: self.pending_presentations.values().cloned().collect(),
+            pending_platform: self.pending_platform.values().cloned().collect(),
             material_ledger,
             replay_sequence: self.replay_sequence,
             prepared_transaction: None,
@@ -526,6 +535,26 @@ impl GameKernelV7 {
         }
         self.synchronize_terminal(&mut step)?;
         Ok(step)
+    }
+
+    pub fn settle_presentation(
+        &mut self,
+        event_id: er_types::PresentationEventId,
+    ) -> Result<(), GameKernelV7Error> {
+        self.pending_presentations
+            .remove(&event_id)
+            .map(|_| ())
+            .ok_or(GameKernelV7Error::Invalid)
+    }
+
+    pub fn settle_platform_request(
+        &mut self,
+        request_id: PlatformRequestId,
+    ) -> Result<(), GameKernelV7Error> {
+        self.pending_platform
+            .remove(&request_id)
+            .map(|_| ())
+            .ok_or(GameKernelV7Error::Invalid)
     }
 
     pub fn admit_game_proposal(

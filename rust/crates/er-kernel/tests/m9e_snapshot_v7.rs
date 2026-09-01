@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -99,8 +99,8 @@ fn active_snapshot(
         scheduler: scheduler(),
         protocol: None,
         next_menu_instance_id: MenuInstanceId::new(safe(1)),
-        pending_presentations: BTreeMap::new(),
-        pending_platform: BTreeMap::new(),
+        pending_presentations: Vec::new(),
+        pending_platform: Vec::new(),
         material_ledger: AppliedGameMaterialLedgerV1::new(safe(1))?,
         replay_sequence: SafeU53::ZERO,
         prepared_transaction: None,
@@ -128,26 +128,20 @@ fn typed_pending_effects_cross_validate_allocator_and_content() -> Result<(), Bo
         _ => return Err("fixture is not active".into()),
     };
     let request = state.identities.allocate_platform_request_id()?;
-    snapshot.pending_platform.insert(
-        request,
-        PendingPlatformRequestV2 {
-            request_id: request,
-            effect: GamePlatformEffectV2::Telemetry {
-                request,
-                event: GameTelemetryEventV2::ActionApplied,
-            },
+    snapshot.pending_platform.push(PendingPlatformRequestV2 {
+        request_id: request,
+        effect: GamePlatformEffectV2::Telemetry {
+            request,
+            event: GameTelemetryEventV2::ActionApplied,
         },
-    );
+    });
     let event = PresentationEventId::new(safe(1));
-    snapshot.pending_presentations.insert(
-        event,
-        PendingPresentationV3 {
-            event_id: event,
-            semantic: PresentationSemanticIdV1::Control(GameControlKindV2::Waiting),
-            blocking: PresentationBlockingPolicy::NonBlocking,
-            skip: PresentationSkipPolicy::Allowed,
-        },
-    );
+    snapshot.pending_presentations.push(PendingPresentationV3 {
+        event_id: event,
+        semantic: PresentationSemanticIdV1::Control(GameControlKindV2::Waiting),
+        blocking: PresentationBlockingPolicy::NonBlocking,
+        skip: PresentationSkipPolicy::Allowed,
+    });
     snapshot.validate(&content)?;
 
     let state = match &mut snapshot.lifecycle {
