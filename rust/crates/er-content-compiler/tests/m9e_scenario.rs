@@ -1,10 +1,8 @@
 use std::error::Error;
 
 use er_content_compiler::m9e_scenario::build_m9_engineering_scenario_v2;
-use er_scenario::content_v2::ScenarioCompiledEffectV2;
-use er_scenario::runtime_v2::{
-    ScenarioControlV2, ScenarioDomainFactoryV2, ScenarioInputV2, ScenarioRuntimeV2Error,
-};
+use er_scenario::content_v2::ScenarioProgramHandlerV2;
+use er_scenario::runtime_v2::{ScenarioControlV2, ScenarioDomainFactoryV2, ScenarioInputV2};
 use er_types::ScenarioId;
 
 const SCENARIOS: &[u8] = include_bytes!(concat!(
@@ -55,12 +53,12 @@ fn complete_scenario_catalog_is_classified_prepared_and_byte_stable() -> Result<
             .flat_map(|scenario| {
                 scenario.options.iter().filter(|option| {
                     prepared
-                        .option_effects(scenario.id, option.option_index)
+                        .option_program(scenario.id, option.option_index)
                         .is_some()
                 })
             })
             .count(),
-        69
+        219
     );
     Ok(())
 }
@@ -88,9 +86,13 @@ fn scenario_factory_executes_and_restores_the_typed_graph() -> Result<(), Box<dy
         factory.control(&runtime)?,
         ScenarioControlV2::ExecuteOption { .. }
     ));
+    let program = factory.program(&runtime)?;
+    assert_eq!(program.handler, ScenarioProgramHandlerV2::GroupA);
+    assert_eq!(program.scenario, ScenarioId::ZERO);
+    assert_eq!(program.option_index, 0);
     assert_eq!(
-        factory.compiled_effects(&runtime),
-        Err(ScenarioRuntimeV2Error::UnsupportedBehavior)
+        program.apply_callback_sha256,
+        "e7b8bf2f9be861c06540559d2607cb2794f83d3a2bbd17befca84f214ffbdde7"
     );
     factory.apply(&mut runtime, ScenarioInputV2::OptionApplied)?;
     assert!(matches!(
@@ -102,15 +104,17 @@ fn scenario_factory_executes_and_restores_the_typed_graph() -> Result<(), Box<dy
 }
 
 #[test]
-fn cleansing_font_options_compile_source_bound_effects() -> Result<(), Box<dyn Error>> {
+fn cleansing_font_options_bind_source_callbacks_to_closed_handlers() -> Result<(), Box<dyn Error>> {
     let pack = build_m9_engineering_scenario_v2(SCENARIOS, CATALOG, IMPLEMENTATIONS)?;
     let factory = ScenarioDomainFactoryV2::new(pack.prepare()?);
     let mut runtime = factory.start(ScenarioId::try_from_u64(73)?)?;
     factory.apply(&mut runtime, ScenarioInputV2::AcknowledgeMessage)?;
     factory.apply(&mut runtime, ScenarioInputV2::Choose(0))?;
+    let program = factory.program(&runtime)?;
+    assert_eq!(program.handler, ScenarioProgramHandlerV2::GroupG);
     assert_eq!(
-        factory.compiled_effects(&runtime)?,
-        vec![ScenarioCompiledEffectV2::RestoreParty]
+        program.apply_callback_sha256,
+        "36655e9af0ef2718fc59812babf5584af44146d289918d3c5037e4f59eb36a8d"
     );
     Ok(())
 }

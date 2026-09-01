@@ -517,6 +517,54 @@ fn scenario_choices_apply_source_compiled_graph_effects() -> Result<(), Box<dyn 
     assert!(declined_run.scenario.is_none());
     Ok(())
 }
+
+#[test]
+fn unimplemented_source_program_fails_closed() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let scenario_id = ScenarioId::try_from_u64(6)?;
+    let scenario = content
+        .scenarios
+        .scenario(scenario_id)
+        .ok_or("department store scenario missing")?;
+    let choice_node = scenario
+        .nodes
+        .iter()
+        .find_map(|entry| {
+            matches!(
+                entry.node,
+                er_scenario::content_v2::ScenarioNodeV2::Choice { .. }
+            )
+            .then_some(entry.id)
+        })
+        .ok_or("department store choice missing")?;
+    let mut initial = natural_state(&content)?;
+    initial.active_run.as_mut().ok_or("run missing")?.scenario = Some(ScenarioRuntimeStateV2 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
+        scenario: scenario_id,
+        node: choice_node,
+        stage: ScenarioRuntimeStageV2::Choice,
+        selected_option: None,
+        primary_target: None,
+        secondary_target: None,
+        locals: Default::default(),
+        reserved_pokemon: Vec::new(),
+        visit_count: SafeU53::ZERO,
+    });
+    let result = execute(
+        initial,
+        content,
+        GameControlKindV2::Scenario,
+        "scenario/department-store/unsupported",
+        GameActionV1::Scenario {
+            action: ScenarioGameActionV1::Choose {
+                node: choice_node,
+                option_ordinal: 0,
+            },
+        },
+    );
+    assert!(result.is_err());
+    Ok(())
+}
 #[test]
 fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Result<(), Box<dyn Error>>
 {

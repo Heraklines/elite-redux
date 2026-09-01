@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::content_v2::{
-    PreparedScenarioContentV2, ScenarioCompiledEffectV2, ScenarioDefinitionV2, ScenarioNodeV2,
-    ScenarioOptionDefinitionV2,
+    PreparedScenarioContentV2, ScenarioDefinitionV2, ScenarioNodeV2, ScenarioOptionDefinitionV2,
+    ScenarioOptionProgramV2,
 };
 
 pub const SCENARIO_RUNTIME_SCHEMA_VERSION_V2: u32 = 2;
@@ -62,8 +62,6 @@ pub enum ScenarioRuntimeV2Error {
     Invalid,
     #[error("scenario V2 input does not match the current control")]
     Input,
-    #[error("scenario V2 option callback has no source-derived compiled effect program")]
-    UnsupportedBehavior,
 }
 
 impl ScenarioDomainFactoryV2 {
@@ -134,10 +132,10 @@ impl ScenarioDomainFactoryV2 {
         Ok(control)
     }
 
-    pub fn compiled_effects(
-        &self,
+    pub fn program<'a>(
+        &'a self,
         runtime: &ScenarioRuntimeV2,
-    ) -> Result<Vec<ScenarioCompiledEffectV2>, ScenarioRuntimeV2Error> {
+    ) -> Result<&'a ScenarioOptionProgramV2, ScenarioRuntimeV2Error> {
         let definition = self.definition(runtime)?;
         let ScenarioNodeV2::ExecuteOption { option_index, .. } =
             node(definition, runtime.current_node)?
@@ -145,9 +143,8 @@ impl ScenarioDomainFactoryV2 {
             return Err(ScenarioRuntimeV2Error::Input);
         };
         self.content
-            .option_effects(definition.id, *option_index)
-            .map(<[ScenarioCompiledEffectV2]>::to_vec)
-            .ok_or(ScenarioRuntimeV2Error::UnsupportedBehavior)
+            .option_program(definition.id, *option_index)
+            .ok_or(ScenarioRuntimeV2Error::Invalid)
     }
 
     pub fn apply(
