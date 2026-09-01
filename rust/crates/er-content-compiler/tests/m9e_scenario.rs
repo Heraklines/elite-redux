@@ -5,6 +5,7 @@ use er_scenario::content_v2::ScenarioCompiledEffectV2;
 use er_scenario::runtime_v2::{
     ScenarioControlV2, ScenarioDomainFactoryV2, ScenarioInputV2, ScenarioRuntimeV2Error,
 };
+use er_types::ScenarioId;
 
 const SCENARIOS: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -46,7 +47,21 @@ fn complete_scenario_catalog_is_classified_prepared_and_byte_stable() -> Result<
             .iter()
             .all(|scenario| !scenario.nodes.is_empty())
     );
-    first.clone().prepare()?;
+    let prepared = first.clone().prepare()?;
+    assert_eq!(
+        first
+            .scenarios
+            .iter()
+            .flat_map(|scenario| {
+                scenario.options.iter().filter(|option| {
+                    prepared
+                        .option_effects(scenario.id, option.option_index)
+                        .is_some()
+                })
+            })
+            .count(),
+        69
+    );
     Ok(())
 }
 

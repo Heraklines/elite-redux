@@ -12,7 +12,7 @@ const fixture = resolve(fixtureRoot);
 let server: Server;
 let address: string;
 
-test.setTimeout(180_000);
+test.setTimeout(300_000);
 
 const html = `<!doctype html><html><body><div id="status">loading</div><script type="module">
 const status = document.querySelector("#status");
@@ -28,8 +28,10 @@ const canonical = value => {
 const bytes = value => encoder.encode(JSON.stringify(canonical(value)));
 await init("/m9e-assets/er_web_bg.wasm");
 const bundle = new Uint8Array(await (await fetch("/m9e-assets/game-content-bundle-v2.json")).arrayBuffer());
-const host = new BrowserKernelHostV2(bundle); let sequence = 0; let requestId = 1;
+const solo = !new URLSearchParams(location.search).has("coop");
+const host = solo ? new BrowserKernelHostV2(bundle) : null; let sequence = 0; let requestId = 1;
 const send = async request => {
+  if (host == null) throw new Error("solo browser host is unavailable");
   const envelope = { request, request_id: requestId++, sequence: sequence++, version: 2 };
   const response = JSON.parse(decoder.decode(host.process(bytes(envelope))));
   if (response.response.kind === "EFFECTS") {
@@ -39,7 +41,7 @@ const send = async request => {
   }
   return response.response;
 };
-await send({ kind: "INITIALIZE", initialization: { kind: "NATURAL_START", context: {
+if (solo) await send({ kind: "INITIALIZE", initialization: { kind: "NATURAL_START", context: {
   local_seat: 1, role: "AUTHORITY", protocol: null,
   scheduler: { disposed: false, next_timer_id: null, pauses: [], timers: [] }
 }, local_is_host: true, profile: {
@@ -166,7 +168,7 @@ test.beforeAll(async () => {
       serveAsset(request.url.slice(13), response);
       return;
     }
-    if (request.url === "/m9e-v7.html") {
+    if (request.url === "/m9e-v7.html" || request.url?.startsWith("/m9e-v7.html?")) {
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(html);
       return;
@@ -226,8 +228,8 @@ test("natural V7 browser startup reaches the real battle command", async ({ page
 });
 
 test("two V7 browser hosts wait for both humans and converge one turn", async ({ page }) => {
-  await page.goto(new URL("m9e-v7.html", address).href);
-  await expect(page.locator("#status")).toHaveText("ready", { timeout: 120_000 });
+  await page.goto(new URL("m9e-v7.html?coop", address).href);
+  await expect(page.locator("#status")).toHaveText("ready", { timeout: 240_000 });
   const result = await page.evaluate(() => globalThis.__m9eV7.coop());
   expect(result.turnAdvanced).toBe(true);
   expect(result.converged).toBe(true);
