@@ -593,9 +593,23 @@ fn execute_battle(
     };
     let transition = resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    let outcome = transition.outcome;
+    let rng_audit = transition.rng_audit;
+    let mut candidate = adopt_v5(before, transition.after_state)?;
+    if !matches!(outcome, BattleOutcome::Ongoing) {
+        let run = candidate
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        run.outcome = match outcome {
+            BattleOutcome::Victory => RunOutcome::Victory,
+            BattleOutcome::Defeat => RunOutcome::Defeat,
+            BattleOutcome::Ongoing => RunOutcome::InProgress,
+        };
+    }
     Ok(DomainExecutionV1 {
-        candidate: Some(adopt_v5(before, transition.after_state)?),
-        rng_audit: transition.rng_audit,
+        candidate: Some(candidate),
+        rng_audit,
         ..Default::default()
     })
 }
