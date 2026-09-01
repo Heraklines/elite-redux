@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 33487375491 (main)
+timestamp: 2026-09-01T08-43-14Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260901 WAVES=150 - replay this run with:  SOAK_SEED=20260901 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] DONE seed=20260901 waves=150/150 resyncHeals=0 assertions=0 findings=0 trainerWaves=26 (fixed=13 random=13) skips={"mysteryEncounterDisabledV1":1} elapsedMs=677360
+[22m[39m[coop-soak] RUN ENDED at wave 6 (seed 206780945): host at terminal phase TitlePhase. Survey stops here.
+
+----- vitest result tail -----
+    [90m322|[39m     expect(result.preHealMismatches, "no mismatch was hidden by the on…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Errors [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: globalScene.phaseManager.getCurrentPhase(...).getPokemon is not a function[39m
+[36m [2m❯[22m FightUiHandler.clearMoves src/ui/handlers/fight-ui-handler.ts:[2m726:84[22m[39m
+    [90m724|[39m     [35mthis[39m[33m.[39mmoodyMoveBindingText[33m.[39m[34msetVisible[39m([35mfalse[39m)[33m;[39m
+    [90m725|[39m
+    [90m726|[39m     const opponents = (globalScene.phaseManager.getCurrentPhase() as C…
+    [90m   |[39m                                                                                    [31m^[39m
+    [90m727|[39m     opponents[33m.[39m[34mforEach[39m(opponent [33m=>[39m {
+    [90m728|[39m       (opponent [35mas[39m [33mEnemyPokemon[39m)[33m.[39m[34mupdateEffectiveness[39m()[33m;[39m
+[90m [2m❯[22m FightUiHandler.clear src/ui/handlers/fight-ui-handler.ts:[2m712:10[22m[39m
+[90m [2m❯[22m doSetMode src/ui/ui.ts:[2m1211:31[22m[39m
+[90m [2m❯[22m src/ui/ui.ts:[2m1260:9[22m[39m
+[90m [2m❯[22m UI.setModeInternal src/ui/ui.ts:[2m1179:12[22m[39m
+[90m [2m❯[22m PromptHandler.setMode test/helpers/prompt-handler.ts:[2m97:46[22m[39m
+[90m [2m❯[22m UI.<anonymous> test/helpers/prompt-handler.ts:[2m73:44[22m[39m
+[90m [2m❯[22m UI.setModeInternal node_modules/.pnpm/@vitest+spy@4.1.5/node_modules/@vitest/spy/dist/index.js:[2m332:34[22m[39m
+[90m [2m❯[22m UI.setMode src/ui/ui.ts:[2m1321:17[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 08:30:48
+[2m   Duration [22m 744.92s[2m (transform 22.55s, setup 26.99s, import 361ms, tests 716.68s, environment 718ms)[22m
+
