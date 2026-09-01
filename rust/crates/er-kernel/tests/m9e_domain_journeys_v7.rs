@@ -9,6 +9,7 @@ use er_game::m72_bootstrap::{
 };
 use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelV7};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
+use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
     DexState, InventoryEntryV1, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
     ProgressionTaskKindV2, ProgressionTaskV2, SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
@@ -19,8 +20,9 @@ use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
 use er_types::{
-    EvolutionActionV1, FusionActionV1, GameActionV1, GameControlKindV2, GameMenuCancelV2,
-    InventoryActionV1, OperationId, ProgressionActionV1, RewardActionV1, RunDifficultyV1, SafeU53,
+    EvolutionActionV1, FusionActionV1, GAME_CONTROL_PLAN_SCHEMA_VERSION_V2, GameActionV1,
+    GameControlKindV2, GameControlPlanV2, GameMenuCancelV2, InventoryActionV1, OperationId,
+    ProgressionActionV1, RewardActionV1, RunDifficultyV1, RunOutcome, SafeU53,
     ScenarioGameActionV1, ScenarioId, SeatId, StarterSelectionV1, WorldActionV1,
 };
 
@@ -464,5 +466,93 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
             .scenario
             .is_none()
     );
+    Ok(())
+}
+
+#[test]
+fn game_save_v2_restores_every_control_kind() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let kinds = [
+        GameControlKindV2::Title,
+        GameControlKindV2::ModeSelect,
+        GameControlKindV2::StarterSelect,
+        GameControlKindV2::BattleCommand,
+        GameControlKindV2::BattleMove,
+        GameControlKindV2::BattleTarget,
+        GameControlKindV2::BattleSwitch,
+        GameControlKindV2::BattleReplacement,
+        GameControlKindV2::Capture,
+        GameControlKindV2::FullParty,
+        GameControlKindV2::Progression,
+        GameControlKindV2::MoveLearn,
+        GameControlKindV2::Evolution,
+        GameControlKindV2::Fusion,
+        GameControlKindV2::Reward,
+        GameControlKindV2::Market,
+        GameControlKindV2::Scenario,
+        GameControlKindV2::Quest,
+        GameControlKindV2::Faction,
+        GameControlKindV2::Biome,
+        GameControlKindV2::Route,
+        GameControlKindV2::Save,
+        GameControlKindV2::Waiting,
+        GameControlKindV2::Complete,
+    ];
+    for (index, kind) in kinds.into_iter().enumerate() {
+        let mut state = natural_state(&content)?;
+        let revision = safe((index + 1) as u64);
+        let control = if matches!(
+            kind,
+            GameControlKindV2::Waiting | GameControlKindV2::Complete
+        ) {
+            if kind == GameControlKindV2::Complete {
+                state.active_run.as_mut().ok_or("run missing")?.outcome = RunOutcome::Victory;
+            }
+            GameControlPlanV2 {
+                schema_version: GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
+                revision,
+                kind,
+                owner_seat: None,
+                action_context: None,
+                menu: None,
+                actionable: false,
+            }
+        } else {
+            generic_vertical_control_v2(
+                MenuInstanceId::new(revision),
+                revision,
+                SeatId::new(safe(1)),
+                OperationId::new(format!("save/control/{index}"))?,
+                kind,
+                &format!("m9e/save/control/{index}"),
+                &[(
+                    format!("save/control/{index}/option"),
+                    GameActionV1::Save {
+                        action: er_types::SaveActionV1::Cancel,
+                    },
+                )],
+                GameMenuCancelV2::Disabled,
+            )?
+        };
+        state.active_run.as_mut().ok_or("run missing")?.control = control.clone();
+        state.validate_with(content.as_ref())?;
+        let save = GameSaveV2::new(content.identity().clone(), safe(1), state)?;
+        let decoded = GameSaveV2::decode(&save.encode()?)?;
+        assert_eq!(
+            decoded.state.active_run.as_ref().map(|run| &run.control),
+            Some(&control)
+        );
+        let restored = GameKernelV7::from_active(
+            decoded.state,
+            revision,
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content.clone(),
+            input(),
+            scheduler(),
+            None,
+        )?;
+        assert_eq!(restored.current_control(), Some(&control));
+    }
     Ok(())
 }

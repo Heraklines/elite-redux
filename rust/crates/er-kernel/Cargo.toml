@@ -20,5 +20,8 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+er-save = { path = "../er-save" }
+
 [lints]
 workspace = true
