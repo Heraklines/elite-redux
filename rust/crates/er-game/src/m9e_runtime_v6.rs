@@ -24,7 +24,7 @@ use er_types::battle_command::{
     OfferedSwitchCommand,
 };
 use er_types::battle_ids::MenuInstanceId;
-use er_types::battle_model::BattleOutcome;
+use er_types::battle_model::{BattleOutcome, MoveFlag};
 use er_types::run_ids::Experience;
 use er_types::{
     BootstrapActionV1, CaptureActionV1, EvolutionActionV1, FusionActionV1, GameActionContextV1,
@@ -1287,6 +1287,22 @@ fn apply_scenario_program(
             Ok(())
         }
         (
+            ScenarioProgramHandlerV2::GroupF,
+            63,
+            0,
+            "fe0639d6ddacaaa555ab20219ce82bbf42299e89875b04d356a99f47220d3726",
+        ) => {
+            chart_scenario_onward_routes(run, content)?;
+            add_scenario_landmark(run, "The Observatory");
+            Ok(())
+        }
+        (
+            ScenarioProgramHandlerV2::GroupF,
+            64,
+            0,
+            "6edfc6c144ba7e250512ee63fff3e4468b104e442d3d5b3ec9c5586a3c8e6f88",
+        ) => reveal_echo_chamber_routes(run, content),
+        (
             ScenarioProgramHandlerV2::GroupG,
             68,
             0,
@@ -1432,6 +1448,59 @@ fn chart_scenario_onward_routes(
                 kind: MapNodeKindV1::Biome,
             });
         }
+    }
+    Ok(())
+}
+
+fn add_scenario_landmark(run: &mut er_state::m7_state::RunStateV3, label: &str) {
+    if !run
+        .world
+        .map_nodes
+        .iter()
+        .any(|node| node.biome == run.world.biome && node.label == label)
+    {
+        run.world.map_nodes.push(MapNodeStateV1 {
+            biome: run.world.biome,
+            label: label.to_owned(),
+            kind: MapNodeKindV1::Landmark,
+        });
+    }
+}
+
+fn reveal_echo_chamber_routes(
+    run: &mut er_state::m7_state::RunStateV3,
+    content: &PreparedGameContentV2,
+) -> Result<(), GameRuntimeV6Error> {
+    let mut has_sound_move = false;
+    for move_slot in run
+        .party
+        .iter()
+        .flat_map(|pokemon| pokemon.moves.iter().flatten())
+    {
+        let definition = content
+            .battle
+            .move_definition(move_slot.move_id)
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        if definition.flags.contains(&MoveFlag::SoundBased) {
+            has_sound_move = true;
+            break;
+        }
+    }
+    if has_sound_move {
+        for pending in &mut run.world.pending_nodes {
+            if !pending.revealed {
+                pending.revealed = true;
+                pending.source = RouteRevealSourceV1::Event;
+            }
+        }
+    } else if let Some(pending) = run
+        .world
+        .pending_nodes
+        .iter_mut()
+        .find(|node| !node.revealed)
+    {
+        pending.revealed = true;
+        pending.source = RouteRevealSourceV1::Event;
     }
     Ok(())
 }
