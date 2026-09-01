@@ -14,7 +14,8 @@ use er_scenario::runtime_v2::{
     ScenarioInputV2, ScenarioRuntimeV2,
 };
 use er_state::m7_state::{
-    GameStateV5, ProgressionTaskKindV2, ProgressionTaskV2, ScenarioRuntimeStageV2,
+    GameStateV5, MapNodeKindV1, MapNodeStateV1, ProgressionTaskKindV2, ProgressionTaskV2,
+    RouteRevealSourceV1, ScenarioRuntimeStageV2,
 };
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_command::{
@@ -1207,7 +1208,7 @@ fn execute_scenario(
         .active_run
         .as_mut()
         .ok_or(GameRuntimeV6Error::Action)?;
-    apply_scenario_program(run, compiled_program.as_ref())?;
+    apply_scenario_program(run, content, compiled_program.as_ref())?;
     let scenario = run.scenario.as_mut().ok_or(GameRuntimeV6Error::Action)?;
     scenario.node = runtime.current_node;
     scenario.stage = stage;
@@ -1224,6 +1225,7 @@ fn execute_scenario(
 
 fn apply_scenario_program(
     run: &mut er_state::m7_state::RunStateV3,
+    content: &PreparedGameContentV2,
     program: Option<&ScenarioOptionProgramV2>,
 ) -> Result<(), GameRuntimeV6Error> {
     let Some(program) = program else {
@@ -1256,6 +1258,41 @@ fn apply_scenario_program(
                     move_slot.pp_used = 0;
                 }
             }
+            Ok(())
+        }
+        (
+            ScenarioProgramHandlerV2::GroupF,
+            61,
+            0,
+            "edccabcc68275abcbc045dbd22d706749ff8527743c818cc4afb953367ae4ba8",
+        ) => {
+            add_scenario_treasure_fragments(run, 1)?;
+            chart_scenario_onward_routes(run, content)?;
+            Ok(())
+        }
+        (
+            ScenarioProgramHandlerV2::GroupF,
+            62,
+            1,
+            "7ec44c68dfd01f50a90e34b2c25165642c5b2aa59f5230d3a1c96b9fc7bdaa2b",
+        ) => {
+            add_scenario_treasure_fragments(run, 1)?;
+            Ok(())
+        }
+        (
+            ScenarioProgramHandlerV2::GroupG,
+            68,
+            0,
+            "e9f78701c9129968acca7db729690b25f5aaa00523640564ba4987c649ed0c5c",
+        )
+        | (
+            ScenarioProgramHandlerV2::GroupG,
+            69,
+            0,
+            "20c5590a30b2e3f16cca401d8c8bb23d76f2c621c9d2b15a42ff19275a3f6a26",
+        ) => {
+            add_scenario_treasure_fragments(run, 1)?;
+            chart_scenario_onward_routes(run, content)?;
             Ok(())
         }
         _ => Err(GameRuntimeV6Error::Domain(format!(
@@ -1316,6 +1353,54 @@ fn callback_has_no_canonical_effects(callback_sha: &str) -> bool {
             | "f6845e6f72508eb1a86ad9faa81e9cef6683dd39d3efb11f7ea454b4caf5be09"
             | "fe7d5ed79aaf17174e1db717bb6c30bfe63810b1faf2a0921ccc885779d11336"
     )
+}
+
+fn add_scenario_treasure_fragments(
+    run: &mut er_state::m7_state::RunStateV3,
+    amount: u32,
+) -> Result<(), GameRuntimeV6Error> {
+    run.world.treasure_fragments = run
+        .world
+        .treasure_fragments
+        .checked_add(amount)
+        .ok_or_else(|| GameRuntimeV6Error::Domain("treasure fragments overflow".to_owned()))?;
+    Ok(())
+}
+
+fn chart_scenario_onward_routes(
+    run: &mut er_state::m7_state::RunStateV3,
+    content: &PreparedGameContentV2,
+) -> Result<(), GameRuntimeV6Error> {
+    for pending in &mut run.world.pending_nodes {
+        if !pending.revealed {
+            pending.revealed = true;
+            pending.source = RouteRevealSourceV1::Event;
+        }
+    }
+    let links = &content
+        .world
+        .biome(run.world.biome)
+        .ok_or(GameRuntimeV6Error::Invalid)?
+        .links;
+    for link in links {
+        let definition = content
+            .world
+            .biome(link.biome)
+            .ok_or(GameRuntimeV6Error::Invalid)?;
+        if !run
+            .world
+            .map_nodes
+            .iter()
+            .any(|node| node.biome == link.biome && node.label == definition.key)
+        {
+            run.world.map_nodes.push(MapNodeStateV1 {
+                biome: link.biome,
+                label: definition.key.clone(),
+                kind: MapNodeKindV1::Biome,
+            });
+        }
+    }
+    Ok(())
 }
 fn execute_save(
     before: Option<&GameStateV6>,
