@@ -30,14 +30,21 @@ pub enum EvolutionConditionV2 {
     TimeOfDay(u8),
     KnownMove(MoveId),
     KnownMoveType(u8),
+    PartyType(u8),
     PartySpecies(SpeciesId),
     Biome(u64),
     Weather(u16),
+    Nature(Vec<u8>),
     HeldItem(InventoryItemId),
+    HeldItemKey(String),
+    TreasureAtLeast(u16),
+    RandomForm(u16),
+    SpeciesCaught(SpeciesId),
+    FormKey(String),
+    Shedinja,
     All(Vec<EvolutionConditionV2>),
     Any(Vec<EvolutionConditionV2>),
     Not(Box<EvolutionConditionV2>),
-    Bespoke(String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -220,12 +227,24 @@ fn validate_condition(
         EvolutionConditionV2::Always => true,
         EvolutionConditionV2::MinimumLevel(value)
         | EvolutionConditionV2::MinimumFriendship(value) => *value > 0,
-        EvolutionConditionV2::Gender(_) | EvolutionConditionV2::TimeOfDay(_) => true,
+        EvolutionConditionV2::Gender(_)
+        | EvolutionConditionV2::TimeOfDay(_)
+        | EvolutionConditionV2::KnownMoveType(_)
+        | EvolutionConditionV2::PartyType(_)
+        | EvolutionConditionV2::Biome(_)
+        | EvolutionConditionV2::Weather(_)
+        | EvolutionConditionV2::HeldItem(_)
+        | EvolutionConditionV2::Shedinja => true,
         EvolutionConditionV2::KnownMove(move_id) => known_moves.contains(move_id),
-        EvolutionConditionV2::KnownMoveType(_) => true,
-        EvolutionConditionV2::PartySpecies(species) => known_species.contains(species),
-        EvolutionConditionV2::Biome(_) | EvolutionConditionV2::Weather(_) => true,
-        EvolutionConditionV2::HeldItem(_) => true,
+        EvolutionConditionV2::PartySpecies(species)
+        | EvolutionConditionV2::SpeciesCaught(species) => known_species.contains(species),
+        EvolutionConditionV2::Nature(values) => !values.is_empty(),
+        EvolutionConditionV2::HeldItemKey(key) | EvolutionConditionV2::FormKey(key) => {
+            !key.is_empty()
+        }
+        EvolutionConditionV2::TreasureAtLeast(value) | EvolutionConditionV2::RandomForm(value) => {
+            *value > 0
+        }
         EvolutionConditionV2::All(values) | EvolutionConditionV2::Any(values) => {
             !values.is_empty()
                 && values
@@ -235,7 +254,6 @@ fn validate_condition(
         EvolutionConditionV2::Not(value) => {
             validate_condition(value, known_species, known_moves).is_ok()
         }
-        EvolutionConditionV2::Bespoke(key) => !key.is_empty(),
     };
     if valid {
         Ok(())
