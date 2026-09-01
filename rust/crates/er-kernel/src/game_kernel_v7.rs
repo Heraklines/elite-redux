@@ -6,6 +6,7 @@ use std::sync::Arc;
 use er_ai::authority_v2::AuthorityAiV2;
 use er_ai::full_surface::{AiActionKindV1, AiActorViewV1, AiScoreContextV1, legal_actions_v1};
 use er_canonical::canonical_bytes;
+use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::PreparedGameContentV2;
 use er_game::m9e_internal_event_v2::{
     GameInternalEventKindV2, GameInternalEventQueueV2, GameInternalEventV2,
@@ -25,12 +26,13 @@ use er_game::m72_bootstrap::{
 use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2};
 use er_state::m7_state::ProfileStateV1;
 use er_state::m9e_state_v6::GameStateV6;
+use er_types::battle_ids::MenuInstanceId;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::ui_menu::NavigationDirection;
 use er_types::{
     BootstrapActionV1, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1, GameActionV1,
-    GameButton, GameControlPlanV2, GameProposalV1, OperationId, PlatformRequestId, RunOutcome,
-    SafeU53, SeatId, StarterSelectionV1, TerminalState,
+    GameButton, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2, GameProposalV1,
+    OperationId, PlatformRequestId, RunOutcome, SafeU53, SeatId, StarterSelectionV1, TerminalState,
 };
 use thiserror::Error;
 
@@ -90,6 +92,7 @@ pub struct GameKernelV7 {
     authority_ai: Option<AuthorityAiV2>,
     input_router: InputRouterSnapshotV2,
     scheduler: KernelSchedulerSnapshotV2,
+    next_menu_instance_id: MenuInstanceId,
     protocol: Option<ProtocolRuntimeSnapshotV2>,
     pending_presentations: BTreeMap<er_types::PresentationEventId, PendingPresentationV3>,
     pending_platform: BTreeMap<PlatformRequestId, PendingPlatformRequestV2>,
@@ -133,6 +136,7 @@ impl GameKernelV7 {
         let catalog = bootstrap_catalog(content.as_ref(), local_seat, save_slots, local_is_host)?;
         let bootstrap = RunBootstrapMachineV1::new(profile, seed, local_seat, catalog)
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        let next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
         let authority_ai =
             (role == GameKernelRoleV7::Authority).then(|| AuthorityAiV2::new(content.ai.clone()));
         let value = Self {
@@ -141,6 +145,7 @@ impl GameKernelV7 {
             local_seat,
             role,
             authority_ai,
+            next_menu_instance_id,
             input_router: empty_input_router(),
             scheduler,
             protocol,
@@ -163,6 +168,7 @@ impl GameKernelV7 {
         scheduler: KernelSchedulerSnapshotV2,
         protocol: Option<ProtocolRuntimeSnapshotV2>,
     ) -> Result<Self, GameKernelV7Error> {
+        let next_menu_instance_id = next_menu_from_state(&state)?;
         let runtime = GameRuntimeV6::new(Some(state), content.clone(), next_authority_revision)
             .map_err(runtime_error)?;
         let authority_ai =
@@ -173,6 +179,7 @@ impl GameKernelV7 {
             local_seat,
             role,
             authority_ai,
+            next_menu_instance_id,
             input_router,
             scheduler,
             protocol,
@@ -239,6 +246,7 @@ impl GameKernelV7 {
             local_seat,
             role,
             authority_ai,
+            next_menu_instance_id: snapshot.next_menu_instance_id,
             input_router: snapshot.input_router,
             scheduler: snapshot.scheduler,
             protocol: snapshot.protocol,
@@ -291,6 +299,7 @@ impl GameKernelV7 {
             authority_ai: self.authority_ai.as_ref().map(AuthorityAiV2::snapshot),
             input_router: self.input_router.clone(),
             scheduler: self.scheduler.clone(),
+            next_menu_instance_id: self.next_menu_instance_id,
             protocol: self.protocol.clone(),
             pending_presentations: self.pending_presentations.clone(),
             pending_platform: self.pending_platform.clone(),
@@ -537,6 +546,7 @@ impl GameKernelV7 {
             }
             Err(error) => return Err(GameKernelV7Error::Bootstrap(error.to_string())),
         }
+        self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
         if bootstrap.stage != RunBootstrapStageV1::Complete {
             return Ok(GameKernelStepV7 {
                 effects: vec![GameKernelEffectV7::UiChanged(bootstrap.control.clone())],
@@ -547,8 +557,20 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         }
         let bootstrap = bootstrap.clone();
-        let candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
+        let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        let command_instance = self.allocate_menu_instance()?;
+        let command_control = command_root_control(
+            &candidate,
+            self.local_seat,
+            command_instance,
+            increment_safe(safe_one())?,
+        )?;
+        candidate
+            .active_run
+            .as_mut()
+            .ok_or(GameKernelV7Error::Invalid)?
+            .control = command_control;
         let mut runtime =
             GameRuntimeV6::new(None, self.content.clone(), safe_one()).map_err(runtime_error)?;
         let context = GameActionDispatchContextV1 {
@@ -733,6 +755,54 @@ impl GameKernelV7 {
                 .cancel_action()
                 .map_err(runtime_error)?
         };
+        match &action {
+            GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::OpenFight,
+            } => {
+                let instance = self.allocate_menu_instance()?;
+                let revision = self.active_runtime()?.next_authority_revision();
+                let control = move_select_control(
+                    self.state().ok_or(GameKernelV7Error::Invalid)?,
+                    self.local_seat,
+                    instance,
+                    revision,
+                )?;
+                self.active_runtime_mut()?
+                    .install_control(control.clone())
+                    .map_err(runtime_error)?;
+                return Ok(GameKernelStepV7 {
+                    effects: vec![GameKernelEffectV7::UiChanged(control)],
+                    internal_events: Vec::new(),
+                });
+            }
+            GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::OpenParty,
+            } => {
+                let instance = self.allocate_menu_instance()?;
+                let revision = self.active_runtime()?.next_authority_revision();
+                let control = switch_select_control(
+                    self.state().ok_or(GameKernelV7Error::Invalid)?,
+                    self.local_seat,
+                    instance,
+                    revision,
+                )?;
+                self.active_runtime_mut()?
+                    .install_control(control.clone())
+                    .map_err(runtime_error)?;
+                return Ok(GameKernelStepV7 {
+                    effects: vec![GameKernelEffectV7::UiChanged(control)],
+                    internal_events: Vec::new(),
+                });
+            }
+            GameActionV1::Battle {
+                action:
+                    er_types::BattleUiActionV1::SelectMove { .. }
+                    | er_types::BattleUiActionV1::SelectSwitch { .. },
+            } if self.role == GameKernelRoleV7::Authority => {
+                return self.resolve_local_battle_action(action, action_context);
+            }
+            _ => {}
+        }
         if self.role == GameKernelRoleV7::Replica {
             let proposal = GameProposalV1 {
                 schema_version: GAME_ACTION_SCHEMA_VERSION_V1,
@@ -763,6 +833,102 @@ impl GameKernelV7 {
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
         self.advance_replay_sequence()?;
         let mut step = step;
+        self.synchronize_terminal(&mut step)?;
+        Ok(step)
+    }
+
+    fn resolve_local_battle_action(
+        &mut self,
+        action: GameActionV1,
+        action_context: GameActionContextV1,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let state = self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
+        let (battle, actor, field) = local_battle_actor(&state, self.local_seat)?;
+        let menu = state
+            .active_run
+            .as_ref()
+            .and_then(|run| run.control.menu.as_ref())
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let command = match &action {
+            GameActionV1::Battle {
+                action:
+                    er_types::BattleUiActionV1::SelectMove {
+                        actor: selected_actor,
+                        move_slot,
+                    },
+            } if *selected_actor == actor => er_types::battle_command::BattleCommand::fight(
+                actor,
+                *move_slot,
+                er_types::battle_command::BattleTargetSelection::implicit(),
+            )
+            .map_err(|_| GameKernelV7Error::Invalid)?,
+            GameActionV1::Battle {
+                action:
+                    er_types::BattleUiActionV1::SelectSwitch {
+                        actor: selected_actor,
+                        party_slot,
+                    },
+            } if *selected_actor == actor => {
+                er_types::battle_command::BattleCommand::switch(actor, *party_slot)
+            }
+            _ => return Err(GameKernelV7Error::Invalid),
+        };
+        let proposal = er_types::battle_command::BattleCommandProposalV1::new(
+            action_context.operation_id.clone(),
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            self.local_seat,
+            actor,
+            field,
+            command,
+            menu.instance_id,
+            menu.control_id.clone(),
+        )
+        .map_err(|_| GameKernelV7Error::Invalid)?;
+        let mut entries = vec![er_types::battle_command::AcceptedBattleCommand::human(
+            proposal,
+        )];
+        entries.extend(self.prepare_authority_ai_commands()?);
+        entries.sort_by_key(|entry| entry.field_slot());
+        let commands = er_types::battle_command::CommandSet::new(entries)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let authority = er_battle::m7_resolver::TurnAuthorityContextV1 {
+            authority_seat: self.local_seat,
+            revision: action_context.authority_revision,
+        };
+        let context = GameActionDispatchContextV1 {
+            action: action_context,
+            input: GameDomainExecutionInputV1::BattleTurn {
+                commands,
+                authority,
+            },
+            authority: true,
+        };
+        let mut staged = self.active_runtime()?.clone();
+        let mut step = execute_action_transaction(&mut staged, action, context)?;
+        if staged
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .is_some_and(|run| {
+                matches!(run.outcome, RunOutcome::InProgress) && run.battle.is_some()
+            })
+        {
+            let instance = self.allocate_menu_instance()?;
+            let control = command_root_control(
+                staged.state().ok_or(GameKernelV7Error::Invalid)?,
+                self.local_seat,
+                instance,
+                staged.next_authority_revision(),
+            )?;
+            staged
+                .install_control(control.clone())
+                .map_err(runtime_error)?;
+            step.effects.push(GameKernelEffectV7::UiChanged(control));
+        }
+        self.install_step_effects(&step.effects)?;
+        self.lifecycle = GameKernelLifecycleV7::Active(staged);
+        self.advance_replay_sequence()?;
         self.synchronize_terminal(&mut step)?;
         Ok(step)
     }
@@ -852,6 +1018,12 @@ impl GameKernelV7 {
             GameKernelLifecycleV7::Active(runtime) => Ok(runtime),
             _ => Err(GameKernelV7Error::Invalid),
         }
+    }
+
+    fn allocate_menu_instance(&mut self) -> Result<MenuInstanceId, GameKernelV7Error> {
+        let allocated = self.next_menu_instance_id;
+        self.next_menu_instance_id = next_menu_after(allocated)?;
+        Ok(allocated)
     }
 
     fn advance_replay_sequence(&mut self) -> Result<(), GameKernelV7Error> {
@@ -961,6 +1133,205 @@ fn execute_action_transaction(
         effects,
         internal_events: queue.processed_kinds().to_vec(),
     })
+}
+
+fn command_root_control(
+    state: &GameStateV6,
+    seat: SeatId,
+    instance: MenuInstanceId,
+    revision: SafeU53,
+) -> Result<GameControlPlanV2, GameKernelV7Error> {
+    let (battle, actor, field) = local_battle_actor(state, seat)?;
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        field,
+        seat,
+    )
+    .map_err(|_| GameKernelV7Error::Invalid)?;
+    let entries = vec![
+        (
+            "battle/command/fight".to_owned(),
+            GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::OpenFight,
+            },
+        ),
+        (
+            "battle/command/party".to_owned(),
+            GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::OpenParty,
+            },
+        ),
+    ];
+    let _actor = actor;
+    generic_vertical_control_v2(
+        instance,
+        revision,
+        seat,
+        operation,
+        GameControlKindV2::BattleCommand,
+        "m9e/battle/command",
+        &entries,
+        GameMenuCancelV2::Disabled,
+    )
+    .map_err(|_| GameKernelV7Error::Invalid)
+}
+
+fn move_select_control(
+    state: &GameStateV6,
+    seat: SeatId,
+    instance: MenuInstanceId,
+    revision: SafeU53,
+) -> Result<GameControlPlanV2, GameKernelV7Error> {
+    let (battle, actor, field) = local_battle_actor(state, seat)?;
+    let pokemon = state
+        .active_run
+        .as_ref()
+        .and_then(|run| run.party.iter().find(|pokemon| pokemon.id == actor))
+        .ok_or(GameKernelV7Error::Invalid)?;
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        field,
+        seat,
+    )
+    .map_err(|_| GameKernelV7Error::Invalid)?;
+    let entries = pokemon
+        .moves
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| {
+            slot.as_ref()?;
+            let move_slot = u8::try_from(index).ok()?;
+            Some((
+                format!("battle/move/{move_slot}"),
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::SelectMove {
+                        actor,
+                        move_slot: er_types::battle_ids::MoveSlotIndex::new(move_slot).ok()?,
+                    },
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    generic_vertical_control_v2(
+        instance,
+        revision,
+        seat,
+        operation,
+        GameControlKindV2::BattleMove,
+        "m9e/battle/move",
+        &entries,
+        GameMenuCancelV2::Back {
+            action: Box::new(GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::OpenFight,
+            }),
+        },
+    )
+    .map_err(|_| GameKernelV7Error::Invalid)
+}
+
+fn switch_select_control(
+    state: &GameStateV6,
+    seat: SeatId,
+    instance: MenuInstanceId,
+    revision: SafeU53,
+) -> Result<GameControlPlanV2, GameKernelV7Error> {
+    let (battle, actor, field) = local_battle_actor(state, seat)?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(GameKernelV7Error::Invalid)?;
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        field,
+        seat,
+    )
+    .map_err(|_| GameKernelV7Error::Invalid)?;
+    let entries = run
+        .party
+        .iter()
+        .enumerate()
+        .filter(|(_, pokemon)| {
+            pokemon.id != actor
+                && !pokemon.fainted
+                && !battle
+                    .field
+                    .slots
+                    .iter()
+                    .any(|slot| slot.occupant == Some(pokemon.id))
+        })
+        .filter_map(|(index, _)| {
+            let party_slot = u8::try_from(index).ok()?;
+            Some((
+                format!("battle/switch/{party_slot}"),
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::SelectSwitch {
+                        actor,
+                        party_slot: er_types::battle_ids::PartyIndex::new(party_slot).ok()?,
+                    },
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    if entries.is_empty() {
+        return Err(GameKernelV7Error::Invalid);
+    }
+    generic_vertical_control_v2(
+        instance,
+        revision,
+        seat,
+        operation,
+        GameControlKindV2::BattleSwitch,
+        "m9e/battle/switch",
+        &entries,
+        GameMenuCancelV2::Back {
+            action: Box::new(GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::OpenParty,
+            }),
+        },
+    )
+    .map_err(|_| GameKernelV7Error::Invalid)
+}
+
+fn local_battle_actor(
+    state: &GameStateV6,
+    seat: SeatId,
+) -> Result<
+    (
+        &er_state::m7_state::BattleStateV5,
+        er_types::battle_ids::PokemonId,
+        er_types::battle_ids::FieldSlot,
+    ),
+    GameKernelV7Error,
+> {
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(GameKernelV7Error::Invalid)?;
+    let battle = run.battle.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+    let field = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| {
+            slot.slot.side == er_types::battle_ids::BattleSide::Player
+                && slot.occupant.is_some_and(|pokemon_id| {
+                    run.party
+                        .iter()
+                        .any(|pokemon| pokemon.id == pokemon_id && pokemon.owner_seat == Some(seat))
+                })
+        })
+        .ok_or(GameKernelV7Error::Invalid)?;
+    Ok((
+        battle,
+        field.occupant.ok_or(GameKernelV7Error::Invalid)?,
+        field.slot,
+    ))
 }
 
 fn bootstrap_catalog(
@@ -1089,6 +1460,37 @@ fn complete_control(revision: SafeU53) -> GameControlPlanV2 {
         menu: None,
         actionable: false,
     }
+}
+
+fn next_menu_after(current: MenuInstanceId) -> Result<MenuInstanceId, GameKernelV7Error> {
+    let next = current
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(GameKernelV7Error::Invalid)?;
+    SafeU53::new(next)
+        .map(MenuInstanceId::new)
+        .map_err(|_| GameKernelV7Error::Invalid)
+}
+
+fn next_menu_from_state(state: &GameStateV6) -> Result<MenuInstanceId, GameKernelV7Error> {
+    match state
+        .active_run
+        .as_ref()
+        .and_then(|run| run.control.menu.as_ref())
+        .map(|menu| menu.instance_id)
+    {
+        Some(current) => next_menu_after(current),
+        None => Ok(MenuInstanceId::new(safe_one())),
+    }
+}
+
+fn increment_safe(value: SafeU53) -> Result<SafeU53, GameKernelV7Error> {
+    let next = value
+        .get()
+        .checked_add(1)
+        .ok_or(GameKernelV7Error::Invalid)?;
+    SafeU53::new(next).map_err(|_| GameKernelV7Error::Invalid)
 }
 
 fn safe_one() -> SafeU53 {

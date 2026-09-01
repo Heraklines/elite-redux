@@ -244,7 +244,7 @@ impl GameMaterialV6 {
             || transition.operation_id.as_str().is_empty()
             || transition.authority_revision == SafeU53::ZERO
             || transition.after_state.content_identity != transition.content_identity
-            || transition.next_control.revision != transition.authority_revision
+            || transition.next_control.revision != next_revision(transition.authority_revision)?
             || game_state_digest(&transition.after_state)? != transition.after_digest
             || !valid_digest(&transition.before_digest)
             || !valid_digest(&transition.after_digest)

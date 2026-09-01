@@ -175,6 +175,31 @@ impl GameRuntimeV6 {
         &self.material_ledger
     }
 
+    pub fn next_authority_revision(&self) -> SafeU53 {
+        self.material_ledger.next_authority_revision
+    }
+
+    pub fn install_control(
+        &mut self,
+        control: GameControlPlanV2,
+    ) -> Result<(), GameRuntimeV6Error> {
+        control
+            .validate()
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        if control.revision != self.material_ledger.next_authority_revision {
+            return Err(GameRuntimeV6Error::Invalid);
+        }
+        let state = self.state.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+        let run = state
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        run.control = control;
+        state
+            .validate_with(self.content.as_ref())
+            .map_err(|_| GameRuntimeV6Error::Invalid)
+    }
+
     pub fn navigate_control(
         &mut self,
         direction: er_types::ui_menu::NavigationDirection,
@@ -329,8 +354,10 @@ impl GameActionDispatcherV1 {
         let domain = action_domain(&action, &context.input)?;
         let execution = execute_domain(before, content, &action, &context)?;
         let mut candidate = execution.candidate.ok_or(GameRuntimeV6Error::Invalid)?;
-        let next_control =
-            normalize_next_control(&mut candidate, context.action.authority_revision)?;
+        let next_control = normalize_next_control(
+            &mut candidate,
+            safe_increment(context.action.authority_revision)?,
+        )?;
         candidate
             .validate_with(content)
             .map_err(|_| GameRuntimeV6Error::Invalid)?;
@@ -1636,7 +1663,7 @@ fn validate_runtime_frontier(
 ) -> Result<(), GameRuntimeV6Error> {
     if state
         .and_then(|state| state.active_run.as_ref())
-        .is_some_and(|run| run.control.revision >= ledger.next_authority_revision)
+        .is_some_and(|run| run.control.revision > ledger.next_authority_revision)
     {
         return Err(GameRuntimeV6Error::Invalid);
     }

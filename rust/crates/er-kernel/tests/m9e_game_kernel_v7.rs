@@ -143,6 +143,35 @@ fn raw_keys_complete_natural_start_and_install_serialized_v6_state() -> Result<(
     let ai_commands = kernel.prepare_authority_ai_commands()?;
     assert_eq!(ai_commands.len(), 1);
     ai_commands[0].validate()?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleCommand)
+    );
+    let turn_before = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .map(|battle| battle.turn)
+        .ok_or("battle turn is absent")?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleMove)
+    );
+    let turn_step = press(&mut kernel, PhysicalKey::Space)?;
+    assert!(
+        turn_step
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
+    let turn_after = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .map(|battle| battle.turn)
+        .ok_or("battle turn is absent")?;
+    assert!(turn_after > turn_before);
     let snapshot = kernel.snapshot()?;
     let mut restored = GameKernelV7::from_snapshot(
         snapshot,

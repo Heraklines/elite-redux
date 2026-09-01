@@ -6,6 +6,7 @@ use er_game::m9e_material_v6::{AppliedGameMaterialLedgerV1, GamePlatformEffectV2
 use er_game::m72_bootstrap::RunBootstrapMachineV1;
 use er_protocol::ProtocolRuntimeSnapshotV2;
 use er_state::m9e_state_v6::GameStateV6;
+use er_types::battle_ids::MenuInstanceId;
 use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::{
     GameControlKindV2, GameControlPlanV2, PhysicalKey, PlatformRequestId, PresentationEventId,
@@ -60,6 +61,7 @@ pub struct CoreGameKernelSnapshotV7 {
     pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
+    pub next_menu_instance_id: MenuInstanceId,
     pub protocol: Option<ProtocolRuntimeSnapshotV2>,
     pub pending_presentations: BTreeMap<PresentationEventId, PendingPresentationV3>,
     pub pending_platform: BTreeMap<PlatformRequestId, PendingPlatformRequestV2>,
@@ -79,6 +81,7 @@ pub enum SnapshotV7Error {
 impl CoreGameKernelSnapshotV7 {
     pub fn validate(&self, content: &PreparedGameContentV2) -> Result<(), SnapshotV7Error> {
         if self.schema_version != CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7
+            || self.next_menu_instance_id == MenuInstanceId::ZERO
             || self.prepared_transaction.is_some()
             || self.pending_presentations.len() > MAX_PENDING_PRESENTATIONS_V7
             || self.pending_platform.len() > MAX_PENDING_PLATFORM_REQUESTS_V7
@@ -142,6 +145,11 @@ impl CoreGameKernelSnapshotV7 {
                 }
             }
         }
+        if current_menu_instance(&self.lifecycle)
+            .is_some_and(|instance| instance >= self.next_menu_instance_id)
+        {
+            return Err(SnapshotV7Error::Invalid);
+        }
         Ok(())
     }
 
@@ -156,6 +164,7 @@ impl CoreGameKernelSnapshotV7 {
         {
             return Err(SnapshotV7Error::Migration);
         }
+        let next_menu_instance_id = next_menu_instance_from_v6(&source)?;
         let state = GameStateV6::migrate_from_v5(source.game_state, content.identity().clone())
             .map_err(|_| SnapshotV7Error::Migration)?;
         state
@@ -190,6 +199,7 @@ impl CoreGameKernelSnapshotV7 {
             material_ledger: AppliedGameMaterialLedgerV1::new(next_revision)
                 .map_err(|_| SnapshotV7Error::Migration)?,
             authority_ai: None,
+            next_menu_instance_id,
             replay_sequence: source.replay_sequence,
             prepared_transaction: None,
         };
@@ -214,7 +224,7 @@ fn validate_active_state(
         return Err(SnapshotV7Error::Invalid);
     }
     if let Some(run) = &state.active_run {
-        if snapshot.material_ledger.next_authority_revision <= run.control.revision {
+        if snapshot.material_ledger.next_authority_revision < run.control.revision {
             return Err(SnapshotV7Error::Invalid);
         }
     }
@@ -243,6 +253,72 @@ fn platform_request_id(effect: &GamePlatformEffectV2) -> PlatformRequestId {
         | GamePlatformEffectV2::Telemetry { request, .. }
         | GamePlatformEffectV2::ReproReady { request, .. } => *request,
     }
+}
+
+fn current_menu_instance(lifecycle: &GameKernelLifecycleSnapshotV7) -> Option<MenuInstanceId> {
+    match lifecycle {
+        GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
+            Some(bootstrap.menu_instance_high_water)
+        }
+        GameKernelLifecycleSnapshotV7::Active(state) => state
+            .active_run
+            .as_ref()
+            .and_then(|run| run.control.menu.as_ref())
+            .map(|menu| menu.instance_id),
+        GameKernelLifecycleSnapshotV7::Terminal { control, .. } => {
+            control.menu.as_ref().map(|menu| menu.instance_id)
+        }
+    }
+}
+
+fn next_menu_instance_from_v6(
+    source: &RestorableKernelSnapshotV6,
+) -> Result<MenuInstanceId, SnapshotV7Error> {
+    let mut maximum = source
+        .game_state
+        .active_run
+        .as_ref()
+        .and_then(|run| run.control.menu.as_ref())
+        .map(|menu| menu.instance_id.get())
+        .unwrap_or(SafeU53::ZERO);
+    for candidate in source
+        .input_router
+        .pressed
+        .iter()
+        .filter_map(|pressed| pressed.menu_instance_id)
+        .chain(
+            source
+                .input_router
+                .held_buttons
+                .iter()
+                .map(|held| held.menu_instance_id),
+        )
+        .chain(
+            source
+                .input_router
+                .locks
+                .iter()
+                .map(|lock| lock.menu_instance_id),
+        )
+        .chain(
+            source
+                .input_router
+                .repeats
+                .iter()
+                .map(|repeat| repeat.menu_instance_id),
+        )
+    {
+        if candidate.get() > maximum {
+            maximum = candidate.get();
+        }
+    }
+    let next = maximum
+        .get()
+        .checked_add(1)
+        .ok_or(SnapshotV7Error::Migration)?;
+    SafeU53::new(next)
+        .map(MenuInstanceId::new)
+        .map_err(|_| SnapshotV7Error::Migration)
 }
 
 fn valid_platform_effect(effect: &GamePlatformEffectV2) -> bool {

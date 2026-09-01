@@ -238,6 +238,29 @@ pub fn fusion_control(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn generic_vertical_control_v2(
+    instance: MenuInstanceId,
+    revision: SafeU53,
+    seat: SeatId,
+    operation_id: OperationId,
+    kind: GameControlKindV2,
+    control_id: &str,
+    entries: &[(String, GameActionV1)],
+    cancel: GameMenuCancelV2,
+) -> Result<GameControlPlanV2, ProgressionControlError> {
+    vertical_control(
+        instance,
+        revision,
+        seat,
+        operation_id,
+        kind,
+        control_id,
+        entries,
+        cancel,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn vertical_control(
     instance: MenuInstanceId,
     revision: SafeU53,

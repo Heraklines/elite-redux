@@ -91,7 +91,7 @@ fn new_run_material(
         after_state,
         next_control: GameControlPlanV2 {
             schema_version: GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
-            revision: authority_revision,
+            revision: safe(revision + 1),
             kind: GameControlKindV2::Title,
             owner_seat: None,
             action_context: None,

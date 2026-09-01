@@ -23,7 +23,7 @@ use er_state::m7_state::{
 use er_state::m9e_state_v6::{
     GAME_STATE_SCHEMA_VERSION_V6, GameIdentityAllocatorStateV1, GameStateV6,
 };
-use er_types::battle_ids::WaveIndex;
+use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::{
     GAME_CONTROL_PLAN_SCHEMA_VERSION_V2, GameContentIdentity, GameControlKindV2, GameControlPlanV2,
@@ -98,6 +98,7 @@ fn active_snapshot(
         input_router: input(),
         scheduler: scheduler(),
         protocol: None,
+        next_menu_instance_id: MenuInstanceId::new(safe(1)),
         pending_presentations: BTreeMap::new(),
         pending_platform: BTreeMap::new(),
         material_ledger: AppliedGameMaterialLedgerV1::new(safe(1))?,
