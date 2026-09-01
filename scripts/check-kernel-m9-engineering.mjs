@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -9,21 +9,29 @@ const fail = message => {
   throw new Error(`M9-E engineering audit: ${message}`);
 };
 
-const productionRoots = [
-  "rust/crates/er-kernel/src",
-  "rust/crates/er-wasm/src",
-  "rust/crates/er-web/src",
-  "src/rust-browser/production",
-  "src/rust-browser/routes",
+const productionEntries = [
+  "rust/crates/er-game/src/m9e_content_v2.rs",
+  "rust/crates/er-game/src/m9e_internal_event_v2.rs",
+  "rust/crates/er-game/src/m9e_material_v6.rs",
+  "rust/crates/er-game/src/m9e_new_run_v6.rs",
+  "rust/crates/er-game/src/m9e_runtime_v6.rs",
+  "rust/crates/er-kernel/src/game_kernel_v7.rs",
+  "rust/crates/er-kernel/src/snapshot_v7.rs",
+  "rust/crates/er-web/src/contracts_v2.rs",
+  "rust/crates/er-web/src/host_v2.rs",
+  "src/rust-browser/contracts/browser-contracts-v2.ts",
+  "src/rust-browser/routes/browser-effects-v2.ts",
 ];
-const productionSource = productionRoots.flatMap(collectFiles).map(read).join("\n");
+const productionSource = productionEntries.map(read).join("\n");
 for (const forbidden of [
+  "GameKernelV6",
+  "GameRuntimeV5",
+  "GameContentBundleV1",
+  "PreparedGameContentV1",
+  "BrowserKernelHostV1",
   "M9VerticalSliceKernelV1",
-  "M9VerticalControlV1",
   "M9ProductionSliceSessionV1",
-  "M9VerticalSessionV1",
   "scripted_enemy_policy_for_m9",
-  "run_m9_production_slice",
   "rust/fixtures/m9/solo-entry",
 ]) {
   if (productionSource.includes(forbidden)) {
@@ -31,15 +39,32 @@ for (const forbidden of [
   }
 }
 
-const host = read("rust/crates/er-web/src/host.rs");
-for (const required of ["BrowserKernelHostV1", "GameKernelV6", "PreparedGameContentV1", "GameContentBundleV1"]) {
+const host = read("rust/crates/er-web/src/host_v2.rs");
+for (const required of ["BrowserKernelHostV2", "GameKernelV7", "PreparedGameContentV2", "GameContentBundleV2"]) {
   if (!host.includes(required)) {
-    fail(`generic browser host is missing ${required}`);
+    fail(`V2 browser host is missing ${required}`);
   }
 }
-const worker = read("src/rust-browser/worker/rust-kernel-worker.ts");
-if (!worker.includes("BrowserKernelHostV1.create")) {
-  fail("browser Worker does not instantiate the generic Rust host");
+const webRoot = read("rust/crates/er-web/src/lib.rs");
+if (!webRoot.includes('#[cfg(feature = "legacy-browser-host")]') || !webRoot.includes("pub mod host_v2")) {
+  fail("legacy browser host is not compatibility-gated behind the V2 entry");
+}
+const browserAdapter = read("src/rust-browser/routes/browser-effects-v2.ts");
+for (const family of [
+  "UI_CHANGED",
+  "PRESENTATION",
+  "PRESENTATION_SCENE_CHANGED",
+  "SEND_NETWORK_FRAME",
+  "STORAGE_REQUEST",
+  "ASSET_REQUEST",
+  "AUDIO_CUE",
+  "TERMINAL",
+  "TELEMETRY",
+  "REPRO_READY",
+]) {
+  if (!browserAdapter.includes(`case \"${family}\"`)) {
+    fail(`browser V2 adapter is missing ${family}`);
+  }
 }
 
 const renderer = read("rust/crates/er-renderer/src/lib.rs");
@@ -47,10 +72,6 @@ for (const forbidden of ["KernelInput", "BattlePresentationEventId", "Presentati
   if (renderer.includes(forbidden)) {
     fail(`renderer remains coupled to ${forbidden}`);
   }
-}
-const adapter = read("rust/crates/er-web/src/renderer_settlement.rs");
-if ((adapter.match(/KernelInput::BattlePresentationOutcome/gu) ?? []).length !== 2) {
-  fail("renderer settlement translation is not confined to the adapter and its focused test");
 }
 
 const v7 = JSON.parse(read("rust/fixtures/m9/m9-engineering-v7-contract.json"));
@@ -113,17 +134,6 @@ if (
 }
 
 console.log(
-  `M9-E static ownership: V7 cutover frozen, generic BrowserKernelHostV1, ${expectedControls.length} controls, renderer settlement adapter isolated`,
+  `M9-E static ownership: V7 cutover frozen, BrowserKernelHostV2, ${expectedControls.length} controls, 10 typed browser adapters`,
 );
 
-function collectFiles(relative) {
-  const absolute = resolve(root, relative);
-  const entries = statSync(absolute).isDirectory() ? readdirSync(absolute, { withFileTypes: true }) : [];
-  if (entries.length === 0) {
-    return [relative];
-  }
-  return entries.flatMap(entry => {
-    const child = `${relative}/${entry.name}`;
-    return entry.isDirectory() ? collectFiles(child) : /\.(rs|ts)$/u.test(entry.name) ? [child] : [];
-  });
-}

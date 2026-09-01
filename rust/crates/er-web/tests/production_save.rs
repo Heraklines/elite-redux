@@ -1,3 +1,5 @@
+#![cfg(feature = "legacy-save-migration")]
+
 use er_canonical::canonical_bytes;
 use er_game::m7_content::{GameContentBundleV1, PreparedGameContentV1};
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;

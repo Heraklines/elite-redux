@@ -1,3 +1,5 @@
+#![cfg(feature = "legacy-browser-host")]
+
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::{RunOutcome, SafeU53};
 use er_web::{
