@@ -11,7 +11,7 @@ use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding}
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
-    SCENARIO_RUNTIME_SCHEMA_VERSION_V1, ScenarioRuntimeStateV1,
+    SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioRuntimeStageV2, ScenarioRuntimeStateV2,
 };
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
@@ -379,11 +379,16 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut scenario_snapshot.lifecycle else {
         return Err("snapshot is not active".into());
     };
-    state.active_run.as_mut().ok_or("run missing")?.scenario = Some(ScenarioRuntimeStateV1 {
-        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
+    state.active_run.as_mut().ok_or("run missing")?.scenario = Some(ScenarioRuntimeStateV2 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
         scenario: scenario_id,
         node: entry,
-        flags: Default::default(),
+        stage: ScenarioRuntimeStageV2::Intro,
+        selected_option: None,
+        primary_target: None,
+        secondary_target: None,
+        locals: Default::default(),
+        reserved_pokemon: Vec::new(),
         visit_count: SafeU53::ZERO,
     });
     let mut scenario_host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;

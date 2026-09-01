@@ -13,9 +13,10 @@ use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
 use er_rng::audit::RngReason;
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
-    DexState, InventoryEntryV1, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
-    ProgressionTaskKindV2, ProgressionTaskV2, SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
-    ScenarioRuntimeStateV1,
+    DexState, InventoryEntryV1, M7StateError, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1,
+    ProfileStatistics, ProgressionTaskKindV2, ProgressionTaskV2,
+    SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioLocalValueV2, ScenarioRuntimeStageV2,
+    ScenarioRuntimeStateV2,
 };
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
@@ -439,13 +440,43 @@ fn scenario_choices_apply_source_compiled_graph_effects() -> Result<(), Box<dyn 
     let pokemon = run.party.first_mut().ok_or("party missing")?;
     pokemon.hp = 1;
     let maximum_hp = pokemon.max_hp;
-    run.scenario = Some(ScenarioRuntimeStateV1 {
-        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
+    run.scenario = Some(ScenarioRuntimeStateV2 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
         scenario: scenario.id,
         node: choice_node,
-        flags: Default::default(),
+        stage: ScenarioRuntimeStageV2::Choice,
+        selected_option: None,
+        primary_target: None,
+        secondary_target: None,
+        locals: Default::default(),
+        reserved_pokemon: Vec::new(),
         visit_count: SafeU53::ZERO,
     });
+    let mut empty_local = initial.clone();
+    empty_local
+        .active_run
+        .as_mut()
+        .and_then(|run| run.scenario.as_mut())
+        .ok_or("scenario missing")?
+        .locals
+        .insert(String::new(), ScenarioLocalValueV2::Bool(true));
+    assert!(matches!(
+        empty_local.active_run.as_ref().unwrap().validate(),
+        Err(M7StateError::Scenario("local key is empty"))
+    ));
+    let mut duplicate_reserved = initial.clone();
+    let duplicate = duplicate_reserved.active_run.as_ref().unwrap().party[0].clone();
+    duplicate_reserved
+        .active_run
+        .as_mut()
+        .and_then(|run| run.scenario.as_mut())
+        .ok_or("scenario missing")?
+        .reserved_pokemon
+        .push(duplicate);
+    assert!(matches!(
+        duplicate_reserved.active_run.as_ref().unwrap().validate(),
+        Err(M7StateError::DuplicatePokemon(_))
+    ));
     let (restored_kernel, _) = execute(
         initial.clone(),
         content.clone(),
@@ -697,11 +728,16 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
             })
         })
         .ok_or("scenario completion node missing")?;
-    scenario.active_run.as_mut().unwrap().scenario = Some(ScenarioRuntimeStateV1 {
-        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
+    scenario.active_run.as_mut().unwrap().scenario = Some(ScenarioRuntimeStateV2 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
         scenario: scenario_id,
         node: entry,
-        flags: Default::default(),
+        stage: ScenarioRuntimeStageV2::Complete,
+        selected_option: None,
+        primary_target: None,
+        secondary_target: None,
+        locals: Default::default(),
+        reserved_pokemon: Vec::new(),
         visit_count: SafeU53::ZERO,
     });
     let (scenario, _) = execute(

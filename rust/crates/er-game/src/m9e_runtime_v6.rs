@@ -13,7 +13,9 @@ use er_scenario::runtime_v2::{
     SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioControlV2, ScenarioDomainFactoryV2,
     ScenarioInputV2, ScenarioRuntimeV2,
 };
-use er_state::m7_state::{GameStateV5, ProgressionTaskKindV2, ProgressionTaskV2};
+use er_state::m7_state::{
+    GameStateV5, ProgressionTaskKindV2, ProgressionTaskV2, ScenarioRuntimeStageV2,
+};
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommandOffer, BattleCommandProposalV1, CommandAdmissionSource,
@@ -1124,7 +1126,7 @@ fn execute_scenario(
         schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
         scenario: current.scenario,
         current_node: current.node,
-        selected_option: None,
+        selected_option: current.selected_option,
         completed_outcome: None,
     };
     let mut compiled_effects = Vec::new();
@@ -1176,6 +1178,28 @@ fn execute_scenario(
             return Err(GameRuntimeV6Error::Action);
         }
     };
+    let stage = match factory
+        .control(&runtime)
+        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?
+    {
+        ScenarioControlV2::Message { .. } => ScenarioRuntimeStageV2::Intro,
+        ScenarioControlV2::Choice { .. } => ScenarioRuntimeStageV2::Choice,
+        ScenarioControlV2::ExecuteOption {
+            primary_party_target,
+            secondary_party_target,
+            nested_battle,
+            ..
+        } => {
+            if primary_party_target || secondary_party_target {
+                ScenarioRuntimeStageV2::AwaitingTarget
+            } else if nested_battle {
+                ScenarioRuntimeStageV2::AwaitingBattle
+            } else {
+                ScenarioRuntimeStageV2::ApplyOption
+            }
+        }
+        ScenarioControlV2::Complete { .. } => ScenarioRuntimeStageV2::Complete,
+    };
     let run = candidate
         .active_run
         .as_mut()
@@ -1183,6 +1207,8 @@ fn execute_scenario(
     apply_scenario_effects(run, &compiled_effects);
     let scenario = run.scenario.as_mut().ok_or(GameRuntimeV6Error::Action)?;
     scenario.node = runtime.current_node;
+    scenario.stage = stage;
+    scenario.selected_option = runtime.selected_option;
     scenario.visit_count = safe_increment(scenario.visit_count)?;
     if complete {
         run.scenario = None;

@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use er_state::m7_state::{
     GameStateV5, InventoryEntryV1, RunModifierInstanceV2, RunStateV3,
-    SCENARIO_RUNTIME_SCHEMA_VERSION_V1, ScenarioRuntimeStateV1, StoredPokemonV1,
+    SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioRuntimeStageV2, ScenarioRuntimeStateV2,
+    StoredPokemonV1,
 };
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_types::battle_ids::PokemonId;
@@ -439,11 +440,16 @@ fn dispatch_operation<C: RunExecutionContentV1>(
                 .active_run
                 .as_mut()
                 .ok_or(RunExecutionError::Operation)?
-                .scenario = Some(ScenarioRuntimeStateV1 {
-                schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
+                .scenario = Some(ScenarioRuntimeStateV2 {
+                schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
                 scenario: *scenario,
                 node: entry,
-                flags: Default::default(),
+                stage: ScenarioRuntimeStageV2::Intro,
+                selected_option: None,
+                primary_target: None,
+                secondary_target: None,
+                locals: Default::default(),
+                reserved_pokemon: Vec::new(),
                 visit_count: SafeU53::ZERO,
             });
         }

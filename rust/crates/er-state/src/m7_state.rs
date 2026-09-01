@@ -6,14 +6,14 @@ use er_rng::battle::BattleRngState;
 use er_rng::phaser::RunRngState;
 use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{
-    BattleFormat, BattleId, BattleSide, FaintOccurrenceId, GameModeId, PokemonId, SpeciesId,
-    TurnIndex, WaveIndex,
+    AbilityId, BattleFormat, BattleId, BattleSide, FaintOccurrenceId, GameModeId, MoveId,
+    PokemonId, SpeciesId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
     ArenaConditionState, BattleOutcome, FaintOccurrence, GlobalAbilitySuppressionState,
     PokemonType, TerrainState, WeatherKind, WeatherState,
 };
-use er_types::run_ids::{BiomeId, Experience, GameRunId, Money, RouteNodeId};
+use er_types::run_ids::{BiomeId, Experience, GameRunId, Money, NatureId, RouteNodeId};
 use er_types::run_model::RunOutcome;
 use er_types::{
     AchievementId, ChallengeId, EvolutionId, FactionId, GameContentIdentity, GameControlKindV2,
@@ -40,7 +40,7 @@ pub const BATTLE_STATE_SCHEMA_VERSION_V5: u32 = 5;
 pub const PROFILE_STATE_SCHEMA_VERSION_V1: u32 = 1;
 pub const INVENTORY_STATE_SCHEMA_VERSION_V1: u32 = 1;
 pub const WORLD_STATE_SCHEMA_VERSION_V1: u32 = 1;
-pub const SCENARIO_RUNTIME_SCHEMA_VERSION_V1: u32 = 1;
+pub const SCENARIO_RUNTIME_SCHEMA_VERSION_V2: u32 = 2;
 
 mod ordered_map_serde {
     use std::collections::BTreeMap;
@@ -294,14 +294,53 @@ pub struct WorldStateV1 {
     pub fairy_luck_expiry_wave: Option<WaveIndex>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ScenarioRuntimeStageV2 {
+    Intro,
+    Choice,
+    PreOption,
+    ApplyOption,
+    PostOption,
+    AwaitingTarget,
+    AwaitingBattle,
+    AwaitingReward,
+    Continuous,
+    Complete,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
+pub enum ScenarioLocalValueV2 {
+    Bool(bool),
+    Unsigned(SafeU53),
+    Signed(i64),
+    Text(String),
+    Pokemon(PokemonId),
+    Move(MoveId),
+    Nature(NatureId),
+    Ability(AbilityId),
+    Species(SpeciesId),
+    InventoryItem(InventoryItemId),
+    Biome(BiomeId),
+    UnsignedList(Vec<SafeU53>),
+    TextList(Vec<String>),
+    PokemonList(Vec<PokemonId>),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ScenarioRuntimeStateV1 {
+pub struct ScenarioRuntimeStateV2 {
     pub schema_version: u32,
     pub scenario: ScenarioId,
     pub node: ScenarioNodeId,
+    pub stage: ScenarioRuntimeStageV2,
+    pub selected_option: Option<u8>,
+    pub primary_target: Option<PokemonId>,
+    pub secondary_target: Option<PokemonId>,
     #[serde(with = "ordered_map_serde")]
-    pub flags: BTreeMap<RunFlagId, bool>,
+    pub locals: BTreeMap<String, ScenarioLocalValueV2>,
+    pub reserved_pokemon: Vec<PokemonStateV5>,
     pub visit_count: SafeU53,
 }
 
@@ -391,7 +430,7 @@ pub struct RunStateV3 {
     pub modifiers: Vec<RunModifierInstanceV2>,
     pub money: Money,
     pub world: WorldStateV1,
-    pub scenario: Option<ScenarioRuntimeStateV1>,
+    pub scenario: Option<ScenarioRuntimeStateV2>,
     pub quests: QuestStateV1,
     pub factions: FactionStateV1,
     pub progression_queue: ProgressionQueueV2,
@@ -449,6 +488,8 @@ pub enum M7StateError {
     OutcomeControl,
     #[error("world state is invalid: {0}")]
     World(&'static str),
+    #[error("scenario runtime state is invalid: {0}")]
+    Scenario(&'static str),
 }
 
 impl PokemonStateV5 {
@@ -596,10 +637,13 @@ impl RunStateV3 {
         validate_world(&self.world, self.wave)?;
         if let Some(scenario) = &self.scenario {
             require_schema(
-                "ScenarioRuntimeStateV1",
+                "ScenarioRuntimeStateV2",
                 scenario.schema_version,
-                SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
+                SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
             )?;
+            if scenario.locals.keys().any(String::is_empty) {
+                return Err(M7StateError::Scenario("local key is empty"));
+            }
         }
         let mut ids = BTreeSet::new();
         for pokemon in &self.party {
@@ -626,6 +670,36 @@ impl RunStateV3 {
                 if !ids.insert(fusion.partner.id) {
                     return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
                 }
+            }
+        }
+        if let Some(scenario) = &self.scenario {
+            for pokemon in &scenario.reserved_pokemon {
+                pokemon.validate()?;
+                if !ids.insert(pokemon.id) {
+                    return Err(M7StateError::DuplicatePokemon(pokemon.id));
+                }
+                if let Some(fusion) = &pokemon.fusion {
+                    if !ids.insert(fusion.partner.id) {
+                        return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
+                    }
+                }
+            }
+            if scenario
+                .primary_target
+                .into_iter()
+                .chain(scenario.secondary_target)
+                .any(|pokemon| !ids.contains(&pokemon))
+            {
+                return Err(M7StateError::Scenario("selected target is unknown"));
+            }
+            if scenario.locals.values().any(|value| match value {
+                ScenarioLocalValueV2::Pokemon(pokemon) => !ids.contains(pokemon),
+                ScenarioLocalValueV2::PokemonList(pokemon) => {
+                    pokemon.iter().any(|pokemon| !ids.contains(pokemon))
+                }
+                _ => false,
+            }) {
+                return Err(M7StateError::Scenario("local Pokémon reference is unknown"));
             }
         }
         validate_inventory(&self.inventory)?;
