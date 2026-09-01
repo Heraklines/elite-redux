@@ -76,6 +76,7 @@ pub fn construct_natural_run_v6(
     let run_id = identities
         .allocate_run_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let mut rng = RngRuntime::from_run_seed(&bootstrap.seed);
     let mut party = Vec::with_capacity(bootstrap.selections.starters.len());
     for starter in &bootstrap.selections.starters {
         let pokemon_id = identities
@@ -83,6 +84,7 @@ pub fn construct_natural_run_v6(
             .map_err(|_| NaturalRunV6Error::Exhausted)?;
         party.push(pokemon(
             content,
+            &mut rng,
             pokemon_id,
             Some(starter.owner_seat),
             er_types::battle_ids::SpeciesId::new(starter.species_id),
@@ -94,18 +96,13 @@ pub fn construct_natural_run_v6(
         .world
         .biome(mode.starting_biome)
         .ok_or(NaturalRunV6Error::Invalid)?;
-    let enemy_species = biome
-        .pokemon_pools
-        .iter()
-        .flat_map(|pool| &pool.species)
-        .next()
-        .copied()
-        .ok_or(NaturalRunV6Error::Invalid)?;
+    let enemy_species = select_encounter_species(biome, &mut rng)?;
     let enemy_id = identities
         .allocate_pokemon_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let enemy = pokemon(
         content,
+        &mut rng,
         enemy_id,
         None,
         enemy_species,
@@ -117,7 +114,6 @@ pub fn construct_natural_run_v6(
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let wave = WaveIndex::new(safe(1)?).map_err(|_| NaturalRunV6Error::Invalid)?;
     let battle_seed = format!("{}:battle:1", bootstrap.seed);
-    let mut rng = RngRuntime::from_run_seed(&bootstrap.seed);
     let battle_rng = rng
         .initialize_battle(&battle_seed, wave)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
@@ -252,7 +248,7 @@ pub fn expand_cooperative_topology_v6(
     state
         .validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    let (mode_id, biome_id, player_species, enemy_species) = {
+    let (mode_id, biome_id, player_species, enemy_species, run_rng) = {
         let run = state
             .active_run
             .as_ref()
@@ -281,6 +277,7 @@ pub fn expand_cooperative_topology_v6(
                 .map(|pokemon| pokemon.species_id)
                 .ok_or(NaturalRunV6Error::Invalid)?,
             battle.enemy_party[0].species_id,
+            run.run_rng.clone(),
         )
     };
     let mode = content
@@ -304,12 +301,15 @@ pub fn expand_cooperative_topology_v6(
         .flat_map(|pool| pool.species.iter().copied())
         .find(|species| *species != enemy_species)
         .ok_or(NaturalRunV6Error::Invalid)?;
+    let mut rng = RngRuntime::from_states(run_rng, None)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     let partner_id = state
         .identities
         .allocate_pokemon_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let partner = pokemon(
         content,
+        &mut rng,
         partner_id,
         Some(partner_seat),
         partner_starter.species_id,
@@ -322,6 +322,7 @@ pub fn expand_cooperative_topology_v6(
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let partner_enemy = pokemon(
         content,
+        &mut rng,
         partner_enemy_id,
         None,
         partner_enemy_species,
@@ -332,6 +333,7 @@ pub fn expand_cooperative_topology_v6(
         .active_run
         .as_mut()
         .ok_or(NaturalRunV6Error::Invalid)?;
+    run.run_rng = rng.run_state();
     let battle = run.battle.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
     let player_id = run
         .party
@@ -417,35 +419,9 @@ pub fn advance_to_next_encounter_v6(
         .world
         .biome(biome_id)
         .ok_or(NaturalRunV6Error::Invalid)?;
-    let mut candidates = biome
-        .pokemon_pools
-        .iter()
-        .filter(|pool| pool.tier == 0 && pool.time_of_day == -1)
-        .flat_map(|pool| pool.species.iter().copied())
-        .collect::<Vec<_>>();
-    if candidates.is_empty() {
-        candidates.extend(
-            biome
-                .pokemon_pools
-                .iter()
-                .flat_map(|pool| pool.species.iter().copied()),
-        );
-    }
-    candidates.sort_unstable();
-    candidates.dedup();
-    if candidates.is_empty() {
-        return Err(NaturalRunV6Error::Invalid);
-    }
     let mut rng = RngRuntime::from_states(run_rng, None)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    let selected = rng
-        .run_pick_index(
-            candidates.len(),
-            RngReason::RandomSelector,
-            RngCallsiteId::mechanics(RngReason::RandomSelector),
-        )
-        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    let enemy_species = candidates[selected];
+    let enemy_species = select_encounter_species(biome, &mut rng)?;
     let mode = content
         .world
         .mode(mode_id)
@@ -460,7 +436,7 @@ pub fn advance_to_next_encounter_v6(
         .identities
         .allocate_pokemon_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
-    let enemy = pokemon(content, enemy_id, None, enemy_species, 0, level)?;
+    let enemy = pokemon(content, &mut rng, enemy_id, None, enemy_species, 0, level)?;
     let battle_id = next
         .identities
         .allocate_battle_id()
@@ -534,8 +510,69 @@ pub fn advance_to_next_encounter_v6(
     Ok((next, audit))
 }
 
+fn select_encounter_species(
+    biome: &er_world::content_v2::BiomeDefinitionV2,
+    rng: &mut RngRuntime,
+) -> Result<er_types::battle_ids::SpeciesId, NaturalRunV6Error> {
+    let tier_roll = rng
+        .run_rand_seed_int(
+            safe(512)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?
+        .get();
+    let mut tier = if tier_roll >= 156 {
+        0_i16
+    } else if tier_roll >= 32 {
+        1
+    } else if tier_roll >= 6 {
+        2
+    } else if tier_roll >= 1 {
+        3
+    } else {
+        4
+    };
+    let candidates = loop {
+        let mut candidates = biome
+            .pokemon_pools
+            .iter()
+            .filter(|pool| pool.tier == tier && pool.time_of_day == -1)
+            .flat_map(|pool| pool.species.iter().copied())
+            .collect::<Vec<_>>();
+        if candidates.is_empty() {
+            candidates.extend(
+                biome
+                    .pokemon_pools
+                    .iter()
+                    .filter(|pool| pool.tier == tier)
+                    .flat_map(|pool| pool.species.iter().copied()),
+            );
+        }
+        candidates.sort_unstable();
+        candidates.dedup();
+        if !candidates.is_empty() || tier == 0 {
+            break candidates;
+        }
+        tier -= 1;
+    };
+    if candidates.is_empty() {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let selected = rng
+        .run_pick_index(
+            candidates.len(),
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    Ok(candidates[selected])
+}
+
 fn pokemon(
     content: &PreparedGameContentV2,
+    rng: &mut RngRuntime,
     id: er_types::battle_ids::PokemonId,
     owner_seat: Option<SeatId>,
     species_id: er_types::battle_ids::SpeciesId,
@@ -571,8 +608,33 @@ fn pokemon(
         .get(usize::from(level.saturating_sub(1)))
         .copied()
         .ok_or(NaturalRunV6Error::Invalid)?;
-    let iv = Iv::new(15).map_err(|_| NaturalRunV6Error::Invalid)?;
-    let stats = stats(base, level, iv.get())?;
+    let mut ivs = [Iv::new(0).map_err(|_| NaturalRunV6Error::Invalid)?; 6];
+    for iv in &mut ivs {
+        let draw = rng
+            .run_integer_in_range(
+                SafeU53::ZERO,
+                safe(31)?,
+                RngReason::RandomStat,
+                RngCallsiteId::mechanics(RngReason::RandomStat),
+            )
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        *iv = Iv::new(u8::try_from(draw.get()).map_err(|_| NaturalRunV6Error::Invalid)?)
+            .map_err(|_| NaturalRunV6Error::Invalid)?;
+    }
+    let nature_index = rng
+        .run_pick_index(
+            content.progression.pack().natures.len(),
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let nature = content
+        .progression
+        .pack()
+        .natures
+        .get(nature_index)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let stats = stats(base, level, &ivs, nature)?;
     let moves = progression
         .level_moves
         .iter()
@@ -633,10 +695,10 @@ fn pokemon(
             active_suppressed: false,
             passive_suppressed: [false; 3],
         },
-        ivs: [iv; 6],
+        ivs,
         gender: None,
-        nature: er_types::run_ids::NatureId::ZERO,
-        effective_nature: er_types::run_ids::NatureId::ZERO,
+        nature: nature.id,
+        effective_nature: nature.id,
         friendship: progression.base_friendship,
         permanent_bonuses: PermanentStatBonuses {
             hp: 0,
@@ -665,32 +727,46 @@ fn pokemon(
 fn stats(
     base: er_content::species::SpeciesBaseStats,
     level: u16,
-    iv: u8,
+    ivs: &[Iv; 6],
+    nature: &er_progression::NatureDefinitionV1,
 ) -> Result<BattleStats, NaturalRunV6Error> {
-    let regular = |base: u32| {
-        (base
+    let regular = |base: u32, iv: Iv, stat: er_types::battle_model::BattleStat| {
+        let raw = (base
             .checked_mul(2)?
-            .checked_add(u32::from(iv))?
+            .checked_add(u32::from(iv.get()))?
             .checked_mul(u32::from(level))?
             / 100)
-            .checked_add(5)
+            .checked_add(5)?;
+        if nature.increased_stat == Some(stat) && nature.decreased_stat != Some(stat) {
+            raw.checked_mul(110).map(|value| value / 100)
+        } else if nature.decreased_stat == Some(stat) && nature.increased_stat != Some(stat) {
+            raw.checked_mul(90).map(|value| value / 100)
+        } else {
+            Some(raw)
+        }
     };
     let hp = base
         .hp
         .checked_mul(2)
-        .and_then(|value| value.checked_add(u32::from(iv)))
+        .and_then(|value| value.checked_add(u32::from(ivs[0].get())))
         .and_then(|value| value.checked_mul(u32::from(level)))
         .map(|value| value / 100)
         .and_then(|value| value.checked_add(u32::from(level)))
         .and_then(|value| value.checked_add(10))
         .ok_or(NaturalRunV6Error::Exhausted)?;
+    use er_types::battle_model::BattleStat;
     Ok(BattleStats {
         hp,
-        attack: regular(base.attack).ok_or(NaturalRunV6Error::Exhausted)?,
-        defense: regular(base.defense).ok_or(NaturalRunV6Error::Exhausted)?,
-        special_attack: regular(base.special_attack).ok_or(NaturalRunV6Error::Exhausted)?,
-        special_defense: regular(base.special_defense).ok_or(NaturalRunV6Error::Exhausted)?,
-        speed: regular(base.speed).ok_or(NaturalRunV6Error::Exhausted)?,
+        attack: regular(base.attack, ivs[1], BattleStat::Attack)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
+        defense: regular(base.defense, ivs[2], BattleStat::Defense)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
+        special_attack: regular(base.special_attack, ivs[3], BattleStat::SpecialAttack)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
+        special_defense: regular(base.special_defense, ivs[4], BattleStat::SpecialDefense)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
+        speed: regular(base.speed, ivs[5], BattleStat::Speed)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
     })
 }
 

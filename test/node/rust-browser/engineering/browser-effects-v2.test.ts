@@ -89,7 +89,7 @@ describe("BrowserEffectRouterV2", () => {
           terminal: { terminal_id: "terminal/1", reason: "VICTORY" },
         },
         { kind: "TELEMETRY", event: "ACTION_APPLIED" },
-        { kind: "REPRO_READY", snapshot: { schema_version: 7 } },
+        { kind: "REPRO_READY", snapshot: { schema_version: 7 }, inputs: [] },
       ],
     };
 

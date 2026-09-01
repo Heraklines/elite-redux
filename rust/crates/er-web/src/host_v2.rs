@@ -8,16 +8,20 @@ use er_game::m9e_content_v2::{
     GameContentBundleV2, PreparedGameContentV2, PresentationSemanticIdV1,
 };
 use er_game::m9e_material_v6::{GamePlatformEffectV2, GameTelemetryEventV2};
-use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelStepV7, GameKernelV7};
+use er_kernel::game_kernel_v7::{
+    GameKernelEffectV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2,
+    KernelStorageResultV2,
+};
 use er_types::{SafeU53, ScenarioId};
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
 use crate::contracts_v2::{
     BROWSER_WORKER_PROTOCOL_VERSION_V2, BrowserEffectBatchV2, BrowserEffectV2,
-    BrowserLifecycleEventV2, BrowserRequestEnvelopeV2, BrowserRequestV2, BrowserResponseEnvelopeV2,
-    BrowserResponseV2, BrowserSessionInitializationV2, BrowserStorageRequestKindV2,
-    BrowserStorageRequestV2, MAXIMUM_BROWSER_REQUEST_BYTES_V2, MAXIMUM_BROWSER_RESPONSE_BYTES_V2,
+    BrowserLifecycleEventV2, BrowserPresentationOutcomeV2, BrowserRequestEnvelopeV2,
+    BrowserRequestV2, BrowserResponseEnvelopeV2, BrowserResponseV2, BrowserSessionInitializationV2,
+    BrowserStorageRequestKindV2, BrowserStorageRequestV2, BrowserStorageResultV2,
+    MAXIMUM_BROWSER_REQUEST_BYTES_V2, MAXIMUM_BROWSER_RESPONSE_BYTES_V2,
 };
 
 const MAXIMUM_RETAINED_REQUESTS_V2: usize = 2_048;
@@ -49,6 +53,8 @@ pub struct BrowserKernelHostV2 {
     next_sequence: SafeU53,
     generation: SafeU53,
     retained: BTreeMap<SafeU53, RetainedBrowserRequestV2>,
+    repro_base: Option<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>,
+    repro_inputs: Vec<er_types::RawInputEvent>,
     disposed: bool,
 }
 
@@ -83,6 +89,8 @@ impl BrowserKernelHostV2 {
             next_sequence: SafeU53::ZERO,
             generation: safe_one(),
             retained: BTreeMap::new(),
+            repro_base: None,
+            repro_inputs: Vec::new(),
             disposed: false,
         }
     }
@@ -113,7 +121,9 @@ impl BrowserKernelHostV2 {
             return Err(BrowserWebErrorV2::Invalid);
         }
         let mut staged = self.clone();
+        let repro_request = envelope.request.clone();
         let response = staged.process_request(envelope.request)?;
+        staged.update_repro(&repro_request)?;
         let response = BrowserResponseEnvelopeV2 {
             version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
             request_id: envelope.request_id,
@@ -180,41 +190,101 @@ impl BrowserKernelHostV2 {
                     .map_err(kernel_error)?;
                 self.effects(step)
             }
-            BrowserRequestV2::PresentationSettled { event_id } => {
+            BrowserRequestV2::AdvanceTime { milliseconds } => {
+                let step = self
+                    .kernel_mut()?
+                    .advance_time(milliseconds)
+                    .map_err(kernel_error)?;
+                self.effects(step)
+            }
+            BrowserRequestV2::NetworkFrame { generation, bytes } => {
+                if generation != self.generation {
+                    return Err(BrowserWebErrorV2::Invalid);
+                }
+                let step = self
+                    .kernel_mut()?
+                    .ingest_network_frame(er_types::ConnectionGeneration::new(generation), &bytes)
+                    .map_err(kernel_error)?;
+                self.effects(step)
+            }
+            BrowserRequestV2::TransportChanged {
+                generation,
+                connected,
+            } => {
+                if generation < self.generation {
+                    return Err(BrowserWebErrorV2::Invalid);
+                }
                 self.kernel_mut()?
-                    .settle_presentation(event_id)
+                    .transport_changed(er_types::ConnectionGeneration::new(generation), connected)
+                    .map_err(kernel_error)?;
+                self.generation = generation;
+                self.effects(GameKernelStepV7::default())
+            }
+            BrowserRequestV2::PresentationSettled { event_id, outcome } => {
+                let outcome = match outcome {
+                    BrowserPresentationOutcomeV2::Settled => KernelPresentationOutcomeV2::Settled,
+                    BrowserPresentationOutcomeV2::IntentionallySkipped => {
+                        KernelPresentationOutcomeV2::IntentionallySkipped
+                    }
+                    BrowserPresentationOutcomeV2::Failed { reason } => {
+                        KernelPresentationOutcomeV2::Failed { reason }
+                    }
+                };
+                self.kernel_mut()?
+                    .settle_presentation_outcome(event_id, outcome)
                     .map_err(kernel_error)?;
                 self.effects(GameKernelStepV7::default())
             }
-            BrowserRequestV2::StorageResult { request_id, .. } => {
-                self.kernel_mut()?
-                    .settle_platform_request(request_id)
+            BrowserRequestV2::StorageResult { request_id, result } => {
+                let result = match result {
+                    BrowserStorageResultV2::Read { bytes } => KernelStorageResultV2::Read { bytes },
+                    BrowserStorageResultV2::Written => KernelStorageResultV2::Written,
+                    BrowserStorageResultV2::Deleted => KernelStorageResultV2::Deleted,
+                    BrowserStorageResultV2::Slots { slots } => {
+                        KernelStorageResultV2::Slots { slots }
+                    }
+                    BrowserStorageResultV2::Failed { reason } => {
+                        KernelStorageResultV2::Failed { reason }
+                    }
+                    BrowserStorageResultV2::Conflict { current_generation } => {
+                        KernelStorageResultV2::Conflict { current_generation }
+                    }
+                    BrowserStorageResultV2::Uncertain { reason } => {
+                        KernelStorageResultV2::Uncertain { reason }
+                    }
+                };
+                let step = self
+                    .kernel_mut()?
+                    .apply_storage_result(request_id, result)
                     .map_err(kernel_error)?;
-                self.effects(GameKernelStepV7::default())
+                self.effects(step)
             }
             BrowserRequestV2::Lifecycle { event } => {
-                if matches!(
-                    event,
+                let input = match event {
                     BrowserLifecycleEventV2::Suspend
-                        | BrowserLifecycleEventV2::Hidden
-                        | BrowserLifecycleEventV2::PageHide
-                ) {
-                    self.kernel_mut()?
-                        .raw_input(er_types::RawInputEvent::WindowBlurred)
-                        .map_err(kernel_error)?;
-                }
-                self.effects(GameKernelStepV7::default())
+                    | BrowserLifecycleEventV2::Hidden
+                    | BrowserLifecycleEventV2::PageHide => er_types::RawInputEvent::WindowBlurred,
+                    BrowserLifecycleEventV2::Resume
+                    | BrowserLifecycleEventV2::Visible
+                    | BrowserLifecycleEventV2::PageShow => er_types::RawInputEvent::WindowFocused,
+                };
+                let step = self.kernel_mut()?.raw_input(input).map_err(kernel_error)?;
+                self.effects(step)
             }
             BrowserRequestV2::Snapshot => Ok(BrowserResponseV2::Snapshot {
                 snapshot: Box::new(self.kernel()?.snapshot().map_err(kernel_error)?),
             }),
             BrowserRequestV2::ExportRepro => {
-                let snapshot = self.kernel()?.snapshot().map_err(kernel_error)?;
+                let snapshot = self
+                    .repro_base
+                    .clone()
+                    .unwrap_or(self.kernel()?.snapshot().map_err(kernel_error)?);
                 Ok(BrowserResponseV2::Effects {
                     batch: BrowserEffectBatchV2 {
                         external_sequence: self.next_sequence,
                         effects: vec![BrowserEffectV2::ReproReady {
                             snapshot: Box::new(snapshot),
+                            inputs: self.repro_inputs.clone(),
                         }],
                     },
                 })
@@ -224,12 +294,25 @@ impl BrowserKernelHostV2 {
                 self.disposed = true;
                 Ok(BrowserResponseV2::Disposed)
             }
-            BrowserRequestV2::AdvanceTime { .. }
-            | BrowserRequestV2::NetworkFrame { .. }
-            | BrowserRequestV2::TransportChanged { .. } => {
-                self.effects(GameKernelStepV7::default())
+        }
+    }
+
+    fn update_repro(&mut self, request: &BrowserRequestV2) -> Result<(), BrowserWebErrorV2> {
+        match request {
+            BrowserRequestV2::RawInput { event } if self.repro_inputs.len() < 4_096 => {
+                self.repro_inputs.push(event.clone());
+            }
+            BrowserRequestV2::Snapshot | BrowserRequestV2::ExportRepro => {}
+            BrowserRequestV2::Dispose => {
+                self.repro_base = None;
+                self.repro_inputs.clear();
+            }
+            _ => {
+                self.repro_base = Some(self.kernel()?.snapshot().map_err(kernel_error)?);
+                self.repro_inputs.clear();
             }
         }
+        Ok(())
     }
 
     fn initialize(
@@ -331,6 +414,14 @@ impl BrowserKernelHostV2 {
             })
             .unwrap_or_else(safe_one);
         self.kernel = Some(kernel);
+        self.repro_base = Some(
+            self.kernel
+                .as_ref()
+                .ok_or(BrowserWebErrorV2::Invalid)?
+                .snapshot()
+                .map_err(kernel_error)?,
+        );
+        self.repro_inputs.clear();
         Ok(())
     }
 

@@ -420,6 +420,7 @@ dependencies = [
  "er-rng",
  "er-run",
  "er-save",
+ "er-scenario",
  "er-state",
  "er-types",
  "serde",

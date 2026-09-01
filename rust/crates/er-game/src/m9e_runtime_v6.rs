@@ -6,7 +6,12 @@ use er_battle::m7_resolver::{TurnAuthorityContextV1, resolve_turn_v5};
 use er_progression::lifecycle::{release_stored_pokemon, reorder_party, transfer_all_held_items};
 use er_progression::progression::{fuse_pokemon, replace_move};
 use er_rng::audit::RngDraw;
+use er_rng::phaser::RunRngState;
 use er_save::m9e_save_v2::GameSaveV2;
+use er_scenario::runtime_v2::{
+    SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioControlV2, ScenarioDomainFactoryV2,
+    ScenarioInputV2, ScenarioRuntimeV2,
+};
 use er_state::m7_state::{GameStateV5, ProgressionTaskKindV2, ProgressionTaskV2};
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_command::{
@@ -60,7 +65,11 @@ pub enum GameDomainExecutionInputV1 {
         commands: CommandSet,
         authority: TurnAuthorityContextV1,
     },
-    CaptureDraw(u32),
+    CaptureRng {
+        draw: u32,
+        run_rng: RunRngState,
+        audit: Vec<RngDraw>,
+    },
     SaveGeneration(SafeU53),
     InventoryUse(InventoryUseEffectV1),
     InventoryTransferKey(String),
@@ -510,7 +519,9 @@ fn execute_domain(
         }
         GameActionV1::Fusion { action } => execute_fusion(before, action, &context.input),
         GameActionV1::World { action } => execute_world(before, action, &context.input),
-        GameActionV1::Scenario { action } => execute_scenario(before, action, &context.input),
+        GameActionV1::Scenario { action } => {
+            execute_scenario(before, content, action, &context.input)
+        }
         GameActionV1::Save { action } => execute_save(before, action, &context.input),
         GameActionV1::Terminal { action } => execute_terminal(before, action, &context.input),
         GameActionV1::Capture { action } => execute_capture(
@@ -689,7 +700,23 @@ fn execute_battle(
     let mut candidate = adopt_v5(before, transition.after_state)?;
     match outcome {
         BattleOutcome::Victory => {
-            prepare_post_battle_progression(&mut candidate, content, action_context)?;
+            let final_wave = candidate
+                .active_run
+                .as_ref()
+                .is_some_and(|run| is_final_wave(content, run.mode, run.wave));
+            if final_wave {
+                candidate
+                    .active_run
+                    .as_mut()
+                    .ok_or(GameRuntimeV6Error::Action)?
+                    .outcome = RunOutcome::Victory;
+                candidate.profile.statistics.battles_won =
+                    safe_increment(candidate.profile.statistics.battles_won)?;
+                candidate.profile.statistics.runs_won =
+                    safe_increment(candidate.profile.statistics.runs_won)?;
+            } else {
+                prepare_post_battle_progression(&mut candidate, content, action_context)?;
+            }
         }
         BattleOutcome::Defeat => {
             candidate
@@ -1069,26 +1096,96 @@ fn execute_world(
 
 fn execute_scenario(
     before: Option<&GameStateV6>,
+    content: &PreparedGameContentV2,
     action: &ScenarioGameActionV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     require_none_input(input)?;
     let mut candidate = require_state(before)?.clone();
-    let run = candidate
+    let current = candidate
         .active_run
-        .as_mut()
+        .as_ref()
+        .and_then(|run| run.scenario.as_ref())
+        .cloned()
         .ok_or(GameRuntimeV6Error::Action)?;
-    let scenario = run.scenario.as_mut().ok_or(GameRuntimeV6Error::Action)?;
-    let node = match action {
+    let action_node = match action {
         ScenarioGameActionV1::Advance { node }
         | ScenarioGameActionV1::Choose { node, .. }
         | ScenarioGameActionV1::SelectPartyTarget { node, .. }
         | ScenarioGameActionV1::SelectItemTarget { node, .. }
         | ScenarioGameActionV1::Complete { node } => *node,
     };
-    scenario.node = node;
+    if action_node != current.node {
+        return Err(GameRuntimeV6Error::Action);
+    }
+    let factory = ScenarioDomainFactoryV2::new(content.scenarios.clone());
+    let mut runtime = ScenarioRuntimeV2 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
+        scenario: current.scenario,
+        current_node: current.node,
+        selected_option: None,
+        completed_outcome: None,
+    };
+    let mut selected_option = None;
+    let complete = match action {
+        ScenarioGameActionV1::Advance { .. } => {
+            factory
+                .apply(&mut runtime, ScenarioInputV2::AcknowledgeMessage)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            false
+        }
+        ScenarioGameActionV1::Choose { option_ordinal, .. } => {
+            let option = u8::try_from(*option_ordinal).map_err(|_| GameRuntimeV6Error::Action)?;
+            factory
+                .apply(&mut runtime, ScenarioInputV2::Choose(option))
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            selected_option = Some(option);
+            if matches!(
+                factory
+                    .control(&runtime)
+                    .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+                ScenarioControlV2::ExecuteOption {
+                    primary_party_target: false,
+                    secondary_party_target: false,
+                    nested_battle: false,
+                    ..
+                }
+            ) {
+                factory
+                    .apply(&mut runtime, ScenarioInputV2::OptionApplied)
+                    .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            }
+            runtime.completed_outcome.is_some()
+        }
+        ScenarioGameActionV1::Complete { .. } => {
+            if !matches!(
+                factory
+                    .control(&runtime)
+                    .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+                ScenarioControlV2::Complete { .. }
+            ) {
+                return Err(GameRuntimeV6Error::Action);
+            }
+            true
+        }
+        ScenarioGameActionV1::SelectPartyTarget { .. }
+        | ScenarioGameActionV1::SelectItemTarget { .. } => {
+            return Err(GameRuntimeV6Error::Action);
+        }
+    };
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let scenario = run.scenario.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+    scenario.node = runtime.current_node;
     scenario.visit_count = safe_increment(scenario.visit_count)?;
-    if matches!(action, ScenarioGameActionV1::Complete { .. }) {
+    if let Some(option) = selected_option {
+        let flag = er_types::RunFlagId::new(safe_from_u64(u64::from(option) + 1)?);
+        scenario.flags.insert(flag, true);
+        run.flags.insert(flag, true);
+    }
+    if complete {
         run.scenario = None;
     }
     Ok(DomainExecutionV1 {
@@ -1096,20 +1193,25 @@ fn execute_scenario(
         ..Default::default()
     })
 }
-
 fn execute_save(
     before: Option<&GameStateV6>,
     action: &SaveActionV1,
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     let mut candidate = require_state(before)?.clone();
-    let generation = match input {
-        GameDomainExecutionInputV1::SaveGeneration(generation) => *generation,
-        GameDomainExecutionInputV1::None if matches!(action, SaveActionV1::Cancel) => safe_one(),
+    let generation = match (action, input) {
+        (SaveActionV1::Write { .. }, GameDomainExecutionInputV1::SaveGeneration(generation)) => {
+            Some(*generation)
+        }
+        (
+            SaveActionV1::Load { .. } | SaveActionV1::Delete { .. } | SaveActionV1::Cancel,
+            GameDomainExecutionInputV1::None,
+        ) => None,
         _ => return Err(GameRuntimeV6Error::Invalid),
     };
     let mut output = DomainExecutionV1::default();
     if let SaveActionV1::Write { slot } = action {
+        let generation = generation.ok_or(GameRuntimeV6Error::Invalid)?;
         let request = candidate
             .identities
             .allocate_platform_request_id()
@@ -1223,9 +1325,15 @@ fn execute_capture(
         .progression
         .species(target_state.species_id, target_state.form_index)
         .ok_or(GameRuntimeV6Error::Action)?;
-    let draw = match input {
-        GameDomainExecutionInputV1::CaptureDraw(draw) if *draw < 256 => *draw,
-        GameDomainExecutionInputV1::None if ball_definition.guaranteed => 0,
+    let (draw, next_run_rng, rng_audit) = match input {
+        GameDomainExecutionInputV1::CaptureRng {
+            draw,
+            run_rng,
+            audit,
+        } if *draw < 256 && !ball_definition.guaranteed && !audit.is_empty() => {
+            (*draw, Some(run_rng.clone()), audit.clone())
+        }
+        GameDomainExecutionInputV1::None if ball_definition.guaranteed => (0, None, Vec::new()),
         _ => return Err(GameRuntimeV6Error::Invalid),
     };
     let threshold = if ball_definition.guaranteed {
@@ -1256,6 +1364,9 @@ fn execute_capture(
         .active_run
         .as_mut()
         .ok_or(GameRuntimeV6Error::Action)?;
+    if let Some(next_run_rng) = next_run_rng {
+        run.run_rng = next_run_rng;
+    }
     let inventory_index = run
         .inventory
         .entries
@@ -1298,6 +1409,7 @@ fn execute_capture(
     }
     let mut output = DomainExecutionV1 {
         candidate: Some(candidate),
+        rng_audit,
         ..Default::default()
     };
     if let Some(slot) = storage_slot {
@@ -1307,7 +1419,6 @@ fn execute_capture(
     }
     Ok(output)
 }
-
 fn execute_progression(
     before: Option<&GameStateV6>,
     content: &PreparedGameContentV2,
@@ -2103,6 +2214,22 @@ fn persistent_pokemon_mut(
     }
     Err(GameRuntimeV6Error::Action)
 }
+fn is_final_wave(
+    content: &PreparedGameContentV2,
+    mode: er_types::battle_ids::GameModeId,
+    wave: er_types::battle_ids::WaveIndex,
+) -> bool {
+    let Some(mode) = content.world.mode(mode) else {
+        return false;
+    };
+    match mode.key.as_str() {
+        "CLASSIC" | "CHALLENGE" | "LLM_DIRECTOR" | "COOP" | "FUN" => wave.get().get() == 200,
+        "DAILY" => wave.get().get() == 50,
+        "SHOWDOWN" => wave.get().get() == 1,
+        "ENDLESS" | "SPLICED_ENDLESS" => false,
+        _ => false,
+    }
+}
 
 fn capture_threshold(
     hp: u32,
@@ -2180,10 +2307,6 @@ fn safe_increment(value: SafeU53) -> Result<SafeU53, GameRuntimeV6Error> {
 
 fn safe_from_u64(value: u64) -> Result<SafeU53, GameRuntimeV6Error> {
     SafeU53::new(value).map_err(|_| GameRuntimeV6Error::Invalid)
-}
-
-fn safe_one() -> SafeU53 {
-    SafeU53::new(1).unwrap_or(SafeU53::MAX)
 }
 
 fn validate_runtime_frontier(

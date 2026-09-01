@@ -15,13 +15,15 @@ er-game = { path = "../er-game" }
 er-protocol = { path = "../er-protocol" }
 er-rng = { path = "../er-rng" }
 er-state = { path = "../er-state" }
+er-save = { path = "../er-save" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-er-save = { path = "../er-save" }
+er-scenario = { path = "../er-scenario" }
+
 
 [lints]
 workspace = true

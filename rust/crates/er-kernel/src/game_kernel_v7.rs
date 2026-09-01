@@ -18,6 +18,7 @@ use er_game::m9e_material_v6::{
 use er_game::m9e_new_run_v6::{construct_natural_run_v6, expand_cooperative_topology_v6};
 use er_game::m9e_runtime_v6::{
     GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeSnapshotV6, GameRuntimeV6,
+    InventoryUseEffectV1,
 };
 use er_game::m72_bootstrap::{
     BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapErrorV1, RunBootstrapMachineV1,
@@ -25,6 +26,9 @@ use er_game::m72_bootstrap::{
 };
 use er_protocol::snapshot::ProposalFingerprintSnapshotV2;
 use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2};
+use er_rng::audit::{RngCallsiteId, RngReason};
+use er_rng::battle::RngRuntime;
+use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::ProfileStateV1;
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_command::{
@@ -37,17 +41,19 @@ use er_types::{
     BootstrapActionV1, ConnectionGeneration, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1,
     GameActionV1, GameButton, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
     GameProposalV1, OperationId, PlatformRequestId, RunOutcome, SafeU53, SeatId,
-    StarterSelectionV1, TerminalState,
+    StarterSelectionV1, TerminalState, TimeClass, TransportState,
 };
 use thiserror::Error;
 
 use crate::snapshot::{
     HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRouterSnapshotV2,
     KernelSchedulerSnapshotV2, PhysicalInputSourceV2, PressedPhysicalInputSnapshotV2,
+    TimeClassPauseSnapshotV2,
 };
 use crate::snapshot_v7::{
     CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7, CoreGameKernelSnapshotV7,
     GameKernelLifecycleSnapshotV7, PendingPlatformRequestV2, PendingPresentationV3,
+    StorageFrontierSnapshotV1,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -64,6 +70,26 @@ pub struct GameProposalEnvelopeV2 {
     pub sender_seat: SeatId,
     pub connection_generation: ConnectionGeneration,
     pub proposal: GameProposalV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
+pub enum KernelStorageResultV2 {
+    Read { bytes: Option<Vec<u8>> },
+    Written,
+    Deleted,
+    Slots { slots: Vec<String> },
+    Failed { reason: String },
+    Conflict { current_generation: SafeU53 },
+    Uncertain { reason: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
+pub enum KernelPresentationOutcomeV2 {
+    Settled,
+    IntentionallySkipped,
+    Failed { reason: String },
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -111,6 +137,7 @@ pub struct GameKernelV7 {
     protocol: Option<ProtocolRuntimeSnapshotV2>,
     pending_presentations: BTreeMap<er_types::PresentationEventId, PendingPresentationV3>,
     pending_platform: BTreeMap<PlatformRequestId, PendingPlatformRequestV2>,
+    storage_frontiers: BTreeMap<String, SafeU53>,
     replay_sequence: SafeU53,
 }
 
@@ -126,6 +153,8 @@ pub enum GameKernelV7Error {
     Internal(String),
     #[error("GameKernelV7 snapshot failed: {0}")]
     Snapshot(String),
+    #[error("GameKernelV7 storage result failed: {0}")]
+    Storage(String),
 }
 
 impl GameKernelV7 {
@@ -166,6 +195,7 @@ impl GameKernelV7 {
             protocol,
             pending_presentations: BTreeMap::new(),
             pending_platform: BTreeMap::new(),
+            storage_frontiers: BTreeMap::new(),
             replay_sequence: SafeU53::ZERO,
         };
         value.validate()?;
@@ -200,6 +230,7 @@ impl GameKernelV7 {
             protocol,
             pending_presentations: BTreeMap::new(),
             pending_platform: BTreeMap::new(),
+            storage_frontiers: BTreeMap::new(),
             replay_sequence: SafeU53::ZERO,
         };
         value.validate()?;
@@ -275,6 +306,11 @@ impl GameKernelV7 {
                 .into_iter()
                 .map(|pending| (pending.request_id, pending))
                 .collect(),
+            storage_frontiers: snapshot
+                .storage_frontiers
+                .into_iter()
+                .map(|frontier| (frontier.slot, frontier.generation))
+                .collect(),
             replay_sequence: snapshot.replay_sequence,
         };
         value.validate()?;
@@ -326,6 +362,14 @@ impl GameKernelV7 {
             protocol: self.protocol.clone(),
             pending_presentations: self.pending_presentations.values().cloned().collect(),
             pending_platform: self.pending_platform.values().cloned().collect(),
+            storage_frontiers: self
+                .storage_frontiers
+                .iter()
+                .map(|(slot, generation)| StorageFrontierSnapshotV1 {
+                    slot: slot.clone(),
+                    generation: *generation,
+                })
+                .collect(),
             material_ledger,
             replay_sequence: self.replay_sequence,
             prepared_transaction: None,
@@ -428,35 +472,74 @@ impl GameKernelV7 {
                 hp: actor.hp,
                 max_hp: actor.max_hp,
                 moves,
-                legal_switches: Vec::new(),
+                legal_switches: battle
+                    .enemy_party
+                    .iter()
+                    .filter(|candidate| {
+                        !candidate.fainted
+                            && candidate.id != actor.id
+                            && !battle
+                                .field
+                                .slots
+                                .iter()
+                                .any(|slot| slot.occupant == Some(candidate.id))
+                    })
+                    .map(|candidate| candidate.id)
+                    .collect(),
             };
             let legal = legal_actions_v1(&actor_view);
-            let target = run
-                .party
-                .iter()
-                .find(|pokemon| {
-                    battle.field.slots.iter().any(|slot| {
-                        slot.slot.side == er_types::battle_ids::BattleSide::Player
-                            && slot.occupant == Some(pokemon.id)
-                    })
-                })
-                .ok_or(GameKernelV7Error::Invalid)?;
             let contexts = legal
                 .iter()
                 .cloned()
                 .map(|action| {
-                    (
+                    let target = action
+                        .target
+                        .and_then(|position| {
+                            battle.field.slots.iter().find(|slot| {
+                                slot.slot.side == er_types::battle_ids::BattleSide::Player
+                                    && slot.slot.position == position
+                            })
+                        })
+                        .and_then(|slot| slot.occupant)
+                        .and_then(|pokemon| run.party.iter().find(|target| target.id == pokemon))
+                        .or_else(|| run.party.iter().find(|pokemon| !pokemon.fainted))
+                        .ok_or(GameKernelV7Error::Invalid)?;
+                    let (effectiveness_percent, accuracy_percent) =
+                        if let Some(move_id) = action.move_id {
+                            let definition = self
+                                .content
+                                .battle
+                                .move_definition(move_id)
+                                .map_err(|_| GameKernelV7Error::Invalid)?;
+                            let accuracy = match definition.accuracy {
+                                er_types::battle_model::MoveAccuracy::AlwaysHits => 100,
+                                er_types::battle_model::MoveAccuracy::Percent(value) => {
+                                    u16::from(value)
+                                }
+                            };
+                            (
+                                type_effectiveness_percent(
+                                    self.content.as_ref(),
+                                    definition.move_type,
+                                    target,
+                                ),
+                                accuracy,
+                            )
+                        } else {
+                            (100, 100)
+                        };
+                    Ok((
                         action,
                         AiScoreContextV1 {
-                            effectiveness_percent: 100,
-                            accuracy_percent: 100,
+                            effectiveness_percent,
+                            accuracy_percent,
                             target_hp: target.hp,
                             target_max_hp: target.max_hp,
                             ally_damage_penalty: 0,
                         },
-                    )
+                    ))
                 })
-                .collect::<BTreeMap<_, _>>();
+                .collect::<Result<BTreeMap<_, _>, GameKernelV7Error>>()?;
             let decision = self
                 .authority_ai
                 .as_mut()
@@ -482,7 +565,21 @@ impl GameKernelV7 {
                     )
                     .map_err(|_| GameKernelV7Error::Invalid)?
                 }
-                AiActionKindV1::Switch => return Err(GameKernelV7Error::Invalid),
+                AiActionKindV1::Switch => {
+                    let target = action.switch_target.ok_or(GameKernelV7Error::Invalid)?;
+                    let index = battle
+                        .enemy_party
+                        .iter()
+                        .position(|pokemon| pokemon.id == target && !pokemon.fainted)
+                        .ok_or(GameKernelV7Error::Invalid)?;
+                    er_types::battle_command::BattleCommand::switch(
+                        actor.id,
+                        er_types::battle_ids::PartyIndex::new(
+                            u8::try_from(index).map_err(|_| GameKernelV7Error::Invalid)?,
+                        )
+                        .map_err(|_| GameKernelV7Error::Invalid)?,
+                    )
+                }
             };
             let script_cursor =
                 SafeU53::new(decision.decision_sequence).map_err(|_| GameKernelV7Error::Invalid)?;
@@ -515,12 +612,153 @@ impl GameKernelV7 {
         event: RawInputEvent,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         if matches!(self.lifecycle, GameKernelLifecycleV7::Bootstrap(_)) {
+            let event = match event {
+                RawInputEvent::GamepadDown { button } => {
+                    let Some(code) = gamepad_key(button) else {
+                        return Ok(GameKernelStepV7::default());
+                    };
+                    RawInputEvent::KeyDown {
+                        code,
+                        printable: false,
+                        browser_repeat: false,
+                        focus: InputFocus::Game,
+                    }
+                }
+                RawInputEvent::GamepadUp { button } => {
+                    let Some(code) = gamepad_key(button) else {
+                        return Ok(GameKernelStepV7::default());
+                    };
+                    RawInputEvent::KeyUp { code }
+                }
+                other => other,
+            };
             return self.bootstrap_input(event);
         }
         if matches!(self.lifecycle, GameKernelLifecycleV7::Terminal { .. }) {
             return Ok(GameKernelStepV7::default());
         }
         self.active_input(event)
+    }
+    pub fn advance_time(
+        &mut self,
+        milliseconds: SafeU53,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let mut fired = Vec::new();
+        for timer in &mut self.scheduler.timers {
+            let paused = self.scheduler.pauses.iter().any(|pause| {
+                pause.endpoint == timer.registration.endpoint
+                    && pause.time_class == timer.registration.time_class
+                    && !pause.reasons.is_empty()
+            });
+            if paused {
+                continue;
+            }
+            if timer.remaining_active_ms <= milliseconds {
+                fired.push(timer.registration.timer_id);
+            } else {
+                timer.remaining_active_ms =
+                    SafeU53::new(timer.remaining_active_ms.get() - milliseconds.get())
+                        .map_err(|_| GameKernelV7Error::Invalid)?;
+            }
+        }
+        self.scheduler
+            .timers
+            .retain(|timer| !fired.contains(&timer.registration.timer_id));
+        self.scheduler
+            .validate()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        if milliseconds != SafeU53::ZERO {
+            self.advance_replay_sequence()?;
+        }
+        Ok(GameKernelStepV7 {
+            effects: Vec::new(),
+            internal_events: fired
+                .into_iter()
+                .map(|_| GameInternalEventKindV2::TimerFired)
+                .collect(),
+        })
+    }
+
+    pub fn ingest_network_frame(
+        &mut self,
+        generation: ConnectionGeneration,
+        bytes: &[u8],
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        if !protocol
+            .connections
+            .iter()
+            .any(|connection| connection.generation == generation)
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        match protocol.role {
+            EndpointRole::Authority => self.admit_game_proposal(bytes),
+            EndpointRole::Replica => self.apply_authority_material(bytes),
+        }
+    }
+
+    pub fn transport_changed(
+        &mut self,
+        generation: ConnectionGeneration,
+        connected: bool,
+    ) -> Result<(), GameKernelV7Error> {
+        let protocol = self.protocol.as_mut().ok_or(GameKernelV7Error::Invalid)?;
+        let connection = protocol
+            .connections
+            .first_mut()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        if generation < connection.generation {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        if generation == connection.generation {
+            connection.state = if connected {
+                TransportState::Connected
+            } else {
+                TransportState::Disconnected
+            };
+        } else {
+            if protocol
+                .staged_rebinds
+                .iter()
+                .any(|staged| staged.peer_seat == connection.peer_seat)
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            protocol
+                .staged_rebinds
+                .push(er_protocol::snapshot::StagedPeerRebindSnapshotV2 {
+                    peer_seat: connection.peer_seat,
+                    generation,
+                });
+            protocol
+                .staged_rebinds
+                .sort_by_key(|staged| staged.peer_seat);
+            connection.state = TransportState::Connecting;
+        }
+        let reason = "transport-disconnected".to_owned();
+        self.scheduler.pauses.retain(|pause| {
+            !(pause.endpoint == self.local_seat
+                && pause.time_class == TimeClass::Connected
+                && pause.reasons.iter().any(|value| value == &reason))
+        });
+        if !connected {
+            self.scheduler.pauses.push(TimeClassPauseSnapshotV2 {
+                endpoint: self.local_seat,
+                time_class: TimeClass::Connected,
+                reasons: vec![reason],
+            });
+            self.scheduler
+                .pauses
+                .sort_by_key(|pause| (pause.endpoint, pause.time_class));
+        }
+        protocol
+            .validate()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        self.scheduler
+            .validate()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        self.advance_replay_sequence()
     }
 
     pub fn apply_authority_material(
@@ -546,10 +784,31 @@ impl GameKernelV7 {
         &mut self,
         event_id: er_types::PresentationEventId,
     ) -> Result<(), GameKernelV7Error> {
-        self.pending_presentations
-            .remove(&event_id)
-            .map(|_| ())
-            .ok_or(GameKernelV7Error::Invalid)
+        self.settle_presentation_outcome(event_id, KernelPresentationOutcomeV2::Settled)
+    }
+
+    pub fn settle_presentation_outcome(
+        &mut self,
+        event_id: er_types::PresentationEventId,
+        outcome: KernelPresentationOutcomeV2,
+    ) -> Result<(), GameKernelV7Error> {
+        let pending = self
+            .pending_presentations
+            .get(&event_id)
+            .ok_or(GameKernelV7Error::Invalid)?;
+        match outcome {
+            KernelPresentationOutcomeV2::Settled => {}
+            KernelPresentationOutcomeV2::IntentionallySkipped
+                if pending.skip == er_types::battle_ui::PresentationSkipPolicy::Allowed => {}
+            KernelPresentationOutcomeV2::Failed { reason } if !reason.is_empty() => {
+                return Err(GameKernelV7Error::Runtime(format!(
+                    "renderer recovery required: {reason}"
+                )));
+            }
+            _ => return Err(GameKernelV7Error::Invalid),
+        }
+        self.pending_presentations.remove(&event_id);
+        self.advance_replay_sequence()
     }
 
     pub fn settle_platform_request(
@@ -560,6 +819,104 @@ impl GameKernelV7 {
             .remove(&request_id)
             .map(|_| ())
             .ok_or(GameKernelV7Error::Invalid)
+    }
+
+    pub fn apply_storage_result(
+        &mut self,
+        request_id: PlatformRequestId,
+        result: KernelStorageResultV2,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let pending = self
+            .pending_platform
+            .get(&request_id)
+            .cloned()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let mut step = GameKernelStepV7::default();
+        match (&pending.effect, result) {
+            (
+                GamePlatformEffectV2::StorageWrite {
+                    slot, generation, ..
+                },
+                KernelStorageResultV2::Written,
+            ) => {
+                let expected = self
+                    .storage_frontiers
+                    .get(slot)
+                    .copied()
+                    .map(increment_safe)
+                    .transpose()?
+                    .unwrap_or_else(safe_one);
+                if *generation != expected {
+                    return Err(GameKernelV7Error::Storage(
+                        "write generation differs from the CAS frontier".to_owned(),
+                    ));
+                }
+                self.storage_frontiers.insert(slot.clone(), *generation);
+            }
+            (
+                GamePlatformEffectV2::StorageRead { slot, .. },
+                KernelStorageResultV2::Read { bytes: Some(bytes) },
+            ) => {
+                let save = GameSaveV2::decode(&bytes)
+                    .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
+                if &save.content_identity != self.content.identity() {
+                    return Err(GameKernelV7Error::Storage(
+                        "loaded save content identity differs".to_owned(),
+                    ));
+                }
+                let current_revision = self.active_runtime()?.next_authority_revision();
+                let control_revision = save
+                    .state
+                    .active_run
+                    .as_ref()
+                    .map(|run| run.control.revision)
+                    .unwrap_or(SafeU53::ZERO);
+                let next_revision = current_revision.max(increment_safe(control_revision)?);
+                let runtime =
+                    GameRuntimeV6::new(Some(save.state), self.content.clone(), next_revision)
+                        .map_err(runtime_error)?;
+                self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.storage_frontiers.insert(slot.clone(), save.generation);
+                self.synchronize_menu_allocator()?;
+                if let Some(control) = self.current_control().cloned() {
+                    step.effects.push(GameKernelEffectV7::UiChanged(control));
+                }
+            }
+            (
+                GamePlatformEffectV2::StorageRead { .. },
+                KernelStorageResultV2::Read { bytes: None },
+            ) => {}
+            (GamePlatformEffectV2::StorageDelete { slot, .. }, KernelStorageResultV2::Deleted) => {
+                self.storage_frontiers.remove(slot);
+            }
+            (GamePlatformEffectV2::StorageList { .. }, KernelStorageResultV2::Slots { slots })
+                if slots.windows(2).all(|pair| pair[0] < pair[1])
+                    && slots.iter().all(|slot| !slot.is_empty()) => {}
+            (
+                GamePlatformEffectV2::StorageWrite { slot, .. },
+                KernelStorageResultV2::Conflict { current_generation },
+            ) => {
+                return Err(GameKernelV7Error::Storage(format!(
+                    "storage write conflict for {slot} at generation {}",
+                    current_generation.get()
+                )));
+            }
+            (
+                GamePlatformEffectV2::StorageWrite { .. },
+                KernelStorageResultV2::Uncertain { reason },
+            )
+            | (_, KernelStorageResultV2::Failed { reason }) => {
+                return Err(GameKernelV7Error::Storage(reason));
+            }
+            _ => {
+                return Err(GameKernelV7Error::Storage(
+                    "storage outcome does not match pending request".to_owned(),
+                ));
+            }
+        }
+        self.pending_platform.remove(&request_id);
+        self.advance_replay_sequence()?;
+        Ok(step)
     }
 
     pub fn admit_game_proposal(
@@ -647,7 +1004,7 @@ impl GameKernelV7 {
         }
         let context = GameActionDispatchContextV1 {
             action: action_context,
-            input: execution_input(&action),
+            input: self.execution_input(&action)?,
             authority: true,
         };
         let mut staged_runtime = self.active_runtime()?.clone();
@@ -799,9 +1156,14 @@ impl GameKernelV7 {
                     .current_control()
                     .and_then(|control| control.menu.as_ref())
                     .map(|menu| menu.instance_id);
-                let accepted = self
-                    .current_control()
-                    .is_some_and(|control| control.actionable && menu_instance.is_some());
+                let presentation_blocked = self.pending_presentations.values().any(|pending| {
+                    pending.blocking
+                        == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
+                });
+                let accepted = !presentation_blocked
+                    && self
+                        .current_control()
+                        .is_some_and(|control| control.actionable && menu_instance.is_some());
                 self.input_router
                     .pressed
                     .push(PressedPhysicalInputSnapshotV2 {
@@ -860,10 +1222,102 @@ impl GameKernelV7 {
                 self.input_router.focus = InputFocus::Game;
                 Ok(GameKernelStepV7::default())
             }
-            RawInputEvent::GamepadDown { .. } | RawInputEvent::GamepadUp { .. } => {
-                Ok(GameKernelStepV7::default())
-            }
+            RawInputEvent::GamepadDown { button } => self.active_gamepad_down(button),
+            RawInputEvent::GamepadUp { button } => self.active_gamepad_up(button),
         }
+    }
+
+    fn active_gamepad_down(
+        &mut self,
+        button_index: u16,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let source = PhysicalInputSourceV2::Gamepad(button_index);
+        if self
+            .input_router
+            .pressed
+            .iter()
+            .any(|pressed| pressed.seat == self.local_seat && pressed.source == source)
+        {
+            return Ok(GameKernelStepV7::default());
+        }
+        let Some(button) = gamepad_button(button_index) else {
+            self.input_router
+                .pressed
+                .push(PressedPhysicalInputSnapshotV2 {
+                    seat: self.local_seat,
+                    source,
+                    logical_button: None,
+                    printable: false,
+                    accepted: false,
+                    menu_instance_id: None,
+                });
+            self.sort_input();
+            return Ok(GameKernelStepV7::default());
+        };
+        let menu_instance = self
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .map(|menu| menu.instance_id);
+        let presentation_blocked = self.pending_presentations.values().any(|pending| {
+            pending.blocking == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
+        });
+        let accepted = !presentation_blocked
+            && self
+                .current_control()
+                .is_some_and(|control| control.actionable && menu_instance.is_some());
+        self.input_router
+            .pressed
+            .push(PressedPhysicalInputSnapshotV2 {
+                seat: self.local_seat,
+                source: source.clone(),
+                logical_button: accepted.then_some(button),
+                printable: false,
+                accepted,
+                menu_instance_id: accepted.then_some(menu_instance).flatten(),
+            });
+        if accepted {
+            let instance = menu_instance.ok_or(GameKernelV7Error::Invalid)?;
+            self.input_router
+                .held_buttons
+                .push(HeldLogicalButtonSnapshotV2 {
+                    seat: self.local_seat,
+                    button,
+                    source,
+                    menu_instance_id: instance,
+                });
+            self.input_router.locks.push(InputButtonLockSnapshotV2 {
+                seat: self.local_seat,
+                button,
+                menu_instance_id: instance,
+            });
+        }
+        self.sort_input();
+        if accepted {
+            self.handle_button(button)
+        } else {
+            Ok(GameKernelStepV7::default())
+        }
+    }
+
+    fn active_gamepad_up(
+        &mut self,
+        button_index: u16,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let source = PhysicalInputSourceV2::Gamepad(button_index);
+        self.input_router
+            .pressed
+            .retain(|pressed| !(pressed.seat == self.local_seat && pressed.source == source));
+        self.input_router
+            .held_buttons
+            .retain(|held| !(held.seat == self.local_seat && held.source == source));
+        self.input_router.locks.retain(|lock| {
+            self.input_router.held_buttons.iter().any(|held| {
+                held.seat == lock.seat
+                    && held.button == lock.button
+                    && held.menu_instance_id == lock.menu_instance_id
+            })
+        });
+        Ok(GameKernelStepV7::default())
     }
 
     fn handle_button(&mut self, button: GameButton) -> Result<GameKernelStepV7, GameKernelV7Error> {
@@ -1004,7 +1458,7 @@ impl GameKernelV7 {
                 internal_events: Vec::new(),
             });
         }
-        let input = execution_input(&action);
+        let input = self.execution_input(&action)?;
         let context = GameActionDispatchContextV1 {
             action: action_context,
             input,
@@ -1282,6 +1736,118 @@ impl GameKernelV7 {
         };
         step.effects.push(GameKernelEffectV7::Terminal(terminal));
         Ok(())
+    }
+
+    fn execution_input(
+        &self,
+        action: &GameActionV1,
+    ) -> Result<GameDomainExecutionInputV1, GameKernelV7Error> {
+        match action {
+            GameActionV1::Save {
+                action: er_types::SaveActionV1::Write { slot },
+            } => {
+                let generation = self
+                    .storage_frontiers
+                    .get(slot)
+                    .copied()
+                    .map(increment_safe)
+                    .transpose()?
+                    .unwrap_or_else(safe_one);
+                Ok(GameDomainExecutionInputV1::SaveGeneration(generation))
+            }
+            GameActionV1::Inventory {
+                action: er_types::InventoryActionV1::Use { item, target },
+            } => {
+                let run = self
+                    .state()
+                    .and_then(|state| state.active_run.as_ref())
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                let entry = run
+                    .inventory
+                    .entries
+                    .iter()
+                    .find(|entry| entry.item == *item && entry.count > 0)
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                let target = target.ok_or(GameKernelV7Error::Invalid)?;
+                let pokemon = run
+                    .party
+                    .iter()
+                    .find(|pokemon| pokemon.id == target)
+                    .or_else(|| {
+                        run.storage
+                            .iter()
+                            .map(|stored| &stored.pokemon)
+                            .find(|pokemon| pokemon.id == target)
+                    })
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                let healing = match (item.get().get(), entry.registry_key.as_str()) {
+                    (100, "POTION") => Some((20_u32, 10_u32)),
+                    (101, "SUPER_POTION") => Some((50, 25)),
+                    (102, "HYPER_POTION") => Some((200, 50)),
+                    (103, "MAX_POTION") => Some((0, 100)),
+                    _ => None,
+                };
+                if let Some((points, percent)) = healing {
+                    if pokemon.hp == 0 || pokemon.hp >= pokemon.max_hp {
+                        return Err(GameKernelV7Error::Invalid);
+                    }
+                    let percent_amount = u64::from(pokemon.max_hp)
+                        .checked_mul(u64::from(percent))
+                        .and_then(|value| value.checked_div(100))
+                        .ok_or(GameKernelV7Error::Invalid)?;
+                    let amount = u32::try_from(percent_amount)
+                        .map_err(|_| GameKernelV7Error::Invalid)?
+                        .saturating_add(points)
+                        .min(pokemon.max_hp - pokemon.hp);
+                    Ok(GameDomainExecutionInputV1::InventoryUse(
+                        InventoryUseEffectV1::Heal { amount },
+                    ))
+                } else {
+                    self.content
+                        .battle
+                        .held_item(&entry.registry_key)
+                        .map_err(|_| GameKernelV7Error::Invalid)?;
+                    Ok(GameDomainExecutionInputV1::InventoryUse(
+                        InventoryUseEffectV1::GrantHeldItem {
+                            registry_key: entry.registry_key.clone(),
+                        },
+                    ))
+                }
+            }
+            GameActionV1::Capture {
+                action: er_types::CaptureActionV1::Attempt { ball, .. },
+            } => {
+                let definition = self
+                    .content
+                    .progression
+                    .capture_ball(*ball)
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                if definition.guaranteed {
+                    return Ok(GameDomainExecutionInputV1::None);
+                }
+                let run_rng = self
+                    .state()
+                    .and_then(|state| state.active_run.as_ref())
+                    .map(|run| run.run_rng.clone())
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                let mut rng = RngRuntime::from_states(run_rng, None)
+                    .map_err(|_| GameKernelV7Error::Invalid)?;
+                let draw = rng
+                    .run_integer_in_range(
+                        SafeU53::ZERO,
+                        SafeU53::new(255).map_err(|_| GameKernelV7Error::Invalid)?,
+                        RngReason::RandomSelector,
+                        RngCallsiteId::mechanics(RngReason::RandomSelector),
+                    )
+                    .map_err(|_| GameKernelV7Error::Invalid)?;
+                Ok(GameDomainExecutionInputV1::CaptureRng {
+                    draw: u32::try_from(draw.get()).map_err(|_| GameKernelV7Error::Invalid)?,
+                    run_rng: rng.run_state(),
+                    audit: rng.audit_entries().to_vec(),
+                })
+            }
+            _ => Ok(GameDomainExecutionInputV1::None),
+        }
     }
 
     fn active_runtime(&self) -> Result<&GameRuntimeV6, GameKernelV7Error> {
@@ -1629,6 +2195,31 @@ fn switch_select_control(
     .map_err(|_| GameKernelV7Error::Invalid)
 }
 
+fn type_effectiveness_percent(
+    content: &PreparedGameContentV2,
+    attack: er_types::battle_model::PokemonType,
+    target: &er_state::m7_state::PokemonStateV5,
+) -> u16 {
+    let mut numerator = 100_u16;
+    let mut denominator = 1_u16;
+    for defense in [Some(target.types.primary), target.types.secondary]
+        .into_iter()
+        .flatten()
+    {
+        match content.battle.pack().type_chart.multiplier(attack, defense) {
+            er_types::battle_model::SingleTypeMultiplier::Zero => return 0,
+            er_types::battle_model::SingleTypeMultiplier::Half => {
+                denominator = denominator.saturating_mul(2);
+            }
+            er_types::battle_model::SingleTypeMultiplier::One => {}
+            er_types::battle_model::SingleTypeMultiplier::Two => {
+                numerator = numerator.saturating_mul(2);
+            }
+        }
+    }
+    numerator / denominator
+}
+
 fn accepted_command_owner(command: &AcceptedBattleCommand) -> Option<SeatId> {
     match command {
         AcceptedBattleCommand::Human { proposal, .. } => Some(proposal.owner_seat),
@@ -1739,21 +2330,6 @@ fn bootstrap_catalog(
     })
 }
 
-fn execution_input(action: &GameActionV1) -> GameDomainExecutionInputV1 {
-    match action {
-        GameActionV1::Save {
-            action:
-                er_types::SaveActionV1::Write { .. }
-                | er_types::SaveActionV1::Load { .. }
-                | er_types::SaveActionV1::Delete { .. },
-        } => GameDomainExecutionInputV1::SaveGeneration(safe_one()),
-
-        GameActionV1::Capture {
-            action: er_types::CaptureActionV1::Attempt { .. },
-        } => GameDomainExecutionInputV1::CaptureDraw(0),
-        _ => GameDomainExecutionInputV1::None,
-    }
-}
 fn battle_proposal_is_rooted_in_control(
     state: Option<&GameStateV6>,
     control: Option<&GameControlPlanV2>,
@@ -1889,6 +2465,30 @@ fn physical_button(key: &PhysicalKey) -> Option<GameButton> {
         PhysicalKey::ArrowRight => Some(GameButton::Right),
         PhysicalKey::Enter | PhysicalKey::Space => Some(GameButton::Action),
         PhysicalKey::Escape | PhysicalKey::Backspace => Some(GameButton::Cancel),
+        _ => None,
+    }
+}
+
+fn gamepad_button(button: u16) -> Option<GameButton> {
+    match button {
+        12 => Some(GameButton::Up),
+        13 => Some(GameButton::Down),
+        14 => Some(GameButton::Left),
+        15 => Some(GameButton::Right),
+        0 => Some(GameButton::Action),
+        1 => Some(GameButton::Cancel),
+        _ => None,
+    }
+}
+
+fn gamepad_key(button: u16) -> Option<PhysicalKey> {
+    match button {
+        12 => Some(PhysicalKey::ArrowUp),
+        13 => Some(PhysicalKey::ArrowDown),
+        14 => Some(PhysicalKey::ArrowLeft),
+        15 => Some(PhysicalKey::ArrowRight),
+        0 => Some(PhysicalKey::Space),
+        1 => Some(PhysicalKey::Escape),
         _ => None,
     }
 }

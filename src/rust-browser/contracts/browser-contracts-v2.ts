@@ -57,7 +57,7 @@ export type BrowserEffectV2 =
   | { kind: "AUDIO_CUE"; cue: PresentationAudioCueV1 }
   | { kind: "TERMINAL"; terminal: { terminal_id: string; reason: string } }
   | { kind: "TELEMETRY"; event: "RUN_STARTED" | "ACTION_APPLIED" | "SAVE_COMPLETED" | "TERMINAL_REACHED" }
-  | { kind: "REPRO_READY"; snapshot: unknown };
+  | { kind: "REPRO_READY"; snapshot: unknown; inputs: unknown[] };
 
 export interface BrowserEffectBatchV2 {
   external_sequence: number;

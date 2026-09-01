@@ -53,6 +53,13 @@ pub struct PendingPlatformRequestV2 {
     pub effect: GamePlatformEffectV2,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StorageFrontierSnapshotV1 {
+    pub slot: String,
+    pub generation: SafeU53,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CoreGameKernelSnapshotV7 {
@@ -65,6 +72,7 @@ pub struct CoreGameKernelSnapshotV7 {
     pub protocol: Option<ProtocolRuntimeSnapshotV2>,
     pub pending_presentations: Vec<PendingPresentationV3>,
     pub pending_platform: Vec<PendingPlatformRequestV2>,
+    pub storage_frontiers: Vec<StorageFrontierSnapshotV1>,
     pub material_ledger: AppliedGameMaterialLedgerV1,
     pub replay_sequence: SafeU53,
     pub prepared_transaction: Option<QuiescentPreparedTransaction>,
@@ -102,6 +110,14 @@ impl CoreGameKernelSnapshotV7 {
                     || platform_request_id(&pending.effect) != pending.request_id
                     || !valid_platform_effect(&pending.effect)
             })
+            || self
+                .storage_frontiers
+                .windows(2)
+                .any(|pair| pair[0].slot >= pair[1].slot)
+            || self
+                .storage_frontiers
+                .iter()
+                .any(|frontier| frontier.slot.is_empty() || frontier.generation == SafeU53::ZERO)
         {
             return Err(SnapshotV7Error::Invalid);
         }
@@ -202,6 +218,7 @@ impl CoreGameKernelSnapshotV7 {
             protocol: source.protocol,
             pending_presentations: Vec::new(),
             pending_platform: Vec::new(),
+            storage_frontiers: Vec::new(),
             material_ledger: AppliedGameMaterialLedgerV1::new(next_revision)
                 .map_err(|_| SnapshotV7Error::Migration)?,
             authority_ai: None,

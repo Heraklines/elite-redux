@@ -101,6 +101,7 @@ fn active_snapshot(
         next_menu_instance_id: MenuInstanceId::new(safe(1)),
         pending_presentations: Vec::new(),
         pending_platform: Vec::new(),
+        storage_frontiers: Vec::new(),
         material_ledger: AppliedGameMaterialLedgerV1::new(safe(1))?,
         replay_sequence: SafeU53::ZERO,
         prepared_transaction: None,

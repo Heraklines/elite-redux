@@ -534,7 +534,10 @@ fn callsite_spec(value: &str) -> Option<(RngReason, u8)> {
             RngReason::RandomItem,
             stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
         )),
-        M5_RANDOM_STAT_ID => Some((RngReason::RandomStat, stream_bit(RngStream::Battle))),
+        M5_RANDOM_STAT_ID => Some((
+            RngReason::RandomStat,
+            stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
+        )),
         M5_RANDOM_SELECTOR_ID => Some((
             RngReason::RandomSelector,
             stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),

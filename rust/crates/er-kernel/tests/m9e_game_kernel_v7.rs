@@ -83,6 +83,15 @@ fn press(kernel: &mut GameKernelV7, key: PhysicalKey) -> Result<GameKernelStepV7
     Ok(step)
 }
 
+fn gamepad_press(
+    kernel: &mut GameKernelV7,
+    button: u16,
+) -> Result<GameKernelStepV7, Box<dyn Error>> {
+    let step = kernel.raw_input(RawInputEvent::GamepadDown { button })?;
+    kernel.raw_input(RawInputEvent::GamepadUp { button })?;
+    Ok(step)
+}
+
 fn navigate_down_to(kernel: &mut GameKernelV7, option: &str) -> Result<(), Box<dyn Error>> {
     let bound = kernel
         .current_control()
@@ -341,7 +350,50 @@ fn nonterminal_battle_progresses_to_next_wave() -> Result<(), Box<dyn Error>> {
             return Err("deterministic continuation fixture lost its first battle".into());
         }
     }
+
     Err("solo continuation did not reach wave 2".into())
+}
+#[test]
+fn final_wave_victory_terminates_the_run() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let mut kernel = kernel(content.clone())?;
+    complete_natural_start(&mut kernel)?;
+    let mut snapshot = kernel.snapshot()?;
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("natural run snapshot is not active".into());
+    };
+    let final_wave = WaveIndex::new(safe(200))?;
+    let run = state.active_run.as_mut().ok_or("run missing")?;
+    run.wave = final_wave;
+    let battle = run.battle.as_mut().ok_or("battle missing")?;
+    battle.wave = final_wave;
+    let enemy = battle.enemy_party.first_mut().ok_or("enemy missing")?;
+    enemy.hp = 1;
+    enemy.fainted = false;
+    kernel = GameKernelV7::from_snapshot(
+        snapshot,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    let step = submit_strongest_move(&mut kernel, &content)?;
+    assert!(step.effects.iter().any(|effect| matches!(
+        effect,
+        GameKernelEffectV7::Terminal(terminal) if terminal.reason == "VICTORY"
+    )));
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::Complete)
+    );
+    assert_eq!(
+        kernel
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .map(|run| run.outcome),
+        Some(RunOutcome::Victory)
+    );
+    Ok(())
 }
 
 #[test]
@@ -352,6 +404,7 @@ fn natural_solo_battle_reaches_terminal_using_only_physical_keys() -> Result<(),
     press(&mut kernel, PhysicalKey::Space)?;
     press(&mut kernel, PhysicalKey::Space)?;
     navigate_down_to(&mut kernel, "bootstrap/starter/confirm")?;
+
     press(&mut kernel, PhysicalKey::Space)?;
     press(&mut kernel, PhysicalKey::Space)?;
     press(&mut kernel, PhysicalKey::Space)?;
@@ -437,6 +490,47 @@ fn natural_solo_battle_reaches_terminal_using_only_physical_keys() -> Result<(),
     assert!(kernel.snapshot()?.pending_presentations.is_empty());
     Ok(())
 }
+#[test]
+fn authority_ai_can_choose_a_legal_enemy_switch() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let mut kernel = kernel(content.clone())?;
+    complete_natural_start(&mut kernel)?;
+    let mut snapshot = kernel.snapshot()?;
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("natural run snapshot is not active".into());
+    };
+    let run = state.active_run.as_mut().ok_or("run missing")?;
+    let battle = run.battle.as_mut().ok_or("battle missing")?;
+    let active_id = battle.enemy_party[0].id;
+    for slot in battle.enemy_party[0].moves.iter_mut().flatten() {
+        slot.pp_used = content.battle.move_definition(slot.move_id)?.base_pp;
+    }
+    let mut bench = battle.enemy_party[0].clone();
+    bench.id = state.identities.allocate_pokemon_id()?;
+    let bench_id = bench.id;
+    battle.enemy_party.push(bench);
+    assert_eq!(battle.enemy_party[1].id, bench_id);
+    kernel = GameKernelV7::from_snapshot(
+        snapshot,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content,
+    )?;
+    let commands = kernel.prepare_authority_ai_commands()?;
+    assert_eq!(commands.len(), 1);
+    let er_types::battle_command::AcceptedBattleCommand::ScriptedEnemy { command, .. } =
+        &commands[0]
+    else {
+        return Err("AI command is not scripted enemy authority".into());
+    };
+    assert_eq!(command.actor, active_id);
+    assert!(matches!(
+        command.command,
+        er_types::battle_command::BattleCommand::Switch { party_slot, .. }
+            if party_slot.get() == 1
+    ));
+    Ok(())
+}
 
 #[test]
 fn held_action_cannot_cross_bootstrap_menu_instance() -> Result<(), Box<dyn Error>> {
@@ -455,5 +549,51 @@ fn held_action_cannot_cross_bootstrap_menu_instance() -> Result<(), Box<dyn Erro
     kernel.raw_input(RawInputEvent::KeyUp {
         code: PhysicalKey::Space,
     })?;
+    Ok(())
+}
+
+#[test]
+fn gamepad_buttons_drive_bootstrap_and_active_controls() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let mut kernel = kernel(content.clone())?;
+    gamepad_press(&mut kernel, 0)?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::ModeSelect)
+    );
+    gamepad_press(&mut kernel, 0)?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::StarterSelect)
+    );
+    gamepad_press(&mut kernel, 0)?;
+    let bound = kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .map(|menu| menu.options.len() + 1)
+        .ok_or("starter menu missing")?;
+    for _ in 0..bound {
+        if kernel
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
+        {
+            break;
+        }
+        gamepad_press(&mut kernel, 13)?;
+    }
+    gamepad_press(&mut kernel, 0)?;
+    gamepad_press(&mut kernel, 0)?;
+    gamepad_press(&mut kernel, 0)?;
+    gamepad_press(&mut kernel, 0)?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleCommand)
+    );
+    gamepad_press(&mut kernel, 0)?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleMove)
+    );
     Ok(())
 }

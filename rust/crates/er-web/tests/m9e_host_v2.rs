@@ -2,9 +2,12 @@ use std::error::Error;
 
 use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelV7};
+use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelV7, GameProposalEnvelopeV2};
+use er_kernel::initial_battle_protocol_snapshot_v2;
+use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
+use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
@@ -14,13 +17,16 @@ use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::{
-    GameActionV1, GameControlKindV2, GameMenuCancelV2, OperationId, SafeU53, SaveActionV1,
-    ScenarioId, SeatId, TerminalActionV1,
+    ConnectionGeneration, FrameContext, GAME_ACTION_SCHEMA_VERSION_V1, GameActionV1,
+    GameControlKindV2, GameMenuCancelV2, GameProposalV1, MembershipRevision, OperationId, RunId,
+    SafeU53, SaveActionV1, ScenarioId, SeatId, SessionId, TerminalActionV1, TimeClass,
+    TransportState,
 };
 use er_web::contracts_v2::{
-    BROWSER_WORKER_PROTOCOL_VERSION_V2, BrowserEffectV2, BrowserRequestEnvelopeV2,
-    BrowserRequestV2, BrowserResponseEnvelopeV2, BrowserResponseV2, BrowserSessionContextV2,
-    BrowserSessionInitializationV2,
+    BROWSER_WORKER_PROTOCOL_VERSION_V2, BrowserEffectV2, BrowserLifecycleEventV2,
+    BrowserPresentationOutcomeV2, BrowserRequestEnvelopeV2, BrowserRequestV2,
+    BrowserResponseEnvelopeV2, BrowserResponseV2, BrowserSessionContextV2,
+    BrowserSessionInitializationV2, BrowserStorageResultV2,
 };
 use er_web::host_v2::BrowserKernelHostV2;
 
@@ -67,6 +73,46 @@ fn context() -> BrowserSessionContextV2 {
         },
         protocol: None,
     }
+}
+
+fn authority_protocol(
+    host: SeatId,
+    guest: SeatId,
+    generation: ConnectionGeneration,
+) -> Result<er_protocol::ProtocolRuntimeSnapshotV2, Box<dyn Error>> {
+    let frame = FrameContext {
+        session_id: SessionId::new("m9e-browser-session")?,
+        run_id: RunId::new("m9e-browser-run")?,
+        session_epoch: safe(1),
+        seat_map_id: "m9e-browser-seat-map".to_owned(),
+        membership_revision: MembershipRevision::new(safe(1)),
+        sender_seat_id: host,
+        authority_seat_id: host,
+        connection_generation: generation,
+    };
+    let config = BattleProtocolConfig {
+        role: BattleProtocolRoleConfig::Authority {
+            log: AuthorityLogConfig {
+                local_context: frame,
+                peer_bindings: vec![PeerBinding {
+                    seat_id: guest,
+                    connection_generation: generation,
+                }],
+                owner_id: "m9e-browser-authority".to_owned(),
+                retain_capacity: safe(32),
+                delivery_backoff: BackoffPolicy {
+                    initial_ms: safe(1),
+                    maximum_ms: safe(64),
+                    factor_numerator: safe(2),
+                    factor_denominator: safe(1),
+                },
+                delivery_time_class: TimeClass::Connected,
+                max_delivery_attempts: Some(safe(8)),
+            },
+            proposal_capacity: safe(64),
+        },
+    };
+    Ok(initial_battle_protocol_snapshot_v2(&config, host)?)
 }
 
 fn send(
@@ -183,6 +229,31 @@ fn complete_natural_start(
         return Err("natural completion did not return effects".into());
     };
     Ok(batch.effects)
+}
+
+fn install_save_control(
+    snapshot: &mut er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    operation: &str,
+    action: SaveActionV1,
+) -> Result<(), Box<dyn Error>> {
+    let revision = snapshot.material_ledger.next_authority_revision;
+    let menu = snapshot.next_menu_instance_id;
+    let control = generic_vertical_control_v2(
+        menu,
+        revision,
+        context().local_seat,
+        OperationId::new(operation)?,
+        GameControlKindV2::Save,
+        operation,
+        &[(format!("{operation}/option"), GameActionV1::Save { action })],
+        GameMenuCancelV2::Disabled,
+    )?;
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("snapshot is not active".into());
+    };
+    state.active_run.as_mut().ok_or("run missing")?.control = control;
+    snapshot.next_menu_instance_id = MenuInstanceId::new(safe(menu.get().get() + 1));
+    Ok(())
 }
 
 #[test]
@@ -496,6 +567,418 @@ fn browser_requests_are_atomic_and_conflicting_retries_fail_closed() -> Result<(
     assert_eq!(
         host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
         accepted
+    );
+    Ok(())
+}
+
+#[test]
+fn browser_time_and_lifecycle_requests_execute_kernel_state_changes() -> Result<(), Box<dyn Error>>
+{
+    let (mut host, mut sequence) = natural_host()?;
+    complete_natural_start(&mut host, &mut sequence)?;
+    let before = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let response = send(
+        &mut host,
+        sequence,
+        BrowserRequestV2::AdvanceTime {
+            milliseconds: safe(25),
+        },
+    )?;
+    assert!(matches!(response, BrowserResponseV2::Effects { .. }));
+    sequence += 1;
+    let advanced = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    assert!(advanced.replay_sequence > before.replay_sequence);
+
+    send(
+        &mut host,
+        sequence,
+        BrowserRequestV2::Lifecycle {
+            event: BrowserLifecycleEventV2::Hidden,
+        },
+    )?;
+    sequence += 1;
+    assert_eq!(
+        host.kernel_ref()
+            .ok_or("kernel missing")?
+            .snapshot()?
+            .input_router
+            .focus,
+        InputFocus::TextEntry
+    );
+    send(
+        &mut host,
+        sequence,
+        BrowserRequestV2::Lifecycle {
+            event: BrowserLifecycleEventV2::Visible,
+        },
+    )?;
+    assert_eq!(
+        host.kernel_ref()
+            .ok_or("kernel missing")?
+            .snapshot()?
+            .input_router
+            .focus,
+        InputFocus::Game
+    );
+    Ok(())
+}
+
+#[test]
+fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(), Box<dyn Error>> {
+    let prepared = content()?;
+    let (mut source, mut source_sequence) = natural_host()?;
+    complete_natural_start(&mut source, &mut source_sequence)?;
+    let mut snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(1));
+    let revision = snapshot.material_ledger.next_authority_revision;
+    let menu_instance = snapshot.next_menu_instance_id;
+    let operation = OperationId::new("save/browser/guest/1")?;
+    let mut control = generic_vertical_control_v2(
+        menu_instance,
+        revision,
+        guest,
+        operation.clone(),
+        GameControlKindV2::Save,
+        "m9e/browser/guest-save",
+        &[(
+            "save/cancel".to_owned(),
+            GameActionV1::Save {
+                action: SaveActionV1::Cancel,
+            },
+        )],
+        GameMenuCancelV2::Disabled,
+    )?;
+    control
+        .action_context
+        .as_mut()
+        .ok_or("control context missing")?
+        .authority_seat = host;
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("source snapshot is not active".into());
+    };
+    state.active_run.as_mut().ok_or("run missing")?.control = control.clone();
+    let save = GameSaveV2::new(prepared.identity().clone(), safe(1), state.clone())?;
+    let mut browser = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    send(
+        &mut browser,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::ExistingSave {
+                context: BrowserSessionContextV2 {
+                    local_seat: host,
+                    role: GameKernelRoleV7::Authority,
+                    scheduler: context().scheduler,
+                    protocol: Some(authority_protocol(host, guest, generation)?),
+                },
+                save,
+            }),
+        },
+    )?;
+    let proposal = GameProposalEnvelopeV2 {
+        schema_version: 2,
+        sender_seat: guest,
+        connection_generation: generation,
+        proposal: GameProposalV1 {
+            schema_version: GAME_ACTION_SCHEMA_VERSION_V1,
+            context: control.action_context.ok_or("control context missing")?,
+            action: GameActionV1::Save {
+                action: SaveActionV1::Cancel,
+            },
+        },
+    };
+    let response = send(
+        &mut browser,
+        1,
+        BrowserRequestV2::NetworkFrame {
+            generation: safe(1),
+            bytes: er_canonical::canonical_bytes(&proposal)?,
+        },
+    )?;
+    let BrowserResponseV2::Effects { batch } = response else {
+        return Err("network ingress returned no effects".into());
+    };
+    assert!(
+        batch
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, BrowserEffectV2::SendNetworkFrame { .. }))
+    );
+
+    send(
+        &mut browser,
+        2,
+        BrowserRequestV2::TransportChanged {
+            generation: safe(1),
+            connected: false,
+        },
+    )?;
+    let disconnected = browser.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let disconnected_protocol = disconnected.protocol.as_ref().ok_or("protocol missing")?;
+    assert_eq!(
+        disconnected_protocol.connections[0].state,
+        TransportState::Disconnected
+    );
+    assert!(!disconnected.scheduler.pauses.is_empty());
+    send(
+        &mut browser,
+        3,
+        BrowserRequestV2::TransportChanged {
+            generation: safe(1),
+            connected: true,
+        },
+    )?;
+    let connected = browser.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let connected_protocol = connected.protocol.as_ref().ok_or("protocol missing")?;
+    assert_eq!(
+        connected_protocol.connections[0].state,
+        TransportState::Connected
+    );
+    assert!(connected.scheduler.pauses.is_empty());
+    Ok(())
+}
+
+#[test]
+fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Error>> {
+    let (mut source, mut source_sequence) = natural_host()?;
+    complete_natural_start(&mut source, &mut source_sequence)?;
+    let mut write_snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    install_save_control(
+        &mut write_snapshot,
+        "save/storage/write-1",
+        SaveActionV1::Write {
+            slot: "slot-a".to_owned(),
+        },
+    )?;
+    let mut writer = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    send(
+        &mut writer,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+                context: context(),
+                snapshot: write_snapshot,
+            }),
+        },
+    )?;
+    let mut writer_sequence = 1;
+    let response = press(&mut writer, &mut writer_sequence, PhysicalKey::Space)?;
+    let BrowserResponseV2::Effects { batch } = response else {
+        return Err("save write returned no effects".into());
+    };
+    let first_write = batch
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            BrowserEffectV2::StorageRequest { request } => Some(request),
+            _ => None,
+        })
+        .ok_or("storage write request missing")?;
+    assert_eq!(first_write.generation, Some(safe(1)));
+    assert!(!first_write.bytes.is_empty());
+    send(
+        &mut writer,
+        writer_sequence,
+        BrowserRequestV2::StorageResult {
+            request_id: first_write.request_id,
+            result: BrowserStorageResultV2::Written,
+        },
+    )?;
+    let written_snapshot = writer.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    assert_eq!(written_snapshot.storage_frontiers.len(), 1);
+    assert_eq!(written_snapshot.storage_frontiers[0].generation, safe(1));
+
+    let mut second_snapshot = written_snapshot.clone();
+    install_save_control(
+        &mut second_snapshot,
+        "save/storage/write-2",
+        SaveActionV1::Write {
+            slot: "slot-a".to_owned(),
+        },
+    )?;
+    let mut second_writer = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    send(
+        &mut second_writer,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+                context: context(),
+                snapshot: second_snapshot,
+            }),
+        },
+    )?;
+    let mut second_sequence = 1;
+    let response = press(&mut second_writer, &mut second_sequence, PhysicalKey::Space)?;
+    let BrowserResponseV2::Effects { batch } = response else {
+        return Err("second save returned no effects".into());
+    };
+    let second_write = batch
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            BrowserEffectV2::StorageRequest { request } => Some(request),
+            _ => None,
+        })
+        .ok_or("second storage write missing")?;
+    assert_eq!(second_write.generation, Some(safe(2)));
+    let before_conflict = second_writer
+        .kernel_ref()
+        .ok_or("kernel missing")?
+        .snapshot()?;
+    assert!(
+        send(
+            &mut second_writer,
+            second_sequence,
+            BrowserRequestV2::StorageResult {
+                request_id: second_write.request_id,
+                result: BrowserStorageResultV2::Conflict {
+                    current_generation: safe(1),
+                },
+            },
+        )
+        .is_err()
+    );
+    assert_eq!(
+        second_writer
+            .kernel_ref()
+            .ok_or("kernel missing")?
+            .snapshot()?,
+        before_conflict
+    );
+
+    let mut load_snapshot = written_snapshot;
+    install_save_control(
+        &mut load_snapshot,
+        "save/storage/load",
+        SaveActionV1::Load {
+            slot: "slot-a".to_owned(),
+        },
+    )?;
+    let mut loader = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    send(
+        &mut loader,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+                context: context(),
+                snapshot: load_snapshot,
+            }),
+        },
+    )?;
+    let mut load_sequence = 1;
+    let response = press(&mut loader, &mut load_sequence, PhysicalKey::Space)?;
+    let BrowserResponseV2::Effects { batch } = response else {
+        return Err("save load returned no effects".into());
+    };
+    let read = batch
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            BrowserEffectV2::StorageRequest { request } => Some(request),
+            _ => None,
+        })
+        .ok_or("storage read request missing")?;
+    send(
+        &mut loader,
+        load_sequence,
+        BrowserRequestV2::StorageResult {
+            request_id: read.request_id,
+            result: BrowserStorageResultV2::Read {
+                bytes: Some(first_write.bytes),
+            },
+        },
+    )?;
+    let loaded = loader.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    assert_eq!(loaded.storage_frontiers[0].generation, safe(1));
+    assert!(loaded.pending_platform.is_empty());
+    Ok(())
+}
+
+#[test]
+fn presentation_failure_retains_barrier_until_successful_settlement() -> Result<(), Box<dyn Error>>
+{
+    let (mut host, mut sequence) = natural_host()?;
+    complete_natural_start(&mut host, &mut sequence)?;
+    let pending = host
+        .kernel_ref()
+        .ok_or("kernel missing")?
+        .snapshot()?
+        .pending_presentations;
+    let event = pending
+        .first()
+        .map(|pending| pending.event_id)
+        .ok_or("pending presentation missing")?;
+    let before = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    assert!(
+        send(
+            &mut host,
+            sequence,
+            BrowserRequestV2::PresentationSettled {
+                event_id: event,
+                outcome: BrowserPresentationOutcomeV2::Failed {
+                    reason: "renderer-lost".to_owned(),
+                },
+            },
+        )
+        .is_err()
+    );
+    assert_eq!(
+        host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+        before
+    );
+    send(
+        &mut host,
+        sequence,
+        BrowserRequestV2::PresentationSettled {
+            event_id: event,
+            outcome: BrowserPresentationOutcomeV2::Settled,
+        },
+    )?;
+    assert!(
+        host.kernel_ref()
+            .ok_or("kernel missing")?
+            .snapshot()?
+            .pending_presentations
+            .iter()
+            .all(|pending| pending.event_id != event)
+    );
+    Ok(())
+}
+
+#[test]
+fn exported_repro_replays_recorded_raw_inputs() -> Result<(), Box<dyn Error>> {
+    let (mut host, mut sequence) = natural_host()?;
+    press(&mut host, &mut sequence, PhysicalKey::Space)?;
+    let expected = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let response = send(&mut host, sequence, BrowserRequestV2::ExportRepro)?;
+    let BrowserResponseV2::Effects { batch } = response else {
+        return Err("repro export returned no effects".into());
+    };
+    let (snapshot, inputs) = batch
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            BrowserEffectV2::ReproReady { snapshot, inputs } => Some((snapshot, inputs)),
+            _ => None,
+        })
+        .ok_or("repro capsule missing")?;
+    assert_eq!(inputs.len(), 2);
+    let mut replay = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    send(
+        &mut replay,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::ReproCapsule {
+                context: context(),
+                snapshot: *snapshot,
+                inputs,
+            }),
+        },
+    )?;
+    assert_eq!(
+        replay.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+        expected
     );
     Ok(())
 }

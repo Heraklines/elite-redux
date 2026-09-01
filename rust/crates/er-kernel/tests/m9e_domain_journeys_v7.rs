@@ -3,12 +3,14 @@ use std::sync::Arc;
 
 use er_game::m7_progression_control::{capture_control, generic_vertical_control_v2};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_material_v6::GameMaterialV6;
 use er_game::m9e_new_run_v6::construct_natural_run_v6;
 use er_game::m72_bootstrap::{
     BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapMachineV1, RunBootstrapStageV1,
 };
 use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelV7};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
+use er_rng::audit::RngReason;
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
     DexState, InventoryEntryV1, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
@@ -177,7 +179,8 @@ fn capture_success_with_full_party_uses_allocator_backed_storage() -> Result<(),
         .progression
         .pack()
         .capture_balls
-        .first()
+        .iter()
+        .find(|ball| ball.guaranteed)
         .ok_or("capture ball missing")?;
     let ball_item = ball.item;
     let ball_key = ball.registry_key.clone();
@@ -237,6 +240,246 @@ fn capture_success_with_full_party_uses_allocator_backed_storage() -> Result<(),
     Ok(())
 }
 
+#[test]
+fn raw_capture_uses_audited_rng() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let mut state = natural_state(&content)?;
+    let run = state.active_run.as_mut().ok_or("run missing")?;
+    let before_rng = run.run_rng.clone();
+    let ball = content
+        .progression
+        .pack()
+        .capture_balls
+        .iter()
+        .find(|ball| !ball.guaranteed)
+        .ok_or("non-guaranteed capture ball missing")?;
+    run.inventory.entries.push(InventoryEntryV1 {
+        item: ball.item,
+        registry_key: ball.registry_key.clone(),
+        count: 1,
+    });
+    let target = run
+        .battle
+        .as_ref()
+        .and_then(|battle| battle.enemy_party.first())
+        .map(|pokemon| pokemon.id)
+        .ok_or("capture target missing")?;
+    run.control = capture_control(
+        MenuInstanceId::new(safe(1)),
+        safe(1),
+        SeatId::new(safe(1)),
+        OperationId::new("capture/audited/1")?,
+        target,
+        &[(ball.item, ball.registry_key.clone())],
+    )?;
+    let mut kernel = GameKernelV7::from_active(
+        state,
+        safe(1),
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content,
+        input(),
+        scheduler(),
+        None,
+    )?;
+    let step = kernel.raw_input(RawInputEvent::KeyDown {
+        code: PhysicalKey::Space,
+        printable: false,
+        browser_repeat: false,
+        focus: InputFocus::Game,
+    })?;
+    let bytes = step
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
+            _ => None,
+        })
+        .ok_or("capture material missing")?;
+    let material = GameMaterialV6::decode(bytes)?;
+    let draws = &material.transition().rng_audit;
+    assert_eq!(draws.len(), 1);
+    assert_eq!(draws[0].reason, RngReason::RandomSelector);
+    assert!(draws[0].consumed);
+    assert_ne!(draws[0].before_state, draws[0].after_state);
+    let after_rng = &kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run missing after capture")?
+        .run_rng;
+    assert_ne!(after_rng, &before_rng);
+    Ok(())
+}
+
+#[test]
+fn raw_reward_resolves_the_committed_content_offer() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let expected = content
+        .progression
+        .pack()
+        .capture_balls
+        .first()
+        .ok_or("reward content missing")?
+        .clone();
+    let mut state = natural_state(&content)?;
+    let run = state.active_run.as_mut().ok_or("run missing")?;
+    let battle = run.battle.as_mut().ok_or("battle missing")?;
+    battle.outcome = er_types::battle_model::BattleOutcome::Victory;
+    for enemy in &mut battle.enemy_party {
+        enemy.hp = 0;
+        enemy.fainted = true;
+    }
+    let (kernel, effects) = execute(
+        state,
+        content,
+        GameControlKindV2::Reward,
+        "reward/committed/1",
+        GameActionV1::Reward {
+            action: RewardActionV1::Select { option_ordinal: 0 },
+        },
+    )?;
+    let run = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run missing after reward")?;
+    assert!(run.inventory.entries.iter().any(|entry| {
+        entry.item == expected.item
+            && entry.registry_key == expected.registry_key
+            && entry.count == 1
+    }));
+    assert_eq!(run.wave.get().get(), 2);
+    assert_eq!(run.control.kind, GameControlKindV2::BattleCommand);
+    let material = effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
+            _ => None,
+        })
+        .ok_or("reward material missing")?;
+    assert!(
+        !GameMaterialV6::decode(material)?
+            .transition()
+            .rng_audit
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
+fn raw_inventory_use_resolves_content_and_target() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let mut state = natural_state(&content)?;
+    let run = state.active_run.as_mut().ok_or("run missing")?;
+    let target = run.party[0].id;
+    let before_hp = run.party[0].max_hp.saturating_sub(30).max(1);
+    run.party[0].hp = before_hp;
+    let potion = er_types::InventoryItemId::new(safe(100));
+    run.inventory.entries.push(InventoryEntryV1 {
+        item: potion,
+        registry_key: "POTION".to_owned(),
+        count: 1,
+    });
+    let max_hp = run.party[0].max_hp;
+    let (kernel, _) = execute(
+        state,
+        content,
+        GameControlKindV2::FullParty,
+        "inventory/use/potion",
+        GameActionV1::Inventory {
+            action: InventoryActionV1::Use {
+                item: potion,
+                target: Some(target),
+            },
+        },
+    )?;
+    let pokemon = &kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run missing after item use")?
+        .party[0];
+    let expected = before_hp.saturating_add(20 + max_hp / 10).min(max_hp);
+    assert_eq!(pokemon.hp, expected);
+    assert!(
+        kernel
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .unwrap()
+            .inventory
+            .entries
+            .iter()
+            .all(|entry| entry.item != potion)
+    );
+    Ok(())
+}
+
+#[test]
+fn scenario_choices_apply_distinct_graph_effects() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let (scenario_id, choice_node, left, right) = content
+        .scenarios
+        .pack()
+        .scenarios
+        .iter()
+        .find_map(|scenario| {
+            scenario.nodes.iter().find_map(|entry| {
+                let er_scenario::content_v2::ScenarioNodeV2::Choice { edges, .. } = &entry.node
+                else {
+                    return None;
+                };
+                (edges.len() >= 2).then(|| {
+                    (
+                        scenario.id,
+                        entry.id,
+                        edges[0].option_index,
+                        edges[1].option_index,
+                    )
+                })
+            })
+        })
+        .ok_or("two-choice scenario missing")?;
+    let mut initial = natural_state(&content)?;
+    initial.active_run.as_mut().ok_or("run missing")?.scenario = Some(ScenarioRuntimeStateV1 {
+        schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
+        scenario: scenario_id,
+        node: choice_node,
+        flags: Default::default(),
+        visit_count: SafeU53::ZERO,
+    });
+    let (left_kernel, _) = execute(
+        initial.clone(),
+        content.clone(),
+        GameControlKindV2::Scenario,
+        "scenario/choice/left",
+        GameActionV1::Scenario {
+            action: ScenarioGameActionV1::Choose {
+                node: choice_node,
+                option_ordinal: u32::from(left),
+            },
+        },
+    )?;
+    let (right_kernel, _) = execute(
+        initial,
+        content,
+        GameControlKindV2::Scenario,
+        "scenario/choice/right",
+        GameActionV1::Scenario {
+            action: ScenarioGameActionV1::Choose {
+                node: choice_node,
+                option_ordinal: u32::from(right),
+            },
+        },
+    )?;
+    let left_run = left_kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("left run missing")?;
+    let right_run = right_kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("right run missing")?;
+    assert_ne!(left_run.flags, right_run.flags);
+    Ok(())
+}
 #[test]
 fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Result<(), Box<dyn Error>>
 {
@@ -438,8 +681,16 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     let entry = content
         .scenarios
         .scenario(scenario_id)
-        .ok_or("scenario missing")?
-        .entry;
+        .and_then(|scenario| {
+            scenario.nodes.iter().find_map(|entry| {
+                matches!(
+                    entry.node,
+                    er_scenario::content_v2::ScenarioNodeV2::Complete { .. }
+                )
+                .then_some(entry.id)
+            })
+        })
+        .ok_or("scenario completion node missing")?;
     scenario.active_run.as_mut().unwrap().scenario = Some(ScenarioRuntimeStateV1 {
         schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
         scenario: scenario_id,

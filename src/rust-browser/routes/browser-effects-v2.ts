@@ -20,7 +20,7 @@ export interface BrowserEffectAdaptersV2 {
   recordTelemetry(
     event: "RUN_STARTED" | "ACTION_APPLIED" | "SAVE_COMPLETED" | "TERMINAL_REACHED",
   ): void | Promise<void>;
-  publishRepro(snapshot: unknown): void | Promise<void>;
+  publishRepro(snapshot: unknown, inputs: readonly unknown[]): void | Promise<void>;
   dispose(): void | Promise<void>;
 }
 
@@ -84,7 +84,7 @@ export class BrowserEffectRouterV2 {
         await this.adapters.recordTelemetry(effect.event);
         return;
       case "REPRO_READY":
-        await this.adapters.publishRepro(effect.snapshot);
+        await this.adapters.publishRepro(effect.snapshot, effect.inputs);
         return;
       default:
         effect satisfies never;

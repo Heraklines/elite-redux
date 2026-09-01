@@ -401,15 +401,29 @@ fn execute_switch(
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
 ) -> Result<ActionDisposition, BattleV5Error> {
-    if source_slot.side != BattleSide::Player {
-        return Err(BattleV5Error::SwitchTarget);
-    }
     let index = usize::from(party_slot.get());
-    let replacement = run.party.get(index).ok_or(BattleV5Error::SwitchTarget)?;
-    if replacement.fainted || replacement.id == actor || field_contains(run, replacement.id) {
-        return Err(BattleV5Error::SwitchTarget);
+    let replacement_id = match source_slot.side {
+        BattleSide::Player => run
+            .party
+            .get(index)
+            .filter(|replacement| {
+                !replacement.fainted
+                    && replacement.id != actor
+                    && !field_contains(run, replacement.id)
+            })
+            .map(|replacement| replacement.id),
+        BattleSide::Enemy => run
+            .battle
+            .as_ref()
+            .and_then(|battle| battle.enemy_party.get(index))
+            .filter(|replacement| {
+                !replacement.fainted
+                    && replacement.id != actor
+                    && !field_contains(run, replacement.id)
+            })
+            .map(|replacement| replacement.id),
     }
-    let replacement_id = replacement.id;
+    .ok_or(BattleV5Error::SwitchTarget)?;
     let battle = run.battle.as_mut().ok_or(BattleV5Error::NoBattle)?;
     let field = battle
         .field

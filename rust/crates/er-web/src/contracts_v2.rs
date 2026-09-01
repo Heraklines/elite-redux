@@ -73,12 +73,22 @@ pub enum BrowserLifecycleEventV2 {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
+pub enum BrowserPresentationOutcomeV2 {
+    Settled,
+    IntentionallySkipped,
+    Failed { reason: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserStorageResultV2 {
     Read { bytes: Option<Vec<u8>> },
     Written,
     Deleted,
     Slots { slots: Vec<String> },
     Failed { reason: String },
+    Conflict { current_generation: SafeU53 },
+    Uncertain { reason: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -113,6 +123,7 @@ pub enum BrowserRequestV2 {
     },
     PresentationSettled {
         event_id: PresentationEventId,
+        outcome: BrowserPresentationOutcomeV2,
     },
     Lifecycle {
         event: BrowserLifecycleEventV2,
@@ -183,6 +194,7 @@ pub enum BrowserEffectV2 {
     },
     ReproReady {
         snapshot: Box<CoreGameKernelSnapshotV7>,
+        inputs: Vec<RawInputEvent>,
     },
 }
 
