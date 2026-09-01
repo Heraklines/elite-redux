@@ -24,6 +24,7 @@ const MAXIMUM_RETAINED_REQUESTS_V2: usize = 2_048;
 
 #[derive(Clone, Debug)]
 struct RetainedBrowserRequestV2 {
+    accepted_sequence: SafeU53,
     fingerprint: String,
     response: Vec<u8>,
 }
@@ -41,7 +42,7 @@ pub enum BrowserWebErrorV2 {
 }
 
 #[wasm_bindgen]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BrowserKernelHostV2 {
     content: Arc<PreparedGameContentV2>,
     kernel: Option<GameKernelV7>,
@@ -108,12 +109,11 @@ impl BrowserKernelHostV2 {
                 Err(BrowserWebErrorV2::Conflict)
             };
         }
-        if envelope.sequence != self.next_sequence
-            || self.retained.len() >= MAXIMUM_RETAINED_REQUESTS_V2
-        {
+        if envelope.sequence != self.next_sequence {
             return Err(BrowserWebErrorV2::Invalid);
         }
-        let response = self.process_request(envelope.request)?;
+        let mut staged = self.clone();
+        let response = staged.process_request(envelope.request)?;
         let response = BrowserResponseEnvelopeV2 {
             version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
             request_id: envelope.request_id,
@@ -124,14 +124,25 @@ impl BrowserKernelHostV2 {
         if bytes.len() > MAXIMUM_BROWSER_RESPONSE_BYTES_V2 {
             return Err(BrowserWebErrorV2::Invalid);
         }
-        self.next_sequence = increment(self.next_sequence)?;
-        self.retained.insert(
+        staged.next_sequence = increment(staged.next_sequence)?;
+        staged.retained.insert(
             envelope.request_id,
             RetainedBrowserRequestV2 {
+                accepted_sequence: envelope.sequence,
                 fingerprint,
                 response: bytes.clone(),
             },
         );
+        while staged.retained.len() > MAXIMUM_RETAINED_REQUESTS_V2 {
+            let evicted = staged
+                .retained
+                .iter()
+                .min_by_key(|(_, retained)| retained.accepted_sequence)
+                .map(|(request_id, _)| *request_id)
+                .ok_or(BrowserWebErrorV2::Invalid)?;
+            staged.retained.remove(&evicted);
+        }
+        *self = staged;
         Ok(bytes)
     }
 

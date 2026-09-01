@@ -449,3 +449,53 @@ fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(
     );
     Ok(())
 }
+
+#[test]
+fn browser_host_survives_request_window() -> Result<(), Box<dyn Error>> {
+    let (mut host, mut sequence) = natural_host()?;
+    for _ in 0..2_100 {
+        let response = send(&mut host, sequence, BrowserRequestV2::Snapshot)?;
+        assert!(matches!(response, BrowserResponseV2::Snapshot { .. }));
+        sequence += 1;
+    }
+    let response = send(&mut host, sequence, BrowserRequestV2::Snapshot)?;
+    assert!(matches!(response, BrowserResponseV2::Snapshot { .. }));
+    Ok(())
+}
+
+#[test]
+fn browser_requests_are_atomic_and_conflicting_retries_fail_closed() -> Result<(), Box<dyn Error>> {
+    let (mut host, sequence) = natural_host()?;
+    let before = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let invalid = BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
+        request_id: safe(sequence + 1),
+        sequence: safe(sequence),
+        request: BrowserRequestV2::AuthorityMaterial {
+            bytes: vec![1, 2, 3],
+        },
+    };
+    let invalid = er_canonical::canonical_bytes(&invalid)?;
+    assert!(host.process_bytes(&invalid).is_err());
+    assert_eq!(
+        host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+        before
+    );
+
+    let response = send(&mut host, sequence, BrowserRequestV2::Snapshot)?;
+    assert!(matches!(response, BrowserResponseV2::Snapshot { .. }));
+    let accepted = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let conflict = BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
+        request_id: safe(sequence + 1),
+        sequence: safe(sequence),
+        request: BrowserRequestV2::ExportRepro,
+    };
+    let conflict = er_canonical::canonical_bytes(&conflict)?;
+    assert!(host.process_bytes(&conflict).is_err());
+    assert_eq!(
+        host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+        accepted
+    );
+    Ok(())
+}
