@@ -9,7 +9,7 @@ Updated: 2026-09-01
 - Expected base: `06341375ee2d206ed246c0504789ed853039fd6c`
 - TypeScript oracle: `399d5d368f0b5642ebf8f45bd8a5e73350fa4de7`
 - Architecture: `CLEAN_V7_CUTOVER`
-- Final tag, after exact-SHA qualification only: `rust-kernel-m9-engineering-final`
+- Historical limited-scope tag: `rust-kernel-m9-engineering-final` at `cfe2ed3e1d88b5cddb73124d5336c051f6e60c8a`; immutable and never repointed.
 - Release boundary: engineering only; no deployment, G53, R2-R7 rollout, production default change, or legacy production-save access/migration.
 
 ## Prepared content
@@ -98,19 +98,24 @@ All active ownership is held by the integration owner in this worktree; no paral
 - Control-family coverage: 24/24 controls survive canonical GameSaveV2 encode/decode and GameKernelV7 restoration; presentation mappings remain 24/24.
 - Content-domain closure: battle, run, progression, world, scenario, AI, meta, bootstrap, presentation, and the direct V2 bundle are complete; fresh-process bundle output is 2/2 byte-identical.
 - Migration: V5-to-V6 state migration, V6-to-V7 snapshot migration, allocator minima, material ledger, pending effects, save, and V7 continuation checks are implemented.
-- Native/Wasm: the V7 raw-input report is locked to digest `13aee334c66c6e0da239f0c4f56317ccc039af6362d340a7b56c753c92b7c1c3`; native execution is green and the wasm32 test binary compiles locally. Hosted wasm execution remains part of the exact-SHA gate.
-- Focused tests at current HEAD: V7 natural solo terminal, natural co-op proposal/material/recovery, four domain journeys including 24-control save reload, Snapshot V7, BrowserHostV2, browser effect routing, and native eventwise parity are green. Static ownership, TypeScript, Biome, and Rust formatting checks are green on the exercised surface.
-- Current failing tests: run `33484904634` at exact SHA `c6b047d239e3c9909b68854f95daaf147db20e04` exposed two roots; both are repaired in `6f76059c65`, and the replacement exact-SHA qualification is pending.
+- Native/Wasm: the corrected longitudinal V7 trace crosses progression, rewards, and wave 3; its eventwise report is locked to digest `ee3f694f9f766c2a8e730fbad3c81d533b0ce39dd97c7e673da3f67478cd584b`.
+- Corrective execution now covers non-final victory continuation, finite-mode finality, two-human command frontiers, audited capture and encounter RNG, content-resolved rewards/items, browser time/network/transport/storage/presentation outcomes, replay compaction, gamepad input, and reproducible raw-input export.
+- Remaining qualification gaps: complete source-derived scenario callback effects and required real-browser V7 solo/co-op journeys. No corrected final tag exists yet.
 
 ## Qualification attempts
 
 | Attempt | Candidate | Run | Result | Classified roots |
 |---|---|---|---|---|
 | 1 | `c6b047d239e3c9909b68854f95daaf147db20e04` | `33484904634` | RED | Static used an uncalibrated workspace-wide Clippy scope; simulator ran a historical M3 ancestry audit and its token audit falsely rejected the production `GameRuntimeV6` identifier. All other 30 pre-aggregate jobs were green. |
+| 2 | `cfe2ed3e1d88b5cddb73124d5336c051f6e60c8a` | `33486932792` | GREEN, LIMITED | Authentic configured gate covering 29 Rust shards, static, typed browser effect routing, native/Wasm short trace, and browser Wasm compilation. It did not cover the corrective longitudinal gameplay/browser requirements and therefore is historical evidence, not corrected completion. |
+
+## Historical tag scope
+
+`rust-kernel-m9-engineering-final` remains published at the exact attempt-2 SHA. It is not moved or deleted. Its scope is the original configured gate only. The corrected train will use `rust-kernel-m9-engineering-corrected-final` after a new exact-SHA aggregate includes longitudinal native/Wasm and real V7 browser solo/co-op jobs.
 
 ## Current next ready tasks
 
-1. Push the immutable candidate containing this ledger and workflow to `origin/arch/rust-kernel-m9-engineering`.
-2. Require `Rust Kernel M9 Engineering Qualification` to finish green at that exact SHA, including all 29 Rust shards, independent static checks, browser contract, wasm32 execution, and aggregate.
-3. If any shard is red, classify exact artifacts, repair one incremental candidate, update this ledger, and rerun the whole exact-SHA gate.
-4. Create `rust-kernel-m9-engineering-final` only after the aggregate is green at the exact tagged SHA.
+1. Finish source-derived scenario effects and the real-browser V7 solo/co-op acceptance surfaces.
+2. Push one immutable corrective candidate to `origin/arch/rust-kernel-m9-engineering`.
+3. Require the strengthened `Rust Kernel M9 Engineering Qualification` aggregate to finish green at that exact SHA.
+4. Create `rust-kernel-m9-engineering-corrected-final` only at the green corrected SHA.

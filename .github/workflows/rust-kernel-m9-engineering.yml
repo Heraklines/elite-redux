@@ -180,6 +180,32 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  v7-browser-wasm:
+    name: V7 browser Wasm production artifact
+    needs: candidate-binding
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-browser-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
+      - run: node scripts/build-kernel-m9e-v7-web.mjs --out-dir "$RUNNER_TEMP/m9e-v7-web"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9e-v7-web-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-v7-web
+          if-no-files-found: error
+          retention-days: 30
+
   aggregate:
     name: M9 Engineering exact-SHA aggregate
     if: always()
@@ -188,6 +214,7 @@ jobs:
       - static
       - browser-contract
       - rust-shards
+      - v7-browser-wasm
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -197,9 +224,11 @@ jobs:
           STATIC: ${{ needs.static.result }}
           BROWSER: ${{ needs.browser-contract.result }}
           RUST_SHARDS: ${{ needs.rust-shards.result }}
+          V7_BROWSER_WASM: ${{ needs.v7-browser-wasm.result }}
         run: |
           test "$BINDING" = success
           test "$STATIC" = success
           test "$BROWSER" = success
           test "$RUST_SHARDS" = success
+          test "$V7_BROWSER_WASM" = success
           printf '%s\n' "M9 Engineering candidate $CANDIDATE_SHA passed all 29 Rust shards, independent static checks, and the browser V2 contract."
