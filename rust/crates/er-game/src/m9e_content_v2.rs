@@ -1,22 +1,28 @@
 //! M9-E complete generic content bundle extension for GameKernelV7.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use er_ai::content_v2::{AiPolicyPackV2, PreparedAiPolicyContentV2};
 use er_canonical::content_digest;
 use er_content::pack::m6_pack::BattleContentPackV3;
+use er_content::pack::m6_prepared::{PreparedBattleContentV3, prepare_content};
+use er_progression::content_v2::{PreparedProgressionContentV2, ProgressionContentPackV2};
+use er_scenario::content_v2::{PreparedScenarioContentV2, ScenarioContentPackV2};
 use er_types::battle_ids::{GameModeId, MoveId, SpeciesId};
 use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::run_ids::BiomeId;
 use er_types::{
-    CatalogHash, GameContentBundleHash, GameControlKindV2, OracleSha, RunDifficultyV1, SafeU53,
-    SetupChoiceIdV1, SetupChoiceValueV1,
+    CatalogHash, GameBehaviorStatus, GameContentBundleHash, GameContentIdentityV2,
+    GameControlKindV2, OracleSha, RunDifficultyV1, SafeU53, SetupChoiceIdV1, SetupChoiceValueV1,
 };
-use er_world::content_v2::WorldContentPackV2;
+use er_world::content_v2::{PreparedWorldContentV2, WorldContentPackV2};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::m7_content::{GameContentBundleV1, PreparedGameContentV1};
+use crate::m7_content::{
+    MetaContentPackV1, PreparedMetaContentV1, PreparedRunContentV3, RunContentPackV3,
+};
 
 pub const GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2: u32 = 2;
 pub const BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1: u32 = 1;
@@ -185,8 +191,13 @@ pub struct PresentationContentPackV1 {
 pub struct GameContentBundleV2 {
     pub schema_version: u32,
     pub oracle_sha: OracleSha,
-    pub core: Arc<GameContentBundleV1>,
-    pub world_v2: Arc<WorldContentPackV2>,
+    pub battle: Arc<BattleContentPackV3>,
+    pub run: Arc<RunContentPackV3>,
+    pub progression: Arc<ProgressionContentPackV2>,
+    pub world: Arc<WorldContentPackV2>,
+    pub scenarios: Arc<ScenarioContentPackV2>,
+    pub ai: Arc<AiPolicyPackV2>,
+    pub meta: Arc<MetaContentPackV1>,
     pub bootstrap: Arc<BootstrapContentPackV1>,
     pub presentation: Arc<PresentationContentPackV1>,
     pub content_hash: GameContentBundleHash,
@@ -194,9 +205,16 @@ pub struct GameContentBundleV2 {
 
 #[derive(Clone, Debug)]
 pub struct PreparedGameContentV2 {
-    identity_hash: GameContentBundleHash,
+    identity: GameContentIdentityV2,
     bundle: Arc<GameContentBundleV2>,
-    core: Arc<PreparedGameContentV1>,
+    pub battle: PreparedBattleContentV3,
+    pub run: PreparedRunContentV3,
+    pub progression: PreparedProgressionContentV2,
+    pub world: PreparedWorldContentV2,
+    pub scenarios: PreparedScenarioContentV2,
+    pub ai: PreparedAiPolicyContentV2,
+    pub meta: PreparedMetaContentV1,
+    presentation: BTreeMap<PresentationSemanticIdV1, usize>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -211,8 +229,8 @@ pub enum GameContentV2Error {
     CrossReference,
     #[error("V2 content hash is invalid: {0}")]
     Hash(String),
-    #[error("V1 core content is invalid: {0}")]
-    Core(String),
+    #[error("V2 domain content is invalid: {0}")]
+    Domain(String),
 }
 
 #[derive(Serialize)]
@@ -238,8 +256,13 @@ struct PresentationHashView<'a> {
 struct BundleHashView<'a> {
     schema_version: u32,
     oracle_sha: &'a OracleSha,
-    core_hash: &'a GameContentBundleHash,
-    world_v2_hash: &'a CatalogHash,
+    battle_hash: &'a er_types::BattleContentPackHashV3,
+    run_hash: &'a CatalogHash,
+    progression_hash: &'a CatalogHash,
+    world_hash: &'a CatalogHash,
+    scenario_hash: &'a CatalogHash,
+    ai_hash: &'a CatalogHash,
+    meta_hash: &'a CatalogHash,
     bootstrap_hash: &'a CatalogHash,
     presentation_hash: &'a CatalogHash,
 }
@@ -469,9 +492,14 @@ impl GameContentBundleV2 {
         let digest = content_digest(&BundleHashView {
             schema_version: self.schema_version,
             oracle_sha: &self.oracle_sha,
-            core_hash: &self.core.content_hash,
+            battle_hash: &self.battle.content_hash,
+            run_hash: &self.run.content_hash,
+            progression_hash: &self.progression.content_hash,
+            world_hash: &self.world.content_hash,
+            scenario_hash: &self.scenarios.content_hash,
+            ai_hash: &self.ai.content_hash,
+            meta_hash: &self.meta.content_hash,
             bootstrap_hash: &self.bootstrap.content_hash,
-            world_v2_hash: &self.world_v2.content_hash,
             presentation_hash: &self.presentation.content_hash,
         })
         .map_err(|error| GameContentV2Error::Hash(error.to_string()))?;
@@ -481,28 +509,71 @@ impl GameContentBundleV2 {
 
     pub fn validate(&self) -> Result<(), GameContentV2Error> {
         if self.schema_version != GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2
-            || self.oracle_sha != self.core.oracle_sha
-            || self.oracle_sha != self.world_v2.oracle_sha
-            || self.oracle_sha != self.bootstrap.oracle_sha
-            || self.oracle_sha != self.presentation.oracle_sha
+            || [
+                &self.battle.oracle_sha,
+                &self.run.oracle_sha,
+                &self.progression.oracle_sha,
+                &self.world.oracle_sha,
+                &self.scenarios.oracle_sha,
+                &self.ai.oracle_sha,
+                &self.meta.oracle_sha,
+                &self.bootstrap.oracle_sha,
+                &self.presentation.oracle_sha,
+            ]
+            .iter()
+            .any(|oracle_sha| **oracle_sha != self.oracle_sha)
+            || self.run.battle_content_hash != self.battle.content_hash
             || self.content_hash != self.recompute_hash()?
         {
             return Err(GameContentV2Error::Identity);
         }
-        PreparedGameContentV1::prepare(self.core.clone())
-            .map_err(|error| GameContentV2Error::Core(error.to_string()))?;
+        self.run
+            .validate()
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        self.meta
+            .validate()
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let classifications = self
+            .meta
+            .classifications
+            .iter()
+            .map(|entry| (entry.behavior.clone(), entry.status))
+            .collect::<BTreeMap<_, _>>();
+        if self.run.programs.iter().any(|program| {
+            !matches!(
+                classifications.get(&program.source),
+                Some(GameBehaviorStatus::Compiled | GameBehaviorStatus::BespokeImplemented)
+            )
+        }) {
+            return Err(GameContentV2Error::CrossReference);
+        }
         let known_species = self
-            .core
             .battle
             .species
             .iter()
             .flatten()
             .map(|species| species.id)
             .collect::<BTreeSet<_>>();
-        self.world_v2
+        let known_moves = self
+            .battle
+            .moves
+            .iter()
+            .flatten()
+            .map(|move_definition| move_definition.id)
+            .collect::<BTreeSet<_>>();
+        self.progression
+            .validate(&known_species, &known_moves)
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        self.world
             .validate(&known_species)
-            .map_err(|error| GameContentV2Error::Core(error.to_string()))?;
-        self.bootstrap.validate(&self.core.battle, &self.world_v2)?;
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        self.scenarios
+            .validate()
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        self.ai
+            .validate()
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        self.bootstrap.validate(&self.battle, &self.world)?;
         self.presentation.validate(&self.oracle_sha)?;
         Ok(())
     }
@@ -511,26 +582,94 @@ impl GameContentBundleV2 {
 impl PreparedGameContentV2 {
     pub fn prepare(bundle: Arc<GameContentBundleV2>) -> Result<Self, GameContentV2Error> {
         bundle.validate()?;
-        let core = Arc::new(
-            PreparedGameContentV1::prepare(bundle.core.clone())
-                .map_err(|error| GameContentV2Error::Core(error.to_string()))?,
-        );
+        let known_species = bundle
+            .battle
+            .species
+            .iter()
+            .flatten()
+            .map(|species| species.id)
+            .collect::<BTreeSet<_>>();
+        let known_moves = bundle
+            .battle
+            .moves
+            .iter()
+            .flatten()
+            .map(|move_definition| move_definition.id)
+            .collect::<BTreeSet<_>>();
+        let battle = prepare_content((*bundle.battle).clone())
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let run = PreparedRunContentV3::prepare(bundle.run.clone())
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let progression = (*bundle.progression)
+            .clone()
+            .prepare(&known_species, &known_moves)
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let world = (*bundle.world)
+            .clone()
+            .prepare(&known_species)
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let scenarios = (*bundle.scenarios)
+            .clone()
+            .prepare()
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let ai = (*bundle.ai)
+            .clone()
+            .prepare()
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let meta = PreparedMetaContentV1::prepare(bundle.meta.clone())
+            .map_err(|error| GameContentV2Error::Domain(error.to_string()))?;
+        let presentation = bundle
+            .presentation
+            .mappings
+            .iter()
+            .enumerate()
+            .map(|(index, mapping)| (mapping.semantic, index))
+            .collect();
+        let identity = GameContentIdentityV2 {
+            oracle_sha: bundle.oracle_sha.clone(),
+            bundle_hash: bundle.content_hash.clone(),
+            battle_hash: bundle.battle.content_hash.clone(),
+            run_hash: bundle.run.content_hash.clone(),
+            progression_hash: bundle.progression.content_hash.clone(),
+            world_hash: bundle.world.content_hash.clone(),
+            scenario_hash: bundle.scenarios.content_hash.clone(),
+            ai_hash: bundle.ai.content_hash.clone(),
+            bootstrap_hash: bundle.bootstrap.content_hash.clone(),
+            presentation_hash: bundle.presentation.content_hash.clone(),
+            semantic_catalog_hash: bundle.battle.semantic_catalog_hash.clone(),
+        };
         Ok(Self {
-            identity_hash: bundle.content_hash.clone(),
+            identity,
             bundle,
-            core,
+            battle,
+            run,
+            progression,
+            world,
+            scenarios,
+            ai,
+            meta,
+            presentation,
         })
     }
 
+    pub fn identity(&self) -> &GameContentIdentityV2 {
+        &self.identity
+    }
+
     pub fn content_hash(&self) -> &GameContentBundleHash {
-        &self.identity_hash
+        &self.identity.bundle_hash
     }
 
     pub fn bundle(&self) -> &Arc<GameContentBundleV2> {
         &self.bundle
     }
 
-    pub fn core(&self) -> &Arc<PreparedGameContentV1> {
-        &self.core
+    pub fn presentation(
+        &self,
+        semantic: PresentationSemanticIdV1,
+    ) -> Option<&PresentationSemanticMappingV1> {
+        self.presentation
+            .get(&semantic)
+            .and_then(|index| self.bundle.presentation.mappings.get(*index))
     }
 }

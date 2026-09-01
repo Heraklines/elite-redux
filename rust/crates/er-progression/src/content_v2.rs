@@ -1,6 +1,7 @@
 //! Faithful M9-E progression content with signed learnset levels and closed evolution conditions.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use er_canonical::content_digest;
 use er_types::battle_ids::{MoveId, SpeciesId};
@@ -94,6 +95,14 @@ pub struct ProgressionContentPackV2 {
     pub capture_balls: Vec<CaptureBallDefinitionV2>,
     pub species: Vec<SpeciesProgressionDefinitionV2>,
     pub evolutions: Vec<EvolutionDefinitionV2>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PreparedProgressionContentV2 {
+    pack: Arc<ProgressionContentPackV2>,
+    species: BTreeMap<(SpeciesId, u16), usize>,
+    evolutions: BTreeMap<EvolutionId, usize>,
+    capture_balls: BTreeMap<InventoryItemId, usize>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -214,6 +223,66 @@ impl ProgressionContentPackV2 {
             validate_condition(&evolution.condition, known_species, known_moves)?;
         }
         Ok(())
+    }
+
+    pub fn prepare(
+        self,
+        known_species: &BTreeSet<SpeciesId>,
+        known_moves: &BTreeSet<MoveId>,
+    ) -> Result<PreparedProgressionContentV2, ProgressionContentV2Error> {
+        self.validate(known_species, known_moves)?;
+        let species = self
+            .species
+            .iter()
+            .enumerate()
+            .map(|(index, value)| ((value.species, value.form), index))
+            .collect();
+        let evolutions = self
+            .evolutions
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (value.id, index))
+            .collect();
+        let capture_balls = self
+            .capture_balls
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (value.item, index))
+            .collect();
+        Ok(PreparedProgressionContentV2 {
+            pack: Arc::new(self),
+            species,
+            evolutions,
+            capture_balls,
+        })
+    }
+}
+
+impl PreparedProgressionContentV2 {
+    pub fn pack(&self) -> &ProgressionContentPackV2 {
+        &self.pack
+    }
+
+    pub fn species(
+        &self,
+        species: SpeciesId,
+        form: u16,
+    ) -> Option<&SpeciesProgressionDefinitionV2> {
+        self.species
+            .get(&(species, form))
+            .and_then(|index| self.pack.species.get(*index))
+    }
+
+    pub fn evolution(&self, id: EvolutionId) -> Option<&EvolutionDefinitionV2> {
+        self.evolutions
+            .get(&id)
+            .and_then(|index| self.pack.evolutions.get(*index))
+    }
+
+    pub fn capture_ball(&self, id: InventoryItemId) -> Option<&CaptureBallDefinitionV2> {
+        self.capture_balls
+            .get(&id)
+            .and_then(|index| self.pack.capture_balls.get(*index))
     }
 }
 

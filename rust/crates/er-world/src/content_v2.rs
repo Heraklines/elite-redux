@@ -1,6 +1,7 @@
 //! Faithful M9-E world content preserving biome pool dimensions.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use er_canonical::content_digest;
 use er_types::battle_ids::{GameModeId, SpeciesId};
@@ -74,6 +75,13 @@ pub struct WorldContentPackV2 {
     pub content_hash: CatalogHash,
     pub modes: Vec<GameModeDefinitionV2>,
     pub biomes: Vec<BiomeDefinitionV2>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PreparedWorldContentV2 {
+    pack: Arc<WorldContentPackV2>,
+    modes: BTreeMap<GameModeId, usize>,
+    biomes: BTreeMap<BiomeId, usize>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -177,6 +185,48 @@ impl WorldContentPackV2 {
             }
         }
         Ok(())
+    }
+
+    pub fn prepare(
+        self,
+        known_species: &BTreeSet<SpeciesId>,
+    ) -> Result<PreparedWorldContentV2, WorldContentV2Error> {
+        self.validate(known_species)?;
+        let modes = self
+            .modes
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (value.id, index))
+            .collect();
+        let biomes = self
+            .biomes
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (value.id, index))
+            .collect();
+        Ok(PreparedWorldContentV2 {
+            pack: Arc::new(self),
+            modes,
+            biomes,
+        })
+    }
+}
+
+impl PreparedWorldContentV2 {
+    pub fn pack(&self) -> &WorldContentPackV2 {
+        &self.pack
+    }
+
+    pub fn mode(&self, id: GameModeId) -> Option<&GameModeDefinitionV2> {
+        self.modes
+            .get(&id)
+            .and_then(|index| self.pack.modes.get(*index))
+    }
+
+    pub fn biome(&self, id: BiomeId) -> Option<&BiomeDefinitionV2> {
+        self.biomes
+            .get(&id)
+            .and_then(|index| self.pack.biomes.get(*index))
     }
 }
 

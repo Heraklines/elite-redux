@@ -366,7 +366,7 @@ impl PreparedGameContentV1 {
 }
 
 impl PreparedRunContentV3 {
-    fn prepare(pack: Arc<RunContentPackV3>) -> Result<Self, GameContentError> {
+    pub(crate) fn prepare(pack: Arc<RunContentPackV3>) -> Result<Self, GameContentError> {
         pack.validate()?;
         let program_indexes = pack
             .programs
@@ -392,7 +392,7 @@ impl PreparedRunContentV3 {
 }
 
 impl PreparedMetaContentV1 {
-    fn prepare(pack: Arc<MetaContentPackV1>) -> Result<Self, GameContentError> {
+    pub(crate) fn prepare(pack: Arc<MetaContentPackV1>) -> Result<Self, GameContentError> {
         pack.validate()?;
         let classification_indexes = pack
             .classifications
