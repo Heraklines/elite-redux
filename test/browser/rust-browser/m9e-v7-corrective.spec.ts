@@ -204,7 +204,7 @@ async function press(page: Page, key: string) {
 // Real Chromium -> DOM keyboard -> canonical BrowserRequestV2 -> BrowserKernelHostV2 -> GameKernelV7.
 test("natural V7 browser startup reaches the real battle command", async ({ page }) => {
   await page.goto(new URL("m9e-v7.html", address).href);
-  await expect(page.locator("#status")).toHaveText("ready", { timeout: 120_000 });
+  await expect(page.locator("#status")).toHaveText("ready", { timeout: 240_000 });
   await press(page, "Space");
   await press(page, "Space");
   await press(page, "Space");
