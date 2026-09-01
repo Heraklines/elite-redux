@@ -11,6 +11,7 @@ pub mod field;
 pub mod format;
 pub mod game_v2;
 pub mod m7_state;
+pub mod m9e_state_v6;
 pub mod mechanic_state;
 pub mod mechanic_state_v2;
 pub mod migration;
