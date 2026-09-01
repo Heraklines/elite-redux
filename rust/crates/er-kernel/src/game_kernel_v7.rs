@@ -603,6 +603,13 @@ impl GameKernelV7 {
                 Err(GameKernelV7Error::Invalid)
             };
         }
+        if !proposal_is_rooted_in_control(
+            self.current_control(),
+            envelope.sender_seat,
+            &envelope.proposal,
+        ) {
+            return Err(GameKernelV7Error::Invalid);
+        }
         let capacity =
             usize::try_from(admission.capacity.get()).map_err(|_| GameKernelV7Error::Invalid)?;
         if admission.disposed || admission.fingerprints.len() >= capacity {
@@ -1552,6 +1559,47 @@ fn execution_input(action: &GameActionV1) -> GameDomainExecutionInputV1 {
             action: er_types::CaptureActionV1::Attempt { .. },
         } => GameDomainExecutionInputV1::CaptureDraw(0),
         _ => GameDomainExecutionInputV1::None,
+    }
+}
+
+fn proposal_is_rooted_in_control(
+    control: Option<&GameControlPlanV2>,
+    sender: SeatId,
+    proposal: &GameProposalV1,
+) -> bool {
+    let Some(control) = control else {
+        return false;
+    };
+    if !control.actionable
+        || control.owner_seat != Some(sender)
+        || control.action_context.as_ref() != Some(&proposal.context)
+    {
+        return false;
+    }
+    let Some(menu) = control.menu.as_ref() else {
+        return false;
+    };
+    if menu.owner_seat != sender || menu.instance_id != proposal.context.menu_instance {
+        return false;
+    }
+    if menu
+        .options
+        .iter()
+        .any(|option| option.enabled && option.visible && option.action == proposal.action)
+    {
+        return true;
+    }
+    match &menu.cancel {
+        GameMenuCancelV2::Disabled => false,
+        GameMenuCancelV2::Select { option_id } => menu.options.iter().any(|option| {
+            &option.option_id == option_id
+                && option.enabled
+                && option.visible
+                && option.action == proposal.action
+        }),
+        GameMenuCancelV2::Back { action } | GameMenuCancelV2::Close { action } => {
+            action.as_ref() == &proposal.action
+        }
     }
 }
 

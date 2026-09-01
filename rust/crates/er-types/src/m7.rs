@@ -247,8 +247,7 @@ impl GameControlPlanV2 {
                 .menu
                 .as_ref()
                 .ok_or(GameControlPlanV2Error::ActionableWithoutMenu)?;
-            if context.authority_seat != menu.owner_seat
-                || context.authority_revision != self.revision
+            if context.authority_revision != self.revision
                 || context.menu_instance != menu.instance_id
             {
                 return Err(GameControlPlanV2Error::ContextMismatch);
@@ -279,7 +278,7 @@ pub enum GameControlPlanV2Error {
     ActionableWithoutMenu,
     #[error("an actionable control requires an action context")]
     ActionableWithoutContext,
-    #[error("control action context differs from menu owner, revision, or instance")]
+    #[error("control action context differs from control revision or menu instance")]
     ContextMismatch,
     #[error("a non-actionable control cannot retain an action context")]
     NonActionableContext,

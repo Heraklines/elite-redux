@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelV7, GameProposalEnvelopeV2,
@@ -15,14 +16,13 @@ use er_protocol::replica::AuthorityReplicaConfig;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
-use er_state::m9e_state_v6::{
-    GAME_STATE_SCHEMA_VERSION_V6, GameIdentityAllocatorStateV1, GameStateV6,
-};
+use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
+use er_types::input::{PhysicalKey, RawInputEvent};
 use er_types::{
     ConnectionGeneration, FrameContext, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1,
-    GameActionV1, GameProposalV1, InputFocus, MembershipRevision, OperationId, RunId, SafeU53,
-    SaveActionV1, SeatId, SessionId, TimeClass,
+    GameActionV1, GameControlKindV2, GameMenuCancelV2, GameProposalV1, InputFocus,
+    MembershipRevision, OperationId, RunId, SafeU53, SaveActionV1, SeatId, SessionId, TimeClass,
 };
 
 const BUNDLE: &[u8] =
@@ -37,28 +37,22 @@ fn content() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
     Ok(Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?))
 }
 
-fn state(content: &PreparedGameContentV2) -> Result<GameStateV6, Box<dyn Error>> {
-    Ok(GameStateV6 {
-        schema_version: GAME_STATE_SCHEMA_VERSION_V6,
-        content_identity: content.identity().clone(),
-        identities: GameIdentityAllocatorStateV1::derive(None)?,
-        profile: ProfileStateV1 {
-            schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
-            unlocks: Vec::new(),
-            achievements: Vec::new(),
-            challenges: Vec::new(),
-            flags: Default::default(),
-            statistics: ProfileStatistics {
-                runs_started: SafeU53::ZERO,
-                runs_won: SafeU53::ZERO,
-                runs_lost: SafeU53::ZERO,
-                battles_won: SafeU53::ZERO,
-                pokemon_captured: SafeU53::ZERO,
-                highest_wave: WaveIndex::new(safe(1))?,
-            },
-            dex: DexState::default(),
+fn profile() -> Result<ProfileStateV1, Box<dyn Error>> {
+    Ok(ProfileStateV1 {
+        schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
+        unlocks: Vec::new(),
+        achievements: Vec::new(),
+        challenges: Vec::new(),
+        flags: Default::default(),
+        statistics: ProfileStatistics {
+            runs_started: SafeU53::ZERO,
+            runs_won: SafeU53::ZERO,
+            runs_lost: SafeU53::ZERO,
+            battles_won: SafeU53::ZERO,
+            pokemon_captured: SafeU53::ZERO,
+            highest_wave: WaveIndex::new(safe(1))?,
         },
-        active_run: None,
+        dex: DexState::default(),
     })
 }
 
@@ -81,6 +75,96 @@ fn scheduler() -> KernelSchedulerSnapshotV2 {
         pauses: Vec::new(),
         disposed: false,
     }
+}
+
+fn press(
+    kernel: &mut GameKernelV7,
+    code: PhysicalKey,
+) -> Result<er_kernel::game_kernel_v7::GameKernelStepV7, Box<dyn Error>> {
+    let step = kernel
+        .raw_input(RawInputEvent::KeyDown {
+            code: code.clone(),
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        })
+        .map_err(|error| format!("raw key down {code:?} failed: {error}"))?;
+    kernel
+        .raw_input(RawInputEvent::KeyUp { code })
+        .map_err(|error| format!("raw key up failed: {error}"))?;
+    Ok(step)
+}
+
+fn navigate_down_to(kernel: &mut GameKernelV7, option: &str) -> Result<(), Box<dyn Error>> {
+    let bound = kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .map(|menu| menu.options.len() + 1)
+        .ok_or("current control has no menu")?;
+    for _ in 0..bound {
+        if kernel
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == option)
+        {
+            return Ok(());
+        }
+        press(kernel, PhysicalKey::ArrowDown)?;
+    }
+    Err(format!("option {option} is unreachable").into())
+}
+
+fn natural_coop_state(
+    content: Arc<PreparedGameContentV2>,
+    host: SeatId,
+) -> Result<(GameStateV6, SafeU53, MenuInstanceId), Box<dyn Error>> {
+    let cooperative_mode = content
+        .bundle()
+        .bootstrap
+        .modes
+        .iter()
+        .find(|mode| mode.cooperative && mode.supported)
+        .ok_or("supported cooperative mode missing")?;
+    let cooperative_mode_id = cooperative_mode.mode;
+    let mode_option = format!("bootstrap/mode/{}", cooperative_mode_id.get());
+    let mut kernel = GameKernelV7::natural_start(
+        profile()?,
+        "m9e-natural-coop".to_owned(),
+        host,
+        vec!["m9e-coop-slot".to_owned()],
+        true,
+        content,
+        scheduler(),
+        None,
+    )
+    .map_err(|error| format!("natural co-op initialization failed: {error}"))?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    navigate_down_to(&mut kernel, &mode_option)?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    navigate_down_to(&mut kernel, "bootstrap/challenge/done")?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    navigate_down_to(&mut kernel, "bootstrap/starter/confirm")?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    let state = kernel
+        .state()
+        .cloned()
+        .ok_or("cooperative bootstrap did not install a run")?;
+    assert_eq!(
+        state.active_run.as_ref().ok_or("run missing")?.mode,
+        cooperative_mode_id
+    );
+    let snapshot = kernel
+        .snapshot()
+        .map_err(|error| format!("natural co-op snapshot failed: {error}"))?;
+    Ok((
+        state,
+        snapshot.material_ledger.next_authority_revision,
+        snapshot.next_menu_instance_id,
+    ))
 }
 
 fn frame(
@@ -161,8 +245,8 @@ fn replica_protocol(
 
 fn envelope(
     guest: SeatId,
-    host: SeatId,
     generation: ConnectionGeneration,
+    context: GameActionContextV1,
     action: GameActionV1,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     let value = GameProposalEnvelopeV2 {
@@ -171,12 +255,7 @@ fn envelope(
         connection_generation: generation,
         proposal: GameProposalV1 {
             schema_version: GAME_ACTION_SCHEMA_VERSION_V1,
-            context: GameActionContextV1 {
-                operation_id: OperationId::new("save/guest/1")?,
-                authority_seat: host,
-                authority_revision: safe(1),
-                menu_instance: MenuInstanceId::new(safe(1)),
-            },
+            context,
             action,
         },
     };
@@ -184,46 +263,91 @@ fn envelope(
 }
 
 #[test]
-fn authority_admits_once_replica_applies_once_and_generation_is_fenced()
--> Result<(), Box<dyn Error>> {
+fn natural_coop_raw_proposal_converges_and_generation_is_fenced() -> Result<(), Box<dyn Error>> {
     let content = content()?;
-    let state = state(&content)?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(1));
+    let (mut state, revision, menu_instance) = natural_coop_state(content.clone(), host)?;
+    let operation = OperationId::new("save/guest/1")?;
+    let mut control = generic_vertical_control_v2(
+        menu_instance,
+        revision,
+        guest,
+        operation.clone(),
+        GameControlKindV2::Save,
+        "m9e/coop/save",
+        &[(
+            "save/cancel".to_owned(),
+            GameActionV1::Save {
+                action: SaveActionV1::Cancel,
+            },
+        )],
+        GameMenuCancelV2::Disabled,
+    )?;
+    let context = control
+        .action_context
+        .as_mut()
+        .ok_or("co-op control context missing")?;
+    context.authority_seat = host;
+    let proposal_context = context.clone();
+    state.active_run.as_mut().ok_or("run missing")?.control = control;
+    state
+        .validate_with(content.as_ref())
+        .map_err(|error| format!("natural co-op state validation failed: {error}"))?;
+
     let authority_protocol =
-        initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)?;
+        initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)
+            .map_err(|error| format!("authority protocol initialization failed: {error}"))?;
     let replica_protocol =
-        initial_battle_protocol_snapshot_v2(&replica_protocol(host, guest, generation)?, guest)?;
+        initial_battle_protocol_snapshot_v2(&replica_protocol(host, guest, generation)?, guest)
+            .map_err(|error| format!("replica protocol initialization failed: {error}"))?;
     let mut authority = GameKernelV7::from_active(
         state.clone(),
-        safe(1),
+        revision,
         host,
         GameKernelRoleV7::Authority,
         content.clone(),
         input(),
         scheduler(),
         Some(authority_protocol),
-    )?;
+    )
+    .map_err(|error| format!("authority initialization failed: {error}"))?;
     let mut replica = GameKernelV7::from_active(
         state,
-        safe(1),
+        revision,
         guest,
         GameKernelRoleV7::Replica,
         content.clone(),
         input(),
         scheduler(),
         Some(replica_protocol),
-    )?;
-    let bytes = envelope(
+    )
+    .map_err(|error| format!("replica initialization failed: {error}"))?;
+    let mut forged_context = proposal_context.clone();
+    forged_context.operation_id = OperationId::new("save/guest/forged")?;
+    let forged = envelope(
         guest,
-        host,
         generation,
+        forged_context,
         GameActionV1::Save {
             action: SaveActionV1::Cancel,
         },
     )?;
-    let first = authority.admit_game_proposal(&bytes)?;
+    assert!(authority.admit_game_proposal(&forged).is_err());
+    let proposal_step = press(&mut replica, PhysicalKey::Space)
+        .map_err(|error| format!("guest raw proposal failed: {error}"))?;
+    let bytes = proposal_step
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::ProposalReady { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        })
+        .ok_or("guest raw input did not emit a proposal")?;
+    let first = authority
+        .admit_game_proposal(&bytes)
+        .map_err(|error| format!("authority proposal admission failed: {error}"))?;
     let material = first
         .effects
         .iter()
@@ -232,8 +356,11 @@ fn authority_admits_once_replica_applies_once_and_generation_is_fenced()
             _ => None,
         })
         .ok_or("authority did not emit material")?;
-    replica.apply_authority_material(&material)?;
+    replica
+        .apply_authority_material(&material)
+        .map_err(|error| format!("replica material apply failed: {error}"))?;
     assert_eq!(replica.state(), authority.state());
+    assert_eq!(replica.current_control(), authority.current_control());
     assert!(authority.admit_game_proposal(&bytes)?.effects.is_empty());
 
     let snapshot = authority.snapshot()?;
@@ -242,8 +369,8 @@ fn authority_admits_once_replica_applies_once_and_generation_is_fenced()
     assert!(recovered.admit_game_proposal(&bytes)?.effects.is_empty());
     let conflict = envelope(
         guest,
-        host,
         generation,
+        proposal_context.clone(),
         GameActionV1::Save {
             action: SaveActionV1::Delete {
                 slot: "preview-slot".to_owned(),
@@ -253,8 +380,8 @@ fn authority_admits_once_replica_applies_once_and_generation_is_fenced()
     assert!(authority.admit_game_proposal(&conflict).is_err());
     let stale = envelope(
         guest,
-        host,
         ConnectionGeneration::new(safe(2)),
+        proposal_context,
         GameActionV1::Save {
             action: SaveActionV1::Cancel,
         },
