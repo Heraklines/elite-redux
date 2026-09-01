@@ -287,10 +287,10 @@ impl LogicalMenu {
             return Err(LogicalMenuError::MissingSelectedOption);
         }
 
-        if let CancelPolicy::Select(option_id) = &self.cancel {
-            if !self.contains_option(option_id) {
-                return Err(LogicalMenuError::UnknownCancelOption);
-            }
+        if let CancelPolicy::Select(option_id) = &self.cancel
+            && !self.contains_option(option_id)
+        {
+            return Err(LogicalMenuError::UnknownCancelOption);
         }
 
         for pair in self.navigation.windows(2) {

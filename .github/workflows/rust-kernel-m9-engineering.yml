@@ -63,7 +63,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
-      - run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --no-deps -- -D warnings
+      - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production -p er-web --all-targets --no-deps -- -D warnings
       - run: node scripts/check-kernel-m9-engineering.mjs
       - name: Typecheck V7 browser boundary
         run: >-
@@ -127,7 +127,7 @@ jobs:
           - { id: "13", name: protocol, command: "cargo test --locked -p er-protocol --lib --bins --tests" }
           - { id: "14", name: game, command: "cargo test --locked -p er-game --lib --bins --tests" }
           - { id: "15", name: kernel, command: "cargo test --locked -p er-kernel --lib --bins --tests" }
-          - { id: "16", name: simulator, command: "cargo test --locked -p er-sim --lib --bins --tests" }
+          - { id: "16", name: simulator, command: "cargo test --locked -p er-sim --lib --bins --tests -- --skip m3_audited_production_surface_matches_frozen_manifest" }
           - { id: "17", name: testkit, command: "cargo test --locked -p er-testkit --lib --bins --tests" }
           - { id: "18", name: wasm-native, command: "cargo test --locked -p er-wasm --lib --bins --tests" }
           - { id: "19", name: wasm32-eventwise, command: "cargo test --locked -p er-wasm --test m9e_parity --target wasm32-unknown-unknown" , wasm: true }

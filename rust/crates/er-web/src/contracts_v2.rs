@@ -85,7 +85,7 @@ pub enum BrowserStorageResultV2 {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserRequestV2 {
     Initialize {
-        initialization: BrowserSessionInitializationV2,
+        initialization: Box<BrowserSessionInitializationV2>,
     },
     RawInput {
         event: RawInputEvent,
@@ -153,16 +153,37 @@ pub struct BrowserStorageRequestV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserEffectV2 {
-    UiChanged { control: GameControlPlanV2 },
-    Presentation { effect: GamePresentationEffectV2 },
-    PresentationSceneChanged { semantic: PresentationSemanticIdV1 },
-    SendNetworkFrame { generation: SafeU53, bytes: Vec<u8> },
-    StorageRequest { request: BrowserStorageRequestV2 },
-    AssetRequest { asset: PresentationAssetIdentityV1 },
-    AudioCue { cue: PresentationAudioCueV1 },
-    Terminal { terminal: TerminalState },
-    Telemetry { event: GameTelemetryEventV2 },
-    ReproReady { snapshot: CoreGameKernelSnapshotV7 },
+    UiChanged {
+        control: GameControlPlanV2,
+    },
+    Presentation {
+        effect: GamePresentationEffectV2,
+    },
+    PresentationSceneChanged {
+        semantic: PresentationSemanticIdV1,
+    },
+    SendNetworkFrame {
+        generation: SafeU53,
+        bytes: Vec<u8>,
+    },
+    StorageRequest {
+        request: BrowserStorageRequestV2,
+    },
+    AssetRequest {
+        asset: PresentationAssetIdentityV1,
+    },
+    AudioCue {
+        cue: PresentationAudioCueV1,
+    },
+    Terminal {
+        terminal: TerminalState,
+    },
+    Telemetry {
+        event: GameTelemetryEventV2,
+    },
+    ReproReady {
+        snapshot: Box<CoreGameKernelSnapshotV7>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -183,9 +204,15 @@ pub struct BrowserKernelFaultV2 {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserResponseV2 {
     Ready,
-    Effects { batch: BrowserEffectBatchV2 },
-    Snapshot { snapshot: CoreGameKernelSnapshotV7 },
-    Fault { fault: BrowserKernelFaultV2 },
+    Effects {
+        batch: BrowserEffectBatchV2,
+    },
+    Snapshot {
+        snapshot: Box<CoreGameKernelSnapshotV7>,
+    },
+    Fault {
+        fault: BrowserKernelFaultV2,
+    },
     Disposed,
 }
 

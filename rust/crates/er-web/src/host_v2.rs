@@ -148,7 +148,7 @@ impl BrowserKernelHostV2 {
                 if self.kernel.is_some() {
                     return Err(BrowserWebErrorV2::Invalid);
                 }
-                self.initialize(initialization)?;
+                self.initialize(*initialization)?;
                 Ok(BrowserResponseV2::Ready)
             }
             BrowserRequestV2::RawInput { event } => {
@@ -195,14 +195,16 @@ impl BrowserKernelHostV2 {
                 self.effects(GameKernelStepV7::default())
             }
             BrowserRequestV2::Snapshot => Ok(BrowserResponseV2::Snapshot {
-                snapshot: self.kernel()?.snapshot().map_err(kernel_error)?,
+                snapshot: Box::new(self.kernel()?.snapshot().map_err(kernel_error)?),
             }),
             BrowserRequestV2::ExportRepro => {
                 let snapshot = self.kernel()?.snapshot().map_err(kernel_error)?;
                 Ok(BrowserResponseV2::Effects {
                     batch: BrowserEffectBatchV2 {
                         external_sequence: self.next_sequence,
-                        effects: vec![BrowserEffectV2::ReproReady { snapshot }],
+                        effects: vec![BrowserEffectV2::ReproReady {
+                            snapshot: Box::new(snapshot),
+                        }],
                     },
                 })
             }

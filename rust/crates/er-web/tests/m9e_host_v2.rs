@@ -128,13 +128,13 @@ fn natural_host() -> Result<(BrowserKernelHostV2, u64), Box<dyn Error>> {
         &mut host,
         0,
         BrowserRequestV2::Initialize {
-            initialization: BrowserSessionInitializationV2::NaturalStart {
+            initialization: Box::new(BrowserSessionInitializationV2::NaturalStart {
                 context: context(),
                 profile: profile()?,
                 seed: "browser-v2-natural".to_owned(),
                 save_slots: vec!["preview-slot".to_owned()],
                 local_is_host: true,
-            },
+            }),
         },
     )
     .map_err(|error| format!("natural session initialization failed: {error}"))?;
@@ -291,7 +291,9 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
         let response = send(
             &mut host,
             0,
-            BrowserRequestV2::Initialize { initialization },
+            BrowserRequestV2::Initialize {
+                initialization: Box::new(initialization),
+            },
         )
         .map_err(|error| format!("{label} initialization failed: {error}"))?;
         assert!(matches!(response, BrowserResponseV2::Ready));
@@ -319,11 +321,11 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
             &mut scenario_host,
             0,
             BrowserRequestV2::Initialize {
-                initialization: BrowserSessionInitializationV2::Scenario {
+                initialization: Box::new(BrowserSessionInitializationV2::Scenario {
                     context: context(),
                     snapshot: scenario_snapshot,
                     scenario: scenario_id,
-                },
+                }),
             },
         )?,
         BrowserResponseV2::Ready
@@ -377,10 +379,10 @@ fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(
         &mut save_host,
         0,
         BrowserRequestV2::Initialize {
-            initialization: BrowserSessionInitializationV2::ExistingSave {
+            initialization: Box::new(BrowserSessionInitializationV2::ExistingSave {
                 context: context(),
                 save,
-            },
+            }),
         },
     )?;
     let response = press(&mut save_host, &mut 1, PhysicalKey::Space)?;
@@ -424,10 +426,10 @@ fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(
         &mut terminal_host,
         0,
         BrowserRequestV2::Initialize {
-            initialization: BrowserSessionInitializationV2::Snapshot {
+            initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
                 context: context(),
                 snapshot: terminal_snapshot,
-            },
+            }),
         },
     )?;
     let mut terminal_sequence = 1;

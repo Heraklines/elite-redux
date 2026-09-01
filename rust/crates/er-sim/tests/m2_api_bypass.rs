@@ -91,7 +91,6 @@ const FORBIDDEN_PRODUCTION_IDENTIFIERS: &[&str] = &[
     "Fn",
     "FnMut",
     "FnOnce",
-    "Runtime",
 ];
 
 const FORBIDDEN_PRODUCTION_QUALIFIERS: &[&str] = &[

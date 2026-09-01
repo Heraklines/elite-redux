@@ -157,7 +157,7 @@ impl TraceSnapshotEnvelopeV3 {
             ));
         }
         if self.canonical_snapshot.as_str().is_empty()
-            || self.canonical_snapshot.as_str().len() % 2 != 0
+            || !self.canonical_snapshot.as_str().len().is_multiple_of(2)
             || !self
                 .canonical_snapshot
                 .as_str()
@@ -229,16 +229,15 @@ impl KernelTraceEventV3 {
                     "failure evidence must name a subsystem, path, and first difference",
                 ));
             }
-            if let Some(surface) = &failure.surface {
-                if surface.surface_kind.is_empty()
+            if let Some(surface) = &failure.surface
+                && (surface.surface_kind.is_empty()
                     || surface.expected_surface_digest.is_empty()
-                    || surface.actual_surface_digest.is_empty()
-                {
-                    return Err(invalid(
-                        format!("{path}.failure.surface"),
-                        "surface evidence must retain identity and both digests",
-                    ));
-                }
+                    || surface.actual_surface_digest.is_empty())
+            {
+                return Err(invalid(
+                    format!("{path}.failure.surface"),
+                    "surface evidence must retain identity and both digests",
+                ));
             }
         }
         Ok(())
