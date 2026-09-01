@@ -9,21 +9,41 @@ describe("BrowserEffectRouterV2", () => {
   it("routes every typed effect once and fences stale or disposed batches", async () => {
     const calls: string[] = [];
     const adapters: BrowserEffectAdaptersV2 = {
-      renderUi: () => calls.push("UI_CHANGED"),
-      present: () => calls.push("PRESENTATION"),
-      changePresentationScene: () => calls.push("PRESENTATION_SCENE_CHANGED"),
+      renderUi: () => {
+        calls.push("UI_CHANGED");
+      },
+      present: () => {
+        calls.push("PRESENTATION");
+      },
+      changePresentationScene: () => {
+        calls.push("PRESENTATION_SCENE_CHANGED");
+      },
       sendNetworkFrame: (generation, bytes) => {
         expect(generation).toBe(2);
         expect([...bytes]).toEqual([1, 2, 3]);
         calls.push("SEND_NETWORK_FRAME");
       },
-      handleStorageRequest: () => calls.push("STORAGE_REQUEST"),
-      requestAsset: () => calls.push("ASSET_REQUEST"),
-      playAudioCue: () => calls.push("AUDIO_CUE"),
-      showTerminal: () => calls.push("TERMINAL"),
-      recordTelemetry: () => calls.push("TELEMETRY"),
-      publishRepro: () => calls.push("REPRO_READY"),
-      dispose: () => calls.push("DISPOSE"),
+      handleStorageRequest: () => {
+        calls.push("STORAGE_REQUEST");
+      },
+      requestAsset: () => {
+        calls.push("ASSET_REQUEST");
+      },
+      playAudioCue: () => {
+        calls.push("AUDIO_CUE");
+      },
+      showTerminal: () => {
+        calls.push("TERMINAL");
+      },
+      recordTelemetry: () => {
+        calls.push("TELEMETRY");
+      },
+      publishRepro: () => {
+        calls.push("REPRO_READY");
+      },
+      dispose: () => {
+        calls.push("DISPOSE");
+      },
     };
     const router = new BrowserEffectRouterV2(adapters);
     const batch: BrowserEffectBatchV2 = {

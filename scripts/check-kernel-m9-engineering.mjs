@@ -62,7 +62,7 @@ for (const family of [
   "TELEMETRY",
   "REPRO_READY",
 ]) {
-  if (!browserAdapter.includes(`case \"${family}\"`)) {
+  if (!browserAdapter.includes(`case "${family}"`)) {
     fail(`browser V2 adapter is missing ${family}`);
   }
 }
@@ -136,4 +136,3 @@ if (
 console.log(
   `M9-E static ownership: V7 cutover frozen, BrowserKernelHostV2, ${expectedControls.length} controls, 10 typed browser adapters`,
 );
-
