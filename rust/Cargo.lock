@@ -323,6 +323,7 @@ dependencies = [
  "er-game",
  "er-mechanics",
  "er-progression",
+ "er-scenario",
  "er-types",
  "er-world",
  "serde",
@@ -608,6 +609,7 @@ dependencies = [
 name = "er-scenario"
 version = "0.1.0"
 dependencies = [
+ "er-canonical",
  "er-state",
  "er-types",
  "serde",

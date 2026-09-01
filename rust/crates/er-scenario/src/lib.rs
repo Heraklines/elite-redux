@@ -1,7 +1,9 @@
 //! Closed deterministic M7 scenario graphs.
+pub mod content_v2;
 pub mod full_surface;
 pub mod party_requirements;
 pub mod runtime;
+pub mod runtime_v2;
 pub mod training_session;
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
