@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use er_ai::authority_v2::AuthorityAiV2;
 use er_ai::full_surface::{AiActionKindV1, AiActorViewV1, AiScoreContextV1, legal_actions_v1};
-use er_canonical::canonical_bytes;
+use er_canonical::{canonical_bytes, content_digest};
 use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::PreparedGameContentV2;
 use er_game::m9e_internal_event_v2::{
@@ -23,6 +23,7 @@ use er_game::m72_bootstrap::{
     BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapErrorV1, RunBootstrapMachineV1,
     RunBootstrapStageV1,
 };
+use er_protocol::snapshot::ProposalFingerprintSnapshotV2;
 use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2};
 use er_state::m7_state::ProfileStateV1;
 use er_state::m9e_state_v6::GameStateV6;
@@ -30,9 +31,10 @@ use er_types::battle_ids::MenuInstanceId;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::ui_menu::NavigationDirection;
 use er_types::{
-    BootstrapActionV1, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1, GameActionV1,
-    GameButton, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2, GameProposalV1,
-    OperationId, PlatformRequestId, RunOutcome, SafeU53, SeatId, StarterSelectionV1, TerminalState,
+    BootstrapActionV1, ConnectionGeneration, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1,
+    GameActionV1, GameButton, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
+    GameProposalV1, OperationId, PlatformRequestId, RunOutcome, SafeU53, SeatId,
+    StarterSelectionV1, TerminalState,
 };
 use thiserror::Error;
 
@@ -49,6 +51,15 @@ use crate::snapshot_v7::{
 pub enum GameKernelRoleV7 {
     Authority,
     Replica,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GameProposalEnvelopeV2 {
+    pub schema_version: u32,
+    pub sender_seat: SeatId,
+    pub connection_generation: ConnectionGeneration,
+    pub proposal: GameProposalV1,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -517,6 +528,94 @@ impl GameKernelV7 {
         Ok(step)
     }
 
+    pub fn admit_game_proposal(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if self.role != GameKernelRoleV7::Authority || bytes.is_empty() {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let envelope: GameProposalEnvelopeV2 =
+            serde_json::from_slice(bytes).map_err(|_| GameKernelV7Error::Invalid)?;
+        if envelope.schema_version != 2
+            || canonical_bytes(&envelope).map_err(|_| GameKernelV7Error::Invalid)? != bytes
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        envelope
+            .proposal
+            .validate()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        if envelope.proposal.context.authority_seat
+            != protocol.frame_context.context.authority_seat_id
+            || !protocol.connections.iter().any(|connection| {
+                connection.peer_seat == envelope.sender_seat
+                    && connection.generation == envelope.connection_generation
+            })
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let fingerprint = content_digest(&envelope.proposal)
+            .map(|digest| format!("blake3-v1:{digest}"))
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let admission = protocol
+            .proposal_admission
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        if let Some(previous) = admission
+            .fingerprints
+            .iter()
+            .find(|entry| entry.operation_id == envelope.proposal.context.operation_id)
+        {
+            return if previous.fingerprint == fingerprint {
+                Ok(GameKernelStepV7::default())
+            } else {
+                Err(GameKernelV7Error::Invalid)
+            };
+        }
+        let capacity =
+            usize::try_from(admission.capacity.get()).map_err(|_| GameKernelV7Error::Invalid)?;
+        if admission.disposed || admission.fingerprints.len() >= capacity {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let action = envelope.proposal.action;
+        if matches!(action, GameActionV1::Battle { .. }) {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let context = GameActionDispatchContextV1 {
+            action: envelope.proposal.context.clone(),
+            input: execution_input(&action),
+            authority: true,
+        };
+        let mut staged_runtime = self.active_runtime()?.clone();
+        let step = execute_action_transaction(&mut staged_runtime, action, context)?;
+        let mut staged_protocol = protocol.clone();
+        let staged_admission = staged_protocol
+            .proposal_admission
+            .as_mut()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        staged_admission
+            .fingerprints
+            .push(ProposalFingerprintSnapshotV2 {
+                operation_id: envelope.proposal.context.operation_id,
+                fingerprint,
+            });
+        staged_admission
+            .fingerprints
+            .sort_by(|left, right| left.operation_id.cmp(&right.operation_id));
+        staged_protocol
+            .validate()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        self.install_step_effects(&step.effects)?;
+        self.lifecycle = GameKernelLifecycleV7::Active(staged_runtime);
+        self.protocol = Some(staged_protocol);
+        self.advance_replay_sequence()?;
+        let mut step = step;
+        self.synchronize_terminal(&mut step)?;
+        Ok(step)
+    }
+
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
         self.input_router
             .validate()
@@ -812,7 +911,18 @@ impl GameKernelV7 {
             proposal
                 .validate()
                 .map_err(|_| GameKernelV7Error::Invalid)?;
-            let bytes = canonical_bytes(&proposal).map_err(|_| GameKernelV7Error::Invalid)?;
+            let connection_generation = self
+                .protocol
+                .as_ref()
+                .map(|protocol| protocol.frame_context.context.connection_generation)
+                .ok_or(GameKernelV7Error::Invalid)?;
+            let envelope = GameProposalEnvelopeV2 {
+                schema_version: 2,
+                sender_seat: self.local_seat,
+                connection_generation,
+                proposal,
+            };
+            let bytes = canonical_bytes(&envelope).map_err(|_| GameKernelV7Error::Invalid)?;
             return Ok(GameKernelStepV7 {
                 effects: vec![GameKernelEffectV7::ProposalReady {
                     operation_id: action_context.operation_id,
