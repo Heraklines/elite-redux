@@ -413,71 +413,77 @@ fn raw_inventory_use_resolves_content_and_target() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
-fn scenario_choices_apply_distinct_graph_effects() -> Result<(), Box<dyn Error>> {
+fn scenario_choices_apply_source_compiled_graph_effects() -> Result<(), Box<dyn Error>> {
     let content = content()?;
-    let (scenario_id, choice_node, left, right) = content
+    let scenario = content
         .scenarios
         .pack()
         .scenarios
         .iter()
-        .find_map(|scenario| {
-            scenario.nodes.iter().find_map(|entry| {
-                let er_scenario::content_v2::ScenarioNodeV2::Choice { edges, .. } = &entry.node
-                else {
-                    return None;
-                };
-                (edges.len() >= 2).then(|| {
-                    (
-                        scenario.id,
-                        entry.id,
-                        edges[0].option_index,
-                        edges[1].option_index,
-                    )
-                })
-            })
+        .find(|scenario| scenario.key == "ER_CLEANSING_FONT")
+        .ok_or("cleansing font scenario missing")?;
+    let choice_node = scenario
+        .nodes
+        .iter()
+        .find_map(|entry| {
+            matches!(
+                entry.node,
+                er_scenario::content_v2::ScenarioNodeV2::Choice { .. }
+            )
+            .then_some(entry.id)
         })
-        .ok_or("two-choice scenario missing")?;
+        .ok_or("cleansing font choice missing")?;
     let mut initial = natural_state(&content)?;
-    initial.active_run.as_mut().ok_or("run missing")?.scenario = Some(ScenarioRuntimeStateV1 {
+    let run = initial.active_run.as_mut().ok_or("run missing")?;
+    let initial_flags = run.flags.clone();
+    let pokemon = run.party.first_mut().ok_or("party missing")?;
+    pokemon.hp = 1;
+    let maximum_hp = pokemon.max_hp;
+    run.scenario = Some(ScenarioRuntimeStateV1 {
         schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V1,
-        scenario: scenario_id,
+        scenario: scenario.id,
         node: choice_node,
         flags: Default::default(),
         visit_count: SafeU53::ZERO,
     });
-    let (left_kernel, _) = execute(
+    let (restored_kernel, _) = execute(
         initial.clone(),
         content.clone(),
         GameControlKindV2::Scenario,
-        "scenario/choice/left",
+        "scenario/cleansing-font/restore",
         GameActionV1::Scenario {
             action: ScenarioGameActionV1::Choose {
                 node: choice_node,
-                option_ordinal: u32::from(left),
+                option_ordinal: 0,
             },
         },
     )?;
-    let (right_kernel, _) = execute(
+    let (declined_kernel, _) = execute(
         initial,
         content,
         GameControlKindV2::Scenario,
-        "scenario/choice/right",
+        "scenario/cleansing-font/decline",
         GameActionV1::Scenario {
             action: ScenarioGameActionV1::Choose {
                 node: choice_node,
-                option_ordinal: u32::from(right),
+                option_ordinal: 1,
             },
         },
     )?;
-    let left_run = left_kernel
+    let restored_run = restored_kernel
         .state()
         .and_then(|state| state.active_run.as_ref())
-        .ok_or("left run missing")?;
-    let right_run = right_kernel
+        .ok_or("restored run missing")?;
+    let declined_run = declined_kernel
         .state()
         .and_then(|state| state.active_run.as_ref())
-        .ok_or("right run missing")?;
-    assert_ne!(left_run.flags, right_run.flags);
+        .ok_or("declined run missing")?;
+    assert_eq!(restored_run.party[0].hp, maximum_hp);
+    assert_eq!(declined_run.party[0].hp, 1);
+    assert_eq!(restored_run.flags, initial_flags);
+    assert_eq!(declined_run.flags, initial_flags);
+    assert!(restored_run.scenario.is_none());
+    assert!(declined_run.scenario.is_none());
     Ok(())
 }
 #[test]

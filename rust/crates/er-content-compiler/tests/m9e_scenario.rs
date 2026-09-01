@@ -1,8 +1,10 @@
 use std::error::Error;
 
 use er_content_compiler::m9e_scenario::build_m9_engineering_scenario_v2;
-use er_scenario::runtime_v2::{ScenarioControlV2, ScenarioDomainFactoryV2, ScenarioInputV2};
-use er_types::ScenarioId;
+use er_scenario::content_v2::ScenarioCompiledEffectV2;
+use er_scenario::runtime_v2::{
+    ScenarioControlV2, ScenarioDomainFactoryV2, ScenarioInputV2, ScenarioRuntimeV2Error,
+};
 
 const SCENARIOS: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -71,11 +73,29 @@ fn scenario_factory_executes_and_restores_the_typed_graph() -> Result<(), Box<dy
         factory.control(&runtime)?,
         ScenarioControlV2::ExecuteOption { .. }
     ));
+    assert_eq!(
+        factory.compiled_effects(&runtime),
+        Err(ScenarioRuntimeV2Error::UnsupportedBehavior)
+    );
     factory.apply(&mut runtime, ScenarioInputV2::OptionApplied)?;
     assert!(matches!(
         factory.control(&runtime)?,
         ScenarioControlV2::Complete { .. }
     ));
     assert!(runtime.completed_outcome.is_some());
+    Ok(())
+}
+
+#[test]
+fn cleansing_font_options_compile_source_bound_effects() -> Result<(), Box<dyn Error>> {
+    let pack = build_m9_engineering_scenario_v2(SCENARIOS, CATALOG, IMPLEMENTATIONS)?;
+    let factory = ScenarioDomainFactoryV2::new(pack.prepare()?);
+    let mut runtime = factory.start(ScenarioId::try_from_u64(73)?)?;
+    factory.apply(&mut runtime, ScenarioInputV2::AcknowledgeMessage)?;
+    factory.apply(&mut runtime, ScenarioInputV2::Choose(0))?;
+    assert_eq!(
+        factory.compiled_effects(&runtime)?,
+        vec![ScenarioCompiledEffectV2::RestoreParty]
+    );
     Ok(())
 }

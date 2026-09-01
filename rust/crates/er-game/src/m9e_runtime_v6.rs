@@ -8,6 +8,7 @@ use er_progression::progression::{fuse_pokemon, replace_move};
 use er_rng::audit::RngDraw;
 use er_rng::phaser::RunRngState;
 use er_save::m9e_save_v2::GameSaveV2;
+use er_scenario::content_v2::ScenarioCompiledEffectV2;
 use er_scenario::runtime_v2::{
     SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioControlV2, ScenarioDomainFactoryV2,
     ScenarioInputV2, ScenarioRuntimeV2,
@@ -1126,7 +1127,7 @@ fn execute_scenario(
         selected_option: None,
         completed_outcome: None,
     };
-    let mut selected_option = None;
+    let mut compiled_effects = Vec::new();
     let complete = match action {
         ScenarioGameActionV1::Advance { .. } => {
             factory
@@ -1139,7 +1140,6 @@ fn execute_scenario(
             factory
                 .apply(&mut runtime, ScenarioInputV2::Choose(option))
                 .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
-            selected_option = Some(option);
             if matches!(
                 factory
                     .control(&runtime)
@@ -1151,6 +1151,9 @@ fn execute_scenario(
                     ..
                 }
             ) {
+                compiled_effects = factory
+                    .compiled_effects(&runtime)
+                    .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
                 factory
                     .apply(&mut runtime, ScenarioInputV2::OptionApplied)
                     .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
@@ -1177,14 +1180,10 @@ fn execute_scenario(
         .active_run
         .as_mut()
         .ok_or(GameRuntimeV6Error::Action)?;
+    apply_scenario_effects(run, &compiled_effects);
     let scenario = run.scenario.as_mut().ok_or(GameRuntimeV6Error::Action)?;
     scenario.node = runtime.current_node;
     scenario.visit_count = safe_increment(scenario.visit_count)?;
-    if let Some(option) = selected_option {
-        let flag = er_types::RunFlagId::new(safe_from_u64(u64::from(option) + 1)?);
-        scenario.flags.insert(flag, true);
-        run.flags.insert(flag, true);
-    }
     if complete {
         run.scenario = None;
     }
@@ -1192,6 +1191,30 @@ fn execute_scenario(
         candidate: Some(candidate),
         ..Default::default()
     })
+}
+
+fn apply_scenario_effects(
+    run: &mut er_state::m7_state::RunStateV3,
+    effects: &[ScenarioCompiledEffectV2],
+) {
+    for effect in effects {
+        match effect {
+            ScenarioCompiledEffectV2::RestoreParty => {
+                for pokemon in &mut run.party {
+                    pokemon.hp = pokemon.max_hp;
+                    pokemon.fainted = false;
+                    pokemon.status = er_types::battle_model::StatusState {
+                        kind: er_types::battle_model::StatusKind::None,
+                        toxic_turn_count: 0,
+                        sleep_turns_remaining: None,
+                    };
+                    for move_slot in pokemon.moves.iter_mut().flatten() {
+                        move_slot.pp_used = 0;
+                    }
+                }
+            }
+        }
+    }
 }
 fn execute_save(
     before: Option<&GameStateV6>,

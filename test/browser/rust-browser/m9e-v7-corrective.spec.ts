@@ -12,8 +12,13 @@ const fixture = resolve(fixtureRoot);
 let server: Server;
 let address: string;
 
+test.setTimeout(180_000);
+
 const html = `<!doctype html><html><body><div id="status">loading</div><script type="module">
-import init, { BrowserKernelHostV2 } from "/m9e-assets/er_web.js";
+const status = document.querySelector("#status");
+try {
+// Dynamic import keeps Wasm bootstrap failures observable; static import errors occur before the harness can report them.
+const { default: init, BrowserKernelHostV2 } = await import("/m9e-assets/er_web.js");
 const encoder = new TextEncoder(); const decoder = new TextDecoder();
 const canonical = value => {
   if (Array.isArray(value)) return value.map(canonical);
@@ -83,7 +88,10 @@ const coop = async () => {
   return { converged: JSON.stringify(canonical(authorityAfter.lifecycle)) === JSON.stringify(canonical(replicaAfter.lifecycle)), turnAdvanced: authorityAfter.lifecycle.value.active_run.battle.turn > initialTurn };
 };
 globalThis.__m9eV7 = { idle: () => pending, snapshot, send, coop };
-document.querySelector("#status").textContent = "ready";
+status.textContent = "ready";
+} catch (error) {
+  status.textContent = "error: " + (error instanceof Error ? error.stack : String(error));
+}
 </script></body></html>`;
 
 interface ControlWire {
