@@ -3,6 +3,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use er_ai::authority_v2::AuthorityAiV2;
+use er_ai::full_surface::{AiActionKindV1, AiActorViewV1, AiScoreContextV1, legal_actions_v1};
 use er_canonical::canonical_bytes;
 use er_game::m9e_content_v2::PreparedGameContentV2;
 use er_game::m9e_internal_event_v2::{
@@ -85,6 +87,7 @@ pub struct GameKernelV7 {
     content: Arc<PreparedGameContentV2>,
     local_seat: SeatId,
     role: GameKernelRoleV7,
+    authority_ai: Option<AuthorityAiV2>,
     input_router: InputRouterSnapshotV2,
     scheduler: KernelSchedulerSnapshotV2,
     protocol: Option<ProtocolRuntimeSnapshotV2>,
@@ -130,11 +133,14 @@ impl GameKernelV7 {
         let catalog = bootstrap_catalog(content.as_ref(), local_seat, save_slots, local_is_host)?;
         let bootstrap = RunBootstrapMachineV1::new(profile, seed, local_seat, catalog)
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        let authority_ai =
+            (role == GameKernelRoleV7::Authority).then(|| AuthorityAiV2::new(content.ai.clone()));
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Bootstrap(bootstrap),
             content,
             local_seat,
             role,
+            authority_ai,
             input_router: empty_input_router(),
             scheduler,
             protocol,
@@ -159,11 +165,14 @@ impl GameKernelV7 {
     ) -> Result<Self, GameKernelV7Error> {
         let runtime = GameRuntimeV6::new(Some(state), content.clone(), next_authority_revision)
             .map_err(runtime_error)?;
+        let authority_ai =
+            (role == GameKernelRoleV7::Authority).then(|| AuthorityAiV2::new(content.ai.clone()));
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Active(runtime),
             content,
             local_seat,
             role,
+            authority_ai,
             input_router,
             scheduler,
             protocol,
@@ -184,6 +193,16 @@ impl GameKernelV7 {
         snapshot
             .validate(content.as_ref())
             .map_err(|error| GameKernelV7Error::Snapshot(error.to_string()))?;
+        let material_ledger = snapshot.material_ledger.clone();
+        let authority_ai = match (role, snapshot.authority_ai.clone()) {
+            (GameKernelRoleV7::Authority, Some(snapshot)) => Some(
+                AuthorityAiV2::from_snapshot(content.ai.clone(), snapshot)
+                    .map_err(|_| GameKernelV7Error::Invalid)?,
+            ),
+            (GameKernelRoleV7::Authority, None) => Some(AuthorityAiV2::new(content.ai.clone())),
+            (GameKernelRoleV7::Replica, None) => None,
+            (GameKernelRoleV7::Replica, Some(_)) => return Err(GameKernelV7Error::Invalid),
+        };
         let lifecycle = match snapshot.lifecycle {
             GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
                 GameKernelLifecycleV7::Bootstrap(bootstrap)
@@ -192,7 +211,7 @@ impl GameKernelV7 {
                 GameRuntimeV6::from_snapshot(
                     GameRuntimeSnapshotV6 {
                         state: Some(state),
-                        material_ledger: snapshot.material_ledger,
+                        material_ledger: material_ledger.clone(),
                     },
                     content.clone(),
                 )
@@ -206,7 +225,7 @@ impl GameKernelV7 {
                 runtime: GameRuntimeV6::from_snapshot(
                     GameRuntimeSnapshotV6 {
                         state: Some(state),
-                        material_ledger: snapshot.material_ledger,
+                        material_ledger: material_ledger.clone(),
                     },
                     content.clone(),
                 )
@@ -219,6 +238,7 @@ impl GameKernelV7 {
             content,
             local_seat,
             role,
+            authority_ai,
             input_router: snapshot.input_router,
             scheduler: snapshot.scheduler,
             protocol: snapshot.protocol,
@@ -268,6 +288,7 @@ impl GameKernelV7 {
         let snapshot = CoreGameKernelSnapshotV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
+            authority_ai: self.authority_ai.as_ref().map(AuthorityAiV2::snapshot),
             input_router: self.input_router.clone(),
             scheduler: self.scheduler.clone(),
             protocol: self.protocol.clone(),
@@ -300,6 +321,161 @@ impl GameKernelV7 {
                 .and_then(|state| state.active_run.as_ref())
                 .map(|run| &run.control),
         }
+    }
+
+    pub fn prepare_authority_ai_commands(
+        &mut self,
+    ) -> Result<Vec<er_types::battle_command::AcceptedBattleCommand>, GameKernelV7Error> {
+        if self.role != GameKernelRoleV7::Authority {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let state = self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
+        let run = state
+            .active_run
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let battle = run.battle.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        let player_targets = battle
+            .field
+            .slots
+            .iter()
+            .filter(|slot| {
+                slot.slot.side == er_types::battle_ids::BattleSide::Player
+                    && slot.occupant.is_some()
+            })
+            .map(|slot| slot.slot)
+            .collect::<Vec<_>>();
+        if player_targets.is_empty() {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let policy = self
+            .content
+            .ai
+            .mode(run.mode.get().get())
+            .map(|mode| mode.policy)
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let mut accepted = Vec::new();
+        for field in battle.field.slots.iter().filter(|slot| {
+            slot.slot.side == er_types::battle_ids::BattleSide::Enemy && slot.occupant.is_some()
+        }) {
+            let actor_id = field.occupant.ok_or(GameKernelV7Error::Invalid)?;
+            let actor = battle
+                .enemy_party
+                .iter()
+                .find(|pokemon| pokemon.id == actor_id)
+                .ok_or(GameKernelV7Error::Invalid)?;
+            let moves = actor
+                .moves
+                .iter()
+                .enumerate()
+                .filter_map(|(index, slot)| {
+                    let slot = slot.as_ref()?;
+                    let definition = self.content.battle.move_definition(slot.move_id).ok()?;
+                    if slot.pp_used >= definition.base_pp {
+                        return None;
+                    }
+                    let move_slot = u8::try_from(index).ok()?;
+                    let power = match definition.power {
+                        er_types::battle_model::MovePower::None => 0,
+                        er_types::battle_model::MovePower::Value(power) => power,
+                    };
+                    Some((
+                        slot.move_id,
+                        move_slot,
+                        power,
+                        definition.priority,
+                        player_targets
+                            .iter()
+                            .map(|target| target.position)
+                            .collect::<Vec<_>>(),
+                    ))
+                })
+                .collect::<Vec<_>>();
+            let actor_view = AiActorViewV1 {
+                pokemon: actor.id,
+                hp: actor.hp,
+                max_hp: actor.max_hp,
+                moves,
+                legal_switches: Vec::new(),
+            };
+            let legal = legal_actions_v1(&actor_view);
+            let target = run
+                .party
+                .iter()
+                .find(|pokemon| {
+                    battle.field.slots.iter().any(|slot| {
+                        slot.slot.side == er_types::battle_ids::BattleSide::Player
+                            && slot.occupant == Some(pokemon.id)
+                    })
+                })
+                .ok_or(GameKernelV7Error::Invalid)?;
+            let contexts = legal
+                .iter()
+                .cloned()
+                .map(|action| {
+                    (
+                        action,
+                        AiScoreContextV1 {
+                            effectiveness_percent: 100,
+                            accuracy_percent: 100,
+                            target_hp: target.hp,
+                            target_max_hp: target.max_hp,
+                            ally_damage_penalty: 0,
+                        },
+                    )
+                })
+                .collect::<BTreeMap<_, _>>();
+            let decision = self
+                .authority_ai
+                .as_mut()
+                .ok_or(GameKernelV7Error::Invalid)?
+                .choose_single(true, policy, &actor_view, &contexts, None)
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+            let action = decision.actions.first().ok_or(GameKernelV7Error::Invalid)?;
+            let command = match action.kind {
+                AiActionKindV1::Move => {
+                    let slot = action.move_slot.ok_or(GameKernelV7Error::Invalid)?;
+                    let target_position = action.target.ok_or(GameKernelV7Error::Invalid)?;
+                    let target = player_targets
+                        .iter()
+                        .find(|target| target.position == target_position)
+                        .copied()
+                        .ok_or(GameKernelV7Error::Invalid)?;
+                    er_types::battle_command::BattleCommand::fight(
+                        actor.id,
+                        er_types::battle_ids::MoveSlotIndex::new(slot)
+                            .map_err(|_| GameKernelV7Error::Invalid)?,
+                        er_types::battle_command::BattleTargetSelection::selected(vec![target])
+                            .map_err(|_| GameKernelV7Error::Invalid)?,
+                    )
+                    .map_err(|_| GameKernelV7Error::Invalid)?
+                }
+                AiActionKindV1::Switch => return Err(GameKernelV7Error::Invalid),
+            };
+            let script_cursor =
+                SafeU53::new(decision.decision_sequence).map_err(|_| GameKernelV7Error::Invalid)?;
+            let operation = er_types::battle_command::scripted_enemy_command_operation_id(
+                battle.battle_id,
+                battle.wave,
+                battle.turn,
+                field.slot,
+                script_cursor,
+            )
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+            let command = er_types::battle_command::ScriptedEnemyBattleCommandV1::new(
+                operation,
+                battle.battle_id,
+                battle.wave,
+                battle.turn,
+                script_cursor,
+                actor.id,
+                field.slot,
+                command,
+            )
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+            accepted.push(er_types::battle_command::AcceptedBattleCommand::scripted_enemy(command));
+        }
+        Ok(accepted)
     }
 
     pub fn raw_input(

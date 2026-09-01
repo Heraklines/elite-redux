@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+er-ai = { path = "../er-ai" }
 er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }

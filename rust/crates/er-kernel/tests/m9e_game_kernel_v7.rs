@@ -140,14 +140,20 @@ fn raw_keys_complete_natural_start_and_install_serialized_v6_state() -> Result<(
             .iter()
             .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
     );
+    let ai_commands = kernel.prepare_authority_ai_commands()?;
+    assert_eq!(ai_commands.len(), 1);
+    ai_commands[0].validate()?;
     let snapshot = kernel.snapshot()?;
-    let restored = GameKernelV7::from_snapshot(
+    let mut restored = GameKernelV7::from_snapshot(
         snapshot,
         SeatId::new(safe(1)),
         GameKernelRoleV7::Authority,
         content,
     )?;
     assert_eq!(restored.state(), kernel.state());
+    let restored_ai = restored.prepare_authority_ai_commands()?;
+    assert_eq!(restored_ai.len(), 1);
+    restored_ai[0].validate()?;
     Ok(())
 }
 

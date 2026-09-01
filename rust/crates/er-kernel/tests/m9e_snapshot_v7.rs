@@ -94,6 +94,7 @@ fn active_snapshot(
     Ok(CoreGameKernelSnapshotV7 {
         schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
         lifecycle: GameKernelLifecycleSnapshotV7::Active(state(content)?),
+        authority_ai: None,
         input_router: input(),
         scheduler: scheduler(),
         protocol: None,

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use er_ai::authority_v2::{AuthorityAiSnapshotV2, AuthorityAiV2};
 use er_game::m9e_content_v2::{PreparedGameContentV2, PresentationSemanticIdV1};
 use er_game::m9e_material_v6::{AppliedGameMaterialLedgerV1, GamePlatformEffectV2};
 use er_game::m72_bootstrap::RunBootstrapMachineV1;
@@ -56,6 +57,7 @@ pub struct PendingPlatformRequestV2 {
 pub struct CoreGameKernelSnapshotV7 {
     pub schema_version: u32,
     pub lifecycle: GameKernelLifecycleSnapshotV7,
+    pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
     pub protocol: Option<ProtocolRuntimeSnapshotV2>,
@@ -106,6 +108,10 @@ impl CoreGameKernelSnapshotV7 {
         self.material_ledger
             .validate()
             .map_err(|_| SnapshotV7Error::Invalid)?;
+        if let Some(snapshot) = &self.authority_ai {
+            AuthorityAiV2::from_snapshot(content.ai.clone(), snapshot.clone())
+                .map_err(|_| SnapshotV7Error::Invalid)?;
+        }
         match &self.lifecycle {
             GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
                 bootstrap.validate().map_err(|_| SnapshotV7Error::Invalid)?;
@@ -183,6 +189,7 @@ impl CoreGameKernelSnapshotV7 {
             pending_platform: BTreeMap::new(),
             material_ledger: AppliedGameMaterialLedgerV1::new(next_revision)
                 .map_err(|_| SnapshotV7Error::Migration)?,
+            authority_ai: None,
             replay_sequence: source.replay_sequence,
             prepared_transaction: None,
         };

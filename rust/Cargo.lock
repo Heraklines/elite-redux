@@ -411,6 +411,7 @@ dependencies = [
 name = "er-kernel"
 version = "0.1.0"
 dependencies = [
+ "er-ai",
  "er-battle",
  "er-canonical",
  "er-content",
