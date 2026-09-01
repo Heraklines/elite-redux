@@ -36,7 +36,7 @@ pub enum InventoryUseEffectV1 {
     GrantHeldItem { registry_key: String },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GameDomainExecutionInputV1 {
     None,
     BootstrapCandidate(GameStateV6),
@@ -55,7 +55,7 @@ pub enum GameDomainExecutionInputV1 {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct GameActionDispatchContextV1 {
     pub action: GameActionContextV1,
     pub input: GameDomainExecutionInputV1,
