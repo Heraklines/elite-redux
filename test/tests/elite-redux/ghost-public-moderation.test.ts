@@ -43,13 +43,27 @@ describe("public ghost moderation", () => {
     expect(moderateGhostPresentation("hello")).toBe("hello");
   });
 
+  it("rewrites confirmed public display-name aliases", () => {
+    expect(moderateGhostPresentation({ displayName: "Iceuranus", title: "Wholesome" })).toEqual({
+      displayName: "IceUrshifu",
+      title: "Wholesome",
+    });
+    expect(moderateGhostPresentation({ displayName: "PocketBussy" })).toEqual({
+      displayName: "PocketBlissey",
+    });
+  });
+
   it("keeps the historical public alias and rejects high-confidence slur registrations", () => {
     expect(moderateGhostUsername("Bigdickenergy 69")).toBe("smallpeckerenergy");
+    expect(moderateGhostUsername("Iceuranus")).toBe("IceUrshifu");
+    expect(moderateGhostUsername("PocketBussy")).toBe("PocketBlissey");
     expect(moderateGhostUsername("Normal Trainer")).toBe("Normal Trainer");
     expect(isDisallowedPublicUsername("nigga44")).toBe(true);
     expect(isDisallowedPublicUsername("The Nigger Hater")).toBe(true);
     expect(isDisallowedPublicUsername("Sniggers softly")).toBe(false);
     expect(isDisallowedPublicUsername("snigger-nigga")).toBe(true);
+    expect(isDisallowedPublicUsername("Iceuranus")).toBe(true);
+    expect(isDisallowedPublicUsername("PocketBussy")).toBe(true);
     expect(isDisallowedPublicUsername("GarchompFan")).toBe(false);
   });
 });
