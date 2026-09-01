@@ -6,10 +6,11 @@ use std::sync::Arc;
 use er_canonical::content_digest;
 use er_content::pack::m6_pack::BattleContentPackV3;
 use er_types::battle_ids::{GameModeId, MoveId, SpeciesId};
+use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::run_ids::BiomeId;
 use er_types::{
-    CatalogHash, GameContentBundleHash, OracleSha, RunDifficultyV1, SafeU53, SetupChoiceIdV1,
-    SetupChoiceValueV1,
+    CatalogHash, GameContentBundleHash, GameControlKindV2, OracleSha, RunDifficultyV1, SafeU53,
+    SetupChoiceIdV1, SetupChoiceValueV1,
 };
 use er_world::content_v2::WorldContentPackV2;
 use serde::{Deserialize, Serialize};
@@ -73,14 +74,101 @@ pub struct BootstrapContentPackV1 {
     pub maximum_starters: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PresentationCueFamilyV1 {
+    Move,
+    Ability,
+    HeldItem,
+    Hp,
+    Status,
+    Stat,
+    Switch,
+    Faint,
+    Capture,
+    Progression,
+    Evolution,
+    Fusion,
+    Reward,
+    Market,
+    World,
+    Scenario,
+    Save,
+    Waiting,
+    Terminal,
+    Error,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PresentationUiRoleV1 {
+    Heading,
+    Body,
+    EnabledOption,
+    DisabledOption,
+    Cursor,
+    PartyMember,
+    Item,
+    Target,
+    Status,
+    Currency,
+    Progress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
+pub enum PresentationSemanticIdV1 {
+    Control(GameControlKindV2),
+    Cue(PresentationCueFamilyV1),
+    UiRole(PresentationUiRoleV1),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PresentationAssetIdentityV1 {
+    InterfaceWindow,
+    Cursor,
+    PartyIcon,
+    ItemIcon,
+    PokemonSprite,
+    BattleEffect,
+    WorldBackdrop,
+    ScenarioSprite,
+    TerminalOverlay,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PresentationAudioCueV1 {
+    Confirm,
+    Cancel,
+    Cursor,
+    Battle,
+    Capture,
+    Reward,
+    Evolution,
+    Error,
+    Terminal,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ReducedPresentationPolicyV1 {
+    Essential,
+    Reducible,
+    Omit,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PresentationSemanticMappingV1 {
-    pub semantic: String,
+    pub semantic: PresentationSemanticIdV1,
     pub text_key: String,
-    pub asset_keys: Vec<String>,
-    pub audio_cue: Option<String>,
-    pub blocks_human_input: bool,
+    pub assets: Vec<PresentationAssetIdentityV1>,
+    pub audio_cue: Option<PresentationAudioCueV1>,
+    pub blocking: PresentationBlockingPolicy,
+    pub skip: PresentationSkipPolicy,
+    pub reduced: ReducedPresentationPolicyV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -262,6 +350,82 @@ impl BootstrapContentPackV1 {
     }
 }
 
+pub fn all_presentation_semantics_v1() -> Vec<PresentationSemanticIdV1> {
+    use GameControlKindV2 as Control;
+    use PresentationCueFamilyV1 as Cue;
+    use PresentationSemanticIdV1::{Control as ControlSemantic, Cue as CueSemantic, UiRole};
+    use PresentationUiRoleV1 as Role;
+
+    let controls = [
+        Control::Title,
+        Control::ModeSelect,
+        Control::StarterSelect,
+        Control::BattleCommand,
+        Control::BattleMove,
+        Control::BattleTarget,
+        Control::BattleSwitch,
+        Control::BattleReplacement,
+        Control::Capture,
+        Control::FullParty,
+        Control::Progression,
+        Control::MoveLearn,
+        Control::Evolution,
+        Control::Fusion,
+        Control::Reward,
+        Control::Market,
+        Control::Scenario,
+        Control::Quest,
+        Control::Faction,
+        Control::Biome,
+        Control::Route,
+        Control::Save,
+        Control::Waiting,
+        Control::Complete,
+    ]
+    .into_iter()
+    .map(ControlSemantic);
+    let cues = [
+        Cue::Move,
+        Cue::Ability,
+        Cue::HeldItem,
+        Cue::Hp,
+        Cue::Status,
+        Cue::Stat,
+        Cue::Switch,
+        Cue::Faint,
+        Cue::Capture,
+        Cue::Progression,
+        Cue::Evolution,
+        Cue::Fusion,
+        Cue::Reward,
+        Cue::Market,
+        Cue::World,
+        Cue::Scenario,
+        Cue::Save,
+        Cue::Waiting,
+        Cue::Terminal,
+        Cue::Error,
+    ]
+    .into_iter()
+    .map(CueSemantic);
+    let roles = [
+        Role::Heading,
+        Role::Body,
+        Role::EnabledOption,
+        Role::DisabledOption,
+        Role::Cursor,
+        Role::PartyMember,
+        Role::Item,
+        Role::Target,
+        Role::Status,
+        Role::Currency,
+        Role::Progress,
+    ]
+    .into_iter()
+    .map(UiRole);
+    controls.chain(cues).chain(roles).collect()
+}
+
 impl PresentationContentPackV1 {
     pub fn recompute_hash(&self) -> Result<CatalogHash, GameContentV2Error> {
         let digest = content_digest(&PresentationHashView {
@@ -274,20 +438,24 @@ impl PresentationContentPackV1 {
     }
 
     pub fn validate(&self, oracle_sha: &OracleSha) -> Result<(), GameContentV2Error> {
+        let expected = all_presentation_semantics_v1();
         if self.schema_version != PRESENTATION_CONTENT_SCHEMA_VERSION_V1
             || &self.oracle_sha != oracle_sha
             || self.content_hash != self.recompute_hash()?
-            || self.mappings.is_empty()
+            || self.mappings.len() != expected.len()
             || self
                 .mappings
-                .windows(2)
-                .any(|pair| pair[0].semantic >= pair[1].semantic)
+                .iter()
+                .map(|mapping| mapping.semantic)
+                .ne(expected)
             || self.mappings.iter().any(|mapping| {
-                mapping.semantic.is_empty()
-                    || mapping.text_key.is_empty()
-                    || mapping.asset_keys.is_empty()
-                    || mapping.asset_keys.iter().any(String::is_empty)
-                    || mapping.audio_cue.as_ref().is_some_and(String::is_empty)
+                mapping.text_key.is_empty()
+                    || mapping.assets.is_empty()
+                    || mapping
+                        .assets
+                        .iter()
+                        .enumerate()
+                        .any(|(index, asset)| mapping.assets[index + 1..].contains(asset))
             })
         {
             return Err(GameContentV2Error::Presentation);

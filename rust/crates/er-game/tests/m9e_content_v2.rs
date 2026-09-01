@@ -5,8 +5,7 @@ use er_game::m7_content::GameContentBundleV1;
 use er_game::m9e_content_v2::{
     BOOTSTRAP_CONTENT_SCHEMA_VERSION_V1, BootstrapContentPackV1, BootstrapModeDefinitionV2,
     GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2, GameContentBundleV2, LevelMoveDefinitionV1,
-    PRESENTATION_CONTENT_SCHEMA_VERSION_V1, PreparedGameContentV2, PresentationContentPackV1,
-    PresentationSemanticMappingV1, StarterDefinitionV2,
+    PreparedGameContentV2, PresentationContentPackV1, StarterDefinitionV2,
 };
 use er_types::battle_ids::{GameModeId, MoveId, SpeciesId};
 use er_types::run_ids::BiomeId;
@@ -17,6 +16,8 @@ use er_world::content_v2::{
 };
 
 const CORE: &[u8] = include_bytes!("../../../fixtures/m9/solo-entry/content-pack.json");
+const PRESENTATION: &[u8] =
+    include_bytes!("../../../fixtures/m9/engineering/presentation-content-pack-v1.json");
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("fixture value is safe")
@@ -99,19 +100,7 @@ fn bundle() -> Result<GameContentBundleV2, Box<dyn Error>> {
         maximum_starters: 6,
     };
     bootstrap.content_hash = bootstrap.recompute_hash()?;
-    let mut presentation = PresentationContentPackV1 {
-        schema_version: PRESENTATION_CONTENT_SCHEMA_VERSION_V1,
-        oracle_sha: oracle_sha.clone(),
-        content_hash: zero_catalog(),
-        mappings: vec![PresentationSemanticMappingV1 {
-            semantic: "BATTLE_MOVE_USED".to_owned(),
-            text_key: "battle.move.used".to_owned(),
-            asset_keys: vec!["sprite/pokemon".to_owned()],
-            audio_cue: Some("audio/move".to_owned()),
-            blocks_human_input: true,
-        }],
-    };
-    presentation.content_hash = presentation.recompute_hash()?;
+    let presentation: PresentationContentPackV1 = serde_json::from_slice(PRESENTATION)?;
     let world_v2 = world(&core)?;
     let mut value = GameContentBundleV2 {
         schema_version: GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V2,
@@ -133,7 +122,7 @@ fn content_v2_prepares_one_cross_referenced_identity() -> Result<(), Box<dyn Err
     let second = PreparedGameContentV2::prepare(Arc::new(value))?;
     assert_eq!(first.content_hash(), second.content_hash());
     assert_eq!(first.bundle().bootstrap.starters.len(), 1);
-    assert_eq!(first.bundle().presentation.mappings.len(), 1);
+    assert_eq!(first.bundle().presentation.mappings.len(), 55);
     assert_eq!(
         first.core().bundle().battle.moves.iter().flatten().count(),
         5
