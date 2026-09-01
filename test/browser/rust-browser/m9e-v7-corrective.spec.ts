@@ -88,10 +88,11 @@ const createClient = async (snapshot, seat, role) => {
   return { send: clientSend };
 };
 const rawPress = async client => {
-  await client.send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: { code: { kind: "SPACE" }, printable: false, browser_repeat: false, focus: "GAME" } } });
-  return client.send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } } });
+  const down = await client.send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: { code: { kind: "SPACE" }, printable: false, browser_repeat: false, focus: "GAME" } } });
+  const up = await client.send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } } });
+  return [down, up];
 };
-const networkBytes = response => response.batch.effects.find(effect => effect.kind === "SEND_NETWORK_FRAME")?.bytes;
+const networkBytes = responses => (Array.isArray(responses) ? responses : [responses]).flatMap(response => response.kind === "EFFECTS" ? response.batch.effects : []).find(effect => effect.kind === "SEND_NETWORK_FRAME")?.bytes;
 const coop = async () => {
   const authoritySnapshot = await (await fetch("/m9e-assets/coop-authority-snapshot.json")).json();
   const replicaSnapshot = await (await fetch("/m9e-assets/coop-replica-snapshot.json")).json();
