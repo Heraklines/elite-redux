@@ -28,7 +28,8 @@ describe("ER randomized final-boss progression", () => {
       .enemyAbility(AbilityId.BALL_FETCH)
       .enemyPassiveAbility(AbilityId.BALL_FETCH)
       .enemyMoveset(MoveId.SPLASH)
-      .moveset([MoveId.TACKLE, MoveId.SPLASH])
+      // Feint bypasses species-specific entry protection without changing its rules.
+      .moveset([MoveId.FEINT, MoveId.SPLASH])
       .criticalHits(false);
   });
 
@@ -51,7 +52,7 @@ describe("ER randomized final-boss progression", () => {
     const hp = enemy.hp;
     const dialogue = vi.spyOn(game.scene.ui, "showDialogue");
 
-    game.move.select(MoveId.TACKLE);
+    game.move.select(MoveId.FEINT);
     await game.toNextTurn();
     expect(enemy.hp).toBeLessThan(hp);
     expect(enemy.isFainted()).toBe(false);
@@ -59,7 +60,7 @@ describe("ER randomized final-boss progression", () => {
     expect(enemy.bossSegmentIndex).toBe(0);
 
     enemy.hp = 1;
-    game.move.select(MoveId.TACKLE);
+    game.move.select(MoveId.FEINT);
     await game.phaseInterceptor.to("VictoryPhase", false);
     expect(enemy.isFainted()).toBe(true);
     expect(dialogue).not.toHaveBeenCalled();
