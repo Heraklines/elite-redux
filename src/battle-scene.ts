@@ -5226,6 +5226,10 @@ export class BattleScene extends SceneBase {
    * @param pokemon The (enemy) pokemon
    */
   initFinalBossPhaseTwo(pokemon: Pokemon): void {
+    // Randomizers (and older saves) can put an unrelated boss in this encounter.
+    // It has no finale transformation: replaying the dialogue never advances it.
+    const isFinaleSpecies =
+      pokemon.species.speciesId === SpeciesId.ETERNATUS || isErFinalBossSpecies(pokemon.species.speciesId);
     // ER Black Shinies (#349): the HELL finale STARTS as Primal Cascoon
     // (formIndex 1), so the formIndex>0 guard must not skip its stage 2 —
     // which is the BLACK SHINY promotion instead of a form change.
@@ -5235,7 +5239,10 @@ export class BattleScene extends SceneBase {
       && getErDifficulty() === "hell"
       && !pokemon.customPokemonData?.erBlackShiny;
     if (
-      !pokemon.isEnemy()
+      !this.currentBattle.isClassicFinalBoss
+      || !isFinaleSpecies
+      || !pokemon.isEnemy()
+      || pokemon.isFainted()
       || !pokemon.isBoss()
       || (pokemon.formIndex > 0 && !erHellFinale)
       || pokemon.bossSegmentIndex >= 1

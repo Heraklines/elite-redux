@@ -1,0 +1,32 @@
+name: Battle Softlock Regression Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/metronome-final-boss-20260902
+
+permissions:
+  contents: read
+
+jobs:
+  headless-battles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ER_SCENARIO: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-deps
+      - name: Run Metronome and final-boss battle regressions
+        run: >-
+          pnpm exec vitest run
+          test/tests/moves/metronome.test.ts
+          test/tests/elite-redux/er-randomized-final-boss.test.ts
+          test/tests/elite-redux/er-final-boss-cascoon.test.ts
+          test/tests/elite-redux/coop/coop-final-boss-stage-one.test.ts
+          --reporter=default
+      - name: Check patch whitespace
+        run: git diff --check

@@ -65,18 +65,33 @@ describe("Moves - Metronome", () => {
     expect(player.isFullHp()).toBeFalsy();
   });
 
-  it("ignores an unregistered MoveId instead of crashing while building its roll pool", async () => {
+  it.each(["player", "enemy"])("ignores an unregistered MoveId when %s uses Metronome", async side => {
+    if (side === "enemy") {
+      game.override.moveset([MoveId.SPLASH]).enemyMoveset(MoveId.METRONOME);
+    }
     await game.classicMode.startBattle(SpeciesId.REGIELEKI);
     vi.spyOn(randomMoveAttr, "getMoveOverride").mockReturnValue(MoveId.SPLASH);
     const savedMove = allMoves[MoveId.TACKLE];
     const mutableMoves = allMoves as unknown as Array<(typeof allMoves)[number] | undefined>;
     try {
       mutableMoves[MoveId.TACKLE] = undefined;
-      game.move.select(MoveId.METRONOME);
+      game.move.select(side === "player" ? MoveId.METRONOME : MoveId.SPLASH);
       await expect(game.toNextTurn()).resolves.not.toThrow();
+      const caller = side === "player" ? game.field.getPlayerPokemon() : game.field.getEnemyPokemon();
+      expect(caller.getLastXMoves().some(entry => entry.move === MoveId.SPLASH)).toBe(true);
     } finally {
       mutableMoves[MoveId.TACKLE] = savedMove;
     }
+  });
+
+  it("fails instead of looping when its forced candidate is not callable", async () => {
+    await game.classicMode.startBattle(SpeciesId.REGIELEKI);
+    vi.spyOn(randomMoveAttr, "getMoveOverride").mockReturnValue(MoveId.METRONOME);
+
+    game.move.select(MoveId.METRONOME);
+    await game.toNextTurn();
+
+    expect(game.scene.currentBattle.turn).toBe(2);
   });
 
   it("should recharge after using recharge move", async () => {

@@ -8032,3 +8032,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 
 - Added a Debug-only starter action that lists every obtainable form across the selected Pokemon's forward evolution graph, including alternate and Mega forms, and fields the selected stage without changing the account's dex, unlocks, costs, or saved starter preferences.
 - Preview sprite, party icon, types, abilities, passives, Tera options, and legal move pool now follow the temporary stage. The focused GitHub runner passed (`32907133550`); game production remains untouched.
+
+2026-09-02 - Metronome and randomized finale softlocks
+
+- Production ab83981e still contains the unsafe Metronome enum scan; feat already has the registered-move guard from dbfe71155. Extended headless coverage to player and enemy callers and an uncallable candidate.
+- Restricted final-boss phase-two narration to living Eternatus/Cascoon finale bosses. Randomized replacements cannot repeatedly enter an unavailable transformation after direct or residual damage.
+- Added phase-driven regression coverage for replacement defeat, consecutive status-damage turns, and the canonical Eternatus transformation. Verification will run on GitHub, not locally. Nothing deployed.
