@@ -469,6 +469,16 @@
     "ability2": 192,
     "hidden": 118
   },
+  "SPECIES_SLOWKING_MEGA": {
+    "ability1": 20020,
+    "ability2": 20020,
+    "hidden": 20020,
+    "innates": [
+      227,
+      144,
+      75
+    ]
+  },
   "SPECIES_TEDDIURSA": {
     "hidden": 118
   },
