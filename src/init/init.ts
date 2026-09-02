@@ -8,6 +8,7 @@ import { allAbilities } from "#data/data-lists";
 import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
 import { installAbilityStudioSourceAbilityComponents } from "#data/elite-redux/ability-studio/runtime-components";
+import { applyDocumentedLearnsets } from "#data/elite-redux/er-documented-learnsets";
 import {
   applyErFakemonPitchEggMoves,
   applyErFakemonPitchLearnsets,
@@ -460,6 +461,11 @@ function initPhaseErTiersFinal(): void {
   console.info(`[er-newcomer-species] wired ${newcomerSpeciesTms} species TM sets`);
   const pitchSpeciesTms = applyErFakemonPitchTmCompatibility();
   console.info(`[er-fakemon-pitches] wired ${pitchSpeciesTms} species TM sets`);
+
+  applyDocumentedLearnsets();
+  // Donor TM overrides are needed above; restore explicit target overrides after
+  // documented defaults so future staff edits remain authoritative.
+  initEliteReduxPokedexOverrides();
 
   // Type-nativization sweep (Pass A): remove every type-grant ability from its
   // holder, give the granted type NATIVELY (setExtraTypes), and put the per-mon

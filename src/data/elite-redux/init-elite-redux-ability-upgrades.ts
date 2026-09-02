@@ -284,7 +284,7 @@ const REQUESTED_VANILLA_DESCRIPTIONS: ReadonlyMap<AbilityId, string> = new Map([
   [AbilityId.TANGLING_HAIR, "Contact lowers the attacker's Speed and has a 50% chance to trap it."],
   [
     AbilityId.GULP_MISSILE,
-    "Surf or Dive catches prey that is spat at the next attacker. The holder also takes 20% less direct damage.",
+    "Surf or Dive catches prey. Takes 20% less direct damage. Water and Flying attacks trigger a 35-power Water Pulse or Aeroblast.",
   ],
   [
     AbilityId.MIMICRY,
@@ -426,6 +426,14 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
     [],
     "Weakens Aura moves by 25% and suppresses opposing Battle Aura and Aura Armor.",
   );
+  patchVanilla(AbilityId.GULP_MISSILE, "docs:gulp-missile:typed-followups", [
+    () => new PostAttackScriptedMoveAbAttr({
+      moveId: MoveId.WATER_PULSE, power: 35, typeFilter: [PokemonType.WATER],
+    }),
+    () => new PostAttackScriptedMoveAbAttr({
+      moveId: MoveId.AEROBLAST, power: 35, typeFilter: [PokemonType.FLYING],
+    }),
+  ]);
 
   patch(545, ability =>
     Number(

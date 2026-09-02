@@ -82,6 +82,7 @@ import {
 } from "#data/elite-redux/abilities/omniform-registry";
 import { registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
 import { EggTier } from "#enums/egg-type";
+import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -368,8 +369,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     slug: "drawclops",
     types: [PokemonType.GROUND, PokemonType.GHOST],
     stats: [110, 40, 90, 110, 80, 40],
-    actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
-    innates: [DEADEYE, MINIGUN, TURBOBLAZE],
+    actives: [SNIPER, AbilityId.PRESSURE, SPECTRALIZE],
+    innates: [DEADEYE, AbilityId.QUICK_DRAW, AbilityId.MOLD_BREAKER],
     catchRate: 60,
     // Between Dusclops (30.6kg) and Dusknoir (106.6kg) as a new middle stage. ~40kg.
     weight: 40.0,

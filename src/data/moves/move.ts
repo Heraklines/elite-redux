@@ -13,6 +13,7 @@ import { isComatoseLike } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
+import { consumeCranisphereSkip } from "#data/elite-redux/abilities/cranisphere";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { PendingHealTag } from "#data/arena-tag";
 import { EntryHazardTag, WeakenMoveTypeTag } from "#data/arena-tag";
@@ -8136,6 +8137,10 @@ export class ConfuseAttr extends AddBattlerTagAttr {
 export class RechargeAttr extends AddBattlerTagAttr {
   constructor() {
     super(BattlerTagType.RECHARGING, true, false, 1, 1, true);
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    return consumeCranisphereSkip(user, move) ? false : super.apply(user, target, move, args);
   }
 }
 

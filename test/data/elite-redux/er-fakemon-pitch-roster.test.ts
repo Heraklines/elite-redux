@@ -13,6 +13,7 @@ import { tmSpecies } from "#balance/tm-species-map";
 import { speciesTmMoves } from "#balance/tms";
 import { allAbilities } from "#data/data-lists";
 import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { DOCUMENTED_LEARNSETS } from "#data/elite-redux/er-documented-learnsets";
 import { erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import {
   ER_FAKEMON_PITCH_EDITOR_SPECIES,
@@ -109,10 +110,10 @@ const STANDALONE_CONTRACT = [
     name: "Tagela",
     slug: "tagela",
     editorConst: "SPECIES_TAGELA",
-    types: [PokemonType.GHOST, PokemonType.PSYCHIC],
-    stats: [65, 55, 115, 100, 40, 60],
-    actives: [34, 4, 102],
-    innates: [144, 5080, 221],
+    types: [PokemonType.GHOST],
+    stats: [65, 55, 40, 100, 115, 60],
+    actives: [6068, 5070, AbilityId.TANGLING_HAIR],
+    innates: [AbilityId.REGENERATOR, AbilityId.FLUFFY, 5073],
     weight: 35,
     learnsetSource: SpeciesId.TANGELA,
     eggTier: 0,
@@ -226,6 +227,11 @@ describe("Discord fakemon-pitch roster", () => {
     const reverseTmMoves = tmSpecies as Record<number, (number | readonly unknown[])[]>;
 
     for (const def of standalone) {
+      // Document-owned sets have their complete forward/reverse contracts tested
+      // in er-documented-learnsets.test.ts; only undocumented entries inherit.
+      if (DOCUMENTED_LEARNSETS.some(rule => rule.species.includes(def.id))) {
+        continue;
+      }
       const expectedLevelMoves = [...(levelMoves[def.learnsetSource] ?? [])].map(
         ([level, move]) => [level, move] as [number, number],
       );

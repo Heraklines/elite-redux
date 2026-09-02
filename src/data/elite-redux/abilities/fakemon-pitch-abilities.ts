@@ -435,7 +435,7 @@ export const ER_FAKEMON_PITCH_ABILITIES: readonly FakemonPitchAbilityDefinition[
   ability(
     ER_CRANISPHERE_ABILITY_ID,
     "Cranisphere",
-    "Bone Zone; the first Skull Bash after entry executes in one turn.",
+    "Bone Zone; the first Normal-type Bone move after entry skips charging or recharging.",
   ),
   ability(
     ER_MUDBALL_ABILITY_ID,

@@ -429,6 +429,32 @@ function buildSwirlyRoomMove(): Move {
     .target(MoveTarget.BOTH_SIDES);
 }
 
+function buildTwinkleHornMove(): Move {
+  ErCustomAttackMove.registerDraft(MoveId.TWINKLE_HORN, "Twinkle Horn",
+    "Has a 20% chance to make the target drowsy.", "Has a 20% chance to make the target drowsy.");
+  const move = new ErCustomAttackMove(MoveId.TWINKLE_HORN, PokemonType.FAIRY, MoveCategory.PHYSICAL, 85, 100, 15, 20, 0, 9)
+    .attr(AddBattlerTagAttr, BattlerTagType.DROWSY, false, false, 2, 2);
+  applyErArchetypeToMove(move, MoveFlags.HORN_BASED, []);
+  return move;
+}
+
+function buildHammerDrillMove(): Move {
+  ErCustomAttackMove.registerDraft(MoveId.HAMMER_DRILL, "Hammer Drill",
+    "Has a 20% chance to lower the target's Defense.", "Has a 20% chance to lower the target's Defense.");
+  const move = new ErCustomAttackMove(MoveId.HAMMER_DRILL, PokemonType.STEEL, MoveCategory.PHYSICAL, 85, 100, 10, 20, 0, 9)
+    .attr(StatStageChangeAttr, [Stat.DEF], -1);
+  applyErArchetypeToMove(move, MoveFlags.DRILL_BASED | MoveFlags.HAMMER_BASED, []);
+  return move;
+}
+
+function buildDrillBitsMove(): Move {
+  ErCustomStatusMove.registerDraft(MoveId.DRILL_BITS, "Drill Bits",
+    "Scatters drill bits that embed in grounded foes switching in.", "Scatters drill bits that embed in grounded foes switching in.");
+  return new ErCustomStatusMove(MoveId.DRILL_BITS, PokemonType.STEEL, -1, 20, -1, 0, 9)
+    .attr(AddArenaTrapTagAttr, ArenaTagType.ER_DRILL_BITS)
+    .target(MoveTarget.ENEMY_SIDE);
+}
+
 function buildIvoryImpactMove(): Move {
   ErCustomAttackMove.registerDraft(
     MoveId.IVORY_IMPACT,
@@ -536,6 +562,18 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
   }
 
   if (isNewPokemonContentEnabled()) {
+    for (const [id, build] of [
+      [MoveId.TWINKLE_HORN, buildTwinkleHornMove],
+      [MoveId.HAMMER_DRILL, buildHammerDrillMove],
+      [MoveId.DRILL_BITS, buildDrillBitsMove],
+    ] as const) {
+      if (existingIds.has(id)) {
+        result.customsAlreadyPresent++;
+      } else {
+        (allMoves as Move[])[id] = build();
+        result.customsAdded++;
+      }
+    }
     if (existingIds.has(MoveId.SWIRLY_ROOM)) {
       result.customsAlreadyPresent++;
     } else {

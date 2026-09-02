@@ -1,0 +1,30 @@
+name: Fakemon Document Alignment
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/fakemon-doc-alignment-20260902
+
+permissions:
+  contents: read
+
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ER_SCENARIO: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-deps
+      - name: Exercise documented learnsets and battle mechanics
+        run: >-
+          pnpm exec vitest run
+          test/data/elite-redux/er-documented-learnsets.test.ts
+          test/data/elite-redux/er-fakemon-pitch-roster.test.ts
+          test/tests/elite-redux/er-document-mechanics.test.ts
+          test/tests/elite-redux/er-newcomer-species.test.ts
+          --reporter=default

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { consumeCranisphereSkip } from "#data/elite-redux/abilities/cranisphere";
 import { MoveChargeAnim } from "#data/battle-anims";
 import { erTryQuickeningGrace } from "#data/elite-redux/abilities/quickening-grace";
 import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
@@ -111,16 +112,7 @@ export class MoveChargePhase extends PokemonPhase {
       instantCharge.value = true;
     }
 
-    // Cranisphere: only the first Skull Bash after each entry skips charging.
-    // tempSummonData is recreated on send-out, so switching naturally re-arms it.
-    const cranisphereState = user.tempSummonData as unknown as { erCranisphereSkullBashUsed?: boolean };
-    if (
-      !instantCharge.value
-      && move.id === MoveId.SKULL_BASH
-      && !cranisphereState.erCranisphereSkullBashUsed
-      && user.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "CranisphereSkullBashAbAttr")
-    ) {
-      cranisphereState.erCranisphereSkullBashUsed = true;
+    if (!instantCharge.value && consumeCranisphereSkip(user, move)) {
       instantCharge.value = true;
     }
     erRecordAchievementChargeMove(user, move.id, instantCharge.value);

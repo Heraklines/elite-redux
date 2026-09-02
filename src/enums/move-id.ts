@@ -1877,4 +1877,7 @@ export enum MoveId {
   SWIRLY_ROOM = 6000,
   /** Temporal Skull signature — 150 BP Bone move with recharge. */
   IVORY_IMPACT = 6001,
+  TWINKLE_HORN = 6002,
+  HAMMER_DRILL = 6003,
+  DRILL_BITS = 6004,
 }
