@@ -72,6 +72,7 @@ import {
 } from "#data/elite-redux/abilities/electivire";
 import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { DOCUMENTED_ABILITY_DEFINITIONS } from "#data/elite-redux/abilities/documented-ability-definitions";
+import { wireDocumentedAbility } from "#data/elite-redux/abilities/documented-mechanics";
 import { wireFakemonPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { wireRaichuPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
@@ -1107,6 +1108,7 @@ function buildCustomAbility(
   // real mechanics for whichever id matches (no-op for non-signature ids).
   wireNewcomerSignatureAbility(builder, pokerogueId);
   wireFakemonPitchAbility(builder, pokerogueId);
+  wireDocumentedAbility(builder, pokerogueId);
   wireBernerdRosterAbility(builder, pokerogueId);
   wireBarbaracleAbility(builder, pokerogueId);
   wireRaichuPitchAbility(builder, pokerogueId);

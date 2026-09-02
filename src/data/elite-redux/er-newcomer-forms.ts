@@ -697,10 +697,10 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     formKey: "primal",
     formName: "Corrupted",
     slug: "uxie_corrupted",
-    types: [PokemonType.PSYCHIC, PokemonType.DARK],
+    types: [PokemonType.PSYCHIC, PokemonType.FAIRY, PokemonType.DARK],
     stats: [75, 125, 130, 125, 130, 95],
-    actives: [ab(5224), AbilityId.MOODY, ab(5158)],
-    innates: [ab(5464), ab(5314), ab(5475)],
+    actives: [ab(6159), AbilityId.MOODY, ab(5158)],
+    innates: [ab(6160), ab(6148), ab(6149)],
     item: FormChangeItem.DISTORTED_CHAIN,
   },
   {

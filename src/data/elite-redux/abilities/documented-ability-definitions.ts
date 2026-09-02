@@ -182,9 +182,27 @@ export const DOCUMENTED_COMPOSITES: readonly ManualCompositeDef[] = [
   { id: 6158, name: "Lignivore", description: "Growing Tooth + Raw Wood.", constituents: [5027, 5075] },
 ];
 
-export const DOCUMENTED_ABILITY_DEFINITIONS: readonly FakemonPitchAbilityDefinition[] = DOCUMENTED_COMPOSITES.map(
+export const ER_IRRESISTIBLE_ABILITY_ID = 6159;
+export const ER_SINISTER_SPORES_ABILITY_ID = 6160;
+
+export const DOCUMENTED_ABILITY_DEFINITIONS: readonly FakemonPitchAbilityDefinition[] = [
+  ...DOCUMENTED_COMPOSITES.map(
   def => ({
     pokerogueId: def.id,
     draft: { id: def.id, name: def.name, description: def.description, archetype: "unknown" },
   }),
-);
+  ),
+  {
+    pokerogueId: ER_IRRESISTIBLE_ABILITY_ID,
+    draft: { id: ER_IRRESISTIBLE_ABILITY_ID, name: "Irresistible", description: "Uses Follow Me on entry.", archetype: "unknown" },
+  },
+  {
+    pokerogueId: ER_SINISTER_SPORES_ABILITY_ID,
+    draft: {
+      id: ER_SINISTER_SPORES_ABILITY_ID,
+      name: "Sinister Spores",
+      description: "Contact in either direction infects non-Dark Pokemon until they switch out. Infected Pokemon lose 1/8 max HP each turn, or 1/4 during Full Moon.",
+      archetype: "unknown",
+    },
+  },
+];

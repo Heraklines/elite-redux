@@ -709,9 +709,11 @@ export interface WireManualCompositesResult {
  * + C-source corrections + `refreshEliteReduxComposites`, so vanilla and
  * draft-id-composite constituents are in their final patched state.
  */
-export function wireEliteReduxManualComposites(): WireManualCompositesResult {
+export function wireEliteReduxManualComposites(
+  definitions: readonly ManualCompositeDef[] = Object.values(MANUAL_COMPOSITE_PARTS),
+): WireManualCompositesResult {
   const result: WireManualCompositesResult = { wired: 0, emptyConstituents: [] };
-  for (const def of Object.values(MANUAL_COMPOSITE_PARTS)) {
+  for (const def of definitions) {
     const ability = allAbilities[def.id];
     if (!ability) {
       continue;
@@ -732,7 +734,10 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     // abilities). Constituent-derived attrs are rebuilt below, so only ctor
     // shapes absent from the resolved parts are preserved.
     const constituentCtorNames = new Set(collected.map(attr => attr.constructor.name));
-    const preservedBespokeAttrs = ability.attrs.filter(attr => !constituentCtorNames.has(attr.constructor.name));
+    const documented = DOCUMENTED_COMPOSITES.some(entry => entry.id === def.id);
+    const preservedBespokeAttrs = documented
+      ? []
+      : ability.attrs.filter(attr => !constituentCtorNames.has(attr.constructor.name));
     if (collected.length === 0) {
       continue;
     }

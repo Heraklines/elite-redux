@@ -7,6 +7,7 @@ import { initChallenges } from "#data/challenge";
 import { allAbilities } from "#data/data-lists";
 import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
+import { DOCUMENTED_COMPOSITES } from "#data/elite-redux/abilities/documented-ability-definitions";
 import { installAbilityStudioSourceAbilityComponents } from "#data/elite-redux/ability-studio/runtime-components";
 import { applyDocumentedLearnsets } from "#data/elite-redux/er-documented-learnsets";
 import {
@@ -288,6 +289,8 @@ function initPhaseErSpritesRebalance(): void {
   if (editorAbilityResult.errors.length > 0) {
     console.warn("[er-editor-abilities] issues:", editorAbilityResult.errors);
   }
+  // These pure composites must copy the final upgraded/staff-authored constituents.
+  wireEliteReduxManualComposites(DOCUMENTED_COMPOSITES);
   console.info(`[er-editor-abilities] registered ${editorAbilityResult.registered} staff-authored abilities`);
 }
 

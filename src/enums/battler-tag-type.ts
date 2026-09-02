@@ -147,6 +147,7 @@ export enum BattlerTagType {
    * FEAR) — a spored mon can still be bled/frozen/etc.
    */
   ER_PARASITIC_SPORES = "ER_PARASITIC_SPORES",
+  ER_SINISTER_SPORES = "ER_SINISTER_SPORES",
   /**
    * ER Trepidation's "Despair" seal. Applied to the foe for 3 turns; while
    * present, EVERY Psychic-type move the holder USES misses (forced in the

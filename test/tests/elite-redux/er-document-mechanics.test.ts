@@ -2,6 +2,11 @@ import { allMoves } from "#data/data-lists";
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_CRANISPHERE_ABILITY_ID } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { ER_IRRESISTIBLE_ABILITY_ID, ER_SINISTER_SPORES_ABILITY_ID } from "#data/elite-redux/abilities/documented-ability-definitions";
+import { ErSinisterSporesTag, loadBattlerTag } from "#data/battler-tags";
+import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
+import { WeatherType } from "#enums/weather-type";
+import { toDmgValue } from "#utils/common";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -45,8 +50,92 @@ describe.skipIf(process.env.ER_SCENARIO !== "1")("documented fakemon battle mech
     // ER has three innates; the vanilla passive override only replaces slot 1.
     for (const pokemon of [game.scene.getPlayerPokemon()!, game.scene.getEnemyPokemon()!]) {
       vi.spyOn(pokemon, "getPassiveAbilities").mockReturnValue([]);
+      const activeSources = pokemon.getActiveAbilitySources.bind(pokemon);
+      vi.spyOn(pokemon, "getActiveAbilitySources").mockImplementation(ignoreOverride =>
+        activeSources(ignoreOverride).filter(source => !source.passive),
+      );
     }
   }
+
+  it("Sinister Spores is not a field aura", async () => {
+    game.override.ability(ER_SINISTER_SPORES_ABILITY_ID as AbilityId);
+    await startBattle();
+    const enemy = game.scene.getEnemyPokemon()!;
+    game.move.use(MoveId.HARDEN);
+    await game.toNextTurn();
+    expect(enemy.getTag(BattlerTagType.ER_SINISTER_SPORES)).toBeUndefined();
+    expect(enemy.hp).toBe(enemy.getMaxHp());
+  });
+
+  it.each([true, false])("Sinister Spores spreads on contact, attacking=%s", async attacking => {
+    game.override.ability(ER_SINISTER_SPORES_ABILITY_ID as AbilityId);
+    if (!attacking) game.override.enemyMoveset(MoveId.TACKLE);
+    await startBattle();
+    game.move.use(attacking ? MoveId.TACKLE : MoveId.HARDEN);
+    await game.toNextTurn();
+    expect(game.scene.getEnemyPokemon()!.getTag(BattlerTagType.ER_SINISTER_SPORES)).toBeDefined();
+    expect(game.scene.getPlayerPokemon()!.getTag(BattlerTagType.ER_SINISTER_SPORES)).toBeUndefined();
+  });
+
+  it("non-contact hits do not spread Sinister Spores", async () => {
+    game.override.ability(ER_SINISTER_SPORES_ABILITY_ID as AbilityId);
+    await startBattle();
+    game.move.use(MoveId.GUST);
+    await game.toNextTurn();
+    expect(game.scene.getEnemyPokemon()!.getTag(BattlerTagType.ER_SINISTER_SPORES)).toBeUndefined();
+  });
+
+  it("Dark targets cannot be infected", async () => {
+    await startBattle();
+    const enemy = game.scene.getEnemyPokemon()!;
+    vi.spyOn(enemy, "isOfType").mockImplementation(type => type === PokemonType.DARK);
+    expect(enemy.addTag(BattlerTagType.ER_SINISTER_SPORES)).toBe(false);
+  });
+
+  it.each([
+    [WeatherType.NONE, false, 8],
+    [WeatherType.FULL_MOON, false, 4],
+    [WeatherType.FULL_MOON, true, 8],
+  ])("infection damage follows weather %s, suppressed=%s", async (weather, suppressed, denominator) => {
+    await startBattle();
+    const enemy = game.scene.getEnemyPokemon()!;
+    game.scene.arena.trySetWeather(weather);
+    if (game.scene.arena.weather) {
+      vi.spyOn(game.scene.arena.weather, "isEffectSuppressed").mockReturnValue(suppressed);
+    }
+    enemy.addTag(BattlerTagType.ER_SINISTER_SPORES);
+    const hp = enemy.hp;
+    enemy.getTag(BattlerTagType.ER_SINISTER_SPORES)!.lapse(enemy, BattlerTagLapseType.TURN_END);
+    expect(enemy.hp).toBe(hp - toDmgValue(enemy.getMaxHp() / denominator));
+  });
+
+  it("Magic Guard blocks infection damage", async () => {
+    game.override.enemyAbility(AbilityId.MAGIC_GUARD);
+    await startBattle();
+    const enemy = game.scene.getEnemyPokemon()!;
+    enemy.addTag(BattlerTagType.ER_SINISTER_SPORES);
+    enemy.getTag(BattlerTagType.ER_SINISTER_SPORES)!.lapse(enemy, BattlerTagLapseType.TURN_END);
+    expect(enemy.hp).toBe(enemy.getMaxHp());
+  });
+
+  it("infection survives JSON reload but is removed by switching", async () => {
+    await startBattle();
+    const player = game.scene.getPlayerPokemon()!;
+    player.addTag(BattlerTagType.ER_SINISTER_SPORES);
+    const restored = loadBattlerTag(JSON.parse(JSON.stringify(player.getTag(BattlerTagType.ER_SINISTER_SPORES))));
+    expect(restored).toBeInstanceOf(ErSinisterSporesTag);
+    const hp = player.hp;
+    expect(restored.lapse(player, BattlerTagLapseType.TURN_END)).toBe(true);
+    expect(player.hp).toBe(hp - toDmgValue(player.getMaxHp() / 8));
+    player.resetSummonData();
+    expect(player.getTag(BattlerTagType.ER_SINISTER_SPORES)).toBeUndefined();
+  });
+
+  it("Irresistible uses Follow Me on entry", async () => {
+    game.override.ability(ER_IRRESISTIBLE_ABILITY_ID as AbilityId);
+    await startBattle();
+    expect(game.scene.getPlayerPokemon()!.getTag(BattlerTagType.CENTER_OF_ATTENTION)).toBeDefined();
+  });
 
   it("Cranisphere skips the first Ivory Impact recharge, but not the second", async () => {
     game.override.ability(ER_CRANISPHERE_ABILITY_ID as AbilityId);
@@ -131,6 +220,7 @@ describe.skipIf(process.env.ER_SCENARIO !== "1")("documented fakemon battle mech
   });
 
   it("Hammer Drill lowers Defense and counts as both a hammer and drill", async () => {
+    game.override.enemyMoveset(MoveId.TACKLE);
     await startBattle();
     const move = allMoves[MoveId.HAMMER_DRILL];
     expect(move.chance).toBe(20);

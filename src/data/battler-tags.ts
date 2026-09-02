@@ -4496,6 +4496,38 @@ export class ErParasiticSporesTag extends SerializableBattlerTag {
   }
 }
 
+/** Contact infection; it is not a field aura and cannot infect other targets by itself. */
+export class ErSinisterSporesTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_SINISTER_SPORES;
+
+  constructor() {
+    super(BattlerTagType.ER_SINISTER_SPORES, BattlerTagLapseType.TURN_END, 1);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    return !pokemon.isOfType(PokemonType.DARK) && !pokemon.getTag(this.tagType);
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    // CUSTOM is the engine's explicit removal path. Turn-end ticks never expire the infection.
+    if (lapseType === BattlerTagLapseType.CUSTOM) {
+      return false;
+    }
+    if (lapseType !== BattlerTagLapseType.TURN_END || pokemon.isFainted() || pokemon.isOfType(PokemonType.DARK)) {
+      return true;
+    }
+    const cancelled = new BooleanHolder(false);
+    applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+    if (!cancelled.value) {
+      const weather = globalScene.arena.weather;
+      const fullMoon = weather?.weatherType === WeatherType.FULL_MOON && !weather.isEffectSuppressed();
+      pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / (fullMoon ? 4 : 8)), { result: HitResult.INDIRECT });
+      globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(pokemon)} was hurt by Sinister Spores!`);
+    }
+    return true;
+  }
+}
+
 /**
  * Elite Redux Trepidation (er move 967). The damaging body lands, then this tag
  * is applied to the TARGET for 3 turns. While present, EVERY Psychic-type move
@@ -5149,6 +5181,8 @@ export function getBattlerTag(
       return new ErIceStatueTag();
     case BattlerTagType.ER_PARASITIC_SPORES:
       return new ErParasiticSporesTag();
+    case BattlerTagType.ER_SINISTER_SPORES:
+      return new ErSinisterSporesTag();
     case BattlerTagType.ER_DESPAIR:
       return new ErDespairTag(turnCount || 3);
     case BattlerTagType.ER_DRENCHED:
@@ -5327,6 +5361,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_SILKEN_DECREE]: ErSilkenDecreeTag;
   [BattlerTagType.ER_ICE_STATUE]: ErIceStatueTag;
   [BattlerTagType.ER_PARASITIC_SPORES]: ErParasiticSporesTag;
+  [BattlerTagType.ER_SINISTER_SPORES]: ErSinisterSporesTag;
   [BattlerTagType.ER_DESPAIR]: ErDespairTag;
   [BattlerTagType.ER_DRENCHED]: ErDrenchedTag;
   [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
