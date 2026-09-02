@@ -294,6 +294,23 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-22": {
+    "componentRules": [],
+    "description": "Spinning Top + Battle Armor + Intimidate",
+    "flags": {},
+    "generation": 9,
+    "id": 20021,
+    "includes": [
+      5142,
+      4,
+      22
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Spin To Win",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-3": {
     "componentRules": [],
     "description": "Ambush + Volt Rush\n\"Iron Exo endlessly stalks the ultra space for signs of the Ultra recon squad, Their fate sealed with a single shot.\"",
