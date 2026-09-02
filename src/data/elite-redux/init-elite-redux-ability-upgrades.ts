@@ -16,6 +16,7 @@ import {
   ReceivedTypeDamageMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
+import { ToxicHighestAttackAbAttr } from "#data/elite-redux/abilities/documented-mechanics";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import {
@@ -38,7 +39,6 @@ import {
   ReverseNegativeStatChangesAbAttr,
   replaceAbilityAttrsOnce,
   replaceMatchingAbilityAttrOnce,
-  SameTypeStabOtherwiseBoostAbAttr,
   TelekineticStruggleOnEntryAbAttr,
   TypeImmunityHigherDefenseStatRaiseAbAttr,
   UserFieldIgnoreOptionalMoveEffectsAbAttr,
@@ -201,12 +201,13 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [1009, "Using an Ice-type move triggers a 40 BP Breaking Swipe follow-up."],
   [
     303,
-    "Halves incoming Rock damage. Rock moves gain STAB for Rock-type holders; otherwise they deal 20% more damage.",
+    "Halves incoming Rock damage. Rock moves gain STAB, or deal 20% more damage if the holder is already Rock-type.",
   ],
   [
     337,
-    "Halves incoming Grass damage. Grass moves gain STAB for Grass-type holders; otherwise they deal 20% more damage.",
+    "Halves incoming Grass damage. Grass moves gain STAB, or deal 20% more damage if the holder is already Grass-type.",
   ],
+  [306, "Halves incoming Dark damage. Dark moves gain STAB, or deal 20% more damage if the holder is already Dark-type."],
   [373, "Contact may trap the target. Every damaging move also binds for four turns, dealing 1/4 maximum HP per turn."],
   [
     1028,
@@ -215,6 +216,7 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
 ]);
 
 const REQUESTED_VANILLA_DESCRIPTIONS: ReadonlyMap<AbilityId, string> = new Map([
+  [AbilityId.TOXIC_BOOST, "While poisoned, boosts the higher of Attack and Sp. Atk by 50%. Prevents poison damage and becomes poisoned in Toxic Terrain."],
   [AbilityId.INSOMNIA, "Prevents sleep and casts Torment on opposing Pokemon on entry."],
   [
     AbilityId.LIQUID_OOZE,
@@ -434,6 +436,15 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
       moveId: MoveId.AEROBLAST, power: 35, typeFilter: [PokemonType.FLYING],
     }),
   ]);
+  const toxicBoost = allAbilities[AbilityId.TOXIC_BOOST];
+  if (toxicBoost) {
+    result.applied += Number(replaceMatchingAbilityAttrOnce(
+      toxicBoost,
+      "docs:toxic-boost:higher-offense",
+      attr => attr instanceof MovePowerBoostAbAttr,
+      () => new ToxicHighestAttackAbAttr(),
+    ));
+  }
 
   patch(545, ability =>
     Number(
@@ -1185,14 +1196,21 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
   for (const [draftId, type] of [
     [303, PokemonType.ROCK],
     [337, PokemonType.GRASS],
+    [306, PokemonType.DARK],
   ] as const) {
     patch(draftId, ability =>
       Number(
-        replaceMatchingAbilityAttrOnce(
+        replaceAbilityAttrsOnce(
           ability,
-          `upgrade:${draftId}:same-type-stab-otherwise-boost`,
-          attr => attr instanceof TypeDamageBoostAbAttr && attr.getBoostType() === type,
-          () => new SameTypeStabOtherwiseBoostAbAttr(type, 1.2),
+          `upgrade:${draftId}:documented-off-type-stab`,
+          [
+            () => new StabAddAbAttr({ targetType: type }),
+            () => new MovePowerBoostAbAttr(
+              (user, _target, move) => user.getTypes(false, false).includes(type) && user.getMoveType(move) === type,
+              1.2,
+            ),
+            () => new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type } }),
+          ],
         ),
       ),
     );

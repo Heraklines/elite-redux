@@ -25,7 +25,6 @@ import {
   OnceLowHpStatRaiseAbAttr,
   PostDefendAddTagAbAttr,
   ReverseNegativeStatChangesAbAttr,
-  SameTypeStabOtherwiseBoostAbAttr,
   TypeImmunityHigherDefenseStatRaiseAbAttr,
   UserFieldIgnoreOptionalMoveEffectsAbAttr,
 } from "#data/elite-redux/ability-upgrades/attrs/index";
@@ -38,6 +37,7 @@ import { PostAttackScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-
 import { PostSummonQuashFoesAbAttr } from "#data/elite-redux/archetypes/post-summon-quash-foes";
 import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
 import { RepeatMovePowerBoostAbAttr } from "#data/elite-redux/archetypes/repeat-move-power-boost";
+import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import {
   ActivateOncePerBattleEntryWindowAbAttr,
   TimeLimitedEffectivenessFloorAbAttr,
@@ -209,8 +209,8 @@ describe("requested ability overhaul - replacements and riders", () => {
   });
 
   it("uses conditional STAB for Raw Wood and Fossilized and renames Ninja's Blade", () => {
-    expect(erAbility(303).attrs.some(attr => attr instanceof SameTypeStabOtherwiseBoostAbAttr)).toBe(true);
-    expect(erAbility(337).attrs.some(attr => attr instanceof SameTypeStabOtherwiseBoostAbAttr)).toBe(true);
+    expect(erAbility(303).attrs.some(attr => attr instanceof StabAddAbAttr)).toBe(true);
+    expect(erAbility(337).attrs.some(attr => attr instanceof StabAddAbAttr)).toBe(true);
     expect(erAbility(460).name).toBe("Ninja's Blade");
   });
 });

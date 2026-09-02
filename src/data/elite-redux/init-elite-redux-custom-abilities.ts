@@ -71,6 +71,7 @@ import {
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
 import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { DOCUMENTED_ABILITY_DEFINITIONS } from "#data/elite-redux/abilities/documented-ability-definitions";
 import { wireFakemonPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { wireRaichuPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
@@ -739,6 +740,7 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
   // post-init manual-composite pass.
   if (isNewPokemonContentEnabled()) {
     manualDrafts.push(...ER_FAKEMON_PITCH_ABILITIES);
+    manualDrafts.push(...DOCUMENTED_ABILITY_DEFINITIONS);
   }
   // Newcomer BATCH 2 — the TWO residual parked placeholders (Meteor Mass,
   // Inverse Room) the codex batch does not define. Named + battle-inert so each

@@ -14,7 +14,7 @@ export function consumeCranisphereSkip(pokemon: Pokemon, move: Move): boolean {
   if (
     state.erCranisphereSkullBashUsed
     || move.type !== PokemonType.NORMAL
-    || !move.checkFlag(MoveFlags.BONE_BASED, pokemon)
+    || !move.doesFlagEffectApply({ flag: MoveFlags.BONE_BASED, user: pokemon })
     || !pokemon.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "CranisphereSkullBashAbAttr")
   ) {
     return false;

@@ -24,7 +24,9 @@ jobs:
         run: >-
           pnpm exec vitest run
           test/data/elite-redux/er-documented-learnsets.test.ts
+          test/data/elite-redux/er-documented-composites.test.ts
           test/data/elite-redux/er-fakemon-pitch-roster.test.ts
           test/tests/elite-redux/er-document-mechanics.test.ts
           test/tests/elite-redux/er-newcomer-species.test.ts
+          test/tests/elite-redux/er-ability-overhaul-requested-batch.test.ts
           --reporter=default

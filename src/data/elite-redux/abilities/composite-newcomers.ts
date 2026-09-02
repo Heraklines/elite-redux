@@ -39,6 +39,7 @@
 import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
+import { DOCUMENTED_COMPOSITES } from "#data/elite-redux/abilities/documented-ability-definitions";
 import {
   ER_BEJEWELED_ABILITY_ID,
   ER_BLAZE_RELEASE_ABILITY_ID,
@@ -229,6 +230,7 @@ const BRAIN_OVER_BRAWN = 6080;
  * (attrs) and `getErCompositeDetailedDescription` (constituent detail text).
  */
 export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>> = {
+  ...Object.fromEntries(DOCUMENTED_COMPOSITES.map(def => [def.id, def])),
   [ER_CRYOGENESIS_ABILITY_ID]: {
     id: ER_CRYOGENESIS_ABILITY_ID,
     name: "Cryogenesis",
@@ -742,10 +744,9 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     for (const attr of preservedBespokeAttrs) {
       attrs.push(attr);
     }
-    // A part with a PostFaint attr only fires if the ability bypasses the faint
-    // gate. None of the newcomer constituents carry PostFaint attrs today, so no
-    // bypassFaint plumbing is needed; documented so a future faint-based
-    // constituent gets it (see wireArchetypeAttrs in init-elite-redux-custom-abilities).
+    if (def.constituents.some(id => allAbilities[id]?.bypassFaint)) {
+      ability.makeBypassFaint();
+    }
     result.wired++;
   }
   return result;

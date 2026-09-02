@@ -68,7 +68,7 @@ export function isNewPokemonContentEnabled(): boolean {
 }
 
 export function isGatedNewPokemonAbilityId(abilityId: number): boolean {
-  return abilityId >= 6004 && abilityId <= 6116;
+  return abilityId >= 6004 && abilityId <= 6158;
 }
 
 export function isGatedNewPokemonFormSlug(slug: string): boolean {

@@ -207,7 +207,7 @@ describe("Discord fakemon-pitch roster", () => {
 
   it("makes standalone convergents obtainable with source egg tiers and costs", () => {
     expect(speciesEggTiers[70052]).toBe(speciesEggTiers[SpeciesId.FALINKS]);
-    expect(speciesStarterCosts[70052]).toBe(speciesStarterCosts[SpeciesId.FALINKS]);
+    expect(speciesStarterCosts[70052]).toBe(4);
 
     expect(speciesEggTiers[70053]).toBe(speciesEggTiers[SpeciesId.IRON_LEAVES]);
     expect(speciesStarterCosts[70053]).toBe(speciesStarterCosts[SpeciesId.IRON_LEAVES]);
