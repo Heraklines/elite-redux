@@ -29,8 +29,8 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Test direct media upload Worker
-        run: pnpm exec vitest run test/node/editor-media-upload.test.ts
+      - name: Test editor Worker uploads and approvals
+        run: pnpm exec vitest run test/node/editor-media-upload.test.ts test/node/editor-suggestion-approval.test.ts
 
       - name: Deploy ER Editor Worker
         run: npx wrangler deploy --config workers/er-editor-api/wrangler.toml

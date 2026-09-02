@@ -60,13 +60,21 @@ interface Env {
   /** Private temporary storage for direct audio/video uploads. */
   MEDIA_UPLOADS?: R2BucketLike;
   EDITOR_PASSWORD: string;
-  SUGGESTION_API?: Pick<typeof globalThis, "fetch">;
+  SUGGESTIONS_DB?: SuggestionDatabase;
   ALLOWED_ORIGIN: string;
   /** Sprite asset repo for /upload-assets (default "Heraklines/er-assets").
    * The GITHUB_TOKEN PAT must ALSO have Contents read+write on this repo. */
   ASSETS_REPO?: string;
   /** Branch of ASSETS_REPO to commit sprites to (default "main"). */
   ASSETS_BRANCH?: string;
+}
+
+interface SuggestionDatabase {
+  prepare(query: string): {
+    bind(...values: (string | number)[]): {
+      run(): Promise<{ meta: { changes: number } }>;
+    };
+  };
 }
 
 interface R2UploadedPartLike {
@@ -2730,24 +2738,17 @@ async function handleSuggestionApproval(request: Request, env: Env): Promise<Res
   ) {
     return json({ ok: false, error: "Provide only a valid suggestion id." }, 400, env);
   }
-  if (!env.SUGGESTION_API || !env.EDITOR_PASSWORD) {
+  if (!env.SUGGESTIONS_DB) {
     return json({ ok: false, error: "Suggestion approval is not configured." }, 503, env);
   }
   try {
-    const response = await env.SUGGESTION_API.fetch(
-      new Request("https://er-save-api.heraklines.workers.dev/community/editor-suggestions/staff/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: body.id, action: "approve", password: env.EDITOR_PASSWORD }),
-        signal: AbortSignal.timeout(15_000),
-      }),
-    );
-    await response.body?.cancel();
-    if (response.status === 409) {
+    const result = await env.SUGGESTIONS_DB.prepare(
+      "UPDATE community_editor_suggestions SET status = 'approved', reviewer_note = '', reviewed_at = ?1, updated_at = ?1 WHERE id = ?2 AND status = 'open'",
+    )
+      .bind(Date.now(), body.id)
+      .run();
+    if (result.meta.changes !== 1) {
       return json({ ok: false, error: "Suggestion is no longer in a reviewable state." }, 409, env);
-    }
-    if (!response.ok) {
-      return json({ ok: false, error: "Suggestion approval is temporarily unavailable." }, 502, env);
     }
     return json({ ok: true, id: body.id, status: "approved" }, 200, env);
   } catch {
