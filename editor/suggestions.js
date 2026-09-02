@@ -1,5 +1,6 @@
 (() => {
   const API = "https://er-save-api.heraklines.workers.dev";
+  const EDITOR_API = "https://er-editor-api.heraklines.workers.dev";
   const STAGED_KEY = "er-editor-staged-community-suggestions";
   const IGNORED_KEY = "er-editor-ignored-suggestion-authors";
   const DEMO_QUEUE_KEY = "er-community-editor-demo-suggestions";
@@ -416,14 +417,15 @@
     if (demo) {
       return { ok: true };
     }
-    if (!password()) {
+    const approval = path === "/community/editor-suggestions/staff/review" && body.action === "approve";
+    if (!approval && !password()) {
       document.querySelector("#password")?.focus();
       throw new Error("Enter the editor password at the top, then retry the review.");
     }
-    const response = await fetch(`${API}${path}`, {
+    const response = await fetch(approval ? `${EDITOR_API}/suggestions/approve` : `${API}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: password(), ...body }),
+      body: JSON.stringify(approval ? { id: body.id } : { password: password(), ...body }),
       signal: AbortSignal.timeout(20_000),
     });
     const data = await response.json().catch(() => ({}));

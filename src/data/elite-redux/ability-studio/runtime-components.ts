@@ -444,9 +444,15 @@ export function compileAbilityStudioRuntimeComponentRule(
   const helperAttrs: { before: AbAttr[]; after: AbAttr[] } = { before: [], after: [] };
   const consumedSignals: Array<(params: AbAttrBaseParams) => void> = [];
   const clonedSources = new Map<string, { ability: Ability; attr: AbAttr }>();
+  const effectSourceCounts = new Map<string, number>();
+  for (const source of rule.effects.filter(isRuntimeSource)) {
+    const key = runtimeSourceBaseKey(source);
+    effectSourceCounts.set(key, (effectSourceCounts.get(key) ?? 0) + 1);
+  }
   const effectOverrides = new Map(
     rule.effects
       .filter(isRuntimeSource)
+      .filter(source => effectSourceCounts.get(runtimeSourceBaseKey(source)) === 1)
       .filter(source => source.parameterOverrides !== undefined)
       .map(source => [runtimeSourceBaseKey(source), source.parameterOverrides]),
   );
@@ -528,7 +534,8 @@ export function compileAbilityStudioRuntimeComponentRule(
     if (!isRuntimeSource(reference)) {
       return { effect: reference } as const;
     }
-    const source = resolveClonedSource(reference);
+    const resolved = resolveAttr(reference, resolveAbility);
+    const source = { ability: resolved.ability, attr: cloneRuntimeSourceAttr(reference, resolved.attr) };
     const capability = source.attr;
     if (
       (capability instanceof AbilityStudioRuntimeCapabilityAbAttr

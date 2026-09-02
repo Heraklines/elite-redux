@@ -8,11 +8,13 @@ interface SearchRuntime {
   requestedMoveIds(payload: { prompt: string; moveIndex: Array<{ id: number; name: string }> }): number[];
   containsCatalogName(text: string, name: string): boolean;
   assemblyPlanSchemaForSearch(search: unknown, catalog: unknown, payload: unknown): Record<string, unknown>;
+  normalizePrimitiveAliases(result: unknown): void;
+  validateBlueprintShape(result: unknown, payload: unknown): void;
 }
 
 const source = readFileSync(resolve(process.cwd(), "workers/er-ability-ai/container/server.mjs"), "utf8");
 const runtime: SearchRuntime = runInNewContext(
-  `${source.slice(0, source.indexOf("const server = createServer")).replace(/^import .*;\r?\n/gm, "")}\n({ requestedMoveIds, containsCatalogName, assemblyPlanSchemaForSearch })`,
+  `${source.slice(0, source.indexOf("const server = createServer")).replace(/^import .*;\r?\n/gm, "")}\n({ requestedMoveIds, containsCatalogName, assemblyPlanSchemaForSearch, normalizePrimitiveAliases, validateBlueprintShape })`,
   { randomUUID, process: { env: {} }, structuredClone },
 );
 const moves = [
@@ -67,5 +69,52 @@ describe("ability builder catalog search", () => {
       }
     };
     visit(schema);
+  });
+
+  it("normalizes primitive IF and THEN aliases inside component rules without changing runtime references", () => {
+    const component = { abilityId: 5164, attrIndex: 0, attrType: "PostAttackScriptedMoveAbAttr" };
+    const runtimeCondition = { ...component, kind: "event", parameterOverrides: { "opts.power": 50 } };
+    const result = {
+      explanation: "Use a move after Fire or Water attacks.",
+      blueprint: {
+        version: 1,
+        id: 20001,
+        name: "Steam Followup",
+        description: "Use Steam Eruption after Fire or Water moves.",
+        includes: [],
+        mechanics: [],
+        modifiers: [],
+        rules: [],
+        componentRules: [
+          {
+            key: "steam",
+            hook: component,
+            prerequisiteHooks: [],
+            chance: 100,
+            conditionLogic: "any",
+            conditions: [
+              { kind: "move-filter", filter: { type: "fire" } },
+              { kind: "move-condition", filter: { type: "water" } },
+              runtimeCondition,
+            ],
+            effects: [component, { kind: "stat-change", target: "self", stat: "speed", stages: 1 }],
+          },
+        ],
+      },
+    };
+    runtime.normalizePrimitiveAliases(result);
+    const rule = result.blueprint.componentRules[0];
+    expect(rule.conditions.slice(0, 2)).toEqual([
+      { kind: "move", filter: { type: "FIRE" } },
+      { kind: "move", filter: { type: "WATER" } },
+    ]);
+    expect(runtimeCondition).toEqual({ ...component, kind: "event", parameterOverrides: { "opts.power": 50 } });
+    expect(rule.effects[1]).toMatchObject({ kind: "stat-stage", target: "holder", stat: "SPD", stages: 1 });
+    const catalog = JSON.parse(readFileSync(resolve(process.cwd(), "editor/data/ability-primitives.json"), "utf8"));
+    expect(() => runtime.validateBlueprintShape(result, { primitiveCatalog: catalog })).not.toThrow();
+    rule.conditions[0].kind = "invented-condition";
+    expect(() => runtime.validateBlueprintShape(result, { primitiveCatalog: catalog })).toThrow(
+      ".kind is not available",
+    );
   });
 });

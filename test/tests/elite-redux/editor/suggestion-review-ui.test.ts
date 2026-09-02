@@ -15,7 +15,7 @@ async function setupReview(response: () => Promise<Response>) {
   windows.push(window);
   const root = window.document.getElementById("root");
   const applyChanges = vi.fn();
-  const fetch = vi.fn(async (url: string) =>
+  const fetch = vi.fn(async (url: string, _init?: RequestInit) =>
     url.endsWith("/staff/list")
       ? new Response(
           JSON.stringify({
@@ -47,9 +47,9 @@ afterEach(() => {
 });
 
 describe("suggestion review controls", () => {
-  it("shows a password error even while the queue contains suggestions", async () => {
+  it("still requires a password to dismiss a suggestion", async () => {
     const { root, fetch, applyChanges } = await setupReview(async () => new Response("{}"));
-    root?.querySelector<HTMLButtonElement>('[data-sug-action="approve"]')?.click();
+    root?.querySelector<HTMLButtonElement>('[data-sug-action="dismiss"]')?.click();
     await vi.waitFor(() =>
       expect(root?.querySelector('[role="alert"]')?.textContent).toContain("Enter the editor password"),
     );
@@ -58,40 +58,35 @@ describe("suggestion review controls", () => {
   });
 
   it("surfaces server errors and re-enables retry without staging anything", async () => {
-    const { window, root, applyChanges } = await setupReview(
-      async () => new Response(JSON.stringify({ error: "Invalid editor password." }), { status: 401 }),
+    const { root, applyChanges } = await setupReview(
+      async () =>
+        new Response(JSON.stringify({ error: "Suggestion approval is temporarily unavailable." }), { status: 502 }),
     );
-    const password = window.document.querySelector<HTMLInputElement>("#password");
-    if (password) {
-      password.value = "test-password";
-    }
     root?.querySelector<HTMLButtonElement>('[data-sug-action="approve"]')?.click();
     await vi.waitFor(() =>
-      expect(root?.querySelector('[role="alert"]')?.textContent).toContain("Invalid editor password."),
+      expect(root?.querySelector('[role="alert"]')?.textContent).toContain("temporarily unavailable"),
     );
     expect(root?.querySelector<HTMLButtonElement>('[data-sug-action="approve"]')?.disabled).toBe(false);
     expect(applyChanges).not.toHaveBeenCalled();
   });
 
-  it("stages a successful review once and blocks double submissions", async () => {
+  it("approves without a password and blocks double submissions", async () => {
     let finish: (response: Response) => void = () => {};
-    const { window, root, fetch, applyChanges } = await setupReview(
+    const { root, fetch, applyChanges } = await setupReview(
       () =>
         new Promise(resolve => {
           finish = resolve;
         }),
     );
-    const password = window.document.querySelector<HTMLInputElement>("#password");
-    if (password) {
-      password.value = "test-password";
-    }
     const button = root?.querySelector<HTMLButtonElement>('[data-sug-action="approve"]');
     button?.click();
     button?.click();
     expect(button?.disabled).toBe(true);
     finish(new Response(JSON.stringify({ ok: true })));
     await vi.waitFor(() => expect(applyChanges).toHaveBeenCalledTimes(1));
-    expect(fetch.mock.calls.filter(([url]) => url.endsWith("/staff/review"))).toHaveLength(1);
+    const approvals = fetch.mock.calls.filter(([url]) => url.endsWith("/suggestions/approve"));
+    expect(approvals).toHaveLength(1);
+    expect(JSON.parse(String(approvals[0][1]?.body))).toEqual({ id: "review-test" });
     expect(applyChanges).toHaveBeenCalledWith({ "egg-moves": { SPECIES_ABRA: ["ICE_BEAM"] } });
     expect(root?.querySelector('[data-sug-action="approve"]')).toBeNull();
   });

@@ -875,7 +875,7 @@ describe("Ability Studio", () => {
     ).toBe(40);
   });
 
-  it("applies component parameter overrides without mutating the source ability", () => {
+  it("keeps repeated effects and their parameters independent without mutating the source ability", () => {
     const state = { total: 0 };
     const source = new AbBuilder(AbilityId.BLAZE, 3)
       .attr(AbilityStudioPostAttackRuleAbAttr, blueprint.rules[0])
@@ -897,7 +897,18 @@ describe("Ability Studio", () => {
               abilityId: AbilityId.BLAZE,
               attrIndex: 1,
               attrType: "ParameterizedReusableEffectAbAttr",
+            },
+            {
+              abilityId: AbilityId.BLAZE,
+              attrIndex: 1,
+              attrType: "ParameterizedReusableEffectAbAttr",
               parameterOverrides: { amount: 7 },
+            },
+            {
+              abilityId: AbilityId.BLAZE,
+              attrIndex: 1,
+              attrType: "ParameterizedReusableEffectAbAttr",
+              parameterOverrides: { amount: 3 },
             },
           ],
         },
@@ -915,7 +926,7 @@ describe("Ability Studio", () => {
       move: { category: MoveCategory.PHYSICAL },
       simulated: false,
     } as never);
-    expect(state.total).toBe(7);
+    expect(state.total).toBe(11);
     const sourceAttr = source.attrs[1];
     expect(sourceAttr).toBeInstanceOf(ParameterizedReusableEffectAbAttr);
     if (!(sourceAttr instanceof ParameterizedReusableEffectAbAttr)) {

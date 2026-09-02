@@ -31,7 +31,7 @@ describe("community suggestion access", () => {
     expect(staffList).not.toContain("verifyEditorPassword");
   });
 
-  it("keeps suggestion review actions password-protected", () => {
+  it("uses the editor's accept-only route while keeping other review actions protected", () => {
     const staffRequest = sourceBetween(
       editorSource,
       "async function staffRequest",
@@ -44,6 +44,9 @@ describe("community suggestion access", () => {
     );
 
     expect(staffRequest).toContain("password: password()");
+    expect(staffRequest).toContain('body.action === "approve"');
+    expect(staffRequest).toContain("/suggestions/approve");
+    expect(staffRequest).toContain("!approval && !password()");
     expect(staffReview).toContain("verifyEditorPassword");
     expect(staffReview).toContain("Invalid editor password.");
   });

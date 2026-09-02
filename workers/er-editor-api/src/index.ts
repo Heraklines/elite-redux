@@ -60,6 +60,7 @@ interface Env {
   /** Private temporary storage for direct audio/video uploads. */
   MEDIA_UPLOADS?: R2BucketLike;
   EDITOR_PASSWORD: string;
+  SUGGESTION_API?: Pick<typeof globalThis, "fetch">;
   ALLOWED_ORIGIN: string;
   /** Sprite asset repo for /upload-assets (default "Heraklines/er-assets").
    * The GITHUB_TOKEN PAT must ALSO have Contents read+write on this repo. */
@@ -2695,6 +2696,65 @@ async function handleMediaJobs(password: string | undefined, env: Env): Promise<
   );
 }
 
+async function handleSuggestionApproval(request: Request, env: Env): Promise<Response> {
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return json({ ok: false, error: "A suggestion id is required." }, 400, env);
+  }
+  let body: unknown;
+  try {
+    const decoder = new TextDecoder();
+    let text = "";
+    let size = 0;
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        break;
+      }
+      size += chunk.value.byteLength;
+      if (size > 2048) {
+        await reader.cancel();
+        return json({ ok: false, error: "Approval request is too large." }, 413, env);
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    body = JSON.parse(text + decoder.decode());
+  } catch {
+    return json({ ok: false, error: "Invalid JSON body." }, 400, env);
+  }
+  if (
+    !isPlainObject(body)
+    || typeof body.id !== "string"
+    || !/^[a-zA-Z0-9_-]{1,128}$/.test(body.id)
+    || Object.keys(body).some(key => key !== "id")
+  ) {
+    return json({ ok: false, error: "Provide only a valid suggestion id." }, 400, env);
+  }
+  if (!env.SUGGESTION_API || !env.EDITOR_PASSWORD) {
+    return json({ ok: false, error: "Suggestion approval is not configured." }, 503, env);
+  }
+  try {
+    const response = await env.SUGGESTION_API.fetch(
+      new Request("https://er-save-api.heraklines.workers.dev/community/editor-suggestions/staff/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: body.id, action: "approve", password: env.EDITOR_PASSWORD }),
+        signal: AbortSignal.timeout(15_000),
+      }),
+    );
+    await response.body?.cancel();
+    if (response.status === 409) {
+      return json({ ok: false, error: "Suggestion is no longer in a reviewable state." }, 409, env);
+    }
+    if (!response.ok) {
+      return json({ ok: false, error: "Suggestion approval is temporarily unavailable." }, 502, env);
+    }
+    return json({ ok: true, id: body.id, status: "approved" }, 200, env);
+  } catch {
+    return json({ ok: false, error: "Suggestion approval could not be completed. Please retry." }, 502, env);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -2704,6 +2764,9 @@ export default {
     }
     if (url.pathname === "/health") {
       return json({ ok: true }, 200, env);
+    }
+    if (url.pathname === "/suggestions/approve" && request.method === "POST") {
+      return handleSuggestionApproval(request, env);
     }
     if (/^\/media-upload\/[0-9a-f-]{36}\/parts\/\d{1,5}$/.test(url.pathname) && request.method === "POST") {
       return handleMediaUploadPart(request, url, env);

@@ -133,7 +133,7 @@ describe("Ability Studio move parameters", () => {
               label: "Use a move",
               parameters: [parameter],
               hook: { id: "PostSummonAbAttr", label: "On entry", mode: "event", context: [], source },
-              conditions: [],
+              conditions: [{ id: "entry-ready", source, kind: "holder", label: "Move condition" }],
               effects: [{ source, label: "Use a move", kind: "effect", parameters: [parameter] }],
             },
           ],
@@ -196,6 +196,60 @@ describe("Ability Studio move parameters", () => {
     expect(first.value).toBe("Ember #52; Pain Split #220");
     expect(studio.buildDelta().delta.draft).toMatchObject({
       componentRules: [{ effects: [{ parameterOverrides: { "opts.moveId": [52, 220] } }, { abilityId: 5164 }] }],
+    });
+  });
+
+  it("keeps a used effect selectable for repeated THEN entries without forking", () => {
+    const { root } = setupMoves();
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const input = root.querySelector<HTMLInputElement>('[data-as-component-part="effect"]');
+      if (!input) {
+        throw new Error("missing THEN search");
+      }
+      input.value = "Use a move";
+      studio.handleInput(input);
+      const option = root.querySelector<HTMLElement>('[data-as-action="choose-component-effect"]');
+      if (!option) {
+        throw new Error("used effect disappeared from the picker");
+      }
+      studio.handleClick({ target: option });
+      studio.renderContent(root);
+    }
+    const result = studio.buildDelta();
+    expect(result.errors).toEqual([]);
+    expect(result.delta.draft).toMatchObject({
+      componentRules: [{ effects: Array.from({ length: 4 }, () => ({ abilityId: 5164 })) }],
+    });
+    expect(root.querySelectorAll('[data-as-drag-part="effect"]')).toHaveLength(4);
+    expect(root.querySelector('[aria-label="Search THEN effects…"]')).not.toBeNull();
+  });
+
+  it("allows the same parameterized IF condition more than once", () => {
+    const { root } = setupMoves();
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const input = root.querySelector<HTMLInputElement>('[data-as-component-part="condition"]');
+      if (!input) {
+        throw new Error("missing IF search");
+      }
+      input.value = "Move condition";
+      studio.handleInput(input);
+      const option = root.querySelector<HTMLElement>('[data-as-action="choose-component-condition"]');
+      if (!option) {
+        throw new Error("used condition disappeared from the picker");
+      }
+      studio.handleClick({ target: option });
+      studio.renderContent(root);
+    }
+    expect(studio.buildDelta().errors).toEqual([]);
+    expect(studio.buildDelta().delta.draft).toMatchObject({
+      componentRules: [
+        {
+          conditions: [
+            { abilityId: 5164, kind: "holder" },
+            { abilityId: 5164, kind: "holder" },
+          ],
+        },
+      ],
     });
   });
 });

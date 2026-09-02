@@ -1680,18 +1680,10 @@
       return false;
     }
     if (componentInsertTarget.kind === "condition") {
-      const selected = new Set(
-        targetRule.conditions
-          .filter(isRuntimeComponent)
-          .map(reference => componentConditionsByKey.get(componentConditionKey(reference))?.id)
-          .filter(Boolean),
-      );
       const candidates = uniqueMatches(
-        componentCatalog
-          .flatMap(ability =>
-            ability.rules.flatMap(rule => rule.conditions.map(condition => ({ ability, rule, condition }))),
-          )
-          .filter(({ condition }) => !selected.has(condition.id)),
+        componentCatalog.flatMap(ability =>
+          ability.rules.flatMap(rule => rule.conditions.map(condition => ({ ability, rule, condition }))),
+        ),
         ({ condition }) => condition.id,
       ).map(candidate => {
         const observed = candidate.condition.kind === "event" && !runtimeHookSupports(targetHook, candidate.rule.hook);
@@ -1745,32 +1737,29 @@
         results.innerHTML = `<div class="as-part-screen"><header><b>ADD IF CONDITION (${primitives.length + candidates.length})</b><span>All reusable conditions; event gates can be observed across WHEN hooks</span></header>${matches.map(componentConditionResultHtml).join("")}${componentResultFooter("part", matches.length, primitives.length + candidates.length)}</div>`;
       }
     } else {
-      const selected = new Set(targetRule.effects.filter(isRuntimeComponent).map(componentInstanceKey));
       const candidates = uniqueMatches(
         componentCatalog.flatMap(ability =>
           ability.rules.flatMap(rule => rule.effects.map(effect => ({ ability, rule, effect }))),
         ),
         componentEffectSemanticKey,
-      )
-        .filter(({ effect }) => !selected.has(componentInstanceKey(effect.source)))
-        .map(candidate => {
-          const compatible = componentEffectSupports(targetRule, candidate.effect.source);
-          const armed = compatible && !runtimeEffectSupports(targetHook, candidate.rule.hook);
-          const persistentCapability = candidate.effect.kind === "capability";
-          return {
-            ...candidate,
-            effect: armed
-              ? {
-                  ...candidate.effect,
-                  summary: persistentCapability
-                    ? `Activated by "${targetHook.label}" for the rest of the battle. ${candidate.effect.summary}`
-                    : `Armed by "${targetHook.label}", then consumed the next time "${candidate.rule.hook.label}" occurs. ${candidate.effect.summary}`,
-                }
-              : candidate.effect,
-            compatible,
-            reason: "",
-          };
-        });
+      ).map(candidate => {
+        const compatible = componentEffectSupports(targetRule, candidate.effect.source);
+        const armed = compatible && !runtimeEffectSupports(targetHook, candidate.rule.hook);
+        const persistentCapability = candidate.effect.kind === "capability";
+        return {
+          ...candidate,
+          effect: armed
+            ? {
+                ...candidate.effect,
+                summary: persistentCapability
+                  ? `Activated by "${targetHook.label}" for the rest of the battle. ${candidate.effect.summary}`
+                  : `Armed by "${targetHook.label}", then consumed the next time "${candidate.rule.hook.label}" occurs. ${candidate.effect.summary}`,
+              }
+            : candidate.effect,
+          compatible,
+          reason: "",
+        };
+      });
       const primitives = primitiveCatalog.effectKinds.map(primitive => ({ primitive }));
       if (query) {
         results.innerHTML = fanoutHtml(
@@ -2882,9 +2871,7 @@
         if (button.dataset.asConditionIndex !== undefined) {
           reference.conditionIndex = Number(button.dataset.asConditionIndex);
         }
-        if (!rule.conditions.some(condition => componentConditionKey(condition) === componentConditionKey(reference))) {
-          rule.conditions.push(reference);
-        }
+        rule.conditions.push(reference);
       }
       componentInsertTarget = null;
     } else if (action === "choose-component-primitive-condition") {
@@ -2901,9 +2888,7 @@
           attrIndex: Number(button.dataset.asIndex),
           attrType: button.dataset.asType,
         };
-        if (!rule.effects.some(effect => componentSourceKey(effect) === componentSourceKey(reference))) {
-          rule.effects.push(reference);
-        }
+        rule.effects.push(reference);
       }
       componentInsertTarget = null;
     } else if (action === "choose-component-primitive-effect") {

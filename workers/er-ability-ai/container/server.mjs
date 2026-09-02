@@ -1637,10 +1637,15 @@ function normalizePrimitiveAliases(result) {
     eva: "EVA",
     evasion: "EVA",
   };
-  for (const rule of result.blueprint.rules || []) {
+  for (const rule of [...(result.blueprint.rules || []), ...(result.blueprint.componentRules || [])]) {
     const triggerKey = normalizedPrimitiveAlias(rule.trigger);
-    rule.trigger = triggerAliases[triggerKey] || rule.trigger;
+    if (rule.trigger != null) {
+      rule.trigger = triggerAliases[triggerKey] || rule.trigger;
+    }
     for (const condition of rule.conditions || []) {
+      if (Number.isInteger(condition.abilityId)) {
+        continue;
+      }
       const kindKey = normalizedPrimitiveAlias(condition.kind);
       condition.kind = conditionAliases[kindKey] || condition.kind;
       if (condition.filter) {
@@ -1651,6 +1656,9 @@ function normalizePrimitiveAliases(result) {
       }
     }
     for (const effect of rule.effects || []) {
+      if (Number.isInteger(effect.abilityId)) {
+        continue;
+      }
       const kindKey = normalizedPrimitiveAlias(effect.kind);
       const targetKey = normalizedPrimitiveAlias(effect.target);
       const statKey = normalizedPrimitiveAlias(effect.stat);
@@ -1684,7 +1692,7 @@ Triggers, conditions, and effects are independent. Recombine them freely. compon
 
 The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId and selectableParts. A component is valid as a hook only when selectableParts.hook is true. A condition or effect partIndex must appear in selectableParts.conditionIndexes or selectableParts.effectIndexes for that role. For hooks set partIndex to null. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Ability parameters must use an id from the ability matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
-Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
+Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. A component may be reused in multiple IF or DO/THEN entries with separate parameterOverrides. For "after a Fire or Water move", use conditionLogic:"any" with conditions:[{"kind":"move","filter":{"type":"FIRE"}},{"kind":"move","filter":{"type":"WATER"}}]. Do not invent a condition kind for OR or put several types into filter.type. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
 ${isPrimitiveStatRuleRequest(payload) ? "This request is fully expressible as a primitive stat-stage rule. Leave componentRules empty and implement it only in draft.rules." : ""}
 
 PRIMITIVE CATALOG:
