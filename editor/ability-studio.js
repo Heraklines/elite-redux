@@ -1059,10 +1059,93 @@
     return componentCatalog.find(ability => ability.name.toLowerCase() === normalized.toLowerCase())?.id;
   }
 
-  function runtimeMoveDatalistHtml() {
-    return `<datalist id="as-runtime-moves">${moveCatalog
-      .map(move => `<option value="${esc(`${move.name} #${move.id}`)}"></option>`)
-      .join("")}</datalist>`;
+  function runtimeMoveSearchHtml(value, parameter, prefix, part, ruleIndex, itemIndex) {
+    const id = `as-move-${part}-${ruleIndex}-${itemIndex}-${encodeURIComponent(parameter.path || parameter.key)}`;
+    return `<span class="as-runtime-search"><input id="${id}" type="search" role="combobox" aria-autocomplete="list" aria-controls="${id}-results" aria-expanded="false" aria-label="${esc(parameter.label)}" autocomplete="off" value="${esc(value)}" placeholder="Search a move..." data-as-action="open-move-search" data-as-move-search ${prefix}><span id="${id}-results" class="as-include-results as-runtime-move-results" role="listbox" hidden></span></span>`;
+  }
+
+  function renderRuntimeMoveSearch(input) {
+    closeOtherSearches(input);
+    const results = document.getElementById(input.getAttribute("aria-controls"));
+    if (!results) {
+      return;
+    }
+    const text = input.dataset.asRuntimeControl === "move-list" ? input.value.split(";").at(-1) : input.value;
+    const query = text
+      .trim()
+      .toLowerCase()
+      .replace(/#(?=\d)/g, "");
+    const matches = moveCatalog.filter(move => searchMatches(`${move.name} ${move.id}`.toLowerCase(), query));
+    results.innerHTML =
+      matches.length > 0
+        ? matches
+            .map(
+              move =>
+                `<button type="button" role="option" data-as-action="choose-runtime-move" data-as-input="${input.id}" data-as-id="${move.id}"><b>${esc(move.name)}</b><span>#${move.id}</span><small>${esc([move.type, move.category, move.power > 0 ? `${move.power} BP` : ""].filter(Boolean).join(" / "))}</small></button>`,
+            )
+            .join("")
+        : '<span class="as-include-empty">No matching moves</span>';
+    const rect = input.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom - 12;
+    const above = rect.top - 12;
+    const openBelow = below >= 240 || below >= above;
+    const height = Math.max(40, Math.min(340, openBelow ? below : above));
+    const width = Math.min(Math.max(rect.width, 300), window.innerWidth - 24);
+    Object.assign(results.style, {
+      width: `${width}px`,
+      maxHeight: `${height}px`,
+      left: `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`,
+      top: openBelow ? `${rect.bottom + 4}px` : "auto",
+      bottom: openBelow ? "auto" : `${window.innerHeight - rect.top + 4}px`,
+    });
+    results.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+
+  function closeRuntimeMoveSearch() {
+    document.querySelectorAll("[data-as-move-search]").forEach(input => {
+      input.setAttribute("aria-expanded", "false");
+      const results = document.getElementById(input.getAttribute("aria-controls"));
+      if (results) {
+        results.hidden = true;
+      }
+    });
+  }
+
+  function handleKeyDown(event) {
+    const input = event.target.closest(".as-runtime-search")?.querySelector("[data-as-move-search]");
+    if (!input) {
+      return false;
+    }
+    const results = document.getElementById(input.getAttribute("aria-controls"));
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeRuntimeMoveSearch();
+      input.focus();
+      return true;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (results.hidden) {
+        renderRuntimeMoveSearch(input);
+      }
+      const choices = [...results.querySelectorAll('[role="option"]')];
+      const index = choices.indexOf(event.target);
+      const next =
+        event.key === "ArrowDown"
+          ? Math.min(index + 1, choices.length - 1)
+          : index <= 0
+            ? choices.length - 1
+            : index - 1;
+      choices[next]?.focus();
+      return true;
+    }
+    if (event.key === "Enter" && event.target === input && !results.hidden) {
+      event.preventDefault();
+      results.querySelector('[role="option"]')?.click();
+      return true;
+    }
+    return false;
   }
 
   function runtimeAbilityDatalistHtml() {
@@ -1084,10 +1167,17 @@
     if (parameter.control === "ability") {
       control = `<input type="search" list="as-runtime-abilities" value="${esc(value == null ? "" : abilityLabel(value))}" placeholder="Search an ability…" ${prefix}>`;
     } else if (parameter.control === "move") {
-      control = `<input type="search" list="as-runtime-moves" value="${esc(value == null ? "" : moveLabel(value))}" placeholder="Search a move…" ${prefix}>`;
+      control = runtimeMoveSearchHtml(
+        value == null ? "" : moveLabel(value),
+        parameter,
+        prefix,
+        part,
+        ruleIndex,
+        itemIndex,
+      );
     } else if (parameter.control === "move-list") {
       const moveValues = Array.isArray(value) ? value.map(moveLabel).join("; ") : "";
-      control = `<input type="text" value="${esc(moveValues)}" placeholder="Move names or IDs, semicolon-separated" ${prefix}>`;
+      control = runtimeMoveSearchHtml(moveValues, parameter, prefix, part, ruleIndex, itemIndex);
     } else if (parameter.control === "number" || parameter.control === "number-list") {
       const numberValue = Array.isArray(value) ? value.join(", ") : (value ?? "");
       const limits =
@@ -2090,7 +2180,6 @@
       }</div></aside>
       <main class="as-workspace" aria-label="Ability editor">${entry ? renderEntry(entry, errors) : '<div class="as-welcome"><h2>Create an ability</h2><p>Build it from existing ability packages, passive modifiers, and triggered effect chains.</p><button type="button" class="primary" data-as-action="new-ability">Create first ability</button></div>'}</main>
       <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant()}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
-      ${runtimeMoveDatalistHtml()}
       ${runtimeAbilityDatalistHtml()}
     </div>`;
   }
@@ -2303,6 +2392,9 @@
   }
 
   function handleInput(element) {
+    if (element.hasAttribute("data-as-move-search")) {
+      renderRuntimeMoveSearch(element);
+    }
     if (element.hasAttribute("data-as-ai-prompt")) {
       aiState.prompt = element.value;
       aiState.error = "";
@@ -2618,6 +2710,9 @@
   function handleClick(event) {
     const button = event.target.closest("[data-as-action]");
     if (!button) {
+      if (!event.target.closest(".as-runtime-search")) {
+        closeRuntimeMoveSearch();
+      }
       if (!event.target.closest(".as-include-picker")) {
         closeIncludeSearch();
       }
@@ -2631,6 +2726,27 @@
     }
     const action = button.dataset.asAction;
     const entry = currentEntry();
+    if (action === "open-move-search") {
+      renderRuntimeMoveSearch(button);
+      return true;
+    }
+    if (action === "choose-runtime-move") {
+      const input = document.getElementById(button.dataset.asInput);
+      if (!input || !entry) {
+        return true;
+      }
+      const label = moveLabel(Number(button.dataset.asId));
+      const values = input.value
+        .split(";")
+        .slice(0, -1)
+        .map(value => value.trim())
+        .filter(Boolean);
+      input.value = input.dataset.asRuntimeControl === "move-list" ? [...values, label].join("; ") : label;
+      handleInput(input);
+      closeRuntimeMoveSearch();
+      input.focus();
+      return true;
+    }
     if (action === "ai-generate") {
       generateAiAbility();
       return true;
@@ -3020,6 +3136,8 @@
     renderContent,
     handleInput,
     handleClick,
+    handleKeyDown,
+    closeRuntimeMoveSearch,
     handleDragStart,
     handleDragOver,
     handleDrop,

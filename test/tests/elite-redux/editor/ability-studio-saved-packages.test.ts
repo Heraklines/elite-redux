@@ -98,3 +98,104 @@ describe("Ability Studio saved packages", () => {
     expect(result.delta["local-draft"]).toEqual(expect.objectContaining({ includes: [20002] }));
   });
 });
+
+describe("Ability Studio move parameters", () => {
+  function setupMoves(control = "move") {
+    const source = { abilityId: 5164, attrIndex: 0, attrType: "PostSummonScriptedMoveAbAttr" };
+    const parameter = {
+      key: "opts.moveId",
+      path: "opts.moveId",
+      label: "Move",
+      control,
+      editable: true,
+      rawValue: control === "move-list" ? [52] : 52,
+    };
+    const draft = {
+      ...blueprint(20001, "Move Draft"),
+      rules: [],
+      componentRules: [{ key: "entry", hook: source, chance: 100, conditions: [], effects: [source, source] }],
+    };
+    studio.init({
+      catalog: primitiveCatalog,
+      abilities: [],
+      moves: [
+        { id: 52, name: "Ember", type: "FIRE", category: "SPECIAL", power: 40 },
+        { id: 220, name: "Pain Split", type: "NORMAL", category: "STATUS", power: 0 },
+      ],
+      mechanics: [],
+      components: [
+        {
+          id: 5164,
+          name: "Entry Move",
+          rules: [
+            {
+              source,
+              label: "Use a move",
+              parameters: [parameter],
+              hook: { id: "PostSummonAbAttr", label: "On entry", mode: "event", context: [], source },
+              conditions: [],
+              effects: [{ source, label: "Use a move", kind: "effect", parameters: [parameter] }],
+            },
+          ],
+        },
+      ],
+      blueprints: { draft },
+      callbacks: {},
+    });
+    const root = window.document.getElementById("root");
+    if (!root) {
+      throw new Error("missing editor root");
+    }
+    studio.renderContent(root);
+    const inputs = root.querySelectorAll<HTMLInputElement>("[data-as-move-search]");
+    const first = inputs[0];
+    if (!first) {
+      throw new Error("missing move input");
+    }
+    return { root, first, second: inputs[1] };
+  }
+
+  it("shows partial-name matches and updates only the selected move parameter", () => {
+    const { root, first, second } = setupMoves();
+    first.value = "pain";
+    studio.handleInput(first);
+    expect(studio.buildDelta().delta).toEqual({});
+    const result = root.querySelector<HTMLElement>("[data-as-action='choose-runtime-move'][data-as-id='220']");
+    if (!result) {
+      throw new Error("missing Pain Split result");
+    }
+    studio.handleClick({ target: result });
+    expect(first.value).toBe("Pain Split #220");
+    expect(first.getAttribute("aria-expanded")).toBe("false");
+    expect(second.value).toBe("Ember #52");
+    expect(studio.buildDelta().delta.draft).toMatchObject({
+      componentRules: [{ effects: [{ parameterOverrides: { "opts.moveId": 220 } }, { abilityId: 5164 }] }],
+    });
+  });
+
+  it("closes the previous picker and leaves unmatched text uncommitted", () => {
+    const { first, second } = setupMoves();
+    first.value = "not a move";
+    studio.handleInput(first);
+    expect(studio.buildDelta().delta).toEqual({});
+    second.value = "#220";
+    studio.handleInput(second);
+    expect(first.getAttribute("aria-expanded")).toBe("false");
+    expect(second.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps earlier moves when choosing the next move in a move-list parameter", () => {
+    const { root, first } = setupMoves("move-list");
+    first.value = "Ember #52; pain";
+    studio.handleInput(first);
+    const result = root.querySelector<HTMLElement>("[data-as-action='choose-runtime-move'][data-as-id='220']");
+    if (!result) {
+      throw new Error("missing Pain Split result");
+    }
+    studio.handleClick({ target: result });
+    expect(first.value).toBe("Ember #52; Pain Split #220");
+    expect(studio.buildDelta().delta.draft).toMatchObject({
+      componentRules: [{ effects: [{ parameterOverrides: { "opts.moveId": [52, 220] } }, { abilityId: 5164 }] }],
+    });
+  });
+});

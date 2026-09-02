@@ -12,7 +12,7 @@ const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
-const nimModel = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimModel = process.env.NVIDIA_NIM_MODEL || "moonshotai/kimi-k3";
 const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 const maxGenerateBodyBytes = 8_388_608;
@@ -332,7 +332,7 @@ function componentSelectionSchemaForRole(searchContext, role) {
     const parameterProperties = {};
     for (const parameter of component.rule.parameters || []) {
       if (parameter.path) {
-        parameterProperties[parameter.path] = parameterValueSchema;
+        parameterProperties[parameter.path] = { $ref: "#/$defs/parameterValue" };
       }
     }
     schema.properties.parameterOverrides = {
@@ -375,7 +375,7 @@ function isPrimitiveStatRuleRequest(payload) {
   const prompt = normalizedSearchText(payload.prompt);
   const namesAbility = (payload.abilityIndex || []).some(ability => {
     const name = normalizedSearchText(ability.name);
-    return name.length >= 3 && prompt.includes(name);
+    return name.length >= 3 && containsCatalogName(prompt, name);
   });
   return (
     requestedMoveEntries(payload).length === 0
@@ -394,17 +394,27 @@ function assemblyPlanSchemaForSearch(searchContext, catalog, payload) {
   const componentConditionSchema = componentSelectionSchemaForRole(searchContext, "condition");
   const componentEffectSchema = componentSelectionSchemaForRole(searchContext, "effect");
   const primitiveSchemas = primitiveSchemasForCatalog(catalog);
-  ruleProperties.prerequisiteHooks.items = hookSchema || componentPartSelectionSchema;
-  ruleProperties.hook = hookSchema || componentPartSelectionSchema;
+  schema.$defs = {
+    parameterValue: parameterValueSchema,
+    hook: hookSchema || componentPartSelectionSchema,
+    condition: primitiveSchemas.conditionSchema,
+    effect: primitiveSchemas.effectSchema,
+  };
+  ruleProperties.prerequisiteHooks.items = { $ref: "#/$defs/hook" };
+  ruleProperties.hook = { $ref: "#/$defs/hook" };
+  schema.$defs.componentCondition = componentConditionSchema
+    ? componentConditionSchema
+    : primitiveSchemas.conditionSchema;
+  schema.$defs.componentEffect = componentEffectSchema ? componentEffectSchema : primitiveSchemas.effectSchema;
   ruleProperties.conditions.items.anyOf = componentConditionSchema
-    ? [componentConditionSchema, primitiveSchemas.conditionSchema]
-    : [primitiveSchemas.conditionSchema];
+    ? [{ $ref: "#/$defs/componentCondition" }, { $ref: "#/$defs/condition" }]
+    : [{ $ref: "#/$defs/condition" }];
   ruleProperties.effects.items.anyOf = componentEffectSchema
-    ? [componentEffectSchema, primitiveSchemas.effectSchema]
-    : [primitiveSchemas.effectSchema];
+    ? [{ $ref: "#/$defs/componentEffect" }, { $ref: "#/$defs/effect" }]
+    : [{ $ref: "#/$defs/effect" }];
   const primitiveRuleProperties = schema.properties.draft.properties.rules.items.properties;
-  primitiveRuleProperties.conditions.items = primitiveSchemas.conditionSchema;
-  primitiveRuleProperties.effects.items = primitiveSchemas.effectSchema;
+  primitiveRuleProperties.conditions.items = { $ref: "#/$defs/condition" };
+  primitiveRuleProperties.effects.items = { $ref: "#/$defs/effect" };
   schema.properties.draft.properties.modifiers.items = primitiveSchemas.modifierSchema;
   if (isPrimitiveStatRuleRequest(payload)) {
     schema.properties.draft.properties.componentRules = { type: "array", maxItems: 0 };
@@ -1102,13 +1112,7 @@ function validateSources(result, payload) {
 }
 
 function requestedMoveIds(payload) {
-  const prompt = normalizedSearchText(payload.prompt);
-  return (payload.moveIndex || [])
-    .filter(move => {
-      const name = normalizedSearchText(move.name);
-      return name.length >= 3 && prompt.includes(name);
-    })
-    .map(move => Number(move.id));
+  return requestedMoveEntries(payload).map(move => Number(move.id));
 }
 
 function blueprintMoveIds(result, payload) {
@@ -1211,7 +1215,7 @@ function validatePromptRequirements(result, payload) {
   for (const abilityId of result.blueprint.includes || []) {
     const ability = payload.abilityIndex.find(candidate => Number(candidate.id) === Number(abilityId));
     const name = normalizedSearchText(ability?.name);
-    if (!name || !prompt.includes(name)) {
+    if (!name || !containsCatalogName(prompt, name)) {
       throw new Error(`Generated draft included unrelated ability ${ability?.name || abilityId}`);
     }
   }
@@ -1248,6 +1252,10 @@ function normalizedSearchText(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function containsCatalogName(text, name) {
+  return ` ${normalizedSearchText(text)} `.includes(` ${normalizedSearchText(name)} `);
 }
 
 const catalogSearchStopWords = new Set([
@@ -1344,7 +1352,7 @@ function requestedMoveEntries(payload) {
   const query = normalizedSearchText(payload.prompt);
   return (payload.moveIndex || []).filter(move => {
     const name = normalizedSearchText(move.name);
-    return name.length >= 3 && query.includes(name);
+    return name.length >= 3 && containsCatalogName(query, name);
   });
 }
 
@@ -1363,7 +1371,7 @@ function defaultCatalogSearchPlan(payload) {
   }
   for (const ability of payload.abilityIndex || []) {
     const name = normalizedSearchText(ability.name);
-    if (name.length >= 3 && normalizedSearchText(payload.prompt).includes(name)) {
+    if (name.length >= 3 && containsCatalogName(payload.prompt, name)) {
       queries.push({ scope: "abilities", role: "any", query: ability.name, limit: 4 });
     }
   }
@@ -1969,8 +1977,11 @@ async function requestNimJson(model, body, schema, source, timeoutMs, forceGuide
       ),
       signal: AbortSignal.timeout(timeoutMs),
     });
-  } catch {
-    throw new Error(`The ${source} timed out`);
+  } catch (error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      throw new Error(`The ${source} timed out`, { cause: error });
+    }
+    throw new Error(`Could not connect to the ${source}. Please retry.`, { cause: error });
   }
   if (!response.ok) {
     const providerError = (await response.text().catch(() => "")).replace(/\s+/g, " ").trim().slice(0, 1000);

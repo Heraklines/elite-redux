@@ -759,6 +759,19 @@
 .as-include-results[hidden] {
   display: none;
 }
+.as-runtime-search {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+.as-runtime-search > input {
+  width: 100%;
+}
+.as-runtime-move-results {
+  position: fixed;
+  z-index: 100;
+  right: auto;
+}
 .as-mechanic-results {
   top: calc(100% + 4px);
   right: 0;

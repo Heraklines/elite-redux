@@ -6940,6 +6940,9 @@ async function init() {
       }
     });
     content.addEventListener("keydown", e => {
+      if (activeTab === "abilities" && window.erAbilityStudio?.handleKeyDown?.(e)) {
+        return;
+      }
       if (activeTab === "customtrainers") {
         onCustomTrainerSpeciesKeyDown(e);
       }
@@ -6996,6 +6999,9 @@ async function init() {
       }
     });
     content.addEventListener("focusout", e => {
+      if (e.target.closest?.(".as-runtime-search") && !e.relatedTarget?.closest?.(".as-runtime-search")) {
+        window.erAbilityStudio?.closeRuntimeMoveSearch?.();
+      }
       // Delay so a click on an option registers before the dropdown closes.
       if (e.target.classList && e.target.classList.contains("abil-input")) {
         setTimeout(closeAbilDrops, 150);

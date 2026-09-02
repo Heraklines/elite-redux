@@ -68,6 +68,8 @@
   let loaded = false;
   let loading = false;
   let error = "";
+  let reviewErrorId = "";
+  const pendingReviews = new Set();
   let aggregateRoot = null;
   let selectedId = "";
   let revealId = "";
@@ -414,10 +416,15 @@
     if (demo) {
       return { ok: true };
     }
+    if (!password()) {
+      document.querySelector("#password")?.focus();
+      throw new Error("Enter the editor password at the top, then retry the review.");
+    }
     const response = await fetch(`${API}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: password(), ...body }),
+      signal: AbortSignal.timeout(20_000),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -799,11 +806,17 @@
     panel.id = `suggestion-review-${active.id}`;
     panel.tabIndex = -1;
     panel.innerHTML = `<div class="sug-ctx-head"><span>${esc(options.title || "Proposed changes")}</span><span class="suggestion-count">${relevant.length}</span></div>${suggestionItemHtml(active, tab, key)}`;
+    if (error && reviewErrorId === active.id) {
+      panel.insertAdjacentHTML("beforeend", reviewErrorHtml());
+    }
     bindReviewActions(panel, tab, key);
     return panel;
   }
 
   function bindReviewActions(container, tab, key) {
+    container.querySelectorAll("[data-sug-id]").forEach(button => {
+      button.disabled = pendingReviews.has(button.dataset.sugId);
+    });
     container.querySelectorAll("[data-sug-action]").forEach(button =>
       button.addEventListener("click", event => {
         event.stopPropagation();
@@ -1076,15 +1089,23 @@
 
   async function reviewById(id, action) {
     const item = items.find(entry => entry.id === id);
-    if (!item) {
+    if (!item || pendingReviews.has(id)) {
       return;
     }
+    error = "";
+    reviewErrorId = "";
+    pendingReviews.add(id);
+    document.querySelectorAll("[data-sug-id]").forEach(button => {
+      if (button.dataset.sugId === id) {
+        button.disabled = true;
+      }
+    });
     try {
       const context = firstContext(item);
       const remaining = context ? itemsFor(context.tab, context.key).filter(entry => entry.id !== id) : [];
+      const changes = action === "approve" ? approvedChanges(item) : null;
       await staffRequest("/community/editor-suggestions/staff/review", { id, action });
       if (action === "approve") {
-        const changes = approvedChanges(item);
         stage({ ...item, status: "approved", changes });
         bridge()?.applyChanges?.(changes);
         appliedStaged.add(item.id);
@@ -1095,12 +1116,21 @@
         persistDemoReview(item, nextStatus);
       }
       revealId = remaining[0]?.id || "";
+    } catch (cause) {
+      error =
+        cause.name === "TimeoutError"
+          ? "Review timed out. Refresh suggestions to check its status before retrying."
+          : cause.message || "Could not review the suggestion. Please retry.";
+      reviewErrorId = id;
+    } finally {
+      pendingReviews.delete(id);
       syncNavBadges();
       bridge()?.activeTab?.() === "suggestions" ? drawAggregate() : bridge()?.render?.();
-    } catch (cause) {
-      error = cause.message;
-      drawAggregate();
     }
+  }
+
+  function reviewErrorHtml() {
+    return error ? `<div class="sug-review-error" role="alert">${esc(error)}</div>` : "";
   }
 
   function summaryFor(item, context) {
@@ -1170,6 +1200,7 @@
     }
     aggregateRoot.innerHTML = `<div class="sug-shell"><section class="sug-index"><div class="sug-toolbarline"><select id="sug-status"><option value="open">Open</option><option value="approved">Approved</option><option value="dismissed">Dismissed</option><option value="applied">Applied</option><option value="all">All</option></select><input id="sug-search" class="grow" type="search" placeholder="Filter by Pokemon, field, tab, or author" value="${esc(query)}"><label class="check"><input id="sug-ignored" type="checkbox"${showIgnored ? " checked" : ""}${ignored.size > 0 ? "" : " disabled"}> Show ignored</label><button type="button" id="sug-refresh" class="push-right">Refresh</button></div>${renderAggregateRows(list)}</section><aside class="sug-inspector">${renderInspector(selected)}</aside></div>`;
     aggregateRoot.querySelector("#sug-status").value = status;
+    aggregateRoot.querySelector(".sug-index").insertAdjacentHTML("afterbegin", reviewErrorHtml());
     bindAggregate();
   }
 
