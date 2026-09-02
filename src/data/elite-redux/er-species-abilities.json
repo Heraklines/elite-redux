@@ -276,6 +276,16 @@
       290
     ]
   },
+  "SPECIES_HITMONTOP_MEGA": {
+    "ability1": 20021,
+    "ability2": 20021,
+    "hidden": 20021,
+    "innates": [
+      101,
+      80,
+      5038
+    ]
+  },
   "SPECIES_HOUNDOOM_MEGA_REDUX": {
     "ability1": 138,
     "ability2": 5327
