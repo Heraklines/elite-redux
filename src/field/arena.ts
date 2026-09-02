@@ -440,7 +440,8 @@ export class Arena {
   private overrideWeather(): void {
     const weather = Overrides.WEATHER_OVERRIDE;
     this.weather = new Weather(weather, 0);
-    globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, weatherCommonAnim(weather));
+    const anim = weatherCommonAnim(weather);
+    if (anim != null) globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim);
     globalScene.phaseManager.queueMessage(getWeatherStartMessage(weather)!); // TODO: is this bang correct?
   }
 

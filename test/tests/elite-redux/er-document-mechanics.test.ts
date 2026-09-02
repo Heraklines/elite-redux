@@ -140,7 +140,9 @@ describe.skipIf(process.env.ER_SCENARIO !== "1")("documented fakemon battle mech
   it("Irresistible uses Follow Me on entry", async () => {
     game.override.ability(ER_IRRESISTIBLE_ABILITY_ID as AbilityId).battleStyle("double");
     await game.classicMode.startBattle(SpeciesId.SHUCKLE, SpeciesId.SHUCKLE);
-    expect(game.scene.getPlayerPokemon()!.getTag(BattlerTagType.CENTER_OF_ATTENTION)).toBeDefined();
+    const holders = game.scene.getPlayerField().filter(p => p.getTag(BattlerTagType.CENTER_OF_ATTENTION));
+    expect(holders).toHaveLength(1);
+    expect(holders[0].getLastXMoves(-1).some(entry => entry.move === MoveId.FOLLOW_ME)).toBe(true);
   });
 
   it("Moonrise starts eight turns of non-damaging, serializable Full Moon", async () => {
@@ -223,6 +225,7 @@ describe.skipIf(process.env.ER_SCENARIO !== "1")("documented fakemon battle mech
   ])("Gulp Missile follows %s with exactly one %s, without recursion", async (move, followUp) => {
     game.override.ability(AbilityId.GULP_MISSILE);
     game.override.enemySpecies(SpeciesId.MAGIKARP);
+    game.override.enemyAbility(AbilityId.RUN_AWAY);
     await startBattle();
     game.move.use(move);
     await game.toNextTurn();
