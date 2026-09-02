@@ -21,6 +21,8 @@ import { BooleanHolder, toDmgValue } from "#utils/common";
  * other (contiguous) weather uses the `SUNNY + (w-1)` index math.
  */
 function weatherEffectAnim(w: WeatherType): CommonAnim {
+  // Full Moon has no bespoke animation; its phase skips playback below.
+  if (w === WeatherType.FULL_MOON) return CommonAnim.SUNNY;
   if (isFogWeather(w)) {
     return CommonAnim.FOG;
   }
@@ -136,7 +138,8 @@ export class WeatherEffectPhase extends CommonAnimPhase {
         }
       });
 
-      super.start();
+      if (w === WeatherType.FULL_MOON) this.end();
+      else super.start();
     });
   }
 }

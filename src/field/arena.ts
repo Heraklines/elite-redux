@@ -142,7 +142,10 @@ const ER_CUSTOM_ID_FLOOR = 10000;
  * explicit slots — FOG has its own anim, and Tempest Storm reuses the RAIN anim
  * as a storm visual (it has no dedicated asset).
  */
-function weatherCommonAnim(weather: WeatherType): CommonAnim {
+function weatherCommonAnim(weather: WeatherType): CommonAnim | null {
+  if (weather === WeatherType.FULL_MOON) {
+    return null;
+  }
   if (weather === WeatherType.FOG || weather === WeatherType.EERIE_FOG) {
     // ER Eerie Fog reuses the vanilla fog visual.
     return CommonAnim.FOG;
@@ -514,16 +517,18 @@ export class Arena {
       k: "weather",
       weather,
       turnsLeft: this.weather?.turnsLeft ?? 0,
-      ...(this.weather ? { anim: weatherCommonAnim(weather) } : {}),
+      ...(this.weather && weatherCommonAnim(weather) != null ? { anim: weatherCommonAnim(weather)! } : {}),
     });
 
     if (this.weather) {
       const anim = weatherCommonAnim(weather);
-      globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim, {
-        source: "environment",
-        kind: "weather",
-        value: weather,
-      });
+      if (anim != null) {
+        globalScene.phaseManager.unshiftNew("CommonAnimPhase", undefined, undefined, anim, {
+          source: "environment",
+          kind: "weather",
+          value: weather,
+        });
+      }
       globalScene.phaseManager.queueMessage(getWeatherStartMessage(weather)!); // TODO: is this bang correct?
     } else {
       globalScene.phaseManager.queueMessage(getWeatherClearMessage(oldWeatherType)!); // TODO: is this bang correct?

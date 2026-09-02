@@ -30,4 +30,6 @@ export enum WeatherType {
    * preserved.
    */
   EERIE_FOG,
+  /** Documented fakemon weather. No intrinsic damage or type boosts. */
+  FULL_MOON,
 }

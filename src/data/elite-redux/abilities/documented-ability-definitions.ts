@@ -184,24 +184,58 @@ export const DOCUMENTED_COMPOSITES: readonly ManualCompositeDef[] = [
 
 export const ER_IRRESISTIBLE_ABILITY_ID = 6159;
 export const ER_SINISTER_SPORES_ABILITY_ID = 6160;
+export const ER_MOONRISE_ABILITY_ID = 6161;
+export const ER_LUNAR_RUSH_ABILITY_ID = 6162;
+export const ER_LUNATIC_ABILITY_ID = 6163;
 
 export const DOCUMENTED_ABILITY_DEFINITIONS: readonly FakemonPitchAbilityDefinition[] = [
-  ...DOCUMENTED_COMPOSITES.map(
-  def => ({
+  {
+    pokerogueId: ER_MOONRISE_ABILITY_ID,
+    draft: {
+      id: ER_MOONRISE_ABILITY_ID,
+      name: "Moonrise",
+      description: "Summons Full Moon for 8 turns on entry. Mystical Rock extends its duration.",
+      archetype: "unknown",
+    },
+  },
+  {
+    pokerogueId: ER_LUNAR_RUSH_ABILITY_ID,
+    draft: {
+      id: ER_LUNAR_RUSH_ABILITY_ID,
+      name: "Lunar Rush",
+      description: "Speed is boosted by 50% during Full Moon.",
+      archetype: "unknown",
+    },
+  },
+  {
+    pokerogueId: ER_LUNATIC_ABILITY_ID,
+    draft: {
+      id: ER_LUNATIC_ABILITY_ID,
+      name: "Lunatic",
+      description: "The higher of Attack and Sp. Atk is boosted by 50% during Full Moon.",
+      archetype: "unknown",
+    },
+  },
+  ...DOCUMENTED_COMPOSITES.map(def => ({
     pokerogueId: def.id,
     draft: { id: def.id, name: def.name, description: def.description, archetype: "unknown" },
-  }),
-  ),
+  })),
   {
     pokerogueId: ER_IRRESISTIBLE_ABILITY_ID,
-    draft: { id: ER_IRRESISTIBLE_ABILITY_ID, name: "Irresistible", description: "Uses Follow Me on entry.", archetype: "unknown" },
+    draft: {
+      id: ER_IRRESISTIBLE_ABILITY_ID,
+      name: "Irresistible",
+      description: "Uses Follow Me on entry.",
+      archetype: "unknown",
+    },
   },
   {
     pokerogueId: ER_SINISTER_SPORES_ABILITY_ID,
     draft: {
       id: ER_SINISTER_SPORES_ABILITY_ID,
       name: "Sinister Spores",
-      description: "Contact in either direction infects non-Dark Pokemon until they switch out. Infected Pokemon lose 1/8 max HP each turn, or 1/4 during Full Moon.",
+      description:
+        "Contact in either direction infects non-Dark Pokemon until they switch out. Infected Pokemon lose 1/8 max HP each turn, or 1/4 during Full Moon.",
       archetype: "unknown",
     },
   },

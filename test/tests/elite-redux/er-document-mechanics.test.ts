@@ -2,7 +2,13 @@ import { allMoves } from "#data/data-lists";
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_CRANISPHERE_ABILITY_ID } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
-import { ER_IRRESISTIBLE_ABILITY_ID, ER_SINISTER_SPORES_ABILITY_ID } from "#data/elite-redux/abilities/documented-ability-definitions";
+import {
+  ER_IRRESISTIBLE_ABILITY_ID,
+  ER_SINISTER_SPORES_ABILITY_ID,
+  ER_MOONRISE_ABILITY_ID,
+  ER_LUNAR_RUSH_ABILITY_ID,
+  ER_LUNATIC_ABILITY_ID,
+} from "#data/elite-redux/abilities/documented-ability-definitions";
 import { ErSinisterSporesTag, loadBattlerTag } from "#data/battler-tags";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { WeatherType } from "#enums/weather-type";
@@ -132,9 +138,42 @@ describe.skipIf(process.env.ER_SCENARIO !== "1")("documented fakemon battle mech
   });
 
   it("Irresistible uses Follow Me on entry", async () => {
-    game.override.ability(ER_IRRESISTIBLE_ABILITY_ID as AbilityId);
-    await startBattle();
+    game.override.ability(ER_IRRESISTIBLE_ABILITY_ID as AbilityId).battleStyle("double");
+    await game.classicMode.startBattle(SpeciesId.SHUCKLE, SpeciesId.SHUCKLE);
     expect(game.scene.getPlayerPokemon()!.getTag(BattlerTagType.CENTER_OF_ATTENTION)).toBeDefined();
+  });
+
+  it("Moonrise starts eight turns of non-damaging, serializable Full Moon", async () => {
+    game.override.ability(ER_MOONRISE_ABILITY_ID as AbilityId);
+    await startBattle();
+    const weather = game.scene.arena.weather!;
+    expect(weather.weatherType).toBe(WeatherType.FULL_MOON);
+    expect(weather.turnsLeft).toBe(8);
+    expect(weather.isDamaging()).toBe(false);
+    expect(JSON.parse(JSON.stringify(weather)).weatherType).toBe(WeatherType.FULL_MOON);
+    game.move.use(MoveId.HARDEN);
+    await game.toNextTurn();
+    expect(weather.turnsLeft).toBe(7);
+  });
+
+  it.each([
+    ER_LUNAR_RUSH_ABILITY_ID,
+    ER_LUNATIC_ABILITY_ID,
+  ])("lunar ability %s respects weather suppression", async id => {
+    game.override.ability(id as AbilityId);
+    await startBattle();
+    const player = game.scene.getPlayerPokemon()!;
+    const stat =
+      id === ER_LUNAR_RUSH_ABILITY_ID
+        ? Stat.SPD
+        : player.getStat(Stat.ATK, false) >= player.getStat(Stat.SPATK, false)
+          ? Stat.ATK
+          : Stat.SPATK;
+    const base = player.getEffectiveStat(stat);
+    game.scene.arena.trySetWeather(WeatherType.FULL_MOON, player, 8);
+    expect(player.getEffectiveStat(stat)).toBeCloseTo(base * 1.5, 0);
+    vi.spyOn(game.scene.arena.weather!, "isEffectSuppressed").mockReturnValue(true);
+    expect(player.getEffectiveStat(stat)).toBe(base);
   });
 
   it("Cranisphere skips the first Ivory Impact recharge, but not the second", async () => {
@@ -183,6 +222,7 @@ describe.skipIf(process.env.ER_SCENARIO !== "1")("documented fakemon battle mech
     [MoveId.WATER_PULSE, MoveId.WATER_PULSE],
   ])("Gulp Missile follows %s with exactly one %s, without recursion", async (move, followUp) => {
     game.override.ability(AbilityId.GULP_MISSILE);
+    game.override.enemySpecies(SpeciesId.MAGIKARP);
     await startBattle();
     game.move.use(move);
     await game.toNextTurn();

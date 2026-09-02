@@ -4520,7 +4520,7 @@ export class ErSinisterSporesTag extends SerializableBattlerTag {
     applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
     if (!cancelled.value) {
       const weather = globalScene.arena.weather;
-      const fullMoon = weather?.weatherType === WeatherType.FULL_MOON && !weather.isEffectSuppressed();
+      const fullMoon = weather != null && weather.weatherType === WeatherType.FULL_MOON && !weather.isEffectSuppressed();
       pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / (fullMoon ? 4 : 8)), { result: HitResult.INDIRECT });
       globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(pokemon)} was hurt by Sinister Spores!`);
     }

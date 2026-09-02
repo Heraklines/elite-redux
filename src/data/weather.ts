@@ -237,6 +237,8 @@ export function getWeatherStartMessage(weatherType: WeatherType): string | null 
     case WeatherType.EERIE_FOG:
       // ER custom weather — English-only (the shared locales submodule has no key).
       return "An eerie fog crept in!";
+    case WeatherType.FULL_MOON:
+      return "A full moon rose over the battlefield!";
   }
 
   return null;
@@ -268,6 +270,8 @@ export function getWeatherLapseMessage(weatherType: WeatherType): string | null 
       return "The wrathful blizzard rages.";
     case WeatherType.EERIE_FOG:
       return "The eerie fog is deep.";
+    case WeatherType.FULL_MOON:
+      return "The full moon shines.";
   }
 
   return null;
@@ -318,6 +322,8 @@ export function getWeatherClearMessage(weatherType: WeatherType): string | null 
       return "The wrathful blizzard subsided.";
     case WeatherType.EERIE_FOG:
       return "The eerie fog lifted.";
+    case WeatherType.FULL_MOON:
+      return "The full moon faded.";
   }
 
   return null;
