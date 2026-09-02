@@ -263,7 +263,7 @@
   },
   "new-ability-20": {
     "componentRules": [],
-    "description": "Radiance + Dazzling",
+    "description": "Radiance + Dazzling\n",
     "flags": {},
     "generation": 9,
     "id": 20019,
@@ -274,6 +274,23 @@
     "mechanics": [],
     "modifiers": [],
     "name": "Radiant Jewel",
+    "rules": [],
+    "version": 1
+  },
+  "new-ability-21": {
+    "componentRules": [],
+    "description": "Twisted Dimension + Unaware + Gifted Mind\n\"The sage of the sea, It's ideas can change the world, but as soon it has those thoughts it forgets them.\"",
+    "flags": {},
+    "generation": 9,
+    "id": 20020,
+    "includes": [
+      5084,
+      109,
+      5158
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Unintentional Genius",
     "rules": [],
     "version": 1
   },
