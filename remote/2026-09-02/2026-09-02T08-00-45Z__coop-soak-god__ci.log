@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 33605381183 (main)
+timestamp: 2026-09-02T08-00-45Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260902 WAVES=150 - replay this run with:  SOAK_SEED=20260902 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] DONE seed=20260902 waves=150/150 resyncHeals=0 assertions=0 findings=0 trainerWaves=22 (fixed=13 random=9) skips={"mysteryEncounterDisabledV1":1} elapsedMs=674287
+[22m[39m[coop-soak] RUN ENDED at wave 6 (seed 206780945): host at terminal phase TitlePhase. Survey stops here.
+
+----- vitest result tail -----
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:165:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: [coop-soak-coverage] UI-OPERATION CONTRACT FAILED (seed 20260902, 150 waves):
+  - OBSERVED UI-OPERATION STILL UNDRIVABLE: the run drove 2 edge(s) that remain exempt; delete each exemption and classify it as GUARANTEED/PROBABILISTIC with a continuous watcher-apply assertion: [uiOperation:ER_MAP->op:biome, uiOperation:OPTION_SELECT->op:biome][39m
+[36m [2m❯[22m assertObservedUiOperationContracts test/tools/coop-soak-coverage.ts:[2m1256:11[22m[39m
+    [90m1254|[39m   }
+    [90m1255|[39m   [35mif[39m (reds[33m.[39mlength [33m>[39m [34m0[39m) {
+    [90m1256|[39m     [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   |[39m           [31m^[39m
+    [90m1257|[39m       `[coop-soak-coverage] UI-OPERATION CONTRACT FAILED (seed ${opts.…
+    [90m1258|[39m         [33m+[39m reds[33m.[39m[34mmap[39m(red [33m=>[39m [32m`  - [39m[36m${[39mred[36m}[39m[32m`[39m)[33m.[39m[34mjoin[39m([32m"\n"[39m)[33m,[39m
+[90m [2m❯[22m assertSoakCompleteness test/tools/coop-soak-coverage.ts:[2m1297:3[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m291:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[31m[1mAssertionError[22m: the focused lifecycle crossed every requested battle boundary: expected 5 to be 6 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 6[39m
+[31m+ 5[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m320:100[22m[39m
+    [90m318|[39m     })[33m;[39m
+    [90m319|[39m
+    [90m320|[39m     expect(result.wavesCompleted, "the focused lifecycle crossed every…
+    [90m   |[39m                                                                                                    [31m^[39m
+    [90m321|[39m     expect(result.findings, "no modifier/save divergence survived a bo…
+    [90m322|[39m     expect(result.preHealMismatches, "no mismatch was hidden by the on…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 07:48:23
+[2m   Duration [22m 742.33s[2m (transform 23.26s, setup 27.93s, import 342ms, tests 713.16s, environment 724ms)[22m
+
