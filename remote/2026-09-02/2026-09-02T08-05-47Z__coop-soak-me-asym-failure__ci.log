@@ -1,0 +1,356 @@
+{
+  "invariant": "no-park",
+  "seed": 828633,
+  "wave": 7,
+  "detail": "wave driving threw (strand/stall): PhaseInterceptor.to(\"CoopTurnCommitPhase\") did not reach its target (soft-lock / freeze?): stuck at phase \"CommandPhase\", UI mode MESSAGE (=0), interceptor state \"running\". runTarget=true, promptTarget=\"CoopTurnCommitPhase\".\nOriginal: Timed out in waitUntil!",
+  "replay": "SOAK_SEED=828633",
+  "phaseState": {
+    "hostPhase": "CommandPhase",
+    "guestPhase": "CommandPhase",
+    "hostInteractionCounter": 7,
+    "guestInteractionCounter": 7,
+    "hostWave": 7,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 2358948657,
+        "battlerIndex": 0,
+        "speciesId": 890,
+        "speciesName": "Eternatus",
+        "hp": 2065,
+        "maxHp": 2065,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2362669912,
+        "battlerIndex": 1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1372263638,
+        "battlerIndex": 2,
+        "speciesId": 370,
+        "speciesName": "Luvdisc",
+        "hp": 21,
+        "maxHp": 21,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5033,
+            "ppUsed": 0
+          },
+          {
+            "id": 381,
+            "ppUsed": 0
+          },
+          {
+            "id": 391,
+            "ppUsed": 0
+          },
+          {
+            "id": 531,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 874387596,
+        "battlerIndex": 3,
+        "speciesId": 265,
+        "speciesName": "Wurmple",
+        "hp": 21,
+        "maxHp": 21,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 522,
+            "ppUsed": 0
+          },
+          {
+            "id": 5048,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 2358948657,
+        "battlerIndex": -1,
+        "speciesId": 890,
+        "speciesName": "Eternatus",
+        "hp": 2065,
+        "maxHp": 2065,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2362669912,
+        "battlerIndex": -1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1372263638,
+        "battlerIndex": -1,
+        "speciesId": 370,
+        "speciesName": "Luvdisc",
+        "hp": 21,
+        "maxHp": 21,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5033,
+            "ppUsed": 0
+          },
+          {
+            "id": 381,
+            "ppUsed": 0
+          },
+          {
+            "id": 391,
+            "ppUsed": 0
+          },
+          {
+            "id": 531,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 874387596,
+        "battlerIndex": -1,
+        "speciesId": 265,
+        "speciesName": "Wurmple",
+        "hp": 21,
+        "maxHp": 21,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 522,
+            "ppUsed": 0
+          },
+          {
+            "id": 5048,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "content seed=test preseeded=true",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=85 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[890:2065/2065]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2: host slot move=85 guest slot move=53",
+    "wave 2 turn 1: progress enemyHp=[661:0/14,263:0/14] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=85 guest slot move=85",
+    "wave 3 turn 1: progress enemyHp=[293:0/18,506:0/16] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 3: reward shop owner=host leave",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=85 guest slot move=34",
+    "wave 4 turn 1: progress enemyHp=[831:0/18,46:0/16] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 4: reward shop owner=guest leave",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=53 guest slot move=53",
+    "wave 5 turn 1: progress enemyHp=[399:0/20,161:0/18] playerHp=[890:2059/2065,384:1715/1715]",
+    "wave 5: reward shop owner=host take-nonparty",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1831256381233476:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest crossed cmd:6:1 through real public COMMAND=opened",
+    "wave 6: BIOME 0->2",
+    "wave 6: host slot move=34 guest slot move=53",
+    "wave 6 turn 1: progress enemyHp=[546:0/20,548:0/18] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 6: reward shop owner=host take-nonparty",
+    "wave 7 turn 1: replay guest crossed cmd:7:1 through real public COMMAND=opened",
+    "wave 7: host slot move=247 guest slot move=85"
+  ]
+}
