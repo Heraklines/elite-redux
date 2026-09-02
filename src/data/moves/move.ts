@@ -9559,7 +9559,12 @@ export class RandomMoveAttr extends CallMoveAttr {
     // a restrictive challenge cannot spin forever.
     const moveIds = getEnumValues(MoveId).filter(moveId => {
       const candidate = allMoves[moveId];
-      return candidate != null && !this.invalidMoves.has(moveId) && !candidate.name.endsWith(" (N)");
+      return (
+        moveId !== MoveId.NONE
+        && candidate != null
+        && !this.invalidMoves.has(moveId)
+        && !candidate.name.endsWith(" (N)")
+      );
     });
     const override = this.getMoveOverride();
     const candidates = override == null ? moveIds : moveIds.includes(override) ? [override] : [];

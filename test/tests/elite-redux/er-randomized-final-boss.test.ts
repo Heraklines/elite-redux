@@ -20,6 +20,7 @@ describe("ER randomized final-boss progression", () => {
     game = new GameManager(phaserGame);
     game.override
       .battleStyle("single")
+      .startingWave(200)
       .startingLevel(100)
       .enemyLevel(100)
       .ability(AbilityId.BALL_FETCH)
@@ -39,15 +40,18 @@ describe("ER randomized final-boss progression", () => {
     game.override.enemySpecies(species);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const enemy = game.field.getEnemyPokemon();
+    expect(enemy.species.speciesId).toBe(species);
     // Also represents reloading an older randomized finale after updating.
     vi.spyOn(game.scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(true);
     enemy.setBoss(true, 3);
     enemy.bossSegmentIndex = 0;
+    enemy.hp = Math.floor(enemy.getMaxHp() / 3);
+    const hp = enemy.hp;
     const dialogue = vi.spyOn(game.scene.ui, "showDialogue");
 
     game.move.select(MoveId.TACKLE);
     await game.toNextTurn();
-    expect(enemy.hp).toBeLessThan(enemy.getMaxHp());
+    expect(enemy.hp).toBeLessThan(hp);
     expect(enemy.isFainted()).toBe(false);
     expect(dialogue).not.toHaveBeenCalled();
     expect(enemy.bossSegmentIndex).toBe(0);
@@ -66,6 +70,7 @@ describe("ER randomized final-boss progression", () => {
     vi.spyOn(game.scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(true);
     enemy.setBoss(true, 3);
     enemy.bossSegmentIndex = 0;
+    enemy.hp = Math.floor(enemy.getMaxHp() / 3);
     enemy.trySetStatus(StatusEffect.BURN);
     const dialogue = vi.spyOn(game.scene.ui, "showDialogue");
     const hp = enemy.hp;
@@ -84,6 +89,7 @@ describe("ER randomized final-boss progression", () => {
     game.override.enemySpecies(SpeciesId.ETERNATUS);
     await game.classicMode.startBattle(SpeciesId.MAGIKARP);
     const enemy = game.field.getEnemyPokemon();
+    expect(enemy.species.speciesId).toBe(SpeciesId.ETERNATUS);
     vi.spyOn(game.scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(true);
     enemy.formIndex = 0;
     enemy.setBoss(true, 2);

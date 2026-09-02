@@ -18,6 +18,7 @@ import {
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { isErEndlessRaidWave, recordErEndlessGhostPlayerFaint } from "#data/elite-redux/er-endless-continuation";
+import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
   claimErEndlessGraveReturn,
   markErEndlessRaidMinionSlotEmpty,
@@ -149,7 +150,9 @@ export class FaintPhase extends PokemonPhase {
       }
     }
 
-    if (globalScene.currentBattle.isClassicFinalBoss && !this.player) {
+    const isFinaleSpecies =
+      faintPokemon.species.speciesId === SpeciesId.ETERNATUS || isErFinalBossSpecies(faintPokemon.species.speciesId);
+    if (globalScene.currentBattle.isClassicFinalBoss && !this.player && isFinaleSpecies) {
       this.handleFinalBossFaint();
     } else {
       this.doFaint();

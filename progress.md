@@ -8036,5 +8036,5 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 2026-09-02 - Metronome and randomized finale softlocks
 
 - Production ab83981e still contains the unsafe Metronome enum scan; feat already has the registered-move guard from dbfe71155. Extended headless coverage to player and enemy callers and an uncallable candidate.
-- Restricted final-boss phase-two narration to living Eternatus/Cascoon finale bosses. Randomized replacements cannot repeatedly enter an unavailable transformation after direct or residual damage.
+- Restricted final-boss phase-two narration and faint interception to Eternatus/Cascoon finale bosses. Randomized replacements cannot repeatedly enter an unavailable transformation or be revived after defeat. Metronome also excludes the internal NONE move sentinel.
 - Added phase-driven regression coverage for replacement defeat, consecutive status-damage turns, and the canonical Eternatus transformation. Verification will run on GitHub, not locally. Nothing deployed.

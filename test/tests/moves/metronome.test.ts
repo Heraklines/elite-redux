@@ -70,23 +70,28 @@ describe("Moves - Metronome", () => {
       game.override.moveset([MoveId.SPLASH]).enemyMoveset(MoveId.METRONOME);
     }
     await game.classicMode.startBattle(SpeciesId.REGIELEKI);
-    vi.spyOn(randomMoveAttr, "getMoveOverride").mockReturnValue(MoveId.SPLASH);
+    const caller = side === "player" ? game.field.getPlayerPokemon() : game.field.getEnemyPokemon();
+    // Exercise the real roll pool: its first callable move is Pound, never NONE.
+    vi.spyOn(caller, "randBattleSeedInt").mockReturnValue(0);
     const savedMove = allMoves[MoveId.TACKLE];
     const mutableMoves = allMoves as unknown as Array<(typeof allMoves)[number] | undefined>;
     try {
       mutableMoves[MoveId.TACKLE] = undefined;
       game.move.select(side === "player" ? MoveId.METRONOME : MoveId.SPLASH);
       await expect(game.toNextTurn()).resolves.not.toThrow();
-      const caller = side === "player" ? game.field.getPlayerPokemon() : game.field.getEnemyPokemon();
-      expect(caller.getLastXMoves().some(entry => entry.move === MoveId.SPLASH)).toBe(true);
+      expect(caller.getLastXMoves().some(entry => entry.move === MoveId.POUND)).toBe(true);
     } finally {
       mutableMoves[MoveId.TACKLE] = savedMove;
     }
   });
 
-  it("fails instead of looping when its forced candidate is not callable", async () => {
+  it.each([MoveId.METRONOME, MoveId.NONE])("rejects uncallable candidate %s without looping", async moveId => {
     await game.classicMode.startBattle(SpeciesId.REGIELEKI);
-    vi.spyOn(randomMoveAttr, "getMoveOverride").mockReturnValue(MoveId.METRONOME);
+    vi.spyOn(randomMoveAttr, "getMoveOverride").mockReturnValue(moveId);
+
+    expect(
+      randomMoveAttr.apply(game.field.getPlayerPokemon(), game.field.getEnemyPokemon(), allMoves[MoveId.METRONOME], []),
+    ).toBe(false);
 
     game.move.select(MoveId.METRONOME);
     await game.toNextTurn();
@@ -141,7 +146,8 @@ describe("Moves - Metronome", () => {
   });
 
   it("should only target ally for Aromatic Mist", async () => {
-    game.override.battleStyle("double");
+    // Wave one is deliberately always a single encounter in Redux.
+    game.override.battleStyle("double").startingWave(2);
     await game.classicMode.startBattle(SpeciesId.REGIELEKI, SpeciesId.RATTATA);
     const [leftPlayer, rightPlayer] = game.scene.getPlayerField();
     const [leftOpp, rightOpp] = game.scene.getEnemyField();
