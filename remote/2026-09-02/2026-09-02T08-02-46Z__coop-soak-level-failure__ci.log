@@ -1,0 +1,374 @@
+{
+  "invariant": "no-park",
+  "seed": 20260902,
+  "wave": 8,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 8 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260902",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 8,
+    "guestInteractionCounter": 8,
+    "hostWave": 8,
+    "hostBattleType": 1,
+    "hostPlayerField": [
+      {
+        "id": 1990709657,
+        "battlerIndex": -1,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 211,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1569574500,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 223,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 2674842136,
+        "battlerIndex": -1,
+        "speciesId": 501,
+        "speciesName": "Oshawott",
+        "hp": 0,
+        "maxHp": 27,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 534,
+            "ppUsed": 0
+          },
+          {
+            "id": 280,
+            "ppUsed": 0
+          },
+          {
+            "id": 693,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 265986161,
+        "battlerIndex": -1,
+        "speciesId": 276,
+        "speciesName": "Taillow",
+        "hp": 0,
+        "maxHp": 22,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 64,
+            "ppUsed": 1
+          },
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 0
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1990709657,
+        "battlerIndex": 0,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 211,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1569574500,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 223,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 2674842136,
+        "battlerIndex": 2,
+        "speciesId": 501,
+        "speciesName": "Oshawott",
+        "hp": 0,
+        "maxHp": 27,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 534,
+            "ppUsed": 0
+          },
+          {
+            "id": 280,
+            "ppUsed": 0
+          },
+          {
+            "id": 693,
+            "ppUsed": 0
+          },
+          {
+            "id": 39,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 265986161,
+        "battlerIndex": 3,
+        "speciesId": 276,
+        "speciesName": "Taillow",
+        "hp": 0,
+        "maxHp": 22,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 64,
+            "ppUsed": 1
+          },
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 501,
+            "ppUsed": 0
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260902 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1 turn 1: host SWITCH -> party[2]",
+    "wave 1: host slot move=53 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:14/14] playerHp=[149:213/213]",
+    "wave 1 turn 2: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=247",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[265:0/16,167:16/16] playerHp=[149:211/213,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2 turn 2: guest SWITCH -> party[5]",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=53 guest slot move=53",
+    "wave 3 turn 1: progress enemyHp=[293:0/18,399:0/18] playerHp=[149:211/213,445:234/235]",
+    "wave 3: reward shop owner=host leave",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=85 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[831:0/18,401:0/18] playerHp=[149:211/213,445:234/235]",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=247 guest slot move=247",
+    "wave 5 turn 1: progress enemyHp=[10:0/18,261:0/18] playerHp=[149:211/213,445:234/235]",
+    "wave 5: reward shop owner=host leave",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1831256179562419:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest crossed cmd:6:1 through real public COMMAND=opened",
+    "wave 6: BIOME 0->1",
+    "wave 6 turn 1: host SWITCH -> party[2]",
+    "wave 6: host slot move=85 guest slot move=85",
+    "wave 6 turn 1: progress enemyHp=[21:18/18,41:0/18] playerHp=[143:303/303,445:234/235]",
+    "wave 6 turn 2: replay guest crossed cmd:6:2 through real public COMMAND=opened",
+    "wave 6: reward shop owner=host take-nonparty",
+    "wave 7 turn 1: replay guest crossed cmd:7:1 through real public COMMAND=opened",
+    "wave 7: host slot move=53 guest slot move=247",
+    "wave 7 turn 1: progress enemyHp=[16:0/20,261:0/22] playerHp=[143:303/303,445:234/235]",
+    "wave 7: reward shop owner=guest take-nonparty",
+    "wave 8 turn 1: replay guest crossed cmd:8:1 through real public COMMAND=opened",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=247 guest slot move=85",
+    "wave 8 turn 1: guest SWITCH -> party[5]",
+    "wave 8 turn 1: progress enemyHp=[501:0/27,276:22/22] playerHp=[143:303/303,248:223/225]",
+    "wave 8 turn 2: replay guest crossed cmd:8:2 through real public COMMAND=opened",
+    "wave 8 turn 2: host SWITCH -> party[2]"
+  ]
+}
