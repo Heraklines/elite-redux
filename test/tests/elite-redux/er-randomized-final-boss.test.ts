@@ -24,7 +24,9 @@ describe("ER randomized final-boss progression", () => {
       .startingLevel(100)
       .enemyLevel(100)
       .ability(AbilityId.BALL_FETCH)
+      .passiveAbility(AbilityId.BALL_FETCH)
       .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyPassiveAbility(AbilityId.BALL_FETCH)
       .enemyMoveset(MoveId.SPLASH)
       .moveset([MoveId.TACKLE, MoveId.SPLASH])
       .criticalHits(false);

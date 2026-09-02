@@ -145,7 +145,7 @@ describe("Moves - Metronome", () => {
     });
   });
 
-  it("should only target ally for Aromatic Mist", async () => {
+  it("calls Redux Aromatic Mist on the user and ally without boosting opponents", async () => {
     // Wave one is deliberately always a single encounter in Redux.
     game.override.battleStyle("double").startingWave(2);
     await game.classicMode.startBattle(SpeciesId.REGIELEKI, SpeciesId.RATTATA);
@@ -157,8 +157,8 @@ describe("Moves - Metronome", () => {
     game.move.select(MoveId.SPLASH, 1);
     await game.toNextTurn();
 
-    expect(rightPlayer.getStatStage(Stat.SPDEF)).toBe(1);
-    expect(leftPlayer.getStatStage(Stat.SPDEF)).toBe(0);
+    expect(rightPlayer.getStatStage(Stat.SPDEF)).toBe(2);
+    expect(leftPlayer.getStatStage(Stat.SPDEF)).toBe(2);
     expect(leftOpp.getStatStage(Stat.SPDEF)).toBe(0);
     expect(rightOpp.getStatStage(Stat.SPDEF)).toBe(0);
   });
