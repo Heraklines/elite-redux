@@ -105,6 +105,11 @@
   "SPECIES_BURMY_TRASH_CLOAK": {
     "ability2": 118
   },
+  "SPECIES_CALYREX_CLOUD_RIDER": {
+    "ability1": 20022,
+    "ability2": 20022,
+    "hidden": 20022
+  },
   "SPECIES_CASCOON": {
     "ability2": 192,
     "hidden": 118
