@@ -2,10 +2,10 @@ use std::io::{BufReader, BufWriter, Write};
 use std::process::ExitCode;
 
 use er_kernel_worker::{
-    KERNEL_WORKER_ABI_VERSION_V1, KERNEL_WORKER_ABI_VERSION_V2,
-    KernelWorkerBootstrapV1, KernelWorkerBootstrapV2, KernelWorkerRequestEnvelopeV1,
-    KernelWorkerRequestEnvelopeV2, KernelWorkerResponseV1, KernelWorkerRuntimeV1,
-    KernelWorkerRuntimeV2, MAXIMUM_WORKER_FRAME_BYTES_V2, read_frame_v1, write_frame_v1,
+    KERNEL_WORKER_ABI_VERSION_V1, KERNEL_WORKER_ABI_VERSION_V2, KernelWorkerBootstrapV1,
+    KernelWorkerBootstrapV2, KernelWorkerRequestEnvelopeV1, KernelWorkerRequestEnvelopeV2,
+    KernelWorkerResponseV1, KernelWorkerRuntimeV1, KernelWorkerRuntimeV2,
+    MAXIMUM_WORKER_FRAME_BYTES_V2, read_frame_v1, write_frame_v1,
 };
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,7 +20,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some(version) if version == u64::from(KERNEL_WORKER_ABI_VERSION_V1) => {
             let bootstrap: KernelWorkerBootstrapV1 = serde_json::from_value(value)?;
             let mut runtime = KernelWorkerRuntimeV1::new(bootstrap.identity)?;
-            while let Some(request) = read_frame_v1::<_, KernelWorkerRequestEnvelopeV1>(&mut reader)? {
+            while let Some(request) =
+                read_frame_v1::<_, KernelWorkerRequestEnvelopeV1>(&mut reader)?
+            {
                 let response = runtime.handle(request);
                 let disposed = matches!(response.response, KernelWorkerResponseV1::Disposed);
                 write_frame_v1(&mut writer, &response)?;
@@ -32,7 +34,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some(version) if version == u64::from(KERNEL_WORKER_ABI_VERSION_V2) => {
             let bootstrap: KernelWorkerBootstrapV2 = serde_json::from_value(value)?;
             let mut runtime = KernelWorkerRuntimeV2::new(bootstrap.identity)?;
-            while let Some(request) = read_frame_v1::<_, KernelWorkerRequestEnvelopeV2>(&mut reader)? {
+            while let Some(request) =
+                read_frame_v1::<_, KernelWorkerRequestEnvelopeV2>(&mut reader)?
+            {
                 let bytes = runtime.handle_bytes(request)?;
                 write_prepared_frame_v2(&mut writer, &bytes)?;
                 if runtime.is_disposed() {
@@ -40,7 +44,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        _ => return Err("unsupported bootstrap ABI; select ABI1 compatibility or current ABI2".into()),
+        _ => {
+            return Err(
+                "unsupported bootstrap ABI; select ABI1 compatibility or current ABI2".into(),
+            );
+        }
     }
     Ok(())
 }

@@ -43,16 +43,21 @@ pub struct KernelWorkerBootstrapV2 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value", deny_unknown_fields)]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "kind",
+    content = "value",
+    deny_unknown_fields
+)]
 pub enum KernelWorkerInitializationV2 {
     Natural {
-        profile: ProfileStateV1,
+        profile: Box<ProfileStateV1>,
         seed: String,
         local_seat: SeatId,
         save_slots: Vec<String>,
         local_is_host: bool,
         scheduler: KernelSchedulerSnapshotV2,
-        protocol: Option<ProtocolRuntimeSnapshotV2>,
+        protocol: Box<Option<ProtocolRuntimeSnapshotV2>>,
     },
     Snapshot {
         snapshot_bytes: Vec<u8>,
@@ -62,7 +67,12 @@ pub enum KernelWorkerInitializationV2 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value", deny_unknown_fields)]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "kind",
+    content = "value",
+    deny_unknown_fields
+)]
 pub enum KernelWorkerRequestV2 {
     Hello,
     Initialize {
@@ -131,14 +141,28 @@ pub struct KernelWorkerFaultV2 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value", deny_unknown_fields)]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "kind",
+    content = "value",
+    deny_unknown_fields
+)]
 pub enum KernelWorkerResponseV2 {
     Ready(Box<KernelGenerationIdentityV2>),
-    Initialized { observation: Box<CurrentGameObservation> },
-    Restored { observation: Box<CurrentGameObservation> },
-    Effects { step: GameKernelStepV7, observation: Box<CurrentGameObservation> },
+    Initialized {
+        observation: Box<CurrentGameObservation>,
+    },
+    Restored {
+        observation: Box<CurrentGameObservation>,
+    },
+    Effects {
+        step: GameKernelStepV7,
+        observation: Box<CurrentGameObservation>,
+    },
     Observation(Box<CurrentGameObservation>),
-    Snapshot { snapshot: Box<CoreGameKernelSnapshotV7> },
+    Snapshot {
+        snapshot: Box<CoreGameKernelSnapshotV7>,
+    },
     Health(KernelWorkerHealthV2),
     Fault(KernelWorkerFaultV2),
     Disposed,
@@ -176,23 +200,34 @@ pub enum KernelWorkerProtocolErrorV2 {
 
 impl KernelGenerationIdentityV2 {
     pub fn validate(&self) -> Result<(), KernelWorkerProtocolErrorV2> {
-        if self.schema_version != 2 || self.worker_abi_version != KERNEL_WORKER_ABI_VERSION_V2
-            || self.minimum_snapshot_schema != 7 || self.maximum_snapshot_schema != 7
+        if self.schema_version != 2
+            || self.worker_abi_version != KERNEL_WORKER_ABI_VERSION_V2
+            || self.minimum_snapshot_schema != 7
+            || self.maximum_snapshot_schema != 7
         {
             return Err(KernelWorkerProtocolErrorV2::Abi);
         }
         if self.session_id.0.is_empty() || self.session_id.0.len() > 128 || self.generation.0 == 0 {
-            return Err(KernelWorkerProtocolErrorV2::Identity("session or generation"));
+            return Err(KernelWorkerProtocolErrorV2::Identity(
+                "session or generation",
+            ));
         }
-        if !is_hex(&self.artifact_sha256, 64) || !is_hex(&self.executable_sha256, 64)
+        if !is_hex(&self.artifact_sha256, 64)
+            || !is_hex(&self.executable_sha256, 64)
             || !is_hex(&self.source_git_sha, 40)
         {
-            return Err(KernelWorkerProtocolErrorV2::Identity("source or artifact digest"));
+            return Err(KernelWorkerProtocolErrorV2::Identity(
+                "source or artifact digest",
+            ));
         }
-        if self.build_target.is_empty() || self.build_target.len() > 256
-            || self.build_profile.is_empty() || self.build_profile.len() > 64
+        if self.build_target.is_empty()
+            || self.build_target.len() > 256
+            || self.build_profile.is_empty()
+            || self.build_profile.len() > 64
         {
-            return Err(KernelWorkerProtocolErrorV2::Identity("build target or profile"));
+            return Err(KernelWorkerProtocolErrorV2::Identity(
+                "build target or profile",
+            ));
         }
         Ok(())
     }
@@ -226,19 +261,24 @@ impl KernelWorkerRequestEnvelopeV2 {
         if self.abi_version != KERNEL_WORKER_ABI_VERSION_V2 {
             return Err(KernelWorkerProtocolErrorV2::Abi);
         }
-        if self.session_id != identity.session_id || self.generation != identity.generation
+        if self.session_id != identity.session_id
+            || self.generation != identity.generation
             || self.request_id == 0
         {
             return Err(KernelWorkerProtocolErrorV2::Address);
         }
         let expected = match accepted_sequence {
-            Some(sequence) => sequence.checked_add(1).ok_or(KernelWorkerProtocolErrorV2::Sequence)?,
+            Some(sequence) => sequence
+                .checked_add(1)
+                .ok_or(KernelWorkerProtocolErrorV2::Sequence)?,
             None => 0,
         };
         if self.sequence != expected {
             return Err(KernelWorkerProtocolErrorV2::Sequence);
         }
-        if self.fingerprint != request_fingerprint(identity, self.request_id, self.sequence, &self.request)? {
+        if self.fingerprint
+            != request_fingerprint(identity, self.request_id, self.sequence, &self.request)?
+        {
             return Err(KernelWorkerProtocolErrorV2::Fingerprint);
         }
         let bytes = serde_json::to_vec(self)
@@ -256,8 +296,14 @@ fn request_fingerprint(
     sequence: u64,
     request: &KernelWorkerRequestV2,
 ) -> Result<String, KernelWorkerProtocolErrorV2> {
-    let bytes = er_canonical::canonical_bytes(&(KERNEL_WORKER_ABI_VERSION_V2, identity, request_id, sequence, request))
-        .map_err(|error| KernelWorkerProtocolErrorV2::Serialization(error.to_string()))?;
+    let bytes = er_canonical::canonical_bytes(&(
+        KERNEL_WORKER_ABI_VERSION_V2,
+        identity,
+        request_id,
+        sequence,
+        request,
+    ))
+    .map_err(|error| KernelWorkerProtocolErrorV2::Serialization(error.to_string()))?;
     if bytes.len() > MAXIMUM_WORKER_FRAME_BYTES_V2 {
         return Err(KernelWorkerProtocolErrorV2::Oversized);
     }
@@ -265,5 +311,8 @@ fn request_fingerprint(
 }
 
 fn is_hex(value: &str, length: usize) -> bool {
-    value.len() == length && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == length
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }

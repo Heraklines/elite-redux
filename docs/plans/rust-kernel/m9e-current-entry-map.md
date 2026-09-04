@@ -123,8 +123,9 @@ state. Observation does not clone the complete session or snapshot.
 `er-cli/src/current_agent.rs` serves the normal `agent` command using that
 facade. The old route is explicitly `agent-v6`. Current `new-run`, `resume`,
 `simulate`, `replay`, worker, browser delegation, and the remaining developer
-tools require their own consumer cutovers. Browser delegation has since been
-implemented and is undergoing separate remote verification; this checkpoint does
+tools require their own consumer cutovers. Browser delegation has since passed
+focused remote verification at `b7e2266cfbe774664a7737160c90727a71e4a030`
+(run `33926691832`); this checkpoint does
 not silently relabel the remaining entries as current.
 
 Callable methods added to the current adapter use the existing protocol

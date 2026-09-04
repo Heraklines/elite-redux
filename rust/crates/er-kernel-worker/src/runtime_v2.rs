@@ -116,59 +116,111 @@ impl KernelWorkerRuntimeV2 {
         let accepted = Some(envelope.sequence);
         match envelope.request {
             KernelWorkerRequestV2::Hello => encode_response(
-                &self.identity, request_id, accepted, self.observation_digest()?,
+                &self.identity,
+                request_id,
+                accepted,
+                self.observation_digest()?,
                 KernelWorkerResponseV2::Ready(Box::new(self.identity.clone())),
             ),
-            KernelWorkerRequestV2::Initialize { content_bundle, initialization } => {
+            KernelWorkerRequestV2::Initialize {
+                content_bundle,
+                initialization,
+            } => {
                 if self.session.is_some() {
                     return Err(KernelWorkerRuntimeErrorV2::AlreadyInitialized);
                 }
-                let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(*content_bundle))
-                    .map_err(|error| KernelWorkerRuntimeErrorV2::Content(error.to_string()))?);
+                let content = Arc::new(
+                    PreparedGameContentV2::prepare(Arc::new(*content_bundle))
+                        .map_err(|error| KernelWorkerRuntimeErrorV2::Content(error.to_string()))?,
+                );
                 if content.identity() != &self.identity.content_identity {
-                    return Err(KernelWorkerRuntimeErrorV2::Content("generation content identity differs".to_owned()));
+                    return Err(KernelWorkerRuntimeErrorV2::Content(
+                        "generation content identity differs".to_owned(),
+                    ));
                 }
                 let session = match *initialization {
                     KernelWorkerInitializationV2::Natural {
-                        profile, seed, local_seat, save_slots, local_is_host, scheduler, protocol,
+                        profile,
+                        seed,
+                        local_seat,
+                        save_slots,
+                        local_is_host,
+                        scheduler,
+                        protocol,
                     } => CurrentGameSession::natural_start_with_scheduler(
-                        profile, seed, local_seat, save_slots, local_is_host,
-                        Arc::clone(&content), scheduler, protocol,
+                        *profile,
+                        seed,
+                        local_seat,
+                        save_slots,
+                        local_is_host,
+                        Arc::clone(&content),
+                        scheduler,
+                        *protocol,
                     )?,
-                    KernelWorkerInitializationV2::Snapshot { snapshot_bytes, local_seat, role } => {
-                        restored(&snapshot_bytes, local_seat, role, Arc::clone(&content))?
-                    }
+                    KernelWorkerInitializationV2::Snapshot {
+                        snapshot_bytes,
+                        local_seat,
+                        role,
+                    } => restored(&snapshot_bytes, local_seat, role, Arc::clone(&content))?,
                 };
                 let observation = session.observe()?;
                 let bytes = encode_response(
-                    &self.identity, request_id, accepted, observation.mechanical_digest.clone(),
-                    KernelWorkerResponseV2::Initialized { observation: Box::new(observation) },
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    observation.mechanical_digest.clone(),
+                    KernelWorkerResponseV2::Initialized {
+                        observation: Box::new(observation),
+                    },
                 )?;
                 self.session = Some(session);
                 self.content = Some(content);
                 Ok(bytes)
             }
-            KernelWorkerRequestV2::Restore { snapshot_bytes, local_seat, role } => {
-                let content = self.content.as_ref().ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?;
+            KernelWorkerRequestV2::Restore {
+                snapshot_bytes,
+                local_seat,
+                role,
+            } => {
+                let content = self
+                    .content
+                    .as_ref()
+                    .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?;
                 let session = restored(&snapshot_bytes, local_seat, role, Arc::clone(content))?;
                 let observation = session.observe()?;
                 let bytes = encode_response(
-                    &self.identity, request_id, accepted, observation.mechanical_digest.clone(),
-                    KernelWorkerResponseV2::Restored { observation: Box::new(observation) },
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    observation.mechanical_digest.clone(),
+                    KernelWorkerResponseV2::Restored {
+                        observation: Box::new(observation),
+                    },
                 )?;
                 self.session = Some(session);
                 Ok(bytes)
             }
             KernelWorkerRequestV2::Apply(event) => {
-                let next_count = self.applied_events.checked_add(1)
+                let next_count = self
+                    .applied_events
+                    .checked_add(1)
                     .ok_or(KernelWorkerRuntimeErrorV2::Exhausted)?;
                 let identity = &self.identity;
-                let bytes = self.session.as_mut().ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
+                let bytes = self
+                    .session
+                    .as_mut()
+                    .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
                     .apply_with(event, |candidate, step| {
                         let observation = candidate.observe()?;
                         encode_response(
-                            identity, request_id, accepted, observation.mechanical_digest.clone(),
-                            KernelWorkerResponseV2::Effects { step, observation: Box::new(observation) },
+                            identity,
+                            request_id,
+                            accepted,
+                            observation.mechanical_digest.clone(),
+                            KernelWorkerResponseV2::Effects {
+                                step,
+                                observation: Box::new(observation),
+                            },
                         )
                     })?;
                 self.applied_events = next_count;
@@ -177,7 +229,10 @@ impl KernelWorkerRuntimeV2 {
             KernelWorkerRequestV2::Observe => {
                 let observation = self.session()?.observe()?;
                 encode_response(
-                    &self.identity, request_id, accepted, observation.mechanical_digest.clone(),
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    observation.mechanical_digest.clone(),
                     KernelWorkerResponseV2::Observation(Box::new(observation)),
                 )
             }
@@ -188,13 +243,21 @@ impl KernelWorkerRuntimeV2 {
                     return Err(KernelWorkerRuntimeErrorV2::ResponseTooLarge);
                 }
                 encode_response(
-                    &self.identity, request_id, accepted, self.observation_digest()?,
-                    KernelWorkerResponseV2::Snapshot { snapshot: Box::new(snapshot) },
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    self.observation_digest()?,
+                    KernelWorkerResponseV2::Snapshot {
+                        snapshot: Box::new(snapshot),
+                    },
                 )
             }
             KernelWorkerRequestV2::ExportRepro => Err(KernelWorkerRuntimeErrorV2::Unsupported),
             KernelWorkerRequestV2::Health => encode_response(
-                &self.identity, request_id, accepted, self.observation_digest()?,
+                &self.identity,
+                request_id,
+                accepted,
+                self.observation_digest()?,
                 KernelWorkerResponseV2::Health(KernelWorkerHealthV2 {
                     initialized: self.session.is_some(),
                     disposed: self.disposed,
@@ -205,7 +268,11 @@ impl KernelWorkerRuntimeV2 {
             ),
             KernelWorkerRequestV2::Dispose => {
                 let bytes = encode_response(
-                    &self.identity, request_id, accepted, None, KernelWorkerResponseV2::Disposed,
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    None,
+                    KernelWorkerResponseV2::Disposed,
                 )?;
                 if let Some(session) = &mut self.session {
                     session.dispose();
@@ -219,11 +286,17 @@ impl KernelWorkerRuntimeV2 {
     }
 
     fn session(&self) -> Result<&CurrentGameSession, KernelWorkerRuntimeErrorV2> {
-        self.session.as_ref().ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)
+        self.session
+            .as_ref()
+            .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)
     }
 
     fn observation_digest(&self) -> Result<Option<String>, KernelWorkerRuntimeErrorV2> {
-        Ok(self.session.as_ref().map(CurrentGameSession::observe).transpose()?
+        Ok(self
+            .session
+            .as_ref()
+            .map(CurrentGameSession::observe)
+            .transpose()?
             .and_then(|observation| observation.mechanical_digest))
     }
 }
@@ -235,12 +308,20 @@ fn restored(
     content: Arc<PreparedGameContentV2>,
 ) -> Result<CurrentGameSession, KernelWorkerRuntimeErrorV2> {
     if bytes.is_empty() || bytes.len() > MAXIMUM_SNAPSHOT_BYTES_V2 {
-        return Err(KernelWorkerRuntimeErrorV2::Snapshot("snapshot byte bound".to_owned()));
+        return Err(KernelWorkerRuntimeErrorV2::Snapshot(
+            "snapshot byte bound".to_owned(),
+        ));
     }
     let value: serde_json::Value = serde_json::from_slice(bytes)
         .map_err(|error| KernelWorkerRuntimeErrorV2::Snapshot(error.to_string()))?;
-    if value.get("schema_version").and_then(serde_json::Value::as_u64) != Some(7) {
-        return Err(KernelWorkerRuntimeErrorV2::Snapshot("current worker requires V7; use explicit ABI1 for V6".to_owned()));
+    if value
+        .get("schema_version")
+        .and_then(serde_json::Value::as_u64)
+        != Some(7)
+    {
+        return Err(KernelWorkerRuntimeErrorV2::Snapshot(
+            "current worker requires V7; use explicit ABI1 for V6".to_owned(),
+        ));
     }
     let snapshot: CoreGameKernelSnapshotV7 = serde_json::from_value(value)
         .map_err(|error| KernelWorkerRuntimeErrorV2::Snapshot(error.to_string()))?;
@@ -263,7 +344,8 @@ fn encode_response(
         accepted_sequence,
         after_mechanical_digest,
         response,
-    }).map_err(serialization)?;
+    })
+    .map_err(serialization)?;
     if bytes.len() > MAXIMUM_WORKER_FRAME_BYTES_V2 {
         return Err(KernelWorkerRuntimeErrorV2::ResponseTooLarge);
     }
@@ -279,11 +361,15 @@ fn error_code(error: &KernelWorkerRuntimeErrorV2) -> KernelWorkerFaultCodeV2 {
         KernelWorkerRuntimeErrorV2::Protocol(_) => KernelWorkerFaultCodeV2::ProtocolViolation,
         KernelWorkerRuntimeErrorV2::Session(_) => KernelWorkerFaultCodeV2::KernelFailure,
         KernelWorkerRuntimeErrorV2::NotInitialized => KernelWorkerFaultCodeV2::NotInitialized,
-        KernelWorkerRuntimeErrorV2::AlreadyInitialized => KernelWorkerFaultCodeV2::AlreadyInitialized,
+        KernelWorkerRuntimeErrorV2::AlreadyInitialized => {
+            KernelWorkerFaultCodeV2::AlreadyInitialized
+        }
         KernelWorkerRuntimeErrorV2::Content(_) => KernelWorkerFaultCodeV2::ContentRejected,
         KernelWorkerRuntimeErrorV2::Snapshot(_) => KernelWorkerFaultCodeV2::SnapshotRejected,
         KernelWorkerRuntimeErrorV2::ResponseTooLarge => KernelWorkerFaultCodeV2::ResponseTooLarge,
-        KernelWorkerRuntimeErrorV2::Serialization(_) => KernelWorkerFaultCodeV2::SerializationFailure,
+        KernelWorkerRuntimeErrorV2::Serialization(_) => {
+            KernelWorkerFaultCodeV2::SerializationFailure
+        }
         KernelWorkerRuntimeErrorV2::Unsupported => KernelWorkerFaultCodeV2::UnsupportedOperation,
         KernelWorkerRuntimeErrorV2::Disposed => KernelWorkerFaultCodeV2::Disposed,
         KernelWorkerRuntimeErrorV2::Exhausted => KernelWorkerFaultCodeV2::ResourceExhausted,

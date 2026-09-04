@@ -203,3 +203,19 @@ then worker Clippy. A parsed full-lock guard accepts only the three existing
 workspace dependencies added to er-kernel-worker. Five additional harness
 selftests exercise mapping and lock failures. All candidate execution is pending
 remote verification; no local builds, tests, formatting or installations ran.
+
+Worker candidate `7a329cc5c02175ac05a0d06ed5c25ac5d0dd50bb`, run `33928482002`,
+passed 33 harness selftests and all 22 selected native tests, including both
+actual ABI2 process witnesses and explicit ABI1 compatibility. The run failed
+only formatting and Clippy's large initialization-enum finding (3,832 bytes).
+The 12,567-byte compact artifact supplied a 30,127-byte formatting patch;
+source correction boxes the two large initialization fields without changing
+their JSON representation. The comparison baseline remains the green browser
+candidate until a complete worker run passes.
+
+A third process witness extends pending verification to genuine natural raw
+startup into Active, restoration of that V7 checkpoint into generation 2,
+fingerprint/generation/session spoof rejection, and complete ordered effect,
+observation and snapshot equality through presentation outcomes, time and raw
+navigation. Both generations run the same candidate executable; this does not
+certify changed-rule acceptance, a supervisor swap, or complete causal repro.

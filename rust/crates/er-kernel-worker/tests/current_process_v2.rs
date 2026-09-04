@@ -5,14 +5,14 @@ use std::sync::{Arc, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use er_env::current::CurrentExternalEvent;
+use er_env::current::{CurrentExternalEvent, CurrentGameObservation};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, KernelPresentationOutcomeV2,
 };
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v6::RestorableKernelSnapshotV6;
-use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
+use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
 use er_kernel_worker::{
     KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelGenerationV1,
     KernelSessionIdV1, KernelWorkerBootstrapV2, KernelWorkerFaultCodeV2,
@@ -20,8 +20,7 @@ use er_kernel_worker::{
     KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, read_frame_v1, write_frame_v1,
 };
 use er_types::{
-    GameControlKindV2, InputFocus, PhysicalKey, PresentationEventId, RawInputEvent, SafeU53,
-    SeatId,
+    GameControlKindV2, InputFocus, PhysicalKey, PresentationEventId, RawInputEvent, SafeU53, SeatId,
 };
 
 const BUNDLE: &[u8] =
@@ -85,13 +84,20 @@ impl WorkerProcess {
         request: KernelWorkerRequestV2,
     ) -> Result<KernelWorkerResponseEnvelopeV2, Box<dyn Error>> {
         let request_id = sequence + 100;
-        let envelope = KernelWorkerRequestEnvelopeV2::new(
-            &self.identity,
-            request_id,
-            sequence,
-            request,
+        let envelope =
+            KernelWorkerRequestEnvelopeV2::new(&self.identity, request_id, sequence, request)?;
+        self.exchange_envelope(envelope)
+    }
+
+    fn exchange_envelope(
+        &mut self,
+        envelope: KernelWorkerRequestEnvelopeV2,
+    ) -> Result<KernelWorkerResponseEnvelopeV2, Box<dyn Error>> {
+        let request_id = envelope.request_id;
+        write_frame_v1(
+            self.input.as_mut().ok_or("worker stdin missing")?,
+            &envelope,
         )?;
-        write_frame_v1(self.input.as_mut().ok_or("worker stdin missing")?, &envelope)?;
         let response = self.output.recv_timeout(Duration::from_secs(60))??;
         assert_eq!(response.abi_version, KERNEL_WORKER_ABI_VERSION_V2);
         assert_eq!(response.session_id, self.identity.session_id);
@@ -107,7 +113,10 @@ impl WorkerProcess {
     ) -> Result<KernelWorkerResponseV2, Box<dyn Error>> {
         let response = self.exchange(sequence, request)?;
         assert_eq!(response.accepted_sequence, Some(sequence));
-        assert!(!matches!(response.response, KernelWorkerResponseV2::Fault(_)));
+        assert!(!matches!(
+            response.response,
+            KernelWorkerResponseV2::Fault(_)
+        ));
         Ok(response.response)
     }
 
@@ -136,6 +145,202 @@ impl WorkerProcess {
             thread::sleep(Duration::from_millis(10));
         }
     }
+}
+
+fn raw_key(code: PhysicalKey, pressed: bool) -> CurrentExternalEvent {
+    CurrentExternalEvent::RawInput {
+        input: if pressed {
+            RawInputEvent::KeyDown {
+                code,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            }
+        } else {
+            RawInputEvent::KeyUp { code }
+        },
+    }
+}
+
+fn press_next(
+    worker: &mut WorkerProcess,
+    sequence: &mut u64,
+    code: PhysicalKey,
+) -> Result<CurrentGameObservation, Box<dyn Error>> {
+    worker.accepted(
+        *sequence,
+        KernelWorkerRequestV2::Apply(raw_key(code.clone(), true)),
+    )?;
+    *sequence += 1;
+    let response = worker.accepted(
+        *sequence,
+        KernelWorkerRequestV2::Apply(raw_key(code, false)),
+    )?;
+    *sequence += 1;
+    match response {
+        KernelWorkerResponseV2::Effects { observation, .. } => Ok(*observation),
+        _ => Err("raw key release did not return a current observation".into()),
+    }
+}
+
+#[test]
+fn actual_abi2_generations_restore_active_v7_and_continue_identical_typed_trace()
+-> Result<(), Box<dyn Error>> {
+    let (bundle, identity) = fixture()?;
+    let mut original = WorkerProcess::spawn(identity.clone())?;
+    original.accepted(0, KernelWorkerRequestV2::Hello)?;
+    original.accepted(1, initialization(bundle.clone())?)?;
+    let mut original_sequence = 2;
+    press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
+    press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
+    let mut observation =
+        press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
+    let bound = observation
+        .control
+        .as_ref()
+        .and_then(|control| control.menu.as_ref())
+        .map(|menu| menu.options.len())
+        .ok_or("natural starter menu missing")?;
+    for _ in 0..bound {
+        if observation
+            .control
+            .as_ref()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
+        {
+            break;
+        }
+        observation = press_next(
+            &mut original,
+            &mut original_sequence,
+            PhysicalKey::ArrowDown,
+        )?;
+    }
+    assert!(
+        observation
+            .control
+            .as_ref()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
+    );
+    for _ in 0..4 {
+        observation = press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
+    }
+    assert!(observation.mechanical_digest.is_some());
+    let checkpoint = original.snapshot(original_sequence)?;
+    original_sequence += 1;
+    assert!(matches!(
+        checkpoint.lifecycle,
+        GameKernelLifecycleSnapshotV7::Active(_)
+    ));
+    assert!(!checkpoint.pending_presentations.is_empty());
+
+    let mut replacement_identity = identity;
+    replacement_identity.generation = KernelGenerationV1(2);
+    let mut restored = WorkerProcess::spawn(replacement_identity.clone())?;
+    assert!(matches!(
+        restored.accepted(0, KernelWorkerRequestV2::Hello)?,
+        KernelWorkerResponseV2::Ready(value) if *value == replacement_identity
+    ));
+    // Start at Title to prove Restore actually replaces the candidate's session.
+    let KernelWorkerResponseV2::Initialized {
+        observation: initial,
+    } = restored.accepted(1, initialization(bundle)?)?
+    else {
+        return Err("replacement generation did not initialize".into());
+    };
+    assert_eq!(
+        initial.control.map(|control| control.kind),
+        Some(GameControlKindV2::Title)
+    );
+    let KernelWorkerResponseV2::Restored {
+        observation: restored_observation,
+    } = restored.accepted(
+        2,
+        KernelWorkerRequestV2::Restore {
+            snapshot_bytes: serde_json::to_vec(&checkpoint)?,
+            local_seat: SeatId::new(safe(1)),
+            role: GameKernelRoleV7::Authority,
+        },
+    )?
+    else {
+        return Err("replacement generation did not restore a V7 snapshot".into());
+    };
+    assert_eq!(*restored_observation, observation);
+    assert_eq!(restored.snapshot(3)?, checkpoint);
+    let mut restored_sequence = 4;
+
+    for spoof in 0..3 {
+        let mut sender = replacement_identity.clone();
+        if spoof == 1 {
+            sender.generation = KernelGenerationV1(1);
+        } else if spoof == 2 {
+            sender.session_id = KernelSessionIdV1("another-session".to_owned());
+        }
+        let mut envelope = KernelWorkerRequestEnvelopeV2::new(
+            &sender,
+            restored_sequence + 100,
+            restored_sequence,
+            KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+                milliseconds: safe(99),
+            }),
+        )?;
+        if spoof == 0 {
+            envelope.fingerprint = "0".repeat(64);
+        }
+        assert_fault(
+            restored.exchange_envelope(envelope)?,
+            KernelWorkerFaultCodeV2::ProtocolViolation,
+            Some(restored_sequence - 1),
+        );
+        assert_eq!(restored.snapshot(restored_sequence)?, checkpoint);
+        restored_sequence += 1;
+    }
+
+    let mut trace: Vec<_> = checkpoint
+        .pending_presentations
+        .iter()
+        .map(|pending| CurrentExternalEvent::PresentationOutcome {
+            event_id: pending.event_id,
+            outcome: KernelPresentationOutcomeV2::Settled,
+        })
+        .collect();
+    trace.extend([
+        CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(11),
+        },
+        raw_key(PhysicalKey::ArrowDown, true),
+        raw_key(PhysicalKey::ArrowDown, false),
+        raw_key(PhysicalKey::ArrowUp, true),
+        raw_key(PhysicalKey::ArrowUp, false),
+        raw_key(PhysicalKey::Space, true),
+        raw_key(PhysicalKey::Space, false),
+        CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(17),
+        },
+    ]);
+    let mut final_snapshot = checkpoint.clone();
+    for event in trace {
+        let expected = original.accepted(
+            original_sequence,
+            KernelWorkerRequestV2::Apply(event.clone()),
+        )?;
+        original_sequence += 1;
+        let actual = restored.accepted(restored_sequence, KernelWorkerRequestV2::Apply(event))?;
+        restored_sequence += 1;
+        assert!(matches!(expected, KernelWorkerResponseV2::Effects { .. }));
+        // Includes ordered effect payloads, internal events, full control and content identity.
+        assert_eq!(actual, expected);
+        final_snapshot = original.snapshot(original_sequence)?;
+        original_sequence += 1;
+        assert_eq!(restored.snapshot(restored_sequence)?, final_snapshot);
+        restored_sequence += 1;
+    }
+    assert!(final_snapshot.pending_presentations.is_empty());
+    assert!(final_snapshot.replay_sequence > checkpoint.replay_sequence);
+    assert!(final_snapshot.next_menu_instance_id > checkpoint.next_menu_instance_id);
+    original.dispose(original_sequence)?;
+    restored.dispose(restored_sequence)
 }
 
 impl Drop for WorkerProcess {
@@ -189,7 +394,7 @@ fn initialization(bundle: GameContentBundleV2) -> Result<KernelWorkerRequestV2, 
     Ok(KernelWorkerRequestV2::Initialize {
         content_bundle: Box::new(bundle),
         initialization: Box::new(KernelWorkerInitializationV2::Natural {
-            profile: serde_json::from_value(profile_json())?,
+            profile: Box::new(serde_json::from_value(profile_json())?),
             seed: "current-worker-natural".to_owned(),
             local_seat: SeatId::new(safe(1)),
             save_slots: vec!["preview-slot".to_owned()],
@@ -200,7 +405,7 @@ fn initialization(bundle: GameContentBundleV2) -> Result<KernelWorkerRequestV2, 
                 pauses: Vec::new(),
                 disposed: false,
             },
-            protocol: None,
+            protocol: Box::new(None),
         }),
     })
 }
@@ -211,12 +416,14 @@ fn assert_fault(
     accepted_sequence: Option<u64>,
 ) {
     assert_eq!(response.accepted_sequence, accepted_sequence);
-    assert!(matches!(response.response, KernelWorkerResponseV2::Fault(fault) if fault.code == code));
+    assert!(
+        matches!(response.response, KernelWorkerResponseV2::Fault(fault) if fault.code == code)
+    );
 }
 
 #[test]
-fn actual_abi2_process_runs_current_natural_controls_and_non_key_time()
--> Result<(), Box<dyn Error>> {
+fn actual_abi2_process_runs_current_natural_controls_and_non_key_time() -> Result<(), Box<dyn Error>>
+{
     let (bundle, identity) = fixture()?;
     let mut worker = WorkerProcess::spawn(identity.clone())?;
     assert!(matches!(
@@ -230,31 +437,48 @@ fn actual_abi2_process_runs_current_natural_controls_and_non_key_time()
     };
     assert_eq!(observation.kernel_version, 7);
     assert_eq!(observation.content_identity, identity.content_identity);
-    assert_eq!(observation.control.map(|control| control.kind), Some(GameControlKindV2::Title));
-    let response = worker.accepted(2, KernelWorkerRequestV2::Apply(CurrentExternalEvent::RawInput {
-        input: RawInputEvent::KeyDown {
-            code: PhysicalKey::Enter,
-            printable: false,
-            browser_repeat: false,
-            focus: InputFocus::Game,
-        },
-    }))?;
+    assert_eq!(
+        observation.control.map(|control| control.kind),
+        Some(GameControlKindV2::Title)
+    );
+    let response = worker.accepted(
+        2,
+        KernelWorkerRequestV2::Apply(CurrentExternalEvent::RawInput {
+            input: RawInputEvent::KeyDown {
+                code: PhysicalKey::Enter,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+        }),
+    )?;
     let KernelWorkerResponseV2::Effects { step, observation } = response else {
         return Err("worker did not return typed current effects".into());
     };
-    assert_eq!(observation.control.map(|control| control.kind), Some(GameControlKindV2::ModeSelect));
+    assert_eq!(
+        observation.control.map(|control| control.kind),
+        Some(GameControlKindV2::ModeSelect)
+    );
     assert!(step.effects.iter().any(|effect| matches!(
         effect,
         GameKernelEffectV7::UiChanged(control) if control.kind == GameControlKindV2::ModeSelect
     )));
-    worker.accepted(3, KernelWorkerRequestV2::Apply(CurrentExternalEvent::RawInput {
-        input: RawInputEvent::KeyUp { code: PhysicalKey::Enter },
-    }))?;
+    worker.accepted(
+        3,
+        KernelWorkerRequestV2::Apply(CurrentExternalEvent::RawInput {
+            input: RawInputEvent::KeyUp {
+                code: PhysicalKey::Enter,
+            },
+        }),
+    )?;
     let before = worker.snapshot(4)?;
     assert_eq!(before.schema_version, 7);
-    worker.accepted(5, KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
-        milliseconds: safe(25),
-    }))?;
+    worker.accepted(
+        5,
+        KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(25),
+        }),
+    )?;
     let after = worker.snapshot(6)?;
     let mut expected = before;
     expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
@@ -281,18 +505,24 @@ fn actual_abi2_process_rejects_bad_content_events_sequence_and_historical_snapsh
     ));
     let before = worker.snapshot(2)?;
     assert_fault(
-        worker.exchange(3, KernelWorkerRequestV2::Apply(CurrentExternalEvent::PresentationOutcome {
-            event_id: PresentationEventId::new(safe(999)),
-            outcome: KernelPresentationOutcomeV2::Settled,
-        }))?,
+        worker.exchange(
+            3,
+            KernelWorkerRequestV2::Apply(CurrentExternalEvent::PresentationOutcome {
+                event_id: PresentationEventId::new(safe(999)),
+                outcome: KernelPresentationOutcomeV2::Settled,
+            }),
+        )?,
         KernelWorkerFaultCodeV2::KernelFailure,
         Some(2),
     );
     assert_eq!(worker.snapshot(3)?, before);
     assert_fault(
-        worker.exchange(5, KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
-            milliseconds: safe(25),
-        }))?,
+        worker.exchange(
+            5,
+            KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+                milliseconds: safe(25),
+            }),
+        )?,
         KernelWorkerFaultCodeV2::ProtocolViolation,
         Some(3),
     );
@@ -325,11 +555,14 @@ fn actual_abi2_process_rejects_bad_content_events_sequence_and_historical_snapsh
     }))?;
     legacy.validate()?;
     assert_fault(
-        worker.exchange(5, KernelWorkerRequestV2::Restore {
-            snapshot_bytes: serde_json::to_vec(&legacy)?,
-            local_seat: SeatId::new(safe(1)),
-            role: GameKernelRoleV7::Authority,
-        })?,
+        worker.exchange(
+            5,
+            KernelWorkerRequestV2::Restore {
+                snapshot_bytes: serde_json::to_vec(&legacy)?,
+                local_seat: SeatId::new(safe(1)),
+                role: GameKernelRoleV7::Authority,
+            },
+        )?,
         KernelWorkerFaultCodeV2::SnapshotRejected,
         Some(4),
     );
