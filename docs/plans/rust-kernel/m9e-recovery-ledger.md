@@ -43,4 +43,22 @@ remain subsequent measured work.
 3. Add dependency-ready timer/effect/retention repairs with explicit platform coverage.
 4. Continue handoff checkpoints 1–5; do not call this checkpoint M9 completion or tag it.
 
+## Remote runs
+
+| Candidate | Run | Result | Exact scope |
+|---|---|---|---|
+| `b427d952c6f3c2b07de045f4acca0748ac27632d` | `33920083121` | workflow rejected | Job-level runner context unsupported; moved report path to step env. No runner started. |
+| `74bcaea727110a3f235a6ff07a282f35de83c387` | `33920260169` | PASS | F0 readiness: 30 selected/executed/passed, zero failed/skipped; format check passed. |
+
+F0 report: `m9e-summary-74bcaea727110a3f235a6ff07a282f35de83c387`, 1,250 compressed bytes.
+Rust 1.97.1, Linux x86_64, test/default features. Format 3,339 ms; build 5,683 ms;
+execution 3 ms. Run creation to completion 53 seconds. Harness SHA-256
+`f9844ade250d7a2167d51760465467035ad3f4bce783ca693eb1b8a93d3a5a68`;
+content manifest SHA-256 `aa8da070c2f929dc4e9903d4adf0455e164d5980d9be506ce5700267cd187698`.
+All complete evidence remains in the named remote diagnostics artifact.
+
+Next patch adds real CLI red witnesses and 13 stdlib remote harness regression tests.
+Source formatting patches are produced on the runner and the original candidate
+restored afterward. Test binaries run from their Cargo manifest directory.
+
 No corrected final tag or qualification claim is made here.

@@ -43,6 +43,25 @@ def run(args, name, cwd=RUST):
     return path
 
 
+def check_format(selection):
+    try:
+        run(["cargo", "fmt", "--all", "--", "--check"], "format")
+    except RuntimeError:
+        # Mutation is confined to the disposable remote checkout. Restore the
+        # exact candidate after producing a patch for changed source only.
+        paths = [path for path in selection["changed_paths"] if path.endswith(".rs")]
+        if paths:
+            try:
+                run(["cargo", "fmt", "--all"], "format-patch")
+                patch = subprocess.check_output(["git", "diff", "--", *paths], cwd=ROOT)
+                (FULL / "format.patch").write_bytes(patch)
+                if len(patch) <= 24000:
+                    (COMPACT / "format.patch").write_bytes(patch)
+            finally:
+                subprocess.run(["git", "restore", "--worktree", "--", "rust"], cwd=ROOT, check=True)
+        raise
+
+
 def plan():
     config = json.loads((ROOT / "scripts/ci/m9e-targets.json").read_text())
     # Cumulative coverage survives canceled/failed intermediate pushes. Advancing
@@ -107,7 +126,7 @@ def plan():
     return result
 
 
-def main():
+def main(preflight_failure=None):
     COMPACT.mkdir(parents=True, exist_ok=True)
     FULL.mkdir(parents=True, exist_ok=True)
     summary = {"status": "failed", "product_sha": os.environ.get("GITHUB_SHA"),
@@ -120,6 +139,8 @@ def main():
                "tests": {"selected": 0, "executed": 0, "passed": 0, "failed": 0, "skipped": 0}}
     tests = []
     try:
+        if preflight_failure:
+            raise RuntimeError(preflight_failure)
         if capture(["git", "rev-parse", "HEAD"]) != summary["product_sha"]:
             raise RuntimeError("candidate identity mismatch")
         manifest = RUST / "fixtures/m9/engineering/game-content-bundle-v2-manifest.json"
@@ -129,7 +150,7 @@ def main():
         summary["toolchain"] = capture(["rustc", "--version"], RUST)
         summary["target"] = next(line.split(": ", 1)[1] for line in
                                  capture(["rustc", "-vV"], RUST).splitlines() if line.startswith("host: "))
-        run(["cargo", "fmt", "--all", "--", "--check"], "format")
+        check_format(selection)
         args = ["cargo", "test", "--locked", "--lib", "--bins", "--tests", "--no-run", "--message-format=json"]
         for package in selection["packages"]:
             args.extend(["-p", package])
@@ -140,22 +161,22 @@ def main():
                 continue
             message = json.loads(line)
             if message.get("reason") == "compiler-artifact" and message.get("profile", {}).get("test") and message.get("executable"):
-                binaries[message["executable"]] = message["target"]["name"]
+                binaries[message["executable"]] = (message["target"]["name"], Path(message["manifest_path"]).parent)
         if not binaries:
             raise RuntimeError("build emitted no test binaries")
         enumerated = []
-        for index, (binary, name) in enumerate(sorted(binaries.items())):
-            listing = run([binary, "--list", "--format", "terse"], f"list-{index}")
+        for index, (binary, (name, cwd)) in enumerate(sorted(binaries.items())):
+            listing = run([binary, "--list", "--format", "terse"], f"list-{index}", cwd)
             ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
-            enumerated.append((index, binary, name, ids))
-        for index, binary, name, ids in enumerated:
+            enumerated.append((index, binary, name, ids, cwd))
+        for index, binary, name, ids, cwd in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             output = FULL / f"execute-{index}.log"
             start = time.monotonic()
             with output.open("w") as stream:
-                code = subprocess.run([binary, "--format", "terse"], cwd=RUST,
+                code = subprocess.run([binary, "--format", "terse"], cwd=cwd,
                                       stdout=stream, stderr=subprocess.STDOUT).returncode
             TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
             counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
@@ -187,9 +208,11 @@ def main():
                     marker = "[TRUNCATED: full log retained remotely]\n" if len(text) > 12000 else ""
                     excerpt += f"\n--- {path.name} ---\n" + marker + text[-12000:]
             encoded = excerpt.encode()
-            truncated = len(encoded) > 48000
+            patch_size = (COMPACT / "format.patch").stat().st_size if (COMPACT / "format.patch").exists() else 0
+            diagnostic_limit = 48000 - patch_size
+            truncated = len(encoded) > diagnostic_limit
             summary["diagnostics_truncated"] |= truncated
-            (COMPACT / "failure.txt").write_bytes(encoded[:48000] + (b"\n[TRUNCATED: see full remote diagnostics]\n" if truncated else b""))
+            (COMPACT / "failure.txt").write_bytes(encoded[:diagnostic_limit] + (b"\n[TRUNCATED: see full remote diagnostics]\n" if truncated else b""))
         encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
         if len(encoded_summary) > 16000:
             (FULL / "full-summary.json").write_bytes(encoded_summary)
@@ -202,4 +225,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    FULL.mkdir(parents=True, exist_ok=True)
+    with (FULL / "harness-tests.log").open("w") as stream:
+        preflight = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/ci", "-p", "test_m9e_feedback.py", "-v"],
+                                   cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
+    sys.exit(main("feedback harness self-tests failed; see harness-tests.log" if preflight.returncode else None))

@@ -1,0 +1,110 @@
+# M9E A0: current entry ownership and first executable witness
+
+Base: `5c21f3dc9e899a0d1902ee3637af1b58a29fbd24` on
+`wrk/m9e-recovery-20260904-source`. This is a bounded source inspection and
+regression specification, not a completed cutover or remote test result.
+
+## Observed entry paths at the base
+
+| Entry | Actual session/kernel | Content and boundary | Gap |
+|---|---|---|---|
+| `er-cli new-run` | `GameEnvironment::new_run` -> `GameKernelV6` | Caller-supplied `GameStateV5`, `PreparedGameContentV1`, raw physical keys; terminal effects formatted with Debug | No natural V7 initialization |
+| `er-cli resume`, `simulate` | `GameEnvironment::from_snapshot` -> `GameKernelV6` | `RestorableKernelSnapshotV6`, V1 content; simulation advances time | Current V7 snapshots/content cannot enter |
+| `er-cli agent --protocol jsonl` | `CliAgentDispatcher` -> existing `GameEnvironment` | V6 snapshot loaded before JSONL starts; `AgentRequestV1`/`AgentResponseV1`; raw input/time return effect counts | `session.create` only reports SOLO; it does not create a new game |
+| `er-cli agent --protocol jsonl --warm true` | `WarmCliDispatcherV1` -> `WarmCliSessionV1::{Bootstrap,Game}` | Standalone `RunBootstrapMachineV1` or V6 environment; V1 content | Natural bootstrap forwards raw keys but never installs a current V7 game when complete |
+| `er-cli replay` | `validate_replay` -> `GameReplayV1::validate` | V1 content identity | Validation only; no event execution |
+| `er-cli capsule-validate` | `ReproCapsuleV1::decode` | Bounded capsule files | Validation only; no event execution |
+| `er-cli inspect-content`, `validate-save` | V1 prepared content / `GameSaveV1` | Historical identity/save format | Not current content/save verification |
+| `er-env::GameEnvironment` | Owns `GameKernelV6` and `Arc<PreparedGameContentV1>` | V6 snapshots; raw input/time; custom `GameEffect` wrapper | Current public facade is historical |
+| `KernelWorkerRuntimeV1` | `Option<GameEnvironment>` | V6 restore/trace types and V1 content | Native generation worker shares historical environment; sequence accepted before fallible operation |
+| Direct `GameKernelV7` | Bootstrap -> `GameRuntimeV6` -> terminal lifecycle | `PreparedGameContentV2`, `CoreGameKernelSnapshotV7`, typed `GameKernelStepV7` | Existing implementation to reuse |
+
+Inspected files: `er-cli/src/main.rs`, `er-cli/src/m72_lab.rs`,
+`er-env/src/lib.rs`, `er-agent-protocol/src/lib.rs`,
+`er-kernel-worker/src/runtime.rs`, `er-kernel/src/game_kernel_v7.rs`,
+`er-kernel/src/snapshot_v7.rs`, `er-game/src/m9e_content_v2.rs`,
+`er-game/src/m9e_new_run_v6.rs`, and the constructor/control witness in
+`er-kernel/tests/m9e_game_kernel_v7.rs` (paths relative to `rust/crates`).
+
+The lab's module inventory alone does not establish execution ownership.
+`er-lab` reload/daemon, `er-batch`, `er-devplane`, `er-repro` replay, and the
+browser delegate need their own bounded consumer trace before claiming the
+complete tools cutover. The handoff identifies `BrowserKernelHostV2` as V7;
+this A0 witness does not certify browser, worker, batch, or co-op execution.
+
+## Existing current interface to reuse
+
+`GameKernelV7::natural_start(profile, seed, local_seat, save_slots,
+local_is_host, content, scheduler, protocol)` creates the title bootstrap
+inside the kernel. It derives the bootstrap catalog from current prepared
+content. Normal clients should not supply a second catalog.
+
+`from_snapshot(snapshot, local_seat, role, content)` restores V7 explicitly;
+seat and role are restore context, not inferred from a V6 fallback.
+`snapshot()` returns a validated current lifecycle snapshot. `state()` is
+optional during bootstrap; `current_control()` supports bootstrap and play.
+
+Already implemented external operations include `raw_input`, `advance_time`,
+`ingest_network_frame`, `transport_changed`, `settle_presentation_outcome`,
+and `apply_storage_result`. Preserve their typed `GameKernelStepV7` effects
+(`UiChanged`, `ProposalReady`, `AuthorityMaterial`, `Presentation`,
+`Platform`, `Terminal`) at the shared session boundary. Exact lifecycle,
+timer-wakeup and model-result support remains implementation work where the
+existing kernel lacks the required causal operation.
+
+## First remote executable regression
+
+Owned test: `rust/crates/er-cli/tests/m9e_current_entry.rs`.
+
+Remote command, from `rust/`:
+
+```sh
+cargo test --locked -p er-cli --test m9e_current_entry
+```
+
+Expected test count: **2**. The runner needs the existing committed fixture
+`rust/fixtures/m9/engineering/game-content-bundle-v2.json`; do not download
+or generate it locally. The test launches the actual `CARGO_BIN_EXE_er-cli`
+with finite JSONL input and closes stdin.
+
+1. `public_agent_natural_start_owns_v7_content_and_raw_controls`: launch the
+   normal warm agent using V2 content, create NATURAL, verify current content
+   identity, decode and validate an actual V7 snapshot, send Enter keydown
+   and keyup, then verify Title -> ModeSelect in another V7 snapshot.
+2. `public_agent_rejects_old_snapshot_schema_without_replacing_current_session`:
+   create NATURAL, accept a valid V7 snapshot in a second session, reject an
+   otherwise identical snapshot with schema version changed to 6, and verify
+   the first session snapshot remains unchanged. Acceptance of the valid
+   snapshot prevents an always-rejecting restore from satisfying the witness.
+
+The expected baseline failure is the real executable rejecting V2 content
+through its V1 loader, before it serves the JSONL requests. This expectation
+must be observed remotely; no tests, builds, or formatters ran locally.
+The deliberately invalid schema is only an in-memory negative test payload,
+not a committed runtime fault or a claim of full legacy migration coverage.
+
+## Minimal adapter contract required for the next cutover
+
+Keep the current `agent --protocol jsonl --warm true --content <V2 bundle>`
+entry and protocol envelope. Add `kernel_version: 7` and the serialized
+`PreparedGameContentV2::identity()` as `content_identity` to `protocol.hello`;
+the existing hello has no identity fields. Identity labels supplement the
+executable snapshot/control assertions and cannot replace them.
+
+`session.create` NATURAL accepts `profile`, `seed`, `owner_seat`, `save_slots`,
+and `local_is_host`, passing them to the existing V7 constructor. SNAPSHOT
+accepts `snapshot`, `owner_seat`, and `role` (`AUTHORITY` in this witness).
+`session.snapshot` returns `CoreGameKernelSnapshotV7` directly;
+`session.raw_input` accepts the existing serialized `RawInputEvent`.
+
+The shared current facade belongs in `er-env`. Preserve historical APIs with
+explicit compatibility naming/routing while consumer changes land; do not
+switch historical types by search-and-replace, hide another bootstrap beside
+V7, or make native CLI depend on Wasm/browser bindings. One current session
+must own construction, typed external events, observation, snapshot/fork and
+disposal before the worker/browser consumers delegate to it.
+
+Status: **READY_IMPLEMENTATION**. No handoff commit or report artifact yet;
+the integrator owns committing, remote execution, and recording the exact
+candidate/run evidence. Passing these two tests will close only the bounded
+current CLI identity/bootstrap seam, not Gate A or M9 engineering.
