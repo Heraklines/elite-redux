@@ -52,6 +52,9 @@ remain subsequent measured work.
 | `c33a0503ff97a92486f83a136a151547670e0fe4` | `33920552315` | format failure | 13 feedback harness regressions passed; scoped remote formatting patch returned and applied. |
 | `e9c4aa464794e93fd5f5cd4da15c95028732c32b` | `33920701633` | target-selection failure | Fixed binary-only Cargo selection from `--lib --bins --tests` to `--tests`; no game test ran. |
 | `8909544f6184c61b0193c62a1d1a279dd941ffde` | `33920832537` | EXPECTED RED | 6 CLI tests executed: 4 historical pass, 2 new current-entry failures. Actual agent rejects V2 `guaranteed` content field via V1 loader. |
+| `a887f7831179c7a6548a6dfc34fa7ef554307f17` | `33921183079` | format failure | A1 remote patch exceeded initial 24 KB allocation; compact budget increased within total 64 KiB ceiling. |
+| `ef2881daa1b143107937e1e1c5e7a63a0508e2d2` | `33921362838` | superseded | Replaced by compile-plus-format feedback on same recovery branch. |
+| `03ec01438ba4871c27e82b95ee244e16d6d1137d` | `33921419907` | historical audit + format failure | A1 and full native cone compiled; 447 enumerated, 82 executed, 81 passed, one historical M3 audit failed. Remaining tests did not run. Remote 26,292-byte formatting patch returned and applied. |
 
 F0 report: `m9e-summary-74bcaea727110a3f235a6ff07a282f35de83c387`, 1,250 compressed bytes.
 Rust 1.97.1, Linux x86_64, test/default features. Format 3,339 ms; build 5,683 ms;
@@ -82,5 +85,14 @@ Worker/WebRTC/storage topology is certified by the focused Wasm witness.
 The historical JSONL request-ID window still needs safe retry retirement, and the
 current adapter stages an extra clone before serialization. These are implementation
 tasks, not external blockers.
+
+Historical audit disposition: `m2_api_bypass::m3_audited_production_surface_matches_frozen_manifest`
+requires the old oracle/M3 ancestry and frozen production blobs; it is not a current
+M9 ownership test. The published M9 workflow already excludes this exact test in
+shard 16. Focused feedback mirrors that one exclusion, reports its name/reason
+separately, and still executes the other 12 tests in that binary. No blanket skips,
+golden digest rewrites, or changes to the published qualification workflow are made.
+The normal CLI V7 positive/negative executable witnesses supply the new entry evidence;
+this does not replace the full current source-fidelity acceptance required by the handoff.
 
 No corrected final tag or qualification claim is made here.

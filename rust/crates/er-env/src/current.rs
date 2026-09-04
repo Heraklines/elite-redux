@@ -22,12 +22,28 @@ use thiserror::Error;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum CurrentExternalEvent {
-    RawInput { input: RawInputEvent },
-    AdvanceTime { milliseconds: SafeU53 },
-    NetworkFrame { generation: ConnectionGeneration, bytes: Vec<u8> },
-    TransportChanged { generation: ConnectionGeneration, connected: bool },
-    PresentationOutcome { event_id: PresentationEventId, outcome: KernelPresentationOutcomeV2 },
-    StorageResult { request_id: PlatformRequestId, result: KernelStorageResultV2 },
+    RawInput {
+        input: RawInputEvent,
+    },
+    AdvanceTime {
+        milliseconds: SafeU53,
+    },
+    NetworkFrame {
+        generation: ConnectionGeneration,
+        bytes: Vec<u8>,
+    },
+    TransportChanged {
+        generation: ConnectionGeneration,
+        connected: bool,
+    },
+    PresentationOutcome {
+        event_id: PresentationEventId,
+        outcome: KernelPresentationOutcomeV2,
+    },
+    StorageResult {
+        request_id: PlatformRequestId,
+        result: KernelStorageResultV2,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -69,12 +85,12 @@ impl CurrentGameSession {
         content: Arc<PreparedGameContentV2>,
         protocol: Option<ProtocolRuntimeSnapshotV2>,
     ) -> Result<Self, CurrentSessionError> {
-        let role = protocol.as_ref().map_or(GameKernelRoleV7::Authority, |value| {
-            match value.role {
+        let role = protocol
+            .as_ref()
+            .map_or(GameKernelRoleV7::Authority, |value| match value.role {
                 er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
                 er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
-            }
-        });
+            });
         let kernel = GameKernelV7::natural_start(
             profile,
             seed,
@@ -90,7 +106,12 @@ impl CurrentGameSession {
             },
             protocol,
         )?;
-        Ok(Self { kernel: Some(kernel), content, local_seat, role })
+        Ok(Self {
+            kernel: Some(kernel),
+            content,
+            local_seat,
+            role,
+        })
     }
 
     pub fn from_snapshot(
@@ -100,13 +121,24 @@ impl CurrentGameSession {
         content: Arc<PreparedGameContentV2>,
     ) -> Result<Self, CurrentSessionError> {
         let kernel = GameKernelV7::from_snapshot(snapshot, local_seat, role, Arc::clone(&content))?;
-        Ok(Self { kernel: Some(kernel), content, local_seat, role })
+        Ok(Self {
+            kernel: Some(kernel),
+            content,
+            local_seat,
+            role,
+        })
     }
 
-    pub fn restore(&mut self, snapshot: CoreGameKernelSnapshotV7) -> Result<(), CurrentSessionError> {
+    pub fn restore(
+        &mut self,
+        snapshot: CoreGameKernelSnapshotV7,
+    ) -> Result<(), CurrentSessionError> {
         self.kernel()?;
         let restored = GameKernelV7::from_snapshot(
-            snapshot, self.local_seat, self.role, Arc::clone(&self.content),
+            snapshot,
+            self.local_seat,
+            self.role,
+            Arc::clone(&self.content),
         )?;
         self.kernel = Some(restored);
         Ok(())
@@ -122,11 +154,14 @@ impl CurrentGameSession {
 
     pub fn observe(&self) -> Result<CurrentGameObservation, CurrentSessionError> {
         let kernel = self.kernel()?;
-        let mechanical_digest = kernel.state().map(|state| {
-            content_digest(state)
-                .map(|value| format!("blake3-v1:{value}"))
-                .map_err(|error| CurrentSessionError::Digest(error.to_string()))
-        }).transpose()?;
+        let mechanical_digest = kernel
+            .state()
+            .map(|state| {
+                content_digest(state)
+                    .map(|value| format!("blake3-v1:{value}"))
+                    .map_err(|error| CurrentSessionError::Digest(error.to_string()))
+            })
+            .transpose()?;
         Ok(CurrentGameObservation {
             kernel_version: 7,
             content_identity: self.content.identity().clone(),
@@ -136,15 +171,23 @@ impl CurrentGameSession {
     }
 
     /// Stage only mutable game state: rejected external events cannot partially commit.
-    pub fn apply(&mut self, event: CurrentExternalEvent) -> Result<GameKernelStepV7, CurrentSessionError> {
+    pub fn apply(
+        &mut self,
+        event: CurrentExternalEvent,
+    ) -> Result<GameKernelStepV7, CurrentSessionError> {
         let mut candidate = self.kernel()?.clone();
         let step = match event {
             CurrentExternalEvent::RawInput { input } => candidate.raw_input(input)?,
-            CurrentExternalEvent::AdvanceTime { milliseconds } => candidate.advance_time(milliseconds)?,
+            CurrentExternalEvent::AdvanceTime { milliseconds } => {
+                candidate.advance_time(milliseconds)?
+            }
             CurrentExternalEvent::NetworkFrame { generation, bytes } => {
                 candidate.ingest_network_frame(generation, &bytes)?
             }
-            CurrentExternalEvent::TransportChanged { generation, connected } => {
+            CurrentExternalEvent::TransportChanged {
+                generation,
+                connected,
+            } => {
                 candidate.transport_changed(generation, connected)?;
                 GameKernelStepV7::default()
             }

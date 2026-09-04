@@ -75,6 +75,8 @@ class FeedbackTests(unittest.TestCase):
         self.commands = []
         self.events = []
         self.executed = []
+        self.binary_workdirs = []
+        self.format_code = 0
         self.build_code = 0
         self.build_diagnostic = "error: synthetic compiler failure\n"
         self.extra_failure_logs = 0
@@ -109,8 +111,16 @@ class FeedbackTests(unittest.TestCase):
         self.commands.append(args)
         if args[:3] == ["git", "cat-file", "-e"]:
             return subprocess.CompletedProcess(args, 0)
+        if args == ["git", "restore", "--worktree", "--", "rust"]:
+            self.events.append("restore")
+            return subprocess.CompletedProcess(args, 0)
         if args[:2] == ["cargo", "fmt"]:
-            self.events.append("format")
+            if "--check" in args:
+                self.events.append("format")
+                if self.format_code:
+                    stdout.write("Diff in synthetic source: formatting required\n")
+                return subprocess.CompletedProcess(args, self.format_code)
+            self.events.append("format-patch")
             return subprocess.CompletedProcess(args, 0)
         if args[:2] == ["cargo", "test"]:
             self.events.append("build")
@@ -130,6 +140,7 @@ class FeedbackTests(unittest.TestCase):
         name = Path(args[0]).name
         if name not in self.binary_ids:
             raise AssertionError(f"Unexpected process: {args}")
+        self.binary_workdirs.append((name, Path(cwd)))
         if "--list" in args:
             self.events.append("list:" + name)
             stdout.write("".join(f"{test_id}: test\n" for test_id in self.binary_ids[name]))
@@ -184,6 +195,50 @@ class FeedbackTests(unittest.TestCase):
 
     def test_docs_only_readiness_remains_small(self):
         self.assertEqual(self.feedback.plan()["packages"], ["er-canonical"])
+
+    def test_current_environment_selects_reverse_consumers_and_wasm_witness(self):
+        self.config["current_session_packages"] = ["er-env"]
+        self.config["current_session_wasm_test"] = "m9e_parity"
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-env")
+        self.package("er-native", '[dependencies]\ner-env = { path = "../er-env" }\n')
+        self.package("er-cli", '[dependencies]\ner-native = { path = "../er-native" }\n')
+        self.changed = ["rust/crates/er-env/src/current.rs"]
+        selection = self.feedback.plan()
+        self.assertEqual(selection["packages"], ["er-cli", "er-env", "er-native", "er-wasm"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(selection["boundary_paths"], [])
+
+    def test_format_failure_without_changed_rust_still_runs_original_tests(self):
+        self.format_code = 1
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["status"], "failed")
+        self.assertIn("format exited 1", summary["format_failure"])
+        self.assertEqual(summary["first_failure"], summary["format_failure"])
+        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertEqual(self.executed, ["a_suite", "b_suite"])
+        self.assertNotIn("format-patch", self.events)
+        self.assertNotIn("restore", self.events)
+        self.assertFalse((self.compact / "format.patch").exists())
+
+    def test_format_patch_is_scoped_and_restore_precedes_compilation(self):
+        self.format_code = 1
+        source = "rust/crates/er-native/src/lib.rs"
+        self.changed = [source, "docs/plans/rust-kernel/m9e-progress.md"]
+        patch_bytes = b"diff --git a/rust/crates/er-native/src/lib.rs b/rust/crates/er-native/src/lib.rs\n"
+        with patch.object(self.feedback.subprocess, "check_output", return_value=patch_bytes) as diff:
+            code, summary = self.invoke()
+        diff.assert_called_once_with(["git", "diff", "--", source], cwd=self.root)
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertEqual(self.executed, ["a_suite", "b_suite"])
+        self.assertLess(self.events.index("format-patch"), self.events.index("restore"))
+        self.assertLess(self.events.index("restore"), self.events.index("build"))
+        self.assertEqual((self.compact / "format.patch").read_bytes(), patch_bytes)
+        self.assertEqual((self.full / "format.patch").read_bytes(), patch_bytes)
+        self.assertLessEqual(sum(path.stat().st_size for path in self.compact.iterdir()), 64 * 1024)
 
     def test_compiler_failure_cannot_become_green_after_report_generation(self):
         self.build_code = 101
@@ -271,6 +326,10 @@ class FeedbackTests(unittest.TestCase):
         code, summary = self.invoke()
         self.assertEqual(code, 0)
         self.assertEqual(self.executed, ["a_suite", "b_suite"])
+        self.assertEqual(self.binary_workdirs, [
+            (name, self.rust / "crates/er-native")
+            for name in ("a_suite", "b_suite", "a_suite", "b_suite")
+        ])
         self.assertEqual(summary["tests"], {"selected": 2, "executed": 2, "passed": 2, "failed": 0, "skipped": 0})
         self.assertEqual(summary["product_sha"], CANDIDATE)
         self.assertEqual(summary["workflow_sha"], CANDIDATE)

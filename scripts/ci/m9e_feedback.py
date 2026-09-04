@@ -123,6 +123,7 @@ def plan():
         selected.add("er-wasm")
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
+              "historical_dispositions": config.get("historical_dispositions", []),
               "requires_wasm": shared or bool(boundaries) or current_session,
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "features": "default"}
@@ -209,15 +210,23 @@ def main(preflight_failure=None):
         for index, (binary, (name, cwd)) in enumerate(sorted(binaries.items())):
             listing = run([binary, "--list", "--format", "terse"], f"list-{index}", cwd)
             ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
+            exclusions = [item for item in selection["historical_dispositions"]
+                          if item["target"] == name and item["test"] in ids]
+            excluded_ids = {item["test"] for item in exclusions}
+            summary.setdefault("historical_dispositions", []).extend(exclusions)
+            ids = [test_id for test_id in ids if test_id not in excluded_ids]
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
-            enumerated.append((index, binary, name, ids, cwd))
-        for index, binary, name, ids, cwd in enumerated:
+            enumerated.append((index, binary, name, ids, cwd, excluded_ids))
+        for index, binary, name, ids, cwd, excluded_ids in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             output = FULL / f"execute-{index}.log"
             start = time.monotonic()
+            command = [binary, "--format", "terse"]
+            for test_id in sorted(excluded_ids):
+                command.extend(["--skip", test_id])
             with output.open("w") as stream:
-                code = subprocess.run([binary, "--format", "terse"], cwd=cwd,
+                code = subprocess.run(command, cwd=cwd,
                                       stdout=stream, stderr=subprocess.STDOUT).returncode
             TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
             counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
@@ -264,7 +273,7 @@ def main(preflight_failure=None):
                     else:
                         diagnostics.append(line)
                 text = "\n".join(diagnostics)
-                if re.search(r"(?im)^error[:\[]|FAILED|^Traceback", text) or (path.name == "format.log" and text):
+                if re.search(r"(?m)^error[:\[]|^Error:|--- FAILED|^FAILED |test result: FAILED|^Traceback", text) or (path.name == "format.log" and text):
                     if len(text) > 12000:
                         summary["diagnostics_truncated"] = True
                     marker = "[TRUNCATED: full log retained remotely]\n" if len(text) > 12000 else ""

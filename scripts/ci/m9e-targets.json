@@ -8,6 +8,11 @@
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],
   "current_session_packages": ["er-env"],
   "current_session_wasm_test": "m9e_parity",
+  "historical_dispositions": [{
+    "target": "m2_api_bypass",
+    "test": "m3_audited_production_surface_matches_frozen_manifest",
+    "reason": "Historical M3 ancestor/blob freeze does not describe M9; identical exact exclusion in published M9 qualification shard 16 at baseline 5c21f3dc. Remaining API-bypass tests and current CLI execution witnesses remain mandatory."
+  }],
   "boundary_prefixes": ["src/", "test/browser/", "test/node/", "workers/", "rust/crates/er-wasm/", "rust/crates/er-web/"],
   "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes"
 }

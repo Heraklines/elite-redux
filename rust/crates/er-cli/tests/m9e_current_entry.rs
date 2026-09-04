@@ -251,17 +251,42 @@ fn public_agent_fork_time_restore_and_close_preserve_current_session_identity()
             disposed: false,
         },
         None,
-    )?.snapshot()?;
+    )?
+    .snapshot()?;
     let responses = run_cli(&[
         create_request()?,
         request("before", "session.snapshot", json!({"session": "current"})),
-        request("fork", "session.fork", json!({"session": "current", "target_session": "forked"})),
-        request("time", "session.advance_time", json!({"session": "current", "milliseconds": 13})),
-        request("fork-time", "session.advance_time", json!({"session": "forked", "milliseconds": 13})),
+        request(
+            "fork",
+            "session.fork",
+            json!({"session": "current", "target_session": "forked"}),
+        ),
+        request(
+            "time",
+            "session.advance_time",
+            json!({"session": "current", "milliseconds": 13}),
+        ),
+        request(
+            "fork-time",
+            "session.advance_time",
+            json!({"session": "forked", "milliseconds": 13}),
+        ),
         request("after", "session.snapshot", json!({"session": "current"})),
-        request("fork-after", "session.snapshot", json!({"session": "forked"})),
-        request("restore", "session.restore", json!({"session": "current", "snapshot": initial})),
-        request("restored", "session.snapshot", json!({"session": "current"})),
+        request(
+            "fork-after",
+            "session.snapshot",
+            json!({"session": "forked"}),
+        ),
+        request(
+            "restore",
+            "session.restore",
+            json!({"session": "current", "snapshot": initial}),
+        ),
+        request(
+            "restored",
+            "session.snapshot",
+            json!({"session": "current"}),
+        ),
         request("close", "session.close", json!({"session": "forked"})),
         request("closed", "session.observe", json!({"session": "forked"})),
     ])?;
@@ -271,31 +296,52 @@ fn public_agent_fork_time_restore_and_close_preserve_current_session_identity()
     assert_eq!(snapshot(&responses[1])?, initial);
     let after = snapshot(&responses[5])?;
     assert_eq!(after, snapshot(&responses[6])?);
-    assert_eq!(after.replay_sequence.get(), initial.replay_sequence.get() + 1);
+    assert_eq!(
+        after.replay_sequence.get(),
+        initial.replay_sequence.get() + 1
+    );
     assert_eq!(snapshot(&responses[8])?, initial);
     let step: er_kernel::game_kernel_v7::GameKernelStepV7 =
         serde_json::from_value(result(&responses[3])?["step"].clone())?;
-    assert!(step.effects.is_empty(), "empty bootstrap has no timer effects");
+    assert!(
+        step.effects.is_empty(),
+        "empty bootstrap has no timer effects"
+    );
     assert!(responses[10]["result"].is_null());
-    assert!(!responses[10]["error"].is_null(), "closed session still observed");
+    assert!(
+        !responses[10]["error"].is_null(),
+        "closed session still observed"
+    );
     Ok(())
 }
 
 #[test]
-fn public_agent_rejected_external_results_do_not_commit_partial_state()
--> Result<(), Box<dyn Error>> {
+fn public_agent_rejected_external_results_do_not_commit_partial_state() -> Result<(), Box<dyn Error>>
+{
     let responses = run_cli(&[
         create_request()?,
         request("before", "session.snapshot", json!({"session": "current"})),
-        request("network", "session.network_frame", json!({
-            "session": "current", "generation": 1, "bytes": []
-        })),
-        request("storage", "session.storage_result", json!({
-            "session": "current", "request_id": 1, "result": {"kind": "WRITTEN"}
-        })),
-        request("presentation", "session.presentation_settled", json!({
-            "session": "current", "event_id": 1, "outcome": {"kind": "SETTLED"}
-        })),
+        request(
+            "network",
+            "session.network_frame",
+            json!({
+                "session": "current", "generation": 1, "bytes": []
+            }),
+        ),
+        request(
+            "storage",
+            "session.storage_result",
+            json!({
+                "session": "current", "request_id": 1, "result": {"kind": "WRITTEN"}
+            }),
+        ),
+        request(
+            "presentation",
+            "session.presentation_settled",
+            json!({
+                "session": "current", "event_id": 1, "outcome": {"kind": "SETTLED"}
+            }),
+        ),
         request("after", "session.snapshot", json!({"session": "current"})),
     ])?;
     result(&responses[0])?;
