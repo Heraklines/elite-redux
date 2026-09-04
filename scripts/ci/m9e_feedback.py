@@ -151,7 +151,9 @@ def main(preflight_failure=None):
         summary["target"] = next(line.split(": ", 1)[1] for line in
                                  capture(["rustc", "-vV"], RUST).splitlines() if line.startswith("host: "))
         check_format(selection)
-        args = ["cargo", "test", "--locked", "--lib", "--bins", "--tests", "--no-run", "--message-format=json"]
+        # --tests includes unit and integration targets without requiring a
+        # library target in binary-only packages such as er-cli.
+        args = ["cargo", "test", "--locked", "--tests", "--no-run", "--message-format=json"]
         for package in selection["packages"]:
             args.extend(["-p", package])
         build = run(args, "build")
