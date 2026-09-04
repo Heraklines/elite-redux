@@ -327,6 +327,22 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-24": {
+    "componentRules": [],
+    "description": "Moves use 20% of its speed stat additionally, Flying moves have +1 Priority.",
+    "flags": {},
+    "generation": 9,
+    "id": 20023,
+    "includes": [
+      5624,
+      5398
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Sky Sovereign ",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-3": {
     "componentRules": [],
     "description": "Ambush + Volt Rush\n\"Iron Exo endlessly stalks the ultra space for signs of the Ultra recon squad, Their fate sealed with a single shot.\"",
