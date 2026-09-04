@@ -193,8 +193,7 @@ fn actual_abi2_generations_restore_active_v7_and_continue_identical_typed_trace(
     let mut original_sequence = 2;
     press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
     press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
-    let mut observation =
-        press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
+    let mut observation = press_next(&mut original, &mut original_sequence, PhysicalKey::Space)?;
     let bound = observation
         .control
         .as_ref()

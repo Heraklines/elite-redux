@@ -131,8 +131,13 @@ def plan():
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
         path in worker_paths or path == "rust/Cargo.lock" for path in rust_changes)
+    endpoint_focus = config.get("endpoint_session_focus", {})
+    endpoint_paths = endpoint_focus.get("paths", [])
+    endpoint_session = any(path in endpoint_paths for path in rust_changes) and all(
+        path in endpoint_paths or path in worker_paths or path == "rust/Cargo.lock" for path in rust_changes)
+    native_worker_delta = worker_session or endpoint_session
     worker_lock_guard = None
-    if worker_session and "rust/Cargo.lock" in changed:
+    if native_worker_delta and "rust/Cargo.lock" in changed:
         worker_lock_guard = verify_worker_lock_change(
             capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text())
         worker_lock_guard["baseline_sha"] = base
@@ -149,7 +154,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (worker_session and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (native_worker_delta and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -195,10 +200,17 @@ def plan():
         boundaries = [path for path in boundaries if path not in browser_paths]
     if worker_session:
         execution_scope = worker_focus["execute"]
+    if endpoint_session:
+        execution_scope = endpoint_focus["execute"]
     if execution_scope is not None:
         selected.update(execution_scope)
-        if not worker_session:
+        if not native_worker_delta:
             current_session = True
+    endpoint_execution = "er-lab" in selected and (
+        execution_scope is None or "*" in execution_scope.get("er-lab", [])
+        or "current_kernel_endpoint_v2" in execution_scope.get("er-lab", []))
+    if endpoint_execution:
+        selected.add("er-kernel-worker")
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
               "historical_dispositions": config.get("historical_dispositions", []),
@@ -207,12 +219,53 @@ def plan():
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
               "worker_session_focus": worker_session,
+              "endpoint_session_focus": endpoint_session,
+              "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     if unknown or boundaries or shared:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
+
+
+def discover_worker_executable(artifacts, summary):
+    """Bind the real worker binary emitted by this candidate's Cargo invocation."""
+    manifest = (RUST / "crates/er-kernel-worker/Cargo.toml").resolve()
+    candidates = {}
+    for message in artifacts:
+        target = message.get("target", {})
+        if message.get("reason") != "compiler-artifact" or target.get("name") != "er-kernel-worker" or "bin" not in target.get("kind", []) or message.get("profile", {}).get("test") is not False:
+            continue
+        if Path(message.get("manifest_path", "")).resolve() != manifest:
+            continue
+        raw_path = Path(message.get("executable") or "")
+        if not raw_path.is_absolute() or not raw_path.is_file() or not os.access(raw_path, os.X_OK):
+            raise RuntimeError("current endpoint worker executable is missing or not executable")
+        candidates[raw_path.resolve()] = message
+    if len(candidates) != 1:
+        raise RuntimeError("current endpoint requires exactly one real worker executable artifact")
+    path, message = next(iter(candidates.items()))
+    return {"path": str(path), "sha256": digest(path), "bytes": path.stat().st_size,
+            "source_sha": summary["product_sha"], "target": summary["target"], "profile": summary["profile"],
+            "manifest_path": "rust/crates/er-kernel-worker/Cargo.toml",
+            "cargo_package_id": message.get("package_id"), "cargo_profile": message["profile"]}
+
+
+def native_target_env(crate, target, worker_executable):
+    if (crate, target) != ("er-lab", "current_kernel_endpoint_v2"):
+        return None
+    if worker_executable is None:
+        raise RuntimeError("current endpoint target has no bound worker executable")
+    env = os.environ.copy()
+    env.update({
+        "ER_M9E_WORKER_EXECUTABLE": worker_executable["path"],
+        "ER_M9E_WORKER_EXECUTABLE_SHA256": worker_executable["sha256"],
+        "ER_M9E_WORKER_SOURCE_SHA": worker_executable["source_sha"],
+        "ER_M9E_WORKER_BUILD_TARGET": worker_executable["target"],
+        "ER_M9E_WORKER_BUILD_PROFILE": worker_executable["profile"],
+    })
+    return env
 
 
 def wasm_checks(selection, summary):
@@ -341,10 +394,13 @@ def main(preflight_failure=None):
             args.extend(["-p", package])
         build = run(args, "build")
         binaries = {}
+        artifacts = []
         for line in build.read_text().splitlines():
             if not line.startswith("{"):
                 continue
             message = json.loads(line)
+            if message.get("reason") == "compiler-artifact":
+                artifacts.append(message)
             if message.get("reason") == "compiler-artifact" and message.get("profile", {}).get("test") and message.get("executable"):
                 binaries[message["executable"]] = (message["target"]["name"], Path(message["manifest_path"]).parent)
         if not binaries:
@@ -367,9 +423,16 @@ def main(preflight_failure=None):
             summary["build_only_targets"] = sorted(build_only)
             summary["execution_scope"] = execution_scope
             binaries = selected_binaries
+        worker_executable = None
+        if selection["requires_worker_executable"]:
+            if not any(name == "current_kernel_endpoint_v2" and cwd.name == "er-lab" for name, cwd in binaries.values()):
+                raise RuntimeError("required current endpoint test target is missing")
+            worker_executable = discover_worker_executable(artifacts, summary)
+            summary["worker_executable"] = worker_executable
         enumerated = []
         for index, (binary, (name, cwd)) in enumerate(sorted(binaries.items())):
-            listing = run([binary, "--list", "--format", "terse"], f"list-{index}", cwd)
+            env = native_target_env(cwd.name, name, worker_executable)
+            listing = run([binary, "--list", "--format", "terse"], f"list-{index}", cwd, env)
             ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
             exclusions = [item for item in selection["historical_dispositions"]
                           if item["crate"] == cwd.name and item["target"] == name and item["test"] in ids]
@@ -378,12 +441,12 @@ def main(preflight_failure=None):
             ids = [test_id for test_id in ids if test_id not in excluded_ids]
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
-            enumerated.append((index, binary, name, ids, cwd, excluded_ids))
+            enumerated.append((index, binary, name, ids, cwd, excluded_ids, env))
         for item in selection["historical_dispositions"]:
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
                 raise RuntimeError("historical disposition must identify exactly one enumerated test")
-        for index, binary, name, ids, cwd, excluded_ids in enumerated:
+        for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             output = FULL / f"execute-{index}.log"
             start = time.monotonic()
@@ -394,7 +457,7 @@ def main(preflight_failure=None):
             try:
                 with output.open("w") as stream:
                     code = subprocess.run(command, cwd=cwd,
-                                          stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
+                                          env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
             except subprocess.TimeoutExpired as error:
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
@@ -411,8 +474,10 @@ def main(preflight_failure=None):
                 raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
-        if selection["worker_session_focus"]:
+        if selection["worker_session_focus"] or selection["requires_worker_executable"]:
             run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
+        if selection["requires_worker_executable"]:
+            run(["cargo", "clippy", "--locked", "-p", "er-lab", "--all-targets", "--no-deps", "--", "-D", "warnings"], "endpoint-clippy")
         if selection["requires_wasm"]:
             wasm_checks(selection, summary)
         if selection["requires_browser"]:

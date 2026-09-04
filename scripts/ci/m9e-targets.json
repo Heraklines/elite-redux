@@ -25,6 +25,11 @@
     "execute": {"er-kernel-worker": ["*"], "er-cli": ["*"], "er-lab": ["kernel_reload_acceptance", "kernel_reload_artifact"]},
     "reason": "Native ABI2 worker-only changes compile the complete reverse dependency cone and execute worker/process, CLI, and existing ABI1 reload compatibility targets. Cargo.lock is accepted only after parsed comparison proves the worker adds exactly er-canonical, er-protocol, and er-state from already locked workspace packages. Shared session and browser changes retain their separate platform requirements."
   },
+  "endpoint_session_focus": {
+    "paths": ["rust/crates/er-lab/src/kernel_reload/endpoint_v2.rs", "rust/crates/er-lab/src/kernel_reload/artifact_v2.rs", "rust/crates/er-lab/src/kernel_reload/types_v2.rs", "rust/crates/er-lab/src/kernel_reload/mod.rs", "rust/crates/er-lab/tests/current_kernel_endpoint_v2.rs", "rust/crates/er-lab/tests/current_kernel_endpoint_faults_v2.rs"],
+    "execute": {"er-kernel-worker": ["*"], "er-cli": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "kernel_reload_acceptance", "kernel_reload_artifact"]},
+    "reason": "Current native endpoint and immutable artifact validation, optionally cumulative with the exact worker ABI2 paths and guarded lock delta. Compile the complete reverse cone plus worker executable; bind the actual non-test Cargo artifact to endpoint process tests. Preserve ABI1 reload compatibility and current CLI witnesses."
+  },
   "historical_dispositions": [{
     "crate": "er-sim",
     "target": "m2_api_bypass",

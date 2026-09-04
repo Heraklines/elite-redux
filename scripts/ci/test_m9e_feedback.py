@@ -78,6 +78,9 @@ class FeedbackTests(unittest.TestCase):
         self.events = []
         self.executed = []
         self.binary_workdirs = []
+        self.binary_envs = []
+        self.binary_crates = {}
+        self.extra_artifacts = []
         self.format_code = 0
         self.clippy_code = 0
         self.build_code = 0
@@ -143,14 +146,17 @@ class FeedbackTests(unittest.TestCase):
                     stdout.write(json.dumps({
                         "reason": "compiler-artifact", "profile": {"test": True},
                         "executable": str(self.rust / "target" / name),
-                        "manifest_path": str(self.rust / "crates" / "er-native" / "Cargo.toml"),
+                        "manifest_path": str(self.rust / "crates" / self.binary_crates.get(name, "er-native") / "Cargo.toml"),
                         "target": {"name": name},
                     }) + "\n")
+                for artifact in self.extra_artifacts:
+                    stdout.write(json.dumps(artifact) + "\n")
             return subprocess.CompletedProcess(args, self.build_code)
         name = Path(args[0]).name
         if name not in self.binary_ids:
             raise AssertionError(f"Unexpected process: {args}")
         self.binary_workdirs.append((name, Path(cwd)))
+        self.binary_envs.append((name, "list" if "--list" in args else "execute", kwargs.get("env")))
         if "--list" in args:
             self.events.append("list:" + name)
             stdout.write("".join(f"{test_id}: test\n" for test_id in self.binary_ids[name]))
@@ -472,6 +478,108 @@ class FeedbackTests(unittest.TestCase):
         self.changed = [worker, "rust/Cargo.lock", "rust/crates/er-env/src/current.rs"]
         with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
             self.feedback.plan()
+
+    def configure_endpoint_scope(self):
+        self.configure_worker_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["endpoint_session_focus"] = policy["endpoint_session_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+
+    def test_endpoint_scope_includes_worker_and_guarded_cumulative_lock(self):
+        self.configure_endpoint_scope()
+        self.changed = self.config["endpoint_session_focus"]["paths"] + [
+            "rust/crates/er-kernel-worker/src/runtime_v2.rs", "rust/Cargo.lock"]
+        self.baseline_lock = self.worker_lock_fixture(["er-env"])
+        (self.rust / "Cargo.lock").write_text(self.worker_lock_fixture(
+            ["er-canonical", "er-env", "er-protocol", "er-state"]))
+        selection = self.feedback.plan()
+        self.assertTrue(selection["endpoint_session_focus"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertFalse(selection["requires_browser"])
+        self.assertFalse(selection["requires_wasm"])
+        self.assertEqual(selection["worker_lock_guard"]["status"], "verified")
+        self.assertEqual(selection["execution_scope"]["er-lab"], [
+            "current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "kernel_reload_acceptance", "kernel_reload_artifact"])
+        self.assertEqual(selection["execution_scope"]["er-kernel-worker"], ["*"])
+        self.assertEqual(selection["execution_scope"]["er-cli"], ["*"])
+
+    def test_endpoint_mixed_source_preserves_broader_platform_requirements(self):
+        self.configure_endpoint_scope()
+        endpoint = "rust/crates/er-lab/src/kernel_reload/endpoint_v2.rs"
+        self.changed = [endpoint, "rust/crates/er-env/src/current.rs"]
+        selection = self.feedback.plan()
+        self.assertIsNone(selection["execution_scope"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertTrue(selection["requires_wasm"])
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-web/src/host_v2.rs", "unmapped-input.json", "rust/Cargo.lock"):
+            with self.subTest(extra=extra):
+                self.changed = [endpoint, "rust/crates/er-env/src/current.rs", extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+
+    def worker_executable_artifact(self, filename="candidate-worker"):
+        self.package("er-kernel-worker")
+        executable = self.root / "built" / filename
+        executable.parent.mkdir(exist_ok=True)
+        executable.write_bytes(b"#!/bin/sh\n# synthetic artifact; never executed by these tests\n")
+        executable.chmod(0o755)
+        return {"reason": "compiler-artifact", "package_id": "synthetic-worker-package",
+                "target": {"name": "er-kernel-worker", "kind": ["bin"]},
+                "profile": {"test": False}, "executable": str(executable),
+                "manifest_path": str(self.rust / "crates/er-kernel-worker/Cargo.toml")}
+
+    def test_worker_executable_binding_rejects_wrong_artifacts_and_ambiguity(self):
+        summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test"}
+        valid = self.worker_executable_artifact()
+        invalid = []
+        for key, value in (("target", {"name": "another-worker", "kind": ["bin"]}),
+                           ("target", {"name": "er-kernel-worker", "kind": ["lib"]}),
+                           ("profile", {"test": True}), ("profile", {}),
+                           ("manifest_path", str(self.rust / "crates/er-native/Cargo.toml")),
+                           ("executable", str(self.root / "missing-worker"))):
+            wrong = copy.deepcopy(valid)
+            wrong[key] = value
+            invalid.append([wrong])
+        invalid.extend([[], [valid, self.worker_executable_artifact("other-worker")]])
+        for index, artifacts in enumerate(invalid):
+            with self.subTest(case=index):
+                with self.assertRaises(RuntimeError):
+                    self.feedback.discover_worker_executable(artifacts, summary)
+        binding = self.feedback.discover_worker_executable([valid], summary)
+        self.assertEqual(binding["path"], str(Path(valid["executable"]).resolve()))
+        self.assertEqual(binding["sha256"], hashlib.sha256(Path(valid["executable"]).read_bytes()).hexdigest())
+        self.assertEqual(binding["source_sha"], CANDIDATE)
+
+    def test_bound_worker_environment_reaches_only_current_endpoint_execution(self):
+        self.package("er-lab")
+        self.binary_ids = {"a_suite": ["unrelated"], "current_kernel_endpoint_v2": ["real_process"],
+                           "current_kernel_endpoint_faults_v2": ["synthetic_fault_peer"]}
+        self.binary_crates["current_kernel_endpoint_v2"] = "er-lab"
+        self.binary_crates["current_kernel_endpoint_faults_v2"] = "er-lab"
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        selection = self.feedback.plan()
+        selection["packages"] = ["er-native", "er-lab", "er-kernel-worker"]
+        selection["requires_worker_executable"] = True
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        binding = summary["worker_executable"]
+        self.assertEqual(self.executed, ["a_suite", "current_kernel_endpoint_faults_v2", "current_kernel_endpoint_v2"])
+        for name, phase, env in self.binary_envs:
+            with self.subTest(name=name, phase=phase):
+                if name != "current_kernel_endpoint_v2":
+                    self.assertIsNone(env)
+                else:
+                    self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE"], binding["path"])
+                    self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], binding["sha256"])
+                    self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+                    self.assertEqual(env["ER_M9E_WORKER_BUILD_TARGET"], summary["target"])
+                    self.assertEqual(env["ER_M9E_WORKER_BUILD_PROFILE"], summary["profile"])
+        self.assertIn("worker-clippy", summary["timing_ms"])
+        self.assertIn("endpoint-clippy", summary["timing_ms"])
+        self.assertNotIn("wasm_tests", summary)
+        self.assertNotIn("browser_tests", summary)
 
     def test_cumulative_current_and_browser_paths_require_all_platform_witnesses(self):
         self.configure_browser_scope()

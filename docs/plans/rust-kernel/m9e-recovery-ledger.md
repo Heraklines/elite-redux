@@ -219,3 +219,44 @@ fingerprint/generation/session spoof rejection, and complete ordered effect,
 observation and snapshot equality through presentation outcomes, time and raw
 navigation. Both generations run the same candidate executable; this does not
 certify changed-rule acceptance, a supervisor swap, or complete causal repro.
+
+Candidate `2affd3f9f19e337c01d6ba400fd532634facf94d`, run `33929343581`,
+passed all 23 selected native tests, including the third actual worker
+restoration/continuation witness, and worker Clippy. Only one test formatting
+line failed; the compact artifact was 4,234 bytes. Worker process tests took
+111,541 ms. Its remote formatting patch is applied in the endpoint candidate.
+The baseline remains `b7e2266` until a fully green exact candidate.
+
+## Current reload endpoint entering verification
+
+The additive lab endpoint launches a read-only verified executable reference,
+performs the ABI2 sequence-zero handshake, and returns typed current results.
+It validates response addresses, kinds, sequences and observation identity.
+Typed faults preserve the accepted frontier; uncertain writes, reads or invalid
+responses fence the endpoint. One bounded I/O queue covers write/read deadlines.
+Disposal requires acknowledgement and child exit while stdin remains open.
+Only finished pipe threads are joined; exceptional delayed OS reaping is moved
+off the caller thread. This is not an unconditional zero-resource proof under
+arbitrary OS failures. Executable containment/hash are rechecked before launch;
+the producer's source/build labels and immutable-directory contract remain
+explicit, not independent executable self-attestation.
+
+Two actual endpoint tests bind the non-test worker executable discovered from
+the exact Cargo build, its SHA-256, product SHA, target and profile. They compare
+two processes and the direct current session through raw/time events, rejected
+presentation outcomes, V7 restore and disposal. Two separate Linux fault-peer
+tests verify bounded rejection/reaping for silence and malformed framed JSON;
+they are not current game execution evidence. All four require remote execution.
+
+Focused endpoint feedback compiles the reverse cone plus the worker, executes
+worker/CLI/current endpoint/fault and historical reload targets, and runs worker
+and lab Clippy. Required executable discovery fails on absent or ambiguous
+non-test Cargo artifacts. The five worker metadata environment variables are
+supplied only to the actual endpoint target. Four added harness tests bring the
+source inventory to 37; none ran locally. Full Q will need equivalent explicit
+worker binding when corrected qualification is prepared; its workflow remains
+unchanged during focused implementation.
+
+Still outstanding after this endpoint slice: activation supervision through
+current tools, batch/replay migration, complete causal input/effect retention,
+timer consequences, co-op/persistence/fidelity/control work and corrected Q.
