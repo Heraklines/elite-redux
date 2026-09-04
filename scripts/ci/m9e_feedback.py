@@ -182,7 +182,14 @@ def main(preflight_failure=None):
         summary["toolchain"] = capture(["rustc", "--version"], RUST)
         summary["target"] = next(line.split(": ", 1)[1] for line in
                                  capture(["rustc", "-vV"], RUST).splitlines() if line.startswith("host: "))
-        check_format(selection)
+        format_failure = None
+        try:
+            check_format(selection)
+        except RuntimeError as error:
+            # Formatting alone need not consume an entire remote feedback turn.
+            # check_format restores the original candidate before compilation.
+            format_failure = str(error)
+            summary["format_failure"] = format_failure
         # --tests includes unit and integration targets without requiring a
         # library target in binary-only packages such as er-cli.
         args = ["cargo", "test", "--locked", "--tests", "--no-run", "--message-format=json"]
@@ -225,6 +232,8 @@ def main(preflight_failure=None):
             raise RuntimeError("zero tests executed")
         if selection["requires_wasm"]:
             wasm_checks(selection, summary)
+        if format_failure:
+            raise RuntimeError(format_failure)
         summary["status"] = "passed"
     except Exception as error:
         summary["first_failure"] = str(error)[:4096]
