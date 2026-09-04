@@ -150,15 +150,21 @@ impl BrowserKernelHostV2 {
         }
         let next_sequence = increment(self.next_sequence)?;
         let evicted = if self.retained.len() == MAXIMUM_RETAINED_REQUESTS_V2 {
-            Some(self.retained.iter()
-                .min_by_key(|(_, retained)| retained.accepted_sequence)
-                .map(|(request_id, _)| *request_id)
-                .ok_or(BrowserWebErrorV2::Invalid)?)
+            Some(
+                self.retained
+                    .iter()
+                    .min_by_key(|(_, retained)| retained.accepted_sequence)
+                    .map(|(request_id, _)| *request_id)
+                    .ok_or(BrowserWebErrorV2::Invalid)?,
+            )
         } else {
             None
         };
         let (bytes, repro_update) = self.process_request(
-            envelope.request, envelope.request_id, envelope.sequence, maximum_response_bytes,
+            envelope.request,
+            envelope.request_id,
+            envelope.sequence,
+            maximum_response_bytes,
         )?;
         self.update_repro(repro_update);
         self.next_sequence = next_sequence;
@@ -177,7 +183,9 @@ impl BrowserKernelHostV2 {
     }
 
     pub fn kernel_ref(&self) -> Option<&GameKernelV7> {
-        self.session.as_ref().and_then(|session| session.kernel_ref().ok())
+        self.session
+            .as_ref()
+            .and_then(|session| session.kernel_ref().ok())
     }
 
     fn process_request(
@@ -196,11 +204,16 @@ impl BrowserKernelHostV2 {
                 }
                 let session = self.initialize(*initialization)?;
                 let snapshot = session.snapshot()?;
-                let generation = snapshot.protocol.as_ref()
+                let generation = snapshot
+                    .protocol
+                    .as_ref()
                     .map(|protocol| protocol.frame_context.context.connection_generation.get())
                     .unwrap_or_else(safe_one);
                 let bytes = encode_response(
-                    BrowserResponseV2::Ready, request_id, sequence, maximum_response_bytes,
+                    BrowserResponseV2::Ready,
+                    request_id,
+                    sequence,
+                    maximum_response_bytes,
                 )?;
                 self.session = Some(session);
                 self.generation = generation;
@@ -210,7 +223,8 @@ impl BrowserKernelHostV2 {
                 let response = BrowserResponseV2::Snapshot {
                     snapshot: Box::new(self.session()?.snapshot()?),
                 };
-                let bytes = encode_response(response, request_id, sequence, maximum_response_bytes)?;
+                let bytes =
+                    encode_response(response, request_id, sequence, maximum_response_bytes)?;
                 return Ok((bytes, ReproUpdateV2::Keep));
             }
             BrowserRequestV2::ExportRepro => {
@@ -227,12 +241,16 @@ impl BrowserKernelHostV2 {
                         }],
                     },
                 };
-                let bytes = encode_response(response, request_id, sequence, maximum_response_bytes)?;
+                let bytes =
+                    encode_response(response, request_id, sequence, maximum_response_bytes)?;
                 return Ok((bytes, ReproUpdateV2::Keep));
             }
             BrowserRequestV2::Dispose => {
                 let bytes = encode_response(
-                    BrowserResponseV2::Disposed, request_id, sequence, maximum_response_bytes,
+                    BrowserResponseV2::Disposed,
+                    request_id,
+                    sequence,
+                    maximum_response_bytes,
                 )?;
                 if let Some(session) = &mut self.session {
                     session.dispose();
@@ -247,24 +265,38 @@ impl BrowserKernelHostV2 {
                 }
                 CurrentExternalEvent::RawInput { input: event }
             }
-            BrowserRequestV2::ProposalFrame { bytes } => CurrentExternalEvent::ProposalFrame { bytes },
-            BrowserRequestV2::AuthorityMaterial { bytes } => CurrentExternalEvent::AuthorityMaterial { bytes },
-            BrowserRequestV2::AdvanceTime { milliseconds } => CurrentExternalEvent::AdvanceTime { milliseconds },
-            BrowserRequestV2::NetworkFrame { generation: incoming, bytes } => {
+            BrowserRequestV2::ProposalFrame { bytes } => {
+                CurrentExternalEvent::ProposalFrame { bytes }
+            }
+            BrowserRequestV2::AuthorityMaterial { bytes } => {
+                CurrentExternalEvent::AuthorityMaterial { bytes }
+            }
+            BrowserRequestV2::AdvanceTime { milliseconds } => {
+                CurrentExternalEvent::AdvanceTime { milliseconds }
+            }
+            BrowserRequestV2::NetworkFrame {
+                generation: incoming,
+                bytes,
+            } => {
                 if incoming != generation {
                     return Err(BrowserWebErrorV2::Invalid);
                 }
                 CurrentExternalEvent::NetworkFrame {
-                    generation: er_types::ConnectionGeneration::new(incoming), bytes,
+                    generation: er_types::ConnectionGeneration::new(incoming),
+                    bytes,
                 }
             }
-            BrowserRequestV2::TransportChanged { generation: incoming, connected } => {
+            BrowserRequestV2::TransportChanged {
+                generation: incoming,
+                connected,
+            } => {
                 if incoming < generation {
                     return Err(BrowserWebErrorV2::Invalid);
                 }
                 generation = incoming;
                 CurrentExternalEvent::TransportChanged {
-                    generation: er_types::ConnectionGeneration::new(incoming), connected,
+                    generation: er_types::ConnectionGeneration::new(incoming),
+                    connected,
                 }
             }
             BrowserRequestV2::PresentationSettled { event_id, outcome } => {
@@ -284,12 +316,18 @@ impl BrowserKernelHostV2 {
                     BrowserStorageResultV2::Read { bytes } => KernelStorageResultV2::Read { bytes },
                     BrowserStorageResultV2::Written => KernelStorageResultV2::Written,
                     BrowserStorageResultV2::Deleted => KernelStorageResultV2::Deleted,
-                    BrowserStorageResultV2::Slots { slots } => KernelStorageResultV2::Slots { slots },
-                    BrowserStorageResultV2::Failed { reason } => KernelStorageResultV2::Failed { reason },
+                    BrowserStorageResultV2::Slots { slots } => {
+                        KernelStorageResultV2::Slots { slots }
+                    }
+                    BrowserStorageResultV2::Failed { reason } => {
+                        KernelStorageResultV2::Failed { reason }
+                    }
                     BrowserStorageResultV2::Conflict { current_generation } => {
                         KernelStorageResultV2::Conflict { current_generation }
                     }
-                    BrowserStorageResultV2::Uncertain { reason } => KernelStorageResultV2::Uncertain { reason },
+                    BrowserStorageResultV2::Uncertain { reason } => {
+                        KernelStorageResultV2::Uncertain { reason }
+                    }
                 };
                 CurrentExternalEvent::StorageResult { request_id, result }
             }
@@ -306,14 +344,18 @@ impl BrowserKernelHostV2 {
             }
         };
         let content = Arc::clone(&self.content);
-        let prepared = self.session.as_mut().ok_or(BrowserWebErrorV2::Invalid)?
+        let prepared = self
+            .session
+            .as_mut()
+            .ok_or(BrowserWebErrorV2::Invalid)?
             .apply_with(event, |candidate, step| {
                 let response = Self::effects(content.as_ref(), step, generation, sequence)?;
                 let repro = match append_input {
                     Some(input) => ReproUpdateV2::Append(input),
                     None => ReproUpdateV2::Replace(Box::new(candidate.snapshot()?)),
                 };
-                let bytes = encode_response(response, request_id, sequence, maximum_response_bytes)?;
+                let bytes =
+                    encode_response(response, request_id, sequence, maximum_response_bytes)?;
                 Ok::<_, BrowserWebErrorV2>((bytes, repro))
             })?;
         self.generation = generation;
@@ -448,16 +490,10 @@ impl BrowserKernelHostV2 {
                     }
                 }
                 GameKernelEffectV7::ProposalReady { bytes, .. } => {
-                    effects.push(BrowserEffectV2::SendNetworkFrame {
-                        generation,
-                        bytes,
-                    });
+                    effects.push(BrowserEffectV2::SendNetworkFrame { generation, bytes });
                 }
                 GameKernelEffectV7::AuthorityMaterial { bytes, .. } => {
-                    effects.push(BrowserEffectV2::SendNetworkFrame {
-                        generation,
-                        bytes,
-                    });
+                    effects.push(BrowserEffectV2::SendNetworkFrame { generation, bytes });
                     effects.push(BrowserEffectV2::Telemetry {
                         event: GameTelemetryEventV2::ActionApplied,
                     });
@@ -642,7 +678,9 @@ mod transaction_tests {
         })?)
     }
 
-    fn initialized() -> Result<(BrowserKernelHostV2, Vec<u8>, Vec<u8>), Box<dyn Error>> {
+    type InitializedHost = (BrowserKernelHostV2, Vec<u8>, Vec<u8>);
+
+    fn initialized() -> Result<InitializedHost, Box<dyn Error>> {
         let bundle: GameContentBundleV2 = serde_json::from_slice(include_bytes!(
             "../../../fixtures/m9/engineering/game-content-bundle-v2.json"
         ))?;
@@ -664,33 +702,46 @@ mod transaction_tests {
             },
             dex: DexState::default(),
         };
-        let bytes = request(safe_one(), SafeU53::ZERO, BrowserRequestV2::Initialize {
-            initialization: Box::new(BrowserSessionInitializationV2::NaturalStart {
-                context: BrowserSessionContextV2 {
-                    local_seat: SeatId::new(safe_one()),
-                    role: GameKernelRoleV7::Authority,
-                    scheduler: KernelSchedulerSnapshotV2 {
-                        next_timer_id: None,
-                        timers: Vec::new(),
-                        pauses: Vec::new(),
-                        disposed: false,
+        let bytes = request(
+            safe_one(),
+            SafeU53::ZERO,
+            BrowserRequestV2::Initialize {
+                initialization: Box::new(BrowserSessionInitializationV2::NaturalStart {
+                    context: BrowserSessionContextV2 {
+                        local_seat: SeatId::new(safe_one()),
+                        role: GameKernelRoleV7::Authority,
+                        scheduler: KernelSchedulerSnapshotV2 {
+                            next_timer_id: None,
+                            timers: Vec::new(),
+                            pauses: Vec::new(),
+                            disposed: false,
+                        },
+                        protocol: None,
                     },
-                    protocol: None,
-                },
-                profile,
-                seed: "browser-transaction".to_owned(),
-                save_slots: vec!["preview-slot".to_owned()],
-                local_is_host: true,
-            }),
-        })?;
+                    profile,
+                    seed: "browser-transaction".to_owned(),
+                    save_slots: vec!["preview-slot".to_owned()],
+                    local_is_host: true,
+                }),
+            },
+        )?;
         let response = host.process_bytes(&bytes)?;
         Ok((host, bytes, response))
     }
 
     fn evidence(host: &BrowserKernelHostV2) -> Result<Vec<u8>, Box<dyn Error>> {
-        let retained = host.retained.iter().map(|(id, entry)| {
-            (id, entry.accepted_sequence, &entry.fingerprint, &entry.response)
-        }).collect::<Vec<_>>();
+        let retained = host
+            .retained
+            .iter()
+            .map(|(id, entry)| {
+                (
+                    id,
+                    entry.accepted_sequence,
+                    &entry.fingerprint,
+                    &entry.response,
+                )
+            })
+            .collect::<Vec<_>>();
         Ok(canonical_bytes(&(
             host.session()?.snapshot()?,
             host.next_sequence,
@@ -714,12 +765,19 @@ mod transaction_tests {
     }
 
     #[test]
-    fn late_response_limit_rejection_preserves_state_cache_and_retry() -> Result<(), Box<dyn Error>> {
+    fn late_response_limit_rejection_preserves_state_cache_and_retry() -> Result<(), Box<dyn Error>>
+    {
         let (mut host, initialization, ready) = initialized()?;
         let mut fresh = host.clone();
         let before = evidence(&host)?;
         let event = request(SafeU53::new(2)?, safe_one(), enter())?;
-        assert_eq!(host.session()?.observe()?.control.map(|control| control.kind), Some(GameControlKindV2::Title));
+        assert_eq!(
+            host.session()?
+                .observe()?
+                .control
+                .map(|control| control.kind),
+            Some(GameControlKindV2::Title)
+        );
         assert!(matches!(
             host.process_bytes_with_response_limit(&event, 1),
             Err(BrowserWebErrorV2::Invalid)
@@ -728,17 +786,27 @@ mod transaction_tests {
         assert_eq!(host.process_bytes(&initialization)?, ready);
         assert_eq!(host.process_bytes(&event)?, fresh.process_bytes(&event)?);
         assert_eq!(evidence(&host)?, evidence(&fresh)?);
-        assert_eq!(host.session()?.observe()?.control.map(|control| control.kind), Some(GameControlKindV2::ModeSelect));
+        assert_eq!(
+            host.session()?
+                .observe()?
+                .control
+                .map(|control| control.kind),
+            Some(GameControlKindV2::ModeSelect)
+        );
         Ok(())
     }
 
     #[test]
-    fn sequence_exhaustion_preflight_preserves_current_session_and_cached_response() -> Result<(), Box<dyn Error>> {
+    fn sequence_exhaustion_preflight_preserves_current_session_and_cached_response()
+    -> Result<(), Box<dyn Error>> {
         let (mut host, initialization, ready) = initialized()?;
         host.next_sequence = SafeU53::MAX;
         let before = evidence(&host)?;
         let event = request(SafeU53::new(2)?, SafeU53::MAX, enter())?;
-        assert!(matches!(host.process_bytes(&event), Err(BrowserWebErrorV2::Invalid)));
+        assert!(matches!(
+            host.process_bytes(&event),
+            Err(BrowserWebErrorV2::Invalid)
+        ));
         assert_eq!(evidence(&host)?, before);
         assert_eq!(host.process_bytes(&initialization)?, ready);
         assert_eq!(evidence(&host)?, before);

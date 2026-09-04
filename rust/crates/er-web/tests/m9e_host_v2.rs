@@ -1007,7 +1007,9 @@ fn compare_current_event(
     assert_eq!(batch.external_sequence, safe(*sequence));
     *sequence += 1;
     assert_eq!(
-        host.kernel_ref().ok_or("browser kernel missing")?.snapshot()?,
+        host.kernel_ref()
+            .ok_or("browser kernel missing")?
+            .snapshot()?,
         session.snapshot()?
     );
 
@@ -1025,7 +1027,9 @@ fn compare_current_event(
                     bytes,
                 })
             }
-            GameKernelEffectV7::Presentation(effect) => Some(BrowserEffectV2::Presentation { effect }),
+            GameKernelEffectV7::Presentation(effect) => {
+                Some(BrowserEffectV2::Presentation { effect })
+            }
             GameKernelEffectV7::Terminal(terminal) => Some(BrowserEffectV2::Terminal { terminal }),
             GameKernelEffectV7::Platform(_) => None,
         })
@@ -1057,7 +1061,9 @@ fn press_current_pair(
         let BrowserRequestV2::RawInput { event } = &request else {
             return Err("key helper did not return raw input".into());
         };
-        let event = CurrentExternalEvent::RawInput { input: event.clone() };
+        let event = CurrentExternalEvent::RawInput {
+            input: event.clone(),
+        };
         compare_current_event(host, session, sequence, request, event)?;
     }
     Ok(())
@@ -1094,7 +1100,9 @@ fn current_session_and_browser_match_natural_input_and_external_outcomes()
     )?;
     assert_eq!(session.observe()?.kernel_version, 7);
     assert_eq!(
-        host.kernel_ref().ok_or("browser kernel missing")?.snapshot()?,
+        host.kernel_ref()
+            .ok_or("browser kernel missing")?
+            .snapshot()?,
         session.snapshot()?
     );
     let mut sequence = 1;
@@ -1112,17 +1120,28 @@ fn current_session_and_browser_match_natural_input_and_external_outcomes()
             .observe()?
             .control
             .and_then(|control| control.menu)
-            .is_some_and(|menu| menu.selected_option_id == "bootstrap/starter/confirm")
+            .is_some_and(|menu| {
+                menu.selected_option_id.as_str() == "bootstrap/starter/confirm"
+            })
         {
             break;
         }
-        press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::ArrowDown)?;
+        press_current_pair(
+            &mut host,
+            &mut session,
+            &mut sequence,
+            PhysicalKey::ArrowDown,
+        )?;
     }
-    assert!(session
-        .observe()?
-        .control
-        .and_then(|control| control.menu)
-        .is_some_and(|menu| menu.selected_option_id == "bootstrap/starter/confirm"));
+    assert!(
+        session
+            .observe()?
+            .control
+            .and_then(|control| control.menu)
+            .is_some_and(|menu| {
+                menu.selected_option_id.as_str() == "bootstrap/starter/confirm"
+            })
+    );
     for _ in 0..4 {
         press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::Space)?;
     }
@@ -1148,13 +1167,28 @@ fn current_session_and_browser_match_natural_input_and_external_outcomes()
         &mut host,
         &mut session,
         &mut sequence,
-        BrowserRequestV2::AdvanceTime { milliseconds: safe(25) },
-        CurrentExternalEvent::AdvanceTime { milliseconds: safe(25) },
+        BrowserRequestV2::AdvanceTime {
+            milliseconds: safe(25),
+        },
+        CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(25),
+        },
     )?;
-    press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::ArrowDown)?;
+    press_current_pair(
+        &mut host,
+        &mut session,
+        &mut sequence,
+        PhysicalKey::ArrowDown,
+    )?;
     for (event, input) in [
-        (BrowserLifecycleEventV2::Hidden, RawInputEvent::WindowBlurred),
-        (BrowserLifecycleEventV2::Visible, RawInputEvent::WindowFocused),
+        (
+            BrowserLifecycleEventV2::Hidden,
+            RawInputEvent::WindowBlurred,
+        ),
+        (
+            BrowserLifecycleEventV2::Visible,
+            RawInputEvent::WindowFocused,
+        ),
     ] {
         compare_current_event(
             &mut host,
@@ -1184,21 +1218,36 @@ fn rejected_browser_sequence_preserves_state_and_exact_cached_response()
         version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
         request_id: safe(101),
         sequence: safe(sequence + 1),
-        request: BrowserRequestV2::AdvanceTime { milliseconds: safe(25) },
+        request: BrowserRequestV2::AdvanceTime {
+            milliseconds: safe(25),
+        },
     };
     let mut wrong_sequence = valid.clone();
     wrong_sequence.sequence = safe(sequence + 2);
-    assert!(host
-        .process_bytes(&er_canonical::canonical_bytes(&wrong_sequence)?)
-        .is_err());
-    assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, before);
+    assert!(
+        host.process_bytes(&er_canonical::canonical_bytes(&wrong_sequence)?)
+            .is_err()
+    );
+    assert_eq!(
+        host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+        before
+    );
     assert_eq!(host.process_bytes(&accepted_request)?, accepted_response);
     let valid_bytes = er_canonical::canonical_bytes(&valid)?;
-    assert_eq!(host.process_bytes(&valid_bytes)?, expected.process_bytes(&valid_bytes)?);
+    assert_eq!(
+        host.process_bytes(&valid_bytes)?,
+        expected.process_bytes(&valid_bytes)?
+    );
     let after = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     assert!(after.replay_sequence > before.replay_sequence);
-    assert_eq!(after, expected.kernel_ref().ok_or("kernel missing")?.snapshot()?);
+    assert_eq!(
+        after,
+        expected.kernel_ref().ok_or("kernel missing")?.snapshot()?
+    );
     assert_eq!(host.process_bytes(&accepted_request)?, accepted_response);
-    assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, after);
+    assert_eq!(
+        host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+        after
+    );
     Ok(())
 }
