@@ -72,7 +72,14 @@ fn create_request() -> Result<Value, Box<dyn Error>> {
 
 fn run_cli(requests: &[Value]) -> Result<Vec<Value>, Box<dyn Error>> {
     let mut child = Command::new(env!("CARGO_BIN_EXE_er-cli"))
-        .args(["agent", "--protocol", "jsonl", "--warm", "true", "--content"])
+        .args([
+            "agent",
+            "--protocol",
+            "jsonl",
+            "--warm",
+            "true",
+            "--content",
+        ])
         .arg(content_path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -111,7 +118,9 @@ fn run_cli(requests: &[Value]) -> Result<Vec<Value>, Box<dyn Error>> {
 
 fn result(response: &Value) -> Result<&Value, Box<dyn Error>> {
     assert!(response["error"].is_null(), "agent error: {response}");
-    response.get("result").ok_or_else(|| "missing result".into())
+    response
+        .get("result")
+        .ok_or_else(|| "missing result".into())
 }
 
 fn snapshot(response: &Value) -> Result<CoreGameKernelSnapshotV7, Box<dyn Error>> {
@@ -146,7 +155,10 @@ fn public_agent_natural_start_owns_v7_content_and_raw_controls() -> Result<(), B
     ])?;
     let hello = result(&responses[0])?;
     assert_eq!(hello["kernel_version"], 7);
-    assert_eq!(hello["content_identity"], serde_json::to_value(content.identity())?);
+    assert_eq!(
+        hello["content_identity"],
+        serde_json::to_value(content.identity())?
+    );
     result(&responses[1])?;
     result(&responses[3])?;
     result(&responses[4])?;
@@ -213,7 +225,10 @@ fn public_agent_rejects_old_snapshot_schema_without_replacing_current_session()
     result(&responses[0])?;
     result(&responses[2])?;
     assert!(responses[3]["result"].is_null());
-    assert!(!responses[3]["error"].is_null(), "old schema was silently accepted");
+    assert!(
+        !responses[3]["error"].is_null(),
+        "old schema was silently accepted"
+    );
     assert_eq!(snapshot(&responses[1])?, snapshot(&responses[4])?);
     Ok(())
 }
