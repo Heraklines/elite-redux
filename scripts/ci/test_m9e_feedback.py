@@ -5,6 +5,7 @@ mocked; fixture repositories and reports live in disposable temporary folders.
 """
 
 import contextlib
+import copy
 import hashlib
 import importlib.util
 import io
@@ -338,6 +339,153 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["build_only_targets"], ["er-native:b_suite"])
         self.assertEqual(summary["tests"]["selected"], 1)
         self.assertEqual(summary["tests"]["passed"], 1)
+
+    def configure_browser_scope(self):
+        # Read the committed target policy, while keeping Git and manifests synthetic.
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for key in ("current_session_packages", "current_session_wasm_test", "current_session_focus", "browser_session_focus", "boundary_prefixes"):
+            self.config[key] = policy[key]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-env")
+        self.package("er-cli", '[dependencies]\ner-env = { path = "../er-env" }\n')
+        self.package("er-web", '[dependencies]\ner-env = { path = "../er-env" }\n')
+
+    def test_cumulative_current_and_browser_paths_require_all_platform_witnesses(self):
+        self.configure_browser_scope()
+        current_paths = self.config["current_session_focus"]["paths"]
+        browser_paths = self.config["browser_session_focus"]["paths"]
+        for changed in (browser_paths, current_paths + browser_paths, ["rust/crates/er-env/src/current.rs"]):
+            with self.subTest(changed=changed):
+                self.changed = list(changed)
+                selection = self.feedback.plan()
+                self.assertEqual(selection["base_sha"], BASE)
+                self.assertTrue(selection["requires_browser"])
+                self.assertTrue(selection["requires_wasm"])
+                self.assertEqual(selection["wasm_test"], "m9e_parity")
+                self.assertEqual(selection["boundary_paths"], [])
+                for package in ("er-env", "er-cli", "er-web"):
+                    self.assertIn(package, selection["packages"])
+                    self.assertEqual(selection["execution_scope"][package], ["*"])
+                self.assertEqual(selection["execution_scope"]["er-wasm"], ["m9e_parity"])
+
+    def test_environment_plus_ordinary_cli_change_keeps_browser_on_broad_scope(self):
+        self.configure_browser_scope()
+        self.changed = ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/main.rs"]
+        selection = self.feedback.plan()
+        self.assertIsNone(selection["execution_scope"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertIn("er-web", selection["packages"])
+
+    def test_browser_scope_rejects_unmapped_browser_shared_and_unknown_changes(self):
+        self.configure_browser_scope()
+        allowed = ["rust/crates/er-env/src/current.rs", "rust/crates/er-web/src/host_v2.rs"]
+        for extra in (
+            "rust/crates/er-web/src/other_host.rs",
+            "rust/crates/er-web/Cargo.toml",
+            "rust/crates/er-web/build.rs",
+            "rust/crates/er-kernel/src/game_kernel_v7.rs",
+            "rust/crates/er-native/src/lib.rs",
+            "rust/fixtures/generated.json",
+            "src/rust-browser/worker/rust-kernel-worker.ts",
+            "test/browser/rust-browser/new.spec.ts",
+            "unmapped-input.json",
+        ):
+            with self.subTest(extra=extra):
+                self.changed = allowed + [extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+
+    @staticmethod
+    def browser_reports():
+        titles = (
+            "natural V7 browser startup reaches the real battle command",
+            "two V7 browser hosts wait for both humans and converge one turn",
+        )
+        specs = [{"title": title, "tests": [{
+            "projectName": "chromium", "expectedStatus": "passed", "status": "expected",
+            "results": [{"status": "passed", "retry": 0}],
+        }]} for title in titles]
+        playwright = {"suites": [{"suites": [{"specs": specs}]}], "errors": [],
+                      "stats": {"expected": 2, "unexpected": 0, "flaky": 0, "skipped": 0}}
+        vitest = {"success": True, "numTotalTests": 1, "numPassedTests": 1,
+                  "numFailedTests": 0, "numPendingTests": 0, "numTodoTests": 0,
+                  "testResults": [{"assertionResults": [{"status": "passed", "fullName":
+                      "BrowserEffectRouterV2 routes every typed effect once and fences stale or disposed batches"}]}]}
+        return playwright, vitest
+
+    def test_browser_report_accepts_exact_two_chromium_and_one_effect_test(self):
+        playwright, vitest = self.browser_reports()
+        counts = self.feedback.browser_result_counts(playwright, vitest)
+        self.assertEqual(counts["chromium"]["passed"], 2)
+        self.assertEqual(counts["typed_effects"]["passed"], 1)
+        self.assertEqual(len(counts["chromium"]["selected_test_ids"]), 2)
+        self.assertIn("not production Worker/WebRTC", counts["scope"])
+
+    def test_browser_report_rejects_zero_missing_duplicate_or_unknown_chromium(self):
+        for defect in ("zero", "missing", "duplicate", "wrong_title", "missing_execution", "duplicate_execution", "global_error"):
+            with self.subTest(defect=defect):
+                playwright, vitest = self.browser_reports()
+                specs = playwright["suites"][0]["suites"][0]["specs"]
+                if defect == "zero":
+                    playwright["suites"] = []
+                elif defect == "missing":
+                    specs.pop()
+                elif defect == "duplicate":
+                    specs[1] = copy.deepcopy(specs[0])
+                elif defect == "wrong_title":
+                    specs[0]["title"] = "another browser test"
+                elif defect == "missing_execution":
+                    specs[0]["tests"] = []
+                elif defect == "duplicate_execution":
+                    specs[0]["tests"].append(copy.deepcopy(specs[0]["tests"][0]))
+                else:
+                    playwright["errors"] = [{"message": "fixture server teardown failed"}]
+                with self.assertRaises(RuntimeError):
+                    self.feedback.browser_result_counts(playwright, vitest)
+
+    def test_browser_report_rejects_failed_skipped_flaky_and_retried_results(self):
+        for defect in ("failed", "skipped", "flaky", "retry_history", "nonzero_retry", "wrong_project", "expected_failure"):
+            with self.subTest(defect=defect):
+                playwright, vitest = self.browser_reports()
+                test = playwright["suites"][0]["suites"][0]["specs"][0]["tests"][0]
+                if defect in ("failed", "skipped"):
+                    test["results"][0]["status"] = defect
+                elif defect == "flaky":
+                    test["status"] = "flaky"
+                elif defect == "retry_history":
+                    test["results"] = [{"status": "failed", "retry": 0}, {"status": "passed", "retry": 1}]
+                elif defect == "nonzero_retry":
+                    test["results"][0]["retry"] = 1
+                elif defect == "wrong_project":
+                    test["projectName"] = "firefox"
+                else:
+                    test["expectedStatus"] = "failed"
+                with self.assertRaises(RuntimeError):
+                    self.feedback.browser_result_counts(playwright, vitest)
+
+    def test_browser_report_rejects_missing_wrong_or_nonpassing_effect_identity(self):
+        for defect in ("zero", "missing", "duplicate", "wrong_identity", "failed", "pending", "failed_run", "wrong_total"):
+            with self.subTest(defect=defect):
+                playwright, vitest = self.browser_reports()
+                assertions = vitest["testResults"][0]["assertionResults"]
+                if defect == "zero":
+                    vitest["numTotalTests"] = 0
+                    vitest["numPassedTests"] = 0
+                elif defect == "missing":
+                    vitest["testResults"] = []
+                elif defect == "duplicate":
+                    assertions.append(copy.deepcopy(assertions[0]))
+                elif defect == "wrong_identity":
+                    assertions[0]["fullName"] = "another passing effect test"
+                elif defect in ("failed", "pending"):
+                    assertions[0]["status"] = defect
+                elif defect == "failed_run":
+                    vitest["success"] = False
+                else:
+                    vitest["numTotalTests"] = 2
+                with self.assertRaises(RuntimeError):
+                    self.feedback.browser_result_counts(playwright, vitest)
 
     def test_historical_disposition_is_bound_to_one_crate_target_and_test(self):
         self.changed = ["rust/crates/er-native/src/lib.rs"]

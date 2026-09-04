@@ -1,8 +1,9 @@
 # A1b: browser adapter delegates to the current session
 
-Status: READY_IMPLEMENTATION after A1 native compilation succeeds. Source
-review only: no implementation, compilation, tests, formatting, or commits
-were performed by this lane.
+Status: IMPLEMENTED_PENDING_REMOTE in the recovery working tree. The design below
+records the reviewed boundary. `CurrentGameSession::apply_with` is committed;
+BrowserKernelHostV2 delegation and four focused browser regressions are implemented.
+All compilation, formatting, tests and browser execution remain remote-only.
 
 Reviewed local base: `a887f7831179c7a6548a6dfc34fa7ef554307f17`, including
 `er-env/src/current.rs`, `er-web/src/host_v2.rs`, and `contracts_v2.rs`.

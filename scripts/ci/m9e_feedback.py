@@ -129,6 +129,15 @@ def plan():
     rust_changes = [path for path in changed if path.startswith("rust/")]
     focus = config.get("current_session_focus", {})
     execution_scope = focus.get("execute") if rust_changes and all(path in focus.get("paths", []) for path in rust_changes) else None
+    browser_focus = config.get("browser_session_focus", {})
+    browser_paths = browser_focus.get("paths", [])
+    browser_required = bool(browser_focus) and (current_session or any(
+        path in browser_paths or path in browser_focus.get("session_paths", []) for path in rust_changes))
+    browser_session = browser_required and all(
+        path in browser_paths or path in focus.get("paths", []) for path in rust_changes)
+    if browser_session:
+        execution_scope = browser_focus["execute"]
+        boundaries = [path for path in boundaries if path not in browser_paths]
     if execution_scope is not None:
         selected.update(execution_scope)
         current_session = True
@@ -138,6 +147,7 @@ def plan():
               "requires_wasm": shared or bool(boundaries) or current_session,
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
+              "requires_browser": browser_required,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     if unknown or boundaries or shared:
@@ -169,6 +179,67 @@ def wasm_checks(selection, summary):
                              "selected_test_ids": [witness], "scope": "existing V7 eventwise parity"}
     if passed != 1 or failed or skipped or witness not in text:
         raise RuntimeError("Wasm eventwise witness missing or counts disagree")
+
+
+def browser_result_counts(playwright, vitest):
+    expected = {
+        "natural V7 browser startup reaches the real battle command",
+        "two V7 browser hosts wait for both humans and converge one turn",
+    }
+    specs = []
+    def collect(suite):
+        specs.extend(suite.get("specs", []))
+        for child in suite.get("suites", []):
+            collect(child)
+    for suite in playwright.get("suites", []):
+        collect(suite)
+    if len(specs) != 2 or {spec.get("title") for spec in specs} != expected or playwright.get("errors"):
+        raise RuntimeError("Chromium witness identities/counts disagree")
+    for spec in specs:
+        tests = spec.get("tests", [])
+        if len(tests) != 1:
+            raise RuntimeError("Chromium witness must execute exactly once")
+        test = tests[0]
+        results = test.get("results", [])
+        if test.get("projectName") != "chromium" or test.get("expectedStatus") != "passed" or test.get("status") != "expected" or len(results) != 1 or results[0].get("status") != "passed" or results[0].get("retry") != 0:
+            raise RuntimeError("Chromium witness failed, skipped, retried or flaky")
+    assertions = [assertion for suite in vitest.get("testResults", []) for assertion in suite.get("assertionResults", [])]
+    if vitest.get("success") is not True or vitest.get("numTotalTests") != 1 or vitest.get("numPassedTests") != 1 or len(assertions) != 1 or assertions[0].get("status") != "passed" or assertions[0].get("fullName") != "BrowserEffectRouterV2 routes every typed effect once and fences stale or disposed batches":
+        raise RuntimeError("typed browser effect witness identities/counts disagree")
+    return {"chromium": {"expected": 2, "passed": 2, "failed": 0, "skipped": 0, "selected_test_ids": sorted(expected)},
+            "typed_effects": {"expected": 1, "passed": 1, "failed": 0, "skipped": 0},
+            "scope": "V7 Wasm host in Chromium plus typed effect router; not production Worker/WebRTC topology"}
+
+
+def browser_checks(summary):
+    run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
+    run(["pnpm", "install", "--frozen-lockfile"], "browser-dependencies", ROOT)
+    output = Path(os.environ["RUNNER_TEMP"]) / "m9e-v7-web"
+    env = os.environ.copy()
+    # The published builder intentionally resolves its output under rust/target.
+    env.pop("CARGO_TARGET_DIR", None)
+    env["RUSTUP_TOOLCHAIN"] = tomllib.loads((RUST / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
+    run(["node", "scripts/build-kernel-m9e-v7-web.mjs", "--out-dir", str(output)], "browser-build", ROOT, env)
+    manifest_path = output / "m9e-v7-web-assets.json"
+    manifest = json.loads(manifest_path.read_text())
+    expected_assets = {"er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json", "coop-authority-snapshot.json", "coop-replica-snapshot.json"}
+    if manifest.get("source_sha") != summary["product_sha"] or set(manifest.get("assets", {})) != expected_assets or manifest.get("browser_worker_protocol_version") != 2:
+        raise RuntimeError("browser asset manifest candidate or inventory mismatch")
+    for name, metadata in manifest["assets"].items():
+        path = output / name
+        if path.stat().st_size != metadata["bytes"] or digest(path) != metadata["sha256"]:
+            raise RuntimeError("browser asset hash mismatch: " + name)
+    shutil.copyfile(manifest_path, FULL / manifest_path.name)
+    summary["browser_assets"] = {"manifest_sha256": digest(manifest_path), "assets": manifest["assets"]}
+    run(["pnpm", "exec", "playwright", "install", "--with-deps", "chromium"], "browser-chromium-install", ROOT)
+    env["M9E_V7_WEB_DIR"] = str(output)
+    env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-results.json")
+    run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
+         "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "--workers=1", "--reporter=line,json"], "browser-journey", ROOT, env)
+    run(["pnpm", "exec", "vitest", "run", "--config", "test/node/vitest.config.ts",
+         "test/node/rust-browser/engineering/browser-effects-v2.test.ts", "--reporter=json", "--outputFile=" + str(FULL / "browser-effect-results.json")], "browser-effects", ROOT)
+    summary["browser_tests"] = browser_result_counts(json.loads((FULL / "browser-results.json").read_text()),
+                                                     json.loads((FULL / "browser-effect-results.json").read_text()))
 
 
 def main(preflight_failure=None):
@@ -280,6 +351,8 @@ def main(preflight_failure=None):
             raise RuntimeError("zero tests executed")
         if selection["requires_wasm"]:
             wasm_checks(selection, summary)
+        if selection["requires_browser"]:
+            browser_checks(summary)
         if format_failure:
             raise RuntimeError(format_failure)
         summary["status"] = "passed"

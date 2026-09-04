@@ -1,8 +1,12 @@
 use std::error::Error;
 
+use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelV7, GameProposalEnvelopeV2};
+use er_kernel::game_kernel_v7::{
+    GameKernelEffectV7, GameKernelRoleV7, GameKernelV7, GameProposalEnvelopeV2,
+    KernelPresentationOutcomeV2,
+};
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
@@ -985,5 +989,216 @@ fn exported_repro_replays_recorded_raw_inputs() -> Result<(), Box<dyn Error>> {
         replay.kernel_ref().ok_or("kernel missing")?.snapshot()?,
         expected
     );
+    Ok(())
+}
+
+fn compare_current_event(
+    host: &mut BrowserKernelHostV2,
+    session: &mut CurrentGameSession,
+    sequence: &mut u64,
+    request: BrowserRequestV2,
+    event: CurrentExternalEvent,
+) -> Result<(), Box<dyn Error>> {
+    let step = session.apply(event)?;
+    let response = send(host, *sequence, request)?;
+    let BrowserResponseV2::Effects { batch } = response else {
+        return Err("current browser event did not return an effect batch".into());
+    };
+    assert_eq!(batch.external_sequence, safe(*sequence));
+    *sequence += 1;
+    assert_eq!(
+        host.kernel_ref().ok_or("browser kernel missing")?.snapshot()?,
+        session.snapshot()?
+    );
+
+    // Compare game-owned presentation, controls, and transport in order;
+    // assets/audio/telemetry remain browser-specific projections.
+    let expected: Vec<_> = step
+        .effects
+        .into_iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::UiChanged(control) => Some(BrowserEffectV2::UiChanged { control }),
+            GameKernelEffectV7::ProposalReady { bytes, .. }
+            | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => {
+                Some(BrowserEffectV2::SendNetworkFrame {
+                    generation: safe(1),
+                    bytes,
+                })
+            }
+            GameKernelEffectV7::Presentation(effect) => Some(BrowserEffectV2::Presentation { effect }),
+            GameKernelEffectV7::Terminal(terminal) => Some(BrowserEffectV2::Terminal { terminal }),
+            GameKernelEffectV7::Platform(_) => None,
+        })
+        .collect();
+    let actual: Vec<_> = batch
+        .effects
+        .into_iter()
+        .filter(|effect| {
+            matches!(
+                effect,
+                BrowserEffectV2::UiChanged { .. }
+                    | BrowserEffectV2::SendNetworkFrame { .. }
+                    | BrowserEffectV2::Presentation { .. }
+                    | BrowserEffectV2::Terminal { .. }
+            )
+        })
+        .collect();
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
+fn press_current_pair(
+    host: &mut BrowserKernelHostV2,
+    session: &mut CurrentGameSession,
+    sequence: &mut u64,
+    code: PhysicalKey,
+) -> Result<(), Box<dyn Error>> {
+    for request in [key(code.clone()), key_up(code)] {
+        let BrowserRequestV2::RawInput { event } = &request else {
+            return Err("key helper did not return raw input".into());
+        };
+        let event = CurrentExternalEvent::RawInput { input: event.clone() };
+        compare_current_event(host, session, sequence, request, event)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn current_session_and_browser_match_natural_input_and_external_outcomes()
+-> Result<(), Box<dyn Error>> {
+    let prepared = std::sync::Arc::new(content()?);
+    let initial_context = context();
+    let mut session = CurrentGameSession::natural_start_with_scheduler(
+        profile()?,
+        "browser-session-parity".to_owned(),
+        initial_context.local_seat,
+        vec!["preview-slot".to_owned()],
+        true,
+        prepared.clone(),
+        initial_context.scheduler.clone(),
+        initial_context.protocol.clone(),
+    )?;
+    let mut host = BrowserKernelHostV2::from_content(prepared);
+    send(
+        &mut host,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::NaturalStart {
+                context: initial_context,
+                profile: profile()?,
+                seed: "browser-session-parity".to_owned(),
+                save_slots: vec!["preview-slot".to_owned()],
+                local_is_host: true,
+            }),
+        },
+    )?;
+    assert_eq!(session.observe()?.kernel_version, 7);
+    assert_eq!(
+        host.kernel_ref().ok_or("browser kernel missing")?.snapshot()?,
+        session.snapshot()?
+    );
+    let mut sequence = 1;
+    for _ in 0..3 {
+        press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::Space)?;
+    }
+    let bound = session
+        .observe()?
+        .control
+        .and_then(|control| control.menu)
+        .map(|menu| menu.options.len())
+        .ok_or("starter menu missing")?;
+    for _ in 0..bound {
+        if session
+            .observe()?
+            .control
+            .and_then(|control| control.menu)
+            .is_some_and(|menu| menu.selected_option_id == "bootstrap/starter/confirm")
+        {
+            break;
+        }
+        press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::ArrowDown)?;
+    }
+    assert!(session
+        .observe()?
+        .control
+        .and_then(|control| control.menu)
+        .is_some_and(|menu| menu.selected_option_id == "bootstrap/starter/confirm"));
+    for _ in 0..4 {
+        press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::Space)?;
+    }
+    assert!(session.observe()?.mechanical_digest.is_some());
+    let pending = session.snapshot()?.pending_presentations;
+    assert!(!pending.is_empty());
+    for presentation in pending {
+        compare_current_event(
+            &mut host,
+            &mut session,
+            &mut sequence,
+            BrowserRequestV2::PresentationSettled {
+                event_id: presentation.event_id,
+                outcome: BrowserPresentationOutcomeV2::Settled,
+            },
+            CurrentExternalEvent::PresentationOutcome {
+                event_id: presentation.event_id,
+                outcome: KernelPresentationOutcomeV2::Settled,
+            },
+        )?;
+    }
+    compare_current_event(
+        &mut host,
+        &mut session,
+        &mut sequence,
+        BrowserRequestV2::AdvanceTime { milliseconds: safe(25) },
+        CurrentExternalEvent::AdvanceTime { milliseconds: safe(25) },
+    )?;
+    press_current_pair(&mut host, &mut session, &mut sequence, PhysicalKey::ArrowDown)?;
+    for (event, input) in [
+        (BrowserLifecycleEventV2::Hidden, RawInputEvent::WindowBlurred),
+        (BrowserLifecycleEventV2::Visible, RawInputEvent::WindowFocused),
+    ] {
+        compare_current_event(
+            &mut host,
+            &mut session,
+            &mut sequence,
+            BrowserRequestV2::Lifecycle { event },
+            CurrentExternalEvent::RawInput { input },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn rejected_browser_sequence_preserves_state_and_exact_cached_response()
+-> Result<(), Box<dyn Error>> {
+    let (mut host, sequence) = natural_host()?;
+    let accepted_request = er_canonical::canonical_bytes(&BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
+        request_id: safe(100),
+        sequence: safe(sequence),
+        request: key(PhysicalKey::Space),
+    })?;
+    let accepted_response = host.process_bytes(&accepted_request)?;
+    let before = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let mut expected = host.clone();
+    let valid = BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
+        request_id: safe(101),
+        sequence: safe(sequence + 1),
+        request: BrowserRequestV2::AdvanceTime { milliseconds: safe(25) },
+    };
+    let mut wrong_sequence = valid.clone();
+    wrong_sequence.sequence = safe(sequence + 2);
+    assert!(host
+        .process_bytes(&er_canonical::canonical_bytes(&wrong_sequence)?)
+        .is_err());
+    assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, before);
+    assert_eq!(host.process_bytes(&accepted_request)?, accepted_response);
+    let valid_bytes = er_canonical::canonical_bytes(&valid)?;
+    assert_eq!(host.process_bytes(&valid_bytes)?, expected.process_bytes(&valid_bytes)?);
+    let after = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    assert!(after.replay_sequence > before.replay_sequence);
+    assert_eq!(after, expected.kernel_ref().ok_or("kernel missing")?.snapshot()?);
+    assert_eq!(host.process_bytes(&accepted_request)?, accepted_response);
+    assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, after);
     Ok(())
 }

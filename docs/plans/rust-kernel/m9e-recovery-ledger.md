@@ -56,6 +56,8 @@ remain subsequent measured work.
 | `ef2881daa1b143107937e1e1c5e7a63a0508e2d2` | `33921362838` | superseded | Replaced by compile-plus-format feedback on same recovery branch. |
 | `03ec01438ba4871c27e82b95ee244e16d6d1137d` | `33921419907` | historical audit + format failure | A1 and full native cone compiled; 447 enumerated, 82 executed, 81 passed, one historical M3 audit failed. Remaining tests did not run. Remote 26,292-byte formatting patch returned and applied. |
 | `e79aa6a51c7ccc9b6364a33399cc2874e1e034fb` | `33921848212` | PASS | Format, 16 harness regressions, 446 native selected/executed/passed, zero failed/skipped, one explicitly excluded historical audit; current facade Wasm compile check and one V7 Wasm parity witness passed. All four actual current CLI witnesses passed. |
+| `f3e711336fe249cde763f19d48313be1fbb72cde` | `33924006886` | format-only failure | 21 harness regressions, 10 selected native tests and one V7 Wasm parity test passed, including session completion rollback. Full native reverse cone compiled. Remote format patch applied in `e4064db`. Compact artifact 4,747 compressed bytes. |
+| `e4064dba1c8001724eefb715ab01b62a1eab610a` | `33924401642` | PASS | Format, 21 harness regressions, 10 selected/executed/passed native tests and one V7 Wasm parity test; full native cone compiled, facade Wasm check passed. Compact artifact 2,940 compressed bytes. |
 
 F0 report: `m9e-summary-74bcaea727110a3f235a6ff07a282f35de83c387`, 1,250 compressed bytes.
 Rust 1.97.1, Linux x86_64, test/default features. Format 3,339 ms; build 5,683 ms;
@@ -120,4 +122,35 @@ adapter response before committing. A fifth test exercises completion rejection 
 successful retry directly through the session; it is not a fifth CLI subprocess test.
 Exact scheduler construction, active-state construction and existing proposal/material
 ingress prepare browser delegation. This API change does not itself migrate the browser.
-Remote validation for this follow-up is pending.
+Formatting correction candidate `e4064dba1c8001724eefb715ab01b62a1eab610a`
+passed remote verification in run `33924401642`.
+
+## Browser delegation entering focused verification
+
+`BrowserKernelHostV2` now owns `CurrentGameSession` and delegates all existing
+initialization forms and typed events. Mutable requests stage only the session;
+projected effects, response encoding/size check and repro delta finish before
+commit. Retained response history is outside that transaction. Read-only requests
+encode from the live session. Sequence advancement and cache eviction are prepared
+before reduction. No browser protocol or content schema changed.
+
+Two private host tests cover late response-size rejection and sequence exhaustion,
+including unchanged full snapshot, replay bookkeeping and cached response bytes.
+Two integration tests cover direct session/browser event parity and rejected-request
+retry behavior. These new tests are pending remote execution.
+
+Browser changes and future shared-session edits select all er-web, er-env and er-cli
+tests, native/Wasm V7 parity, er-web clippy, the existing two Chromium host journeys,
+and the existing typed effect-router test. Remote browser asset hashes bind to the
+candidate; full generated assets and browser traces stay remote. Browser release
+Wasm, native debug outputs, test Wasm, tool binaries, dependency downloads and
+Chromium downloads have separate cache identities. Native cache v1 is a migration
+fallback containing only the pre-browser native build.
+
+The Chromium spec executes the real generated V7 Wasm host with DOM keyboard input
+and direct same-page host byte relay. It does not exercise production Worker/WebRTC
+topology. Browser repro remains the existing raw-only capsule with base replacement
+after non-key events. Complete causal replay, native reload worker, batch/replay
+consumers, causal timer/effect/retention repairs and fault-injected qualification
+remain outstanding. This is still a partial current-entry recovery, not checkpoint 1
+completion or final M9 qualification.
