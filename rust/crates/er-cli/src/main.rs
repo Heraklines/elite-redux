@@ -1,5 +1,6 @@
 //! Terminal adapter for the M7 headless environment.
 
+mod current_agent;
 mod m72;
 mod m72_lab;
 
@@ -36,7 +37,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "validate-save" => validate_save(&options),
         "simulate" => simulate(&options),
         "inspect-content" => inspect_content(&options),
-        "agent" => agent_jsonl(&options),
+        "agent" => current_agent::run(&options),
+        "agent-v6" => agent_jsonl(&options),
         "capsule-validate" => validate_capsule(&options),
         _ => Err(format!("unknown er-cli command {command}").into()),
     }

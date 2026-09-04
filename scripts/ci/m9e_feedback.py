@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -32,11 +33,11 @@ def capture(args, cwd=ROOT):
     return subprocess.check_output(args, cwd=cwd, text=True).strip()
 
 
-def run(args, name, cwd=RUST):
+def run(args, name, cwd=RUST, env=None):
     start = time.monotonic()
     path = FULL / (name + ".log")
     with path.open("w") as output:
-        result = subprocess.run(args, cwd=cwd, stdout=output, stderr=subprocess.STDOUT)
+        result = subprocess.run(args, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT)
     TIMINGS[name] = round((time.monotonic() - start) * 1000)
     if result.returncode:
         raise RuntimeError(f"{name} exited {result.returncode}; see {path.name}")
@@ -113,17 +114,48 @@ def plan():
                 break
             selected = widened
     shared = bool(selected & set(config["shared_packages"]))
+    current_session = bool(selected & set(config.get("current_session_packages", [])))
     if shared:
         selected.update(config["shared_witness_packages"])
     if not selected:
         selected.update(config["readiness_packages"])
+    if current_session:
+        selected.add("er-wasm")
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
-              "requires_wasm": shared or bool(boundaries), "features": "default"}
+              "requires_wasm": shared or bool(boundaries) or current_session,
+              "wasm_test": config.get("current_session_wasm_test") if current_session else None,
+              "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     if unknown or boundaries or shared:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
+
+
+def wasm_checks(selection, summary):
+    # Existing V7 eventwise witness; this does not claim shipping browser topology
+    # or that the current native facade is already the browser host's entry.
+    env = os.environ.copy()
+    env["CARGO_TARGET_DIR"] = str(Path(os.environ["RUNNER_TEMP"]) / "m9e-wasm-target")
+    env["CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER"] = "wasm-bindgen-test-runner"
+    version = capture(["wasm-bindgen", "--version"], RUST) if shutil.which("wasm-bindgen") else ""
+    if version != "wasm-bindgen 0.2.127":
+        run(["cargo", "install", "wasm-bindgen-cli", "--version", "0.2.127", "--locked", "--force"], "wasm-tools")
+    run(["cargo", "check", "--locked", "-p", "er-env", "--target", "wasm32-unknown-unknown"], "current-session-wasm-check", env=env)
+    output = run(["cargo", "test", "--locked", "-p", "er-wasm", "--test", selection["wasm_test"],
+                  "--target", "wasm32-unknown-unknown"], "wasm-eventwise", env=env)
+    text = output.read_text()
+    counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", text)
+    if not counts:
+        raise RuntimeError("missing Wasm eventwise result counts")
+    passed, failed, skipped = map(int, counts.groups())
+    # This pinned test target contains one real wasm_bindgen_test; require its
+    # executed name as well as counts so a zero-test cargo invocation cannot pass.
+    witness = "wasm_replays_v7_raw_inputs_eventwise"
+    summary["wasm_tests"] = {"expected": 1, "passed": passed, "failed": failed, "skipped": skipped,
+                             "selected_test_ids": [witness], "scope": "existing V7 eventwise parity"}
+    if passed != 1 or failed or skipped or witness not in text:
+        raise RuntimeError("Wasm eventwise witness missing or counts disagree")
 
 
 def main(preflight_failure=None):
@@ -191,6 +223,8 @@ def main(preflight_failure=None):
                 raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
+        if selection["requires_wasm"]:
+            wasm_checks(selection, summary)
         summary["status"] = "passed"
     except Exception as error:
         summary["first_failure"] = str(error)[:4096]
@@ -204,7 +238,24 @@ def main(preflight_failure=None):
             excerpt = summary.get("first_failure", "unknown failure") + "\n"
             for path in sorted(FULL.glob("*.log")):
                 text = path.read_text(errors="replace")
-                if "error" in text.lower() or "FAILED" in text:
+                # Cargo artifact records contain dependency names like thiserror;
+                # those are not compiler failures and must not crowd out diagnostics.
+                diagnostics = []
+                for line in text.splitlines():
+                    if line.startswith("{"):
+                        try:
+                            message = json.loads(line)
+                        except json.JSONDecodeError:
+                            diagnostics.append(line)
+                            continue
+                        if message.get("reason") == "compiler-message":
+                            detail = message.get("message", {})
+                            if detail.get("level") == "error":
+                                diagnostics.append(detail.get("rendered") or detail.get("message", ""))
+                    else:
+                        diagnostics.append(line)
+                text = "\n".join(diagnostics)
+                if re.search(r"(?im)^error[:\[]|FAILED|^Traceback", text) or (path.name == "format.log" and text):
                     if len(text) > 12000:
                         summary["diagnostics_truncated"] = True
                     marker = "[TRUNCATED: full log retained remotely]\n" if len(text) > 12000 else ""

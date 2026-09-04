@@ -62,7 +62,7 @@ Remote command, from `rust/`:
 cargo test --locked -p er-cli --test m9e_current_entry
 ```
 
-Expected test count: **2**. The runner needs the existing committed fixture
+Initial A0 test count: **2**. The runner needs the existing committed fixture
 `rust/fixtures/m9/engineering/game-content-bundle-v2.json`; do not download
 or generate it locally. The test launches the actual `CARGO_BIN_EXE_er-cli`
 with finite JSONL input and closes stdin.
@@ -108,3 +108,59 @@ Status: **READY_IMPLEMENTATION**. No handoff commit or report artifact yet;
 the integrator owns committing, remote execution, and recording the exact
 candidate/run evidence. Passing these two tests will close only the bounded
 current CLI identity/bootstrap seam, not Gate A or M9 engineering.
+
+## A1 implementation checkpoint (remote verification pending)
+
+`er-env/src/current.rs` adds `CurrentGameSession` beside the retained historical
+facade. It owns the existing V7 kernel, shared prepared V2 content, local seat
+and role. Natural initialization starts the real V7 bootstrap with a live empty
+scheduler (`next_timer_id: Some(0)`). Restore validates V7 snapshots explicitly.
+The facade exposes read-only structured observation, snapshot, validation,
+typed external events, fork and disposal. An active-state mechanical digest
+is absent during bootstrap rather than labeling a control-only digest as game
+state. Observation does not clone the complete session or snapshot.
+
+`er-cli/src/current_agent.rs` serves the normal `agent` command using that
+facade. The old route is explicitly `agent-v6`. Current `new-run`, `resume`,
+`simulate`, `replay`, worker, browser delegation, and the remaining developer
+tools still require their own consumer cutovers; this checkpoint does not
+silently relabel them as current.
+
+Callable methods added to the current adapter use the existing protocol
+allowlist: `session.create`, `session.from_snapshot`, `session.observe`,
+`session.snapshot`, `session.checkpoint`, `session.raw_input`,
+`session.advance_time`, `session.network_frame`, `session.transport_changed`,
+`session.storage_result`, `session.presentation_settled`, `platform.event`,
+`session.restore`, `session.fork`, `session.close`, and `session.invariants`.
+The latter invokes kernel validation. `session.state_delta` is unsupported;
+full observations are not mislabeled as deltas. Read structured menus through
+`session.observe.control`. Fork names its destination in `target_session`.
+
+`CurrentExternalEvent` forwards existing V7 raw input, time, generation-bound
+network, transport, storage outcome and presentation outcome operations.
+Responses contain a typed `GameKernelStepV7` as `step`, not debug strings or
+only effect counts. Missing suspend/model/repro operations return unsupported
+results until implemented; no successful no-op is used as a substitute.
+
+The adapter caps requests and directly readable responses at 4 MiB, and live
+sessions at 256. The historical server's inaccessible artifact-reference path
+is not used: responses above the cap fail. Event execution and response-size
+validation occur on a candidate session before it replaces the original.
+The facade also stages its kernel for rejected-event atomicity. The two
+candidate copies are a known optimization target, not a measured throughput
+claim. Immutable content is shared across sessions.
+
+The same remote command now selects **4** executable tests. The two additional
+tests verify time-event replay sequence changes, exact fork equality under the
+same non-key event, snapshot restoration, closed-session rejection, and exact
+state preservation when generation-bound network, storage, and presentation
+results have no corresponding valid pending operation. They require actual
+`BACKEND_ERROR` responses, so an unrecognized method or malformed payload does
+not accidentally count as exercising the kernel's negative path.
+
+All verification and formatting remain remote. No local build, test,
+installation, fixture download, runtime process, or formatter was executed.
+This source checkpoint still needs remote compile/test evidence before it can
+be called a qualified current CLI capability. Timer consequences, natural
+campaign/co-op play, complete repro, hot reload, and browser topology remain
+outside these four bounded witnesses.

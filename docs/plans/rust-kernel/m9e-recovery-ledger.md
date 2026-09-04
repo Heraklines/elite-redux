@@ -49,6 +49,9 @@ remain subsequent measured work.
 |---|---|---|---|
 | `b427d952c6f3c2b07de045f4acca0748ac27632d` | `33920083121` | workflow rejected | Job-level runner context unsupported; moved report path to step env. No runner started. |
 | `74bcaea727110a3f235a6ff07a282f35de83c387` | `33920260169` | PASS | F0 readiness: 30 selected/executed/passed, zero failed/skipped; format check passed. |
+| `c33a0503ff97a92486f83a136a151547670e0fe4` | `33920552315` | format failure | 13 feedback harness regressions passed; scoped remote formatting patch returned and applied. |
+| `e9c4aa464794e93fd5f5cd4da15c95028732c32b` | `33920701633` | target-selection failure | Fixed binary-only Cargo selection from `--lib --bins --tests` to `--tests`; no game test ran. |
+| `8909544f6184c61b0193c62a1d1a279dd941ffde` | `33920832537` | EXPECTED RED | 6 CLI tests executed: 4 historical pass, 2 new current-entry failures. Actual agent rejects V2 `guaranteed` content field via V1 loader. |
 
 F0 report: `m9e-summary-74bcaea727110a3f235a6ff07a282f35de83c387`, 1,250 compressed bytes.
 Rust 1.97.1, Linux x86_64, test/default features. Format 3,339 ms; build 5,683 ms;
@@ -60,5 +63,24 @@ All complete evidence remains in the named remote diagnostics artifact.
 Next patch adds real CLI red witnesses and 13 stdlib remote harness regression tests.
 Source formatting patches are produced on the runner and the original candidate
 restored afterward. Test binaries run from their Cargo manifest directory.
+
+## A1 implementation scope entering remote verification
+
+Current V7 facade in `er-env::current::CurrentGameSession` now owns typed raw,
+time, network, transport, storage and presentation ingress, staged failure,
+structured observation, snapshot/restore/fork/disposal and shared prepared V2 content.
+Normal `er-cli agent` routes to this facade; `agent-v6` explicitly retains historical
+compatibility. Four current executable witnesses are committed for remote validation.
+The affected native reverse dependency cone is selected; the new facade must also
+compile for Wasm and the existing native/Wasm V7 eventwise witness must pass.
+Tool binaries and Wasm/native outputs have separate caches.
+
+This does not finish A1: native reload worker, lab/batch/replay and browser host still
+need this shared session. Natural CLI setup is currently solo; transport-capable
+sessions require snapshots until natural co-op configuration is wired. No real
+Worker/WebRTC/storage topology is certified by the focused Wasm witness.
+The historical JSONL request-ID window still needs safe retry retirement, and the
+current adapter stages an extra clone before serialization. These are implementation
+tasks, not external blockers.
 
 No corrected final tag or qualification claim is made here.

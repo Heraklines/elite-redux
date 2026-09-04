@@ -46,6 +46,21 @@ jobs:
           key: m9e-focused-native-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-native-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Restore pinned Wasm tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/bin/wasm2es6js
+          key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
+      - name: Restore separate Wasm build
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/m9e-wasm-target
+          key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
       - name: Focused remote checks and evidence
         env:
           M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback

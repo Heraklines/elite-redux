@@ -1,5 +1,7 @@
 //! Public M7 headless game environment.
 
+pub mod current;
+
 use std::sync::Arc;
 
 use er_canonical::content_digest;

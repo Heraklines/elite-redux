@@ -6,6 +6,8 @@
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
   "shared_packages": ["er-kernel", "er-game", "er-state", "er-protocol", "er-types"],
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],
+  "current_session_packages": ["er-env"],
+  "current_session_wasm_test": "m9e_parity",
   "boundary_prefixes": ["src/", "test/browser/", "test/node/", "workers/", "rust/crates/er-wasm/", "rust/crates/er-web/"],
   "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes"
 }

@@ -232,3 +232,77 @@ fn public_agent_rejects_old_snapshot_schema_without_replacing_current_session()
     assert_eq!(snapshot(&responses[1])?, snapshot(&responses[4])?);
     Ok(())
 }
+
+#[test]
+fn public_agent_fork_time_restore_and_close_preserve_current_session_identity()
+-> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let initial = GameKernelV7::natural_start(
+        profile()?,
+        "m9e-current-cli".to_owned(),
+        SeatId::new(SafeU53::new(1)?),
+        vec!["preview-slot".to_owned()],
+        true,
+        content,
+        KernelSchedulerSnapshotV2 {
+            next_timer_id: Some(SafeU53::ZERO),
+            timers: Vec::new(),
+            pauses: Vec::new(),
+            disposed: false,
+        },
+        None,
+    )?.snapshot()?;
+    let responses = run_cli(&[
+        create_request()?,
+        request("before", "session.snapshot", json!({"session": "current"})),
+        request("fork", "session.fork", json!({"session": "current", "target_session": "forked"})),
+        request("time", "session.advance_time", json!({"session": "current", "milliseconds": 13})),
+        request("fork-time", "session.advance_time", json!({"session": "forked", "milliseconds": 13})),
+        request("after", "session.snapshot", json!({"session": "current"})),
+        request("fork-after", "session.snapshot", json!({"session": "forked"})),
+        request("restore", "session.restore", json!({"session": "current", "snapshot": initial})),
+        request("restored", "session.snapshot", json!({"session": "current"})),
+        request("close", "session.close", json!({"session": "forked"})),
+        request("closed", "session.observe", json!({"session": "forked"})),
+    ])?;
+    for response in &responses[..10] {
+        result(response)?;
+    }
+    assert_eq!(snapshot(&responses[1])?, initial);
+    let after = snapshot(&responses[5])?;
+    assert_eq!(after, snapshot(&responses[6])?);
+    assert_eq!(after.replay_sequence.get(), initial.replay_sequence.get() + 1);
+    assert_eq!(snapshot(&responses[8])?, initial);
+    let step: er_kernel::game_kernel_v7::GameKernelStepV7 =
+        serde_json::from_value(result(&responses[3])?["step"].clone())?;
+    assert!(step.effects.is_empty(), "empty bootstrap has no timer effects");
+    assert!(responses[10]["result"].is_null());
+    assert!(!responses[10]["error"].is_null(), "closed session still observed");
+    Ok(())
+}
+
+#[test]
+fn public_agent_rejected_external_results_do_not_commit_partial_state()
+-> Result<(), Box<dyn Error>> {
+    let responses = run_cli(&[
+        create_request()?,
+        request("before", "session.snapshot", json!({"session": "current"})),
+        request("network", "session.network_frame", json!({
+            "session": "current", "generation": 1, "bytes": []
+        })),
+        request("storage", "session.storage_result", json!({
+            "session": "current", "request_id": 1, "result": {"kind": "WRITTEN"}
+        })),
+        request("presentation", "session.presentation_settled", json!({
+            "session": "current", "event_id": 1, "outcome": {"kind": "SETTLED"}
+        })),
+        request("after", "session.snapshot", json!({"session": "current"})),
+    ])?;
+    result(&responses[0])?;
+    for response in &responses[2..5] {
+        assert!(response["result"].is_null());
+        assert_eq!(response["error"]["code"], "BACKEND_ERROR");
+    }
+    assert_eq!(snapshot(&responses[1])?, snapshot(&responses[5])?);
+    Ok(())
+}
