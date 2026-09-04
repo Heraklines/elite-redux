@@ -122,8 +122,11 @@ state. Observation does not clone the complete session or snapshot.
 
 `er-cli/src/current_agent.rs` serves the normal `agent` command using that
 facade. The old route is explicitly `agent-v6`. Current `new-run`, `resume`,
-`simulate`, `replay`, worker, browser delegation, and the remaining developer
-tools require their own consumer cutovers. Browser delegation has since passed
+`simulate`, `replay`, and the remaining developer tools require their own
+consumer cutovers. Explicit current worker ABI2 and its real lab endpoint passed
+27 native witnesses plus formatting/Clippy at `c2c3ca6383762cc411582e089e2cf26e1caf20d6`
+(run `33930869104`); activation supervision and current tool integration remain
+separate work. Browser delegation has since passed
 focused remote verification at `b7e2266cfbe774664a7737160c90727a71e4a030`
 (run `33926691832`); this checkpoint does
 not silently relabel the remaining entries as current.

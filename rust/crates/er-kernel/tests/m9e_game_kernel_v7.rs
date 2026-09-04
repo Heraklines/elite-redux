@@ -48,7 +48,7 @@ fn content() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
 
 fn scheduler() -> KernelSchedulerSnapshotV2 {
     KernelSchedulerSnapshotV2 {
-        next_timer_id: None,
+        next_timer_id: Some(SafeU53::ZERO),
         timers: Vec::new(),
         pauses: Vec::new(),
         disposed: false,

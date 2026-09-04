@@ -277,3 +277,49 @@ a nonempty list. Both direct and worker fixture initialization now use the same
 preview slot. The 13,849-byte named compact artifact included the full 32,012-byte
 remote formatting patch, applied without local formatting. These are fixture
 corrections; endpoint functional/Clippy completion still requires the next run.
+
+## Current worker/endpoint focused pass; B1a candidate
+
+Exact `c2c3ca6383762cc411582e089e2cf26e1caf20d6` passed run `33930869104`:
+37 harness selftests, all 27 selected native tests, formatting, worker Clippy
+and lab Clippy. The 3,909-byte named compact artifact binds the same worker
+executable hash listed above to this exact source/build invocation. Harness
+SHA-256: `34b9dda375d1c83a3bf9ab05abfe84eaa9c83c588e170542c93a7f3ad8ce1a17`.
+Selected native IDs SHA-256:
+`9f630db5928c43ac436a80542c5bfef72ecd0316d1cf3b8a4d664bdb71445d82`.
+Actual endpoint tests took 33,088 ms; worker tests 111,314 ms; fault peers
+214 ms. The cumulative comparison baseline advances only now, to this SHA.
+
+B1a implements active held keyboard/gamepad navigation at 250 ms intervals.
+Elapsed time dispatches due consequences chronologically with endpoint/timer-ID
+tie ordering, respects independent pause reasons, and admits successor timers
+within the same advance. Release, blur, obsolete menu ownership, blocking
+presentation, load and terminal paths retire repeats. Snapshot validation
+cross-checks physical/logical/repeat/timer ownership and globally unique IDs.
+Unknown due timer purposes fail explicitly; this slice implements navigation
+only. Exhausted IDs remain exhausted. The 1,024-consequence bound and rejected
+directional navigation preserve the complete public-kernel snapshot.
+
+Nine behavioral tests share one genuinely natural active checkpoint and cover
+timing/effects, chunking/restore, key/gamepad release and suppression, menu
+changes, pause reasons/ties, corrupted ownership, exhausted allocation and
+budget/unsupported-purpose failures. Independent review found and corrected
+horizontal-navigation mutation before rejection, duplicate IDs across seats,
+an ignored must-use cancel result, test lint issues and missing preview slots.
+Ten fresh V7 constructors now start allocator zero; restored None is unchanged.
+
+B1 focused feedback requires five named current kernel targets with actual
+test inventories, state/protocol regressions, all current native adapters and
+worker endpoints, native/Wasm parity and the existing browser witnesses. After
+ordinary checks pass, a separate remote build removes only the due timer's
+button consequence. Exactly one cursor/effect test must compile and fail its
+specific assertion; unrelated failure or an unexpectedly green mutant fails
+the gate. Source hashes and a clean exact candidate are checked before/after
+restoration; mutant outputs are isolated and deleted. Seven additional harness
+tests bring the pending inventory to 44. No B1 test or mutant ran locally.
+
+Performance limitation: public advance_time and active directional presses
+stage for direct-call atomicity; CurrentGameSession currently stages them again.
+Transaction reuse remains a measured optimization task, not a claimed speedup.
+The source-only current supervisor and acknowledged-context binding are queued
+separately and are not included in this B1 commit or its evidence.

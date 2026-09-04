@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 
@@ -127,6 +128,11 @@ def plan():
         run(["git", "fetch", "--no-tags", "--depth=1", "origin", base], "comparison-fetch", ROOT)
     changed = capture(["git", "diff", "--name-only", base, "HEAD"]).splitlines()
     rust_changes = [path for path in changed if path.startswith("rust/")]
+    timer_focus = config.get("timer_focus", {})
+    product_changes = [path for path in changed if path not in config["infrastructure_paths"]
+                       and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
+    timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
+        path in timer_focus.get("paths", []) for path in product_changes)
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -154,7 +160,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (native_worker_delta and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (timer_session and path in timer_focus["paths"]) or (native_worker_delta and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -202,6 +208,10 @@ def plan():
         execution_scope = worker_focus["execute"]
     if endpoint_session:
         execution_scope = endpoint_focus["execute"]
+    if timer_session:
+        execution_scope = timer_focus["execute"]
+        browser_required = True
+        boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -220,13 +230,28 @@ def plan():
               "requires_browser": browser_required,
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
+              "timer_focus": timer_session,
+              "required_native_targets": timer_focus.get("required_targets", {}) if timer_session else {},
+              "timer_mutant": timer_focus.get("mutant") if timer_session else None,
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
-    if unknown or boundaries or shared:
+    if unknown or boundaries or (shared and not timer_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
+
+
+def required_native_target_counts(required, enumerated):
+    """A named witness must exist once and enumerate at least one real test."""
+    counts = {}
+    for package, names in required.items():
+        for name in names:
+            matches = [ids for crate, target, ids in enumerated if (crate, target) == (package, name)]
+            if len(matches) != 1 or not matches[0]:
+                raise RuntimeError(f"required native witness missing, ambiguous or empty: {package}:{name}")
+            counts[f"{package}:{name}"] = len(matches[0])
+    return counts
 
 
 def discover_worker_executable(artifacts, summary):
@@ -355,6 +380,90 @@ def browser_checks(summary):
                                                      json.loads((FULL / "browser-effect-results.json").read_text()))
 
 
+def timer_behavioral_mutant(selection, summary, passed_test_ids):
+    policy = selection["timer_mutant"]
+    witness = policy["test"]
+    if passed_test_ids.count(f'{policy["target"]}::{witness}') != 1:
+        raise RuntimeError("mutant requires exactly one passing ordinary behavioral witness")
+    if capture(["git", "diff", "--name-only", "HEAD", "--"]):
+        raise RuntimeError("mutant requires a clean exact candidate tracked source tree")
+    source = ROOT / policy["source"]
+    original = source.read_bytes()
+    needle = policy["original"].encode()
+    replacement = policy["replacement"].encode()
+    if original.count(needle) != 1:
+        raise RuntimeError("mutant source consequence must occur exactly once")
+    mutated = original.replace(needle, replacement, 1)
+    evidence = {"status": "failed", "source": policy["source"], "test": witness,
+                "target": policy["target"], "reason": policy["reason"],
+                "original_sha256": hashlib.sha256(original).hexdigest(),
+                "mutant_sha256": hashlib.sha256(mutated).hexdigest()}
+    summary["timer_mutant"] = evidence
+    try:
+        source.write_bytes(mutated)
+        if capture(["git", "diff", "--name-only", "HEAD", "--"]) != policy["source"]:
+            raise RuntimeError("mutant changed unexpected tracked source paths")
+        # Share the runner's registry/git dependency cache, never target outputs.
+        # This private target tree is deleted and cannot become a passing cache.
+        with tempfile.TemporaryDirectory(prefix="m9e-timer-mutant-", dir=REPORT) as scratch:
+            env = os.environ.copy()
+            env["CARGO_TARGET_DIR"] = scratch
+            build = run(["cargo", "test", "--locked", "-p", policy["package"], "--test", policy["target"],
+                         "--no-run", "--message-format=json"], "timer-mutant-build", RUST, env)
+            if digest(source) != evidence["mutant_sha256"] or capture(["git", "diff", "--name-only", "HEAD", "--"]) != policy["source"]:
+                raise RuntimeError("mutant build changed its exact tracked source delta")
+            candidates = set()
+            expected_manifest = (RUST / "crates" / policy["package"] / "Cargo.toml").resolve()
+            for line in build.read_text().splitlines():
+                if not line.startswith("{"):
+                    continue
+                artifact = json.loads(line)
+                if (artifact.get("reason") == "compiler-artifact" and artifact.get("profile", {}).get("test") is True
+                    and artifact.get("target", {}).get("name") == policy["target"]
+                    and "test" in artifact.get("target", {}).get("kind", [])
+                    and Path(artifact.get("manifest_path", "")).resolve() == expected_manifest
+                    and artifact.get("executable")):
+                    binary = Path(artifact["executable"]).resolve()
+                    if not binary.is_relative_to(Path(scratch).resolve()) or not binary.is_file():
+                        raise RuntimeError("mutant binary is not inside its isolated target tree")
+                    candidates.add(binary)
+            if len(candidates) != 1:
+                raise RuntimeError("mutant build must emit exactly one matching test binary")
+            binary = candidates.pop()
+            cwd = expected_manifest.parent
+            listing = run([str(binary), witness, "--exact", "--list", "--format", "terse"], "timer-mutant-list", cwd, env)
+            ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
+            if ids != [witness]:
+                raise RuntimeError("mutant must enumerate exactly its named behavioral test")
+            output = FULL / "timer-mutant-execute.log"
+            start = time.monotonic()
+            try:
+                with output.open("w") as stream:
+                    result = subprocess.run([str(binary), witness, "--exact", "--format", "pretty"],
+                                            cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=120)
+            except subprocess.TimeoutExpired as error:
+                raise RuntimeError("mutant timed out instead of failing its behavioral assertion") from error
+            finally:
+                TIMINGS["timer-mutant-execute"] = round((time.monotonic() - start) * 1000)
+            text = output.read_text()
+            evidence["exit_code"] = result.returncode
+            counts = re.findall(r"test result: FAILED\. (\d+) passed; (\d+) failed; (\d+) ignored;", text)
+            if (result.returncode != 101 or counts != [("0", "1", "0")]
+                or f"test {witness} ... FAILED" not in text
+                or not re.search(r"thread '" + re.escape(witness) + r"'(?: \(\d+\))? panicked at", text)
+                or "assertion `left == right` failed" not in text
+                or 'left: []' not in text or 'right: ["battle/command/fight"]' not in text):
+                raise RuntimeError("mutant did not fail the exact cursor-effect assertion with one failed test")
+            evidence["tests"] = {"executed": 1, "passed": 0, "failed": 1, "skipped": 0}
+            evidence["status"] = "detected"
+    finally:
+        source.write_bytes(original)
+        evidence["restored_sha256"] = digest(source)
+        if evidence["restored_sha256"] != evidence["original_sha256"] or capture(["git", "diff", "--name-only", "HEAD", "--"]):
+            evidence["status"] = "restoration_failed"
+            raise RuntimeError("mutant source restoration did not recover the exact candidate")
+
+
 def main(preflight_failure=None):
     COMPACT.mkdir(parents=True, exist_ok=True)
     FULL.mkdir(parents=True, exist_ok=True)
@@ -442,6 +551,9 @@ def main(preflight_failure=None):
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
             enumerated.append((index, binary, name, ids, cwd, excluded_ids, env))
+        summary["required_native_target_counts"] = required_native_target_counts(
+            selection.get("required_native_targets", {}),
+            [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
         for item in selection["historical_dispositions"]:
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
@@ -484,6 +596,8 @@ def main(preflight_failure=None):
             browser_checks(summary)
         if format_failure:
             raise RuntimeError(format_failure)
+        if selection.get("timer_mutant"):
+            timer_behavioral_mutant(selection, summary, tests)
         summary["status"] = "passed"
     except Exception as error:
         summary["first_failure"] = str(error)[:4096]

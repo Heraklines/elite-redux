@@ -518,6 +518,186 @@ class FeedbackTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
                     self.feedback.plan()
 
+    def configure_timer_scope(self):
+        self.configure_endpoint_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["timer_focus"] = policy["timer_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for package in self.config["timer_focus"]["execute"]:
+            self.package(package)
+        self.package("er-reverse", '[dependencies]\ner-kernel = { path = "../er-kernel" }\n')
+
+    def test_timer_scope_requires_shared_regressions_and_all_platforms(self):
+        self.configure_timer_scope()
+        self.changed = self.config["timer_focus"]["paths"] + ["docs/plans/rust-kernel/m9e-progress.md"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["timer_focus"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertIsNone(selection["worker_lock_guard"])
+        self.assertEqual(selection["boundary_paths"], [])
+        self.assertEqual(selection["unknown_paths"], [])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        for package in ("er-kernel", "er-state", "er-protocol", "er-env", "er-cli", "er-web", "er-kernel-worker"):
+            self.assertIn(package, selection["packages"])
+            self.assertEqual(selection["execution_scope"][package], ["*"])
+        self.assertEqual(set(selection["required_native_targets"]["er-kernel"]), {
+            "m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"})
+
+    def test_timer_scope_rejects_unmapped_mixed_product_and_lock_changes(self):
+        self.configure_timer_scope()
+        core = "rust/crates/er-kernel/src/game_kernel_v7.rs"
+        for extra in ("rust/crates/er-state/src/lib.rs", "rust/crates/er-protocol/src/lib.rs",
+                      "rust/crates/er-kernel/src/snapshot.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-web/src/lib.rs", "test/browser/rust-browser/other.spec.ts",
+                      "rust/Cargo.lock", "unmapped.json"):
+            with self.subTest(extra=extra):
+                self.changed = [core, extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+
+    def test_timer_named_witnesses_are_nonempty_unique_and_package_bound(self):
+        required = {"er-kernel": ["m9e_timers_v7", "m9e_snapshot_v7"]}
+        valid = [("er-kernel", name, ["behavior"]) for name in required["er-kernel"]]
+        self.assertEqual(self.feedback.required_native_target_counts(required, valid), {
+            "er-kernel:m9e_timers_v7": 1, "er-kernel:m9e_snapshot_v7": 1})
+        for invalid in (valid[:1], valid + valid[:1],
+                        [("er-other", name, ids) for _, name, ids in valid],
+                        [(crate, name, []) for crate, name, _ in valid]):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                    self.feedback.required_native_target_counts(required, invalid)
+        selection = self.feedback.plan()
+        selection["required_native_targets"] = required
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("required native witness", summary["first_failure"])
+        self.assertEqual(self.executed, [])
+        self.assertIn("list:a_suite", self.events)
+        self.assertIn("list:b_suite", self.events)
+
+    def test_timer_execution_keeps_worker_binding_and_both_platform_checks(self):
+        self.configure_timer_scope()
+        self.changed = self.config["timer_focus"]["paths"]
+        policy = self.config["timer_focus"]
+        self.binary_ids = {}
+        for package, names in policy["execute"].items():
+            if names == ["*"]:
+                names = policy["required_targets"].get(package, [package.replace("-", "_")])
+            for name in names:
+                self.binary_ids[name] = ["behavior"]
+                self.binary_crates[name] = package
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        mutant.assert_called_once()
+        self.assertEqual(len(summary["required_native_target_counts"]), 5)
+        self.assertIn("current_kernel_endpoint_v2", self.executed)
+        self.assertIn("current_kernel_endpoint_faults_v2", self.executed)
+        for name, phase, env in self.binary_envs:
+            with self.subTest(name=name, phase=phase):
+                if name == "current_kernel_endpoint_v2":
+                    self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+                else:
+                    self.assertIsNone(env)
+
+    def invoke_synthetic_timer_mutant(self, mode):
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"]["mutant"]
+        source = self.root / policy["source"]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        original = ("fn synthetic() {\n" + policy["original"] + "\n}\n").encode()
+        source.write_bytes(original)
+        summary = {}
+        witness = policy["test"]
+
+        def tracked_diff(args, cwd=None):
+            self.assertEqual(args, ["git", "diff", "--name-only", "HEAD", "--"])
+            return "" if source.read_bytes() == original else policy["source"]
+
+        def mutant_run(args, name, cwd=None, env=None):
+            path = self.full / (name + ".log")
+            self.assertNotEqual(env["CARGO_TARGET_DIR"], str(self.rust / "target"))
+            self.assertEqual(source.read_bytes(), original.replace(policy["original"].encode(), policy["replacement"].encode()))
+            if name == "timer-mutant-build":
+                self.assertIn("--locked", args)
+                self.assertIn("--no-run", args)
+                if mode == "build":
+                    path.write_text("error: synthetic compiler rejection\n")
+                    raise RuntimeError("timer-mutant-build exited 101")
+                binary = Path(env["CARGO_TARGET_DIR"]) / "synthetic-timer-test"
+                binary.write_bytes(b"synthetic artifact, never executed")
+                path.write_text(json.dumps({"reason": "compiler-artifact", "profile": {"test": True},
+                    "target": {"name": policy["target"], "kind": ["test"]}, "executable": str(binary),
+                    "manifest_path": str(self.rust / "crates/er-kernel/Cargo.toml")}) + "\n")
+            elif name == "timer-mutant-list":
+                self.assertIn("--exact", args)
+                path.write_text(("wrong_test" if mode == "unknown" else witness) + ": test\n")
+            else:
+                raise AssertionError(name)
+            return path
+
+        def mutant_process(args, cwd=None, stdout=None, **kwargs):
+            self.assertEqual(args[1:], [witness, "--exact", "--format", "pretty"])
+            if mode == "timeout":
+                raise subprocess.TimeoutExpired(args, 120)
+            if mode == "green":
+                stdout.write(self.result_line(passed=1))
+                return subprocess.CompletedProcess(args, 0)
+            assertion = ('assertion `left == right` failed\n  left: []\n right: ["battle/command/fight"]\n'
+                         if mode != "wrong_assertion" else "assertion failed: unrelated\n")
+            stdout.write(f"test {witness} ... FAILED\nthread '{witness}' (123) panicked at test.rs:147:5:\n" + assertion + self.result_line(failed=1))
+            return subprocess.CompletedProcess(args, 101)
+
+        try:
+            with patch.object(self.feedback, "capture", side_effect=tracked_diff), patch.object(self.feedback, "run", side_effect=mutant_run), patch.object(self.feedback.subprocess, "run", side_effect=mutant_process):
+                self.feedback.timer_behavioral_mutant({"timer_mutant": policy}, summary, [f'{policy["target"]}::{witness}'])
+        finally:
+            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(summary["timer_mutant"]["restored_sha256"], hashlib.sha256(original).hexdigest())
+            self.assertEqual(list((self.root / "report").glob("m9e-timer-mutant-*")), [])
+        return summary
+
+    def test_timer_mutant_detects_the_behavioral_failure_and_restores_source(self):
+        summary = self.invoke_synthetic_timer_mutant("detected")
+        evidence = summary["timer_mutant"]
+        self.assertEqual(evidence["status"], "detected")
+        self.assertEqual(evidence["exit_code"], 101)
+        self.assertNotEqual(evidence["original_sha256"], evidence["mutant_sha256"])
+        self.assertEqual(evidence["tests"], {"executed": 1, "passed": 0, "failed": 1, "skipped": 0})
+
+    def test_timer_mutant_rejects_green_build_timeout_and_unrecognized_failures(self):
+        for mode, reason in (("green", "exact cursor-effect assertion"), ("build", "build exited"),
+                             ("timeout", "timed out"), ("unknown", "enumerate exactly"),
+                             ("wrong_assertion", "exact cursor-effect assertion")):
+            with self.subTest(mode=mode), self.assertRaisesRegex(RuntimeError, reason):
+                self.invoke_synthetic_timer_mutant(mode)
+
+    def test_timer_mutant_requires_a_passing_positive_before_source_mutation(self):
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"]["mutant"]
+        with self.assertRaisesRegex(RuntimeError, "passing ordinary behavioral witness"):
+            self.feedback.timer_behavioral_mutant({"timer_mutant": policy}, {}, [])
+        source = self.root / policy["source"]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        duplicated = (policy["original"] + "\n") * 2
+        source.write_text(duplicated)
+        with patch.object(self.feedback, "capture", return_value=""), self.assertRaisesRegex(RuntimeError, "occur exactly once"):
+            self.feedback.timer_behavioral_mutant({"timer_mutant": policy}, {}, [f'{policy["target"]}::{policy["test"]}'])
+        self.assertEqual(source.read_text(), duplicated)
+        self.configure_timer_scope()
+        self.changed = self.config["timer_focus"]["paths"]
+        self.build_code = 1
+        with patch.object(self.feedback, "timer_behavioral_mutant") as mutant:
+            code, _ = self.invoke()
+        self.assertEqual(code, 1)
+        mutant.assert_not_called()
+
     def worker_executable_artifact(self, filename="candidate-worker"):
         self.package("er-kernel-worker")
         executable = self.root / "built" / filename

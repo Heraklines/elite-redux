@@ -48,7 +48,7 @@ const send = async request => {
 if (solo) status.textContent = "initializing-kernel";
 if (solo) await send({ kind: "INITIALIZE", initialization: { kind: "NATURAL_START", context: {
   local_seat: 1, role: "AUTHORITY", protocol: null,
-  scheduler: { disposed: false, next_timer_id: null, pauses: [], timers: [] }
+  scheduler: { disposed: false, next_timer_id: 0, pauses: [], timers: [] }
 }, local_is_host: true, profile: {
   schema_version: 1, unlocks: [], achievements: [], challenges: [], flags: [], dex: { entries: [] },
   statistics: { runs_started: 0, runs_won: 0, runs_lost: 0, battles_won: 0, pokemon_captured: 0, highest_wave: 1 }

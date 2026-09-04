@@ -9,7 +9,8 @@ use er_canonical::{canonical_bytes, content_digest};
 use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::PreparedGameContentV2;
 use er_game::m9e_internal_event_v2::{
-    GameInternalEventKindV2, GameInternalEventQueueV2, GameInternalEventV2,
+    GAME_INTERNAL_TIMER_CONSEQUENCE_BUDGET_V2, GameInternalEventKindV2,
+    GameInternalEventQueueV2, GameInternalEventV2,
 };
 use er_game::m9e_material_v6::{
     AppliedGameMaterialLedgerV1, GameMaterialApplyOutcomeV6, GamePlatformEffectV2,
@@ -25,7 +26,7 @@ use er_game::m72_bootstrap::{
     RunBootstrapStageV1,
 };
 use er_protocol::snapshot::ProposalFingerprintSnapshotV2;
-use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2};
+use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2, ScheduledTimer, SchedulerCommand, SchedulerError};
 use er_rng::audit::{RngCallsiteId, RngReason};
 use er_rng::battle::RngRuntime;
 use er_save::m9e_save_v2::GameSaveV2;
@@ -41,12 +42,12 @@ use er_types::{
     BootstrapActionV1, ConnectionGeneration, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1,
     GameActionV1, GameButton, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
     GameProposalV1, OperationId, PlatformRequestId, RunOutcome, SafeU53, SeatId,
-    StarterSelectionV1, TerminalState, TimeClass, TransportState,
+    StarterSelectionV1, TerminalState, TimeClass, TimerId, TimerOwner, TransportState,
 };
 use thiserror::Error;
 
 use crate::snapshot::{
-    HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRouterSnapshotV2,
+    HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRepeatSnapshotV2, InputRouterSnapshotV2,
     KernelSchedulerSnapshotV2, PhysicalInputSourceV2, PressedPhysicalInputSnapshotV2,
     TimeClassPauseSnapshotV2,
 };
@@ -54,6 +55,11 @@ use crate::snapshot_v7::{
     CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7, CoreGameKernelSnapshotV7,
     GameKernelLifecycleSnapshotV7, PendingPlatformRequestV2, PendingPresentationV3,
     StorageFrontierSnapshotV1,
+};
+
+pub(crate) const NAVIGATION_REPEAT_INTERVAL_MS_V7: SafeU53 = match SafeU53::new(250) {
+    Ok(value) => value,
+    Err(_) => SafeU53::ZERO,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -155,6 +161,16 @@ pub enum GameKernelV7Error {
     Snapshot(String),
     #[error("GameKernelV7 storage result failed: {0}")]
     Storage(String),
+    #[error("GameKernelV7 timer allocation is exhausted")]
+    TimerAllocationExhausted,
+    #[error("GameKernelV7 timer {timer_id} has an unsupported purpose")]
+    UnsupportedTimerPurpose { timer_id: TimerId },
+    #[error("GameKernelV7 timer consequence budget {limit} exceeded at {timer_id}, with {remaining_milliseconds:?} ms remaining")]
+    TimerBudgetExceeded {
+        limit: usize,
+        timer_id: TimerId,
+        remaining_milliseconds: SafeU53,
+    },
 }
 
 impl GameKernelV7 {
@@ -637,46 +653,125 @@ impl GameKernelV7 {
         if matches!(self.lifecycle, GameKernelLifecycleV7::Terminal { .. }) {
             return Ok(GameKernelStepV7::default());
         }
-        self.active_input(event)
+        let directional_press = match &event {
+            RawInputEvent::KeyDown { code, .. } => {
+                navigation_button_v7(&PhysicalInputSourceV2::Keyboard(code.clone())).is_some()
+            }
+            RawInputEvent::GamepadDown { button } => {
+                navigation_button_v7(&PhysicalInputSourceV2::Gamepad(*button)).is_some()
+            }
+            _ => false,
+        };
+        if directional_press {
+            // Navigation can reject after registering physical and timer owners.
+            // Keep direct kernel calls atomic; shared sessions currently stage
+            // this bounded path a second time until transaction reuse is added.
+            let mut candidate = self.clone();
+            let step = candidate.active_input(event)?;
+            candidate.retire_obsolete_repeats()?;
+            candidate.validate()?;
+            *self = candidate;
+            return Ok(step);
+        }
+        let step = self.active_input(event)?;
+        self.retire_obsolete_repeats()?;
+        Ok(step)
     }
     pub fn advance_time(
         &mut self,
         milliseconds: SafeU53,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        let mut fired = Vec::new();
-        for timer in &mut self.scheduler.timers {
-            let paused = self.scheduler.pauses.iter().any(|pause| {
-                pause.endpoint == timer.registration.endpoint
-                    && pause.time_class == timer.registration.time_class
-                    && !pause.reasons.is_empty()
-            });
-            if paused {
-                continue;
+        let mut candidate = self.clone();
+        let step = candidate.advance_time_transaction(milliseconds)?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(step)
+    }
+
+    fn advance_time_transaction(
+        &mut self,
+        milliseconds: SafeU53,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.retire_obsolete_repeats()?;
+        let mut remaining = milliseconds;
+        let mut step = GameKernelStepV7::default();
+        loop {
+            let next = self.scheduler.timers.iter()
+                .filter(|timer| !timer_paused(&self.scheduler, &timer.registration))
+                .min_by_key(|timer| (
+                    timer.remaining_active_ms,
+                    timer.registration.endpoint,
+                    timer.registration.timer_id,
+                ))
+                .cloned();
+            let Some(next) = next.filter(|timer| timer.remaining_active_ms <= remaining) else {
+                self.elapse_active_time(remaining)?;
+                break;
+            };
+            if step.internal_events.len() >= GAME_INTERNAL_TIMER_CONSEQUENCE_BUDGET_V2 {
+                return Err(GameKernelV7Error::TimerBudgetExceeded {
+                    limit: GAME_INTERNAL_TIMER_CONSEQUENCE_BUDGET_V2,
+                    timer_id: next.registration.timer_id,
+                    remaining_milliseconds: remaining,
+                });
             }
-            if timer.remaining_active_ms <= milliseconds {
-                fired.push(timer.registration.timer_id);
-            } else {
-                timer.remaining_active_ms =
-                    SafeU53::new(timer.remaining_active_ms.get() - milliseconds.get())
-                        .map_err(|_| GameKernelV7Error::Invalid)?;
-            }
+            self.elapse_active_time(next.remaining_active_ms)?;
+            remaining = SafeU53::new(remaining.get() - next.remaining_active_ms.get())
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+            let consequence = self.fire_navigation_timer(next.registration)?;
+            step.internal_events.push(GameInternalEventKindV2::TimerFired);
+            step.effects.extend(consequence.effects);
         }
-        self.scheduler
-            .timers
-            .retain(|timer| !fired.contains(&timer.registration.timer_id));
-        self.scheduler
-            .validate()
-            .map_err(|_| GameKernelV7Error::Invalid)?;
         if milliseconds != SafeU53::ZERO {
             self.advance_replay_sequence()?;
         }
-        Ok(GameKernelStepV7 {
-            effects: Vec::new(),
-            internal_events: fired
-                .into_iter()
-                .map(|_| GameInternalEventKindV2::TimerFired)
-                .collect(),
-        })
+        Ok(step)
+    }
+
+    fn elapse_active_time(&mut self, milliseconds: SafeU53) -> Result<(), GameKernelV7Error> {
+        let pauses = &self.scheduler.pauses;
+        for timer in &mut self.scheduler.timers {
+            if pauses.iter().any(|pause| pause.endpoint == timer.registration.endpoint
+                && pause.time_class == timer.registration.time_class && !pause.reasons.is_empty())
+            {
+                continue;
+            }
+            timer.remaining_active_ms = SafeU53::new(
+                timer.remaining_active_ms.get().checked_sub(milliseconds.get())
+                    .ok_or(GameKernelV7Error::Invalid)?,
+            ).map_err(|_| GameKernelV7Error::Invalid)?;
+        }
+        Ok(())
+    }
+
+    fn fire_navigation_timer(
+        &mut self,
+        registration: ScheduledTimer,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let index = self.input_router.repeats.iter()
+            .position(|repeat| repeat.timer_id == registration.timer_id)
+            .ok_or(GameKernelV7Error::UnsupportedTimerPurpose { timer_id: registration.timer_id })?;
+        let repeat = self.input_router.repeats[index].clone();
+        if registration.endpoint != repeat.seat
+            || registration.owner != TimerOwner::input_repeat(repeat.button)
+            || registration.time_class != TimeClass::HumanInput
+            || registration.delay_ms != NAVIGATION_REPEAT_INTERVAL_MS_V7
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let mut scheduler = self.scheduler.clone().into_scheduler()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        scheduler.fired(registration.timer_id).map_err(timer_error)?;
+        let SchedulerCommand::Schedule { timer } = scheduler.schedule(
+            repeat.seat, TimerOwner::input_repeat(repeat.button),
+            NAVIGATION_REPEAT_INTERVAL_MS_V7, TimeClass::HumanInput,
+        ).map_err(timer_error)? else {
+            return Err(GameKernelV7Error::Invalid);
+        };
+        self.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        self.input_router.repeats[index].timer_id = timer.timer_id;
+        self.handle_button(repeat.button)
     }
 
     pub fn ingest_network_frame(
@@ -876,6 +971,7 @@ impl GameKernelV7 {
                     GameRuntimeV6::new(Some(save.state), self.content.clone(), next_revision)
                         .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.clear_input()?;
                 self.storage_frontiers.insert(slot.clone(), save.generation);
                 self.synchronize_menu_allocator()?;
                 if let Some(control) = self.current_control().cloned() {
@@ -1021,6 +1117,9 @@ impl GameKernelV7 {
         Ok(step)
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
+        if self.input_router.repeats.iter().any(|repeat| repeat.seat != self.local_seat) {
+            return Err(GameKernelV7Error::Invalid);
+        }
         self.input_router
             .validate()
             .map_err(|_| GameKernelV7Error::Invalid)?;
@@ -1161,9 +1260,20 @@ impl GameKernelV7 {
                         == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
                 });
                 let accepted = !presentation_blocked
+                    && self.input_router.focus == InputFocus::Game
+                    && !self.input_router.locks.iter().any(|lock| {
+                        lock.seat == self.local_seat && lock.button == button
+                            && Some(lock.menu_instance_id) == menu_instance
+                    })
                     && self
                         .current_control()
                         .is_some_and(|control| control.actionable && menu_instance.is_some());
+                if accepted {
+                    self.register_navigation_repeat(
+                        button, PhysicalInputSourceV2::Keyboard(code.clone()),
+                        menu_instance.ok_or(GameKernelV7Error::Invalid)?,
+                    )?;
+                }
                 self.input_router
                     .pressed
                     .push(PressedPhysicalInputSnapshotV2 {
@@ -1198,6 +1308,7 @@ impl GameKernelV7 {
             }
             RawInputEvent::KeyUp { code } => {
                 let source = PhysicalInputSourceV2::Keyboard(code);
+                self.cancel_source_repeats(&source)?;
                 self.input_router.pressed.retain(|pressed| {
                     !(pressed.seat == self.local_seat && pressed.source == source)
                 });
@@ -1215,7 +1326,7 @@ impl GameKernelV7 {
             }
             RawInputEvent::WindowBlurred | RawInputEvent::FocusChanged(InputFocus::TextEntry) => {
                 self.input_router.focus = InputFocus::TextEntry;
-                self.clear_input();
+                self.clear_input()?;
                 Ok(GameKernelStepV7::default())
             }
             RawInputEvent::WindowFocused | RawInputEvent::FocusChanged(InputFocus::Game) => {
@@ -1262,9 +1373,19 @@ impl GameKernelV7 {
             pending.blocking == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
         });
         let accepted = !presentation_blocked
+            && self.input_router.focus == InputFocus::Game
+            && !self.input_router.locks.iter().any(|lock| {
+                lock.seat == self.local_seat && lock.button == button
+                    && Some(lock.menu_instance_id) == menu_instance
+            })
             && self
                 .current_control()
                 .is_some_and(|control| control.actionable && menu_instance.is_some());
+        if accepted {
+            self.register_navigation_repeat(
+                button, source.clone(), menu_instance.ok_or(GameKernelV7Error::Invalid)?,
+            )?;
+        }
         self.input_router
             .pressed
             .push(PressedPhysicalInputSnapshotV2 {
@@ -1304,6 +1425,7 @@ impl GameKernelV7 {
         button_index: u16,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let source = PhysicalInputSourceV2::Gamepad(button_index);
+        self.cancel_source_repeats(&source)?;
         self.input_router
             .pressed
             .retain(|pressed| !(pressed.seat == self.local_seat && pressed.source == source));
@@ -1707,7 +1829,7 @@ impl GameKernelV7 {
                 _ => {}
             }
         }
-        Ok(())
+        self.retire_obsolete_repeats()
     }
 
     fn synchronize_terminal(
@@ -1734,6 +1856,7 @@ impl GameKernelV7 {
             runtime,
             terminal: terminal.clone(),
         };
+        self.clear_input()?;
         step.effects.push(GameKernelEffectV7::Terminal(terminal));
         Ok(())
     }
@@ -1904,6 +2027,7 @@ impl GameKernelV7 {
     }
 
     fn synchronize_menu_allocator(&mut self) -> Result<(), GameKernelV7Error> {
+        self.retire_obsolete_repeats()?;
         let Some(instance) = self
             .current_control()
             .and_then(|control| control.menu.as_ref())
@@ -1943,15 +2067,108 @@ impl GameKernelV7 {
         self.input_router
             .locks
             .sort_by_key(|lock| (lock.seat, lock.button, lock.menu_instance_id));
+        self.input_router.repeats.sort_by_key(|repeat| (
+            repeat.seat, repeat.button, repeat.source.clone(),
+        ));
     }
 
-    fn clear_input(&mut self) {
+    fn clear_input(&mut self) -> Result<(), GameKernelV7Error> {
+        let timers: Vec<_> = self.input_router.repeats.iter().map(|repeat| repeat.timer_id).collect();
+        self.cancel_repeats(&timers)?;
         self.input_router.pressed.clear();
         self.input_router.suppressed_printable_keys.clear();
         self.input_router.held_buttons.clear();
         self.input_router.locks.clear();
         self.input_router.repeats.clear();
+        Ok(())
     }
+
+    fn register_navigation_repeat(
+        &mut self,
+        button: GameButton,
+        source: PhysicalInputSourceV2,
+        menu_instance_id: MenuInstanceId,
+    ) -> Result<(), GameKernelV7Error> {
+        if navigation_button_v7(&source) != Some(button) {
+            return Ok(());
+        }
+        let mut scheduler = self.scheduler.clone().into_scheduler()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let SchedulerCommand::Schedule { timer } = scheduler.schedule(
+            self.local_seat, TimerOwner::input_repeat(button),
+            NAVIGATION_REPEAT_INTERVAL_MS_V7, TimeClass::HumanInput,
+        ).map_err(timer_error)? else {
+            return Err(GameKernelV7Error::Invalid);
+        };
+        self.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        self.input_router.repeats.push(InputRepeatSnapshotV2 {
+            seat: self.local_seat, button, source, menu_instance_id, timer_id: timer.timer_id,
+        });
+        Ok(())
+    }
+
+    fn cancel_source_repeats(&mut self, source: &PhysicalInputSourceV2) -> Result<(), GameKernelV7Error> {
+        let timers: Vec<_> = self.input_router.repeats.iter()
+            .filter(|repeat| repeat.seat == self.local_seat && &repeat.source == source)
+            .map(|repeat| repeat.timer_id).collect();
+        self.cancel_repeats(&timers)
+    }
+
+    fn cancel_repeats(&mut self, timers: &[TimerId]) -> Result<(), GameKernelV7Error> {
+        if timers.is_empty() {
+            return Ok(());
+        }
+        let mut scheduler = self.scheduler.clone().into_scheduler()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        for timer_id in timers {
+            let _ = scheduler.cancel(*timer_id);
+        }
+        self.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        self.input_router.repeats.retain(|repeat| !timers.contains(&repeat.timer_id));
+        Ok(())
+    }
+
+    fn retire_obsolete_repeats(&mut self) -> Result<(), GameKernelV7Error> {
+        let current_menu = if matches!(self.lifecycle, GameKernelLifecycleV7::Active(_))
+            && self.input_router.focus == InputFocus::Game
+            && !self.pending_presentations.values().any(|pending| {
+                pending.blocking == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
+            })
+        {
+            self.current_control().filter(|control| control.actionable)
+                .and_then(|control| control.menu.as_ref()).map(|menu| menu.instance_id)
+        } else {
+            None
+        };
+        let timers: Vec<_> = self.input_router.repeats.iter()
+            .filter(|repeat| Some(repeat.menu_instance_id) != current_menu
+                || repeat.seat != self.local_seat)
+            .map(|repeat| repeat.timer_id).collect();
+        self.cancel_repeats(&timers)
+    }
+}
+
+fn timer_error(error: SchedulerError) -> GameKernelV7Error {
+    match error {
+        SchedulerError::TimerIdExhausted => GameKernelV7Error::TimerAllocationExhausted,
+        _ => GameKernelV7Error::Invalid,
+    }
+}
+
+fn timer_paused(scheduler: &KernelSchedulerSnapshotV2, timer: &ScheduledTimer) -> bool {
+    scheduler.pauses.iter().any(|pause| pause.endpoint == timer.endpoint
+        && pause.time_class == timer.time_class && !pause.reasons.is_empty())
+}
+
+pub(crate) fn navigation_button_v7(source: &PhysicalInputSourceV2) -> Option<GameButton> {
+    let button = match source {
+        PhysicalInputSourceV2::Keyboard(key) => physical_button(key),
+        PhysicalInputSourceV2::Gamepad(button) => gamepad_button(*button),
+    }?;
+    matches!(button, GameButton::Up | GameButton::Down | GameButton::Left | GameButton::Right)
+        .then_some(button)
 }
 
 fn execute_action_transaction(

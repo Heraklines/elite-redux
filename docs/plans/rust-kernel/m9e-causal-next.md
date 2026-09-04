@@ -1,7 +1,9 @@
 # B1a: current V7 held-navigation timer consequence
 
-Status: READY_IMPLEMENTATION. Source review only; no build, test, formatting,
-commit, or push performed by this lane.
+Status: IMPLEMENTED_PENDING_REMOTE. Nine behavioral tests and the focused remote
+mutation gate are ready. Independent source review corrections cover rejected
+horizontal input atomicity, global timer ID uniqueness and fresh allocator
+construction. No local build, test, or formatter ran.
 
 Base: `5c21f3dc9e899a0d1902ee3637af1b58a29fbd24`.
 

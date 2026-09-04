@@ -711,7 +711,7 @@ mod transaction_tests {
                         local_seat: SeatId::new(safe_one()),
                         role: GameKernelRoleV7::Authority,
                         scheduler: KernelSchedulerSnapshotV2 {
-                            next_timer_id: None,
+                            next_timer_id: Some(SafeU53::ZERO),
                             timers: Vec::new(),
                             pauses: Vec::new(),
                             disposed: false,

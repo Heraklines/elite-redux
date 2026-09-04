@@ -191,7 +191,7 @@ fn public_agent_rejects_old_snapshot_schema_without_replacing_current_session()
         true,
         content,
         KernelSchedulerSnapshotV2 {
-            next_timer_id: None,
+            next_timer_id: Some(SafeU53::ZERO),
             timers: Vec::new(),
             pauses: Vec::new(),
             disposed: false,

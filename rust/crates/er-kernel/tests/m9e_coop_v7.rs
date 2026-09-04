@@ -70,7 +70,7 @@ fn input() -> InputRouterSnapshotV2 {
 
 fn scheduler() -> KernelSchedulerSnapshotV2 {
     KernelSchedulerSnapshotV2 {
-        next_timer_id: None,
+        next_timer_id: Some(SafeU53::ZERO),
         timers: Vec::new(),
         pauses: Vec::new(),
         disposed: false,

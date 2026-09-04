@@ -10,7 +10,7 @@ use er_types::battle_ids::MenuInstanceId;
 use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::{
     GameControlKindV2, GameControlPlanV2, PhysicalKey, PlatformRequestId, PresentationEventId,
-    SafeU53, TerminalState,
+    SafeU53, TerminalState, TimeClass, TimerOwner,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -20,6 +20,7 @@ use crate::snapshot::{
     QuiescentPreparedTransaction,
 };
 use crate::snapshot_v6::RestorableKernelSnapshotV6;
+use crate::game_kernel_v7::{NAVIGATION_REPEAT_INTERVAL_MS_V7, navigation_button_v7};
 
 pub const CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7: u32 = 7;
 pub const MAX_PENDING_PRESENTATIONS_V7: usize = 4_096;
@@ -127,6 +128,7 @@ impl CoreGameKernelSnapshotV7 {
         self.scheduler
             .validate()
             .map_err(|_| SnapshotV7Error::Invalid)?;
+        self.validate_repeat_ownership()?;
         if let Some(protocol) = &self.protocol {
             protocol.validate().map_err(|_| SnapshotV7Error::Invalid)?;
         }
@@ -171,6 +173,54 @@ impl CoreGameKernelSnapshotV7 {
             .is_some_and(|instance| instance >= self.next_menu_instance_id)
         {
             return Err(SnapshotV7Error::Invalid);
+        }
+        Ok(())
+    }
+
+    fn validate_repeat_ownership(&self) -> Result<(), SnapshotV7Error> {
+        let mut logical_owners = BTreeSet::new();
+        let active_control = match &self.lifecycle {
+            GameKernelLifecycleSnapshotV7::Active(state) => state.active_run.as_ref()
+                .map(|run| &run.control),
+            _ => None,
+        };
+        for repeat in &self.input_router.repeats {
+            if !logical_owners.insert((repeat.seat, repeat.button, repeat.menu_instance_id))
+                || self.input_router.focus != er_types::InputFocus::Game
+                || navigation_button_v7(&repeat.source) != Some(repeat.button)
+                || !active_control.is_some_and(|control| control.actionable
+                    && control.menu.as_ref().is_some_and(|menu| menu.instance_id == repeat.menu_instance_id))
+                || self.pending_presentations.iter().any(|pending| {
+                    pending.blocking == PresentationBlockingPolicy::BlocksHumanInput
+                })
+                || !self.input_router.locks.iter().any(|lock| lock.seat == repeat.seat
+                    && lock.button == repeat.button && lock.menu_instance_id == repeat.menu_instance_id)
+                || !self.scheduler.timers.iter().any(|timer| {
+                    timer.registration.timer_id == repeat.timer_id
+                        && timer.registration.endpoint == repeat.seat
+                        && timer.registration.owner == TimerOwner::input_repeat(repeat.button)
+                        && timer.registration.time_class == TimeClass::HumanInput
+                        && timer.registration.delay_ms == NAVIGATION_REPEAT_INTERVAL_MS_V7
+                })
+            {
+                return Err(SnapshotV7Error::Invalid);
+            }
+        }
+        let mut timer_ids = BTreeSet::new();
+        for timer in &self.scheduler.timers {
+            if !timer_ids.insert(timer.registration.timer_id) {
+                return Err(SnapshotV7Error::Invalid);
+            }
+            if timer.registration.owner.owner_id == "input-router"
+                && timer.registration.owner.reason == "input-repeat"
+                && !self.input_router.repeats.iter().any(|repeat| {
+                    repeat.timer_id == timer.registration.timer_id
+                        && repeat.seat == timer.registration.endpoint
+                        && timer.registration.owner == TimerOwner::input_repeat(repeat.button)
+                })
+            {
+                return Err(SnapshotV7Error::Invalid);
+            }
         }
         Ok(())
     }

@@ -70,7 +70,7 @@ fn context() -> BrowserSessionContextV2 {
         local_seat: SeatId::new(safe(1)),
         role: GameKernelRoleV7::Authority,
         scheduler: KernelSchedulerSnapshotV2 {
-            next_timer_id: None,
+            next_timer_id: Some(SafeU53::ZERO),
             timers: Vec::new(),
             pauses: Vec::new(),
             disposed: false,
