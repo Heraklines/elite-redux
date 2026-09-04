@@ -516,6 +516,16 @@
       20018
     ]
   },
+  "SPECIES_WEAVILE_MEGA": {
+    "ability1": 5274,
+    "ability2": 46,
+    "hidden": 181,
+    "innates": [
+      5096,
+      5701,
+      5702
+    ]
+  },
   "SPECIES_YVELTAL_MEGA": {
     "ability1": 5144,
     "ability2": 5144,
