@@ -1,0 +1,67 @@
+name: M9E Focused Feedback
+
+on:
+  push:
+    branches:
+      - 'wrk/m9e-recovery-*'
+      - 'wrk/m9e-task-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m9e-focused-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Restore dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Restore native test build
+        uses: actions/cache@v5
+        with:
+          path: rust/target
+          key: m9e-focused-native-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-native-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Focused remote checks and evidence
+        run: python3 scripts/ci/m9e_feedback.py
+      - name: Compact result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Full remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/full/
+          if-no-files-found: error
+          retention-days: 14
