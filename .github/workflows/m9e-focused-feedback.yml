@@ -22,7 +22,6 @@ jobs:
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
-      M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
     steps:
       - uses: actions/checkout@v6
         with:
@@ -48,6 +47,8 @@ jobs:
           restore-keys: |
             m9e-focused-native-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
       - name: Focused remote checks and evidence
+        env:
+          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
         run: python3 scripts/ci/m9e_feedback.py
       - name: Compact result
         if: always()
