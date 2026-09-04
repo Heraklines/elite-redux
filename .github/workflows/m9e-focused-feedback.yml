@@ -54,7 +54,6 @@ jobs:
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
-            m9e-focused-native-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
       - name: Restore browser release Wasm build
         uses: actions/cache@v5
         with:
@@ -112,3 +111,21 @@ jobs:
           path: ${{ runner.temp }}/m9e-v7-web/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Preserve native compilation after failed checks
+        if: failure()
+        uses: actions/cache/save@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+      - name: Preserve browser compilation after failed checks
+        if: failure()
+        uses: actions/cache/save@v5
+        with:
+          path: rust/target/wasm32-unknown-unknown/release
+          key: m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+      - name: Preserve test Wasm compilation after failed checks
+        if: failure()
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/m9e-wasm-target
+          key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}

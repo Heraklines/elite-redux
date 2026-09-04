@@ -104,12 +104,12 @@ V7, or make native CLI depend on Wasm/browser bindings. One current session
 must own construction, typed external events, observation, snapshot/fork and
 disposal before the worker/browser consumers delegate to it.
 
-Status: **READY_IMPLEMENTATION**. No handoff commit or report artifact yet;
-the integrator owns committing, remote execution, and recording the exact
-candidate/run evidence. Passing these two tests will close only the bounded
-current CLI identity/bootstrap seam, not Gate A or M9 engineering.
+Status: **CLI_VALIDATED** at `e4064dba1c8001724eefb715ab01b62a1eab610a`,
+run `33924401642`; see `m9e-recovery-ledger.md` for the preceding real red baseline
+and full integration run. This closes the bounded current CLI identity/bootstrap
+seam, not Gate A or M9 engineering.
 
-## A1 implementation checkpoint (remote verification pending)
+## A1 CLI implementation checkpoint (remotely validated)
 
 `er-env/src/current.rs` adds `CurrentGameSession` beside the retained historical
 facade. It owns the existing V7 kernel, shared prepared V2 content, local seat
@@ -123,8 +123,9 @@ state. Observation does not clone the complete session or snapshot.
 `er-cli/src/current_agent.rs` serves the normal `agent` command using that
 facade. The old route is explicitly `agent-v6`. Current `new-run`, `resume`,
 `simulate`, `replay`, worker, browser delegation, and the remaining developer
-tools still require their own consumer cutovers; this checkpoint does not
-silently relabel them as current.
+tools require their own consumer cutovers. Browser delegation has since been
+implemented and is undergoing separate remote verification; this checkpoint does
+not silently relabel the remaining entries as current.
 
 Callable methods added to the current adapter use the existing protocol
 allowlist: `session.create`, `session.from_snapshot`, `session.observe`,
@@ -146,9 +147,10 @@ The adapter caps requests and directly readable responses at 4 MiB, and live
 sessions at 256. The historical server's inaccessible artifact-reference path
 is not used: responses above the cap fail. Event execution and response-size
 validation occur on a candidate session before it replaces the original.
-The facade also stages its kernel for rejected-event atomicity. The two
-candidate copies are a known optimization target, not a measured throughput
-claim. Immutable content is shared across sessions.
+The facade stages its kernel once through `apply_with`; the CLI prepares its bounded
+response in the completion closure before commit. A native helper regression rejects
+completion after a valid event and proves full snapshot rollback and successful retry.
+Immutable content is shared across sessions. No measured throughput claim is made.
 
 The same remote command now selects **4** executable tests. The two additional
 tests verify time-event replay sequence changes, exact fork equality under the
@@ -160,7 +162,7 @@ not accidentally count as exercising the kernel's negative path.
 
 All verification and formatting remain remote. No local build, test,
 installation, fixture download, runtime process, or formatter was executed.
-This source checkpoint still needs remote compile/test evidence before it can
-be called a qualified current CLI capability. Timer consequences, natural
+Remote evidence includes four real CLI executable witnesses plus the native session
+transaction regression. Timer consequences, natural
 campaign/co-op play, complete repro, hot reload, and browser topology remain
 outside these four bounded witnesses.

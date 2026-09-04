@@ -17,7 +17,7 @@
 | F0 | integrator + independent feedback reviewer | VALIDATED | Read-only isolated push workflow, exact SHA, cumulative impact selection, bounded summaries | actual nonzero tests / build, execution, count or unmapped-scope failure fails job | M9E Focused Feedback; validated integration run `33921848212` |
 | A0 | current-entry lane | VALIDATED | Actual CLI accepts current V2 content and owns a V7 natural session | real V2 rejection baseline, then four positive/negative executable witnesses | `er-cli::m9e_current_entry` at `e79aa6a` |
 | A1 | integrator + current-entry lane | PARTIAL_VALIDATED | Current environment and CLI use V7; worker, batch, replay and browser delegation remain | four CLI witnesses passed; non-key-inclusive browser replay still pending | integration run `33921848212`; next transaction prerequisite |
-| B0 | causal lane | IN_PROGRESS | Existing typed timer purpose reaches real reducer, repeat/restore/pauses | real raw held navigation / release, stale generation, overflow | focused kernel regression after platform mapping |
+| B0 | causal lane | REVIEWED_NEXT | Existing typed timer purpose reaches real reducer, repeat/restore/pauses | real raw held navigation / release, stale generation, overflow | focused kernel regression after platform mapping |
 | D0 | independent feedback reviewer | REVIEWED_TRIGGERS | Safe recovery branch triggers | 65 existing workflows inspected; no matching deploy/full-gate trigger or workflow_run chain | no local test execution |
 
 ## Focused feedback scope
@@ -58,6 +58,8 @@ remain subsequent measured work.
 | `e79aa6a51c7ccc9b6364a33399cc2874e1e034fb` | `33921848212` | PASS | Format, 16 harness regressions, 446 native selected/executed/passed, zero failed/skipped, one explicitly excluded historical audit; current facade Wasm compile check and one V7 Wasm parity witness passed. All four actual current CLI witnesses passed. |
 | `f3e711336fe249cde763f19d48313be1fbb72cde` | `33924006886` | format-only failure | 21 harness regressions, 10 selected native tests and one V7 Wasm parity test passed, including session completion rollback. Full native reverse cone compiled. Remote format patch applied in `e4064db`. Compact artifact 4,747 compressed bytes. |
 | `e4064dba1c8001724eefb715ab01b62a1eab610a` | `33924401642` | PASS | Format, 21 harness regressions, 10 selected/executed/passed native tests and one V7 Wasm parity test; full native cone compiled, facade Wasm check passed. Compact artifact 2,940 compressed bytes. |
+| `52866a27514b6c330dd4abdfb045510eeb780c63` | `33925063385` | compile + format failure | 28 harness regressions passed. Two new browser-test comparisons used MenuOptionId as a string; production host compiled, but no tests executed. Remote 20,842-byte format patch applied and typed comparisons corrected in `3969554`. Compact artifact 10,100 compressed bytes. |
+| `3969554e6dc2c9fe7a19b9acdb5cd49f667a610f` | `33925332115` | format-only failure | 28 harness regressions; 24 native tests, one V7 Wasm parity test, two Chromium journeys and one typed-effect test all passed. er-web clippy passed. One test closure required a one-line formatting correction, returned remotely. Compact artifact 5,143 compressed bytes; browser assets retained remotely. |
 
 F0 report: `m9e-summary-74bcaea727110a3f235a6ff07a282f35de83c387`, 1,250 compressed bytes.
 Rust 1.97.1, Linux x86_64, test/default features. Format 3,339 ms; build 5,683 ms;
@@ -105,7 +107,7 @@ No corrected final tag or qualification claim is made here.
 Run `33921848212` completed in 14m24s at exact candidate `e79aa6a51c7ccc9b6364a33399cc2874e1e034fb`.
 Named compact artifact: 1,828 compressed bytes; full diagnostics remain remote.
 Rust 1.97.1, Linux x86_64, default features, test profile with debug information disabled.
-Native build: 92,613 ms; two historical test binaries used 129,022 and 282,641 ms.
+Native build: 92,613 ms; two existing test binaries used 129,022 and 282,641 ms.
 Harness SHA-256: `82fd73437655c2ca960e169652b8c27c645446c78c9b94cee17f54298a197aad`.
 Selected native IDs SHA-256: `4c74db30e020a6e0b452934eabff06720d325738b9f6bfb8306368797a324acc`.
 Full summary SHA-256: `6750784f2947bf5fae987152a2b86abdc228ebf9459bf48ec70103760903153d`.
@@ -137,15 +139,17 @@ before reduction. No browser protocol or content schema changed.
 Two private host tests cover late response-size rejection and sequence exhaustion,
 including unchanged full snapshot, replay bookkeeping and cached response bytes.
 Two integration tests cover direct session/browser event parity and rejected-request
-retry behavior. These new tests are pending remote execution.
+retry behavior. All four new browser tests passed in run `33925332115`; the formatting
+correction still requires an entirely green exact candidate.
 
 Browser changes and future shared-session edits select all er-web, er-env and er-cli
 tests, native/Wasm V7 parity, er-web clippy, the existing two Chromium host journeys,
 and the existing typed effect-router test. Remote browser asset hashes bind to the
 candidate; full generated assets and browser traces stay remote. Browser release
 Wasm, native debug outputs, test Wasm, tool binaries, dependency downloads and
-Chromium downloads have separate cache identities. Native cache v1 is a migration
-fallback containing only the pre-browser native build.
+Chromium downloads have separate cache identities. Native cache v2 stores only debug
+outputs. Failed checks may preserve compiled artifacts, but every candidate must
+recompile as needed and execute tests; no stored passing status is accepted.
 
 The Chromium spec executes the real generated V7 Wasm host with DOM keyboard input
 and direct same-page host byte relay. It does not exercise production Worker/WebRTC
@@ -154,3 +158,14 @@ after non-key events. Complete causal replay, native reload worker, batch/replay
 consumers, causal timer/effect/retention repairs and fault-injected qualification
 remain outstanding. This is still a partial current-entry recovery, not checkpoint 1
 completion or final M9 qualification.
+
+Next bounded consumer cut: `er-kernel-worker/src/{main,protocol,runtime}.rs` and
+`er-lab/src/kernel_reload/{endpoint,types,supervisor}.rs`. The process currently
+boots ABI V1 and owns V6/V1 content through `GameEnvironment`; current operation
+needs typed V7/V2 session ingress and corresponding reload clients, with ABI V1
+explicitly retained for historical compatibility. Do not copy two old semantics:
+`handle_checked` assigns accepted sequence before request success, and ExportRepro
+pairs a post-event snapshot with the earlier trace. The current path needs staged
+response completion and a preceding replay checkpoint. Require a real spawned
+current worker and a CLI/browser/worker non-key trace, then generation-replacement
+acceptance. Existing worker tests alone certify only the historical ABI.

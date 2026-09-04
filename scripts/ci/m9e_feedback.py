@@ -337,8 +337,10 @@ def main(preflight_failure=None):
                                           stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
             except subprocess.TimeoutExpired as error:
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
+                summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
                 raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
             TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
+            summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
             counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
             if not counts:
                 raise RuntimeError(f"missing test result: {output.name}")

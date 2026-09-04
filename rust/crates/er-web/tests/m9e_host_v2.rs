@@ -1120,9 +1120,7 @@ fn current_session_and_browser_match_natural_input_and_external_outcomes()
             .observe()?
             .control
             .and_then(|control| control.menu)
-            .is_some_and(|menu| {
-                menu.selected_option_id.as_str() == "bootstrap/starter/confirm"
-            })
+            .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
         {
             break;
         }
