@@ -1,6 +1,7 @@
 # A1b: browser adapter delegates to the current session
 
-Status: IMPLEMENTED_PENDING_REMOTE in the recovery working tree. The design below
+Status: FOCUSED_REMOTE_PASS at `b7e2266cfbe774664a7737160c90727a71e4a030`, run
+`33926691832`. The design below
 records the reviewed boundary. `CurrentGameSession::apply_with` is committed;
 BrowserKernelHostV2 delegation and four focused browser regressions are implemented.
 All compilation, formatting, tests and browser execution remain remote-only.

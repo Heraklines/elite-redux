@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "e79aa6a51c7ccc9b6364a33399cc2874e1e034fb",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33921848212",
+  "baseline": "b7e2266cfbe774664a7737160c90727a71e4a030",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33926691832",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -19,6 +19,11 @@
     "session_paths": ["rust/crates/er-env/src/current.rs"],
     "execute": {"er-env": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-wasm": ["m9e_parity"]},
     "reason": "Current session delegation in the existing V7 browser host. Require native adapter tests, Wasm parity, Chromium host journeys and typed effect routing; this does not certify production Worker/WebRTC topology."
+  },
+  "worker_session_focus": {
+    "paths": ["rust/crates/er-kernel-worker/src/protocol_v2.rs", "rust/crates/er-kernel-worker/src/runtime_v2.rs", "rust/crates/er-kernel-worker/src/lib.rs", "rust/crates/er-kernel-worker/src/main.rs", "rust/crates/er-kernel-worker/Cargo.toml", "rust/crates/er-kernel-worker/tests/current_process_v2.rs"],
+    "execute": {"er-kernel-worker": ["*"], "er-cli": ["*"], "er-lab": ["kernel_reload_acceptance", "kernel_reload_artifact"]},
+    "reason": "Native ABI2 worker-only changes compile the complete reverse dependency cone and execute worker/process, CLI, and existing ABI1 reload compatibility targets. Cargo.lock is accepted only after parsed comparison proves the worker adds exactly er-canonical, er-protocol, and er-state from already locked workspace packages. Shared session and browser changes retain their separate platform requirements."
   },
   "historical_dispositions": [{
     "crate": "er-sim",

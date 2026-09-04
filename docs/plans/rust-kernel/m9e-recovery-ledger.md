@@ -169,3 +169,37 @@ pairs a post-event snapshot with the earlier trace. The current path needs stage
 response completion and a preceding replay checkpoint. Require a real spawned
 current worker and a CLI/browser/worker non-key trace, then generation-replacement
 acceptance. Existing worker tests alone certify only the historical ABI.
+
+## Browser focused pass and worker candidate
+
+Exact candidate `b7e2266cfbe774664a7737160c90727a71e4a030` passed run
+`33926691832`: 28 harness selftests, 24/24 native tests (zero failures/skips),
+one Wasm parity test, two Chromium journeys, one typed effect-routing test,
+formatting, and er-web Clippy. Only the named 4,335-byte compressed summary
+was retrieved. Harness SHA-256:
+`0933b1a7634fa758b5e97aec6ebea7dd7e77f80725aafd1f3e8f918a4af11a59`.
+Selected native IDs SHA-256:
+`204aa05153d8c1bd92ab632fb633060949eef53c14e6e26b0d5588946da48317`.
+The comparison baseline advances to this validated candidate. Native build
+took 97,077 ms; `er-web:m9e_host_v2` execution took 333,386 ms; browser build
+took 283,088 ms. No production Worker/WebRTC claim follows from this pass.
+
+The next candidate adds explicit ABI2 bootstrap dispatch to the actual native
+worker, with V7/V2 initialization, typed current events, observation, snapshot,
+restore and disposal through CurrentGameSession. Failed requests retain the
+accepted sequence and state; responses are serialized before commit. ABI1
+remains explicit compatibility. Current causal repro export is explicitly
+unsupported pending the complete preceding-checkpoint/event trace contract.
+Two actual-process tests cover natural controls/time, typed effects, disposal,
+invalid content/event/sequence recovery and genuine V6 snapshot rejection.
+Their source/artifact markers are synthetic; they do not certify an artifact
+manager or reload swap. Successful V7 continuation and current reload acceptance
+remain outstanding. Independent source review found one test panic lint, fixed
+before submission, and no other blocking transaction or framing issue.
+
+Worker-only feedback compiles the complete native reverse dependency cone and
+executes worker, CLI and the two named historical reload compatibility targets,
+then worker Clippy. A parsed full-lock guard accepts only the three existing
+workspace dependencies added to er-kernel-worker. Five additional harness
+selftests exercise mapping and lock failures. All candidate execution is pending
+remote verification; no local builds, tests, formatting or installations ran.

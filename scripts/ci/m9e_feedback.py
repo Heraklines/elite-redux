@@ -68,6 +68,52 @@ def check_format(selection):
         raise
 
 
+def verify_worker_lock_change(before_text, after_text):
+    """Allow only the ABI2 worker's three existing workspace dependencies."""
+    before = tomllib.loads(before_text)
+    after = tomllib.loads(after_text)
+    additions = {"er-canonical", "er-protocol", "er-state"}
+
+    def records(lock):
+        packages = lock.get("package", [])
+        result = {(item["name"], item["version"], item.get("source")): item for item in packages}
+        if len(result) != len(packages):
+            raise RuntimeError("worker lock guard: duplicate package identity")
+        return result
+
+    old = records(before)
+    new = records(after)
+    if {key: value for key, value in before.items() if key != "package"} != {
+        key: value for key, value in after.items() if key != "package"
+    } or old.keys() != new.keys():
+        raise RuntimeError("worker lock guard: lock metadata or package inventory changed")
+    worker_keys = [key for key in old if key[0] == "er-kernel-worker" and key[2] is None]
+    if len(worker_keys) != 1:
+        raise RuntimeError("worker lock guard: one existing workspace worker required")
+    worker_key = worker_keys[0]
+    for name in additions:
+        candidates = [key for key in old if key[0] == name]
+        if len(candidates) != 1 or candidates[0][2] is not None:
+            raise RuntimeError("worker lock guard: dependency is not an existing unambiguous workspace package")
+    for key in old:
+        if key != worker_key and old[key] != new[key]:
+            raise RuntimeError("worker lock guard: another package record changed")
+    old_worker = old[worker_key]
+    new_worker = new[worker_key]
+    if {key: value for key, value in old_worker.items() if key != "dependencies"} != {
+        key: value for key, value in new_worker.items() if key != "dependencies"
+    }:
+        raise RuntimeError("worker lock guard: worker metadata changed")
+    old_dependencies = old_worker.get("dependencies", [])
+    new_dependencies = new_worker.get("dependencies", [])
+    if len(old_dependencies) != len(set(old_dependencies)) or len(new_dependencies) != len(set(new_dependencies)) or (
+        set(new_dependencies) - set(old_dependencies) != additions
+        or set(old_dependencies) - set(new_dependencies)
+    ):
+        raise RuntimeError("worker lock guard: only the three exact added dependencies are allowed")
+    return {"status": "verified", "added_workspace_dependencies": sorted(additions)}
+
+
 def plan():
     config = json.loads((ROOT / "scripts/ci/m9e-targets.json").read_text())
     # Cumulative coverage survives canceled/failed intermediate pushes. Advancing
@@ -80,6 +126,16 @@ def plan():
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         run(["git", "fetch", "--no-tags", "--depth=1", "origin", base], "comparison-fetch", ROOT)
     changed = capture(["git", "diff", "--name-only", base, "HEAD"]).splitlines()
+    rust_changes = [path for path in changed if path.startswith("rust/")]
+    worker_focus = config.get("worker_session_focus", {})
+    worker_paths = worker_focus.get("paths", [])
+    worker_session = any(path in worker_paths for path in rust_changes) and all(
+        path in worker_paths or path == "rust/Cargo.lock" for path in rust_changes)
+    worker_lock_guard = None
+    if worker_session and "rust/Cargo.lock" in changed:
+        worker_lock_guard = verify_worker_lock_change(
+            capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text())
+        worker_lock_guard["baseline_sha"] = base
     packages = {}
     for manifest in sorted((RUST / "crates").glob("*/Cargo.toml")):
         data = tomllib.loads(manifest.read_text())
@@ -93,7 +149,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif path in config["infrastructure_paths"] or any(
+        elif (worker_session and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -126,7 +182,6 @@ def plan():
         selected.update(config["readiness_packages"])
     if current_session:
         selected.add("er-wasm")
-    rust_changes = [path for path in changed if path.startswith("rust/")]
     focus = config.get("current_session_focus", {})
     execution_scope = focus.get("execute") if rust_changes and all(path in focus.get("paths", []) for path in rust_changes) else None
     browser_focus = config.get("browser_session_focus", {})
@@ -138,9 +193,12 @@ def plan():
     if browser_session:
         execution_scope = browser_focus["execute"]
         boundaries = [path for path in boundaries if path not in browser_paths]
+    if worker_session:
+        execution_scope = worker_focus["execute"]
     if execution_scope is not None:
         selected.update(execution_scope)
-        current_session = True
+        if not worker_session:
+            current_session = True
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
               "historical_dispositions": config.get("historical_dispositions", []),
@@ -148,6 +206,8 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
+              "worker_session_focus": worker_session,
+              "worker_lock_guard": worker_lock_guard,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     if unknown or boundaries or shared:
@@ -351,6 +411,8 @@ def main(preflight_failure=None):
                 raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
+        if selection["worker_session_focus"]:
+            run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
         if selection["requires_wasm"]:
             wasm_checks(selection, summary)
         if selection["requires_browser"]:

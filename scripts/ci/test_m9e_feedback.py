@@ -72,12 +72,14 @@ class FeedbackTests(unittest.TestCase):
 
         self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
         self.head = CANDIDATE
+        self.baseline_lock = None
         self.capture_calls = []
         self.commands = []
         self.events = []
         self.executed = []
         self.binary_workdirs = []
         self.format_code = 0
+        self.clippy_code = 0
         self.build_code = 0
         self.build_diagnostic = "error: synthetic compiler failure\n"
         self.extra_failure_logs = 0
@@ -101,6 +103,8 @@ class FeedbackTests(unittest.TestCase):
             return "\n".join(self.changed)
         if args == ["git", "rev-parse", "HEAD"]:
             return self.head
+        if args == ["git", "show", f"{BASE}:rust/Cargo.lock"] and self.baseline_lock is not None:
+            return self.baseline_lock
         if args == ["rustc", "--version"]:
             return "rustc 1.97.1 (synthetic)"
         if args == ["rustc", "-vV"]:
@@ -123,6 +127,11 @@ class FeedbackTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, self.format_code)
             self.events.append("format-patch")
             return subprocess.CompletedProcess(args, 0)
+        if args[:2] == ["cargo", "clippy"]:
+            self.events.append("clippy")
+            if self.clippy_code:
+                stdout.write("error: synthetic worker lint failure\n")
+            return subprocess.CompletedProcess(args, self.clippy_code)
         if args[:2] == ["cargo", "test"]:
             self.events.append("build")
             if self.build_code:
@@ -349,6 +358,120 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-env")
         self.package("er-cli", '[dependencies]\ner-env = { path = "../er-env" }\n')
         self.package("er-web", '[dependencies]\ner-env = { path = "../er-env" }\n')
+
+    def configure_worker_scope(self):
+        self.configure_browser_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["worker_session_focus"] = policy["worker_session_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-kernel-worker", '[dependencies]\ner-env = { path = "../er-env" }\n')
+        self.package("er-lab", '[dependencies]\ner-kernel-worker = { path = "../er-kernel-worker" }\n')
+        self.package("er-cli", '[dependencies]\ner-lab = { path = "../er-lab" }\n')
+
+    @staticmethod
+    def worker_lock_fixture(dependencies):
+        text = 'version = 4\n'
+        for name in ("er-canonical", "er-env", "er-kernel-worker", "er-protocol", "er-state"):
+            text += f'\n[[package]]\nname = "{name}"\nversion = "0.1.0"\n'
+            if name == "er-kernel-worker":
+                text += "dependencies = " + json.dumps(dependencies) + "\n"
+        return text
+
+    def test_worker_focus_compiles_reverse_cone_without_browser_or_wasm(self):
+        self.configure_worker_scope()
+        self.changed = list(self.config["worker_session_focus"]["paths"])
+        selection = self.feedback.plan()
+        self.assertTrue(selection["worker_session_focus"])
+        self.assertFalse(selection["requires_browser"])
+        self.assertFalse(selection["requires_wasm"])
+        self.assertEqual(selection["packages"], ["er-cli", "er-kernel-worker", "er-lab"])
+        self.assertEqual(selection["execution_scope"], {
+            "er-kernel-worker": ["*"], "er-cli": ["*"],
+            "er-lab": ["kernel_reload_acceptance", "kernel_reload_artifact"],
+        })
+
+    def test_worker_lock_guard_allows_only_three_existing_workspace_additions(self):
+        self.configure_worker_scope()
+        self.changed = ["rust/crates/er-kernel-worker/src/runtime_v2.rs", "rust/Cargo.lock"]
+        self.baseline_lock = self.worker_lock_fixture(["er-env"])
+        (self.rust / "Cargo.lock").write_text(self.worker_lock_fixture(
+            ["er-canonical", "er-env", "er-protocol", "er-state"]))
+        selection = self.feedback.plan()
+        self.assertEqual(selection["unknown_paths"], [])
+        self.assertEqual(selection["worker_lock_guard"], {
+            "status": "verified", "baseline_sha": BASE,
+            "added_workspace_dependencies": ["er-canonical", "er-protocol", "er-state"],
+        })
+        self.assertIn(["git", "show", f"{BASE}:rust/Cargo.lock"], self.capture_calls)
+        self.assertFalse(selection["requires_wasm"])
+
+    def test_worker_clippy_runs_after_tests_and_its_failure_cannot_turn_green(self):
+        selection = self.feedback.plan()
+        selection["worker_session_focus"] = True
+        for clippy_code in (0, 1):
+            with self.subTest(clippy_code=clippy_code):
+                self.clippy_code = clippy_code
+                self.events.clear()
+                with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+                    code, summary = self.invoke()
+                self.assertEqual(code, clippy_code)
+                self.assertEqual(summary["tests"]["passed"], 2)
+                self.assertLess(self.events.index("execute:b_suite"), self.events.index("clippy"))
+                self.assertIn("worker-clippy", summary["timing_ms"])
+                self.assertIn(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], self.commands)
+                wasm.assert_not_called()
+                browser.assert_not_called()
+                if clippy_code:
+                    self.assertIn("worker-clippy exited 1", summary["first_failure"])
+
+    def test_worker_lock_guard_rejects_other_semantic_lock_changes(self):
+        before = self.worker_lock_fixture(["er-env"])
+        added = ["er-canonical", "er-env", "er-protocol", "er-state"]
+        valid = self.worker_lock_fixture(added)
+        invalid = {
+            "missing_addition": self.worker_lock_fixture(added[:-1]),
+            "extra_dependency": self.worker_lock_fixture(added + ["serde"]),
+            "removed_dependency": self.worker_lock_fixture([name for name in added if name != "er-env"]),
+            "duplicate_dependency": self.worker_lock_fixture(added + ["er-state"]),
+            "changed_metadata": valid.replace("version = 4", "version = 3"),
+            "other_package_record": valid.replace('name = "er-env"\n', 'name = "er-env"\nchecksum = "changed"\n'),
+            "package_version": valid.replace('name = "er-state"\nversion = "0.1.0"', 'name = "er-state"\nversion = "0.2.0"'),
+            "new_package": valid + '\n[[package]]\nname = "new"\nversion = "0.1.0"\n',
+            "unchanged_dependencies": before,
+        }
+        for defect, after in invalid.items():
+            with self.subTest(defect=defect):
+                with self.assertRaisesRegex(RuntimeError, "worker lock guard"):
+                    self.feedback.verify_worker_lock_change(before, after)
+        external = 'name = "er-protocol"\nsource = "registry+https://example.invalid/index"\n'
+        with self.assertRaisesRegex(RuntimeError, "existing unambiguous workspace"):
+            self.feedback.verify_worker_lock_change(
+                before.replace('name = "er-protocol"\n', external),
+                valid.replace('name = "er-protocol"\n', external))
+
+    def test_worker_focus_does_not_exempt_mixed_or_unmapped_inputs(self):
+        self.configure_worker_scope()
+        worker = "rust/crates/er-kernel-worker/src/runtime_v2.rs"
+        for extra in ("rust/crates/er-kernel-worker/src/other.rs", "rust/crates/er-cli/src/main.rs"):
+            with self.subTest(extra=extra):
+                self.changed = [worker, extra]
+                selection = self.feedback.plan()
+                self.assertFalse(selection["worker_session_focus"])
+                self.assertIsNone(selection["execution_scope"])
+        self.changed = [worker, "rust/crates/er-env/src/current.rs"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["worker_session_focus"])
+        self.assertIsNone(selection["execution_scope"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertTrue(selection["requires_wasm"])
+        for extra in ("rust/crates/er-web/src/host_v2.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/fixtures/generated.json", "unmapped-input.json"):
+            with self.subTest(extra=extra):
+                self.changed = [worker, extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+        self.changed = [worker, "rust/Cargo.lock", "rust/crates/er-env/src/current.rs"]
+        with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+            self.feedback.plan()
 
     def test_cumulative_current_and_browser_paths_require_all_platform_witnesses(self):
         self.configure_browser_scope()

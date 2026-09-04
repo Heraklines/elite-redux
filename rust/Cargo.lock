@@ -432,9 +432,12 @@ dependencies = [
 name = "er-kernel-worker"
 version = "0.1.0"
 dependencies = [
+ "er-canonical",
  "er-env",
  "er-game",
  "er-kernel",
+ "er-protocol",
+ "er-state",
  "er-types",
  "serde",
  "serde_json",
