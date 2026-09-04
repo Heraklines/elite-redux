@@ -26,13 +26,18 @@ impl VerifiedKernelExecutableV2 {
         identity: KernelGenerationIdentityV2,
     ) -> Result<Self, KernelEndpointErrorV2> {
         identity.validate().map_err(artifact_error)?;
-        let allowed_root = allowed_root.as_ref().canonicalize().map_err(artifact_error)?;
+        let allowed_root = allowed_root
+            .as_ref()
+            .canonicalize()
+            .map_err(artifact_error)?;
         if !allowed_root.is_dir() {
             return Err(artifact_error("allowed root is not a directory"));
         }
         let executable = executable.as_ref().canonicalize().map_err(artifact_error)?;
         if !executable.starts_with(&allowed_root) || !executable.is_file() {
-            return Err(artifact_error("executable is not a file inside the allowed root"));
+            return Err(artifact_error(
+                "executable is not a file inside the allowed root",
+            ));
         }
         let mut file = File::open(&executable).map_err(artifact_error)?;
         let mut digest = Sha256::new();
@@ -45,9 +50,15 @@ impl VerifiedKernelExecutableV2 {
             digest.update(&buffer[..count]);
         }
         if format!("{:x}", digest.finalize()) != identity.executable_sha256 {
-            return Err(artifact_error("executable digest differs from expected identity"));
+            return Err(artifact_error(
+                "executable digest differs from expected identity",
+            ));
         }
-        Ok(Self { allowed_root, executable, identity })
+        Ok(Self {
+            allowed_root,
+            executable,
+            identity,
+        })
     }
 
     pub fn identity(&self) -> &KernelGenerationIdentityV2 {

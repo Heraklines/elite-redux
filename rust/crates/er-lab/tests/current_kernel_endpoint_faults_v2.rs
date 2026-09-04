@@ -12,8 +12,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use er_kernel_worker::{
-    KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelGenerationV1,
-    KernelSessionIdV1,
+    KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelGenerationV1, KernelSessionIdV1,
 };
 use er_lab::kernel_reload::{
     ChildKernelGenerationV2, KernelEndpointErrorV2, KernelWorkerDeadlinesV2,
@@ -36,7 +35,8 @@ impl FaultPeer {
         let serial = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
         let directory = std::env::temp_dir().join(format!(
-            "er-lab-current-fault-peer-{}-{timestamp}-{serial}", std::process::id(),
+            "er-lab-current-fault-peer-{}-{timestamp}-{serial}",
+            std::process::id(),
         ));
         fs::create_dir(&directory)?;
         let peer = Self { directory };
@@ -78,8 +78,12 @@ impl FaultPeer {
     }
 
     fn pid(&self) -> Result<u32, Box<dyn Error>> {
-        let pid = fs::read_to_string(self.directory.join("peer.pid"))?.trim().parse::<u32>()?;
-        if pid <= 1 { return Err("fault peer recorded an invalid PID".into()); }
+        let pid = fs::read_to_string(self.directory.join("peer.pid"))?
+            .trim()
+            .parse::<u32>()?;
+        if pid <= 1 {
+            return Err("fault peer recorded an invalid PID".into());
+        }
         Ok(pid)
     }
 
@@ -92,7 +96,10 @@ impl FaultPeer {
         }
         // Linux retains /proc entries for zombies, so absence proves exit and
         // reaping, rather than merely successful delivery of a kill signal.
-        assert!(!process.exists(), "fault peer {pid} is still alive or unreaped");
+        assert!(
+            !process.exists(),
+            "fault peer {pid} is still alive or unreaped"
+        );
         Ok(())
     }
 }
@@ -104,13 +111,17 @@ impl Drop for FaultPeer {
         if let Ok(pid) = self.pid()
             && let Ok(status) = fs::read_to_string(format!("/proc/{pid}/status"))
             && status.lines().any(|line| {
-                line.strip_prefix("PPid:").and_then(|value| value.trim().parse::<u32>().ok())
+                line.strip_prefix("PPid:")
+                    .and_then(|value| value.trim().parse::<u32>().ok())
                     == Some(std::process::id())
             })
         {
             let _ = Command::new("/bin/kill")
-                .arg("-KILL").arg(pid.to_string())
-                .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+                .arg("-KILL")
+                .arg(pid.to_string())
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status();
         }
         // This exact directory was created exclusively by this fixture.
@@ -121,25 +132,36 @@ impl Drop for FaultPeer {
 fn reject_peer(bytes: &[u8]) -> Result<KernelEndpointErrorV2, Box<dyn Error>> {
     let (peer, artifact) = FaultPeer::create(bytes)?;
     let started = Instant::now();
-    let result = ChildKernelGenerationV2::spawn_with_deadlines(&artifact, KernelWorkerDeadlinesV2 {
-        request_timeout: Duration::from_millis(200),
-        shutdown_timeout: Duration::from_secs(1),
-    });
+    let result = ChildKernelGenerationV2::spawn_with_deadlines(
+        &artifact,
+        KernelWorkerDeadlinesV2 {
+            request_timeout: Duration::from_millis(200),
+            shutdown_timeout: Duration::from_secs(1),
+        },
+    );
     let error = result.expect_err("an invalid transport peer must never become a ready endpoint");
-    assert!(started.elapsed() < Duration::from_secs(5), "transport failure cleanup exceeded its bound");
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "transport failure cleanup exceeded its bound"
+    );
     peer.assert_reaped()?;
     Ok(error)
 }
 
 #[test]
 fn silent_transport_peer_times_out_and_is_reaped() -> Result<(), Box<dyn Error>> {
-    assert!(matches!(reject_peer(SILENT_PEER)?, KernelEndpointErrorV2::Deadline(_)));
+    assert!(matches!(
+        reject_peer(SILENT_PEER)?,
+        KernelEndpointErrorV2::Deadline(_)
+    ));
     Ok(())
 }
 
 #[test]
 fn malformed_transport_peer_is_rejected_and_reaped() -> Result<(), Box<dyn Error>> {
-    assert!(matches!(reject_peer(MALFORMED_PEER)?,
-        KernelEndpointErrorV2::Process(_) | KernelEndpointErrorV2::Protocol(_)));
+    assert!(matches!(
+        reject_peer(MALFORMED_PEER)?,
+        KernelEndpointErrorV2::Process(_) | KernelEndpointErrorV2::Protocol(_)
+    ));
     Ok(())
 }

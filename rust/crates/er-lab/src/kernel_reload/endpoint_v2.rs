@@ -13,8 +13,8 @@ use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_kernel_worker::{
     KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelWorkerBootstrapV2,
     KernelWorkerHealthV2, KernelWorkerInitializationV2, KernelWorkerRequestEnvelopeV2,
-    KernelWorkerRequestV2, KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2,
-    read_frame_v1, write_frame_v1,
+    KernelWorkerRequestV2, KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, read_frame_v1,
+    write_frame_v1,
 };
 use er_types::SeatId;
 
@@ -59,27 +59,40 @@ impl ChildKernelGenerationV2 {
         }
         artifact.reverify()?;
         let mut bootstrap = Vec::new();
-        write_frame_v1(&mut bootstrap, &KernelWorkerBootstrapV2 {
-            abi_version: KERNEL_WORKER_ABI_VERSION_V2,
-            identity: artifact.identity().clone(),
-        }).map_err(protocol_error)?;
+        write_frame_v1(
+            &mut bootstrap,
+            &KernelWorkerBootstrapV2 {
+                abi_version: KERNEL_WORKER_ABI_VERSION_V2,
+                identity: artifact.identity().clone(),
+            },
+        )
+        .map_err(protocol_error)?;
         // Own the child before taking pipes or performing any fallible setup.
         let mut worker = OwnedWorkerV2 {
-            child: Some(Command::new(artifact.executable())
-                .current_dir(artifact.allowed_root())
-                .env_clear()
-                .env("RUST_BACKTRACE", "0")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                // Avoid an unbounded diagnostic file or a pipe that can fill.
-                .stderr(Stdio::null())
-                .spawn().map_err(process_error)?),
+            child: Some(
+                Command::new(artifact.executable())
+                    .current_dir(artifact.allowed_root())
+                    .env_clear()
+                    .env("RUST_BACKTRACE", "0")
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    // Avoid an unbounded diagnostic file or a pipe that can fill.
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .map_err(process_error)?,
+            ),
             shutdown_timeout: deadlines.shutdown_timeout,
         };
         let child = worker.child.as_mut().ok_or(KernelEndpointErrorV2::Closed)?;
         let process_id = child.id();
-        let mut stdin = child.stdin.take().ok_or_else(|| process_error("worker stdin unavailable"))?;
-        let stdout = child.stdout.take().ok_or_else(|| process_error("worker stdout unavailable"))?;
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| process_error("worker stdin unavailable"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| process_error("worker stdout unavailable"))?;
         let (jobs_tx, jobs_rx) = mpsc::sync_channel::<Vec<u8>>(1);
         let (responses_tx, responses) = mpsc::sync_channel(1);
         let io_thread = thread::Builder::new()
@@ -99,7 +112,8 @@ impl ChildKernelGenerationV2 {
                         break;
                     }
                 }
-            }).map_err(process_error)?;
+            })
+            .map_err(process_error)?;
         let mut endpoint = Self {
             identity: artifact.identity().clone(),
             worker,
@@ -119,12 +133,22 @@ impl ChildKernelGenerationV2 {
         Ok(endpoint)
     }
 
-    pub fn identity(&self) -> &KernelGenerationIdentityV2 { &self.identity }
-    pub fn process_id(&self) -> u32 { self.process_id }
-    pub fn accepted_sequence(&self) -> Option<u64> { self.accepted_sequence }
-    pub fn is_fenced(&self) -> bool { self.fenced }
+    pub fn identity(&self) -> &KernelGenerationIdentityV2 {
+        &self.identity
+    }
+    pub fn process_id(&self) -> u32 {
+        self.process_id
+    }
+    pub fn accepted_sequence(&self) -> Option<u64> {
+        self.accepted_sequence
+    }
+    pub fn is_fenced(&self) -> bool {
+        self.fenced
+    }
     /// True only after a valid disposal response and successful child exit.
-    pub fn is_disposed(&self) -> bool { self.disposed }
+    pub fn is_disposed(&self) -> bool {
+        self.disposed
+    }
 
     pub fn initialize(
         &mut self,
@@ -132,7 +156,8 @@ impl ChildKernelGenerationV2 {
         initialization: KernelWorkerInitializationV2,
     ) -> Result<CurrentGameObservation, KernelEndpointErrorV2> {
         match self.request(KernelWorkerRequestV2::Initialize {
-            content_bundle: Box::new(content_bundle), initialization: Box::new(initialization),
+            content_bundle: Box::new(content_bundle),
+            initialization: Box::new(initialization),
         })? {
             KernelWorkerResponseV2::Initialized { observation } => Ok(*observation),
             _ => Err(self.invalid_response("initialize response kind")),
@@ -140,17 +165,30 @@ impl ChildKernelGenerationV2 {
     }
 
     pub fn restore(
-        &mut self, snapshot_bytes: Vec<u8>, local_seat: SeatId, role: GameKernelRoleV7,
+        &mut self,
+        snapshot_bytes: Vec<u8>,
+        local_seat: SeatId,
+        role: GameKernelRoleV7,
     ) -> Result<CurrentGameObservation, KernelEndpointErrorV2> {
-        match self.request(KernelWorkerRequestV2::Restore { snapshot_bytes, local_seat, role })? {
+        match self.request(KernelWorkerRequestV2::Restore {
+            snapshot_bytes,
+            local_seat,
+            role,
+        })? {
             KernelWorkerResponseV2::Restored { observation } => Ok(*observation),
             _ => Err(self.invalid_response("restore response kind")),
         }
     }
 
-    pub fn apply(&mut self, event: CurrentExternalEvent) -> Result<CurrentGenerationStepV2, KernelEndpointErrorV2> {
+    pub fn apply(
+        &mut self,
+        event: CurrentExternalEvent,
+    ) -> Result<CurrentGenerationStepV2, KernelEndpointErrorV2> {
         match self.request(KernelWorkerRequestV2::Apply(event))? {
-            KernelWorkerResponseV2::Effects { step, observation } => Ok(CurrentGenerationStepV2 { step, observation: *observation }),
+            KernelWorkerResponseV2::Effects { step, observation } => Ok(CurrentGenerationStepV2 {
+                step,
+                observation: *observation,
+            }),
             _ => Err(self.invalid_response("apply response kind")),
         }
     }
@@ -177,7 +215,9 @@ impl ChildKernelGenerationV2 {
     }
 
     pub fn dispose(&mut self) -> Result<(), KernelEndpointErrorV2> {
-        if self.disposed { return Ok(()); }
+        if self.disposed {
+            return Ok(());
+        }
         self.request(KernelWorkerRequestV2::Dispose)?;
         // Keep the I/O sender and stdin alive until the child exits itself.
         let deadline = Instant::now() + self.deadlines.shutdown_timeout;
@@ -187,11 +227,16 @@ impl ChildKernelGenerationV2 {
                 self.fence();
                 return Err(KernelEndpointErrorV2::Deadline("worker exit after dispose"));
             }
-            Err(error) => { self.fence(); return Err(error); }
+            Err(error) => {
+                self.fence();
+                return Err(error);
+            }
         };
         if !status.success() {
             self.fence();
-            return Err(process_error(format!("worker exit after dispose: {status}")));
+            return Err(process_error(format!(
+                "worker exit after dispose: {status}"
+            )));
         }
         self.disposed = true;
         self.jobs.take();
@@ -202,32 +247,60 @@ impl ChildKernelGenerationV2 {
         Ok(())
     }
 
-    fn request(&mut self, request: KernelWorkerRequestV2) -> Result<KernelWorkerResponseV2, KernelEndpointErrorV2> {
-        if self.fenced || self.disposed { return Err(KernelEndpointErrorV2::Closed); }
-        let next_request = self.next_request.checked_add(1).ok_or(KernelEndpointErrorV2::ResourceExhausted)?;
+    fn request(
+        &mut self,
+        request: KernelWorkerRequestV2,
+    ) -> Result<KernelWorkerResponseV2, KernelEndpointErrorV2> {
+        if self.fenced || self.disposed {
+            return Err(KernelEndpointErrorV2::Closed);
+        }
+        let next_request = self
+            .next_request
+            .checked_add(1)
+            .ok_or(KernelEndpointErrorV2::ResourceExhausted)?;
         let sequence = match self.accepted_sequence {
             None => 0,
-            Some(sequence) => sequence.checked_add(1).ok_or(KernelEndpointErrorV2::ResourceExhausted)?,
+            Some(sequence) => sequence
+                .checked_add(1)
+                .ok_or(KernelEndpointErrorV2::ResourceExhausted)?,
         };
-        let envelope = KernelWorkerRequestEnvelopeV2::new(&self.identity, self.next_request, sequence, request)
+        let envelope = KernelWorkerRequestEnvelopeV2::new(
+            &self.identity,
+            self.next_request,
+            sequence,
+            request,
+        )
+        .map_err(protocol_error)?;
+        envelope
+            .validate_for(&self.identity, self.accepted_sequence)
             .map_err(protocol_error)?;
-        envelope.validate_for(&self.identity, self.accepted_sequence).map_err(protocol_error)?;
         let mut bytes = Vec::new();
         write_frame_v1(&mut bytes, &envelope).map_err(protocol_error)?;
         if let Some(mut bootstrap) = self.bootstrap.take() {
             bootstrap.extend(bytes);
             bytes = bootstrap;
         }
-        if self.jobs.as_ref().ok_or(KernelEndpointErrorV2::Closed)?.try_send(bytes).is_err() {
+        if self
+            .jobs
+            .as_ref()
+            .ok_or(KernelEndpointErrorV2::Closed)?
+            .try_send(bytes)
+            .is_err()
+        {
             self.fence();
             return Err(process_error("worker request channel unavailable"));
         }
         let response = match self.responses.recv_timeout(self.deadlines.request_timeout) {
             Ok(Ok(response)) => response,
-            Ok(Err(error)) => { self.fence(); return Err(process_error(error)); }
+            Ok(Err(error)) => {
+                self.fence();
+                return Err(process_error(error));
+            }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 self.fence();
-                return Err(KernelEndpointErrorV2::Deadline("worker request write or response read"));
+                return Err(KernelEndpointErrorV2::Deadline(
+                    "worker request write or response read",
+                ));
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 self.fence();
@@ -238,41 +311,65 @@ impl ChildKernelGenerationV2 {
             || response.session_id != self.identity.session_id
             || response.generation != self.identity.generation
             || response.request_id != self.next_request
-        { return Err(self.invalid_response("worker response address")); }
+        {
+            return Err(self.invalid_response("worker response address"));
+        }
         if let KernelWorkerResponseV2::Fault(fault) = &response.response {
             if response.accepted_sequence != self.accepted_sequence
                 || response.after_mechanical_digest != self.mechanical_digest
-            { return Err(self.invalid_response("worker fault changed the accepted frontier")); }
+            {
+                return Err(self.invalid_response("worker fault changed the accepted frontier"));
+            }
             // A corrected request uses a fresh request ID at the same sequence.
             self.next_request = next_request;
             return Err(KernelEndpointErrorV2::Fault(fault.clone()));
         }
         if response.accepted_sequence != Some(sequence)
             || !self.matches_response(&envelope.request, &response)
-        { return Err(self.invalid_response("worker response kind, sequence or observation")); }
+        {
+            return Err(self.invalid_response("worker response kind, sequence or observation"));
+        }
         self.next_request = next_request;
         self.accepted_sequence = response.accepted_sequence;
         self.mechanical_digest = response.after_mechanical_digest;
         Ok(response.response)
     }
 
-    fn matches_response(&self, request: &KernelWorkerRequestV2, response: &KernelWorkerResponseEnvelopeV2) -> bool {
+    fn matches_response(
+        &self,
+        request: &KernelWorkerRequestV2,
+        response: &KernelWorkerResponseEnvelopeV2,
+    ) -> bool {
         let observation = match (request, &response.response) {
             (KernelWorkerRequestV2::Hello, KernelWorkerResponseV2::Ready(identity)) => {
-                return identity.as_ref() == &self.identity && response.after_mechanical_digest == self.mechanical_digest;
+                return identity.as_ref() == &self.identity
+                    && response.after_mechanical_digest == self.mechanical_digest;
             }
-            (KernelWorkerRequestV2::Initialize { .. }, KernelWorkerResponseV2::Initialized { observation })
-            | (KernelWorkerRequestV2::Restore { .. }, KernelWorkerResponseV2::Restored { observation })
-            | (KernelWorkerRequestV2::Apply(_), KernelWorkerResponseV2::Effects { observation, .. }) => observation,
+            (
+                KernelWorkerRequestV2::Initialize { .. },
+                KernelWorkerResponseV2::Initialized { observation },
+            )
+            | (
+                KernelWorkerRequestV2::Restore { .. },
+                KernelWorkerResponseV2::Restored { observation },
+            )
+            | (
+                KernelWorkerRequestV2::Apply(_),
+                KernelWorkerResponseV2::Effects { observation, .. },
+            ) => observation,
             (KernelWorkerRequestV2::Observe, KernelWorkerResponseV2::Observation(observation)) => {
-                if response.after_mechanical_digest != self.mechanical_digest { return false; }
+                if response.after_mechanical_digest != self.mechanical_digest {
+                    return false;
+                }
                 observation
             }
             (KernelWorkerRequestV2::Snapshot, KernelWorkerResponseV2::Snapshot { snapshot }) => {
-                return snapshot.schema_version == 7 && response.after_mechanical_digest == self.mechanical_digest;
+                return snapshot.schema_version == 7
+                    && response.after_mechanical_digest == self.mechanical_digest;
             }
             (KernelWorkerRequestV2::Health, KernelWorkerResponseV2::Health(health)) => {
-                return health.accepted_sequence == response.accepted_sequence && !health.disposed
+                return health.accepted_sequence == response.accepted_sequence
+                    && !health.disposed
                     && response.after_mechanical_digest == self.mechanical_digest;
             }
             (KernelWorkerRequestV2::Dispose, KernelWorkerResponseV2::Disposed) => {
@@ -280,7 +377,8 @@ impl ChildKernelGenerationV2 {
             }
             _ => return false,
         };
-        observation.kernel_version == 7 && observation.content_identity == self.identity.content_identity
+        observation.kernel_version == 7
+            && observation.content_identity == self.identity.content_identity
             && observation.mechanical_digest == response.after_mechanical_digest
     }
 
@@ -298,13 +396,21 @@ impl ChildKernelGenerationV2 {
     }
 
     fn finish_io_until(&mut self, deadline: Instant) -> Result<(), KernelEndpointErrorV2> {
-        while self.io_thread.as_ref().is_some_and(|handle| !handle.is_finished()) {
+        while self
+            .io_thread
+            .as_ref()
+            .is_some_and(|handle| !handle.is_finished())
+        {
             if Instant::now() >= deadline {
                 return Err(KernelEndpointErrorV2::Deadline("worker pipe cleanup"));
             }
             thread::sleep(Duration::from_millis(1));
         }
-        if self.io_thread.take().is_some_and(|handle| handle.join().is_err()) {
+        if self
+            .io_thread
+            .take()
+            .is_some_and(|handle| handle.join().is_err())
+        {
             return Err(process_error("worker pipe thread panicked"));
         }
         Ok(())
@@ -313,7 +419,9 @@ impl ChildKernelGenerationV2 {
 
 impl Drop for ChildKernelGenerationV2 {
     fn drop(&mut self) {
-        if !self.disposed && !self.fenced { self.fence(); }
+        if !self.disposed && !self.fenced {
+            self.fence();
+        }
         self.jobs.take();
         // Never join a thread still blocked in an OS pipe operation. Killing the
         // owned worker normally releases it; a remaining handle is detached.
@@ -332,11 +440,20 @@ struct OwnedWorkerV2 {
 }
 
 impl OwnedWorkerV2 {
-    fn wait_until(&mut self, deadline: Instant) -> Result<Option<ExitStatus>, KernelEndpointErrorV2> {
-        let Some(child) = self.child.as_mut() else { return Ok(None); };
+    fn wait_until(
+        &mut self,
+        deadline: Instant,
+    ) -> Result<Option<ExitStatus>, KernelEndpointErrorV2> {
+        let Some(child) = self.child.as_mut() else {
+            return Ok(None);
+        };
         loop {
-            if let Some(status) = child.try_wait().map_err(process_error)? { return Ok(Some(status)); }
-            if Instant::now() >= deadline { return Ok(None); }
+            if let Some(status) = child.try_wait().map_err(process_error)? {
+                return Ok(Some(status));
+            }
+            if Instant::now() >= deadline {
+                return Ok(None);
+            }
             thread::sleep(Duration::from_millis(1));
         }
     }
@@ -347,7 +464,9 @@ impl OwnedWorkerV2 {
         {
             let _ = child.kill();
         }
-        if matches!(self.wait_until(deadline), Ok(Some(_))) { self.child.take(); }
+        if matches!(self.wait_until(deadline), Ok(Some(_))) {
+            self.child.take();
+        }
     }
 }
 
@@ -357,13 +476,19 @@ impl Drop for OwnedWorkerV2 {
         if let Some(mut child) = self.child.take() {
             // An OS that does not report exit within the bound must not block
             // the caller indefinitely. Reaping continues off the caller thread.
-            let _ = thread::Builder::new().name("kernel-worker-v2-reaper".to_owned()).spawn(move || {
-                let _ = child.kill();
-                let _ = child.wait();
-            });
+            let _ = thread::Builder::new()
+                .name("kernel-worker-v2-reaper".to_owned())
+                .spawn(move || {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                });
         }
     }
 }
 
-fn process_error(error: impl ToString) -> KernelEndpointErrorV2 { KernelEndpointErrorV2::Process(error.to_string()) }
-fn protocol_error(error: impl ToString) -> KernelEndpointErrorV2 { KernelEndpointErrorV2::Protocol(error.to_string()) }
+fn process_error(error: impl ToString) -> KernelEndpointErrorV2 {
+    KernelEndpointErrorV2::Process(error.to_string())
+}
+fn protocol_error(error: impl ToString) -> KernelEndpointErrorV2 {
+    KernelEndpointErrorV2::Protocol(error.to_string())
+}

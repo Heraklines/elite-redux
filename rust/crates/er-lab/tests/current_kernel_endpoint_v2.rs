@@ -45,7 +45,7 @@ fn natural() -> Result<KernelWorkerInitializationV2, Box<dyn Error>> {
         profile: Box::new(profile()?),
         seed: SEED.to_owned(),
         local_seat: seat(),
-        save_slots: Vec::new(),
+        save_slots: vec!["preview-slot".to_owned()],
         local_is_host: true,
         scheduler: KernelSchedulerSnapshotV2 {
             next_timer_id: Some(SafeU53::ZERO),
@@ -79,7 +79,9 @@ fn fixture() -> Result<(GameContentBundleV2, VerifiedKernelExecutableV2), Box<dy
         build_target: std::env::var("ER_M9E_WORKER_BUILD_TARGET")?,
         build_profile: std::env::var("ER_M9E_WORKER_BUILD_PROFILE")?,
     };
-    let root = executable.parent().ok_or("worker executable has no parent")?;
+    let root = executable
+        .parent()
+        .ok_or("worker executable has no parent")?;
     let artifact = VerifiedKernelExecutableV2::verify(root, &executable, identity)?;
     Ok((bundle, artifact))
 }
@@ -105,17 +107,28 @@ fn verified_current_endpoint_matches_session_and_restores_a_second_process()
     let (bundle, artifact) = fixture()?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let mut reference = CurrentGameSession::natural_start(
-        profile()?, SEED.to_owned(), seat(), Vec::new(), true, content, None,
+        profile()?,
+        SEED.to_owned(),
+        seat(),
+        vec!["preview-slot".to_owned()],
+        true,
+        content,
+        None,
     )?;
     let mut active = ChildKernelGenerationV2::spawn(&artifact)?;
     assert_eq!(active.identity(), artifact.identity());
     assert_eq!(active.accepted_sequence(), Some(0));
-    assert_eq!(active.initialize(bundle.clone(), natural()?)?, reference.observe()?);
+    assert_eq!(
+        active.initialize(bundle.clone(), natural()?)?,
+        reference.observe()?
+    );
 
     for event in [
         key(PhysicalKey::Enter, true),
         key(PhysicalKey::Enter, false),
-        CurrentExternalEvent::AdvanceTime { milliseconds: safe(25) },
+        CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(25),
+        },
     ] {
         let step = reference.apply(event.clone())?;
         let actual = active.apply(event)?;
@@ -136,24 +149,36 @@ fn verified_current_endpoint_matches_session_and_restores_a_second_process()
     assert_eq!(active.accepted_sequence(), fault_sequence);
     assert!(!active.is_fenced());
     assert_eq!(active.snapshot()?, checkpoint);
-    assert_eq!(active.health()?.applied_events, before_health.applied_events);
+    assert_eq!(
+        active.health()?.applied_events,
+        before_health.applied_events
+    );
     assert!(active.accepted_sequence() > before_sequence);
 
     let mut identity = artifact.identity().clone();
     identity.generation = KernelGenerationV1(2);
     let replacement_artifact = VerifiedKernelExecutableV2::verify(
-        artifact.allowed_root(), artifact.executable(), identity,
+        artifact.allowed_root(),
+        artifact.executable(),
+        identity,
     )?;
     let mut replacement = ChildKernelGenerationV2::spawn(&replacement_artifact)?;
     assert_ne!(active.process_id(), replacement.process_id());
     replacement.initialize(bundle, natural()?)?;
-    assert_eq!(replacement.restore(
-        serde_json::to_vec(&checkpoint)?, seat(), GameKernelRoleV7::Authority,
-    )?, reference.observe()?);
+    assert_eq!(
+        replacement.restore(
+            serde_json::to_vec(&checkpoint)?,
+            seat(),
+            GameKernelRoleV7::Authority,
+        )?,
+        reference.observe()?
+    );
     assert_eq!(replacement.snapshot()?, checkpoint);
 
     for event in [
-        CurrentExternalEvent::AdvanceTime { milliseconds: safe(17) },
+        CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(17),
+        },
         key(PhysicalKey::ArrowDown, true),
         key(PhysicalKey::ArrowDown, false),
     ] {
@@ -177,19 +202,28 @@ fn verified_current_endpoint_matches_session_and_restores_a_second_process()
 }
 
 #[test]
-fn current_executable_reference_rejects_wrong_hash_and_root_escape()
--> Result<(), Box<dyn Error>> {
+fn current_executable_reference_rejects_wrong_hash_and_root_escape() -> Result<(), Box<dyn Error>> {
     let (_, artifact) = fixture()?;
     let mut incorrect = artifact.identity().clone();
     incorrect.executable_sha256 = "0".repeat(64);
-    assert!(matches!(VerifiedKernelExecutableV2::verify(
-        artifact.allowed_root(), artifact.executable(), incorrect,
-    ), Err(KernelEndpointErrorV2::Artifact(_))));
+    assert!(matches!(
+        VerifiedKernelExecutableV2::verify(
+            artifact.allowed_root(),
+            artifact.executable(),
+            incorrect,
+        ),
+        Err(KernelEndpointErrorV2::Artifact(_))
+    ));
     // An existing directory outside the permitted executable directory is enough
     // to test containment; no executable copies or synthetic payloads are needed.
     let unrelated = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    assert!(matches!(VerifiedKernelExecutableV2::verify(
-        unrelated, artifact.executable(), artifact.identity().clone(),
-    ), Err(KernelEndpointErrorV2::Artifact(_))));
+    assert!(matches!(
+        VerifiedKernelExecutableV2::verify(
+            unrelated,
+            artifact.executable(),
+            artifact.identity().clone(),
+        ),
+        Err(KernelEndpointErrorV2::Artifact(_))
+    ));
     Ok(())
 }

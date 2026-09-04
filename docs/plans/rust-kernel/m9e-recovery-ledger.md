@@ -260,3 +260,20 @@ unchanged during focused implementation.
 Still outstanding after this endpoint slice: activation supervision through
 current tools, batch/replay migration, complete causal input/effect retention,
 timer consequences, co-op/persistence/fidelity/control work and corrected Q.
+
+Endpoint candidate `c84b0553ce3ecf29d87f81864b8a75aaa5759805`, run `33929854075`,
+compiled and bound the actual non-test Cargo worker artifact (73,016,248 bytes;
+SHA-256 `640e0f358be68cc5ccf919f32a2ce36ee51e906b34fe6c139df2869a6842e8b5`).
+Its two fault tests rejected malformed dummy content hashes before spawning;
+the other 25 selected tests were not executed after that failure. The exact
+32,012-byte formatting patch exceeded the original compact cap by 12 bytes.
+The cap was raised to 32 KiB, retaining the 48 KiB patch/diagnostic total bound.
+
+Follow-up `e6112d6eebe45a398220785563564293c82fc247`, run `33930530515`, passed
+both transport fault/reaping tests and the artifact rejection test. Its actual
+endpoint continuation test returned Kernel(Invalid) before worker launch because
+the direct fixture supplied no save slots; bootstrap_catalog explicitly requires
+a nonempty list. Both direct and worker fixture initialization now use the same
+preview slot. The 13,849-byte named compact artifact included the full 32,012-byte
+remote formatting patch, applied without local formatting. These are fixture
+corrections; endpoint functional/Clippy completion still requires the next run.
