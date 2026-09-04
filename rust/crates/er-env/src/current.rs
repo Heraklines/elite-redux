@@ -298,7 +298,9 @@ fn reduce(
             kernel.ingest_network_frame(generation, &bytes)
         }
         CurrentExternalEvent::ProposalFrame { bytes } => kernel.admit_game_proposal(&bytes),
-        CurrentExternalEvent::AuthorityMaterial { bytes } => kernel.apply_authority_material(&bytes),
+        CurrentExternalEvent::AuthorityMaterial { bytes } => {
+            kernel.apply_authority_material(&bytes)
+        }
         CurrentExternalEvent::TransportChanged {
             generation,
             connected,
