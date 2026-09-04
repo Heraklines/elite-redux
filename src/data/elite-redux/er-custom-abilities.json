@@ -311,6 +311,22 @@
     "rules": [],
     "version": 1
   },
+  "new-ability-23": {
+    "componentRules": [],
+    "description": "This Ability combines the effects of both Unnerve and Breezy Neigh, preventing opposing Pokémon from consuming berries and boosting the Pokémon’s speed stat when knocking out a target.",
+    "flags": {},
+    "generation": 9,
+    "id": 20022,
+    "includes": [
+      5559,
+      127
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "As One",
+    "rules": [],
+    "version": 1
+  },
   "new-ability-3": {
     "componentRules": [],
     "description": "Ambush + Volt Rush\n\"Iron Exo endlessly stalks the ultra space for signs of the Ultra recon squad, Their fate sealed with a single shot.\"",
