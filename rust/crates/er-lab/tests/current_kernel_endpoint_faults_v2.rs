@@ -48,8 +48,8 @@ impl FaultPeer {
         // its protocol envelope; they do not claim prepared or published content.
         let content_identity = serde_json::from_value(serde_json::json!({
             "oracle_sha": "0".repeat(40),
-            "bundle_hash": "0".repeat(64),
-            "battle_hash": "0".repeat(64),
+            "bundle_hash": format!("blake3-v1:{}", "0".repeat(64)),
+            "battle_hash": format!("blake3-v3:{}", "0".repeat(64)),
             "run_hash": "0".repeat(64),
             "progression_hash": "0".repeat(64),
             "world_hash": "0".repeat(64),

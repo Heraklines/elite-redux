@@ -61,7 +61,7 @@ def check_format(selection):
                 run(["cargo", "fmt", "--all"], "format-patch")
                 patch = subprocess.check_output(["git", "diff", "--", *paths], cwd=ROOT)
                 (FULL / "format.patch").write_bytes(patch)
-                if len(patch) <= 32000:
+                if len(patch) <= 32768:
                     (COMPACT / "format.patch").write_bytes(patch)
             finally:
                 subprocess.run(["git", "restore", "--worktree", "--", "rust"], cwd=ROOT, check=True)
