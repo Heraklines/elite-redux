@@ -9,7 +9,7 @@ use er_agent_protocol::{
     AgentDispatchErrorV1, AgentDispatcherV1, AgentErrorCodeV1, AgentJsonlServerV1,
     AgentProtocolLimitsV1,
 };
-use er_env::current::{CurrentExternalEvent, CurrentGameSession};
+use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, KernelPresentationOutcomeV2};
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
@@ -55,6 +55,15 @@ struct CurrentDispatcher {
     content: Arc<PreparedGameContentV2>,
     sessions: BTreeMap<String, CurrentGameSession>,
     maximum_sessions: usize,
+}
+
+#[derive(Debug)]
+struct CurrentCompletionError(AgentDispatchErrorV1);
+
+impl From<CurrentSessionError> for CurrentCompletionError {
+    fn from(error: CurrentSessionError) -> Self {
+        Self(backend(error))
+    }
 }
 
 impl CurrentDispatcher {
@@ -128,14 +137,17 @@ impl CurrentDispatcher {
         event: CurrentExternalEvent,
     ) -> Result<Value, AgentDispatchErrorV1> {
         let id = self.session_id(params)?.to_owned();
-        let mut candidate = self.session(params)?.fork().map_err(backend)?;
-        let step = candidate.apply(event).map_err(backend)?;
-        let response = bounded(json!({
-            "step": step,
-            "observation": candidate.observe().map_err(backend)?
-        }))?;
-        self.sessions.insert(id, candidate);
-        Ok(response)
+        self.sessions
+            .get_mut(&id)
+            .ok_or_else(|| backend("current session missing or closed"))?
+            .apply_with(event, |candidate, step| {
+                bounded(json!({
+                    "step": step,
+                    "observation": candidate.observe()?
+                }))
+                .map_err(CurrentCompletionError)
+            })
+            .map_err(|error| error.0)
     }
 }
 

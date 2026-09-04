@@ -36,8 +36,13 @@ def capture(args, cwd=ROOT):
 def run(args, name, cwd=RUST, env=None):
     start = time.monotonic()
     path = FULL / (name + ".log")
-    with path.open("w") as output:
-        result = subprocess.run(args, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT)
+    print(f"[m9e] {name}", flush=True)
+    try:
+        with path.open("w") as output:
+            result = subprocess.run(args, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT, timeout=900)
+    except subprocess.TimeoutExpired as error:
+        TIMINGS[name] = round((time.monotonic() - start) * 1000)
+        raise RuntimeError(f"{name} exceeded 900 seconds; see {path.name}") from error
     TIMINGS[name] = round((time.monotonic() - start) * 1000)
     if result.returncode:
         raise RuntimeError(f"{name} exited {result.returncode}; see {path.name}")
@@ -121,11 +126,18 @@ def plan():
         selected.update(config["readiness_packages"])
     if current_session:
         selected.add("er-wasm")
+    rust_changes = [path for path in changed if path.startswith("rust/")]
+    focus = config.get("current_session_focus", {})
+    execution_scope = focus.get("execute") if rust_changes and all(path in focus.get("paths", []) for path in rust_changes) else None
+    if execution_scope is not None:
+        selected.update(execution_scope)
+        current_session = True
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
               "historical_dispositions": config.get("historical_dispositions", []),
               "requires_wasm": shared or bool(boundaries) or current_session,
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
+              "execution_scope": execution_scope,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     if unknown or boundaries or shared:
@@ -206,28 +218,55 @@ def main(preflight_failure=None):
                 binaries[message["executable"]] = (message["target"]["name"], Path(message["manifest_path"]).parent)
         if not binaries:
             raise RuntimeError("build emitted no test binaries")
+        execution_scope = selection["execution_scope"]
+        if execution_scope is not None:
+            selected_binaries = {}
+            build_only = []
+            for binary, (name, cwd) in binaries.items():
+                scope = execution_scope.get(cwd.name, [])
+                if "*" in scope or name in scope:
+                    selected_binaries[binary] = (name, cwd)
+                else:
+                    build_only.append(f"{cwd.name}:{name}")
+            for package, names in execution_scope.items():
+                for name in names:
+                    if not any(cwd.name == package and (name == "*" or target == name)
+                               for target, cwd in selected_binaries.values()):
+                        raise RuntimeError(f"required focused target missing: {package}:{name}")
+            summary["build_only_targets"] = sorted(build_only)
+            summary["execution_scope"] = execution_scope
+            binaries = selected_binaries
         enumerated = []
         for index, (binary, (name, cwd)) in enumerate(sorted(binaries.items())):
             listing = run([binary, "--list", "--format", "terse"], f"list-{index}", cwd)
             ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
             exclusions = [item for item in selection["historical_dispositions"]
-                          if item["target"] == name and item["test"] in ids]
+                          if item["crate"] == cwd.name and item["target"] == name and item["test"] in ids]
             excluded_ids = {item["test"] for item in exclusions}
             summary.setdefault("historical_dispositions", []).extend(exclusions)
             ids = [test_id for test_id in ids if test_id not in excluded_ids]
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
             enumerated.append((index, binary, name, ids, cwd, excluded_ids))
+        for item in selection["historical_dispositions"]:
+            in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
+            if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
+                raise RuntimeError("historical disposition must identify exactly one enumerated test")
         for index, binary, name, ids, cwd, excluded_ids in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             output = FULL / f"execute-{index}.log"
             start = time.monotonic()
+            print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
             command = [binary, "--format", "terse"]
             for test_id in sorted(excluded_ids):
                 command.extend(["--skip", test_id])
-            with output.open("w") as stream:
-                code = subprocess.run(command, cwd=cwd,
-                                      stdout=stream, stderr=subprocess.STDOUT).returncode
+            try:
+                with output.open("w") as stream:
+                    code = subprocess.run(command, cwd=cwd,
+                                          stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
+            except subprocess.TimeoutExpired as error:
+                TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
+                raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
             TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
             counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
             if not counts:
@@ -254,6 +293,7 @@ def main(preflight_failure=None):
                                for path in sorted(FULL.iterdir()) if path.is_file()]
         if summary["status"] != "passed":
             excerpt = summary.get("first_failure", "unknown failure") + "\n"
+            failed_log = re.search(r"see ([\w.-]+\.log)", excerpt)
             for path in sorted(FULL.glob("*.log")):
                 text = path.read_text(errors="replace")
                 # Cargo artifact records contain dependency names like thiserror;
@@ -273,7 +313,7 @@ def main(preflight_failure=None):
                     else:
                         diagnostics.append(line)
                 text = "\n".join(diagnostics)
-                if re.search(r"(?m)^error[:\[]|^Error:|--- FAILED|^FAILED |test result: FAILED|^Traceback", text) or (path.name == "format.log" and text):
+                if re.search(r"(?m)^error[:\[]|^Error:|--- FAILED|^FAILED |test result: FAILED|^Traceback", text) or (path.name == "format.log" and text) or (failed_log and path.name == failed_log[1]):
                     if len(text) > 12000:
                         summary["diagnostics_truncated"] = True
                     marker = "[TRUNCATED: full log retained remotely]\n" if len(text) > 12000 else ""

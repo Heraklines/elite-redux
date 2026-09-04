@@ -352,3 +352,50 @@ fn public_agent_rejected_external_results_do_not_commit_partial_state() -> Resul
     assert_eq!(snapshot(&responses[1])?, snapshot(&responses[5])?);
     Ok(())
 }
+
+#[derive(Debug, thiserror::Error)]
+enum CompletionFailure {
+    #[error(transparent)]
+    Session(#[from] er_env::current::CurrentSessionError),
+    #[error("adapter refused the prepared response")]
+    Rejected,
+}
+
+#[test]
+fn current_session_rolls_back_when_adapter_completion_rejects() -> Result<(), Box<dyn Error>> {
+    use er_env::current::{CurrentExternalEvent, CurrentGameSession};
+    let mut session = CurrentGameSession::natural_start(
+        profile()?,
+        "m9e-transaction".to_owned(),
+        SeatId::new(SafeU53::new(1)?),
+        vec!["preview-slot".to_owned()],
+        true,
+        content()?,
+        None,
+    )?;
+    let before = session.snapshot()?;
+    let event = CurrentExternalEvent::AdvanceTime { milliseconds: SafeU53::new(13)? };
+    let rejected: Result<(), CompletionFailure> = session.apply_with(event.clone(), |candidate, _step| {
+        assert_eq!(candidate.snapshot()?.replay_sequence.get(), before.replay_sequence.get() + 1);
+        Err(CompletionFailure::Rejected)
+    });
+    assert!(matches!(rejected, Err(CompletionFailure::Rejected)));
+    assert_eq!(session.snapshot()?, before, "adapter failure committed staged state");
+    let mut expected = session.fork()?;
+    let expected_step = expected.apply(event.clone())?;
+    let completed: Result<_, CompletionFailure> = session.apply_with(event, |candidate, step| {
+        Ok((candidate.snapshot()?, step))
+    });
+    let (snapshot, step) = completed?;
+    assert_eq!(snapshot, expected.snapshot()?);
+    assert_eq!(session.snapshot()?, snapshot);
+    assert_eq!(step, expected_step);
+    for event in [
+        CurrentExternalEvent::ProposalFrame { bytes: Vec::new() },
+        CurrentExternalEvent::AuthorityMaterial { bytes: Vec::new() },
+    ] {
+        assert!(session.apply(event).is_err());
+        assert_eq!(session.snapshot()?, snapshot);
+    }
+    Ok(())
+}

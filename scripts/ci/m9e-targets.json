@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "baseline": "5c21f3dc9e899a0d1902ee3637af1b58a29fbd24",
+  "baseline": "e79aa6a51c7ccc9b6364a33399cc2874e1e034fb",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33921848212",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -8,7 +9,13 @@
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],
   "current_session_packages": ["er-env"],
   "current_session_wasm_test": "m9e_parity",
+  "current_session_focus": {
+    "paths": ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs"],
+    "execute": {"er-env": ["*"], "er-cli": ["*"], "er-wasm": ["m9e_parity"]},
+    "reason": "Only the normal CLI currently consumes this additive session module. Compile the full reverse cone; execute current session/CLI and parity witnesses. All other source changes select the integration scope."
+  },
   "historical_dispositions": [{
+    "crate": "er-sim",
     "target": "m2_api_bypass",
     "test": "m3_audited_production_surface_matches_frozen_manifest",
     "reason": "Historical M3 ancestor/blob freeze does not describe M9; identical exact exclusion in published M9 qualification shard 16 at baseline 5c21f3dc. Remaining API-bypass tests and current CLI execution witnesses remain mandatory."

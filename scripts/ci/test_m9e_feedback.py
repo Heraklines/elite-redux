@@ -285,11 +285,85 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["first_failure"], "zero tests executed")
         self.assertEqual(self.executed, ["a_suite"])
 
+    def test_native_timeout_emits_bounded_failure_and_preserves_selected_count(self):
+        def timeout_first_binary(args, **kwargs):
+            if Path(args[0]).name == "a_suite" and "--list" not in args:
+                self.assertEqual(kwargs["timeout"], 600)
+                kwargs["stdout"].write("running 1 test\nfirst ... still running\n")
+                raise subprocess.TimeoutExpired(args, 600)
+            return self.process(args, **kwargs)
+        with patch.object(self.feedback.subprocess, "run", side_effect=timeout_first_binary):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["expected_test_count"], 2)
+        self.assertEqual(summary["tests"]["executed"], 0)
+        self.assertIn("a_suite exceeded 600 seconds", summary["first_failure"])
+        self.assertIn("still running", (self.compact / "failure.txt").read_text())
+
     def test_no_test_binaries_is_failure(self):
         self.binary_ids = {}
         code, summary = self.invoke()
         self.assertEqual(code, 1)
         self.assertEqual(summary["first_failure"], "build emitted no test binaries")
+
+    def test_focused_session_scope_requires_every_changed_rust_path(self):
+        allowed = "rust/crates/er-native/src/current.rs"
+        self.config["current_session_focus"] = {"paths": [allowed], "execute": {"er-native": ["*"], "er-wasm": ["m9e_parity"]}}
+        self.config["current_session_wasm_test"] = "m9e_parity"
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = [allowed]
+        focused = self.feedback.plan()
+        self.assertEqual(focused["execution_scope"], self.config["current_session_focus"]["execute"])
+        self.assertTrue(focused["requires_wasm"])
+        self.assertEqual(focused["wasm_test"], "m9e_parity")
+        self.assertIn("er-wasm", focused["packages"])
+        for extra in ["rust/crates/er-native/src/lib.rs", "rust/crates/er-native/Cargo.toml", "rust/crates/er-native/build.rs"]:
+            with self.subTest(extra=extra):
+                self.changed = [allowed, extra]
+                self.assertIsNone(self.feedback.plan()["execution_scope"])
+        for extra in ["rust/fixtures/generated.json", "src/adapter.ts", "rust/crates/er-kernel/src/lib.rs"]:
+            with self.subTest(extra=extra):
+                self.changed = [allowed, extra]
+                with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                    self.feedback.plan()
+
+    def test_focus_reports_built_but_unexecuted_targets(self):
+        self.config["current_session_focus"] = {"paths": ["rust/crates/er-native/src/current.rs"], "execute": {"er-native": ["a_suite"]}}
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = ["rust/crates/er-native/src/current.rs"]
+        with patch.object(self.feedback, "wasm_checks"):
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.executed, ["a_suite"])
+        self.assertEqual(summary["build_only_targets"], ["er-native:b_suite"])
+        self.assertEqual(summary["tests"]["selected"], 1)
+        self.assertEqual(summary["tests"]["passed"], 1)
+
+    def test_historical_disposition_is_bound_to_one_crate_target_and_test(self):
+        self.changed = ["rust/crates/er-native/src/lib.rs"]
+        disposition = {"crate": "er-native", "target": "a_suite", "test": "historical", "reason": "frozen historical scope"}
+        self.config["historical_dispositions"] = [disposition]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.binary_ids["a_suite"] = ["historical", "current"]
+        self.results["a_suite"] = (0, self.result_line(passed=1).replace("0 filtered out", "1 filtered out"))
+        code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(summary["historical_dispositions"], [disposition])
+        self.assertEqual(summary["tests"]["selected"], 2)
+        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertEqual(summary["tests"]["skipped"], 0)
+        skips = [args for args in self.commands if "--skip" in args]
+        self.assertEqual(len(skips), 1)
+        self.assertEqual(skips[0][-2:], ["--skip", "historical"])
+
+    def test_missing_exact_historical_disposition_fails_before_execution(self):
+        self.changed = ["rust/crates/er-native/src/lib.rs"]
+        self.config["historical_dispositions"] = [{"crate": "er-native", "target": "a_suite", "test": "missing", "reason": "frozen historical scope"}]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("exactly one enumerated test", summary["first_failure"])
+        self.assertEqual(self.executed, [])
 
     def test_single_long_log_marks_omitted_bytes(self):
         self.build_code = 1
