@@ -108,7 +108,12 @@
   "SPECIES_CALYREX_CLOUD_RIDER": {
     "ability1": 20022,
     "ability2": 20022,
-    "hidden": 20022
+    "hidden": 20022,
+    "innates": [
+      20023,
+      5092,
+      5510
+    ]
   },
   "SPECIES_CASCOON": {
     "ability2": 192,
