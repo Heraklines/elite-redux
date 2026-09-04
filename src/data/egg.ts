@@ -366,9 +366,10 @@ export class Egg {
       );
       ret.shiny = this._isShiny;
       ret.variant = this._variantTier;
-      // ER Black Shinies (#349): an EPIC egg hatch rolls the 1/50 t4 upgrade
-      // (this is the "hatch 1k-10k eggs" acquisition path).
-      maybeUpgradeToErBlackShiny(ret);
+      // ER Black Shinies (#349): egg hatches grant account unlocks, not active
+      // party slots. A Black starter already in the run must not suppress this
+      // 1/50-of-epic roll; starter selection independently caps the active team.
+      maybeUpgradeToErBlackShiny(ret, { enforcePlayerPartyLimit: false });
 
       const secondaryIvs = getIvsFromId(randSeedInt(4294967295));
 

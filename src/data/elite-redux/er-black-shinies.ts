@@ -68,6 +68,15 @@ export interface ErBlackShinySpriteSource {
   atlasPath: string;
 }
 
+export interface ErBlackShinyUpgradeOptions {
+  /**
+   * Enforce the one-Black-Shiny limit against the current player party.
+   * Account-unlock flows such as egg hatches disable this; starter selection
+   * independently enforces the active-team limit.
+   */
+  enforcePlayerPartyLimit?: boolean;
+}
+
 interface ErBlackShinyStarterState {
   shiny?: boolean | undefined;
   variant?: number | undefined;
@@ -206,11 +215,14 @@ export function applyErBlackShinyKit(pokemon: Pokemon): void {
 
 /**
  * Roll the black upgrade for a freshly generated shiny. Requires an EPIC
- * (variant 2) shiny; succeeds 1/50 (seeded). The player team is capped at one
- * black shiny — a second player-side roll never upgrades. Returns whether the
- * mon is (now) black.
+ * (variant 2) shiny; succeeds 1/50 (seeded). Player-side generation normally
+ * respects the one-Black active-party cap; account-unlock flows may opt out.
+ * Returns whether the mon is (now) black.
  */
-export function maybeUpgradeToErBlackShiny(pokemon: Pokemon): boolean {
+export function maybeUpgradeToErBlackShiny(
+  pokemon: Pokemon,
+  { enforcePlayerPartyLimit = true }: ErBlackShinyUpgradeOptions = {},
+): boolean {
   try {
     // Dev-suite override: force the black roll at GENERATION so the black
     // atlas loads with the initial assets (no delayed mid-battle swap).
@@ -231,7 +243,7 @@ export function maybeUpgradeToErBlackShiny(pokemon: Pokemon): boolean {
     if (!pokemon.shiny || pokemon.variant !== 2) {
       return false;
     }
-    if (pokemon.isPlayer() && playerHasErBlackShiny()) {
+    if (enforcePlayerPartyLimit && pokemon.isPlayer() && playerHasErBlackShiny()) {
       return false;
     }
     if (randSeedInt(erBalanceNum("er.shiny.blackShinyDenominator")) !== 0) {
