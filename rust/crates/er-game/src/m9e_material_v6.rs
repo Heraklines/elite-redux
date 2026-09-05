@@ -503,22 +503,59 @@ fn variant_matches_transition(
 fn action_matches_domain(action: Option<&GameActionV1>, domain: GameActionDomainV2) -> bool {
     matches!(
         (action, domain),
-        (Some(GameActionV1::Bootstrap { .. }), GameActionDomainV2::NewRun)
-        | (Some(GameActionV1::ExecuteRunProgram { .. }), GameActionDomainV2::RunProgram)
-        | (Some(GameActionV1::Battle { .. }), GameActionDomainV2::BattleTurn)
-        | (Some(GameActionV1::Battle { .. }), GameActionDomainV2::BattleReplacement)
-        | (Some(GameActionV1::Capture { .. }), GameActionDomainV2::Capture)
-        | (Some(GameActionV1::Party { .. }), GameActionDomainV2::Party)
-        | (Some(GameActionV1::Progression { .. }), GameActionDomainV2::Progression)
-        | (Some(GameActionV1::MoveLearning { .. }), GameActionDomainV2::MoveLearning)
-        | (Some(GameActionV1::Evolution { .. }), GameActionDomainV2::Evolution)
-        | (Some(GameActionV1::Fusion { .. }), GameActionDomainV2::Fusion)
-        | (Some(GameActionV1::Inventory { .. }), GameActionDomainV2::Inventory)
-        | (Some(GameActionV1::Reward { .. }), GameActionDomainV2::Reward)
-        | (Some(GameActionV1::World { .. }), GameActionDomainV2::World)
-        | (Some(GameActionV1::Scenario { .. }), GameActionDomainV2::Scenario)
-        | (Some(GameActionV1::Save { .. }), GameActionDomainV2::SaveControl)
-        | (Some(GameActionV1::Terminal { .. }), GameActionDomainV2::Terminal)
+        (
+            Some(GameActionV1::Bootstrap { .. }),
+            GameActionDomainV2::NewRun
+        ) | (
+            Some(GameActionV1::ExecuteRunProgram { .. }),
+            GameActionDomainV2::RunProgram
+        ) | (
+            Some(GameActionV1::Battle { .. }),
+            GameActionDomainV2::BattleTurn
+        ) | (
+            Some(GameActionV1::Battle { .. }),
+            GameActionDomainV2::BattleReplacement
+        ) | (
+            Some(GameActionV1::Capture { .. }),
+            GameActionDomainV2::Capture
+        ) | (Some(GameActionV1::Party { .. }), GameActionDomainV2::Party)
+            | (
+                Some(GameActionV1::Progression { .. }),
+                GameActionDomainV2::Progression
+            )
+            | (
+                Some(GameActionV1::MoveLearning { .. }),
+                GameActionDomainV2::MoveLearning
+            )
+            | (
+                Some(GameActionV1::Evolution { .. }),
+                GameActionDomainV2::Evolution
+            )
+            | (
+                Some(GameActionV1::Fusion { .. }),
+                GameActionDomainV2::Fusion
+            )
+            | (
+                Some(GameActionV1::Inventory { .. }),
+                GameActionDomainV2::Inventory
+            )
+            | (
+                Some(GameActionV1::Reward { .. }),
+                GameActionDomainV2::Reward
+            )
+            | (Some(GameActionV1::World { .. }), GameActionDomainV2::World)
+            | (
+                Some(GameActionV1::Scenario { .. }),
+                GameActionDomainV2::Scenario
+            )
+            | (
+                Some(GameActionV1::Save { .. }),
+                GameActionDomainV2::SaveControl
+            )
+            | (
+                Some(GameActionV1::Terminal { .. }),
+                GameActionDomainV2::Terminal
+            )
     )
 }
 
