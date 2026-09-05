@@ -1063,3 +1063,14 @@ harness next: typed shared V7 environments, global order/rollback/fork/limits,
 actual CLI batch commands and exact outer success-envelope precommit bounds.
 Private-control and response-cache changes remain separate, unqualified work.
 This capsule milestone is not full M9 completion.
+
+### Current batch remote formatting repair
+
+Candidate `a675dec2fb545b6222a36c4aa75e2b0e1c434cf4`, run `33954833074`,
+passed the 106-test harness preflight and stopped at formatting. No product tests
+were selected/executed. Inspected/downloaded native-A compact12,245 compressed
+bytes, then the named complete repair20,499 compressed bytes because the compact
+patch omitted three files. Verified full115,628-byte patch SHA
+`e95455dc58f59eeea8f63d472466ad20b5f641d65d9a71da5b01dc467d91244a`
+and applied all six batch-owned Rust files. Both48,740-byte diagnostics and
+redundant laneB evidence remain remote. Baseline remains qualified d6fd1c4.

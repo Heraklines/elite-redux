@@ -18,8 +18,8 @@ use er_types::{RawInputEvent, SafeU53, SeatId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::current_worker_agent::{CurrentBackend, WorkerConfiguration};
 use crate::current_batch_agent::CurrentBatches;
+use crate::current_worker_agent::{CurrentBackend, WorkerConfiguration};
 use crate::m72::{BoundedLineStatusV1, read_bounded_jsonl_line_v1};
 
 // A full current snapshot is larger than the historical 64 KiB inline threshold.
@@ -156,7 +156,10 @@ impl CurrentDispatcher {
 }
 
 impl CurrentStart {
-    pub(crate) fn into_session(self, content: Arc<PreparedGameContentV2>) -> Result<CurrentGameSession, AgentDispatchErrorV1> {
+    pub(crate) fn into_session(
+        self,
+        content: Arc<PreparedGameContentV2>,
+    ) -> Result<CurrentGameSession, AgentDispatchErrorV1> {
         match self {
             CurrentStart::Natural {
                 profile,
@@ -178,28 +181,34 @@ impl CurrentStart {
                 snapshot,
                 owner_seat,
                 role,
-            } => CurrentGameSession::from_snapshot(
-                *snapshot,
-                owner_seat,
-                role,
-                content,
-            )
-            .map_err(backend),
+            } => CurrentGameSession::from_snapshot(*snapshot, owner_seat, role, content)
+                .map_err(backend),
         }
     }
 }
 
 impl AgentDispatcherV1 for CurrentDispatcher {
-    fn dispatch_with_response_context(&mut self, method: &str, params: &Value,
-        context: AgentResponseContextV1<'_>) -> Result<Value, AgentDispatchErrorV1>
-    {
+    fn dispatch_with_response_context(
+        &mut self,
+        method: &str,
+        params: &Value,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
         if method.starts_with("batch.") {
             // A process batch needs a generation that owns many environments;
             // never substitute native execution or one process per environment.
             if self.worker.is_some() {
-                return Err(invalid("current batch operations require the in-process backend; worker batches are unsupported"));
+                return Err(invalid(
+                    "current batch operations require the in-process backend; worker batches are unsupported",
+                ));
             }
-            return self.batches.dispatch(method, params, self.sessions.len(), self.maximum_sessions, context);
+            return self.batches.dispatch(
+                method,
+                params,
+                self.sessions.len(),
+                self.maximum_sessions,
+                context,
+            );
         }
         self.dispatch(method, params)
     }
@@ -318,9 +327,9 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                 "total_environments": self.sessions.len() + self.batches.environment_count(),
                 "kernel_version": 7, "content_identity": self.content.identity()
             })),
-            method if method.starts_with("batch.") => {
-                Err(invalid("current batch dispatch requires response admission context"))
-            }
+            method if method.starts_with("batch.") => Err(invalid(
+                "current batch dispatch requires response admission context",
+            )),
             _ => Err(backend(format!(
                 "method {method} is not implemented by the current V7 adapter; historical tools require agent-v6"
             ))),
