@@ -1858,14 +1858,15 @@ class FeedbackTests(unittest.TestCase):
             "rust/crates/er-kernel/src/game_kernel_v6.rs",
             "rust/crates/er-kernel/src/snapshot_v3.rs",
             "rust/crates/er-kernel/src/snapshot_v7.rs",
-            "rust/crates/er-kernel/tests/m9e_domain_journeys_v7.rs"}
+            "rust/crates/er-kernel/tests/m9e_domain_journeys_v7.rs",
+            "rust/crates/er-kernel/tests/m9e_coop_v7.rs"}
         original_paths = {
             "rust/crates/er-game/src/m9e_material_v6.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs",
             "rust/crates/er-game/tests/m9e_material_retention.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs",
             "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs"}
         policy = self.config["material_retention_focus"]
         self.assertEqual(set(policy["paths"]), original_paths | lint_paths)
-        self.assertEqual(len(policy["paths"]), 17)
+        self.assertEqual(len(policy["paths"]), 18)
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_domain_journeys_v7"]), 12)
         self.assertIn("m9e_domain_journeys_v7", selection["required_native_targets"]["er-kernel"])
         self.assertEqual(set(policy["trigger_paths"]), original_paths - {"rust/crates/er-kernel/src/game_kernel_v7.rs"})
@@ -1887,7 +1888,8 @@ class FeedbackTests(unittest.TestCase):
                       "rust/crates/er-game/src/m6/unmapped.rs", "rust/crates/er-game/src/m7_internal_event_extra.rs",
                       "rust/crates/er-game/src/m9e_internal_event.rs",
                       "rust/crates/er-kernel/src/game_kernel_v6_extra.rs", "rust/crates/er-kernel/src/snapshot_v3_extra.rs",
-                      "rust/crates/er-kernel/tests/m9e_domain_journeys_v7_extra.rs"):
+                      "rust/crates/er-kernel/tests/m9e_domain_journeys_v7_extra.rs",
+                      "rust/crates/er-kernel/tests/m9e_coop_v7_extra.rs"):
             with self.subTest(extra=extra):
                 self.changed = paths + [extra]
                 with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):

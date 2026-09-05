@@ -801,7 +801,10 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
             _ => None,
         })
         .collect();
-    assert_eq!(authority_presentations, [expected_presentation.clone()]);
+    assert_eq!(
+        authority_presentations.as_slice(),
+        std::slice::from_ref(&expected_presentation)
+    );
     assert_eq!(decoded.transition().presentation, authority_presentations);
     let platforms: Vec<_> = authority_step
         .effects
@@ -840,7 +843,10 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         blocking: expected_presentation.blocking,
         skip: expected_presentation.skip,
     };
-    assert_eq!(authority_snapshot.pending_presentations, [pending.clone()]);
+    assert_eq!(
+        authority_snapshot.pending_presentations.as_slice(),
+        std::slice::from_ref(&pending)
+    );
 
     // This is a valid pre-delivery snapshot. The collision is detected only
     // when presentation ownership is installed after common material apply.

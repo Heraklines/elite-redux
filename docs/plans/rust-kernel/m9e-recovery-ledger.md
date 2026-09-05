@@ -1537,3 +1537,17 @@ formatter patch,0omittedbytes/paths, SHA256
 5a31fdfd9326ddf81fe35dde336ed97c67c8f2bcec721b6d5f81daf967251840,
 was applicability-checked and applied. No product tests ran in this fmt-only run;
 all lint/test evidence and qualified baseline3aa remainunchanged/pending.
+
+22fb7c814a43c37bf6b6f672f48b69f7fe4ced5e/run33967846046 passed122 harness,
+formatting/full compilation and prior game lint, then er-kernel Clippy found only
+two redundant cloned singleton arrays in m9e_coop_v7 assertions. Complete compact
+diagnostic fit in the inspected3,581 compressed-byte nativeA summary; only that
+artifact was downloaded. B3,586-byte summary and fullA85,640/B85,624 diagnostics
+stayremote. Prior32 kernel warnings are cleared;0 producttests executed.
+The two assertions now compare the same ordered full values using borrowed
+singleton slices, preserving cardinality, test IDs and later ownership. Independent
+source review approved. Only this exact co-op test path joins the retention
+allowlist(18total); the122 existing gate tests pin it and reject its adjacent
+unknown name. Co-op was already an exact required target; all33 targets, both
+mutants, platform and limits remain. No product logic/API or baseline changed.
+Remote lint and actual retention execution remain pending.
