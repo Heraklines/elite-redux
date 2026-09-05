@@ -2128,3 +2128,11 @@ exceeds64KiB; every ID/order/partition/required permutation and semantic hash is
 restored and validated, with128KiB expanded maximum unchanged. Actual remote
 inventory bytes, formatting, compiler/lint and test behavior remain pending.
 No rollout, deployment, real saves or final-tag change is included.
+
+## Damage-query remote formatting repair
+
+ea7c268d48eb8cd4d3270c87cf2b4bfe4ff69189 / run33992080521 stopped at the remote
+Rust formatting check before native test execution. The inspected native-A
+compact was1681 bytes. Its exact18,763-byte remote format.patch names only
+the resolver and new damage-query test; it is applied unchanged here.
+No formatter or test ran locally. Baseline remains fully qualified f140.

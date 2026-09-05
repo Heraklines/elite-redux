@@ -13,8 +13,8 @@ use er_types::battle_command::{
 };
 use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, MoveSlotIndex};
 use er_types::battle_model::{
-    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState,
-    PokemonType, PokemonTyping,
+    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState, PokemonType,
+    PokemonTyping,
 };
 
 use std::error::Error;
@@ -155,9 +155,26 @@ fn ordinary_move(
     assert_eq!(definition.base_pp, base_pp);
     Ok(id)
 }
-fn controlled_state(content: &PreparedGameContentV2, mut state: GameStateV6) -> TestResult<GameStateV5> {
-    let physical = ordinary_move(content, 15, MoveCategory::Physical, PokemonType::Normal, MoveAccuracy::Percent(95), 30)?;
-    let special = ordinary_move(content, 93, MoveCategory::Special, PokemonType::Psychic, MoveAccuracy::Percent(100), 25)?;
+fn controlled_state(
+    content: &PreparedGameContentV2,
+    mut state: GameStateV6,
+) -> TestResult<GameStateV5> {
+    let physical = ordinary_move(
+        content,
+        15,
+        MoveCategory::Physical,
+        PokemonType::Normal,
+        MoveAccuracy::Percent(95),
+        30,
+    )?;
+    let special = ordinary_move(
+        content,
+        93,
+        MoveCategory::Special,
+        PokemonType::Psychic,
+        MoveAccuracy::Percent(100),
+        25,
+    )?;
     let splash = MoveId::new(safe(150));
     let splash_definition = content.battle.move_definition(splash)?;
     assert_eq!(splash_definition.category, MoveCategory::Status);
@@ -170,22 +187,45 @@ fn controlled_state(content: &PreparedGameContentV2, mut state: GameStateV6) -> 
         pokemon.max_hp = 400;
         pokemon.fainted = false;
         pokemon.stats = BattleStats {
-            hp: 400, attack: 100, defense: 50, special_attack: 100,
-            special_defense: 200, speed: 100,
+            hp: 400,
+            attack: 100,
+            defense: 50,
+            special_attack: 100,
+            special_defense: 200,
+            speed: 100,
         };
         pokemon.abilities = AbilityLoadout {
-            active: AbilityId::new(safe(1)), passives: [None; 3],
-            active_suppressed: false, passive_suppressed: [false; 3],
+            active: AbilityId::new(safe(1)),
+            passives: [None; 3],
+            active_suppressed: false,
+            passive_suppressed: [false; 3],
         };
         pokemon.held_items.clear();
-        pokemon.types = PokemonTyping { primary: PokemonType::Fire, secondary: None };
-        pokemon.moves = [Some(MoveSlotState {
-            move_id: physical, pp_used: 0, pp_ups: 0, max_pp_override: None,
-        }), Some(MoveSlotState {
-            move_id: special, pp_used: 0, pp_ups: 0, max_pp_override: None,
-        }), Some(MoveSlotState {
-            move_id: splash, pp_used: 0, pp_ups: 0, max_pp_override: None,
-        }), None];
+        pokemon.types = PokemonTyping {
+            primary: PokemonType::Fire,
+            secondary: None,
+        };
+        pokemon.moves = [
+            Some(MoveSlotState {
+                move_id: physical,
+                pp_used: 0,
+                pp_ups: 0,
+                max_pp_override: None,
+            }),
+            Some(MoveSlotState {
+                move_id: special,
+                pp_used: 0,
+                pp_ups: 0,
+                max_pp_override: None,
+            }),
+            Some(MoveSlotState {
+                move_id: splash,
+                pp_used: 0,
+                pp_ups: 0,
+                max_pp_override: None,
+            }),
+            None,
+        ];
     }
     let current = GameStateV5 {
         schema_version: er_state::m7_state::GAME_STATE_SCHEMA_VERSION_V5,
@@ -203,7 +243,12 @@ fn controlled_state(content: &PreparedGameContentV2, mut state: GameStateV6) -> 
 }
 
 fn field(run: &RunStateV3, side: BattleSide) -> TestResult<FieldSlot> {
-    run.battle.as_ref().ok_or("battle missing")?.field.slots.iter()
+    run.battle
+        .as_ref()
+        .ok_or("battle missing")?
+        .field
+        .slots
+        .iter()
         .find(|slot| slot.slot.side == side && slot.occupant.is_some())
         .map(|slot| slot.slot)
         .ok_or_else(|| "active field missing".into())
@@ -212,8 +257,11 @@ fn field(run: &RunStateV3, side: BattleSide) -> TestResult<FieldSlot> {
 fn query(content: &PreparedGameContentV2, state: &GameStateV5, slot: u8) -> TestResult<u32> {
     let run = state.active_run.as_ref().ok_or("run missing")?;
     Ok(query_simulated_move_damage_v5(
-        &content.battle, run, field(run, BattleSide::Enemy)?,
-        MoveSlotIndex::new(slot)?, field(run, BattleSide::Player)?,
+        &content.battle,
+        run,
+        field(run, BattleSide::Enemy)?,
+        MoveSlotIndex::new(slot)?,
+        field(run, BattleSide::Player)?,
     )?)
 }
 
@@ -227,8 +275,13 @@ fn current_damage_query_distinguishes_equal_power_by_physical_and_special_bulk()
     assert_eq!(query(&content, &state, 1)?, 13);
     assert_eq!(state, before);
     let mut inverted = state.clone();
-    let player = inverted.active_run.as_mut().ok_or("run missing")?.party
-        .first_mut().ok_or("player missing")?;
+    let player = inverted
+        .active_run
+        .as_mut()
+        .ok_or("run missing")?
+        .party
+        .first_mut()
+        .ok_or("player missing")?;
     player.stats.defense = 200;
     player.stats.special_defense = 50;
     inverted.validate()?;
@@ -246,15 +299,38 @@ fn current_damage_queries_preserve_full_turn_and_rng_audit_after_reordering() ->
     let battle = run.battle.as_ref().ok_or("battle missing")?;
     let source = field(run, BattleSide::Enemy)?;
     let target = field(run, BattleSide::Player)?;
-    let actor = battle.field.slots.iter().find(|slot| slot.slot == source)
-        .and_then(|slot| slot.occupant).ok_or("enemy occupant missing")?;
+    let actor = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.slot == source)
+        .and_then(|slot| slot.occupant)
+        .ok_or("enemy occupant missing")?;
     let command = ScriptedEnemyBattleCommandV1::new(
-        scripted_enemy_command_operation_id(battle.battle_id, battle.wave, battle.turn, source, SafeU53::ZERO)?,
-        battle.battle_id, battle.wave, battle.turn, SafeU53::ZERO, actor, source,
-        BattleCommand::fight(actor, MoveSlotIndex::new(1)?, BattleTargetSelection::selected(vec![target])?),
+        scripted_enemy_command_operation_id(
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            source,
+            SafeU53::ZERO,
+        )?,
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        SafeU53::ZERO,
+        actor,
+        source,
+        BattleCommand::fight(
+            actor,
+            MoveSlotIndex::new(1)?,
+            BattleTargetSelection::selected(vec![target])?,
+        ),
     )?;
     let commands = CommandSet::new(vec![AcceptedBattleCommand::scripted_enemy(command)])?;
-    let authority = TurnAuthorityContextV1 { authority_seat: battle.authority_seat, revision: safe(1) };
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: battle.authority_seat,
+        revision: safe(1),
+    };
     let baseline = resolve_turn_v5(&state, &commands, &content.battle, &authority)?;
     let before_bytes = serde_json::to_vec(&state)?;
     for (slot, expected) in [(0, 46), (1, 13), (1, 13), (0, 46)] {
@@ -265,20 +341,53 @@ fn current_damage_queries_preserve_full_turn_and_rng_audit_after_reordering() ->
     assert_eq!(after_queries.rng_audit, baseline.rng_audit);
     assert_eq!(after_queries, baseline);
     assert_eq!(serde_json::to_vec(&state)?, before_bytes);
-    let damage_draws = baseline.rng_audit.iter()
-        .filter(|draw| draw.reason == RngReason::DamageVariance).collect::<Vec<_>>();
+    let damage_draws = baseline
+        .rng_audit
+        .iter()
+        .filter(|draw| draw.reason == RngReason::DamageVariance)
+        .collect::<Vec<_>>();
     assert_eq!(damage_draws.len(), 1);
     assert!(damage_draws[0].consumed);
-    let damage_reasons = baseline.rng_audit.iter().filter(|draw| {
-        matches!(draw.reason, RngReason::Accuracy | RngReason::CriticalHit | RngReason::DamageVariance)
-    }).map(|draw| draw.reason).collect::<Vec<_>>();
-    assert_eq!(damage_reasons, vec![RngReason::Accuracy, RngReason::CriticalHit, RngReason::DamageVariance]);
-    for draw in &baseline.rng_audit { draw.validate()?; }
-    let after_run = baseline.after_state.active_run.as_ref().ok_or("after run missing")?;
+    let damage_reasons = baseline
+        .rng_audit
+        .iter()
+        .filter(|draw| {
+            matches!(
+                draw.reason,
+                RngReason::Accuracy | RngReason::CriticalHit | RngReason::DamageVariance
+            )
+        })
+        .map(|draw| draw.reason)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        damage_reasons,
+        vec![
+            RngReason::Accuracy,
+            RngReason::CriticalHit,
+            RngReason::DamageVariance
+        ]
+    );
+    for draw in &baseline.rng_audit {
+        draw.validate()?;
+    }
+    let after_run = baseline
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("after run missing")?;
     assert!(after_run.party[0].hp < run.party[0].hp);
     assert_eq!(after_run.run_rng, run.run_rng);
-    assert_eq!(after_run.battle.as_ref().ok_or("after battle missing")?.enemy_party[0].moves[1]
-        .ok_or("after enemy move missing")?.pp_used, 1);
+    assert_eq!(
+        after_run
+            .battle
+            .as_ref()
+            .ok_or("after battle missing")?
+            .enemy_party[0]
+            .moves[1]
+            .ok_or("after enemy move missing")?
+            .pp_used,
+        1
+    );
     Ok(())
 }
 
@@ -291,35 +400,88 @@ fn current_damage_query_honors_pp_up_and_override_bounds_without_mutation() -> T
     let source = field(run, BattleSide::Enemy)?;
     let target = field(run, BattleSide::Player)?;
     assert_eq!(
-        query_simulated_move_damage_v5(&content.battle, run, source, MoveSlotIndex::new(3)?, target),
+        query_simulated_move_damage_v5(
+            &content.battle,
+            run,
+            source,
+            MoveSlotIndex::new(3)?,
+            target
+        ),
         Err(BattleV5Error::MoveSlot),
     );
     assert_eq!(
-        query_simulated_move_damage_v5(&content.battle, run, source, MoveSlotIndex::new(0)?,
-            FieldSlot { side: BattleSide::Player, position: 1 }),
+        query_simulated_move_damage_v5(
+            &content.battle,
+            run,
+            source,
+            MoveSlotIndex::new(0)?,
+            FieldSlot {
+                side: BattleSide::Player,
+                position: 1
+            }
+        ),
         Err(BattleV5Error::Target),
     );
     assert_eq!(state, untouched);
-    let move_id = state.active_run.as_ref().ok_or("run missing")?.battle.as_ref()
-        .ok_or("battle missing")?.enemy_party[0].moves[0].ok_or("move missing")?.move_id;
+    let move_id = state
+        .active_run
+        .as_ref()
+        .ok_or("run missing")?
+        .battle
+        .as_ref()
+        .ok_or("battle missing")?
+        .enemy_party[0]
+        .moves[0]
+        .ok_or("move missing")?
+        .move_id;
     let base_pp = content.battle.move_definition(move_id)?.base_pp;
     {
-        let slot = state.active_run.as_mut().ok_or("run missing")?.battle.as_mut()
-            .ok_or("battle missing")?.enemy_party[0].moves[0].as_mut().ok_or("move missing")?;
+        let slot = state
+            .active_run
+            .as_mut()
+            .ok_or("run missing")?
+            .battle
+            .as_mut()
+            .ok_or("battle missing")?
+            .enemy_party[0]
+            .moves[0]
+            .as_mut()
+            .ok_or("move missing")?;
         slot.pp_ups = 1;
         slot.pp_used = base_pp;
     }
-    assert_eq!(query(&content, &state, 0)?, 46, "PP Ups allow a query beyond base PP");
+    assert_eq!(
+        query(&content, &state, 0)?,
+        46,
+        "PP Ups allow a query beyond base PP"
+    );
     {
-        let slot = state.active_run.as_mut().ok_or("run missing")?.battle.as_mut()
-            .ok_or("battle missing")?.enemy_party[0].moves[0].as_mut().ok_or("move missing")?;
+        let slot = state
+            .active_run
+            .as_mut()
+            .ok_or("run missing")?
+            .battle
+            .as_mut()
+            .ok_or("battle missing")?
+            .enemy_party[0]
+            .moves[0]
+            .as_mut()
+            .ok_or("move missing")?;
         slot.max_pp_override = Some(base_pp);
     }
     state.validate()?;
     let before = state.clone();
     let run = state.active_run.as_ref().ok_or("run missing")?;
-    assert_eq!(query_simulated_move_damage_v5(&content.battle, run, field(run, BattleSide::Enemy)?,
-        MoveSlotIndex::new(0)?, field(run, BattleSide::Player)?), Err(BattleV5Error::MoveSlot));
+    assert_eq!(
+        query_simulated_move_damage_v5(
+            &content.battle,
+            run,
+            field(run, BattleSide::Enemy)?,
+            MoveSlotIndex::new(0)?,
+            field(run, BattleSide::Player)?
+        ),
+        Err(BattleV5Error::MoveSlot)
+    );
     assert_eq!(state, before);
     Ok(())
 }
@@ -331,49 +493,93 @@ fn current_damage_query_zero_and_inactive_inputs_leave_state_unchanged() -> Test
     let source = field(run, BattleSide::Enemy)?;
     let target = field(run, BattleSide::Player)?;
     let before = state.clone();
-    assert_eq!(query_simulated_move_damage_v5(
-        &content.battle, run, source, MoveSlotIndex::new(2)?, source,
-    )?, 0, "published Splash is a no-power status move");
+    assert_eq!(
+        query_simulated_move_damage_v5(
+            &content.battle,
+            run,
+            source,
+            MoveSlotIndex::new(2)?,
+            source,
+        )?,
+        0,
+        "published Splash is a no-power status move"
+    );
     assert_eq!(state, before);
 
     let mut inactive = state.clone();
     let inactive_run = inactive.active_run.as_mut().ok_or("run missing")?;
     let inactive_battle = inactive_run.battle.as_mut().ok_or("battle missing")?;
-    inactive_battle.field.slots.iter_mut().find(|slot| slot.slot == source)
-        .ok_or("source field missing")?.occupant = None;
+    inactive_battle
+        .field
+        .slots
+        .iter_mut()
+        .find(|slot| slot.slot == source)
+        .ok_or("source field missing")?
+        .occupant = None;
     inactive.validate()?;
     let inactive_before = inactive.clone();
-    assert_eq!(query_simulated_move_damage_v5(
-        &content.battle, inactive.active_run.as_ref().ok_or("run missing")?, source,
-        MoveSlotIndex::new(0)?, target,
-    ), Err(BattleV5Error::Target));
+    assert_eq!(
+        query_simulated_move_damage_v5(
+            &content.battle,
+            inactive.active_run.as_ref().ok_or("run missing")?,
+            source,
+            MoveSlotIndex::new(0)?,
+            target,
+        ),
+        Err(BattleV5Error::Target)
+    );
     assert_eq!(inactive, inactive_before);
 
     let mut fainted_actor = state.clone();
-    let actor = fainted_actor.active_run.as_mut().ok_or("run missing")?.battle.as_mut()
-        .ok_or("battle missing")?.enemy_party.first_mut().ok_or("enemy missing")?;
+    let actor = fainted_actor
+        .active_run
+        .as_mut()
+        .ok_or("run missing")?
+        .battle
+        .as_mut()
+        .ok_or("battle missing")?
+        .enemy_party
+        .first_mut()
+        .ok_or("enemy missing")?;
     actor.hp = 0;
     actor.fainted = true;
     let actor_id = actor.id;
     fainted_actor.validate()?;
     let fainted_actor_before = fainted_actor.clone();
-    assert_eq!(query_simulated_move_damage_v5(
-        &content.battle, fainted_actor.active_run.as_ref().ok_or("run missing")?, source,
-        MoveSlotIndex::new(0)?, target,
-    ), Err(BattleV5Error::InactiveActor(actor_id)));
+    assert_eq!(
+        query_simulated_move_damage_v5(
+            &content.battle,
+            fainted_actor.active_run.as_ref().ok_or("run missing")?,
+            source,
+            MoveSlotIndex::new(0)?,
+            target,
+        ),
+        Err(BattleV5Error::InactiveActor(actor_id))
+    );
     assert_eq!(fainted_actor, fainted_actor_before);
 
     let mut fainted_target = state.clone();
-    let player = fainted_target.active_run.as_mut().ok_or("run missing")?.party
-        .first_mut().ok_or("player missing")?;
+    let player = fainted_target
+        .active_run
+        .as_mut()
+        .ok_or("run missing")?
+        .party
+        .first_mut()
+        .ok_or("player missing")?;
     player.hp = 0;
     player.fainted = true;
     fainted_target.validate()?;
     let fainted_target_before = fainted_target.clone();
-    assert_eq!(query_simulated_move_damage_v5(
-        &content.battle, fainted_target.active_run.as_ref().ok_or("run missing")?, source,
-        MoveSlotIndex::new(0)?, target,
-    ), Err(BattleV5Error::Target));
+    assert_eq!(
+        query_simulated_move_damage_v5(
+            &content.battle,
+            fainted_target.active_run.as_ref().ok_or("run missing")?,
+            source,
+            MoveSlotIndex::new(0)?,
+            target,
+        ),
+        Err(BattleV5Error::Target)
+    );
     assert_eq!(fainted_target, fainted_target_before);
     Ok(())
 }

@@ -737,7 +737,9 @@ pub fn query_simulated_move_damage_v5(
     }
     let sources = active_sources(actor, definition.id);
     let context = mechanics_context(actor, battle, &sources);
-    calculate_damage_with_variance(content, &context, definition, actor, target, false, || Ok(100))
+    calculate_damage_with_variance(content, &context, definition, actor, target, false, || {
+        Ok(100)
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -750,16 +752,24 @@ fn calculate_damage(
     critical: bool,
     rng: &mut RngRuntime,
 ) -> Result<u32, BattleV5Error> {
-    calculate_damage_with_variance(content, context, definition, actor, target, critical, || {
-        rng.battle_rand_seed_int_range(
-            SafeU53::new(85).map_err(|_| BattleV5Error::Overflow)?,
-            SafeU53::new(100).map_err(|_| BattleV5Error::Overflow)?,
-            RngReason::DamageVariance,
-            RngCallsiteId::damage_variance(),
-        )
-        .map(SafeU53::get)
-        .map_err(|error| BattleV5Error::Rng(error.to_string()))
-    })
+    calculate_damage_with_variance(
+        content,
+        context,
+        definition,
+        actor,
+        target,
+        critical,
+        || {
+            rng.battle_rand_seed_int_range(
+                SafeU53::new(85).map_err(|_| BattleV5Error::Overflow)?,
+                SafeU53::new(100).map_err(|_| BattleV5Error::Overflow)?,
+                RngReason::DamageVariance,
+                RngCallsiteId::damage_variance(),
+            )
+            .map(SafeU53::get)
+            .map_err(|error| BattleV5Error::Rng(error.to_string()))
+        },
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
