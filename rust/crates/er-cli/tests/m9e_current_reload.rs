@@ -29,16 +29,23 @@ type CliResponse = Result<Option<Vec<u8>>, String>;
 fn progress(phase: &str) {
     // Direct writes survive libtest capture and an outer process timeout.
     let current = std::thread::current();
-    let _ = writeln!(std::io::stderr().lock(), "M9E_RELOAD {} {phase}",
-        current.name().unwrap_or("unnamed"));
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "M9E_RELOAD {} {phase}",
+        current.name().unwrap_or("unnamed")
+    );
 }
 
 fn join_before<T>(handle: std::thread::JoinHandle<T>, deadline: Instant) -> Result<T, String> {
     while !handle.is_finished() {
-        if Instant::now() >= deadline { return Err("CLI pipe thread did not exit within bound".to_owned()); }
+        if Instant::now() >= deadline {
+            return Err("CLI pipe thread did not exit within bound".to_owned());
+        }
         std::thread::sleep(Duration::from_millis(10));
     }
-    handle.join().map_err(|_| "CLI pipe thread panicked".to_owned())
+    handle
+        .join()
+        .map_err(|_| "CLI pipe thread panicked".to_owned())
 }
 
 fn safe(value: u64) -> SafeU53 {
@@ -95,7 +102,10 @@ impl Fixture {
             .parent()
             .ok_or("worker executable has no parent")?;
         let artifact = VerifiedKernelExecutableV2::verify(root, &executable, identity)?;
-        progress(&format!("fixture-ready elapsed_ms={}", started.elapsed().as_millis()));
+        progress(&format!(
+            "fixture-ready elapsed_ms={}",
+            started.elapsed().as_millis()
+        ));
         Ok(Self {
             content,
             executable: artifact.executable().to_owned(),
@@ -177,7 +187,9 @@ impl Drop for CliProcess {
         let _ = self.child.kill();
         let deadline = Instant::now() + EXIT_TIMEOUT;
         while self.child.try_wait().is_ok_and(|status| status.is_none()) {
-            if Instant::now() >= deadline { break; }
+            if Instant::now() >= deadline {
+                break;
+            }
             std::thread::sleep(Duration::from_millis(10));
         }
         if let Some(reader) = self.reader.take() {
@@ -241,7 +253,10 @@ impl Script {
             Expected::Exact(json!({"session": SESSION, "kernel_version": 7})),
         );
         script.snapshot()?;
-        progress(&format!("reference-ready elapsed_ms={}", started.elapsed().as_millis()));
+        progress(&format!(
+            "reference-ready elapsed_ms={}",
+            started.elapsed().as_millis()
+        ));
         Ok(script)
     }
 
@@ -280,8 +295,12 @@ impl Script {
         self.frontier += 1;
         self.snapshot()?;
         if self.last_progress.elapsed() >= Duration::from_secs(30) {
-            progress(&format!("reference-progress events={} requests={} elapsed_ms={}",
-                self.frontier, self.requests.len(), self.started.elapsed().as_millis()));
+            progress(&format!(
+                "reference-progress events={} requests={} elapsed_ms={}",
+                self.frontier,
+                self.requests.len(),
+                self.started.elapsed().as_millis()
+            ));
             self.last_progress = Instant::now();
         }
         Ok(step)
@@ -354,8 +373,12 @@ impl Script {
             GameControlKindV2::BattleCommand
         );
         assert_eq!(self.selected()?, "battle/command/fight");
-        progress(&format!("reach-battle-ready events={} requests={} elapsed_ms={}",
-            self.frontier, self.requests.len(), self.started.elapsed().as_millis()));
+        progress(&format!(
+            "reach-battle-ready events={} requests={} elapsed_ms={}",
+            self.frontier,
+            self.requests.len(),
+            self.started.elapsed().as_millis()
+        ));
         Ok(())
     }
 
@@ -392,8 +415,12 @@ impl Script {
     }
 
     fn run(self, fixture: &Fixture) -> Result<(), Box<dyn Error>> {
-        progress(&format!("script-ready events={} requests={} elapsed_ms={}",
-            self.frontier, self.requests.len(), self.started.elapsed().as_millis()));
+        progress(&format!(
+            "script-ready events={} requests={} elapsed_ms={}",
+            self.frontier,
+            self.requests.len(),
+            self.started.elapsed().as_millis()
+        ));
         let directory = IdentityDirectory::new()?;
         let identity_path = directory.0.join("identity.json");
         std::fs::write(&identity_path, serde_json::to_vec(&fixture.identity)?)?;
@@ -432,16 +459,23 @@ impl Script {
             loop {
                 let response = (|| -> CliResponse {
                     let mut line = Vec::new();
-                    let count = stdout.by_ref().take(MAX_RESPONSE_BYTES + 1)
-                        .read_until(b'\n', &mut line).map_err(|error| error.to_string())?;
-                    if count == 0 { return Ok(None); }
+                    let count = stdout
+                        .by_ref()
+                        .take(MAX_RESPONSE_BYTES + 1)
+                        .read_until(b'\n', &mut line)
+                        .map_err(|error| error.to_string())?;
+                    if count == 0 {
+                        return Ok(None);
+                    }
                     if line.len() as u64 > MAX_RESPONSE_BYTES {
                         return Err("CLI response exceeds byte cap".to_owned());
                     }
                     Ok(Some(line))
                 })();
                 let terminal = !matches!(response, Ok(Some(_)));
-                if response_tx.send(response).is_err() || terminal { break; }
+                if response_tx.send(response).is_err() || terminal {
+                    break;
+                }
             }
         }));
         let mut stderr = process.child.stderr.take().ok_or("CLI stderr missing")?;
@@ -484,16 +518,28 @@ impl Script {
         let run_started = Instant::now();
         let mut last_progress = Instant::now();
         for (index, (method, expected)) in methods.iter().zip(&expected).enumerate() {
-            let report = index == 0 || last_progress.elapsed() >= Duration::from_secs(30)
-                || matches!(method.as_str(), "session.reload" | "session.restore" | "session.close");
+            let report = index == 0
+                || last_progress.elapsed() >= Duration::from_secs(30)
+                || matches!(
+                    method.as_str(),
+                    "session.reload" | "session.restore" | "session.close"
+                );
             if report {
-                progress(&format!("response-wait index={index}/{} method={method} elapsed_ms={}",
-                    methods.len(), run_started.elapsed().as_millis()));
+                progress(&format!(
+                    "response-wait index={index}/{} method={method} elapsed_ms={}",
+                    methods.len(),
+                    run_started.elapsed().as_millis()
+                ));
             }
             let response_started = Instant::now();
-            let line = process.responses.as_ref().ok_or("CLI response reader missing")?
+            let line = process
+                .responses
+                .as_ref()
+                .ok_or("CLI response reader missing")?
                 .recv_timeout(RESPONSE_TIMEOUT)
-                .map_err(|error| format!("response {index} ({method}) unavailable within60s: {error}"))??
+                .map_err(|error| {
+                    format!("response {index} ({method}) unavailable within60s: {error}")
+                })??
                 .ok_or_else(|| format!("missing response {index} ({method})"))?;
             assert!(
                 line.len() as u64 <= MAX_RESPONSE_BYTES,
@@ -550,35 +596,56 @@ impl Script {
                 }
             }
             if report || last_progress.elapsed() >= Duration::from_secs(30) {
-                progress(&format!("response-checked index={index}/{} method={method} bytes={} wait_check_ms={} elapsed_ms={}",
-                    methods.len(), line.len(), response_started.elapsed().as_millis(), run_started.elapsed().as_millis()));
+                progress(&format!(
+                    "response-checked index={index}/{} method={method} bytes={} wait_check_ms={} elapsed_ms={}",
+                    methods.len(),
+                    line.len(),
+                    response_started.elapsed().as_millis(),
+                    run_started.elapsed().as_millis()
+                ));
                 last_progress = Instant::now();
             }
         }
         progress("stdout-eof-wait");
-        let extra = process.responses.as_ref().ok_or("CLI response reader missing")?
-            .recv_timeout(EXIT_TIMEOUT).map_err(|error| format!("CLI EOF unavailable within5s: {error}"))??;
+        let extra = process
+            .responses
+            .as_ref()
+            .ok_or("CLI response reader missing")?
+            .recv_timeout(EXIT_TIMEOUT)
+            .map_err(|error| format!("CLI EOF unavailable within5s: {error}"))??;
         assert!(extra.is_none(), "extra JSONL response or trailing output");
         process.responses.take();
         progress("process-exit-wait");
         let deadline = Instant::now() + EXIT_TIMEOUT;
         let status = loop {
-            if let Some(status) = process.child.try_wait()? { break status; }
-            if Instant::now() >= deadline { return Err("CLI process did not exit within5s".into()); }
+            if let Some(status) = process.child.try_wait()? {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                return Err("CLI process did not exit within5s".into());
+            }
             std::thread::sleep(Duration::from_millis(10));
         };
         progress("pipe-threads-join");
         let deadline = Instant::now() + EXIT_TIMEOUT;
         join_before(process.reader.take().ok_or("CLI reader missing")?, deadline)?;
-        let write_result = join_before(process.writer.take().ok_or("CLI writer missing")?, deadline)?;
-        let diagnostic = join_before(process.stderr.take().ok_or("CLI stderr reader missing")?, deadline)??;
+        let write_result =
+            join_before(process.writer.take().ok_or("CLI writer missing")?, deadline)?;
+        let diagnostic = join_before(
+            process.stderr.take().ok_or("CLI stderr reader missing")?,
+            deadline,
+        )??;
         assert!(
             status.success(),
             "CLI failed (stderr prefix, capped at {MAX_STDERR_BYTES} bytes): {}",
             String::from_utf8_lossy(&diagnostic)
         );
         write_result?;
-        progress(&format!("complete responses={} elapsed_ms={}", methods.len(), run_started.elapsed().as_millis()));
+        progress(&format!(
+            "complete responses={} elapsed_ms={}",
+            methods.len(),
+            run_started.elapsed().as_millis()
+        ));
         Ok(())
     }
 }
