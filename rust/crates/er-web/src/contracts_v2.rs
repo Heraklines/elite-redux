@@ -60,9 +60,7 @@ pub enum BrowserSessionInitializationV2 {
         inputs: Vec<RawInputEvent>,
     },
     /// Current causal capsule with explicit browser transport context.
-    CurrentReproCapsule {
-        capsule_bytes: Vec<u8>,
-    },
+    CurrentReproCapsule { capsule_bytes: Vec<u8> },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

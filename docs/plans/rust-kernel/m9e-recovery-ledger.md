@@ -808,3 +808,17 @@ wire bounds fit the existing default browser request/response limits. Current
 batch, protocol success-envelope additions and retention/AI/performance source
 investigations remain excluded and unqualified. No local workload was run.
 Full M9 remains incomplete.
+
+### Capsule preflight passed; complete remote formatting repair applied
+
+Candidate `53332a3b8b837583ad8cb2f5c1d9ff432746b459`, run `33947140563`,
+passed harness preflight and stopped at formatting before selecting/executing
+product tests. Compact artifact 12,181 compressed bytes was inspected/downloaded.
+Its formatting excerpt omitted four files, so the separately named repair
+artifact was inspected (21,721 compressed bytes) and downloaded. Full patch
+125,091 bytes, SHA-256
+`11eef98ab73af4d95a8e9d32bb7aefe2b4f97716003eac9bd4a46c2bc2ca83c5`,
+was verified and applied to all eight capsule-owned Rust files. Diagnostics
+49,851 bytes remain remote. Batch CLI edits were retained through a clean
+three-way source merge; the submitted index contains only the capsule repair.
+Baseline remains qualified `9459b9c`. No capsule execution pass is claimed.

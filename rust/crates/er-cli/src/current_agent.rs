@@ -150,8 +150,11 @@ impl CurrentDispatcher {
         self.reserve_id(&id)?;
         let capsule: er_repro::current::CurrentReproCapsuleV1 = required(params, "capsule")?;
         let session = er_repro::current::replay_current_capsule_v1(
-            &capsule, Arc::clone(&self.content), er_repro::current::CurrentReproLimitsV1::default(),
-        ).map_err(backend)?;
+            &capsule,
+            Arc::clone(&self.content),
+            er_repro::current::CurrentReproLimitsV1::default(),
+        )
+        .map_err(backend)?;
         let response = bounded(json!({
             "session": id, "kernel_version": 7, "processed_attempts": capsule.attempts.len(),
             "base_position": capsule.base_position, "final_position": capsule.final_position,

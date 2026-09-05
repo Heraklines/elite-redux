@@ -195,7 +195,9 @@ pub fn replay(options: &Options) -> Result<(), Box<dyn Error>> {
     let path = crate::option_path(options, "capsule", "ER_M9_REPRO")?;
     let capsule: er_repro::current::CurrentReproCapsuleV1 = read_json(&path, MAXIMUM_EVENT_BYTES)?;
     let session = er_repro::current::replay_current_capsule_v1(
-        &capsule, content, er_repro::current::CurrentReproLimitsV1::default(),
+        &capsule,
+        content,
+        er_repro::current::CurrentReproLimitsV1::default(),
     )?;
     let result = serde_json::to_string(&json!({
         "kernel_version": 7, "processed_attempts": capsule.attempts.len(),

@@ -1,8 +1,10 @@
 # Current causal capsule integration
 
 Status: IMPLEMENTED_PENDING_REMOTE_CHECKS. This is a source checkpoint, not
-qualified execution evidence. Submit after the actual current CLI reload and
-B2 replica presentation cuts have passed their separate remote gates.
+qualified execution evidence. The actual current CLI reload and
+B2 replica presentation cuts passed their separate remote gates. Capsule candidate
+`53332a3b8b837583ad8cb2f5c1d9ff432746b459` passed preflight and returned a remote
+formatting repair before compilation.
 
 ## Current path
 
@@ -56,7 +58,7 @@ transactional initialization and response-budget failures. Two actual CLI proces
 tests use a capsule exported by the native Rust browser host and exercise current
 replay plus native/worker import, tamper rejection, full state and continuation.
 
-The actual Wasm/Chromium export-to-CLI bridge is being added separately. It must
+The actual Wasm/Chromium export-to-CLI bridge is included in this candidate. It must
 use a source-bound non-test Cargo CLI artifact, compare the full browser snapshot,
 and require an altered time event to fail causal replay. Native Rust browser-host
 tests alone do not prove this boundary. All execution, generation, formatting,
