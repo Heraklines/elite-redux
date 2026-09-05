@@ -224,9 +224,12 @@ def plan():
     cli_reload_focus = config.get("cli_reload_focus", {})
     cli_reload_paths = cli_reload_focus.get("paths", [])
     cli_reload_session = bool(product_changes) and all(path in cli_reload_paths for path in product_changes)
+    menu_focus = config.get("menu_validation_focus", {})
+    menu_session = any(path in menu_focus.get("trigger_paths", []) for path in product_changes) and all(
+        path in menu_focus.get("paths", []) or path in cli_reload_paths for path in product_changes)
     cli_reload_guard = None
     cli_manifest = "rust/crates/er-cli/Cargo.toml"
-    if cli_reload_session and any(path in changed for path in (cli_manifest, "rust/Cargo.lock")):
+    if (cli_reload_session or menu_session) and any(path in changed for path in (cli_manifest, "rust/Cargo.lock")):
         if not all(path in changed for path in (cli_manifest, "rust/Cargo.lock")):
             raise RuntimeError("CLI dependency guard: manifest and lock changes must be paired")
         cli_reload_guard = verify_cli_reload_dependencies(
@@ -252,7 +255,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (timer_session and path in timer_focus["paths"]) or ((native_worker_delta or cli_reload_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (timer_session and path in timer_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -308,6 +311,9 @@ def plan():
         execution_scope = timer_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
+    if menu_session:
+        execution_scope = menu_focus["execute"]
+        browser_required = True
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -315,7 +321,7 @@ def plan():
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
-    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session
+    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session or menu_session
         or (RUST / "crates/er-cli/tests/m9e_current_reload.rs").is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
@@ -328,15 +334,18 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
-              "requires_cli_clippy": any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
+              "requires_cli_clippy": menu_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
               "cli_reload_focus": cli_reload_session,
+              "menu_validation_focus": menu_session,
+              "required_native_test_ids": menu_focus.get("exact_test_ids", {}) if menu_session else {},
               "cli_reload_dependency_guard": cli_reload_guard,
-              "requires_agent_protocol_clippy": cli_reload_session,
+              "requires_agent_protocol_clippy": cli_reload_session or menu_session,
               "timer_focus": timer_session,
-              "required_native_targets": (timer_focus.get("required_targets", {}) if timer_session
+              "required_native_targets": (menu_focus.get("required_targets", {}) if menu_session
+                                          else timer_focus.get("required_targets", {}) if timer_session
                                           else supervisor_focus.get("required_targets", {}) if supervisor_session
                                           else cli_reload_focus.get("required_targets", {}) if cli_reload_session else {}),
               "timer_mutant": timer_focus.get("mutant") if timer_session else None,
@@ -344,7 +353,7 @@ def plan():
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
-    if unknown or boundaries or (shared and not timer_session):
+    if unknown or boundaries or (shared and not timer_session and not menu_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -359,6 +368,14 @@ def required_native_target_counts(required, enumerated):
                 raise RuntimeError(f"required native witness missing, ambiguous or empty: {package}:{name}")
             counts[f"{package}:{name}"] = len(matches[0])
     return counts
+
+
+def require_native_test_ids(required, enumerated):
+    for identity, expected in required.items():
+        matches = [ids for crate, target, ids in enumerated if f"{crate}:{target}" == identity]
+        if (len(matches) != 1 or not expected or len(expected) != len(set(expected))
+                or len(matches[0]) != len(expected) or set(matches[0]) != set(expected)):
+            raise RuntimeError("required native test identities/counts disagree: " + identity)
 
 
 def discover_worker_executable(artifacts, summary):
@@ -670,11 +687,13 @@ def main(preflight_failure=None):
         summary["required_native_target_counts"] = required_native_target_counts(
             selection.get("required_native_targets", {}),
             [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
+        require_native_test_ids(selection.get("required_native_test_ids", {}),
+                                [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
         for item in selection["historical_dispositions"]:
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
                 raise RuntimeError("historical disposition must identify exactly one enumerated test")
-        if selection.get("cli_reload_focus"):
+        if selection.get("cli_reload_focus") or selection.get("menu_validation_focus"):
             enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
@@ -714,6 +733,8 @@ def main(preflight_failure=None):
             raise RuntimeError("zero tests executed")
         if selection.get("requires_cli_clippy"):
             run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
+        if selection.get("menu_validation_focus"):
+            run(["cargo", "clippy", "--locked", "-p", "er-types", "--all-targets", "--no-deps", "--", "-D", "warnings"], "types-clippy")
         if selection.get("requires_agent_protocol_clippy"):
             run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
         if selection["worker_session_focus"] or selection["requires_worker_executable"]:

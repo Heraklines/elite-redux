@@ -1,5 +1,7 @@
 //! Canonical M7 menus whose options own typed game actions.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -125,11 +127,13 @@ impl GameMenuV2 {
         for option in &self.options {
             option.validate()?;
         }
-        let visible = |id: &MenuOptionId| {
-            self.options
-                .iter()
-                .any(|option| option.option_id == *id && option.visible)
-        };
+        let visible_ids: BTreeSet<&MenuOptionId> = self
+            .options
+            .iter()
+            .filter(|option| option.visible)
+            .map(|option| &option.option_id)
+            .collect();
+        let visible = |id: &MenuOptionId| visible_ids.contains(id);
         if !visible(&self.selected_option_id)
             || self
                 .navigation

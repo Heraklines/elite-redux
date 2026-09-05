@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "da73baacc6cfc57b0a7ce78b484d48d666851fb6",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33937641185",
+  "baseline": "5cbba49ec726fe6e4260f11ad9acfc7ad40c1d10",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33941386739",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -19,6 +19,21 @@
     "execute": {"er-agent-protocol": ["*"], "er-cli": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
     "required_targets": {"er-cli": ["m9e_current_reload", "m9e_current_entry"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"], "er-wasm": ["m9e_parity"]},
     "reason": "Current JSONL agent process backend and exact reload. Compile the full reverse cone, bind the exact candidate worker executable to the CLI process witness, execute protocol/current/historical regressions and both existing native/Wasm parity witnesses. Accept only the paired er-cli manifest and lock addition of the already locked er-kernel-worker workspace dependency. Shared runtime/browser changes retain broader mapping."
+  },
+  "menu_validation_focus": {
+    "trigger_paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs"],
+    "paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs"],
+    "execute": {"er-types": ["*"], "er-kernel": ["*"], "er-state": ["*"], "er-protocol": ["*"], "er-agent-protocol": ["*"], "er-env": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
+    "required_targets": {"er-types": ["m9e_menu_validation"], "er-cli": ["m9e_current_reload", "m9e_current_entry"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2"], "er-web": ["m9e_host_v2"], "er-wasm": ["m9e_parity"], "er-kernel": ["m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"]},
+    "exact_test_ids": {
+      "er-types:m9e_menu_validation": ["visible_graph_allows_disabled_nodes_unsorted_storage_and_hidden_duplicate_ids", "hidden_and_missing_selection_or_edge_endpoints_reject_before_cancel_and_duplicates", "option_action_and_layout_errors_precede_visibility_even_for_hidden_options", "cancel_requires_visible_enabled_option_before_logical_duplicate_validation", "visible_membership_does_not_hide_duplicate_navigation_keys"],
+      "er-cli:m9e_current_reload": ["actual_worker_cli_reload_replays_held_timer_tail_and_preserves_failed_ticket", "actual_worker_cli_rejects_bad_artifacts_then_forks_and_restores"],
+      "er-cli:m9e_current_entry": ["normal_new_run_resume_and_simulate_use_current_session_events", "normal_commands_report_v2_content_and_reject_historical_state_injection", "public_agent_natural_start_owns_v7_content_and_raw_controls", "public_agent_rejects_old_snapshot_schema_without_replacing_current_session", "public_agent_fork_time_restore_and_close_preserve_current_session_identity", "public_agent_rejected_external_results_do_not_commit_partial_state", "current_session_rolls_back_when_adapter_completion_rejects"],
+      "er-kernel-worker:current_process_v2": ["tiny_success_cap_reports_faults_without_initializing_or_disposing", "invalid_success_cap_rejects_bootstrap_and_omission_keeps_transport_default", "actual_abi2_generations_restore_active_v7_and_continue_identical_typed_trace", "actual_abi2_process_runs_current_natural_controls_and_non_key_time", "actual_abi2_process_rejects_bad_content_events_sequence_and_historical_snapshot"],
+      "er-lab:current_kernel_supervisor_v2": ["exact_current_reload_replays_full_tail_then_continues_in_new_process", "prepared_reload_rejects_a_later_active_event_without_losing_progress", "effectful_success_budget_rejection_preserves_frontier_context_and_reload_limit", "tail_rotation_rejects_expired_ticket_and_replays_every_retained_event", "candidate_content_fault_and_generation_reuse_preserve_active", "retention_gap_reports_accepted_event_and_expires_previous_ticket", "byte_budget_rotates_at_absolute_frontier", "acknowledged_restore_context_survives_fault_and_is_preserved_by_reload", "accepted_activation_reports_failed_retirement_without_rejecting_candidate"],
+      "er-wasm:m9e_parity": ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
+    },
+    "reason": "Menu membership validation optimization only, optionally cumulative with the existing exact CLI reload paths and parsed CLI-worker manifest/lock guard. Compile every reverse consumer of er-types; execute the semantic menu witness and current kernel, process and shipping adapter regressions. Require five menu, two CLI reload, seven CLI entry, five worker, nine supervisor and two native parity test identities, both Wasm parity tests, two Chromium journeys and the typed effect route. Run CLI reload first after full discovery. B2 kernel changes and any unrelated product or lock changes require separate mapping."
   },
   "browser_session_focus": {
     "paths": ["rust/crates/er-web/src/host_v2.rs", "rust/crates/er-web/tests/m9e_host_v2.rs"],

@@ -652,3 +652,32 @@ Execute this required target first after full discovery in its explicit reload
 scope; the remaining inventory must still execute before a passing result. No
 timeout increase or reduction in qualification is authorized by this repair.
 B2 and capsule changes remain excluded from the diagnostic candidate.
+
+### Actual current CLI reload qualified; shared menu cost repair next
+
+The diagnostic source first returned format-only feedback in run33941274988,
+candidatee1feec06565c21dbf19a12ea1cf7e3b06a3f5545: zero product tests, complete
+9,452-byte source patch in a7,021-byte compact artifact, no omitted patch files.
+Applied that remote patch only to the reload test.
+
+Candidate `5cbba49ec726fe6e4260f11ad9acfc7ad40c1d10`, run `33941386739`,
+passed all44 selected/executed native tests, both Wasm tests, formatting and
+CLI/protocol/worker/lab Clippy. Zero failures/skips. The unchanged held-timer
+native/Wasm digest is9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e.
+Harness SHA-256682f48ad6af886e6c7c22bda982892bbffbc440c7e0622d301b32b3367bd0799;
+selected IDs SHA-25680d737d5ba85bb828217fd56881c751bc553db1bb660819ba42ebdc525cdbf6b.
+Inspected compact2,426bytes; diagnostics34,281bytes remained remote. Build74,035ms,
+actual CLI reload402,712ms, supervisor148,926ms, worker65,555ms, current entry28,409ms,
+native parity9,938ms, Wasm70,018ms. Both actual reload tests passed. Baseline advances
+to this exact candidate and run.
+
+The result does not prove the earlier timeout was a deadlock or attribute the
+speedup to the reader change: unchanged worker/supervisor targets also ran faster
+on this runner. Source review independently found quadratic visible-option scans
+in `GameMenuV2::validate`. The next isolated cut replaces repeated scans with a
+borrowed visible-ID set, preserves error precedence and adds five domain tests.
+See `m9e-menu-validation-next.md`. Its gate covers current native tools, the full
+shared compile cone and Wasm/Chromium boundaries; B2 and capsules stay excluded.
+No menu performance improvement is claimed before remote measurement. Full M9
+remains incomplete; batch, retention, full failure replay and final qualification
+still require implementation and evidence.

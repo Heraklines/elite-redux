@@ -801,6 +801,150 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("exactly one real worker executable", summary["first_failure"])
 
+    def configure_menu_scope(self):
+        self.configure_cli_reload_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["menu_validation_focus"] = policy["menu_validation_focus"]
+        self.config["shared_packages"] = policy["shared_packages"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-types")
+        for package in ("er-kernel", "er-state", "er-protocol", "er-env"):
+            self.package(package, '[dependencies]\ner-types = { path = "../er-types" }\n')
+        self.package("er-extra-reverse", '[target.\'cfg(unix)\'.build-dependencies]\n'
+                     'alias = { package = "er-env", path = "../er-env" }\n')
+
+    def test_menu_scope_compiles_full_reverse_cone_and_requires_all_platform_witnesses(self):
+        self.configure_menu_scope()
+        self.changed = self.config["menu_validation_focus"]["paths"] + self.config["cli_reload_focus"]["paths"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["menu_validation_focus"])
+        self.assertFalse(selection["cli_reload_focus"])
+        self.assertFalse(selection["timer_focus"])
+        self.assertEqual(selection["base_sha"], BASE)
+        self.assertEqual(selection["boundary_paths"], [])
+        self.assertEqual(selection["unknown_paths"], [])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertTrue(selection["requires_cli_clippy"])
+        self.assertTrue(selection["requires_agent_protocol_clippy"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(selection["cli_reload_dependency_guard"]["added_workspace_dependencies"], ["er-kernel-worker"])
+        self.assertIsNone(selection["worker_lock_guard"])
+        self.assertIsNone(selection["timer_mutant"])
+        self.assertIn("er-extra-reverse", selection["packages"])
+        self.assertNotIn("er-extra-reverse", selection["execution_scope"])
+        for package in ("er-types", "er-kernel", "er-state", "er-protocol", "er-agent-protocol", "er-env", "er-cli", "er-web", "er-kernel-worker"):
+            self.assertEqual(selection["execution_scope"][package], ["*"])
+        self.assertEqual(selection["execution_scope"]["er-wasm"], ["m9e_parity"])
+        self.assertEqual({identity: len(ids) for identity, ids in selection["required_native_test_ids"].items()}, {
+            "er-types:m9e_menu_validation": 5, "er-cli:m9e_current_reload": 2, "er-cli:m9e_current_entry": 7,
+            "er-kernel-worker:current_process_v2": 5, "er-lab:current_kernel_supervisor_v2": 9, "er-wasm:m9e_parity": 2})
+        for trigger in self.config["menu_validation_focus"]["trigger_paths"]:
+            self.changed = [trigger]
+            self.assertTrue(self.feedback.plan()["menu_validation_focus"])
+
+    def test_menu_scope_preserves_exact_paired_cli_dependency_guard(self):
+        self.configure_menu_scope()
+        trigger = "rust/crates/er-types/src/m7_menu.rs"
+        for extra in ("rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml"):
+            self.changed = [trigger, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "must be paired"):
+                self.feedback.plan()
+        self.changed = [trigger, "rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml"]
+        self.assertEqual(self.feedback.plan()["cli_reload_dependency_guard"]["status"], "verified")
+        lock = self.rust / "Cargo.lock"
+        original = lock.read_text()
+        for invalid in (self.baseline_lock, original.replace('"er-kernel-worker"]', '"er-kernel-worker", "serde"]'),
+                        original.replace('name = "er-env"\n', 'name = "er-env"\nchecksum = "changed"\n')):
+            lock.write_text(invalid)
+            with self.assertRaisesRegex(RuntimeError, "CLI lock guard"):
+                self.feedback.plan()
+        lock.write_text(original)
+        manifest = self.rust / "crates/er-cli/Cargo.toml"
+        manifest.write_text(manifest.read_text().replace('../er-kernel-worker', '../wrong-worker'))
+        with self.assertRaisesRegex(RuntimeError, "CLI dependency guard"):
+            self.feedback.plan()
+
+    def test_menu_scope_rejects_b2_kernel_capsule_and_unmapped_product_changes(self):
+        self.configure_menu_scope()
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_coop_v7.rs",
+                      "rust/crates/er-types/src/other.rs", "rust/crates/er-types/Cargo.toml",
+                      "rust/crates/er-repro/src/current.rs", "src/rust-browser/routes/browser-effects-v2.ts",
+                      "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "unmapped.json"):
+            self.changed = ["rust/crates/er-types/src/m7_menu.rs", extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        for path in ("docs/plans/rust-kernel/m9e-progress.md", "scripts/ci/m9e_feedback.py"):
+            self.changed = [path]
+            selection = self.feedback.plan()
+            self.assertFalse(selection["menu_validation_focus"])
+            self.assertEqual(selection["packages"], ["er-canonical"])
+            self.assertFalse(selection["requires_worker_executable"])
+
+    def test_menu_exact_witnesses_reject_removed_renamed_duplicate_and_wrong_crate_tests(self):
+        self.configure_menu_scope()
+        self.changed = ["rust/crates/er-types/src/m7_menu.rs"]
+        selection = self.feedback.plan()
+        required = selection["required_native_test_ids"]
+        valid = [(*identity.split(":"), ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, valid)
+        for index, row in enumerate(valid):
+            for changed in (None, (row[0], row[1], []), ("wrong-crate", row[1], row[2]),
+                            (row[0], row[1], row[2][:-1] + ["wrong-test"]),
+                            (row[0], row[1], row[2] + [row[2][0]])):
+                rows = valid[:index] + valid[index + 1:]
+                if changed is not None:
+                    rows.append(changed)
+                with self.subTest(identity=row[:2], defect=changed), self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                    self.feedback.require_native_test_ids(required, rows)
+        targets = selection["required_native_targets"]
+        enumerated = [(crate, target, ["actual-test"]) for crate, names in targets.items() for target in names]
+        self.feedback.required_native_target_counts(targets, enumerated)
+        for index, row in enumerate(enumerated):
+            with self.subTest(target=row[:2]), self.assertRaisesRegex(RuntimeError, "required native witness"):
+                self.feedback.required_native_target_counts(targets, enumerated[:index] + enumerated[index + 1:])
+
+    def test_menu_orchestration_discovers_all_before_reload_first_and_keeps_platforms(self):
+        self.configure_menu_scope()
+        self.changed = ["rust/crates/er-types/src/m7_menu.rs"]
+        selection = self.feedback.plan()
+        # Isolate ordering and bindings; exact complete inventory is asserted
+        # independently above and remains unchanged in the real selection.
+        selection["execution_scope"] = {"er-cli": ["a_suite", "m9e_current_reload"], "er-types": ["m9e_menu_validation"]}
+        selection["required_native_targets"] = {"er-cli": ["m9e_current_reload"], "er-types": ["m9e_menu_validation"]}
+        selection["required_native_test_ids"] = {key: ids for key, ids in selection["required_native_test_ids"].items()
+                                                  if key in ("er-cli:m9e_current_reload", "er-types:m9e_menu_validation")}
+        self.binary_ids = {"a_suite": ["ordinary-cli"],
+                           "m9e_current_reload": selection["required_native_test_ids"]["er-cli:m9e_current_reload"],
+                           "m9e_menu_validation": selection["required_native_test_ids"]["er-types:m9e_menu_validation"]}
+        self.binary_crates = {"a_suite": "er-cli", "m9e_current_reload": "er-cli", "m9e_menu_validation": "er-types"}
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.executed, ["m9e_current_reload", "a_suite", "m9e_menu_validation"])
+        self.assertEqual(summary["tests"]["passed"], 8)
+        for target in self.binary_ids:
+            self.assertLess(self.events.index("list:" + target), self.events.index("execute:m9e_current_reload"))
+        for target, _, env in self.binary_envs:
+            if target == "m9e_current_reload":
+                self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+                self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+            else:
+                self.assertIsNone(env)
+        for lint in ("types-clippy", "cli-clippy", "agent-protocol-clippy", "worker-clippy", "endpoint-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.binary_ids["m9e_menu_validation"] = self.binary_ids["m9e_menu_validation"][:-1]
+        self.executed.clear()
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.executed, [])
+        self.assertIn("required native test identities", summary["first_failure"])
+
     def test_broad_cli_scope_binds_present_reload_target_without_relaxing_narrow_requirements(self):
         self.configure_browser_scope()
         self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
