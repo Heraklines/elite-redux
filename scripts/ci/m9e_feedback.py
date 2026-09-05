@@ -5,6 +5,7 @@ then every enumerated native test binary is executed. Boundary changes fail
 closed until their additional platform checks have an explicit executable map.
 """
 
+import base64
 import hashlib
 import json
 import os
@@ -26,7 +27,8 @@ RUST = ROOT / "rust"
 TIMINGS = {}
 WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-lab", "current_kernel_supervisor_v2"),
-                        ("er-cli", "m9e_current_reload")}
+                        ("er-cli", "m9e_current_reload"),
+                        ("er-cli", "m9e_current_repro")}
 
 
 def digest(path):
@@ -146,6 +148,57 @@ def verify_cli_reload_dependencies(before_lock, after_lock, before_manifest, aft
     return {"status": "verified", "owner": "er-cli", "added_workspace_dependencies": ["er-kernel-worker"]}
 
 
+def verify_current_repro_dependencies(before_lock, after_lock, before_manifests, after_manifests):
+    """Two exact workspace dependency deltas; no resolution or metadata drift."""
+    additions = {"er-repro": {"er-env", "er-game", "er-kernel"}, "er-cli": {"er-web"}}
+    if set(before_manifests) != set(additions) or set(after_manifests) != set(additions):
+        raise RuntimeError("repro dependency guard: both owner manifests are required")
+    for owner, names in additions.items():
+        old, new = map(tomllib.loads, (before_manifests[owner], after_manifests[owner]))
+        table = "dev-dependencies" if owner == "er-cli" else "dependencies"
+        dependencies = old.get(table, {})
+        if set(dependencies) & names:
+            raise RuntimeError("repro dependency guard: dependency already present")
+        expected = {**old, table: {**dependencies, **{name: {"path": "../" + name} for name in names}}}
+        if new != expected:
+            raise RuntimeError("repro dependency guard: only exact owner path additions may change")
+    before, after = map(tomllib.loads, (before_lock, after_lock))
+    def records(lock):
+        packages = lock.get("package", [])
+        result = {(item["name"], item["version"], item.get("source")): item for item in packages}
+        if len(result) != len(packages):
+            raise RuntimeError("repro lock guard: duplicate package identity")
+        return result
+    old, new = records(before), records(after)
+    if old.keys() != new.keys() or {key: value for key, value in before.items() if key != "package"} != {
+        key: value for key, value in after.items() if key != "package"
+    }:
+        raise RuntimeError("repro lock guard: lock metadata or inventory changed")
+    owners = {}
+    for name in set(additions) | set().union(*additions.values()):
+        keys = [key for key in old if key[0] == name]
+        if len(keys) != 1 or keys[0][2] is not None:
+            raise RuntimeError("repro lock guard: unambiguous existing workspace packages required")
+        if name in additions:
+            owners[keys[0]] = additions[name]
+    for key in old:
+        if key not in owners:
+            if old[key] != new[key]:
+                raise RuntimeError("repro lock guard: another package record changed")
+            continue
+        if {field: value for field, value in old[key].items() if field != "dependencies"} != {
+            field: value for field, value in new[key].items() if field != "dependencies"
+        }:
+            raise RuntimeError("repro lock guard: owner metadata changed")
+        old_deps, new_deps = old[key].get("dependencies", []), new[key].get("dependencies", [])
+        if len(old_deps) != len(set(old_deps)) or len(new_deps) != len(set(new_deps)) or (
+            set(new_deps) - set(old_deps) != owners[key] or set(old_deps) - set(new_deps)
+        ):
+            raise RuntimeError("repro lock guard: only the exact owner additions are allowed")
+    return {"status": "verified", "added_workspace_dependencies": {
+        owner: sorted(names) for owner, names in additions.items()}}
+
+
 def verify_worker_lock_change(before_text, after_text):
     """Allow only the ABI2 worker's three existing workspace dependencies."""
     before = tomllib.loads(before_text)
@@ -224,6 +277,20 @@ def plan():
     cli_reload_focus = config.get("cli_reload_focus", {})
     cli_reload_paths = cli_reload_focus.get("paths", [])
     cli_reload_session = bool(product_changes) and all(path in cli_reload_paths for path in product_changes)
+    repro_focus = config.get("current_repro_focus", {})
+    repro_session = any(path in repro_focus.get("trigger_paths", []) for path in product_changes) and all(
+        path in repro_focus.get("paths", []) for path in product_changes)
+    repro_guard = None
+    repro_manifests = {owner: f"rust/crates/{owner}/Cargo.toml" for owner in ("er-repro", "er-cli")}
+    repro_guard_paths = ["rust/Cargo.lock", *repro_manifests.values()]
+    if repro_session and any(path in changed for path in repro_guard_paths):
+        if not all(path in changed for path in repro_guard_paths):
+            raise RuntimeError("repro dependency guard: both manifests and lock must be paired")
+        repro_guard = verify_current_repro_dependencies(
+            capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text(),
+            {owner: capture(["git", "show", f"{base}:{path}"]) for owner, path in repro_manifests.items()},
+            {owner: (ROOT / path).read_text() for owner, path in repro_manifests.items()})
+        repro_guard["baseline_sha"] = base
     menu_focus = config.get("menu_validation_focus", {})
     menu_session = any(path in menu_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in menu_focus.get("paths", []) or path in cli_reload_paths for path in product_changes)
@@ -255,7 +322,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (timer_session and path in timer_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -311,6 +378,10 @@ def plan():
         execution_scope = timer_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
+    if repro_session:
+        execution_scope = repro_focus["execute"]
+        browser_required = True
+        boundaries = [path for path in boundaries if path not in repro_focus["paths"]]
     if menu_session:
         execution_scope = menu_focus["execute"]
         browser_required = True
@@ -321,12 +392,24 @@ def plan():
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
-    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session or menu_session
-        or (RUST / "crates/er-cli/tests/m9e_current_reload.rs").is_file()) and (
+    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session or repro_session or menu_session
+        or (RUST / "crates/er-cli/tests" / (target + ".rs")).is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
     if endpoint_execution:
         selected.add("er-kernel-worker")
+    cli_executable_required = browser_required and (repro_session or (
+        ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
+    if cli_executable_required:
+        selected.add("er-cli")
+    # Explicit witness roots also need their reverse consumers compiled, even
+    # when only the TypeScript bridge changed in this cumulative source delta.
+    if execution_scope is not None or cli_executable_required or endpoint_execution:
+        while True:
+            widened = selected | {name for name, deps in dependencies.items() if deps & selected}
+            if widened == selected:
+                break
+            selected = widened
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
               "historical_dispositions": config.get("historical_dispositions", []),
@@ -334,17 +417,22 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
-              "requires_cli_clippy": menu_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
+              "requires_cli_clippy": repro_session or menu_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
               "cli_reload_focus": cli_reload_session,
               "menu_validation_focus": menu_session,
-              "required_native_test_ids": menu_focus.get("exact_test_ids", {}) if menu_session else {},
               "cli_reload_dependency_guard": cli_reload_guard,
+              "current_repro_focus": repro_session,
+              "current_repro_dependency_guard": repro_guard,
+              "requires_cli_executable": cli_executable_required,
+              "required_native_test_ids": (repro_focus.get("exact_test_ids", {}) if repro_session
+                                           else menu_focus.get("exact_test_ids", {}) if menu_session else {}),
               "requires_agent_protocol_clippy": cli_reload_session or menu_session,
               "timer_focus": timer_session,
-              "required_native_targets": (menu_focus.get("required_targets", {}) if menu_session
+              "required_native_targets": (repro_focus.get("required_targets", {}) if repro_session
+                                          else menu_focus.get("required_targets", {}) if menu_session
                                           else timer_focus.get("required_targets", {}) if timer_session
                                           else supervisor_focus.get("required_targets", {}) if supervisor_session
                                           else cli_reload_focus.get("required_targets", {}) if cli_reload_session else {}),
@@ -354,7 +442,7 @@ def plan():
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
-    if unknown or boundaries or (shared and not timer_session and not menu_session):
+    if unknown or boundaries or (shared and not timer_session and not repro_session and not menu_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -377,6 +465,47 @@ def require_native_test_ids(required, enumerated):
         if (len(matches) != 1 or not expected or len(expected) != len(set(expected))
                 or len(matches[0]) != len(expected) or set(matches[0]) != set(expected)):
             raise RuntimeError("required native test identities/counts disagree: " + identity)
+
+
+def discover_cli_executable(artifacts, summary):
+    """Select the real candidate Cargo CLI inside this invocation's target root."""
+    manifest = (RUST / "crates/er-cli/Cargo.toml").resolve()
+    configured_root = Path(os.environ.get("CARGO_TARGET_DIR", RUST / "target"))
+    target_root = (configured_root if configured_root.is_absolute() else RUST / configured_root).resolve()
+    candidates = {}
+    for message in artifacts:
+        target = message.get("target", {})
+        if (message.get("reason") != "compiler-artifact" or target.get("name") != "er-cli"
+                or target.get("kind") != ["bin"] or message.get("profile", {}).get("test") is not False
+                or Path(message.get("manifest_path", "")).resolve() != manifest):
+            continue
+        path = Path(message.get("executable") or "")
+        if (not path.is_absolute() or not path.is_file() or not os.access(path, os.X_OK)
+                or path.name != ("er-cli.exe" if os.name == "nt" else "er-cli")
+                or path.resolve().name != path.name
+                or not path.resolve().is_relative_to(target_root)):
+            raise RuntimeError("current repro CLI executable is missing, misnamed or outside target root")
+        candidates[path.resolve()] = message
+    if len(candidates) != 1:
+        raise RuntimeError("current repro requires exactly one real CLI executable artifact")
+    if not re.fullmatch(r"[0-9a-f]{40}", summary["product_sha"]):
+        raise RuntimeError("current repro CLI source SHA is invalid")
+    path, message = next(iter(candidates.items()))
+    return {"path": str(path), "root": str(target_root), "sha256": digest(path), "bytes": path.stat().st_size,
+            "source_sha": summary["product_sha"], "target": summary["target"], "profile": summary["profile"],
+            "manifest_path": "rust/crates/er-cli/Cargo.toml", "cargo_package_id": message.get("package_id"),
+            "cargo_profile": message["profile"]}
+
+
+def browser_cli_env(binding, source_sha):
+    if binding is None or binding.get("source_sha") != source_sha:
+        raise RuntimeError("current repro browser bridge has no candidate-bound CLI executable")
+    path, root = Path(binding["path"]), Path(binding["root"])
+    if (not path.is_absolute() or not root.is_absolute() or not path.is_file()
+            or not path.resolve().is_relative_to(root.resolve()) or digest(path) != binding["sha256"]):
+        raise RuntimeError("current repro browser CLI artifact changed or escaped its root")
+    return {"ER_M9E_CLI_EXECUTABLE": str(path), "ER_M9E_CLI_ROOT": str(root),
+            "ER_M9E_CLI_SHA256": binding["sha256"], "ER_M9E_CLI_SOURCE_SHA": source_sha}
 
 
 def discover_worker_executable(artifacts, summary):
@@ -484,8 +613,58 @@ def browser_result_counts(playwright, vitest):
             "scope": "V7 Wasm host in Chromium plus typed effect router; not production Worker/WebRTC topology"}
 
 
+def browser_bridge_evidence(playwright, binding):
+    attachments = []
+    def collect(suite):
+        for spec in suite.get("specs", []):
+            for test in spec.get("tests", []):
+                for result in test.get("results", []):
+                    attachments.extend((spec.get("title"), item) for item in result.get("attachments", [])
+                                       if item.get("name") == "m9e-current-repro-cli-bridge")
+        for child in suite.get("suites", []):
+            collect(child)
+    for suite in playwright.get("suites", []):
+        collect(suite)
+    if (len(attachments) != 1 or attachments[0][0] != "natural V7 browser startup reaches the real battle command"
+            or attachments[0][1].get("contentType") != "application/json"):
+        raise RuntimeError("current repro Chromium bridge attachment missing, ambiguous or misplaced")
+    attachment = attachments[0][1]
+    if "body" in attachment and "path" not in attachment:
+        encoded = attachment["body"]
+        if not isinstance(encoded, str) or len(encoded) > 5500:
+            raise RuntimeError("current repro bridge attachment exceeds bound")
+        payload = base64.b64decode(encoded, validate=True)
+    elif "path" in attachment and "body" not in attachment:
+        path = Path(attachment["path"])
+        path = (path if path.is_absolute() else ROOT / path).resolve()
+        if (not path.is_relative_to((ROOT / "test-results/rust-browser").resolve())
+                or not path.is_file() or path.stat().st_size > 4096):
+            raise RuntimeError("current repro bridge attachment path or size is invalid")
+        payload = path.read_bytes()
+    else:
+        raise RuntimeError("current repro bridge attachment requires one bounded body or file")
+    if len(payload) > 4096:
+        raise RuntimeError("current repro bridge attachment exceeds bound")
+    evidence = json.loads(payload)
+    fields = {"source_sha", "executable_sha256", "positive_replay", "time_omission_rejected",
+              "base_position", "final_position", "processed_attempts", "snapshot_digest", "negative_divergence_position"}
+    if (not isinstance(evidence, dict) or set(evidence) != fields
+            or evidence["source_sha"] != binding["source_sha"] or evidence["executable_sha256"] != binding["sha256"]
+            or evidence["positive_replay"] is not True or evidence["time_omission_rejected"] is not True):
+        raise RuntimeError("current repro bridge candidate or replay evidence mismatch")
+    for field in ("base_position", "final_position", "processed_attempts", "negative_divergence_position"):
+        if type(evidence[field]) is not int or not 0 <= evidence[field] <= (1 << 53) - 1:
+            raise RuntimeError("current repro bridge positions are unsafe")
+    if (not 1 < evidence["processed_attempts"] <= 256
+            or evidence["final_position"] - evidence["base_position"] != evidence["processed_attempts"]
+            or not evidence["base_position"] < evidence["negative_divergence_position"] < evidence["final_position"]
+            or not isinstance(evidence["snapshot_digest"], str)
+            or not re.fullmatch(r"blake3-v1:[0-9a-f]{64}", evidence["snapshot_digest"])):
+        raise RuntimeError("current repro bridge trace evidence is inconsistent")
+    return evidence
+
+
 def browser_checks(summary):
-    run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
     run(["pnpm", "install", "--frozen-lockfile"], "browser-dependencies", ROOT)
     output = Path(os.environ["RUNNER_TEMP"]) / "m9e-v7-web"
     env = os.environ.copy()
@@ -507,12 +686,17 @@ def browser_checks(summary):
     run(["pnpm", "exec", "playwright", "install", "--with-deps", "chromium"], "browser-chromium-install", ROOT)
     env["M9E_V7_WEB_DIR"] = str(output)
     env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-results.json")
+    if summary.get("plan", {}).get("requires_cli_executable"):
+        env.update(browser_cli_env(summary.get("cli_executable"), summary["product_sha"]))
     run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
          "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "--workers=1", "--reporter=line,json"], "browser-journey", ROOT, env)
     run(["pnpm", "exec", "vitest", "run", "--config", "test/node/vitest.config.ts",
          "test/node/rust-browser/engineering/browser-effects-v2.test.ts", "--reporter=json", "--outputFile=" + str(FULL / "browser-effect-results.json")], "browser-effects", ROOT)
     summary["browser_tests"] = browser_result_counts(json.loads((FULL / "browser-results.json").read_text()),
                                                      json.loads((FULL / "browser-effect-results.json").read_text()))
+    if summary.get("plan", {}).get("requires_cli_executable"):
+        summary["browser_current_repro_bridge"] = browser_bridge_evidence(
+            json.loads((FULL / "browser-results.json").read_text()), summary["cli_executable"])
 
 
 def timer_behavioral_mutant(selection, summary, passed_test_ids):
@@ -693,6 +877,8 @@ def main(preflight_failure=None):
                 raise RuntimeError("required current process test target is missing")
             worker_executable = discover_worker_executable(artifacts, summary)
             summary["worker_executable"] = worker_executable
+        if selection.get("requires_cli_executable"):
+            summary["cli_executable"] = discover_cli_executable(artifacts, summary)
         enumerated = []
         for index, (binary, (name, cwd)) in enumerate(sorted(binaries.items())):
             env = native_target_env(cwd.name, name, worker_executable)
@@ -715,6 +901,23 @@ def main(preflight_failure=None):
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
                 raise RuntimeError("historical disposition must identify exactly one enumerated test")
+        # Preserve complete discovery and identity evidence on lint failure,
+        # while rejecting native lint errors before expensive test execution.
+        if selection.get("requires_cli_clippy"):
+            run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
+        if selection.get("menu_validation_focus"):
+            run(["cargo", "clippy", "--locked", "-p", "er-types", "--all-targets", "--no-deps", "--", "-D", "warnings"], "types-clippy")
+        if selection.get("requires_agent_protocol_clippy"):
+            run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
+        if selection.get("current_repro_focus"):
+            for package in ("er-repro", "er-env"):
+                run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
+        if selection["worker_session_focus"] or selection["requires_worker_executable"]:
+            run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
+        if selection["requires_worker_executable"]:
+            run(["cargo", "clippy", "--locked", "-p", "er-lab", "--all-targets", "--no-deps", "--", "-D", "warnings"], "endpoint-clippy")
+        if selection["requires_browser"]:
+            run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
         if selection.get("cli_reload_focus") or selection.get("menu_validation_focus"):
             enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
@@ -753,16 +956,6 @@ def main(preflight_failure=None):
                 summary["native_timer_parity_digest"] = timer_parity_digest(output.read_text(), "native")
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
-        if selection.get("requires_cli_clippy"):
-            run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
-        if selection.get("menu_validation_focus"):
-            run(["cargo", "clippy", "--locked", "-p", "er-types", "--all-targets", "--no-deps", "--", "-D", "warnings"], "types-clippy")
-        if selection.get("requires_agent_protocol_clippy"):
-            run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
-        if selection["worker_session_focus"] or selection["requires_worker_executable"]:
-            run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
-        if selection["requires_worker_executable"]:
-            run(["cargo", "clippy", "--locked", "-p", "er-lab", "--all-targets", "--no-deps", "--", "-D", "warnings"], "endpoint-clippy")
         if selection["requires_wasm"]:
             wasm_checks(selection, summary)
         if selection["requires_browser"]:

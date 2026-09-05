@@ -2,6 +2,7 @@
 
 pub mod capsule;
 pub mod corpus;
+pub mod current;
 pub mod diff;
 pub mod explain;
 pub mod minimize;

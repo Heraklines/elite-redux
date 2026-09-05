@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { expect, type Page, test } from "playwright/test";
+import { assertCurrentReproCliBridge } from "./m9e-current-repro-bridge";
 
 const fixtureRoot = process.env.M9E_V7_WEB_DIR;
 if (fixtureRoot == null) {
@@ -171,6 +172,7 @@ type SnapshotWire = {
 
 interface ResponseWire {
   kind: string;
+  batch?: { effects: { kind: string; capsule_bytes?: number[] }[] };
 }
 
 interface CoopResult {
@@ -320,6 +322,31 @@ test("natural V7 browser startup reaches the real battle command", async ({ page
   expect(lifecycle.value.active_run.battle).not.toBeNull();
   const advanced = await page.evaluate(() => globalThis.__m9eV7.send({ kind: "ADVANCE_TIME", milliseconds: 16 }));
   expect(advanced.kind).toBe("EFFECTS");
+  await page.keyboard.down("ArrowDown");
+  await page.evaluate(() => globalThis.__m9eV7.idle());
+  expect(currentControl(await page.evaluate(() => globalThis.__m9eV7.snapshot())).menu?.selected_option_id).toBe("battle/command/party");
+  await page.evaluate(() => globalThis.__m9eV7.send({ kind: "ADVANCE_TIME", milliseconds: 249 }));
+  expect(currentControl(await page.evaluate(() => globalThis.__m9eV7.snapshot())).menu?.selected_option_id).toBe("battle/command/party");
+  await page.evaluate(() => globalThis.__m9eV7.send({ kind: "ADVANCE_TIME", milliseconds: 1 }));
+  expect(currentControl(await page.evaluate(() => globalThis.__m9eV7.snapshot())).menu?.selected_option_id).toBe("battle/command/fight");
+  await page.keyboard.up("ArrowDown");
+  await page.evaluate(() => globalThis.__m9eV7.idle());
+  await page.evaluate(() => globalThis.__m9eV7.send({ kind: "ADVANCE_TIME", milliseconds: 500 }));
+  const finalSnapshot = await page.evaluate(() => globalThis.__m9eV7.snapshot());
+  expect(currentControl(finalSnapshot).menu?.selected_option_id).toBe("battle/command/fight");
+  const capsuleBytes = await page.evaluate(async () => {
+    const response = await globalThis.__m9eV7.send({ kind: "EXPORT_REPRO" });
+    const effects = response.batch?.effects;
+    if (response.kind !== "EFFECTS" || effects?.length !== 1
+      || effects[0].kind !== "CURRENT_REPRO_READY" || effects[0].capsule_bytes == null) {
+      throw new Error("actual Wasm host did not export one current capsule");
+    }
+    return effects[0].capsule_bytes;
+  });
+  const bridge = await assertCurrentReproCliBridge(capsuleBytes, finalSnapshot, resolve(fixture, "game-content-bundle-v2.json"));
+  await test.info().attach("m9e-current-repro-cli-bridge", {
+    contentType: "application/json", body: Buffer.from(JSON.stringify(bridge)),
+  });
 });
 
 test("two V7 browser hosts wait for both humans and converge one turn", async ({ page }) => {

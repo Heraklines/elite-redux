@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "823bcc3522683c3f9903b1e521e2a7cd3c551701",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33943804197",
+  "baseline": "9459b9cbce2eebc7cc4800569160d6d2eedc6856",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33945799459",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -19,6 +19,14 @@
     "execute": {"er-agent-protocol": ["*"], "er-cli": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
     "required_targets": {"er-cli": ["m9e_current_reload", "m9e_current_entry"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"], "er-wasm": ["m9e_parity"]},
     "reason": "Current JSONL agent process backend and exact reload. Compile the full reverse cone, bind the exact candidate worker executable to the CLI process witness, execute protocol/current/historical regressions and both existing native/Wasm parity witnesses. Accept only the paired er-cli manifest and lock addition of the already locked er-kernel-worker workspace dependency. Shared runtime/browser changes retain broader mapping."
+  },
+  "current_repro_focus": {
+    "trigger_paths": ["rust/crates/er-repro/src/current.rs", "rust/crates/er-repro/tests/m9e_current_repro.rs", "rust/crates/er-cli/tests/m9e_current_repro.rs", "test/browser/rust-browser/m9e-current-repro-bridge.ts"],
+    "paths": ["rust/Cargo.lock", "rust/crates/er-repro/Cargo.toml", "rust/crates/er-repro/src/lib.rs", "rust/crates/er-repro/src/current.rs", "rust/crates/er-repro/tests/m9e_current_repro.rs", "rust/crates/er-env/src/current.rs", "rust/crates/er-cli/Cargo.toml", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/tests/m9e_current_repro.rs", "rust/crates/er-web/src/contracts_v2.rs", "rust/crates/er-web/src/host_v2.rs", "rust/crates/er-web/tests/m9e_host_v2.rs", "src/rust-browser/contracts/browser-contracts-v2.ts", "src/rust-browser/routes/browser-effects-v2.ts", "test/node/rust-browser/engineering/browser-effects-v2.test.ts", "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "test/browser/rust-browser/m9e-current-repro-bridge.ts"],
+    "execute": {"er-repro": ["*"], "er-env": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
+    "required_targets": {"er-repro": ["m9e_current_repro"], "er-cli": ["m9e_current_repro", "m9e_current_entry", "m9e_current_reload"], "er-web": ["m9e_host_v2"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2"], "er-wasm": ["m9e_parity"]},
+    "exact_test_ids": {"er-repro:m9e_current_repro": ["natural_title_to_battle_held_timer_capsule_replays_full_evidence", "replay_rejects_nonkey_omission_reordering_wrong_content_and_unsafe_positions", "rejected_attempt_retains_game_frontier_and_replays_valid_retry", "count_rotation_retains_checkpoint_before_current_timer_consequence", "byte_rotation_uses_full_serialized_capsule_bound", "oversized_attempt_adapter_gap_and_origin_failure_are_explicit_then_recover", "broken_capture_continuity_cannot_export_a_false_complete_tail", "browser_generation_survives_rotation_import_and_kernel_rejections_without_protocol", "browser_transport_validation_checks_admission_continuity_and_outcome_separately"], "er-cli:m9e_current_repro": ["native_browser_capsule_replays_through_actual_cli_and_continues", "actual_worker_capsule_import_rejects_tampering_without_claiming_session_id"]},
+    "reason": "Causal current capsules across the core recorder, native browser host, real CLI and worker import, and actual Chromium/Wasm export to source-bound normal CLI replay. Compile the complete reverse dependency cone; require exact nine core and two CLI witnesses plus current adapter/process targets, both parity tests and existing typed effect routing. Parsed manifest/lock guard permits only er-repro adding existing er-env/er-game/er-kernel and CLI dev-depending on existing er-web. Shared kernel changes and any unmapped product path fail closed; this scope cannot bypass timer or replica mutants."
   },
   "menu_validation_focus": {
     "trigger_paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs"],

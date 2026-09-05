@@ -743,3 +743,68 @@ presentation-omission mutant alongside the existing timer mutant. See
 `m9e-replica-effects-next.md`. Capsules, current batch code, dependency changes
 and the prepared early-lint ordering repair are excluded from this submission.
 Those source-reviewed future cuts remain unqualified; full M9 is incomplete.
+
+### Replica gate returned its complete formatting repair
+
+Candidate `2000be4e3508f97c569f5c56cded2969c896da6c`, run `33945436561`,
+passed harness preflight and stopped at formatting before selecting or executing
+product tests. The complete 11,462-byte patch covers only the kernel delivery
+function and cooperative witness. Inspected/downloaded compact artifact 7,514
+compressed bytes; 9,631-byte diagnostics remain remote. Format check/repair took
+3,372/3,322 ms. Applied the complete remote patch, committed
+`9459b9cbce2eebc7cc4800569160d6d2eedc6856`, and started run `33945799459`.
+No B2 execution pass is claimed yet; baseline remains qualified `823bcc3`.
+
+While that cut runs, current capsule source is preserved as an isolated tree
+excluding all batch edits; the future capsule gate also moves native Clippy
+(including browser-host Clippy) after complete test discovery and validation but
+before native execution. It preserves the complete selected inventory on lint
+failure, with zero tests executed, and still requires all native/platform checks
+on success. The batch core/CLI and exact success-envelope admission have source
+review, with six core, two actual CLI and three protocol witnesses. They await
+separate remote qualification after capsules; no local workload was executed.
+
+### Replica qualification passed; submit current causal capsules
+
+Candidate `9459b9cbce2eebc7cc4800569160d6d2eedc6856`, run `33945799459`,
+passed all 568 selected/executed native tests, both Wasm parity tests, both
+Chromium journeys and the typed effect-route test, with zero failures/skips.
+Formatting and the required worker/lab/browser Clippy checks passed. Both
+compiled behavioral mutants were detected by the exact intended assertions:
+timer and replica each executed one test, exited 101 with one failure, and
+restored source SHA-256
+`48cf5addd7eaaa7a4329f453e43d68a5d119b7f5b60a7592bf6e2be6bdd30bf4`.
+The supervisor target was build-only in this scope; its prior menu execution
+remains separate evidence. Workflow duration was 25 minutes 2 seconds.
+Baseline advances to this exact candidate and run.
+
+Inspected/downloaded compact artifact 4,227 compressed bytes (13,923-byte JSON).
+Diagnostics 100,678 bytes and browser assets 4,238,951 bytes remain remote.
+Harness SHA-256 `db2f536620b67bc407476f6e3ceddaedff36b21aa6a6a10d60eaba82e5ddf155`;
+selected IDs SHA-256
+`6eb49e460fc9e04b53007b9b699933d809d1fbb848cf32a2608c284306c97745`.
+Content manifest SHA-256
+`aa8da070c2f929dc4e9903d4adf0455e164d5980d9be506ce5700267cd187698`;
+oracle `399d5d368f0b5642ebf8f45bd8a5e73350fa4de7`.
+Native/Wasm timer digest remains
+`9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e`.
+Worker executable SHA-256
+`61a977866fda33c5cb56e3ca2897ad10e04920e56b6849aeaf8481a55575d49f`;
+browser asset manifest SHA-256
+`d93124da057e9d74f6db19413d47f2c376e0f116944f2796d8849d375e0c63bb`.
+Build 92,226 ms; CLI reload 462,023 ms; worker 76,841 ms; host 195,515 ms;
+Wasm eventwise 60,869 ms; browser build 247,365 ms; Chromium 17,469 ms.
+Mutant build/execute timings: timer 35,515/2,220 ms, replica 34,958/2,270 ms.
+These uncontrolled timings establish no performance claim. Chromium covers
+Wasm hosts with in-page byte relay, not production Worker/WebRTC/rendering.
+
+The next isolated cut adds bounded current causal capsules with full typed
+attempts, checkpoints, absolute positions, browser transport generations,
+rejected-attempt evidence, isolated replay, normal CLI replay/import and current
+browser export/import. Nine core and two real CLI witnesses plus the actual
+Chromium/Wasm-export-to-normal-CLI bridge are required. The gate runs native
+lint after complete inventory validation and before native execution. Capsule
+wire bounds fit the existing default browser request/response limits. Current
+batch, protocol success-envelope additions and retention/AI/performance source
+investigations remain excluded and unqualified. No local workload was run.
+Full M9 remains incomplete.

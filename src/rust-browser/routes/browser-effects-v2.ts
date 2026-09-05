@@ -21,6 +21,7 @@ export interface BrowserEffectAdaptersV2 {
     event: "RUN_STARTED" | "ACTION_APPLIED" | "SAVE_COMPLETED" | "TERMINAL_REACHED",
   ): void | Promise<void>;
   publishRepro(snapshot: unknown, inputs: readonly unknown[]): void | Promise<void>;
+  publishCurrentRepro(capsuleBytes: Uint8Array): void | Promise<void>;
   dispose(): void | Promise<void>;
 }
 
@@ -85,6 +86,9 @@ export class BrowserEffectRouterV2 {
         return;
       case "REPRO_READY":
         await this.adapters.publishRepro(effect.snapshot, effect.inputs);
+        return;
+      case "CURRENT_REPRO_READY":
+        await this.adapters.publishCurrentRepro(Uint8Array.from(effect.capsule_bytes));
         return;
       default:
         effect satisfies never;

@@ -188,3 +188,23 @@ fn play(mut session: CurrentGameSession) -> Result<(), Box<dyn Error>> {
         }
     }
 }
+
+/// Replay the complete current event suffix with quarantined platform effects.
+pub fn replay(options: &Options) -> Result<(), Box<dyn Error>> {
+    let content = content(options)?;
+    let path = crate::option_path(options, "capsule", "ER_M9_REPRO")?;
+    let capsule: er_repro::current::CurrentReproCapsuleV1 = read_json(&path, MAXIMUM_EVENT_BYTES)?;
+    let session = er_repro::current::replay_current_capsule_v1(
+        &capsule, content, er_repro::current::CurrentReproLimitsV1::default(),
+    )?;
+    let result = serde_json::to_string(&json!({
+        "kernel_version": 7, "processed_attempts": capsule.attempts.len(),
+        "base_position": capsule.base_position, "final_position": capsule.final_position,
+        "snapshot_digest": capsule.final_snapshot_digest,
+        "observation": session.observe()?, "snapshot": session.snapshot()?
+    }))?;
+    if result.len() > MAXIMUM_EVENT_BYTES {
+        return Err("current replay result exceeds 4 MiB".into());
+    }
+    crate::write_line(&result)
+}

@@ -8,6 +8,7 @@ import {
 describe("BrowserEffectRouterV2", () => {
   it("routes every typed effect once and fences stale or disposed batches", async () => {
     const calls: string[] = [];
+    const capsuleBytes = [123, 34, 120, 34, 58, 34, 195, 169, 34, 125];
     const adapters: BrowserEffectAdaptersV2 = {
       renderUi: () => {
         calls.push("UI_CHANGED");
@@ -40,6 +41,11 @@ describe("BrowserEffectRouterV2", () => {
       },
       publishRepro: () => {
         calls.push("REPRO_READY");
+      },
+      publishCurrentRepro: bytes => {
+        expect(bytes).toBeInstanceOf(Uint8Array);
+        expect([...bytes]).toEqual(capsuleBytes);
+        calls.push("CURRENT_REPRO_READY");
       },
       dispose: () => {
         calls.push("DISPOSE");
@@ -90,6 +96,7 @@ describe("BrowserEffectRouterV2", () => {
         },
         { kind: "TELEMETRY", event: "ACTION_APPLIED" },
         { kind: "REPRO_READY", snapshot: { schema_version: 7 }, inputs: [] },
+        { kind: "CURRENT_REPRO_READY", capsule_bytes: capsuleBytes },
       ],
     };
 
@@ -105,12 +112,15 @@ describe("BrowserEffectRouterV2", () => {
       "TERMINAL",
       "TELEMETRY",
       "REPRO_READY",
+      "CURRENT_REPRO_READY",
     ]);
     await expect(router.dispatch(batch)).rejects.toThrow("stale, duplicated");
+    expect(calls.filter(call => call === "CURRENT_REPRO_READY")).toHaveLength(1);
     await router.dispose();
     await router.dispose();
     expect(calls.at(-1)).toBe("DISPOSE");
     expect(calls.filter(call => call === "DISPOSE")).toHaveLength(1);
-    await expect(router.dispatch({ external_sequence: 2, effects: [] })).rejects.toThrow("after disposal");
+    await expect(router.dispatch({ external_sequence: 2, effects: batch.effects })).rejects.toThrow("after disposal");
+    expect(calls.filter(call => call === "CURRENT_REPRO_READY")).toHaveLength(1);
   });
 });

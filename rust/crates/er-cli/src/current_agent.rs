@@ -145,6 +145,26 @@ impl CurrentDispatcher {
         Ok(response)
     }
 
+    fn import_capsule(&mut self, params: &Value) -> Result<Value, AgentDispatchErrorV1> {
+        let id = self.session_id(params)?.to_owned();
+        self.reserve_id(&id)?;
+        let capsule: er_repro::current::CurrentReproCapsuleV1 = required(params, "capsule")?;
+        let session = er_repro::current::replay_current_capsule_v1(
+            &capsule, Arc::clone(&self.content), er_repro::current::CurrentReproLimitsV1::default(),
+        ).map_err(backend)?;
+        let response = bounded(json!({
+            "session": id, "kernel_version": 7, "processed_attempts": capsule.attempts.len(),
+            "base_position": capsule.base_position, "final_position": capsule.final_position,
+            "snapshot_digest": capsule.final_snapshot_digest, "observation": session.observe().map_err(backend)?
+        }))?;
+        let session = match &self.worker {
+            Some(worker) => worker.adopt(&id, &session, capsule.local_seat, capsule.role)?,
+            None => CurrentBackend::Native(Box::new(session)),
+        };
+        self.sessions.insert(id, session);
+        Ok(response)
+    }
+
     fn apply(
         &mut self,
         params: &Value,
@@ -173,6 +193,7 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                 "reload_actions": if self.worker.is_some() { vec!["begin", "activate"] } else { vec![] }
             })),
             "session.create" => self.create(params),
+            "session.from_capsule" => self.import_capsule(params),
             "session.from_snapshot" => self.create(&json!({
                 "session": self.session_id(params)?,
                 "start": {

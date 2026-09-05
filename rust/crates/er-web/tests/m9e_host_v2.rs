@@ -12,6 +12,7 @@ use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
+use er_repro::current::{CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproOutcomeV1};
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
@@ -416,7 +417,7 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
     };
     assert!(matches!(
         batch.effects.as_slice(),
-        [BrowserEffectV2::ReproReady { .. }]
+        [BrowserEffectV2::CurrentReproReady { .. }]
     ));
     Ok(())
 }
@@ -745,6 +746,30 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
         TransportState::Connected
     );
     assert!(connected.scheduler.pauses.is_empty());
+    send(&mut browser, 4, BrowserRequestV2::TransportChanged { generation: safe(2), connected: true })?;
+    let staged = browser.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    assert_eq!(staged.protocol.as_ref().ok_or("protocol missing")?.staged_rebinds[0].generation, ConnectionGeneration::new(safe(2)));
+    let mut sequence = 5;
+    let (capsule_bytes, capsule) = export_current_capsule(&mut browser, &mut sequence)?;
+    let transport = capsule.browser_transport.as_ref().ok_or("browser transport context missing")?;
+    assert_eq!(transport.base_generation, safe(1));
+    assert_eq!(transport.final_generation, safe(2));
+    assert!(matches!(capsule.attempts.last().ok_or("transport attempt missing")?.event,
+        CurrentExternalEvent::TransportChanged { generation, connected: true } if generation == ConnectionGeneration::new(safe(2))));
+    let mut imported = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    send(&mut imported, 0, BrowserRequestV2::Initialize {
+        initialization: Box::new(BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes }),
+    })?;
+    assert_eq!(imported.kernel_ref().ok_or("kernel missing")?.snapshot()?, staged);
+    // An older transport generation must remain an adapter rejection after
+    // import even while the newer generation is only staged in the kernel.
+    for (host, sequence) in [(&mut browser, sequence), (&mut imported, 1)] {
+        assert!(send(host, sequence, BrowserRequestV2::TransportChanged { generation: safe(1), connected: false }).is_err());
+        assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, staged);
+        assert!(matches!(host.capture_status(), Some(CurrentCaptureStatusV1::Unavailable { .. })));
+        send(host, sequence, BrowserRequestV2::AdvanceTime { milliseconds: safe(17) })?;
+    }
+    assert_eq!(imported.kernel_ref().ok_or("kernel missing")?.snapshot()?, browser.kernel_ref().ok_or("kernel missing")?.snapshot()?);
     Ok(())
 }
 
@@ -955,40 +980,120 @@ fn presentation_failure_retains_barrier_until_successful_settlement() -> Result<
     Ok(())
 }
 
+fn export_current_capsule(host: &mut BrowserKernelHostV2, sequence: &mut u64)
+    -> Result<(Vec<u8>, CurrentReproCapsuleV1), Box<dyn Error>>
+{
+    let response = send(host, *sequence, BrowserRequestV2::ExportRepro)?;
+    *sequence += 1;
+    let BrowserResponseV2::Effects { batch } = response else { return Err("repro export returned no effects".into()); };
+    let [BrowserEffectV2::CurrentReproReady { capsule_bytes }] = batch.effects.as_slice() else {
+        return Err("current repro capsule missing".into());
+    };
+    let capsule: CurrentReproCapsuleV1 = serde_json::from_slice(capsule_bytes)?;
+    assert_eq!(er_canonical::canonical_bytes(&capsule)?, *capsule_bytes);
+    Ok((capsule_bytes.clone(), capsule))
+}
+
 #[test]
-fn exported_repro_replays_recorded_raw_inputs() -> Result<(), Box<dyn Error>> {
+fn exported_current_repro_replays_raw_non_key_rejection_and_continues() -> Result<(), Box<dyn Error>> {
     let (mut host, mut sequence) = natural_host()?;
     press(&mut host, &mut sequence, PhysicalKey::Space)?;
+    send(&mut host, sequence, BrowserRequestV2::AdvanceTime { milliseconds: safe(17) })?;
+    sequence += 1;
+    for event in [BrowserLifecycleEventV2::Hidden, BrowserLifecycleEventV2::Visible] {
+        send(&mut host, sequence, BrowserRequestV2::Lifecycle { event })?;
+        sequence += 1;
+    }
     let expected = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
-    let response = send(&mut host, sequence, BrowserRequestV2::ExportRepro)?;
-    let BrowserResponseV2::Effects { batch } = response else {
-        return Err("repro export returned no effects".into());
-    };
-    let (snapshot, inputs) = batch
-        .effects
-        .into_iter()
-        .find_map(|effect| match effect {
-            BrowserEffectV2::ReproReady { snapshot, inputs } => Some((snapshot, inputs)),
-            _ => None,
-        })
-        .ok_or("repro capsule missing")?;
-    assert_eq!(inputs.len(), 2);
+    assert!(send(&mut host, sequence, BrowserRequestV2::PresentationSettled {
+        event_id: er_types::PresentationEventId::new(safe(999)), outcome: BrowserPresentationOutcomeV2::Settled,
+    }).is_err());
+    assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, expected);
+    let capture = host.capture_status();
+    assert_eq!(capture, Some(CurrentCaptureStatusV1::Available { base_position: 0, final_position: 6 }));
+    send(&mut host, sequence, BrowserRequestV2::Snapshot)?;
+    sequence += 1;
+    assert_eq!(host.capture_status(), capture);
+    let (capsule_bytes, capsule) = export_current_capsule(&mut host, &mut sequence)?;
+    assert_eq!(host.capture_status(), capture);
+    assert_eq!(capsule.attempts.len(), 6);
+    let transport = capsule.browser_transport.as_ref().ok_or("browser transport context missing")?;
+    assert_eq!(transport.base_generation, safe(1));
+    assert_eq!(transport.final_generation, safe(1));
+    assert!(matches!(capsule.attempts[2].event, CurrentExternalEvent::AdvanceTime { milliseconds } if milliseconds == safe(17)));
+    assert_eq!(capsule.attempts[3].origin.as_deref(), Some("browser.lifecycle.HIDDEN"));
+    assert_eq!(capsule.attempts[4].origin.as_deref(), Some("browser.lifecycle.VISIBLE"));
+    assert!(matches!(capsule.attempts[5].outcome, CurrentReproOutcomeV1::KernelRejected { .. }));
     let mut replay = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
     send(
         &mut replay,
         0,
         BrowserRequestV2::Initialize {
-            initialization: Box::new(BrowserSessionInitializationV2::ReproCapsule {
-                context: context(),
-                snapshot: *snapshot,
-                inputs,
-            }),
+            initialization: Box::new(BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes }),
         },
     )?;
     assert_eq!(
         replay.kernel_ref().ok_or("kernel missing")?.snapshot()?,
         expected
     );
+    let mut replay_sequence = 1;
+    let (_, imported) = export_current_capsule(&mut replay, &mut replay_sequence)?;
+    assert_eq!(imported, capsule);
+    send(&mut host, sequence, BrowserRequestV2::AdvanceTime { milliseconds: safe(31) })?;
+    sequence += 1;
+    send(&mut replay, replay_sequence, BrowserRequestV2::AdvanceTime { milliseconds: safe(31) })?;
+    replay_sequence += 1;
+    assert_eq!(replay.kernel_ref().ok_or("kernel missing")?.snapshot()?, host.kernel_ref().ok_or("kernel missing")?.snapshot()?);
+    assert_eq!(export_current_capsule(&mut host, &mut sequence)?.1,
+               export_current_capsule(&mut replay, &mut replay_sequence)?.1);
+    Ok(())
+}
+
+#[test]
+fn current_repro_exact_cached_retry_does_not_record_twice() -> Result<(), Box<dyn Error>> {
+    let (mut host, mut sequence) = natural_host()?;
+    let event = er_canonical::canonical_bytes(&BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2, request_id: safe(sequence + 1), sequence: safe(sequence),
+        request: BrowserRequestV2::AdvanceTime { milliseconds: safe(9) },
+    })?;
+    let response = host.process_bytes(&event)?;
+    sequence += 1;
+    let snapshot = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let capture = host.capture_status();
+    assert_eq!(host.process_bytes(&event)?, response);
+    assert_eq!(host.capture_status(), capture);
+    assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, snapshot);
+    let (_, capsule) = export_current_capsule(&mut host, &mut sequence)?;
+    assert_eq!(capsule.attempts.len(), 1);
+    assert_eq!(capsule.final_position, 1);
+    Ok(())
+}
+
+#[test]
+fn invalid_current_capsule_initialization_is_atomic_and_can_retry() -> Result<(), Box<dyn Error>> {
+    let (mut source, mut sequence) = natural_host()?;
+    send(&mut source, sequence, BrowserRequestV2::AdvanceTime { milliseconds: safe(12) })?;
+    sequence += 1;
+    let expected = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let (bytes, mut capsule) = export_current_capsule(&mut source, &mut sequence)?;
+    let mut missing_context = capsule.clone();
+    missing_context.browser_transport = None;
+    let mut wrong_generation = capsule.clone();
+    wrong_generation.browser_transport.as_mut().ok_or("browser transport context missing")?.final_generation = safe(2);
+    capsule.final_snapshot_digest = "invalid".to_owned();
+    for invalid in [b"not JSON".to_vec(), er_canonical::canonical_bytes(&capsule)?,
+        er_canonical::canonical_bytes(&missing_context)?, er_canonical::canonical_bytes(&wrong_generation)?] {
+        let mut host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+        assert!(send(&mut host, 0, BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes: invalid }),
+        }).is_err());
+        assert!(host.kernel_ref().is_none());
+        assert_eq!(host.capture_status(), None);
+        send(&mut host, 0, BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes: bytes.clone() }),
+        })?;
+        assert_eq!(host.kernel_ref().ok_or("kernel missing")?.snapshot()?, expected);
+    }
     Ok(())
 }
 

@@ -4,6 +4,7 @@ Run with the runner's standard-library unittest. Every Git/Cargo/test process is
 mocked; fixture repositories and reports live in disposable temporary folders.
 """
 
+import base64
 import contextlib
 import copy
 import hashlib
@@ -74,6 +75,7 @@ class FeedbackTests(unittest.TestCase):
         self.head = CANDIDATE
         self.baseline_lock = None
         self.baseline_cli_manifest = None
+        self.baseline_repro_manifest = None
         self.capture_calls = []
         self.commands = []
         self.events = []
@@ -84,6 +86,7 @@ class FeedbackTests(unittest.TestCase):
         self.extra_artifacts = []
         self.format_code = 0
         self.clippy_code = 0
+        self.clippy_codes = {}
         self.build_code = 0
         self.build_diagnostic = "error: synthetic compiler failure\n"
         self.extra_failure_logs = 0
@@ -111,6 +114,8 @@ class FeedbackTests(unittest.TestCase):
             return self.baseline_lock
         if args == ["git", "show", f"{BASE}:rust/crates/er-cli/Cargo.toml"] and self.baseline_cli_manifest is not None:
             return self.baseline_cli_manifest
+        if args == ["git", "show", f"{BASE}:rust/crates/er-repro/Cargo.toml"] and self.baseline_repro_manifest is not None:
+            return self.baseline_repro_manifest
         if args == ["rustc", "--version"]:
             return "rustc 1.97.1 (synthetic)"
         if args == ["rustc", "-vV"]:
@@ -135,9 +140,12 @@ class FeedbackTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0)
         if args[:2] == ["cargo", "clippy"]:
             self.events.append("clippy")
-            if self.clippy_code:
+            package = args[args.index("-p") + 1]
+            self.events.append("clippy:" + package)
+            code = self.clippy_codes.get(package, self.clippy_code)
+            if code:
                 stdout.write("error: synthetic worker lint failure\n")
-            return subprocess.CompletedProcess(args, self.clippy_code)
+            return subprocess.CompletedProcess(args, code)
         if args[:2] == ["cargo", "test"]:
             self.events.append("build")
             if self.build_code:
@@ -214,6 +222,26 @@ class FeedbackTests(unittest.TestCase):
 
     def test_docs_only_readiness_remains_small(self):
         self.assertEqual(self.feedback.plan()["packages"], ["er-canonical"])
+
+    def test_docs_and_infrastructure_readiness_do_not_expand_reverse_consumers(self):
+        self.configure_browser_scope()
+        self.package("er-env", '[dependencies]\ner-canonical = { path = "../er-canonical" }\n')
+        self.package("er-kernel-worker", '[dependencies]\ner-env = { path = "../er-env" }\n')
+        self.package("er-lab", '[dependencies]\ner-kernel-worker = { path = "../er-kernel-worker" }\n')
+        reload = self.rust / "crates/er-cli/tests/m9e_current_reload.rs"
+        reload.parent.mkdir(parents=True)
+        reload.write_text("// synthetic current process witness presence\n")
+        bridge = self.root / "test/browser/rust-browser/m9e-current-repro-bridge.ts"
+        bridge.parent.mkdir(parents=True)
+        bridge.write_text("// synthetic current browser bridge presence\n")
+        for path in ("docs/plans/rust-kernel/m9e-progress.md", "scripts/ci/m9e_feedback.py"):
+            self.changed = [path]
+            with self.subTest(path=path):
+                selection = self.feedback.plan()
+                self.assertEqual(selection["packages"], ["er-canonical"])
+                self.assertIsNone(selection["execution_scope"])
+                for flag in ("requires_wasm", "requires_browser", "requires_worker_executable", "requires_cli_executable"):
+                    self.assertFalse(selection[flag], flag)
 
     def test_current_environment_selects_reverse_consumers_and_wasm_witness(self):
         self.config["current_session_packages"] = ["er-env"]
@@ -431,16 +459,26 @@ class FeedbackTests(unittest.TestCase):
         for clippy_code in (0, 1):
             with self.subTest(clippy_code=clippy_code):
                 self.clippy_code = clippy_code
+                self.events.clear()
+                self.executed.clear()
                 with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
                     code, summary = self.invoke()
                 self.assertEqual(code, clippy_code)
                 self.assertIn("cli-clippy", summary["timing_ms"])
                 self.assertIn(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], self.commands)
+                self.assertEqual(summary["tests"]["selected"], 4)
+                for target in self.binary_ids:
+                    self.assertLess(self.events.index("list:" + target), self.events.index("clippy"))
                 browser.assert_not_called()
                 if clippy_code:
+                    self.assertEqual(summary["tests"]["executed"], 0)
+                    self.assertEqual(self.executed, [])
                     self.assertIn("cli-clippy exited 1", summary["first_failure"])
                     wasm.assert_not_called()
                 else:
+                    self.assertEqual(summary["tests"]["passed"], 4)
+                    self.assertEqual(set(self.executed), set(self.binary_ids))
+                    self.assertLess(self.events.index("clippy"), self.events.index("execute:" + self.executed[0]))
                     wasm.assert_called_once()
 
     def configure_worker_scope(self):
@@ -489,24 +527,32 @@ class FeedbackTests(unittest.TestCase):
         self.assertIn(["git", "show", f"{BASE}:rust/Cargo.lock"], self.capture_calls)
         self.assertFalse(selection["requires_wasm"])
 
-    def test_worker_clippy_runs_after_tests_and_its_failure_cannot_turn_green(self):
+    def test_worker_clippy_runs_after_discovery_before_tests_and_fails_early(self):
         selection = self.feedback.plan()
         selection["worker_session_focus"] = True
         for clippy_code in (0, 1):
             with self.subTest(clippy_code=clippy_code):
                 self.clippy_code = clippy_code
                 self.events.clear()
+                self.executed.clear()
                 with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
                     code, summary = self.invoke()
                 self.assertEqual(code, clippy_code)
-                self.assertEqual(summary["tests"]["passed"], 2)
-                self.assertLess(self.events.index("execute:b_suite"), self.events.index("clippy"))
+                self.assertEqual(summary["tests"]["selected"], 2)
+                for target in self.binary_ids:
+                    self.assertLess(self.events.index("list:" + target), self.events.index("clippy"))
                 self.assertIn("worker-clippy", summary["timing_ms"])
                 self.assertIn(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], self.commands)
                 wasm.assert_not_called()
                 browser.assert_not_called()
                 if clippy_code:
+                    self.assertEqual(summary["tests"]["executed"], 0)
+                    self.assertEqual(self.executed, [])
                     self.assertIn("worker-clippy exited 1", summary["first_failure"])
+                else:
+                    self.assertEqual(summary["tests"]["passed"], 2)
+                    self.assertEqual(self.executed, ["a_suite", "b_suite"])
+                    self.assertLess(self.events.index("clippy"), self.events.index("execute:a_suite"))
 
     def test_worker_lock_guard_rejects_other_semantic_lock_changes(self):
         before = self.worker_lock_fixture(["er-env"])
@@ -801,6 +847,118 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("exactly one real worker executable", summary["first_failure"])
 
+    @staticmethod
+    def repro_lock_fixture(repro_dependencies, cli_dependencies):
+        owners = {"er-repro": repro_dependencies, "er-cli": cli_dependencies}
+        return "version = 4\n" + "".join(
+            f'\n[[package]]\nname = "{name}"\nversion = "0.1.0"\n'
+            + ("dependencies = " + json.dumps(owners[name]) + "\n" if name in owners else "")
+            for name in ("er-repro", "er-cli", "er-env", "er-game", "er-kernel", "er-web"))
+
+    def configure_repro_scope(self):
+        self.configure_browser_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["current_repro_focus"] = policy["current_repro_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-game")
+        self.package("er-lab")
+        self.package("er-kernel-worker")
+        self.package("er-repro", '[dependencies]\ner-env = { path = "../er-env" }\n'
+                     'er-game = { path = "../er-game" }\ner-kernel = { path = "../er-kernel" }\n')
+        self.package("er-cli", '[dependencies]\ner-repro = { path = "../er-repro" }\n'
+                     '[dev-dependencies]\ner-web = { path = "../er-web" }\n')
+        self.package("er-reverse", '[target.\'cfg(unix)\'.build-dependencies]\n'
+                     'alias = { package = "er-cli", path = "../er-cli" }\n')
+        self.baseline_cli_manifest = (self.rust / "crates/er-cli/Cargo.toml").read_text().replace(
+            '[dev-dependencies]\ner-web = { path = "../er-web" }\n', '')
+        self.baseline_repro_manifest = (self.rust / "crates/er-repro/Cargo.toml").read_text().split('[dependencies]')[0]
+        self.baseline_lock = self.repro_lock_fixture([], ["er-repro"])
+        (self.rust / "Cargo.lock").write_text(self.repro_lock_fixture(["er-env", "er-game", "er-kernel"], ["er-repro", "er-web"]))
+
+    def test_current_repro_scope_requires_all_adapters_exact_ids_and_guarded_dependencies(self):
+        self.configure_repro_scope()
+        self.changed = self.config["current_repro_focus"]["paths"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["current_repro_focus"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertTrue(selection["requires_cli_executable"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(selection["boundary_paths"], [])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        self.assertEqual(selection["required_native_targets"]["er-cli"], ["m9e_current_repro", "m9e_current_entry", "m9e_current_reload"])
+        self.assertEqual(len(selection["required_native_test_ids"]["er-repro:m9e_current_repro"]), 9)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-cli:m9e_current_repro"]), 2)
+        self.assertEqual(selection["current_repro_dependency_guard"], {
+            "status": "verified", "baseline_sha": BASE, "added_workspace_dependencies": {
+                "er-repro": ["er-env", "er-game", "er-kernel"], "er-cli": ["er-web"]}})
+        self.assertIsNone(selection["timer_mutant"])
+        self.assertIsNone(selection["replica_mutant"])
+
+    def test_current_repro_guard_rejects_lock_and_manifest_drift(self):
+        self.configure_repro_scope()
+        before = {"er-cli": self.baseline_cli_manifest, "er-repro": self.baseline_repro_manifest}
+        after = {owner: (self.rust / f"crates/{owner}/Cargo.toml").read_text() for owner in before}
+        lock = (self.rust / "Cargo.lock").read_text()
+        verify = self.feedback.verify_current_repro_dependencies
+        for changed in (self.baseline_lock, self.repro_lock_fixture(["er-env", "er-game"], ["er-repro", "er-web"]),
+                        self.repro_lock_fixture(["er-env", "er-game", "er-kernel"], ["er-web"]),
+                        lock.replace('"er-web"]', '"er-web", "er-web"]'),
+                        lock.replace('"er-game",', '"er-game 0.1.0",'),
+                        lock.replace('version = 4', 'version = 3'),
+                        lock.replace('name = "er-cli"\n', 'name = "er-cli"\nchecksum = "drift"\n'),
+                        lock.replace('name = "er-game"\n', 'name = "er-game"\nchecksum = "drift"\n'),
+                        lock + '\n[[package]]\nname = "er-env"\nversion = "0.1.0"\n',
+                        lock + '\n[[package]]\nname = "unrelated"\nversion = "0.1.0"\n'):
+            with self.subTest(lock=changed), self.assertRaisesRegex(RuntimeError, "repro lock guard"):
+                verify(self.baseline_lock, changed, before, after)
+        for owner in after:
+            for changed in (after[owner].replace('path = "../er-', 'path = "../wrong-er-'),
+                            after[owner] + '\n[features]\nextra = []\n',
+                            after[owner].replace('version = "0.1.0"', 'version = "0.2.0"'),
+                            after[owner].replace(' }', ', optional = true }')):
+                with self.subTest(owner=owner), self.assertRaisesRegex(RuntimeError, "repro dependency guard"):
+                    verify(self.baseline_lock, lock, before, {**after, owner: changed})
+        with self.assertRaisesRegex(RuntimeError, "both owner manifests"):
+            verify(self.baseline_lock, lock, {"er-repro": before["er-repro"]}, after)
+        for suffix in ('source = "registry+invalid"\n',):
+            with self.assertRaisesRegex(RuntimeError, "unambiguous existing workspace"):
+                verify(self.baseline_lock.replace('name = "er-web"\n', 'name = "er-web"\n' + suffix),
+                       lock.replace('name = "er-web"\n', 'name = "er-web"\n' + suffix), before, after)
+        ambiguous = '\n[[package]]\nname = "er-game"\nversion = "0.2.0"\n'
+        with self.assertRaisesRegex(RuntimeError, "unambiguous existing workspace"):
+            verify(self.baseline_lock + ambiguous, lock + ambiguous, before, after)
+
+    def test_current_repro_scope_rejects_unpaired_or_unmapped_changes(self):
+        self.configure_repro_scope()
+        trigger = "rust/crates/er-repro/src/current.rs"
+        for extra in ("rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml", "rust/crates/er-repro/Cargo.toml"):
+            self.changed = [trigger, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "must be paired"):
+                self.feedback.plan()
+        allowed = self.config["current_repro_focus"]["paths"]
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-repro/build.rs",
+                      "rust/crates/er-web/Cargo.toml", "src/rust-browser/other.ts", "unmapped.json"):
+            self.changed = allowed + [extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        self.changed = ["test/browser/rust-browser/m9e-current-repro-bridge.ts"]
+        self.assertIn("er-reverse", self.feedback.plan()["packages"])
+
+    def test_current_repro_exact_ids_reject_missing_duplicate_empty_and_wrong_crate(self):
+        self.configure_repro_scope()
+        required = self.config["current_repro_focus"]["exact_test_ids"]
+        valid = [(*identity.split(":"), ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, valid)
+        for rows in (valid[:1], valid + [valid[0]], [(valid[0][0], valid[0][1], []), valid[1]],
+                     [("er-other", valid[0][1], valid[0][2]), valid[1]],
+                     [(valid[0][0], valid[0][1], valid[0][2][:-1] + ["unexpected"]), valid[1]],
+                     [(valid[0][0], valid[0][1], valid[0][2] + [valid[0][2][0]]), valid[1]]):
+            with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                self.feedback.require_native_test_ids(required, rows)
+
     def configure_menu_scope(self):
         self.configure_cli_reload_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
@@ -926,24 +1084,93 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(self.executed, ["m9e_current_reload", "a_suite", "m9e_menu_validation"])
         self.assertEqual(summary["tests"]["passed"], 8)
         for target in self.binary_ids:
-            self.assertLess(self.events.index("list:" + target), self.events.index("execute:m9e_current_reload"))
+            self.assertLess(self.events.index("list:" + target), self.events.index("clippy"))
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, self.events.index("execute:m9e_current_reload"))
         for target, _, env in self.binary_envs:
             if target == "m9e_current_reload":
                 self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
                 self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
             else:
                 self.assertIsNone(env)
-        for lint in ("types-clippy", "cli-clippy", "agent-protocol-clippy", "worker-clippy", "endpoint-clippy"):
+        for lint in ("types-clippy", "cli-clippy", "agent-protocol-clippy", "worker-clippy", "endpoint-clippy", "browser-clippy"):
             self.assertIn(lint, summary["timing_ms"])
         wasm.assert_called_once()
         browser.assert_called_once()
         self.binary_ids["m9e_menu_validation"] = self.binary_ids["m9e_menu_validation"][:-1]
         self.executed.clear()
+        self.events.clear()
         with patch.object(self.feedback, "plan", return_value=selection):
             code, summary = self.invoke()
         self.assertEqual(code, 1)
         self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
         self.assertIn("required native test identities", summary["first_failure"])
+
+    def test_menu_lint_failure_preserves_complete_validated_inventory_without_execution(self):
+        self.configure_menu_scope()
+        self.changed = ["rust/crates/er-types/src/m7_menu.rs"]
+        selection = self.feedback.plan()
+        selection["execution_scope"] = {"er-cli": ["m9e_current_reload"], "er-types": ["m9e_menu_validation"]}
+        selection["required_native_targets"] = {"er-cli": ["m9e_current_reload"], "er-types": ["m9e_menu_validation"]}
+        selection["required_native_test_ids"] = {key: ids for key, ids in selection["required_native_test_ids"].items()
+                                                  if key in ("er-cli:m9e_current_reload", "er-types:m9e_menu_validation")}
+        self.binary_ids = {identity.split(":")[1]: ids for identity, ids in selection["required_native_test_ids"].items()}
+        self.binary_crates = {"m9e_current_reload": "er-cli", "m9e_menu_validation": "er-types"}
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        required_ids = self.feedback.require_native_test_ids
+        required_targets = self.feedback.required_native_target_counts
+        def validate_ids(required, enumerated):
+            required_ids(required, enumerated)
+            self.events.append("required-ids-validated")
+        def validate_targets(required, enumerated):
+            result = required_targets(required, enumerated)
+            self.events.append("required-targets-validated")
+            return result
+        for package, label in (("er-types", "types-clippy"), ("er-web", "browser-clippy")):
+            with self.subTest(package=package):
+                self.events.clear()
+                self.executed.clear()
+                self.clippy_codes = {package: 1}
+                with patch.object(self.feedback, "plan", return_value=selection), patch.object(
+                    self.feedback, "require_native_test_ids", side_effect=validate_ids
+                ), patch.object(self.feedback, "required_native_target_counts", side_effect=validate_targets), patch.object(
+                    self.feedback, "wasm_checks"
+                ) as wasm, patch.object(self.feedback, "browser_checks") as browser:
+                    code, summary = self.invoke()
+                self.assertEqual(code, 1)
+                self.assertEqual(summary["tests"], {"selected": 7, "executed": 0, "passed": 0, "failed": 0, "skipped": 0})
+                self.assertEqual(summary["expected_test_count"], 7)
+                self.assertEqual(summary["required_native_target_counts"], {
+                    "er-cli:m9e_current_reload": 2, "er-types:m9e_menu_validation": 5})
+                expected = sorted(f"{target}::{test_id}" for target, ids in self.binary_ids.items() for test_id in ids)
+                self.assertEqual(sorted(json.loads((self.full / "selected-tests.json").read_text())), expected)
+                self.assertEqual(summary["worker_executable"]["source_sha"], CANDIDATE)
+                for event in ("list:m9e_current_reload", "list:m9e_menu_validation",
+                              "required-targets-validated", "required-ids-validated"):
+                    self.assertLess(self.events.index(event), self.events.index("clippy"))
+                self.assertIn(label + " exited 1", summary["first_failure"])
+                self.assertEqual(self.executed, [])
+                wasm.assert_not_called()
+                browser.assert_not_called()
+                self.assert_evidence_hashes(summary)
+
+    def test_invalid_historical_disposition_rejects_before_native_lint(self):
+        selection = self.feedback.plan()
+        selection["requires_cli_clippy"] = True
+        selection["historical_dispositions"] = [{"crate": "er-canonical", "target": "a_suite", "test": "missing"}]
+        self.clippy_code = 1
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["tests"]["selected"], 2)
+        self.assertEqual(summary["tests"]["executed"], 0)
+        self.assertIn("historical disposition must identify exactly one", summary["first_failure"])
+        self.assertIn("list:a_suite", self.events)
+        self.assertIn("list:b_suite", self.events)
+        self.assertNotIn("clippy", self.events)
+        self.assertEqual(self.executed, [])
 
     def test_broad_cli_scope_binds_present_reload_target_without_relaxing_narrow_requirements(self):
         self.configure_browser_scope()
@@ -961,7 +1188,10 @@ class FeedbackTests(unittest.TestCase):
         with patch.object(self.feedback, "plan", return_value=selection):
             code, summary = self.invoke()
         self.assertEqual(code, 1)
-        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertEqual(summary["tests"]["selected"], 2)
+        self.assertEqual(summary["tests"]["executed"], 0)
+        self.assertEqual(self.executed, [])
+        self.assertLess(self.events.index("list:b_suite"), self.events.index("clippy"))
         self.assertIn("agent-protocol-clippy exited 1", summary["first_failure"])
         self.assertIn(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets",
                        "--no-deps", "--", "-D", "warnings"], self.commands)
@@ -1305,6 +1535,91 @@ class FeedbackTests(unittest.TestCase):
                 "profile": {"test": False}, "executable": str(executable),
                 "manifest_path": str(self.rust / "crates/er-kernel-worker/Cargo.toml")}
 
+    def cli_executable_artifact(self, directory="debug"):
+        path = self.rust / "target" / directory / ("er-cli.exe" if os.name == "nt" else "er-cli")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"#!/bin/sh\n# synthetic CLI artifact; never executed\n")
+        path.chmod(0o755)
+        return {"reason": "compiler-artifact", "package_id": "synthetic-cli-package",
+                "target": {"name": "er-cli", "kind": ["bin"]}, "profile": {"test": False},
+                "executable": str(path), "manifest_path": str(self.rust / "crates/er-cli/Cargo.toml")}
+
+    def test_cli_executable_binding_rejects_test_wrong_manifest_escape_and_ambiguity(self):
+        summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test"}
+        valid = self.cli_executable_artifact()
+        invalid = [[], [valid, self.cli_executable_artifact("other")]]
+        for key, value in (("profile", {"test": True}), ("profile", {}),
+                           ("target", {"name": "er-cli", "kind": ["lib"]}),
+                           ("target", {"name": "er-other", "kind": ["bin"]}),
+                           ("manifest_path", str(self.rust / "crates/er-repro/Cargo.toml")),
+                           ("executable", str(self.rust / "target/missing/er-cli")),
+                           ("executable", "target/debug/er-cli")):
+            invalid.append([{**valid, key: value}])
+        outside = self.root / ("er-cli.exe" if os.name == "nt" else "er-cli")
+        outside.write_bytes(b"outside target root")
+        outside.chmod(0o755)
+        invalid.append([{**valid, "executable": str(outside)}])
+        for artifacts in invalid:
+            with self.subTest(artifacts=artifacts), self.assertRaises(RuntimeError):
+                self.feedback.discover_cli_executable(artifacts, summary)
+        binding = self.feedback.discover_cli_executable([valid], summary)
+        self.assertEqual(binding["root"], str((self.rust / "target").resolve()))
+        self.assertEqual(binding["source_sha"], CANDIDATE)
+        self.assertEqual(self.feedback.browser_cli_env(binding, CANDIDATE), {
+            "ER_M9E_CLI_EXECUTABLE": binding["path"], "ER_M9E_CLI_ROOT": binding["root"],
+            "ER_M9E_CLI_SHA256": binding["sha256"], "ER_M9E_CLI_SOURCE_SHA": CANDIDATE})
+        for wrong in (None, {**binding, "source_sha": BASE}, {**binding, "sha256": "0" * 64},
+                      {**binding, "root": str(self.root / "wrong-root")}):
+            with self.assertRaises(RuntimeError):
+                self.feedback.browser_cli_env(wrong, CANDIDATE)
+        Path(binding["path"]).write_bytes(b"replaced after discovery")
+        with self.assertRaisesRegex(RuntimeError, "artifact changed"):
+            self.feedback.browser_cli_env(binding, CANDIDATE)
+
+    def test_current_repro_actual_cli_target_receives_worker_binding_and_runs_clippy(self):
+        self.configure_repro_scope()
+        self.changed = ["rust/crates/er-repro/src/current.rs"]
+        selection = self.feedback.plan()
+        selection["execution_scope"] = {"er-cli": ["m9e_current_repro"]}
+        selection["required_native_targets"] = {"er-cli": ["m9e_current_repro"]}
+        selection["required_native_test_ids"] = {"er-cli:m9e_current_repro":
+            selection["required_native_test_ids"]["er-cli:m9e_current_repro"]}
+        self.binary_ids = {"m9e_current_repro": selection["required_native_test_ids"]["er-cli:m9e_current_repro"]}
+        self.binary_crates = {"m9e_current_repro": "er-cli"}
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertEqual(summary["cli_executable"]["source_sha"], CANDIDATE)
+        self.assertEqual([(name, phase) for name, phase, _ in self.binary_envs],
+                         [("m9e_current_repro", "list"), ("m9e_current_repro", "execute")])
+        for _, _, env in self.binary_envs:
+            self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+            self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+        self.assertIsNone(self.feedback.native_target_env("er-repro", "m9e_current_repro", None))
+        self.assertIn("cli-clippy", summary["timing_ms"])
+        self.assertIn("er-repro-clippy", summary["timing_ms"])
+        self.assertIn("er-env-clippy", summary["timing_ms"])
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.extra_artifacts = self.extra_artifacts[:1]
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("exactly one real CLI executable", summary["first_failure"])
+
+    def test_later_browser_scope_requires_present_bridge_but_historical_scope_does_not(self):
+        self.configure_browser_scope()
+        self.changed = ["rust/crates/er-web/src/host_v2.rs"]
+        self.assertFalse(self.feedback.plan()["requires_cli_executable"])
+        helper = self.root / "test/browser/rust-browser/m9e-current-repro-bridge.ts"
+        helper.parent.mkdir(parents=True)
+        helper.write_text("// synthetic source presence\n")
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_cli_executable"])
+        self.assertIn("er-cli", selection["packages"])
+
     def test_worker_executable_binding_rejects_wrong_artifacts_and_ambiguity(self):
         summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test"}
         valid = self.worker_executable_artifact()
@@ -1425,6 +1740,107 @@ class FeedbackTests(unittest.TestCase):
                   "testResults": [{"assertionResults": [{"status": "passed", "fullName":
                       "BrowserEffectRouterV2 routes every typed effect once and fences stale or disposed batches"}]}]}
         return playwright, vitest
+
+    def bridge_report(self, evidence=None):
+        playwright, _ = self.browser_reports()
+        if evidence is None:
+            evidence = {"source_sha": CANDIDATE, "executable_sha256": "d" * 64,
+                        "positive_replay": True, "time_omission_rejected": True,
+                        "base_position": 8, "final_position": 12, "processed_attempts": 4,
+                        "snapshot_digest": "blake3-v1:" + "e" * 64, "negative_divergence_position": 10}
+        result = playwright["suites"][0]["suites"][0]["specs"][0]["tests"][0]["results"][0]
+        result["attachments"] = [{"name": "m9e-current-repro-cli-bridge", "contentType": "application/json",
+                                  "body": base64.b64encode(json.dumps(evidence).encode()).decode()}]
+        return playwright, evidence, result["attachments"]
+
+    def test_browser_bridge_evidence_requires_exact_candidate_bounded_causal_result(self):
+        binding = {"source_sha": CANDIDATE, "sha256": "d" * 64}
+        report, evidence, attachments = self.bridge_report()
+        self.assertEqual(self.feedback.browser_bridge_evidence(report, binding), evidence)
+        for key, value in (("source_sha", BASE), ("executable_sha256", "f" * 64), ("positive_replay", False),
+                           ("time_omission_rejected", False), ("processed_attempts", 0), ("processed_attempts", 5),
+                           ("base_position", True), ("final_position", 1 << 53),
+                           ("negative_divergence_position", 8), ("negative_divergence_position", 12),
+                           ("snapshot_digest", "wrong")):
+            report, _, _ = self.bridge_report({**evidence, key: value})
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                self.feedback.browser_bridge_evidence(report, binding)
+        for malformed in ({key: value for key, value in evidence.items() if key != "positive_replay"},
+                          {**evidence, "extra": "unreviewed"}):
+            with self.assertRaises(RuntimeError):
+                self.feedback.browser_bridge_evidence(self.bridge_report(malformed)[0], binding)
+        for defect in ("missing", "duplicate", "wrong_type", "oversize", "misplaced", "invalid_base64"):
+            report, _, attachments = self.bridge_report()
+            if defect == "missing":
+                attachments.clear()
+            elif defect == "duplicate":
+                attachments.append(copy.deepcopy(attachments[0]))
+            elif defect == "wrong_type":
+                attachments[0]["contentType"] = "text/plain"
+            elif defect == "oversize":
+                attachments[0]["body"] = "x" * 5501
+            elif defect == "misplaced":
+                report["suites"][0]["suites"][0]["specs"][0]["title"] = "other test"
+            else:
+                attachments[0]["body"] = "%%%"
+            with self.subTest(defect=defect), self.assertRaises((RuntimeError, ValueError)):
+                self.feedback.browser_bridge_evidence(report, binding)
+        report, _, attachments = self.bridge_report()
+        path = self.root / "test-results/rust-browser/attachment.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(evidence))
+        attachments[0].pop("body")
+        attachments[0]["path"] = str(path)
+        self.assertEqual(self.feedback.browser_bridge_evidence(report, binding), evidence)
+        for wrong in (self.root / "outside.json", path.parent / "missing.json"):
+            attachments[0]["path"] = str(wrong)
+            with self.assertRaisesRegex(RuntimeError, "attachment path or size"):
+                self.feedback.browser_bridge_evidence(report, binding)
+        attachments[0]["path"] = str(path)
+        path.write_bytes(b"x" * 4097)
+        with self.assertRaisesRegex(RuntimeError, "attachment path or size"):
+            self.feedback.browser_bridge_evidence(report, binding)
+
+    def test_browser_orchestration_requires_cli_binding_and_candidate_attachment(self):
+        summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test",
+                   "plan": {"requires_cli_executable": True}}
+        summary["cli_executable"] = self.feedback.discover_cli_executable([self.cli_executable_artifact()], summary)
+        reports, evidence, _ = self.bridge_report()
+        evidence["executable_sha256"] = summary["cli_executable"]["sha256"]
+        reports = self.bridge_report(evidence)[0]
+        _, vitest = self.browser_reports()
+        output = self.root / "runner/m9e-v7-web"
+        output.mkdir(parents=True)
+        assets = {}
+        for name in ("er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json",
+                     "coop-authority-snapshot.json", "coop-replica-snapshot.json"):
+            path = output / name
+            path.write_bytes(b"synthetic remote browser build asset")
+            assets[name] = {"bytes": path.stat().st_size, "sha256": self.feedback.digest(path)}
+        (output / "m9e-v7-web-assets.json").write_text(json.dumps({
+            "source_sha": CANDIDATE, "assets": assets, "browser_worker_protocol_version": 2}))
+        (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        calls = []
+        def browser_run(args, name, cwd=None, env=None):
+            calls.append((name, env))
+            if name == "browser-journey":
+                (self.full / "browser-results.json").write_text(json.dumps(reports))
+            if name == "browser-effects":
+                (self.full / "browser-effect-results.json").write_text(json.dumps(vitest))
+            return self.full / (name + ".log")
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(self.root / "runner")}), patch.object(self.feedback, "run", side_effect=browser_run):
+            self.feedback.browser_checks(summary)
+            self.assertEqual(summary["browser_current_repro_bridge"], evidence)
+            env = next(env for name, env in calls if name == "browser-journey")
+            self.assertEqual(env["ER_M9E_CLI_EXECUTABLE"], summary["cli_executable"]["path"])
+            self.assertEqual(env["ER_M9E_CLI_SHA256"], evidence["executable_sha256"])
+            self.assertEqual(env["ER_M9E_CLI_SOURCE_SHA"], CANDIDATE)
+            reports, _ = self.browser_reports()
+            with self.assertRaisesRegex(RuntimeError, "bridge attachment"):
+                self.feedback.browser_checks(summary)
+            summary.pop("cli_executable")
+            with self.assertRaisesRegex(RuntimeError, "candidate-bound CLI"):
+                self.feedback.browser_checks(summary)
 
     def test_browser_report_accepts_exact_two_chromium_and_one_effect_test(self):
         playwright, vitest = self.browser_reports()

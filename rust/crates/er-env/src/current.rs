@@ -273,6 +273,12 @@ impl CurrentGameSession {
         self.kernel = None;
     }
 
+    /// The context acknowledged when this live session was constructed or restored.
+    pub fn session_context(&self) -> Result<(SeatId, GameKernelRoleV7), CurrentSessionError> {
+        self.kernel()?;
+        Ok((self.local_seat, self.role))
+    }
+
     pub fn content(&self) -> &Arc<PreparedGameContentV2> {
         &self.content
     }

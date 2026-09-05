@@ -13,6 +13,8 @@ use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2,
     KernelStorageResultV2,
 };
+use er_repro::current::{CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1,
+    CurrentReproRecorderV1};
 use er_types::{SafeU53, ScenarioId};
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
@@ -28,11 +30,10 @@ use crate::contracts_v2::{
 const MAXIMUM_RETAINED_REQUESTS_V2: usize = 2_048;
 
 #[derive(Debug)]
-enum ReproUpdateV2 {
-    Keep,
-    Append(er_types::RawInputEvent),
-    Replace(Box<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>),
-    Clear,
+enum BrowserCompletionErrorV2 { Session(CurrentSessionError), Adapter(BrowserWebErrorV2) }
+
+impl From<CurrentSessionError> for BrowserCompletionErrorV2 {
+    fn from(error: CurrentSessionError) -> Self { Self::Session(error) }
 }
 
 #[derive(Clone, Debug)]
@@ -52,6 +53,8 @@ pub enum BrowserWebErrorV2 {
     Kernel(String),
     #[error("browser V2 canonical encoding failed: {0}")]
     Canonical(String),
+    #[error("browser V2 current capture failed: {0}")]
+    Repro(String),
 }
 
 impl From<CurrentSessionError> for BrowserWebErrorV2 {
@@ -72,8 +75,7 @@ pub struct BrowserKernelHostV2 {
     next_sequence: SafeU53,
     generation: SafeU53,
     retained: BTreeMap<SafeU53, RetainedBrowserRequestV2>,
-    repro_base: Option<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>,
-    repro_inputs: Vec<er_types::RawInputEvent>,
+    repro: Option<CurrentReproRecorderV1>,
     disposed: bool,
 }
 
@@ -108,8 +110,7 @@ impl BrowserKernelHostV2 {
             next_sequence: SafeU53::ZERO,
             generation: safe_one(),
             retained: BTreeMap::new(),
-            repro_base: None,
-            repro_inputs: Vec::new(),
+            repro: None,
             disposed: false,
         }
     }
@@ -122,6 +123,25 @@ impl BrowserKernelHostV2 {
         &mut self,
         request_bytes: &[u8],
         maximum_response_bytes: usize,
+    ) -> Result<Vec<u8>, BrowserWebErrorV2> {
+        let previous_capture = self.capture_status();
+        let mut read_only = false;
+        let result = self.process_bytes_inner(request_bytes, maximum_response_bytes, &mut read_only);
+        if let Err(error) = &result
+            && !read_only && self.capture_status() == previous_capture
+            && let Some(recorder) = &mut self.repro
+        {
+            recorder.invalidate_attempt(&format!("browser admission or response rejection: {error}"));
+        }
+        result
+    }
+
+    pub fn capture_status(&self) -> Option<CurrentCaptureStatusV1> {
+        self.repro.as_ref().map(CurrentReproRecorderV1::status)
+    }
+
+    fn process_bytes_inner(
+        &mut self, request_bytes: &[u8], maximum_response_bytes: usize, read_only: &mut bool,
     ) -> Result<Vec<u8>, BrowserWebErrorV2> {
         let maximum_response_bytes = maximum_response_bytes.min(MAXIMUM_BROWSER_RESPONSE_BYTES_V2);
         if self.disposed
@@ -160,13 +180,13 @@ impl BrowserKernelHostV2 {
         } else {
             None
         };
-        let (bytes, repro_update) = self.process_request(
+        *read_only = matches!(&envelope.request, BrowserRequestV2::Snapshot | BrowserRequestV2::ExportRepro);
+        let bytes = self.process_request(
             envelope.request,
             envelope.request_id,
             envelope.sequence,
             maximum_response_bytes,
         )?;
-        self.update_repro(repro_update);
         self.next_sequence = next_sequence;
         if let Some(evicted) = evicted {
             self.retained.remove(&evicted);
@@ -194,21 +214,15 @@ impl BrowserKernelHostV2 {
         request_id: SafeU53,
         sequence: SafeU53,
         maximum_response_bytes: usize,
-    ) -> Result<(Vec<u8>, ReproUpdateV2), BrowserWebErrorV2> {
+    ) -> Result<Vec<u8>, BrowserWebErrorV2> {
         let mut generation = self.generation;
-        let mut append_input = None;
+        let mut origin = None;
         let event = match request {
             BrowserRequestV2::Initialize { initialization } => {
                 if self.session.is_some() {
                     return Err(BrowserWebErrorV2::Invalid);
                 }
-                let session = self.initialize(*initialization)?;
-                let snapshot = session.snapshot()?;
-                let generation = snapshot
-                    .protocol
-                    .as_ref()
-                    .map(|protocol| protocol.frame_context.context.connection_generation.get())
-                    .unwrap_or_else(safe_one);
+                let (session, recorder, generation) = self.initialize(*initialization)?;
                 let bytes = encode_response(
                     BrowserResponseV2::Ready,
                     request_id,
@@ -216,8 +230,9 @@ impl BrowserKernelHostV2 {
                     maximum_response_bytes,
                 )?;
                 self.session = Some(session);
+                self.repro = Some(recorder);
                 self.generation = generation;
-                return Ok((bytes, ReproUpdateV2::Replace(Box::new(snapshot))));
+                return Ok(bytes);
             }
             BrowserRequestV2::Snapshot => {
                 let response = BrowserResponseV2::Snapshot {
@@ -225,25 +240,22 @@ impl BrowserKernelHostV2 {
                 };
                 let bytes =
                     encode_response(response, request_id, sequence, maximum_response_bytes)?;
-                return Ok((bytes, ReproUpdateV2::Keep));
+                return Ok(bytes);
             }
             BrowserRequestV2::ExportRepro => {
-                let snapshot = match &self.repro_base {
-                    Some(snapshot) => snapshot.clone(),
-                    None => self.session()?.snapshot()?,
-                };
+                let capsule = self.repro.as_ref().ok_or(BrowserWebErrorV2::Invalid)?.export()
+                    .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
                 let response = BrowserResponseV2::Effects {
                     batch: BrowserEffectBatchV2 {
                         external_sequence: sequence,
-                        effects: vec![BrowserEffectV2::ReproReady {
-                            snapshot: Box::new(snapshot),
-                            inputs: self.repro_inputs.clone(),
+                        effects: vec![BrowserEffectV2::CurrentReproReady {
+                            capsule_bytes: canonical_bytes(&capsule).map_err(canonical_error)?,
                         }],
                     },
                 };
                 let bytes =
                     encode_response(response, request_id, sequence, maximum_response_bytes)?;
-                return Ok((bytes, ReproUpdateV2::Keep));
+                return Ok(bytes);
             }
             BrowserRequestV2::Dispose => {
                 let bytes = encode_response(
@@ -256,13 +268,11 @@ impl BrowserKernelHostV2 {
                     session.dispose();
                 }
                 self.session = None;
+                self.repro = None;
                 self.disposed = true;
-                return Ok((bytes, ReproUpdateV2::Clear));
+                return Ok(bytes);
             }
             BrowserRequestV2::RawInput { event } => {
-                if self.repro_inputs.len() < 4_096 {
-                    append_input = Some(event.clone());
-                }
                 CurrentExternalEvent::RawInput { input: event }
             }
             BrowserRequestV2::ProposalFrame { bytes } => {
@@ -332,6 +342,14 @@ impl BrowserKernelHostV2 {
                 CurrentExternalEvent::StorageResult { request_id, result }
             }
             BrowserRequestV2::Lifecycle { event } => {
+                origin = Some(match &event {
+                    BrowserLifecycleEventV2::Suspend => "browser.lifecycle.SUSPEND",
+                    BrowserLifecycleEventV2::Resume => "browser.lifecycle.RESUME",
+                    BrowserLifecycleEventV2::Hidden => "browser.lifecycle.HIDDEN",
+                    BrowserLifecycleEventV2::Visible => "browser.lifecycle.VISIBLE",
+                    BrowserLifecycleEventV2::PageHide => "browser.lifecycle.PAGE_HIDE",
+                    BrowserLifecycleEventV2::PageShow => "browser.lifecycle.PAGE_SHOW",
+                });
                 let input = match event {
                     BrowserLifecycleEventV2::Suspend
                     | BrowserLifecycleEventV2::Hidden
@@ -344,43 +362,47 @@ impl BrowserKernelHostV2 {
             }
         };
         let content = Arc::clone(&self.content);
+        let before = self.session()?.snapshot().ok();
         let prepared = self
             .session
             .as_mut()
             .ok_or(BrowserWebErrorV2::Invalid)?
-            .apply_with(event, |candidate, step| {
-                let response = Self::effects(content.as_ref(), step, generation, sequence)?;
-                let repro = match append_input {
-                    Some(input) => ReproUpdateV2::Append(input),
-                    None => ReproUpdateV2::Replace(Box::new(candidate.snapshot()?)),
-                };
+            .apply_with(event.clone(), |_candidate, step| {
+                let response = Self::effects(content.as_ref(), step.clone(), generation, sequence)
+                    .map_err(BrowserCompletionErrorV2::Adapter)?;
                 let bytes =
-                    encode_response(response, request_id, sequence, maximum_response_bytes)?;
-                Ok::<_, BrowserWebErrorV2>((bytes, repro))
-            })?;
-        self.generation = generation;
-        Ok(prepared)
-    }
-
-    fn update_repro(&mut self, update: ReproUpdateV2) {
-        match update {
-            ReproUpdateV2::Keep => {}
-            ReproUpdateV2::Append(input) => self.repro_inputs.push(input),
-            ReproUpdateV2::Replace(snapshot) => {
-                self.repro_base = Some(*snapshot);
-                self.repro_inputs.clear();
+                    encode_response(response, request_id, sequence, maximum_response_bytes)
+                    .map_err(BrowserCompletionErrorV2::Adapter)?;
+                Ok::<_, BrowserCompletionErrorV2>((bytes, step))
+            });
+        let outcome = match &prepared {
+            Ok((_, step)) => Some(Ok(step)),
+            Err(BrowserCompletionErrorV2::Session(error)) => Some(Err(error)),
+            Err(BrowserCompletionErrorV2::Adapter(_)) => None,
+        };
+        if let Some(outcome) = outcome && let Some(recorder) = &mut self.repro {
+            let evidence = self.session.as_ref().and_then(|session| {
+                Some((session.snapshot().ok()?, session.observe().ok()?))
+            });
+            if let (Some(before), Some((after, observation))) = (before, evidence) {
+                let after_generation = if outcome.is_ok() { generation } else { self.generation };
+                recorder.record_with_browser_transport(&before, event, outcome, &after, &observation,
+                    origin, self.generation, after_generation);
+            } else {
+                recorder.invalidate_attempt("browser event diagnostic snapshot or observation unavailable");
             }
-            ReproUpdateV2::Clear => {
-                self.repro_base = None;
-                self.repro_inputs.clear();
-            }
+        }
+        match prepared {
+            Ok((bytes, _)) => { self.generation = generation; Ok(bytes) }
+            Err(BrowserCompletionErrorV2::Session(error)) => Err(error.into()),
+            Err(BrowserCompletionErrorV2::Adapter(error)) => Err(error),
         }
     }
 
     fn initialize(
         &self,
         initialization: BrowserSessionInitializationV2,
-    ) -> Result<CurrentGameSession, BrowserWebErrorV2> {
+    ) -> Result<(CurrentGameSession, CurrentReproRecorderV1, SafeU53), BrowserWebErrorV2> {
         let session = match initialization {
             BrowserSessionInitializationV2::NaturalStart {
                 context,
@@ -460,8 +482,30 @@ impl BrowserKernelHostV2 {
                 }
                 session
             }
+            BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes } => {
+                let limits = CurrentReproLimitsV1::default();
+                if capsule_bytes.is_empty() || capsule_bytes.len() > limits.maximum_bytes {
+                    return Err(BrowserWebErrorV2::Invalid);
+                }
+                let capsule: CurrentReproCapsuleV1 = serde_json::from_slice(&capsule_bytes)
+                    .map_err(|_| BrowserWebErrorV2::Invalid)?;
+                let generation = capsule.browser_transport.as_ref()
+                    .ok_or_else(|| BrowserWebErrorV2::Repro("browser transport context missing".to_owned()))?
+                    .final_generation;
+                let (recorder, session) = CurrentReproRecorderV1::from_capsule(capsule, Arc::clone(&self.content), limits)
+                    .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
+                return Ok((session, recorder, generation));
+            }
         };
-        Ok(session)
+        let (local_seat, role) = session.session_context()?;
+        let snapshot = session.snapshot()?;
+        let generation = snapshot.protocol.as_ref()
+            .map(|protocol| protocol.frame_context.context.connection_generation.get())
+            .unwrap_or_else(safe_one);
+        let recorder = CurrentReproRecorderV1::new_with_browser_transport(snapshot, local_seat, role,
+            Arc::clone(&self.content), CurrentReproLimitsV1::default(), generation)
+            .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
+        Ok((session, recorder, generation))
     }
 
     fn effects(
@@ -730,6 +774,9 @@ mod transaction_tests {
     }
 
     fn evidence(host: &BrowserKernelHostV2) -> Result<Vec<u8>, Box<dyn Error>> {
+        // Diagnostic attempts intentionally advance on rejection. Keep the
+        // complete game/transport/cache evidence strict and assert capture
+        // availability and positions separately in each rejection test.
         let retained = host
             .retained
             .iter()
@@ -747,8 +794,6 @@ mod transaction_tests {
             host.next_sequence,
             host.generation,
             retained,
-            &host.repro_base,
-            &host.repro_inputs,
             host.disposed,
         ))?)
     }
@@ -783,9 +828,18 @@ mod transaction_tests {
             Err(BrowserWebErrorV2::Invalid)
         ));
         assert_eq!(evidence(&host)?, before);
+        let unavailable = host.capture_status();
+        assert!(matches!(unavailable, Some(CurrentCaptureStatusV1::Unavailable { position: 1, .. })));
+        let export = request(SafeU53::new(3)?, safe_one(), BrowserRequestV2::ExportRepro)?;
+        assert!(matches!(host.process_bytes(&export), Err(BrowserWebErrorV2::Repro(_))));
+        assert_eq!(host.capture_status(), unavailable);
+        assert_eq!(evidence(&host)?, before);
         assert_eq!(host.process_bytes(&initialization)?, ready);
+        assert_eq!(host.capture_status(), unavailable);
         assert_eq!(host.process_bytes(&event)?, fresh.process_bytes(&event)?);
         assert_eq!(evidence(&host)?, evidence(&fresh)?);
+        assert_eq!(host.capture_status(), Some(CurrentCaptureStatusV1::Available { base_position: 1, final_position: 2 }));
+        assert_eq!(fresh.capture_status(), Some(CurrentCaptureStatusV1::Available { base_position: 0, final_position: 1 }));
         assert_eq!(
             host.session()?
                 .observe()?
@@ -793,6 +847,23 @@ mod transaction_tests {
                 .map(|control| control.kind),
             Some(GameControlKindV2::ModeSelect)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn read_only_response_limit_failure_preserves_capture() -> Result<(), Box<dyn Error>> {
+        let (mut host, _, _) = initialized()?;
+        let before = evidence(&host)?;
+        let capture = host.capture_status();
+        for query in [BrowserRequestV2::Snapshot, BrowserRequestV2::ExportRepro] {
+            let bytes = request(SafeU53::new(2)?, safe_one(), query)?;
+            assert!(matches!(host.process_bytes_with_response_limit(&bytes, 1), Err(BrowserWebErrorV2::Invalid)));
+            assert_eq!(evidence(&host)?, before);
+            assert_eq!(host.capture_status(), capture);
+        }
+        let dispose = request(SafeU53::new(2)?, safe_one(), BrowserRequestV2::Dispose)?;
+        host.process_bytes(&dispose)?;
+        assert_eq!(host.capture_status(), None);
         Ok(())
     }
 
@@ -808,8 +879,11 @@ mod transaction_tests {
             Err(BrowserWebErrorV2::Invalid)
         ));
         assert_eq!(evidence(&host)?, before);
+        let unavailable = host.capture_status();
+        assert!(matches!(unavailable, Some(CurrentCaptureStatusV1::Unavailable { position: 1, .. })));
         assert_eq!(host.process_bytes(&initialization)?, ready);
         assert_eq!(evidence(&host)?, before);
+        assert_eq!(host.capture_status(), unavailable);
         Ok(())
     }
 }

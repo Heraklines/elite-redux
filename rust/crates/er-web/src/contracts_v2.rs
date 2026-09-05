@@ -53,10 +53,15 @@ pub enum BrowserSessionInitializationV2 {
         snapshot: CoreGameKernelSnapshotV7,
         scenario: ScenarioId,
     },
+    /// Historical raw-input-only replay, retained for explicit compatibility.
     ReproCapsule {
         context: BrowserSessionContextV2,
         snapshot: CoreGameKernelSnapshotV7,
         inputs: Vec<RawInputEvent>,
+    },
+    /// Current causal capsule with explicit browser transport context.
+    CurrentReproCapsule {
+        capsule_bytes: Vec<u8>,
     },
 }
 
@@ -192,9 +197,14 @@ pub enum BrowserEffectV2 {
     Telemetry {
         event: GameTelemetryEventV2,
     },
+    /// Historical raw-input-only capsule response.
     ReproReady {
         snapshot: Box<CoreGameKernelSnapshotV7>,
         inputs: Vec<RawInputEvent>,
+    },
+    /// Canonical current capsule JSON, including browser transport context.
+    CurrentReproReady {
+        capsule_bytes: Vec<u8>,
     },
 }
 

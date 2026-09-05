@@ -21,5 +21,8 @@ er-types = { path = "../er-types" }
 serde_json.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+er-web = { path = "../er-web" }
+
 [lints]
 workspace = true
