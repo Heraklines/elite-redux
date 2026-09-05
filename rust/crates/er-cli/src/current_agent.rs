@@ -30,14 +30,14 @@ const MAXIMUM_SESSIONS: usize = 256;
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 enum CurrentStart {
     Natural {
-        profile: ProfileStateV1,
+        profile: Box<ProfileStateV1>,
         seed: String,
         owner_seat: SeatId,
         save_slots: Vec<String>,
         local_is_host: bool,
     },
     Snapshot {
-        snapshot: CoreGameKernelSnapshotV7,
+        snapshot: Box<CoreGameKernelSnapshotV7>,
         owner_seat: SeatId,
         role: GameKernelRoleV7,
     },
@@ -105,7 +105,7 @@ impl CurrentDispatcher {
                 save_slots,
                 local_is_host,
             } => CurrentGameSession::natural_start(
-                profile,
+                *profile,
                 seed,
                 owner_seat,
                 save_slots,
@@ -119,7 +119,7 @@ impl CurrentDispatcher {
                 owner_seat,
                 role,
             } => CurrentGameSession::from_snapshot(
-                snapshot,
+                *snapshot,
                 owner_seat,
                 role,
                 Arc::clone(&self.content),

@@ -1,7 +1,18 @@
-# Current reload and terminal cut — source prepared, remote proof pending
+# Current reload and terminal integration
 
 This file records the bounded work after B1; it is not completion evidence.
 All execution remains remote. Never blanket-stage the shared checkout.
+
+Supervisor/context and response-budget status: REMOTELY_VERIFIED at
+`f8f69832749cc389f8853f9fa1de04f1ae0fb237`, run `33936401079`:
+38/38 native tests, including nine supervisor and five worker-process tests,
+formatting and worker/lab Clippy. The normal utility and JSONL worker-adapter
+cuts below remain separate and pending their own remote evidence. The two
+actual CLI reload tests and strict CI artifact/dependency mapping are now
+source-complete, including stale tickets across restore. Do not stage them
+with the utility cut. CurrentStart profile/snapshot boxing is included with
+utilities to keep the request enum bounded when enabling CLI Clippy; its
+serialized JSON is unchanged.
 
 ## Supervisor cut
 

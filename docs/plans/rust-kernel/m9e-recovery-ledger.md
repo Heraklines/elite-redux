@@ -458,3 +458,37 @@ its exact SHA-256 verified as
 before applying its six complete source-file edits. Compact summary: 10,559
 bytes. Full diagnostics stayed remote; no local formatter/build/test ran.
 Baseline remains passing `7557e92`; unrelated CLI/B2 changes remain excluded.
+
+### Current supervisor and response budget verified; utilities submitted
+
+Run `33936401079`, exact candidate
+`f8f69832749cc389f8853f9fa1de04f1ae0fb237`, passed all 38 selected/executed
+native tests, zero failures/skips. Required targets: endpoint 2, supervisor 9,
+worker process 5. Formatting and worker/lab Clippy passed. The principal reload,
+retention, stale preparation, context, retirement and effectful response-budget
+rejection/retry/inheritance witnesses all executed. This is exact-preservation
+process reload, not intended semantic-change acceptance or complete causal export.
+
+Harness SHA-256 `d8f13301cef6ec685a69fb23e446ba619205667bbe693a4e4af758211f377a0e`;
+selected IDs SHA-256 `521fcd9ada5663288e5a5cdeedce1d8664ec73cd6c064ed16cb1bece89220912`.
+Actual executable SHA-256
+`4e41c4f8d8ac83876bc114ba3a2b3c8beb296be4e47e7565f5a99fe68cdf3951`,
+73,863,936 bytes, source-bound to this candidate. Inspected compact artifact:
+4,108 bytes. Diagnostics (21,926 bytes) stayed remote. Build 94,141 ms;
+supervisor tests 264,379 ms; worker process tests 111,147 ms. Baseline advances
+to this fully passing checkpoint.
+
+Next candidate migrates normal `new-run`, `resume`, `simulate` and
+`inspect-content` to the current V7/V2 session, preserving explicit `-v6`
+aliases. New-run is natural Title, file/input reads are bounded, time is typed,
+and platform results are never fabricated. Two added actual executable tests
+exercise these routes and held-repeat simulation through the natural journey.
+CurrentStart uses boxed profile/snapshot values to keep its enum size bounded
+when CLI Clippy becomes mandatory; serde JSON shape is unchanged. Focused
+selection preserves native current-entry and both Wasm parity witnesses.
+
+The actual JSONL worker/reload adapter, strict CLI lock/artifact gate and two
+actual-process tests remain uncommitted for the following independent cut.
+B2 now also has an extended existing Chromium journey checking replica
+presentation vectors/settlement and exact duplicate snapshots; it remains
+unverified and outside the utility candidate. Full M9 remains unfinished.

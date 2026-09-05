@@ -1,6 +1,7 @@
-//! Terminal adapter for the M7 headless environment.
+//! Current V7 terminal and agent entries, with explicit historical compatibility.
 
 mod current_agent;
+mod current_commands;
 mod m72;
 mod m72_lab;
 
@@ -31,12 +32,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let command = arguments.next().ok_or("missing command")?;
     let options = parse_options(arguments)?;
     match command.as_str() {
-        "new-run" => new_run(&options),
-        "resume" => resume(&options),
+        "new-run" => current_commands::new_run(&options),
+        "new-run-v6" => new_run(&options),
+        "resume" => current_commands::resume(&options),
+        "resume-v6" => resume(&options),
         "replay" => validate_replay(&options),
         "validate-save" => validate_save(&options),
-        "simulate" => simulate(&options),
-        "inspect-content" => inspect_content(&options),
+        "simulate" => current_commands::simulate(&options),
+        "simulate-v6" => simulate(&options),
+        "inspect-content" => current_commands::inspect_content(&options),
+        "inspect-content-v6" => inspect_content(&options),
         "agent" => current_agent::run(&options),
         "agent-v6" => agent_jsonl(&options),
         "capsule-validate" => validate_capsule(&options),
