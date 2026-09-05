@@ -589,7 +589,7 @@ mod tests {
     };
 
     #[test]
-    fn replica_proposal_effect_contains_canonical_typed_action_bytes() {
+    fn replica_proposal_effect_contains_canonical_typed_action_bytes() -> Result<(), &'static str> {
         let operation_id = OperationId::new("m7/test/proposal").expect("operation");
         let intent = GameControlIntentV2::Selected {
             kind: GameControlKindV2::Reward,
@@ -614,8 +614,7 @@ mod tests {
             ..
         } = effect
         else {
-            assert!(false, "expected proposal effect");
-            return;
+            return Err("expected proposal effect");
         };
         assert_eq!(actual_operation, operation_id);
         let proposal: GameProposalV1 = serde_json::from_slice(&bytes).expect("canonical proposal");
@@ -645,5 +644,6 @@ mod tests {
             admit_game_proposal(&mut admission, &conflict_bytes).expect("conflict result"),
             ProposalAdmission::Conflict
         );
+        Ok(())
     }
 }

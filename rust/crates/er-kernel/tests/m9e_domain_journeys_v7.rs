@@ -404,7 +404,7 @@ fn raw_inventory_use_resolves_content_and_target() -> Result<(), Box<dyn Error>>
         kernel
             .state()
             .and_then(|state| state.active_run.as_ref())
-            .unwrap()
+            .expect("inventory use preserves the active run")
             .inventory
             .entries
             .iter()
@@ -461,11 +461,11 @@ fn scenario_choices_apply_source_compiled_graph_effects() -> Result<(), Box<dyn 
         .locals
         .insert(String::new(), ScenarioLocalValueV2::Bool(true));
     assert!(matches!(
-        empty_local.active_run.as_ref().unwrap().validate(),
+        empty_local.active_run.as_ref().expect("empty-local fixture has an active run").validate(),
         Err(M7StateError::Scenario("local key is empty"))
     ));
     let mut duplicate_reserved = initial.clone();
-    let duplicate = duplicate_reserved.active_run.as_ref().unwrap().party[0].clone();
+    let duplicate = duplicate_reserved.active_run.as_ref().expect("duplicate-reservation fixture has an active run").party[0].clone();
     duplicate_reserved
         .active_run
         .as_mut()
@@ -474,12 +474,12 @@ fn scenario_choices_apply_source_compiled_graph_effects() -> Result<(), Box<dyn 
         .reserved_pokemon
         .push(duplicate);
     assert!(matches!(
-        duplicate_reserved.active_run.as_ref().unwrap().validate(),
+        duplicate_reserved.active_run.as_ref().expect("duplicate-reservation fixture preserves its active run").validate(),
         Err(M7StateError::DuplicatePokemon(_))
     ));
     let mut identity_reservation = initial.clone();
     let reserved_id = PokemonId::new(identity_reservation.identities.next_pokemon_id);
-    let mut reserved = identity_reservation.active_run.as_ref().unwrap().party[0].clone();
+    let mut reserved = identity_reservation.active_run.as_ref().expect("identity-reservation fixture has an active run").party[0].clone();
     reserved.id = reserved_id;
     identity_reservation
         .active_run
@@ -798,28 +798,28 @@ fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Resul
     assert!(
         progression
             .state()
-            .unwrap()
+            .expect("progression leaves a current state")
             .active_run
             .as_ref()
-            .unwrap()
+            .expect("progression preserves the active run")
             .party[0]
             .experience
             > before_experience
     );
 
     let mut evolution = natural_state(&content)?;
-    let actor = evolution.active_run.as_ref().unwrap().party[0].id;
+    let actor = evolution.active_run.as_ref().expect("evolution fixture has an active run").party[0].id;
     let evolution_id = content
         .progression
         .pack()
         .evolutions
         .iter()
         .find(|entry| {
-            entry.source_species == evolution.active_run.as_ref().unwrap().party[0].species_id
+            entry.source_species == evolution.active_run.as_ref().expect("evolution lookup retains the fixture run").party[0].species_id
         })
         .map(|entry| entry.id)
         .ok_or("starter evolution missing")?;
-    evolution.active_run.as_mut().unwrap().party[0].level = 100;
+    evolution.active_run.as_mut().expect("evolution setup retains the fixture run").party[0].level = 100;
     let (evolution, _) = execute(
         evolution,
         content.clone(),
@@ -836,10 +836,10 @@ fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Resul
     assert_eq!(
         evolution
             .state()
-            .unwrap()
+            .expect("evolution leaves a current state")
             .active_run
             .as_ref()
-            .unwrap()
+            .expect("evolution preserves the active run")
             .party[0]
             .evolution
             .last_completed,
@@ -847,11 +847,11 @@ fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Resul
     );
 
     let mut fusion = natural_state(&content)?;
-    let primary = fusion.active_run.as_ref().unwrap().party[0].id;
-    let mut partner = fusion.active_run.as_ref().unwrap().party[0].clone();
+    let primary = fusion.active_run.as_ref().expect("fusion fixture has an active run").party[0].id;
+    let mut partner = fusion.active_run.as_ref().expect("fusion partner setup retains the fixture run").party[0].clone();
     partner.id = fusion.identities.allocate_pokemon_id()?;
     let partner_id = partner.id;
-    fusion.active_run.as_mut().unwrap().party.push(partner);
+    fusion.active_run.as_mut().expect("fusion setup retains the active run").party.push(partner);
     let (fusion, _) = execute(
         fusion,
         content,
@@ -866,7 +866,7 @@ fn progression_evolution_and_fusion_actions_execute_through_raw_input() -> Resul
     )
     .map_err(|error| format!("fusion journey failed: {error}"))?;
     assert!(
-        fusion.state().unwrap().active_run.as_ref().unwrap().party[0]
+        fusion.state().expect("fusion leaves a current state").active_run.as_ref().expect("fusion preserves the active run").party[0]
             .fusion
             .is_some()
     );
@@ -882,7 +882,7 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     inventory
         .active_run
         .as_mut()
-        .unwrap()
+        .expect("inventory fixture has an active run")
         .inventory
         .entries
         .push(InventoryEntryV1 {
@@ -902,10 +902,10 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     assert_eq!(
         inventory
             .state()
-            .unwrap()
+            .expect("inventory use leaves a current state")
             .active_run
             .as_ref()
-            .unwrap()
+            .expect("inventory use preserves the active run")
             .inventory
             .entries[0]
             .count,
@@ -913,7 +913,7 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     );
 
     let reward = natural_state(&content)?;
-    let before = reward.active_run.as_ref().unwrap().world.encounter_sequence;
+    let before = reward.active_run.as_ref().expect("reward fixture has an active run").world.encounter_sequence;
     let (reward, _) = execute(
         reward,
         content.clone(),
@@ -926,10 +926,10 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     assert!(
         reward
             .state()
-            .unwrap()
+            .expect("reward selection leaves a current state")
             .active_run
             .as_ref()
-            .unwrap()
+            .expect("reward selection preserves the active run")
             .world
             .encounter_sequence
             > before
@@ -948,10 +948,10 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     assert!(
         world
             .state()
-            .unwrap()
+            .expect("world action leaves a current state")
             .active_run
             .as_ref()
-            .unwrap()
+            .expect("world action preserves the active run")
             .world
             .leave_biome_now
     );
@@ -971,7 +971,7 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
             })
         })
         .ok_or("scenario completion node missing")?;
-    scenario.active_run.as_mut().unwrap().scenario = Some(ScenarioRuntimeStateV2 {
+    scenario.active_run.as_mut().expect("scenario fixture has an active run").scenario = Some(ScenarioRuntimeStateV2 {
         schema_version: SCENARIO_RUNTIME_SCHEMA_VERSION_V2,
         scenario: scenario_id,
         node: entry,
@@ -995,10 +995,10 @@ fn inventory_reward_world_and_scenario_actions_execute_through_raw_input()
     assert!(
         scenario
             .state()
-            .unwrap()
+            .expect("scenario completion leaves a current state")
             .active_run
             .as_ref()
-            .unwrap()
+            .expect("scenario completion preserves the active run")
             .scenario
             .is_none()
     );

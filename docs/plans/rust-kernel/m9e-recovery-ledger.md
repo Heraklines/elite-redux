@@ -1500,3 +1500,31 @@ stayremote. Complete3,535-byte one-file format.patch, zero omitted paths/bytes,
 SHA256edac002d5888ba1cc0ed6a9d17fee2ec00bfe5b06b3646e414d792b43db7732a,
 was verified applicable and applied. No local formatter executed. Baseline remains
 qualified3aa/run33963418110; all remaining lint and retention evidence is pending.
+
+09317fb5d28f920e88742da39edb9d72a16254cb/run33966823622 passed122 harness,
+formatting, full reverse compilation and er-game all-target Clippy. The next
+newly enforced er-kernel all-target lint stopped on32 prior warnings:28 Option
+unwrap calls in m9e_domain_journeys_v7, a constant-false test assertion, a hex-length
+modulo expression, and the public lifecycle enum size/nested snapshot guard.
+662tests selected,0executed. Build148,945ms; CLIClippy28,856ms; game5,678ms;
+kernel3,727ms. Batch lint and all product/platform/mutant execution remainpending.
+Only inspected nativeA4,934 compressed-byte summary downloaded. Full A87,400-byte
+ZIP stayedremote: selective directory/header/member HTTP ranges retrieved only
+17,705-byte er-kernel-clippy.log (2,199 compressed member bytes). Two initial
+metadata-only attempts did not match its prefixed member name; no full archive
+was fetched. Duplicate B4,436 summary/B86,417 diagnostics stayedremote.
+
+The kernel lint repair adds descriptive fixture expectations to those28 Option
+accesses with all12 journey IDs/actions/assertions preserved. The historical
+proposal unit returns an explicit failing Result when its expected variant is
+missing; this preserves failure without adding a panic macro forbidden by the
+workspace. Hex even-length validation and the active revision guard keep the
+same acceptance/rejection behavior. One item-scoped expected large-variant lint
+preserves the current public lifecycle snapshot's by-value API and wire fields.
+Four exact diagnosed kernel files join the strict retention allowlist (17total).
+The12 domain-journey IDs and whole er-kernel unit target were already selected
+and required; there is no inventory removal or new target shortcut. Existing122
+harness tests retain exact-path and neighboring-path failures,33requiredtargets,
+bothmutants, earlyall-targetlint and platform. Fullyqualified baseline stays3aa.
+This source repair still requires remote formatting/lint/execution; no local
+workloads, production changes or qualification claim are made.

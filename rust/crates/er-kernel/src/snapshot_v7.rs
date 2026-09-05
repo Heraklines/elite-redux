@@ -28,6 +28,10 @@ pub const MAX_PENDING_PLATFORM_REQUESTS_V7: usize = 256;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Preserve the public by-value lifecycle snapshot; changing its ownership is a separate API change"
+)]
 pub enum GameKernelLifecycleSnapshotV7 {
     Bootstrap(RunBootstrapMachineV1),
     Active(GameStateV6),
@@ -358,10 +362,10 @@ fn validate_active_state(
     {
         return Err(SnapshotV7Error::Invalid);
     }
-    if let Some(run) = &state.active_run {
-        if snapshot.material_ledger.next_authority_revision < run.control.revision {
-            return Err(SnapshotV7Error::Invalid);
-        }
+    if let Some(run) = &state.active_run
+        && snapshot.material_ledger.next_authority_revision < run.control.revision
+    {
+        return Err(SnapshotV7Error::Invalid);
     }
     Ok(())
 }

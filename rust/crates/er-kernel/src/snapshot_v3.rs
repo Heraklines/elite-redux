@@ -195,7 +195,7 @@ fn recapture(path: impl Into<String>, reason: impl Into<String>) -> SnapshotErro
 fn validate_hex(value: &CanonicalHexBytes, path: &str) -> Result<(), SnapshotError> {
     let text = value.as_str();
     if text.is_empty()
-        || text.len() % 2 != 0
+        || !text.len().is_multiple_of(2)
         || !text
             .bytes()
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
