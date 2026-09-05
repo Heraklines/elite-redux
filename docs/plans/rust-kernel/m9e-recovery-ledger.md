@@ -1709,3 +1709,10 @@ Full validation still runs on every invocation; no cache, trusted flag, skipped
 import validation, schema change or retention-bound change is introduced. These
 source changes require the unchanged remote ordinary and platform checks; no
 measured speedup is claimed before that run.
+
+Remote run 33975157393 on 34b8c08e300d25654fb122264f66d58d9dcf4228
+stopped at formatting before native test execution. The remote formatter's
+631-byte patch only expands the borrowed-ID collection chain. That exact source
+patch was retrieved inside the inspected 1734-byte native A compact archive
+and applied locally as text; no formatter or other workload ran on this PC.
+The following rerun retains the same behavior, test selection and limits.

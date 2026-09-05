@@ -329,8 +329,11 @@ impl AppliedGameMaterialLedgerV1 {
         {
             return Err(GameMaterialV6Error::Ledger);
         }
-        let mut operations: Vec<&OperationId> =
-            self.records.iter().map(|record| &record.operation_id).collect();
+        let mut operations: Vec<&OperationId> = self
+            .records
+            .iter()
+            .map(|record| &record.operation_id)
+            .collect();
         operations.sort_unstable();
         if operations.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(GameMaterialV6Error::Ledger);
