@@ -2,7 +2,9 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7};
+use er_kernel::game_kernel_v7::{
+    GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
+};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_state::m7_state::{
@@ -258,16 +260,31 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
             .and_then(|state| state.active_run.as_ref())
             .is_some_and(|run| run.wave.get().get() >= 3)
     );
-    assert_eq!(initial_snapshot.scheduler.next_timer_id, Some(SafeU53::ZERO));
-    let navigation_presses = events.iter().filter(|event| matches!(event,
-        M9EParityEventV2::RawInput {
-            event: RawInputEvent::KeyDown { code: PhysicalKey::ArrowDown, .. }
-        }
-    )).count();
+    assert_eq!(
+        initial_snapshot.scheduler.next_timer_id,
+        Some(SafeU53::ZERO)
+    );
+    let navigation_presses = events
+        .iter()
+        .filter(|event| {
+            matches!(
+                event,
+                M9EParityEventV2::RawInput {
+                    event: RawInputEvent::KeyDown {
+                        code: PhysicalKey::ArrowDown,
+                        ..
+                    }
+                }
+            )
+        })
+        .count();
     let final_snapshot = driver.snapshot()?;
     assert!(final_snapshot.input_router.repeats.is_empty());
     assert!(final_snapshot.scheduler.timers.is_empty());
-    assert_eq!(final_snapshot.scheduler.next_timer_id, Some(safe(navigation_presses as u64)));
+    assert_eq!(
+        final_snapshot.scheduler.next_timer_id,
+        Some(safe(navigation_presses as u64))
+    );
     Ok(M9EParityRequestV1 {
         bundle,
         profile: profile(),
@@ -343,8 +360,14 @@ fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), B
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let seat = SeatId::new(safe(1));
     let mut kernel = GameKernelV7::natural_start(
-        profile(), "m9e-native-wasm-held-timer".to_owned(), seat,
-        vec!["m9e-parity-slot".to_owned()], true, content.clone(), scheduler(), None,
+        profile(),
+        "m9e-native-wasm-held-timer".to_owned(),
+        seat,
+        vec!["m9e-parity-slot".to_owned()],
+        true,
+        content.clone(),
+        scheduler(),
+        None,
     )?;
     let mut setup = Vec::new();
     for _ in 0..3 {
@@ -354,33 +377,64 @@ fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), B
     for _ in 0..4 {
         press(&mut kernel, &mut setup, PhysicalKey::Space)?;
     }
-    assert_eq!(kernel.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleCommand));
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleCommand)
+    );
     assert_eq!(timer_cursor(&kernel)?, "battle/command/fight");
     let snapshot = kernel.snapshot()?;
     assert!(snapshot.input_router.repeats.is_empty());
     assert!(snapshot.scheduler.timers.is_empty());
     let events = vec![
-        M9EParityEventV2::RawInput { event: key_down(PhysicalKey::ArrowDown) },
-        M9EParityEventV2::AdvanceTime { milliseconds: safe(249) },
-        M9EParityEventV2::AdvanceTime { milliseconds: safe(1) },
-        M9EParityEventV2::AdvanceTime { milliseconds: safe(250) },
-        M9EParityEventV2::RawInput { event: RawInputEvent::KeyUp { code: PhysicalKey::ArrowDown } },
-        M9EParityEventV2::AdvanceTime { milliseconds: safe(500) },
+        M9EParityEventV2::RawInput {
+            event: key_down(PhysicalKey::ArrowDown),
+        },
+        M9EParityEventV2::AdvanceTime {
+            milliseconds: safe(249),
+        },
+        M9EParityEventV2::AdvanceTime {
+            milliseconds: safe(1),
+        },
+        M9EParityEventV2::AdvanceTime {
+            milliseconds: safe(250),
+        },
+        M9EParityEventV2::RawInput {
+            event: RawInputEvent::KeyUp {
+                code: PhysicalKey::ArrowDown,
+            },
+        },
+        M9EParityEventV2::AdvanceTime {
+            milliseconds: safe(500),
+        },
     ];
-    Ok((M9EParityRequestV1 {
-        bundle, profile: profile(), seed: "unused-with-natural-checkpoint".to_owned(),
-        local_seat: seat, role: GameKernelRoleV7::Authority,
-        save_slots: vec!["m9e-parity-slot".to_owned()], local_is_host: true,
-        initial_snapshot: Some(snapshot), events,
-    }, content))
+    Ok((
+        M9EParityRequestV1 {
+            bundle,
+            profile: profile(),
+            seed: "unused-with-natural-checkpoint".to_owned(),
+            local_seat: seat,
+            role: GameKernelRoleV7::Authority,
+            save_slots: vec!["m9e-parity-slot".to_owned()],
+            local_is_host: true,
+            initial_snapshot: Some(snapshot),
+            events,
+        },
+        content,
+    ))
 }
 
 fn timer_cursor(kernel: &GameKernelV7) -> Result<&str, Box<dyn Error>> {
-    kernel.current_control().and_then(|control| control.menu.as_ref())
-        .map(|menu| menu.selected_option_id.as_str()).ok_or_else(|| "timer menu missing".into())
+    kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .map(|menu| menu.selected_option_id.as_str())
+        .ok_or_else(|| "timer menu missing".into())
 }
 
-fn apply_timer_event(kernel: &mut GameKernelV7, event: M9EParityEventV2) -> Result<GameKernelStepV7, Box<dyn Error>> {
+fn apply_timer_event(
+    kernel: &mut GameKernelV7,
+    event: M9EParityEventV2,
+) -> Result<GameKernelStepV7, Box<dyn Error>> {
     Ok(match event {
         M9EParityEventV2::RawInput { event } => kernel.raw_input(event)?,
         M9EParityEventV2::AdvanceTime { milliseconds } => kernel.advance_time(milliseconds)?,
@@ -396,12 +450,21 @@ fn assert_timer_eventwise_parity_contract(
 ) -> Result<String, Box<dyn Error>> {
     let (request, content) = timer_request()?;
     let mut driver = GameKernelV7::from_snapshot(
-        request.initial_snapshot.clone().ok_or("natural checkpoint missing")?,
-        request.local_seat, request.role, content.clone(),
+        request
+            .initial_snapshot
+            .clone()
+            .ok_or("natural checkpoint missing")?,
+        request.local_seat,
+        request.role,
+        content.clone(),
     )?;
     let expected_cursors = [
-        "battle/command/party", "battle/command/party", "battle/command/fight",
-        "battle/command/party", "battle/command/party", "battle/command/party",
+        "battle/command/party",
+        "battle/command/party",
+        "battle/command/fight",
+        "battle/command/party",
+        "battle/command/party",
+        "battle/command/party",
     ];
     let mut observations = Vec::new();
     let mut midpoint = None;
@@ -413,15 +476,28 @@ fn assert_timer_eventwise_parity_contract(
         match index {
             0 | 2 | 3 => {
                 let [GameKernelEffectV7::UiChanged(control)] = step.effects.as_slice() else {
-                    return Err(format!("timer event {index} did not emit exactly one cursor effect").into());
+                    return Err(format!(
+                        "timer event {index} did not emit exactly one cursor effect"
+                    )
+                    .into());
                 };
-                assert_eq!(control.menu.as_ref().ok_or("effect menu missing")?
-                    .selected_option_id.as_str(), expected_cursors[index]);
+                assert_eq!(
+                    control
+                        .menu
+                        .as_ref()
+                        .ok_or("effect menu missing")?
+                        .selected_option_id
+                        .as_str(),
+                    expected_cursors[index]
+                );
             }
             _ => assert!(step.effects.is_empty()),
         }
         if index == 2 || index == 3 {
-            assert_eq!(step.internal_events, [er_game::m9e_internal_event_v2::GameInternalEventKindV2::TimerFired]);
+            assert_eq!(
+                step.internal_events,
+                [er_game::m9e_internal_event_v2::GameInternalEventKindV2::TimerFired]
+            );
         } else {
             assert!(step.internal_events.is_empty());
         }
@@ -433,7 +509,10 @@ fn assert_timer_eventwise_parity_contract(
             assert_eq!(snapshot.scheduler.timers[0].remaining_active_ms, safe(1));
             midpoint = Some(snapshot.clone());
             restored = Some(GameKernelV7::from_snapshot(
-                snapshot.clone(), request.local_seat, request.role, content.clone(),
+                snapshot.clone(),
+                request.local_seat,
+                request.role,
+                content.clone(),
             )?);
         }
         if index >= 4 {
@@ -448,7 +527,10 @@ fn assert_timer_eventwise_parity_contract(
             mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
             kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
             control_kind: driver.current_control().map(|control| control.kind),
-            wave: driver.state().and_then(|state| state.active_run.as_ref()).map(|run| run.wave),
+            wave: driver
+                .state()
+                .and_then(|state| state.active_run.as_ref())
+                .map(|run| run.wave),
         });
     }
     let expected = M9EParityReportV1 {
@@ -490,8 +572,11 @@ fn native_replays_v7_held_timers_eventwise() -> Result<(), Box<dyn Error>> {
 fn wasm_replays_v7_held_timers_eventwise() -> Result<(), wasm_bindgen::JsValue> {
     let result = assert_timer_eventwise_parity_contract(|request| {
         let json = serde_json::to_string(&request)?;
-        let report = er_wasm::m9e_parity::replay_m9e_eventwise_json(&json)
-            .map_err(|error| error.as_string().unwrap_or_else(|| "Wasm replay failed".to_owned()))?;
+        let report = er_wasm::m9e_parity::replay_m9e_eventwise_json(&json).map_err(|error| {
+            error
+                .as_string()
+                .unwrap_or_else(|| "Wasm replay failed".to_owned())
+        })?;
         Ok(serde_json::from_str(&report)?)
     });
     let digest = result.map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;

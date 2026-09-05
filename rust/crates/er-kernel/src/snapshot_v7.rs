@@ -15,12 +15,12 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::game_kernel_v7::{NAVIGATION_REPEAT_INTERVAL_MS_V7, navigation_button_v7};
 use crate::snapshot::{
     InputRouterSnapshotV2, KernelSchedulerSnapshotV2, PhysicalInputSourceV2,
     QuiescentPreparedTransaction,
 };
 use crate::snapshot_v6::RestorableKernelSnapshotV6;
-use crate::game_kernel_v7::{NAVIGATION_REPEAT_INTERVAL_MS_V7, navigation_button_v7};
 
 pub const CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7: u32 = 7;
 pub const MAX_PENDING_PRESENTATIONS_V7: usize = 4_096;
@@ -180,21 +180,31 @@ impl CoreGameKernelSnapshotV7 {
     fn validate_repeat_ownership(&self) -> Result<(), SnapshotV7Error> {
         let mut logical_owners = BTreeSet::new();
         let active_control = match &self.lifecycle {
-            GameKernelLifecycleSnapshotV7::Active(state) => state.active_run.as_ref()
-                .map(|run| &run.control),
+            GameKernelLifecycleSnapshotV7::Active(state) => {
+                state.active_run.as_ref().map(|run| &run.control)
+            }
             _ => None,
         };
         for repeat in &self.input_router.repeats {
             if !logical_owners.insert((repeat.seat, repeat.button, repeat.menu_instance_id))
                 || self.input_router.focus != er_types::InputFocus::Game
                 || navigation_button_v7(&repeat.source) != Some(repeat.button)
-                || !active_control.is_some_and(|control| control.actionable
-                    && control.menu.as_ref().is_some_and(|menu| menu.instance_id == repeat.menu_instance_id))
-                || self.pending_presentations.iter().any(|pending| {
-                    pending.blocking == PresentationBlockingPolicy::BlocksHumanInput
+                || !active_control.is_some_and(|control| {
+                    control.actionable
+                        && control
+                            .menu
+                            .as_ref()
+                            .is_some_and(|menu| menu.instance_id == repeat.menu_instance_id)
                 })
-                || !self.input_router.locks.iter().any(|lock| lock.seat == repeat.seat
-                    && lock.button == repeat.button && lock.menu_instance_id == repeat.menu_instance_id)
+                || self
+                    .pending_presentations
+                    .iter()
+                    .any(|pending| pending.blocking == PresentationBlockingPolicy::BlocksHumanInput)
+                || !self.input_router.locks.iter().any(|lock| {
+                    lock.seat == repeat.seat
+                        && lock.button == repeat.button
+                        && lock.menu_instance_id == repeat.menu_instance_id
+                })
                 || !self.scheduler.timers.iter().any(|timer| {
                     timer.registration.timer_id == repeat.timer_id
                         && timer.registration.endpoint == repeat.seat

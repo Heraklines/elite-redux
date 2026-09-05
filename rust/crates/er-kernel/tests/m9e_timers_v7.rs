@@ -43,8 +43,14 @@ fn press(kernel: &mut GameKernelV7, code: PhysicalKey) -> TestResult<GameKernelS
 }
 
 fn selected(kernel: &GameKernelV7) -> &str {
-    kernel.current_control().expect("current control").menu.as_ref().expect("current menu")
-        .selected_option_id.as_str()
+    kernel
+        .current_control()
+        .expect("current control")
+        .menu
+        .as_ref()
+        .expect("current menu")
+        .selected_option_id
+        .as_str()
 }
 
 fn create_checkpoint() -> TestResult<Checkpoint> {
@@ -81,12 +87,22 @@ fn create_checkpoint() -> TestResult<Checkpoint> {
         },
         None,
     )?;
-    assert_eq!(kernel.current_control().expect("title control").kind, GameControlKindV2::Title);
+    assert_eq!(
+        kernel.current_control().expect("title control").kind,
+        GameControlKindV2::Title
+    );
     for _ in 0..3 {
         press(&mut kernel, PhysicalKey::Space)?;
     }
-    let bound = kernel.current_control().expect("starter control").menu.as_ref()
-        .expect("starter menu").options.len() + 1;
+    let bound = kernel
+        .current_control()
+        .expect("starter control")
+        .menu
+        .as_ref()
+        .expect("starter menu")
+        .options
+        .len()
+        + 1;
     for _ in 0..bound {
         if selected(&kernel) == "bootstrap/starter/confirm" {
             break;
@@ -101,7 +117,10 @@ fn create_checkpoint() -> TestResult<Checkpoint> {
     for presentation in pending {
         kernel.settle_presentation(presentation.event_id)?;
     }
-    assert_eq!(kernel.current_control().expect("battle control").kind, GameControlKindV2::BattleCommand);
+    assert_eq!(
+        kernel.current_control().expect("battle control").kind,
+        GameControlKindV2::BattleCommand
+    );
     assert_eq!(selected(&kernel), "battle/command/fight");
     let snapshot = kernel.snapshot()?;
     assert!(snapshot.input_router.repeats.is_empty());
@@ -111,13 +130,18 @@ fn create_checkpoint() -> TestResult<Checkpoint> {
 
 fn checkpoint() -> TestResult<&'static Checkpoint> {
     static CHECKPOINT: OnceLock<Result<Checkpoint, String>> = OnceLock::new();
-    CHECKPOINT.get_or_init(|| create_checkpoint().map_err(|error| error.to_string()))
-        .as_ref().map_err(|error| error.clone().into())
+    CHECKPOINT
+        .get_or_init(|| create_checkpoint().map_err(|error| error.to_string()))
+        .as_ref()
+        .map_err(|error| error.clone().into())
 }
 
 fn restore(snapshot: CoreGameKernelSnapshotV7) -> TestResult<GameKernelV7> {
     Ok(GameKernelV7::from_snapshot(
-        snapshot, seat(), GameKernelRoleV7::Authority, checkpoint()?.0.clone(),
+        snapshot,
+        seat(),
+        GameKernelRoleV7::Authority,
+        checkpoint()?.0.clone(),
     )?)
 }
 
@@ -126,11 +150,16 @@ fn active() -> TestResult<GameKernelV7> {
 }
 
 fn cursor_effects(step: &GameKernelStepV7) -> Vec<&str> {
-    step.effects.iter().filter_map(|effect| match effect {
-        GameKernelEffectV7::UiChanged(control) => control.menu.as_ref()
-            .map(|menu| menu.selected_option_id.as_str()),
-        _ => None,
-    }).collect()
+    step.effects
+        .iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::UiChanged(control) => control
+                .menu
+                .as_ref()
+                .map(|menu| menu.selected_option_id.as_str()),
+            _ => None,
+        })
+        .collect()
 }
 
 #[test]
@@ -142,7 +171,10 @@ fn held_navigation_repeats_at_250ms_with_real_cursor_effects() -> TestResult {
     assert_eq!(before.input_router.repeats.len(), 1);
     assert!(kernel.advance_time(safe(249))?.effects.is_empty());
     assert_eq!(selected(&kernel), "battle/command/party");
-    assert_eq!(kernel.snapshot()?.scheduler.timers[0].remaining_active_ms, safe(1));
+    assert_eq!(
+        kernel.snapshot()?.scheduler.timers[0].remaining_active_ms,
+        safe(1)
+    );
     let first = kernel.advance_time(safe(1))?;
     assert_eq!(first.internal_events, [GameInternalEventKindV2::TimerFired]);
     assert_eq!(cursor_effects(&first), ["battle/command/fight"]);
@@ -151,8 +183,14 @@ fn held_navigation_repeats_at_250ms_with_real_cursor_effects() -> TestResult {
     assert_eq!(cursor_effects(&second), ["battle/command/party"]);
     assert_eq!(selected(&kernel), "battle/command/party");
     let after = kernel.snapshot()?;
-    assert_ne!(before.input_router.repeats[0].timer_id, after.input_router.repeats[0].timer_id);
-    assert_eq!(after.input_router.repeats[0].timer_id, after.scheduler.timers[0].registration.timer_id);
+    assert_ne!(
+        before.input_router.repeats[0].timer_id,
+        after.input_router.repeats[0].timer_id
+    );
+    assert_eq!(
+        after.input_router.repeats[0].timer_id,
+        after.scheduler.timers[0].registration.timer_id
+    );
     assert_eq!(after.scheduler.timers[0].remaining_active_ms, safe(250));
     Ok(())
 }
@@ -172,11 +210,21 @@ fn snapshot_resume_and_time_chunking_preserve_ordered_consequences() -> TestResu
         aggregate.internal_events.extend(chunk.internal_events);
     }
     assert_eq!(step, aggregate);
-    assert_eq!(cursor_effects(&step), ["battle/command/fight", "battle/command/party", "battle/command/fight"]);
+    assert_eq!(
+        cursor_effects(&step),
+        [
+            "battle/command/fight",
+            "battle/command/party",
+            "battle/command/fight"
+        ]
+    );
     let expected = whole.snapshot()?;
     let mut actual = resumed.snapshot()?;
     // Replay sequence counts external requests, so three chunks add two requests.
-    assert_eq!(actual.replay_sequence.get(), expected.replay_sequence.get() + 2);
+    assert_eq!(
+        actual.replay_sequence.get(),
+        expected.replay_sequence.get() + 2
+    );
     actual.replay_sequence = expected.replay_sequence;
     assert_eq!(actual, expected);
     let mut same_trace = restore(checkpoint)?;
@@ -188,7 +236,9 @@ fn snapshot_resume_and_time_chunking_preserve_ordered_consequences() -> TestResu
 #[test]
 fn release_blur_text_focus_and_duplicate_sources_cancel_or_suppress_repeats() -> TestResult {
     for release in [
-        RawInputEvent::KeyUp { code: PhysicalKey::ArrowDown },
+        RawInputEvent::KeyUp {
+            code: PhysicalKey::ArrowDown,
+        },
         RawInputEvent::WindowBlurred,
         RawInputEvent::FocusChanged(InputFocus::TextEntry),
     ] {
@@ -202,14 +252,24 @@ fn release_blur_text_focus_and_duplicate_sources_cancel_or_suppress_repeats() ->
     }
     let mut kernel = active()?;
     kernel.raw_input(key_down(PhysicalKey::ArrowDown))?;
-    assert!(kernel.raw_input(RawInputEvent::GamepadDown { button: 13 })?.effects.is_empty());
+    assert!(
+        kernel
+            .raw_input(RawInputEvent::GamepadDown { button: 13 })?
+            .effects
+            .is_empty()
+    );
     assert_eq!(kernel.snapshot()?.input_router.repeats.len(), 1);
-    kernel.raw_input(RawInputEvent::KeyUp { code: PhysicalKey::ArrowDown })?;
+    kernel.raw_input(RawInputEvent::KeyUp {
+        code: PhysicalKey::ArrowDown,
+    })?;
     assert!(kernel.advance_time(safe(500))?.effects.is_empty());
     kernel.raw_input(RawInputEvent::GamepadUp { button: 13 })?;
     kernel.raw_input(RawInputEvent::GamepadDown { button: 13 })?;
     assert_eq!(selected(&kernel), "battle/command/fight");
-    assert_eq!(cursor_effects(&kernel.advance_time(safe(250))?), ["battle/command/party"]);
+    assert_eq!(
+        cursor_effects(&kernel.advance_time(safe(250))?),
+        ["battle/command/party"]
+    );
     kernel.raw_input(RawInputEvent::GamepadUp { button: 13 })?;
     assert!(kernel.snapshot()?.scheduler.timers.is_empty());
     Ok(())
@@ -239,7 +299,10 @@ fn menu_transition_retires_repeat_and_stale_snapshot_ownership_is_rejected() -> 
     assert!(restore(duplicate).is_err());
     press(&mut kernel, PhysicalKey::ArrowUp)?;
     press(&mut kernel, PhysicalKey::Space)?;
-    assert_eq!(kernel.current_control().expect("move control").kind, GameControlKindV2::BattleMove);
+    assert_eq!(
+        kernel.current_control().expect("move control").kind,
+        GameControlKindV2::BattleMove
+    );
     assert!(kernel.snapshot()?.input_router.repeats.is_empty());
     assert!(kernel.snapshot()?.scheduler.timers.is_empty());
     let control = kernel.current_control().cloned();
@@ -255,7 +318,8 @@ fn pause_reasons_preserve_remaining_delay_until_last_reason_is_removed() -> Test
     kernel.advance_time(safe(100))?;
     let mut snapshot = kernel.snapshot()?;
     snapshot.scheduler.pauses.push(TimeClassPauseSnapshotV2 {
-        endpoint: seat(), time_class: TimeClass::HumanInput,
+        endpoint: seat(),
+        time_class: TimeClass::HumanInput,
         reasons: vec!["modal".to_owned(), "suspend".to_owned()],
     });
     let mut paused = restore(snapshot)?;
@@ -269,7 +333,10 @@ fn pause_reasons_preserve_remaining_delay_until_last_reason_is_removed() -> Test
     assert_eq!(snapshot.scheduler.timers[0].remaining_active_ms, safe(150));
     snapshot.scheduler.pauses.clear();
     let mut resumed = restore(snapshot)?;
-    assert_eq!(cursor_effects(&resumed.advance_time(safe(150))?), ["battle/command/fight"]);
+    assert_eq!(
+        cursor_effects(&resumed.advance_time(safe(150))?),
+        ["battle/command/fight"]
+    );
     Ok(())
 }
 
@@ -280,18 +347,43 @@ fn unequal_and_tied_deadlines_dispatch_in_chronological_timer_order() -> TestRes
         kernel.raw_input(key_down(PhysicalKey::ArrowDown))?;
         kernel.advance_time(safe(gap))?;
         kernel.raw_input(key_down(PhysicalKey::ArrowUp))?;
-        let next_id = kernel.snapshot()?.scheduler.next_timer_id.expect("fresh allocator").get();
+        let next_id = kernel
+            .snapshot()?
+            .scheduler
+            .next_timer_id
+            .expect("fresh allocator")
+            .get();
         let step = kernel.advance_time(safe(250))?;
-        assert_eq!(cursor_effects(&step), ["battle/command/party", "battle/command/fight"]);
-        assert_eq!(step.internal_events, [GameInternalEventKindV2::TimerFired, GameInternalEventKindV2::TimerFired]);
+        assert_eq!(
+            cursor_effects(&step),
+            ["battle/command/party", "battle/command/fight"]
+        );
+        assert_eq!(
+            step.internal_events,
+            [
+                GameInternalEventKindV2::TimerFired,
+                GameInternalEventKindV2::TimerFired
+            ]
+        );
         let snapshot = kernel.snapshot()?;
-        let down = snapshot.input_router.repeats.iter()
-            .find(|repeat| repeat.button == GameButton::Down).expect("Down repeat");
-        let up = snapshot.input_router.repeats.iter()
-            .find(|repeat| repeat.button == GameButton::Up).expect("Up repeat");
+        let down = snapshot
+            .input_router
+            .repeats
+            .iter()
+            .find(|repeat| repeat.button == GameButton::Down)
+            .expect("Down repeat");
+        let up = snapshot
+            .input_router
+            .repeats
+            .iter()
+            .find(|repeat| repeat.button == GameButton::Up)
+            .expect("Up repeat");
         assert_eq!(down.timer_id, TimerId::new(safe(next_id)));
         assert_eq!(up.timer_id, TimerId::new(safe(next_id + 1)));
-        assert_eq!(snapshot.scheduler.timers[0].remaining_active_ms, safe(250 - gap));
+        assert_eq!(
+            snapshot.scheduler.timers[0].remaining_active_ms,
+            safe(250 - gap)
+        );
         assert_eq!(snapshot.scheduler.timers[1].remaining_active_ms, safe(250));
     }
     Ok(())
@@ -302,7 +394,10 @@ fn exhausted_allocator_and_consequence_budget_fail_atomically() -> TestResult {
     let mut exhausted = checkpoint()?.1.clone();
     exhausted.scheduler.next_timer_id = None;
     let mut kernel = restore(exhausted.clone())?;
-    assert_eq!(kernel.raw_input(key_down(PhysicalKey::ArrowDown)), Err(GameKernelV7Error::TimerAllocationExhausted));
+    assert_eq!(
+        kernel.raw_input(key_down(PhysicalKey::ArrowDown)),
+        Err(GameKernelV7Error::TimerAllocationExhausted)
+    );
     assert_eq!(kernel.snapshot()?, exhausted);
 
     let mut kernel = active()?;
@@ -310,17 +405,26 @@ fn exhausted_allocator_and_consequence_budget_fail_atomically() -> TestResult {
     let mut exhausted = kernel.snapshot()?;
     exhausted.scheduler.next_timer_id = None;
     let mut resumed = restore(exhausted.clone())?;
-    assert_eq!(resumed.advance_time(safe(250)), Err(GameKernelV7Error::TimerAllocationExhausted));
+    assert_eq!(
+        resumed.advance_time(safe(250)),
+        Err(GameKernelV7Error::TimerAllocationExhausted)
+    );
     assert_eq!(resumed.snapshot()?, exhausted);
 
     let before = kernel.snapshot()?;
-    assert!(matches!(kernel.advance_time(safe(256250)), Err(GameKernelV7Error::TimerBudgetExceeded { limit: 1024, .. })));
+    assert!(matches!(
+        kernel.advance_time(safe(256250)),
+        Err(GameKernelV7Error::TimerBudgetExceeded { limit: 1024, .. })
+    ));
     assert_eq!(kernel.snapshot()?, before);
     let allowed = kernel.advance_time(safe(256000))?;
     assert_eq!(allowed.internal_events.len(), 1024);
     assert_eq!(cursor_effects(&allowed).len(), 1024);
     assert_eq!(selected(&kernel), "battle/command/party");
-    assert_eq!(cursor_effects(&kernel.advance_time(safe(250))?), ["battle/command/fight"]);
+    assert_eq!(
+        cursor_effects(&kernel.advance_time(safe(250))?),
+        ["battle/command/fight"]
+    );
     Ok(())
 }
 
@@ -334,12 +438,18 @@ fn invalid_directional_keyboard_and_gamepad_presses_preserve_full_snapshot() -> 
     ] {
         let mut kernel = active()?;
         let before = kernel.snapshot()?;
-        assert!(matches!(kernel.raw_input(input), Err(GameKernelV7Error::Runtime(_))));
+        assert!(matches!(
+            kernel.raw_input(input),
+            Err(GameKernelV7Error::Runtime(_))
+        ));
         assert_eq!(kernel.snapshot()?, before);
         assert!(kernel.advance_time(safe(500))?.effects.is_empty());
         kernel.raw_input(key_down(PhysicalKey::ArrowDown))?;
         assert_eq!(selected(&kernel), "battle/command/party");
-        assert_eq!(cursor_effects(&kernel.advance_time(safe(250))?), ["battle/command/fight"]);
+        assert_eq!(
+            cursor_effects(&kernel.advance_time(safe(250))?),
+            ["battle/command/fight"]
+        );
     }
     Ok(())
 }
@@ -360,7 +470,12 @@ fn unsupported_later_timer_rolls_back_earlier_real_navigation() -> TestResult {
     snapshot.scheduler.timers.push(unknown);
     snapshot.scheduler.next_timer_id = Some(safe(101));
     let mut restored = restore(snapshot.clone())?;
-    assert_eq!(restored.advance_time(safe(500)), Err(GameKernelV7Error::UnsupportedTimerPurpose { timer_id: TimerId::new(safe(100)) }));
+    assert_eq!(
+        restored.advance_time(safe(500)),
+        Err(GameKernelV7Error::UnsupportedTimerPurpose {
+            timer_id: TimerId::new(safe(100))
+        })
+    );
     assert_eq!(restored.snapshot()?, snapshot);
     let step = restored.advance_time(safe(250))?;
     assert_eq!(cursor_effects(&step), ["battle/command/fight"]);

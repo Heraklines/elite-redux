@@ -104,9 +104,9 @@ pub fn replay_m9e_eventwise_native(
                     .map_err(|error| error.to_string())?;
                 GameKernelStepV7::default()
             }
-            M9EParityEventV2::AdvanceTime { milliseconds } => {
-                kernel.advance_time(milliseconds).map_err(|error| error.to_string())?
-            }
+            M9EParityEventV2::AdvanceTime { milliseconds } => kernel
+                .advance_time(milliseconds)
+                .map_err(|error| error.to_string())?,
         };
         let snapshot = kernel.snapshot().map_err(|error| error.to_string())?;
         observations.push(M9EParityObservationV1 {

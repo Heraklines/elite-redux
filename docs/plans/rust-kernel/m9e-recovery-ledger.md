@@ -358,3 +358,31 @@ the next report uses minimal diff context and bounded complete-file patches,
 with omitted bytes recorded. No local formatter or test has been run.
 The current-supervisor CI mapping is prepared but inert until its separate
 source cut is committed. Baseline remains the last fully green `c2c3ca6`.
+
+### B1 native, Wasm and browser pass; formatting-only correction
+
+Candidate `d1e6da9d6118c57a42e9c4bec126f606cfdc5ee2`, run `33932418436`,
+executed all 561 selected native tests: 561 passed, zero failures/skips. This
+includes all nine timer regressions and the five required current kernel targets.
+Both exact Wasm tests passed, both Chromium journeys passed, and the typed-effect
+test passed. Worker, lab and browser Clippy passed. The only failure was format;
+the mutation phase correctly did not run while formatting was still failing.
+
+Native/Wasm held-timer report digest:
+`9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e`.
+Harness SHA-256: `fee9125c8ded700dcf70936bbb34a74da7216f34ec6ea6e801d2b00a04d17bd8`.
+Selected native IDs SHA-256:
+`5e83fa16946c157b392746ed6175ed04fa9d847c30126d406c84651260b9ff8e`.
+Inspected/downloaded compact artifact: 12,516 bytes. Browser assets and full
+diagnostics stayed remote. Timings: build 112,106 ms, native browser-host target
+335,460 ms, native timer target 3,071 ms, Wasm eventwise 97,242 ms, browser build
+310,695 ms and Chromium journeys 39,163 ms.
+
+The remote format patch totaled 38,959 bytes. The compact patch carried 29,677
+bytes for four complete files. Its bounded diagnostic excerpt also contained
+all 13 formatting blocks for the omitted Wasm test file. Those exact remote
+edits were matched uniquely and applied as text; their resulting Git patch is
+9,282 bytes, exactly the reported omitted byte count. No local formatter ran.
+Only these five formatting changes and this ledger are staged for the next
+candidate. The independent supervisor, normal-command, and B2 presentation
+patches remain uncommitted and are excluded from B1 evidence.
