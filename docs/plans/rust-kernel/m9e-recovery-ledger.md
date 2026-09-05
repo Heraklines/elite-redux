@@ -908,3 +908,79 @@ formatting patch for the three capsule/accounting Rust files. Zero product tests
 selected/executed. Compact artifact 9,945 compressed bytes was inspected and
 downloaded; 15,173-byte diagnostics remain remote. Applied the complete patch;
 baseline remains qualified `9459b9c`. No execution or speedup claim yet.
+
+### Capsule native progress preserved at the outer job limit
+
+Candidate `c3c7d92ec8543cfbe2210a58ac173f355e54ae18`, run `33949885217`,
+was cancelled at the 35-minute job limit (job 101262528392, started
+2026-09-05 06:28:01 UTC). The new atomic progress checkpoint worked: its
+660-byte compressed artifact reports 72 selected, 52 executed/passed, zero
+failed/skipped, full inventory validated, and unfinished native target
+`er-web:m9e_host_v2`. No full capsule/native/platform qualification is claimed.
+The baseline remains qualified `9459b9c`.
+
+Harness SHA `841e42644fed800ae344a5cf0223884cebc318edad90d86590922771f8802ed1`;
+selected-ID SHA `bb197580c4145dc841726ce7a9f7619d47f0cc885c749b13ad1b7af400bfecdf`.
+Lock SHA `f86e807a75f847ce12cd5459b98e9f1a75f6aac638ef0f9d05e518f8ec1e05db`.
+Content manifest and pinned oracle remain unchanged. The named 39,649-byte
+compressed diagnostics artifact remains remote. Inspected the 41,200-byte job
+log size and retrieved only explicit HTTP206 ranges 33008-41199 and 24816-33007,
+8,192 bytes each, to identify phase timings. No Desktop credentials were read.
+
+Phase starts establish successful completed targets: CLI reload approximately
+589.607 seconds; two actual CLI capsule tests 311.728 seconds; all nine core
+capsule tests 9.888 seconds. The host target began 06:53:16.033 and was interrupted
+at 07:03:14.175, about 598 seconds later, before its 600-second target limit.
+Native build took about 104.483 seconds; all required native lint completed
+before test execution. These are job timings, not a controlled speedup claim.
+
+Moving only platform checks to another job cannot fix this observed native
+interruption. A source-only feedback proposal now separates two disjoint native
+execution groups, retaining full compilation/discovery/lint and identical global
+inventory in each. The aggregate must require exact union and all platform
+witnesses at the same candidate identities. Repeating the approximately
+104-second focused compilation is intentionally simpler than transporting all
+large embedded-path native test binaries when execution dominates. Individual
+600-second target bounds and 35-minute job bounds remain unchanged. The host
+may still expose an actual target timeout and must not be marked passed.
+
+The source-only batch tree remains in `.git/m9e-batch-tree.txt` (base c3c7d92,
+tree 27b44d4bed30b20e1fb4c6625dd1c61e31b1dacd, patch 133,778 bytes).
+The independently reviewed private-control repair is separately preserved in
+`.git/m9e-private-control-tree.txt` (base c3c7d92, tree
+1f0db68438d730e760c09664867fd4b8dc2a319b, patch 50,542 bytes). Its seven files
+include explicit canonical/return ownership, repeated Fight/Party and snapshot
+witnesses, and a freshly consistent boosted Wasm fixture. It still requires
+its own gate and evidence for the frozen parity digest; no guessed golden edit.
+Neither future product cut is in the normal index or current remote candidate.
+
+An isolated measurement witness at `.git/m9e-current-cost-probe.rs` covers real
+Title/Mode/Starter/active checkpoints, decode/preparation, copies, validation,
+observation, encoding/digest and separate effectful application/recording phases.
+Setup and semantic replay checks are outside timing; one warmup and three samples,
+no thresholds or allocator claims, output below 8 KiB. It is not integrated or run.
+
+Source review of the interrupted host target found 2,101 read-only Title snapshot
+requests in `browser_host_survives_request_window`, with full serialization and
+response deserialization each time. The product retry cache is count-bounded to
+2,048 entries and responses individually to 32 MiB, but has no small aggregate
+byte budget. Test setup reuse is not a product cache-memory fix. A separate
+bounded byte-retention policy and actual large-response/eviction coverage remain
+necessary before claiming production memory reliability. Six other host tests
+repeat the full starter journey only as setup; an actual-checkpoint test fixture
+is being prepared without removing dedicated natural/capture/parity witnesses.
+
+The next candidate applies the reviewed two-native-lane/platform/aggregate split
+and the host test-only setup repair. The gate now has 99 source-declared selftests
+(85 existing, 14 new); all remain subject to remote preflight. Required execution
+and per-target limits are unchanged. Phase manifests carry the exact global
+inventory/partition and selected mutant/bridge ownership; compact results retain
+counts, hashes and timings while full proofs/logs remain remote.
+
+The host target keeps all 14 test IDs and 2,101 accepted request-window snapshots,
+adds a real Title snapshot equality check, exact recent retry and old-ID rejection,
+and initializes seven setup-only callers from an immutable checkpoint reached by
+real current-session raw input. Dedicated full natural browser/current parity and
+capsule/import witnesses remain. Shared prepared content and actual snapshot
+setup avoid repeated construction; no product cache/memory or speedup claim.
+Future batch and private-control product files remain unstaged.

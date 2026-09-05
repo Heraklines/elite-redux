@@ -3,7 +3,7 @@
   "baseline": "9459b9cbce2eebc7cc4800569160d6d2eedc6856",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33945799459",
   "readiness_packages": ["er-canonical"],
-  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
+  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
   "shared_packages": ["er-kernel", "er-game", "er-state", "er-protocol", "er-types"],
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],

@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -40,6 +41,9 @@ class FeedbackTests(unittest.TestCase):
             "M9E_BASE_SHA": PREVIOUS_PUSH,
             "GITHUB_SHA": CANDIDATE,
             "GITHUB_WORKFLOW_SHA": CANDIDATE,
+            # The native workflow runs these mocks before the real phase. Keep
+            # historical harness tests independent of the invoking phase env.
+            "M9E_PHASE": "combined",
         })
         environment.start()
         self.addCleanup(environment.stop)
@@ -2079,6 +2083,290 @@ class FeedbackTests(unittest.TestCase):
         self.assert_evidence_hashes(summary)
         selected = summary["selected_test_ids"]
         self.assertEqual(selected["sha256"], hashlib.sha256((self.full / selected["file"]).read_bytes()).hexdigest())
+
+
+    def test_native_ambient_phase_cannot_escape_into_mocked_preflight(self):
+        ambient = {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "b", "M9E_PHASE_DIR": "/real-transfer",
+                   "M9E_NATIVE_MANIFEST_SHA256": "a" * 64, "M9E_PLATFORM_RESULT": "success", "GITHUB_OUTPUT": "/real-output"}
+        with patch.dict(os.environ, ambient):
+            child = self.feedback.preflight_environment()
+            for key in ambient:
+                self.assertNotIn(key, child)
+                self.assertEqual(os.environ[key], ambient[key])
+            self.assertEqual(child["M9E_REPORT_DIR"], os.environ["M9E_REPORT_DIR"])
+            self.assertEqual(child["GITHUB_SHA"], CANDIDATE)
+
+
+class PhaseTransferTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-phase-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        spec = importlib.util.spec_from_file_location("m9e_phase_under_test", HARNESS.with_name("m9e_phases.py"))
+        self.phases = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.phases)
+        self.identity = {"product_sha": CANDIDATE, "workflow_sha": CANDIDATE, "run_id": "42", "run_attempt": "1",
+                         "files": {key: "a" * 64 for key in self.phases.IDENTITY_FILES},
+                         "toolchain": "rustc pinned", "target": "x86_64-unknown-linux-gnu",
+                         "profile": "test", "features": "default"}
+        self.binary = b"exact candidate executable"
+        self.native = {"version": 1, "phase": "native", "status": "passed", "qualification": "pending",
+                       "identity": self.identity,
+                       "plan": {"requires_wasm": True, "requires_browser": True, "requires_cli_executable": True,
+                                "required_native_targets": {"er-repro": ["m9e_current_repro"]}},
+                       "tests": {"selected": 13, "executed": 11, "passed": 11, "failed": 0, "skipped": 0},
+                       "selected_inventory_validated": True, "selected_test_ids_sha256": "e" * 64,
+                       "required_native_target_counts": {"er-repro:m9e_current_repro": 9},
+                       "native_timer_parity_digest": "d" * 64,
+                       "cli": {"file": "er-cli", "bytes": len(self.binary), "sha256": self.phases.sha(self.binary),
+                               "source_sha": CANDIDATE, "target": self.identity["target"], "profile": "test",
+                               "cargo_package_id": "path+file:///candidate/rust/crates/er-cli#0.1.0",
+                               "cargo_profile": {"test": False}, "manifest_path": "rust/crates/er-cli/Cargo.toml"}}
+        self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
+        self.native["inventory"] = [
+            {"crate": "er-cli", "target": "m9e_current_repro", "ids": ["cli_one", "cli_two"], "historical_excluded_ids": []},
+            {"crate": "er-repro", "target": "m9e_current_repro", "ids": [f"core_{index}" for index in range(9)], "historical_excluded_ids": []},
+            {"crate": "er-wasm", "target": "m9e_parity", "ids": ["native_raw", "native_timer"], "historical_excluded_ids": []},
+        ]
+        self.native["inventory_sha256"] = self.phases.sha(self.phases.encoded(self.native["inventory"]))
+        self.native["lane"] = "a"
+        self.native["assigned_targets"] = self.phases.partition(self.native["inventory"])["a"]
+        self.native["completed_targets"] = self.native["assigned_targets"]
+        self.other = copy.deepcopy(self.native)
+        self.other["lane"] = "b"
+        self.other["assigned_targets"] = self.phases.partition(self.native["inventory"])["b"]
+        self.other["completed_targets"] = self.other["assigned_targets"]
+        self.other["tests"].update({"executed": 2, "passed": 2})
+        self.other["native_timer_parity_digest"] = None
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform = {"version": 1, "phase": "platform", "status": "passed", "qualification": "pending",
+                         "identity": self.identity, "native_manifest_sha256": self.native_hash,
+                         "plan_sha256": self.native["plan_sha256"],
+                         "wasm_tests": {"expected": 2, "passed": 2, "failed": 0, "skipped": 0,
+                                        "selected_test_ids": sorted(self.phases.WASM_IDS),
+                                        "timer_parity_digest": "d" * 64, "native_timer_parity_digest": "d" * 64},
+                         "browser_tests": {"chromium": {"expected": 2, "passed": 2, "failed": 0, "skipped": 0,
+                                                        "selected_test_ids": sorted(self.phases.BROWSER_IDS)},
+                                           "typed_effects": {"expected": 1, "passed": 1, "failed": 0, "skipped": 0}},
+                         "browser_assets": {"manifest_sha256": "f" * 64},
+                         "browser_current_repro_bridge": {"positive_replay": True, "time_omission_rejected": True,
+                                                          "source_sha": CANDIDATE,
+                                                          "executable_sha256": self.native["cli"]["sha256"],
+                                                          "base_position": 9, "final_position": 12, "processed_attempts": 3,
+                                                          "negative_divergence_position": 10, "snapshot_digest": "blake3-v1:" + "a" * 64}}
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+
+    def test_phase_identity_rejects_source_build_and_run_mismatches(self):
+        for key in ("product_sha", "workflow_sha", "run_id", "run_attempt", "profile", "target", "toolchain"):
+            with self.subTest(key=key):
+                proof = copy.deepcopy(self.native)
+                proof["identity"][key] = "different"
+                with self.assertRaisesRegex(RuntimeError, "identity"):
+                    self.phases.validate_native(proof, self.identity)
+        proof = copy.deepcopy(self.native)
+        proof["identity"]["files"]["lock"] = "0" * 64
+        with self.assertRaisesRegex(RuntimeError, "identity"):
+            self.phases.validate_native(proof, self.identity)
+        proof = copy.deepcopy(self.platform)
+        proof["plan_sha256"] = "0" * 64
+        with self.assertRaisesRegex(RuntimeError, "identity"):
+            self.phases.validate_platform(proof, self.native, self.native_hash)
+
+    def test_platform_requires_exact_parity_and_every_browser_witness(self):
+        for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge"):
+            with self.subTest(omitted=key):
+                proof = copy.deepcopy(self.platform)
+                del proof[key]
+                with self.assertRaises(RuntimeError):
+                    self.phases.validate_platform(proof, self.native, self.native_hash)
+        for key, value in (("timer_parity_digest", "0" * 64), ("selected_test_ids", ["wrong", "also_wrong"]),
+                           ("passed", 1), ("skipped", 1)):
+            with self.subTest(wasm=key):
+                proof = copy.deepcopy(self.platform)
+                proof["wasm_tests"][key] = value
+                with self.assertRaisesRegex(RuntimeError, "Wasm"):
+                    self.phases.validate_platform(proof, self.native, self.native_hash)
+        proof = copy.deepcopy(self.platform)
+        proof["browser_current_repro_bridge"]["executable_sha256"] = "0" * 64
+        with self.assertRaisesRegex(RuntimeError, "bridge"):
+            self.phases.validate_platform(proof, self.native, self.native_hash)
+
+    def test_native_requires_full_inventory_and_selected_mutant_restoration(self):
+        proof = copy.deepcopy(self.native)
+        proof["tests"]["passed"] -= 1
+        with self.assertRaisesRegex(RuntimeError, "inventory"):
+            self.phases.validate_native(proof, self.identity)
+        proof = copy.deepcopy(self.native)
+        proof["plan"]["timer_mutant"] = {"test": "core_0", "package": "er-repro", "target": "m9e_current_repro",
+                                           "source": "rust/crates/er-repro/src/current.rs"}
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        with self.assertRaisesRegex(RuntimeError, "mutant"):
+            self.phases.validate_native(proof, self.identity)
+        proof["timer_mutant"] = {"status": "detected", "original_sha256": "a" * 64, "restored_sha256": "b" * 64,
+                                 "source": "rust/crates/er-repro/src/current.rs", "test": "core_0", "target": "m9e_current_repro",
+                                 "tests": {"executed": 1, "passed": 0, "failed": 1, "skipped": 0}}
+        with self.assertRaisesRegex(RuntimeError, "mutant"):
+            self.phases.validate_native(proof, self.identity)
+        proof["timer_mutant"]["restored_sha256"] = "a" * 64
+        self.phases.validate_native(proof, self.identity)
+        proof["timer_mutant"]["test"] = "different_behavior"
+        with self.assertRaisesRegex(RuntimeError, "mutant"):
+            self.phases.validate_native(proof, self.identity)
+
+    def test_transfer_rejects_manifest_path_size_hash_and_extra_files(self):
+        for key, value in (("file", "../er-cli"), ("bytes", self.phases.CLI_LIMIT + 1),
+                           ("cargo_profile", {"test": True}), ("source_sha", BASE)):
+            with self.subTest(metadata=key):
+                proof = copy.deepcopy(self.native)
+                proof["cli"][key] = value
+                with self.assertRaisesRegex(RuntimeError, "metadata"):
+                    self.phases.validate_native(proof, self.identity)
+        directory = self.root / "cli"
+        directory.mkdir()
+        path = directory / "er-cli"
+        path.write_bytes(b"x" * len(self.binary))
+        with self.assertRaisesRegex(RuntimeError, "hash"):
+            self.phases.transfer_cli(self.native, directory)
+        path.write_bytes(self.binary)
+        (directory / "unexpected").write_bytes(b"not permitted")
+        with self.assertRaisesRegex(RuntimeError, "inventory"):
+            self.phases.transfer_cli(self.native, directory)
+        (directory / "unexpected").unlink()
+        result = self.phases.transfer_cli(self.native, directory)
+        self.assertEqual(result["sha256"], self.native["cli"]["sha256"])
+        self.assertEqual(Path(result["path"]), path.resolve())
+
+    def test_manifest_hash_and_byte_cap_are_enforced(self):
+        path = self.root / "proof/native-a.json"
+        with self.assertRaisesRegex(RuntimeError, "digest"):
+            self.phases.read_bounded(path, "0" * 64)
+        with self.assertRaisesRegex(RuntimeError, "64 KiB"):
+            self.phases.write_bounded(self.root / "large.json", {"payload": "x" * self.phases.MANIFEST_LIMIT})
+        path.write_bytes(b"x" * (self.phases.MANIFEST_LIMIT + 1))
+        with self.assertRaisesRegex(RuntimeError, "size"):
+            self.phases.read_bounded(path, self.native_hash)
+
+    def phase_environment(self):
+        return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",
+                                      "M9E_NATIVE_B_RESULT": "success", "M9E_NATIVE_B_MANIFEST_SHA256": self.other_hash,
+                                      "M9E_PLATFORM_RESULT": "success", "M9E_NATIVE_MANIFEST_SHA256": self.native_hash,
+                                      "M9E_PLATFORM_MANIFEST_SHA256": self.platform_hash})
+
+    def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
+        for status in ("", "failure", "skipped", "cancelled"):
+            with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):
+                with self.assertRaisesRegex(RuntimeError, "absent"):
+                    self.phases.aggregate(None)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            (self.root / "platform/platform.json").unlink()
+            with self.assertRaisesRegex(RuntimeError, "manifest"):
+                self.phases.aggregate(None)
+
+    def test_aggregate_accepts_only_complete_same_run_proofs(self):
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+        self.assertEqual(result["qualification"], "passed")
+        self.assertEqual(result["tests"], {"selected": 13, "executed": 13, "passed": 13, "failed": 0, "skipped": 0})
+        self.assertEqual(result["native_manifest_sha256"], self.native_hash)
+        self.assertEqual(result["platform_manifest_sha256"], self.platform_hash)
+
+    def test_platform_runs_existing_checks_with_only_verified_cli_binding(self):
+        directory = self.root / "cli"
+        directory.mkdir()
+        (directory / "er-cli").write_bytes(self.binary)
+        compact = self.root / "report/compact"
+        compact.mkdir(parents=True)
+        calls = []
+
+        def wasm_checks(plan, summary):
+            calls.append("wasm")
+            self.assertEqual(plan, self.native["plan"])
+            self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
+            summary["wasm_tests"] = self.platform["wasm_tests"]
+
+        def browser_checks(summary):
+            calls.append("browser")
+            binding = summary["cli_executable"]
+            self.assertEqual(self.phases.file_hash(Path(binding["path"])), self.native["cli"]["sha256"])
+            self.assertEqual(Path(binding["root"]), directory.resolve())
+            self.assertNotIn("worker_executable", summary)
+            for key in ("browser_tests", "browser_assets", "browser_current_repro_bridge"):
+                summary[key] = self.platform[key]
+
+        feedback = SimpleNamespace(COMPACT=compact, TIMINGS={}, wasm_checks=wasm_checks, browser_checks=browser_checks)
+        with self.phase_environment(), patch.dict(os.environ, {"GITHUB_OUTPUT": str(self.root / "output")}), \
+                patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.platform(feedback)
+        self.assertEqual(calls, ["wasm", "browser"])
+        self.assertEqual(result["qualification"], "pending")
+        self.assertEqual(result["status"], "passed")
+
+    def test_native_partition_is_crate_qualified_and_retains_zero_test_targets(self):
+        inventory = copy.deepcopy(self.native["inventory"])
+        inventory.extend([
+            {"crate": "er-web", "target": "m9e_host_v2", "ids": ["host"], "historical_excluded_ids": []},
+            {"crate": "er-cli", "target": "m9e_current_batch", "ids": ["batch"], "historical_excluded_ids": []},
+            {"crate": "er-other", "target": "m9e_host_v2", "ids": [], "historical_excluded_ids": []},
+        ])
+        assignment = self.phases.partition(inventory)
+        self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["b"])
+        self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
+        self.assertEqual(len(assignment["a"]) + len(assignment["b"]), len(inventory))
+        inventory.append(copy.deepcopy(inventory[0]))
+        with self.assertRaisesRegex(RuntimeError, "duplicated"):
+            self.phases.partition(inventory)
+
+    def test_native_partition_rejects_omission_overlap_and_unexecuted_target(self):
+        for key in ("assigned_targets", "completed_targets"):
+            for mode in ("omit", "duplicate", "wrong_lane"):
+                with self.subTest(key=key, mode=mode):
+                    proof = copy.deepcopy(self.other)
+                    if mode == "omit":
+                        proof[key] = []
+                    elif mode == "duplicate":
+                        proof[key] = proof[key] * 2
+                    else:
+                        proof[key] = self.native["assigned_targets"]
+                    with self.assertRaises(RuntimeError):
+                        self.phases.validate_native(proof, self.identity)
+
+    def test_aggregate_rejects_independently_valid_different_global_inventory(self):
+        proof = copy.deepcopy(self.other)
+        proof["inventory"][0]["ids"] = ["different_cli_one", "different_cli_two"]
+        proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        proof_hash = self.phases.write_bounded(self.root / "proof/native-b.json", proof)
+        with self.phase_environment(), patch.dict(os.environ, {"M9E_NATIVE_B_MANIFEST_SHA256": proof_hash}), \
+                patch.object(self.phases, "identity", return_value=self.identity):
+            with self.assertRaisesRegex(RuntimeError, "different global"):
+                self.phases.aggregate(None)
+
+    def test_native_empty_b_is_explicit_readiness_evidence(self):
+        proof = copy.deepcopy(self.other)
+        proof["plan"] = {"requires_wasm": False, "requires_browser": False, "requires_cli_executable": False}
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        proof["inventory"] = [{"crate": "er-canonical", "target": "er_canonical", "ids": ["canonical"], "historical_excluded_ids": []}]
+        proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        proof["assigned_targets"] = []
+        proof["completed_targets"] = []
+        proof["required_native_target_counts"] = {}
+        proof["tests"] = {"selected": 1, "executed": 0, "passed": 0, "failed": 0, "skipped": 0}
+        proof["cli"] = None
+        self.phases.validate_native(proof, self.identity)
+
+    def test_platform_bridge_requires_full_causal_payload(self):
+        for field, value in (("processed_attempts", 0), ("final_position", 13), ("negative_divergence_position", 12),
+                             ("base_position", True), ("snapshot_digest", "invalid")):
+            with self.subTest(field=field):
+                proof = copy.deepcopy(self.platform)
+                proof["browser_current_repro_bridge"][field] = value
+                with self.assertRaisesRegex(RuntimeError, "bridge"):
+                    self.phases.validate_platform(proof, self.native, self.native_hash)
+        proof = copy.deepcopy(self.platform)
+        del proof["browser_current_repro_bridge"]["snapshot_digest"]
+        with self.assertRaisesRegex(RuntimeError, "bridge"):
+            self.phases.validate_platform(proof, self.native, self.native_hash)
 
 
 if __name__ == "__main__":

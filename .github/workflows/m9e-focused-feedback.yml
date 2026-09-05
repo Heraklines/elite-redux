@@ -14,14 +14,207 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  focused:
+  native_a:
+    outputs:
+      manifest_sha256: ${{ steps.native.outputs.native_manifest_sha256 }}
+      has_cli: ${{ steps.native.outputs.has_cli }}
+      proof_artifact_id: ${{ steps.native-proof.outputs.artifact-id }}
+      cli_artifact_id: ${{ steps.native-cli.outputs.artifact-id }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    env:
+      M9E_NATIVE_LANE: a
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Restore dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Restore native test build
+        uses: actions/cache@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Complete native checks and evidence
+        id: native
+        env:
+          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
+          M9E_PHASE: native
+          M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
+        run: python3 scripts/ci/m9e_feedback.py
+      # Only successful complete native checks publish these single-file payloads.
+      # Producer checks raw bytes/count before upload (64 KiB proof, 128 MiB CLI).
+      - name: Bound native proof
+        id: native-proof
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-a-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m9e-phase/proof/native-a.json
+          if-no-files-found: error
+          retention-days: 2
+      - name: Bound native CLI
+        id: native-cli
+        if: success() && steps.native.outputs.has_cli == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-cli-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m9e-phase/cli/er-cli
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 2
+      - name: Compact result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-a-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Optional bounded source formatting repair
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-format-repair-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/format-repair.patch
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Full remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-a-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/m9e-feedback/full/
+            test-results/rust-browser/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve native compilation after failed checks
+        if: failure()
+        uses: actions/cache/save@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+
+  native_b:
+    outputs:
+      manifest_sha256: ${{ steps.native.outputs.native_manifest_sha256 }}
+      has_cli: ${{ steps.native.outputs.has_cli }}
+      proof_artifact_id: ${{ steps.native-proof.outputs.artifact-id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      M9E_NATIVE_LANE: b
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Restore dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Restore native test build
+        uses: actions/cache@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Complete native checks and evidence
+        id: native
+        env:
+          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
+          M9E_PHASE: native
+          M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
+        run: python3 scripts/ci/m9e_feedback.py
+      # Only successful complete native checks publish these single-file payloads.
+      # Producer checks raw bytes/count before upload (64 KiB proof, 128 MiB CLI).
+      - name: Bound native proof
+        id: native-proof
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-b-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m9e-phase/proof/native-b.json
+          if-no-files-found: error
+          retention-days: 2
+      - name: Compact result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-b-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Optional bounded source formatting repair
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-format-repair-b-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/format-repair.patch
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Full remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-b-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/m9e-feedback/full/
+            test-results/rust-browser/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve native compilation after failed checks
+        if: failure()
+        uses: actions/cache/save@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+
+  platform:
+    needs: native_a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      manifest_sha256: ${{ steps.platform.outputs.platform_manifest_sha256 }}
+      proof_artifact_id: ${{ steps.platform-proof.outputs.artifact-id }}
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
+      M9E_PHASE: platform
+      M9E_REPORT_DIR: ${{ runner.temp }}/m9e-platform-feedback
+      M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
+      M9E_NATIVE_MANIFEST_SHA256: ${{ needs.native_a.outputs.manifest_sha256 }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -81,33 +274,54 @@ jobs:
           key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
-      - name: Focused remote checks and evidence
+      # IDs come only from the successful producer in this run, never a branch cache.
+      - name: Require exact bounded producer artifact IDs
         env:
-          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
-        run: python3 scripts/ci/m9e_feedback.py
-      - name: Compact result
+          M9E_PROOF_ID: ${{ needs.native_a.outputs.proof_artifact_id }}
+          M9E_CLI_ID: ${{ needs.native_a.outputs.cli_artifact_id }}
+          M9E_HAS_CLI: ${{ needs.native_a.outputs.has_cli }}
+        run: |
+          [[ "$M9E_PROOF_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$M9E_NATIVE_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$M9E_HAS_CLI" == true || "$M9E_HAS_CLI" == false ]]
+          if [[ "$M9E_HAS_CLI" == true ]]; then [[ "$M9E_CLI_ID" =~ ^[1-9][0-9]*$ ]]; fi
+      - uses: actions/download-artifact@v7
+        with:
+          artifact-ids: ${{ needs.native_a.outputs.proof_artifact_id }}
+          path: ${{ runner.temp }}/m9e-phase/proof
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        if: needs.native_a.outputs.has_cli == 'true'
+        with:
+          artifact-ids: ${{ needs.native_a.outputs.cli_artifact_id }}
+          path: ${{ runner.temp }}/m9e-phase/cli
+          merge-multiple: true
+      - name: Exact platform checks and evidence
+        id: platform
+        run: python3 scripts/ci/m9e_phases.py
+      - name: Bound platform proof
+        id: platform-proof
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-platform-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m9e-phase/platform/platform.json
+          if-no-files-found: error
+          retention-days: 2
+      - name: Compact platform result
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-summary-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-feedback/compact/
+          name: m9e-platform-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-platform-feedback/compact/
           if-no-files-found: error
           retention-days: 14
-      - name: Optional bounded source formatting repair
+      - name: Full platform diagnostics
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-format-repair-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-feedback/format-repair.patch
-          if-no-files-found: ignore
-          retention-days: 14
-      - name: Full remote diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: m9e-diagnostics-${{ github.sha }}
+          name: m9e-platform-diagnostics-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/m9e-feedback/full/
+            ${{ runner.temp }}/m9e-platform-feedback/full/
             test-results/rust-browser/
           if-no-files-found: error
           retention-days: 14
@@ -119,12 +333,6 @@ jobs:
           path: ${{ runner.temp }}/m9e-v7-web/
           if-no-files-found: ignore
           retention-days: 14
-      - name: Preserve native compilation after failed checks
-        if: failure()
-        uses: actions/cache/save@v5
-        with:
-          path: rust/target/debug
-          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
       - name: Preserve browser compilation after failed checks
         if: failure()
         uses: actions/cache/save@v5
@@ -137,3 +345,75 @@ jobs:
         with:
           path: ${{ runner.temp }}/m9e-wasm-target
           key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+
+  focused:
+    name: Complete focused qualification
+    needs: [native_a, native_b, platform]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      M9E_PHASE: aggregate
+      M9E_REPORT_DIR: ${{ runner.temp }}/m9e-aggregate-feedback
+      M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
+      M9E_NATIVE_A_RESULT: ${{ needs.native_a.result }}
+      M9E_NATIVE_B_RESULT: ${{ needs.native_b.result }}
+      M9E_NATIVE_B_MANIFEST_SHA256: ${{ needs.native_b.outputs.manifest_sha256 }}
+      M9E_PLATFORM_RESULT: ${{ needs.platform.result }}
+      M9E_NATIVE_MANIFEST_SHA256: ${{ needs.native_a.outputs.manifest_sha256 }}
+      M9E_PLATFORM_MANIFEST_SHA256: ${{ needs.platform.outputs.manifest_sha256 }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Reject missing phase artifact identities
+        env:
+          M9E_NATIVE_A_ID: ${{ needs.native_a.outputs.proof_artifact_id }}
+          M9E_NATIVE_B_ID: ${{ needs.native_b.outputs.proof_artifact_id }}
+          M9E_PLATFORM_ID: ${{ needs.platform.outputs.proof_artifact_id }}
+        run: |
+          if [[ "$M9E_NATIVE_A_RESULT" == success ]]; then [[ "$M9E_NATIVE_A_ID" =~ ^[1-9][0-9]*$ ]]; fi
+          if [[ "$M9E_NATIVE_B_RESULT" == success ]]; then [[ "$M9E_NATIVE_B_ID" =~ ^[1-9][0-9]*$ ]]; fi
+          if [[ "$M9E_PLATFORM_RESULT" == success ]]; then [[ "$M9E_PLATFORM_ID" =~ ^[1-9][0-9]*$ ]]; fi
+      - uses: actions/download-artifact@v7
+        if: needs.native_a.result == 'success'
+        with:
+          artifact-ids: ${{ needs.native_a.outputs.proof_artifact_id }}
+          path: ${{ runner.temp }}/m9e-phase/proof
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        if: needs.native_b.result == 'success'
+        with:
+          artifact-ids: ${{ needs.native_b.outputs.proof_artifact_id }}
+          path: ${{ runner.temp }}/m9e-phase/proof
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        if: needs.platform.result == 'success'
+        with:
+          artifact-ids: ${{ needs.platform.outputs.proof_artifact_id }}
+          path: ${{ runner.temp }}/m9e-phase/platform
+          merge-multiple: true
+      - name: Require every exact phase
+        if: always()
+        run: python3 scripts/ci/m9e_phases.py
+      - name: Final compact result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-aggregate-feedback/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Final phase evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-aggregate-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-aggregate-feedback/full/
+          if-no-files-found: error
+          retention-days: 14

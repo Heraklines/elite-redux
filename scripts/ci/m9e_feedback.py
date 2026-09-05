@@ -817,6 +817,16 @@ def write_progress(summary, phase, target=None):
     for key in ("content_manifest_hash", "target", "selected_test_ids"):
         if key in summary:
             progress[key] = summary[key]
+    if "native_lane" in summary:
+        progress["native_lane"] = summary["native_lane"]
+    if "native_target_timing_ms" in summary:
+        progress["native_target_timing_ms"] = summary["native_target_timing_ms"]
+        if len((json.dumps(progress, indent=2) + "\n").encode()) > 16000:
+            timing_path = FULL / "native-target-timings.json"
+            timing_path.write_text(json.dumps(summary["native_target_timing_ms"], indent=2) + "\n")
+            progress["native_target_timing_ms"] = {"file": timing_path.name, "sha256": digest(timing_path),
+                                                  "targets": len(summary["native_target_timing_ms"]),
+                                                  "total_ms": sum(summary["native_target_timing_ms"].values())}
     encoded = (json.dumps(progress, indent=2) + "\n").encode()
     if len(encoded) > 16000:
         raise RuntimeError("in-progress summary exceeds compact byte bound")
@@ -957,6 +967,14 @@ def main(preflight_failure=None):
             run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
         if selection.get("cli_reload_focus") or selection.get("menu_validation_focus"):
             enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
+        if os.environ.get("M9E_PHASE") == "native":
+            from m9e_phases import inventory_and_assignment
+            lane = os.environ.get("M9E_NATIVE_LANE")
+            inventory, assigned = inventory_and_assignment(enumerated, lane)
+            summary.update({"native_lane": lane, "native_inventory": inventory,
+                            "assigned_targets": assigned, "completed_targets": [],
+                            "phase": "native", "qualification": "pending"})
+            enumerated = [item for item in enumerated if [item[4].name, item[2]] in assigned]
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             write_progress(summary, "native", f"{cwd.name}:{name}")
@@ -987,25 +1005,32 @@ def main(preflight_failure=None):
                 summary["tests"][key] += count
             if code or failed or skipped or passed != len(ids):
                 raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
+            if os.environ.get("M9E_PHASE") == "native":
+                summary["completed_targets"].append([cwd.name, name])
             if native_timer_parity:
                 expected = {"native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"}
                 if len(ids) != 2 or set(ids) != expected:
                     raise RuntimeError("native eventwise parity witness identities/counts disagree")
                 summary["native_timer_parity_digest"] = timer_parity_digest(output.read_text(), "native")
-        if not summary["tests"]["executed"]:
+        if not summary["tests"]["executed"] and not (os.environ.get("M9E_PHASE") == "native" and not enumerated):
             raise RuntimeError("zero tests executed")
-        if selection["requires_wasm"]:
+        if os.environ.get("M9E_PHASE") != "native" and selection["requires_wasm"]:
             write_progress(summary, "wasm", selection.get("wasm_test"))
             wasm_checks(selection, summary)
-        if selection["requires_browser"]:
+        if os.environ.get("M9E_PHASE") != "native" and selection["requires_browser"]:
             write_progress(summary, "browser")
             browser_checks(summary)
-        if selection.get("timer_mutant"):
+        ordinary_passed_ids = [f"{name}::{test_id}" for _, _, name, ids, _, _, _ in enumerated for test_id in ids]
+        owns_mutants = os.environ.get("M9E_PHASE") != "native" or os.environ.get("M9E_NATIVE_LANE") == "a"
+        if owns_mutants and selection.get("timer_mutant"):
             write_progress(summary, "mutant", "timer")
-            timer_behavioral_mutant(selection, summary, tests)
-        if selection.get("replica_mutant"):
+            timer_behavioral_mutant(selection, summary, ordinary_passed_ids)
+        if owns_mutants and selection.get("replica_mutant"):
             write_progress(summary, "mutant", "replica")
-            replica_behavioral_mutant(selection, summary, tests)
+            replica_behavioral_mutant(selection, summary, ordinary_passed_ids)
+        if os.environ.get("M9E_PHASE") == "native":
+            from m9e_phases import export_native
+            export_native(sys.modules[__name__], summary)
         summary["status"] = "passed"
     except Exception as error:
         summary["first_failure"] = str(error)[:4096]
@@ -1057,20 +1082,43 @@ def main(preflight_failure=None):
             truncated = len(encoded) > diagnostic_limit
             summary["diagnostics_truncated"] |= truncated
             (COMPACT / "failure.txt").write_bytes(encoded[:diagnostic_limit] + (b"\n[TRUNCATED: see full remote diagnostics]\n" if truncated else b""))
+        if "native_inventory" in summary:
+            inventory_path = FULL / "native-inventory.json"
+            inventory_path.write_text(json.dumps({key: summary[key] for key in (
+                "native_inventory", "assigned_targets", "completed_targets")}, indent=2) + "\n")
+            summary["native_inventory"] = {"file": inventory_path.name, "sha256": digest(inventory_path),
+                                           "targets": len(summary["native_inventory"])}
+            summary["assigned_targets"] = {"count": len(summary["assigned_targets"])}
+            summary["completed_targets"] = {"count": len(summary["completed_targets"])}
         encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
         if len(encoded_summary) > 16000:
             (FULL / "full-summary.json").write_bytes(encoded_summary)
             summary["evidence"] = [{"file": "full-summary.json", "sha256": digest(FULL / "full-summary.json")}]
             summary["plan"] = {"file": "plan.json", "sha256": digest(FULL / "plan.json")}
             encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
+        if len(encoded_summary) > 16000:
+            for key in ("native_target_timing_ms", "required_native_target_counts", "build_only_targets", "timing_ms"):
+                if key in summary:
+                    summary[key] = {"file": "full-summary.json", "sha256": digest(FULL / "full-summary.json")}
+            encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
+        if len(encoded_summary) > 16000:
+            raise RuntimeError("native compact summary exceeds 16 KiB after bounded projection")
         (COMPACT / "summary.json").write_bytes(encoded_summary)
         print(json.dumps({key: summary[key] for key in ("product_sha", "status", "tests")}))
     return 0 if summary["status"] == "passed" else 1
+
+
+def preflight_environment():
+    environment = os.environ.copy()
+    for key in list(environment):
+        if key.startswith(("M9E_PHASE", "M9E_NATIVE_", "M9E_PLATFORM_")) or key == "GITHUB_OUTPUT":
+            del environment[key]
+    return environment
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=True)
     with (FULL / "harness-tests.log").open("w") as stream:
         preflight = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/ci", "-p", "test_m9e_feedback.py", "-v"],
-                                   cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
+                                   cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, env=preflight_environment())
     sys.exit(main("feedback harness self-tests failed; see harness-tests.log" if preflight.returncode else None))

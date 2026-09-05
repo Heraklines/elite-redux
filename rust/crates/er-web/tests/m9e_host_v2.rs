@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::sync::{Arc, OnceLock};
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m7_progression_control::generic_vertical_control_v2;
@@ -218,22 +219,84 @@ fn navigate_down_to(
     Err("target option is unreachable".into())
 }
 
-fn complete_natural_start(
-    host: &mut BrowserKernelHostV2,
-    sequence: &mut u64,
-) -> Result<Vec<BrowserEffectV2>, Box<dyn Error>> {
-    press(host, sequence, PhysicalKey::Space)?;
-    press(host, sequence, PhysicalKey::Space)?;
-    press(host, sequence, PhysicalKey::Space)?;
-    navigate_down_to(host, sequence, "bootstrap/starter/confirm")?;
-    press(host, sequence, PhysicalKey::Space)?;
-    press(host, sequence, PhysicalKey::Space)?;
-    press(host, sequence, PhysicalKey::Space)?;
-    let response = press(host, sequence, PhysicalKey::Space)?;
-    let BrowserResponseV2::Effects { batch } = response else {
-        return Err("natural completion did not return effects".into());
-    };
-    Ok(batch.effects)
+fn shared_content() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
+    static CONTENT: OnceLock<Result<Arc<PreparedGameContentV2>, String>> = OnceLock::new();
+    CONTENT
+        .get_or_init(|| content().map(Arc::new).map_err(|error| error.to_string()))
+        .as_ref()
+        .map(Arc::clone)
+        .map_err(|error| error.clone().into())
+}
+
+fn setup_press(session: &mut CurrentGameSession, code: PhysicalKey) -> Result<(), Box<dyn Error>> {
+    for request in [key(code.clone()), key_up(code)] {
+        let BrowserRequestV2::RawInput { event } = request else {
+            return Err("setup expected raw input".into());
+        };
+        session.apply(CurrentExternalEvent::RawInput { input: event })?;
+    }
+    Ok(())
+}
+
+fn reached_active_snapshot()
+-> Result<&'static er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, Box<dyn Error>> {
+    static SNAPSHOT: OnceLock<Result<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, String>> =
+        OnceLock::new();
+    SNAPSHOT.get_or_init(|| {
+        let build = || -> Result<_, Box<dyn Error>> {
+            let initial = context();
+            let mut session = CurrentGameSession::natural_start_with_scheduler(
+                profile()?, "browser-v2-natural".to_owned(), initial.local_seat,
+                vec!["preview-slot".to_owned()], true, shared_content()?,
+                initial.scheduler, initial.protocol,
+            )?;
+            assert_eq!(session.observe()?.control.ok_or("title control")?.kind, GameControlKindV2::Title);
+            for _ in 0..3 {
+                setup_press(&mut session, PhysicalKey::Space)?;
+            }
+            let bound = session.observe()?.control.ok_or("starter control")?
+                .menu.ok_or("starter menu")?.options.len() + 1;
+            for _ in 0..bound {
+                if session.kernel_ref()?.current_control().and_then(|control| control.menu.as_ref())
+                    .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
+                {
+                    break;
+                }
+                setup_press(&mut session, PhysicalKey::ArrowDown)?;
+            }
+            assert_eq!(session.observe()?.control.ok_or("starter control")?.menu.ok_or("starter menu")?
+                .selected_option_id.as_str(), "bootstrap/starter/confirm");
+            for _ in 0..4 {
+                setup_press(&mut session, PhysicalKey::Space)?;
+            }
+            assert_eq!(session.observe()?.control.ok_or("active control")?.kind, GameControlKindV2::BattleCommand);
+            // Keep the actual pending presentation barrier and all allocator/context state.
+            // These setup inputs are not advertised as a captured browser history.
+            Ok(session.snapshot()?)
+        };
+        build().map_err(|error| error.to_string())
+    }).as_ref().map_err(|error| error.clone().into())
+}
+
+fn active_host() -> Result<(BrowserKernelHostV2, u64), Box<dyn Error>> {
+    let snapshot = reached_active_snapshot()?;
+    let mut host = BrowserKernelHostV2::from_content(shared_content()?);
+    let response = send(&mut host, 0, BrowserRequestV2::Initialize {
+        initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+            context: BrowserSessionContextV2 {
+                scheduler: snapshot.scheduler.clone(),
+                protocol: snapshot.protocol.clone(),
+                ..context()
+            },
+            snapshot: snapshot.clone(),
+        }),
+    })?;
+    assert!(matches!(response, BrowserResponseV2::Ready));
+    assert_eq!(host.kernel_ref().ok_or("active kernel")?.snapshot()?, *snapshot);
+    assert_eq!(host.capture_status(), Some(CurrentCaptureStatusV1::Available {
+        base_position: 0, final_position: 0,
+    }));
+    Ok((host, 1))
 }
 
 fn install_save_control(
@@ -327,15 +390,16 @@ fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_asse
 
 #[test]
 fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<dyn Error>> {
-    let prepared = content()?;
-    let (mut natural, mut sequence) = natural_host()?;
-    complete_natural_start(&mut natural, &mut sequence)?;
+    let prepared = shared_content()?;
+    // Keep the actual NaturalStart initialization leg; other modes use the reached state.
+    drop(natural_host()?);
+    let (natural, _) = active_host()?;
     let snapshot = natural.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     GameKernelV7::from_snapshot(
         snapshot.clone(),
         context().local_seat,
         GameKernelRoleV7::Authority,
-        std::sync::Arc::new(content()?),
+        shared_content()?,
     )
     .map_err(|error| format!("direct snapshot restore failed: {error}"))?;
     let state = match &snapshot.lifecycle {
@@ -363,7 +427,7 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
         .into_iter()
         .zip(initializations)
     {
-        let mut host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+        let mut host = BrowserKernelHostV2::from_content(shared_content()?);
         let response = send(
             &mut host,
             0,
@@ -396,7 +460,7 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
         reserved_pokemon: Vec::new(),
         visit_count: SafeU53::ZERO,
     });
-    let mut scenario_host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut scenario_host = BrowserKernelHostV2::from_content(shared_content()?);
     assert!(matches!(
         send(
             &mut scenario_host,
@@ -424,9 +488,8 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
 
 #[test]
 fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(), Box<dyn Error>> {
-    let prepared = content()?;
-    let (mut natural, mut sequence) = natural_host()?;
-    complete_natural_start(&mut natural, &mut sequence)?;
+    let prepared = shared_content()?;
+    let (natural, _) = active_host()?;
     let base = natural.kernel_ref().ok_or("kernel missing")?.snapshot()?;
 
     let mut save_snapshot = base.clone();
@@ -455,7 +518,7 @@ fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(
     state.active_run.as_mut().ok_or("run missing")?.control = save_control;
     save_snapshot.next_menu_instance_id = MenuInstanceId::new(safe(menu.get().get() + 1));
     let save = GameSaveV2::new(prepared.identity().clone(), safe(1), state.clone())?;
-    let mut save_host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut save_host = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut save_host,
         0,
@@ -502,7 +565,7 @@ fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(
     )?;
     state.active_run.as_mut().ok_or("run missing")?.control = terminal_control;
     terminal_snapshot.next_menu_instance_id = MenuInstanceId::new(safe(menu.get().get() + 1));
-    let mut terminal_host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut terminal_host = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut terminal_host,
         0,
@@ -533,14 +596,47 @@ fn save_and_terminal_controls_produce_storage_and_terminal_effects() -> Result<(
 
 #[test]
 fn browser_host_survives_request_window() -> Result<(), Box<dyn Error>> {
-    let (mut host, mut sequence) = natural_host()?;
+    {
+        let (mut title, sequence) = natural_host()?;
+        let expected = title.kernel_ref().ok_or("title kernel")?.snapshot()?;
+        let BrowserResponseV2::Snapshot { snapshot } = send(&mut title, sequence, BrowserRequestV2::Snapshot)? else {
+            return Err("title snapshot response missing".into());
+        };
+        assert_eq!(*snapshot, expected);
+    }
+    let (mut host, mut sequence) = active_host()?;
+    let before = host.kernel_ref().ok_or("active kernel")?.snapshot()?;
+    let first = BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
+        request_id: safe(sequence + 1),
+        sequence: safe(sequence),
+        request: BrowserRequestV2::Snapshot,
+    };
+    let first_bytes = er_canonical::canonical_bytes(&first)?;
     for _ in 0..2_100 {
         let response = send(&mut host, sequence, BrowserRequestV2::Snapshot)?;
         assert!(matches!(response, BrowserResponseV2::Snapshot { .. }));
         sequence += 1;
     }
-    let response = send(&mut host, sequence, BrowserRequestV2::Snapshot)?;
-    assert!(matches!(response, BrowserResponseV2::Snapshot { .. }));
+    let last = BrowserRequestEnvelopeV2 {
+        version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
+        request_id: safe(sequence + 1),
+        sequence: safe(sequence),
+        request: BrowserRequestV2::Snapshot,
+    };
+    let last_bytes = er_canonical::canonical_bytes(&last)?;
+    let accepted = host.process_bytes(&last_bytes)?;
+    let response: BrowserResponseEnvelopeV2 = serde_json::from_slice(&accepted)?;
+    let BrowserResponseV2::Snapshot { snapshot } = response.response else {
+        return Err("window snapshot response missing".into());
+    };
+    assert_eq!(*snapshot, before);
+    let capture = host.capture_status();
+    assert_eq!(host.process_bytes(&last_bytes)?, accepted);
+    assert_eq!(host.capture_status(), capture);
+    assert!(host.process_bytes(&first_bytes).is_err(), "evicted request must not be accepted as a new operation");
+    assert_eq!(host.kernel_ref().ok_or("active kernel")?.snapshot()?, before);
+    assert_eq!(host.process_bytes(&last_bytes)?, accepted);
     Ok(())
 }
 
@@ -584,8 +680,7 @@ fn browser_requests_are_atomic_and_conflicting_retries_fail_closed() -> Result<(
 #[test]
 fn browser_time_and_lifecycle_requests_execute_kernel_state_changes() -> Result<(), Box<dyn Error>>
 {
-    let (mut host, mut sequence) = natural_host()?;
-    complete_natural_start(&mut host, &mut sequence)?;
+    let (mut host, mut sequence) = active_host()?;
     let before = host.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     let response = send(
         &mut host,
@@ -635,9 +730,8 @@ fn browser_time_and_lifecycle_requests_execute_kernel_state_changes() -> Result<
 
 #[test]
 fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(), Box<dyn Error>> {
-    let prepared = content()?;
-    let (mut source, mut source_sequence) = natural_host()?;
-    complete_natural_start(&mut source, &mut source_sequence)?;
+    let prepared = shared_content()?;
+    let (source, _) = active_host()?;
     let mut snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
@@ -670,7 +764,7 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
     };
     state.active_run.as_mut().ok_or("run missing")?.control = control.clone();
     let save = GameSaveV2::new(prepared.identity().clone(), safe(1), state.clone())?;
-    let mut browser = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut browser = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut browser,
         0,
@@ -777,7 +871,7 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
         matches!(capsule.attempts.last().ok_or("transport attempt missing")?.event,
         CurrentExternalEvent::TransportChanged { generation, connected: true } if generation == ConnectionGeneration::new(safe(10)))
     );
-    let mut imported = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut imported = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut imported,
         0,
@@ -830,8 +924,7 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
 
 #[test]
 fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Error>> {
-    let (mut source, mut source_sequence) = natural_host()?;
-    complete_natural_start(&mut source, &mut source_sequence)?;
+    let (source, _) = active_host()?;
     let mut write_snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     install_save_control(
         &mut write_snapshot,
@@ -840,7 +933,7 @@ fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Er
             slot: "slot-a".to_owned(),
         },
     )?;
-    let mut writer = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut writer = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut writer,
         0,
@@ -886,7 +979,7 @@ fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Er
             slot: "slot-a".to_owned(),
         },
     )?;
-    let mut second_writer = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut second_writer = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut second_writer,
         0,
@@ -944,7 +1037,7 @@ fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Er
             slot: "slot-a".to_owned(),
         },
     )?;
-    let mut loader = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let mut loader = BrowserKernelHostV2::from_content(shared_content()?);
     send(
         &mut loader,
         0,
@@ -987,8 +1080,7 @@ fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Er
 #[test]
 fn presentation_failure_retains_barrier_until_successful_settlement() -> Result<(), Box<dyn Error>>
 {
-    let (mut host, mut sequence) = natural_host()?;
-    complete_natural_start(&mut host, &mut sequence)?;
+    let (mut host, sequence) = active_host()?;
     let pending = host
         .kernel_ref()
         .ok_or("kernel missing")?
