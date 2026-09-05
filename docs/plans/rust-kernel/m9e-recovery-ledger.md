@@ -1995,3 +1995,69 @@ existing assertions survive. Source review by two independent lanes found no
 blocker. The current strict causal scope already owns this kernel/test pair;
 no inventory, mutation control, timeout or byte cap changes are required.
 Remote qualification of this new callback candidate remains pending.
+
+### Qualified callback transactions (a19d337b)
+
+Exact a19d337b8a20c068315e539b558258d35676d80c passed run33983872608:
+133 harness checks, formatting, full reverse compilation/required Clippy,
+617 native(A597/B20), all22 required inventories and zero failures/skips;
+2 Wasm,2 in-page Chromium,1 typed-effect witness, exact CLI capsule bridge and
+aggregate. Both timer and replica mutants failed their real assertions and the
+kernel source was restored to14a9ad7a5ef61cbca71797084719659d43baf0a50c44c9cef34aa936a6bc3458.
+The extended four-test co-op target passed in5734ms; timer11 in3073ms, V7 retention
+188771ms and native capture35310ms. B reload453975ms, batch386528ms, repro241663ms
+and host235759ms retain all prior limits. Run18:22:44-18:51:21UTC2026-09-05,
+28m37s total; A18m52s/B25m58s. Runner timing variation is not an isolated speedup.
+
+CLI424c9f695bd478c08f92fe084a6b6c61df1c347cf1049e6cfee73e2b9d174eee,
+86441456bytes; both workersb26fbf5e6b09a7ba2077d34b5e2867448d034b1ad5f144980f81d0775196c81e,
+74004152bytes. A proof47b29cf2878eb36feb185118f03a2947fe066e6a2114cde4bd3e666acfe98afc;
+B983920d9f5639f244728544fe04fc73cab54cf66e728b1755fe9f7ee0f6392a3;
+platform66728dd554ae2134ca3d06b9c3dd4c1bf470924df5586b76ff558b39764305ea;
+aggregate04c62d185c869e4fbf489dd808f224ce985c7e0eb929c30b1b5b210cc70e39db.
+Held parity remains8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+The source-bound CLI bridge retains1417->1433/16attempts and omitted-time
+divergence1428, with full snapshot digest unchanged. Browser scope remains the
+existing in-page V7 host/byte relay, not a dedicated Worker or RTC claim.
+Only inspected compacts A2128/B3094/platform2067/aggregate3525 compressed bytes
+were accessed; full proofs/diagnostics, binaries and assets stayed remote.
+Comparison baseline advances now to qualified a19/run33983872608.
+
+### Dedicated current development Worker (execution pending)
+
+The explicit opt-in factory creates a real module Worker, verifies bounded
+same-origin Wasm/glue/content hashes, constructs BrowserKernelHostV2 and uses its
+single ABI2 process entry. A serial request owner bounds pending count/bytes and
+deadlines, checks request/accepted-sequence/response correlation, separates known
+transactional rejection from unknown acceptance, and fences on crash/timeout.
+Disposal distinguishes acknowledged Rust completion from hard termination.
+Callers own effect routing; presentation callback responses are routed after the
+outer effect batch, avoiding nested router waits. V1/default routes are unchanged.
+
+V2 payload encoding admits signed safe integers while keeping IDs nonnegative;
+unsafe/fractional/nonfinite/undefined/sparse values reject. Response decoding
+rejects unsafe numbers before publishing them. This is not all Rust i64 support.
+The new codec3 identities cover signed values, ambiguous numeric payloads and
+nonnegative correlation. Two real Worker witnesses require natural Title-to-
+BattleCommand, actual pending presentation settlement, held249/1ms consequences,
+full kernel-rejection conservation, acknowledged Dispose, ABI/ID rejection and
+external termination with two pending requests. Opaque real Rust payloads remain
+Rust-validated; no signed-state restore or full-game claim is inferred.
+
+The remote Vite stage emits a separate hashed Worker plus entry/chunks and a
+canonical manifest binding eight exact source/build paths, lock/Vite version and
+the original Wasm cohort. Its owned scratch directory is checked and cleaned.
+The gate independently verifies actual assets, loaded Worker URLs and exact
+bounded attachments; Worker2 and codec3 are required in addition to in-page2,
+typed1, Wasm2, current CLI bridge, causal22/native inventories and both kernel
+mutants. All133 existing harness identities remain with9 additions(total142).
+After the Worker exists, subsequent browser-required current-game cuts also
+require these Worker/codec witnesses; documentation/readiness-only cuts do not.
+All execution, evidence, transport and time limits are unchanged. Vite builds
+are transpilation/bundling, not a complete TypeScript typecheck. Source review
+has passed; actual remote build/witnesses/proof bytes remain unqualified.
+
+This cut does not implement RTC, IndexedDB, reconnect, LIST controls, uncertain-
+write recovery, renderer/default rollout or deployment. See m9e-current-browser-
+worker.md for ownership and usage boundaries; those remaining capabilities need
+separate connected implementations and real platform evidence.

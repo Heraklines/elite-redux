@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "9e05ec36cd3308575587961b513e60edb4fc8408",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33982109674",
+  "baseline": "a19d337b8a20c068315e539b558258d35676d80c",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33983872608",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -744,6 +744,28 @@
     "required_targets": {"er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"], "er-kernel-worker": ["current_process_v2"]},
     "reason": "Bounded current process supervisor with acknowledged worker context and bounded success-response serialization. Compile the full reverse cone and explicitly build the exact worker executable; bind it only to actual endpoint/supervisor process witnesses. Require the worker process target, preserve CLI and historical reload coverage, and run worker/lab Clippy. Shared session, timer and browser changes require their existing broader platform mapping; no lock exception."
   },
+  "current_browser_worker_focus": {
+  "paths": [
+    "src/rust-browser/contracts/browser-contracts-v2.ts",
+    "src/rust-browser/worker/rust-wasm-loader.ts",
+    "src/rust-browser/worker/current-rust-kernel-worker.ts",
+    "src/rust-browser/host/current-rust-browser-host.ts",
+    "src/rust-browser/routes/rust-current-worker-entry.ts",
+    "test/browser/rust-browser/m9e-v7-worker.spec.ts",
+    "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+    "scripts/build-kernel-m9e-v7-web.mjs"
+  ],
+  "test_ids": [
+    "current V7 Worker executes natural input and presentation settlement",
+    "current V7 Worker rejects wrong ABI and settles pending work on termination"
+  ],
+  "reason": "Exact additive V2 dedicated Worker capability and bundled development entry only. Preserve the complete causal timer22 native inventory, timer/replica controls, Wasm2, old inpage2, typed1 and actual CLI bridge. Require separately bound Worker2 evidence. No V1 default route, RTC transport, dependency or deployment change; mixed product paths fail closed.",
+  "codec_test_ids": [
+    "current V2 canonical payload preserves signed state values",
+    "current V2 canonical payload rejects ambiguous numeric values",
+    "current V2 envelope keeps correlation IDs nonnegative"
+  ]
+},
   "timer_focus": {
     "trigger_paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-kernel/tests/m9e_timers_v7.rs"],
     "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-kernel/tests/m9e_timers_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-kernel/tests/m9e_coop_v7.rs", "rust/crates/er-kernel/tests/m9e_domain_journeys_v7.rs", "rust/crates/er-wasm/tests/m9e_parity.rs", "rust/crates/er-wasm/src/m9e_parity.rs", "rust/crates/er-web/tests/m9e_host_v2.rs", "rust/crates/er-web/src/host_v2.rs", "rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs", "test/browser/rust-browser/m9e-v7-corrective.spec.ts"],

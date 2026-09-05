@@ -324,6 +324,15 @@ def plan():
     timer_focus = config.get("timer_focus", {})
     product_changes = [path for path in changed if path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
+    from m9e_phases import WORKER_SOURCE_PATHS, WORKER_TEST_IDS, WORKER_CODEC_IDS, browser_worker_source_binding
+    browser_worker_focus = config.get("current_browser_worker_focus", {})
+    browser_worker_paths = browser_worker_focus.get("paths", [])
+    if browser_worker_focus and (browser_worker_paths != WORKER_SOURCE_PATHS
+                                or browser_worker_focus.get("test_ids") != WORKER_TEST_IDS
+                                or browser_worker_focus.get("codec_test_ids") != WORKER_CODEC_IDS):
+        raise RuntimeError("current browser Worker policy identities disagree")
+    browser_worker_changed = any(path in browser_worker_paths for path in product_changes)
+    browser_worker_session = browser_worker_changed and all(path in browser_worker_paths for path in product_changes)
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
@@ -342,7 +351,7 @@ def plan():
     capture_session = capture_changed and all(path in capture_paths for path in product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session
+    timer_session = timer_session or retention_session or browser_worker_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -416,7 +425,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -472,6 +481,8 @@ def plan():
         execution_scope = timer_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
+        if browser_worker_session:
+            boundaries = [path for path in boundaries if path not in browser_worker_paths]
     if repro_session:
         execution_scope = repro_focus["execute"]
         browser_required = True
@@ -523,6 +534,10 @@ def plan():
             if widened == selected:
                 break
             selected = widened
+    browser_worker_required = browser_worker_session or (browser_required and any(
+        (ROOT / path).is_file() for path in (
+            "src/rust-browser/routes/rust-current-worker-entry.ts",
+            "src/rust-browser/worker/current-rust-kernel-worker.ts")))
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
               "unknown_paths": unknown, "boundary_paths": boundaries,
               "historical_dispositions": config.get("historical_dispositions", []),
@@ -530,6 +545,9 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
+              "requires_browser_worker": browser_worker_required,
+              "browser_worker_binding": (browser_worker_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"]))
+                                         if browser_worker_required else None),
               "requires_cli_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
@@ -577,7 +595,7 @@ def plan():
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
-    if unknown or boundaries or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
+    if unknown or boundaries or (browser_worker_changed and not browser_worker_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -799,6 +817,98 @@ def browser_bridge_evidence(playwright, binding):
     return evidence
 
 
+def verify_browser_worker_build(output, summary):
+    from m9e_phases import browser_worker_source_binding, validate_browser_worker_assets
+    path = output / "m9e-v7-worker-assets.json"
+    if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= 16_384:
+        raise RuntimeError("current Worker build manifest path or size is invalid")
+    evidence = {"manifest_sha256": digest(path), "manifest": json.loads(path.read_text())}
+    binding = summary["plan"]["browser_worker_binding"]
+    if binding != browser_worker_source_binding(ROOT, summary["product_sha"]):
+        raise RuntimeError("current Worker checked-out source differs from native plan")
+    validate_browser_worker_assets(evidence, binding, summary["browser_assets"]["assets"])
+    manifest = evidence["manifest"]
+    if manifest["vite_version"] != json.loads((ROOT / "node_modules/vite/package.json").read_text())["version"]:
+        raise RuntimeError("current Worker Vite version differs from installed lock cohort")
+    for name, metadata in manifest["assets"].items():
+        asset = output / name
+        if asset.is_symlink() or not asset.is_file() or asset.stat().st_size != metadata["bytes"] or digest(asset) != metadata["sha256"]:
+            raise RuntimeError("current Worker emitted asset hash or size mismatch")
+    emitted = {asset.name for asset in output.glob("current-*.js")}
+    if emitted != set(manifest["assets"]):
+        raise RuntimeError("current Worker has unlisted emitted assets")
+    shutil.copyfile(path, FULL / path.name)
+    summary["browser_worker_assets"] = evidence
+
+
+def browser_worker_result_evidence(report, assets, binding):
+    from m9e_phases import WORKER_TEST_IDS, validate_browser_worker_tests
+    specs = []
+    def collect(suite):
+        specs.extend(suite.get("specs", []))
+        for child in suite.get("suites", []):
+            collect(child)
+    for suite in report.get("suites", []):
+        collect(suite)
+    if (report.get("errors") or len(specs) != 2
+            or {spec.get("title") for spec in specs} != set(WORKER_TEST_IDS)):
+        raise RuntimeError("current Worker Chromium witness identities/counts disagree")
+    result = {"expected": 2, "passed": 2, "failed": 0, "skipped": 0, "selected_test_ids": WORKER_TEST_IDS}
+    for spec in specs:
+        file = spec.get("file", "").replace("\\", "/")
+        if file != "m9e-v7-worker.spec.ts" and file != "test/browser/rust-browser/m9e-v7-worker.spec.ts":
+            raise RuntimeError("current Worker witness came from an unexpected source file")
+        tests = spec.get("tests", [])
+        if len(tests) != 1:
+            raise RuntimeError("current Worker witness must execute exactly once")
+        test = tests[0]
+        runs = test.get("results", [])
+        if (test.get("projectName") != "chromium" or test.get("expectedStatus") != "passed"
+                or test.get("status") != "expected" or len(runs) != 1 or runs[0].get("status") != "passed"
+                or type(runs[0].get("retry")) is not int or runs[0]["retry"] != 0):
+            raise RuntimeError("current Worker witness failed, skipped, retried or flaky")
+        key = "positive" if spec["title"] == WORKER_TEST_IDS[0] else "negative"
+        attachments = [item for item in runs[0].get("attachments", [])
+                       if str(item.get("name", "")).startswith("m9e-current-worker-")]
+        if (len(attachments) != 1 or attachments[0].get("name") != "m9e-current-worker-" + key
+                or attachments[0].get("contentType") != "application/json"):
+            raise RuntimeError("current Worker attachment missing, ambiguous or misplaced")
+        attachment = attachments[0]
+        if "body" in attachment and "path" not in attachment:
+            body = attachment["body"]
+            if not isinstance(body, str) or len(body) > 5500:
+                raise RuntimeError("current Worker attachment exceeds bound")
+            payload = base64.b64decode(body, validate=True)
+        elif "path" in attachment and "body" not in attachment:
+            path = Path(attachment["path"])
+            path = path if path.is_absolute() else ROOT / path
+            if (path.is_symlink() or not path.resolve().is_relative_to((ROOT / "test-results/rust-browser").resolve())
+                    or not path.is_file() or path.stat().st_size > 4096):
+                raise RuntimeError("current Worker attachment path or size is invalid")
+            payload = path.read_bytes()
+        else:
+            raise RuntimeError("current Worker attachment requires one bounded body or file")
+        if len(payload) > 4096:
+            raise RuntimeError("current Worker attachment exceeds bound")
+        result[key] = json.loads(payload)
+    validate_browser_worker_tests(result, assets, binding)
+    return result
+
+
+def browser_worker_codec_evidence(report):
+    from m9e_phases import WORKER_CODEC_IDS
+    suites = report.get("testResults", [])
+    assertions = [item for suite in suites for item in suite.get("assertionResults", [])]
+    path = suites[0].get("name", "").replace("\\", "/") if len(suites) == 1 else ""
+    expected_path = "test/node/rust-browser/engineering/current-worker-codec.test.ts"
+    if (report.get("success") is not True or report.get("numTotalTests") != 3 or report.get("numPassedTests") != 3
+            or len(suites) != 1 or (path != expected_path and not path.endswith("/" + expected_path))
+            or len(assertions) != 3 or {item.get("fullName") for item in assertions} != set(WORKER_CODEC_IDS)
+            or any(item.get("status") != "passed" or item.get("failureMessages") for item in assertions)):
+        raise RuntimeError("current Worker codec source identities/counts disagree")
+    return {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": WORKER_CODEC_IDS}
+
+
 def browser_checks(summary):
     run(["pnpm", "install", "--frozen-lockfile"], "browser-dependencies", ROOT)
     output = Path(os.environ["RUNNER_TEMP"]) / "m9e-v7-web"
@@ -806,6 +916,9 @@ def browser_checks(summary):
     # The published builder intentionally resolves its output under rust/target.
     env.pop("CARGO_TARGET_DIR", None)
     env["RUSTUP_TOOLCHAIN"] = tomllib.loads((RUST / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
+    env.pop("M9E_BUILD_CURRENT_WORKER", None)
+    if summary.get("plan", {}).get("requires_browser_worker"):
+        env["M9E_BUILD_CURRENT_WORKER"] = "1"
     run(["node", "scripts/build-kernel-m9e-v7-web.mjs", "--out-dir", str(output)], "browser-build", ROOT, env)
     manifest_path = output / "m9e-v7-web-assets.json"
     manifest = json.loads(manifest_path.read_text())
@@ -818,6 +931,8 @@ def browser_checks(summary):
             raise RuntimeError("browser asset hash mismatch: " + name)
     shutil.copyfile(manifest_path, FULL / manifest_path.name)
     summary["browser_assets"] = {"manifest_sha256": digest(manifest_path), "assets": manifest["assets"]}
+    if summary.get("plan", {}).get("requires_browser_worker"):
+        verify_browser_worker_build(output, summary)
     run(["pnpm", "exec", "playwright", "install", "--with-deps", "chromium"], "browser-chromium-install", ROOT)
     env["M9E_V7_WEB_DIR"] = str(output)
     env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-results.json")
@@ -832,6 +947,18 @@ def browser_checks(summary):
     if summary.get("plan", {}).get("requires_cli_executable"):
         summary["browser_current_repro_bridge"] = browser_bridge_evidence(
             json.loads((FULL / "browser-results.json").read_text()), summary["cli_executable"])
+    if summary.get("plan", {}).get("requires_browser_worker"):
+        run(["pnpm", "exec", "vitest", "run", "--config", "test/node/vitest.config.ts",
+             "test/node/rust-browser/engineering/current-worker-codec.test.ts", "--reporter=json",
+             "--outputFile=" + str(FULL / "browser-worker-codec-results.json")], "browser-worker-codec", ROOT)
+        summary["browser_worker_codec"] = browser_worker_codec_evidence(
+            json.loads((FULL / "browser-worker-codec-results.json").read_text()))
+        env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-worker-results.json")
+        run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
+             "test/browser/rust-browser/m9e-v7-worker.spec.ts", "--workers=1", "--reporter=line,json"], "browser-worker-journey", ROOT, env)
+        summary["browser_worker_tests"] = browser_worker_result_evidence(
+            json.loads((FULL / "browser-worker-results.json").read_text()), summary["browser_worker_assets"],
+            summary["plan"]["browser_worker_binding"])
 
 
 def timer_behavioral_mutant(selection, summary, passed_test_ids):

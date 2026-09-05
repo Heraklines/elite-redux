@@ -32,6 +32,21 @@ IDENTITY_FILES = {
 WASM_IDS = {"wasm_replays_v7_raw_inputs_eventwise", "wasm_replays_v7_held_timers_eventwise"}
 BROWSER_IDS = {"natural V7 browser startup reaches the real battle command",
                "two V7 browser hosts wait for both humans and converge one turn"}
+WORKER_SOURCE_PATHS = [
+    "src/rust-browser/contracts/browser-contracts-v2.ts",
+    "src/rust-browser/worker/rust-wasm-loader.ts",
+    "src/rust-browser/worker/current-rust-kernel-worker.ts",
+    "src/rust-browser/host/current-rust-browser-host.ts",
+    "src/rust-browser/routes/rust-current-worker-entry.ts",
+    "test/browser/rust-browser/m9e-v7-worker.spec.ts",
+    "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+    "scripts/build-kernel-m9e-v7-web.mjs",
+]
+WORKER_TEST_IDS = ["current V7 Worker executes natural input and presentation settlement",
+                   "current V7 Worker rejects wrong ABI and settles pending work on termination"]
+WORKER_CODEC_IDS = ["current V2 canonical payload preserves signed state values",
+                    "current V2 canonical payload rejects ambiguous numeric values",
+                    "current V2 envelope keeps correlation IDs nonnegative"]
 LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
                   ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")}
 
@@ -376,6 +391,124 @@ def transfer_cli(proof, directory):
     return {**binding, "path": str(path.resolve()), "root": str(directory.resolve())}
 
 
+def browser_worker_source_binding(root, product_sha):
+    return {"source_sha": product_sha,
+            "source_hashes": {path: file_hash(root / path) for path in WORKER_SOURCE_PATHS},
+            "pnpm_lock_sha256": file_hash(root / "pnpm-lock.yaml")}
+
+
+def validate_browser_worker_assets(evidence, binding, cohort_assets):
+    if not isinstance(evidence, dict) or set(evidence) != {"manifest_sha256", "manifest"}:
+        raise RuntimeError("current Worker asset proof fields disagree")
+    manifest = evidence["manifest"]
+    fields = {"schema_version", "browser_worker_protocol_version", "source_sha", "assets", "entry", "worker",
+              "cohort", "builder_sha256", "pnpm_lock_sha256", "source_hashes", "vite_version"}
+    if (not isinstance(manifest, dict) or set(manifest) != fields
+            or type(manifest["schema_version"]) is not int or manifest["schema_version"] != 1
+            or type(manifest["browser_worker_protocol_version"]) is not int or manifest["browser_worker_protocol_version"] != 2
+            or not isinstance(binding, dict) or set(binding) != {"source_sha", "source_hashes", "pnpm_lock_sha256"}
+            or not isinstance(binding["source_hashes"], dict)
+            or manifest["source_sha"] != binding["source_sha"] or manifest["source_hashes"] != binding["source_hashes"]
+            or set(binding["source_hashes"]) != set(WORKER_SOURCE_PATHS)
+            or manifest["pnpm_lock_sha256"] != binding["pnpm_lock_sha256"]
+            or manifest["builder_sha256"] != binding["source_hashes"][WORKER_SOURCE_PATHS[-1]]
+            or not isinstance(manifest["vite_version"], str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?", manifest["vite_version"])
+            or not isinstance(evidence["manifest_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", evidence["manifest_sha256"])):
+        raise RuntimeError("current Worker source or ABI binding disagrees")
+    if not isinstance(binding["source_sha"], str) or not re.fullmatch(r"[0-9a-f]{40}", binding["source_sha"]):
+        raise RuntimeError("current Worker source SHA is invalid")
+    for value in [*binding["source_hashes"].values(), binding["pnpm_lock_sha256"]]:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise RuntimeError("current Worker source digest is invalid")
+    assets = manifest["assets"]
+    if not isinstance(assets, dict) or not 2 <= len(assets) <= 8 or manifest["entry"] != "current-worker-entry.js":
+        raise RuntimeError("current Worker asset inventory is invalid")
+    total = 0
+    roles = {"entry": [], "worker": [], "chunk": []}
+    for path, metadata in assets.items():
+        if (not isinstance(path, str) or not re.fullmatch(r"[a-zA-Z0-9_-]+\.js", path)
+                or not isinstance(metadata, dict) or set(metadata) != {"bytes", "sha256", "role"}
+                or type(metadata["bytes"]) is not int or not 0 < metadata["bytes"] <= 4_194_304
+                or not isinstance(metadata["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", metadata["sha256"])
+                or not isinstance(metadata["role"], str) or metadata["role"] not in roles):
+            raise RuntimeError("current Worker asset path, size or digest is invalid")
+        total += metadata["bytes"]
+        roles[metadata["role"]].append(path)
+    if (total > 4_194_304 or roles["entry"] != [manifest["entry"]] or roles["worker"] != [manifest["worker"]]
+            or not isinstance(manifest["worker"], str)
+            or not re.fullmatch(r"current-rust-kernel-worker-[a-zA-Z0-9_-]+\.js", manifest["worker"])):
+        raise RuntimeError("current Worker emitted entry/Worker roles disagree")
+    expected_cohort = {key: cohort_assets.get(path, {}).get("sha256") for key, path in (
+        ("glue_sha256", "er_web.js"), ("wasm_sha256", "er_web_bg.wasm"),
+        ("content_sha256", "game-content-bundle-v2.json"))}
+    if manifest["cohort"] != expected_cohort or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in expected_cohort.values()):
+        raise RuntimeError("current Worker Wasm/content cohort disagrees")
+    # The builder emits sorted compact ASCII JSON plus newline. All strings above
+    # are fixed ASCII fields, paths, digests or a validated version.
+    raw = encoded(manifest)
+    if len(raw) > 16_384 or sha(raw) != evidence["manifest_sha256"]:
+        raise RuntimeError("current Worker manifest hash or byte bound disagrees")
+
+
+def validate_browser_worker_tests(tests, evidence, binding):
+    if (not isinstance(tests, dict) or set(tests) != {"expected", "passed", "failed", "skipped", "selected_test_ids", "positive", "negative"}
+            or any(type(tests[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
+            or tests["expected"] != 2 or tests["passed"] != 2 or tests["failed"] != 0 or tests["skipped"] != 0
+            or tests["selected_test_ids"] != WORKER_TEST_IDS):
+        raise RuntimeError("current Worker witness counts or identities disagree")
+    manifest = evidence["manifest"]
+    common = {"schema_version", "source_sha", "manifest_sha256", "entry_sha256", "worker_sha256", "worker_path",
+              "glue_sha256", "wasm_sha256", "content_sha256", "browser_worker_protocol_version", "observed_worker_count"}
+    positive_fields = {"initial_control", "final_control", "presentation_count", "settled_presentation_count", "ui_change_count",
+                       "held_cursor", "released_cursor", "final_snapshot_digest", "accepted_sequence", "disposed",
+                       "rejected_event_code", "rejection_preserved_snapshot"}
+    negative_fields = {"wrong_abi", "invalid_request_id", "pending_before_termination", "settled_after_termination", "rejected_after_termination",
+                       "closed", "pending_after", "queued_bytes_after", "accepted_sequence", "post_termination_rejected"}
+    for key, extra, worker_count in (("positive", positive_fields, 1), ("negative", negative_fields, 2)):
+        item = tests[key]
+        if (not isinstance(item, dict) or set(item) != common | extra
+                or type(item["schema_version"]) is not int or item["schema_version"] != 1
+                or type(item["browser_worker_protocol_version"]) is not int or item["browser_worker_protocol_version"] != 2
+                or type(item["observed_worker_count"]) is not int or item["observed_worker_count"] != worker_count
+                or item["source_sha"] != binding["source_sha"] or item["manifest_sha256"] != evidence["manifest_sha256"]
+                or item["worker_path"] != manifest["worker"]
+                or item["entry_sha256"] != manifest["assets"][manifest["entry"]]["sha256"]
+                or item["worker_sha256"] != manifest["assets"][manifest["worker"]]["sha256"]
+                or any(item[field] != manifest["cohort"][field] for field in manifest["cohort"])):
+            raise RuntimeError("current Worker measured identity disagrees")
+    positive, negative = tests["positive"], tests["negative"]
+    for field in ("presentation_count", "settled_presentation_count", "ui_change_count", "accepted_sequence"):
+        if type(positive[field]) is not int or not 1 <= positive[field] <= (1 << 53) - 1:
+            raise RuntimeError("current Worker positive counters are unsafe or empty")
+    if (positive["initial_control"] != "TITLE" or positive["final_control"] != "BATTLE_COMMAND"
+            or positive["presentation_count"] != positive["settled_presentation_count"]
+            or positive["held_cursor"] != ["battle/command/party", "battle/command/party", "battle/command/fight"]
+            or positive["released_cursor"] != "battle/command/fight" or positive["disposed"] is not True
+            or positive["rejected_event_code"] != "HOST_REJECTED" or positive["rejection_preserved_snapshot"] is not True
+            or not isinstance(positive["final_snapshot_digest"], str) or not re.fullmatch(r"[0-9a-f]{64}", positive["final_snapshot_digest"])):
+        raise RuntimeError("current Worker positive causal evidence disagrees")
+    expected_wrong = {"code": "INVALID_ABI", "acceptance": "REJECTED", "request_id": 1, "sequence": 0, "accepted_sequence": None}
+    if negative["wrong_abi"] != expected_wrong or any(type(negative["wrong_abi"].get(key)) is not int for key in ("request_id", "sequence")):
+        raise RuntimeError("current Worker ABI rejection evidence disagrees")
+    if negative["invalid_request_id"] != {"code": "WORKER_FAILURE", "acceptance": "UNKNOWN", "request_id": None,
+                                          "sequence": None, "accepted_sequence": None}:
+        raise RuntimeError("current Worker invalid correlation evidence disagrees")
+    for field, count in (("pending_before_termination", 2), ("settled_after_termination", 2),
+                         ("rejected_after_termination", 2), ("pending_after", 0), ("queued_bytes_after", 0)):
+        if type(negative[field]) is not int or negative[field] != count:
+            raise RuntimeError("current Worker pending termination evidence disagrees")
+    if negative["closed"] is not True or negative["accepted_sequence"] is not None or negative["post_termination_rejected"] is not True:
+        raise RuntimeError("current Worker termination did not fence the client")
+
+
+def validate_browser_worker_codec(evidence):
+    if (not isinstance(evidence, dict) or set(evidence) != {"expected", "passed", "failed", "skipped", "selected_test_ids"}
+            or any(type(evidence[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
+            or evidence["expected"] != 3 or evidence["passed"] != 3 or evidence["failed"] != 0 or evidence["skipped"] != 0
+            or evidence["selected_test_ids"] != WORKER_CODEC_IDS):
+        raise RuntimeError("current Worker codec identities/counts disagree")
+
+
 def validate_platform(proof, native, native_hash):
     if (proof.get("version") != 1 or proof.get("phase") != "platform"
             or proof.get("status") != "passed" or proof.get("qualification") != "pending"
@@ -384,6 +517,17 @@ def validate_platform(proof, native, native_hash):
             or proof.get("plan_sha256") != native["plan_sha256"]):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
+    if plan.get("requires_browser_worker"):
+        if not plan.get("requires_browser") or not plan.get("requires_wasm") or not plan.get("requires_cli_executable"):
+            raise RuntimeError("current Worker plan omitted an existing platform requirement")
+        binding = plan.get("browser_worker_binding")
+        if not isinstance(binding, dict) or binding.get("source_sha") != native["identity"]["product_sha"]:
+            raise RuntimeError("current Worker plan source binding disagrees")
+        validate_browser_worker_assets(proof.get("browser_worker_assets"), binding, proof.get("browser_assets", {}).get("assets", {}))
+        validate_browser_worker_tests(proof.get("browser_worker_tests"), proof["browser_worker_assets"], binding)
+        validate_browser_worker_codec(proof.get("browser_worker_codec"))
+    elif any(key in proof for key in ("browser_worker_assets", "browser_worker_tests", "browser_worker_codec")):
+        raise RuntimeError("platform cannot claim an unrequested current Worker capability")
     if plan["requires_wasm"]:
         wasm = proof.get("wasm_tests", {})
         if (wasm.get("expected") != 2 or wasm.get("passed") != 2 or wasm.get("failed") != 0
@@ -486,7 +630,7 @@ def aggregate(feedback):
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
-            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge") if key in result},
+            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
 
 
@@ -525,7 +669,7 @@ def main():
             "phase", "status", "qualification", "product_sha", "identity", "tests",
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
-            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge",
+            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec",
             "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:

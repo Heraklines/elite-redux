@@ -105,3 +105,99 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer));
   return Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
 }
+
+export interface RustWasmHostV2 {
+  process(requestBytes: Uint8Array): Uint8Array;
+  free(): void;
+}
+
+export interface RustWasmModuleV2 {
+  default(input: { module_or_path: WebAssembly.Module }): Promise<unknown>;
+  BrowserKernelHostV2: new (contentBytes: Uint8Array) => RustWasmHostV2;
+}
+
+export interface CurrentWorkerAssetsV2 {
+  wasm_url: string;
+  wasm_sha256: string;
+  glue_url: string;
+  glue_sha256: string;
+  content_url: string;
+  content_sha256: string;
+}
+
+/** Explicit development ABI2 loader; V1 rollout and validation above are unchanged. */
+export async function fetchCurrentVerifiedAssetV2(
+  location: string,
+  expectedSha256: string,
+  maximumBytes: number,
+  signal: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const url = new URL(location, globalThis.location.href);
+  if (url.origin !== globalThis.location.origin || !SHA256.test(expectedSha256)) {
+    throw new Error("current Worker asset must have a same-origin SHA-256 identity");
+  }
+  const response = await fetch(url, { cache: "no-store", credentials: "same-origin", redirect: "error", signal });
+  if (!response.ok || response.body == null) {
+    throw new Error(`current Worker asset fetch failed: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    for (;;) {
+      const part = await reader.read();
+      if (part.done) break;
+      if (part.value.byteLength > maximumBytes - length) {
+        part.value.fill(0);
+        await reader.cancel();
+        throw new Error("current Worker asset exceeds its byte bound");
+      }
+      length += part.value.byteLength;
+      chunks.push(part.value);
+    }
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    if (length === 0 || (await sha256(bytes)) !== expectedSha256) {
+      bytes.fill(0);
+      throw new Error("current Worker asset is empty or has a mismatched SHA-256");
+    }
+    return bytes;
+  } finally {
+    reader.releaseLock();
+    for (const chunk of chunks) chunk.fill(0);
+  }
+}
+
+export async function loadCurrentRustWasmModuleV2(
+  assets: CurrentWorkerAssetsV2,
+  signal: AbortSignal,
+): Promise<RustWasmModuleV2> {
+  const wasmUrl = new URL(assets.wasm_url, globalThis.location.href);
+  const glueUrl = new URL(assets.glue_url, globalThis.location.href);
+  if (!wasmUrl.pathname.endsWith(".wasm") || !glueUrl.pathname.endsWith(".js")) {
+    throw new Error("current Worker requires explicit Wasm and JavaScript assets");
+  }
+  const wasm = await fetchCurrentVerifiedAssetV2(assets.wasm_url, assets.wasm_sha256, MAXIMUM_WASM_BYTES, signal);
+  let glue: Uint8Array<ArrayBuffer> | null = null;
+  let objectUrl: string | null = null;
+  try {
+    glue = await fetchCurrentVerifiedAssetV2(assets.glue_url, assets.glue_sha256, MAXIMUM_GLUE_BYTES, signal);
+    objectUrl = URL.createObjectURL(new Blob([glue], { type: "text/javascript" }));
+    const loaded: unknown = await import(/* @vite-ignore */ objectUrl);
+    const module = loaded as Partial<RustWasmModuleV2> | null;
+    if (typeof module?.default !== "function" || typeof module.BrowserKernelHostV2 !== "function"
+      || typeof module.BrowserKernelHostV2.prototype.process !== "function") {
+      throw new Error("Wasm glue does not expose the current browser ABI2");
+    }
+    await module.default({ module_or_path: await WebAssembly.compile(wasm) });
+    return module as RustWasmModuleV2;
+  } finally {
+    if (objectUrl != null) URL.revokeObjectURL(objectUrl);
+    glue?.fill(0);
+    wasm.fill(0);
+  }
+}

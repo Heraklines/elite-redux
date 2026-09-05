@@ -26,6 +26,52 @@ PREVIOUS_PUSH = "c" * 40
 HARNESS = Path(__file__).with_name("m9e_feedback.py")
 
 
+def browser_worker_fixture(phases):
+    binding = {"source_sha": CANDIDATE, "source_hashes": {path: "b" * 64 for path in phases.WORKER_SOURCE_PATHS},
+               "pnpm_lock_sha256": "c" * 64}
+    cohort = {"er_web.js": {"bytes": 4, "sha256": "d" * 64},
+              "er_web_bg.wasm": {"bytes": 8, "sha256": "e" * 64},
+              "game-content-bundle-v2.json": {"bytes": 2, "sha256": "f" * 64}}
+    manifest = {"schema_version": 1, "browser_worker_protocol_version": 2, "source_sha": CANDIDATE,
+                "entry": "current-worker-entry.js", "worker": "current-rust-kernel-worker-abc123.js",
+                "assets": {"current-worker-entry.js": {"bytes": 5, "sha256": phases.sha(b"entry"), "role": "entry"},
+                           "current-rust-kernel-worker-abc123.js": {"bytes": 6, "sha256": phases.sha(b"worker"), "role": "worker"}},
+                "source_hashes": binding["source_hashes"], "builder_sha256": "b" * 64,
+                "pnpm_lock_sha256": "c" * 64, "vite_version": "8.0.10",
+                "cohort": {"glue_sha256": "d" * 64, "wasm_sha256": "e" * 64, "content_sha256": "f" * 64}}
+    assets = {"manifest": manifest, "manifest_sha256": phases.sha(phases.encoded(manifest))}
+    common = {"schema_version": 1, "source_sha": CANDIDATE, "manifest_sha256": assets["manifest_sha256"],
+              "entry_sha256": manifest["assets"][manifest["entry"]]["sha256"],
+              "worker_sha256": manifest["assets"][manifest["worker"]]["sha256"], "worker_path": manifest["worker"],
+              **manifest["cohort"], "browser_worker_protocol_version": 2}
+    positive = {**common, "observed_worker_count": 1, "initial_control": "TITLE", "final_control": "BATTLE_COMMAND",
+                "presentation_count": 3, "settled_presentation_count": 3, "ui_change_count": 4,
+                "held_cursor": ["battle/command/party", "battle/command/party", "battle/command/fight"],
+                "released_cursor": "battle/command/fight", "final_snapshot_digest": "1" * 64,
+                "accepted_sequence": 12, "disposed": True, "rejected_event_code": "HOST_REJECTED",
+                "rejection_preserved_snapshot": True}
+    negative = {**common, "observed_worker_count": 2,
+                "wrong_abi": {"code": "INVALID_ABI", "acceptance": "REJECTED", "request_id": 1, "sequence": 0, "accepted_sequence": None},
+                "invalid_request_id": {"code": "WORKER_FAILURE", "acceptance": "UNKNOWN", "request_id": None, "sequence": None, "accepted_sequence": None},
+                "pending_before_termination": 2, "settled_after_termination": 2, "rejected_after_termination": 2,
+                "closed": True, "pending_after": 0, "queued_bytes_after": 0, "accepted_sequence": None,
+                "post_termination_rejected": True}
+    tests = {"expected": 2, "passed": 2, "failed": 0, "skipped": 0, "selected_test_ids": list(phases.WORKER_TEST_IDS),
+             "positive": positive, "negative": negative}
+    return binding, assets, tests, cohort
+
+
+def browser_worker_report(tests):
+    specs = []
+    for index, key in enumerate(("positive", "negative")):
+        specs.append({"title": tests["selected_test_ids"][index], "file": "m9e-v7-worker.spec.ts",
+                      "tests": [{"projectName": "chromium", "expectedStatus": "passed", "status": "expected",
+                                 "results": [{"status": "passed", "retry": 0, "attachments": [{
+                                     "name": "m9e-current-worker-" + key, "contentType": "application/json",
+                                     "body": base64.b64encode(json.dumps(tests[key]).encode()).decode()}]}]}]})
+    return {"suites": [{"specs": specs}], "errors": []}
+
+
 class FeedbackTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-feedback-test-")
@@ -1988,6 +2034,259 @@ class FeedbackTests(unittest.TestCase):
             self.package(package)
         self.package("er-reverse", '[dependencies]\ner-kernel = { path = "../er-kernel" }\n')
 
+    def configure_browser_worker_scope(self):
+        self.configure_timer_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["current_browser_worker_focus"]
+        self.config["current_browser_worker_focus"] = policy
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for path in policy["paths"]:
+            source = self.root / path
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("source fixture: " + path)
+        (self.root / "pnpm-lock.yaml").write_text("frozen synthetic browser lock\n")
+        self.changed = list(policy["paths"])
+
+    def test_browser_worker_scope_preserves_causal_inventory_and_source_binding(self):
+        self.configure_browser_worker_scope()
+        import m9e_phases as phases
+        expected_paths = ["src/rust-browser/contracts/browser-contracts-v2.ts", "src/rust-browser/worker/rust-wasm-loader.ts",
+                          "src/rust-browser/worker/current-rust-kernel-worker.ts", "src/rust-browser/host/current-rust-browser-host.ts",
+                          "src/rust-browser/routes/rust-current-worker-entry.ts", "test/browser/rust-browser/m9e-v7-worker.spec.ts",
+                          "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+                          "scripts/build-kernel-m9e-v7-web.mjs"]
+        self.assertEqual(self.config["current_browser_worker_focus"]["paths"], expected_paths)
+        for changed in (expected_paths, expected_paths[2:3], expected_paths[-1:]):
+            with self.subTest(changed=changed):
+                self.changed = changed
+                selection = self.feedback.plan()
+                for flag in ("requires_browser_worker", "timer_focus", "requires_browser", "requires_wasm",
+                             "requires_cli_executable", "requires_worker_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+                    self.assertTrue(selection[flag], flag)
+                self.assertEqual(selection["required_native_test_ids"], self.config["timer_focus"]["exact_test_ids"])
+                self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 22)
+                self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_timers_v7"]), 11)
+                self.assertIn("er-reverse", selection["packages"])
+                self.assertNotIn("er-reverse", selection["execution_scope"])
+                self.assertEqual(selection["execution_scope"], self.config["timer_focus"]["execute"])
+                self.assertEqual(selection["browser_worker_binding"], phases.browser_worker_source_binding(self.root, CANDIDATE))
+                self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+                self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+                self.assertIsNone(selection["ledger_mutant"])
+
+        # The capability remains required after its introduction, even with no
+        # Worker file in a later cumulative current-kernel delta.
+        self.changed = ["rust/crates/er-kernel/src/game_kernel_v7.rs"]
+        future = self.feedback.plan()
+        self.assertTrue(future["requires_browser"])
+        self.assertTrue(future["requires_browser_worker"])
+        self.assertEqual(future["browser_worker_binding"], phases.browser_worker_source_binding(self.root, CANDIDATE))
+        self.assertEqual(future["required_native_test_ids"], self.config["timer_focus"]["exact_test_ids"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        with patch.object(phases, "browser_worker_source_binding", side_effect=AssertionError("readiness must not bind Worker sources")):
+            readiness = self.feedback.plan()
+        self.assertEqual(readiness["packages"], ["er-canonical"])
+        self.assertFalse(readiness["requires_browser"])
+        self.assertFalse(readiness["requires_browser_worker"])
+        self.assertIsNone(readiness["browser_worker_binding"])
+
+    def test_browser_worker_scope_rejects_mixed_unknown_dependencies_and_policy_drift(self):
+        self.configure_browser_worker_scope()
+        entry = "src/rust-browser/routes/rust-current-worker-entry.ts"
+        for extra in ("src/rust-browser/routes/rust-current-worker-entry-extra.ts", "src/rust-browser/worker/rust-kernel-worker.ts",
+                      "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock", "pnpm-lock.yaml", "package.json",
+                      "test/browser/rust-browser/other.spec.ts", "scripts/build-other.mjs"):
+            with self.subTest(extra=extra):
+                self.changed = [entry, extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+        self.config["current_browser_worker_focus"]["paths"].append("unmapped.json")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        with self.assertRaisesRegex(RuntimeError, "policy identities"):
+            self.feedback.plan()
+        self.assertEqual(self.executed, [])
+
+    def test_browser_worker_report_requires_two_real_single_attempt_witnesses(self):
+        import m9e_phases as phases
+        binding, assets, tests, _ = browser_worker_fixture(phases)
+        report = browser_worker_report(tests)
+        self.assertEqual(self.feedback.browser_worker_result_evidence(report, assets, binding), tests)
+        bad_reports = []
+        missing = copy.deepcopy(report)
+        missing["suites"][0]["specs"].pop()
+        bad_reports.append(missing)
+        for field, value in (("title", "renamed Worker witness"), ("file", "m9e-v7-corrective.spec.ts")):
+            changed = copy.deepcopy(report)
+            changed["suites"][0]["specs"][0][field] = value
+            bad_reports.append(changed)
+        for field, value in (("projectName", "firefox"), ("status", "flaky"), ("expectedStatus", "skipped")):
+            changed = copy.deepcopy(report)
+            changed["suites"][0]["specs"][0]["tests"][0][field] = value
+            bad_reports.append(changed)
+        for field, value in (("retry", 1), ("retry", False), ("status", "skipped")):
+            changed = copy.deepcopy(report)
+            changed["suites"][0]["specs"][0]["tests"][0]["results"][0][field] = value
+            bad_reports.append(changed)
+        duplicate = copy.deepcopy(report)
+        duplicate["suites"][0]["specs"].append(copy.deepcopy(duplicate["suites"][0]["specs"][0]))
+        bad_reports.append(duplicate)
+        for report in bad_reports:
+            with self.subTest(report=report), self.assertRaises(RuntimeError):
+                self.feedback.browser_worker_result_evidence(report, assets, binding)
+
+    def test_browser_worker_attachments_are_bounded_bound_and_causal(self):
+        import m9e_phases as phases
+        binding, assets, tests, _ = browser_worker_fixture(phases)
+        for key, field, value in (("positive", "manifest_sha256", "0" * 64), ("positive", "observed_worker_count", 0),
+                                  ("positive", "held_cursor", ["battle/command/party"] * 3),
+                                  ("positive", "settled_presentation_count", 2), ("positive", "accepted_sequence", True),
+                                  ("positive", "rejection_preserved_snapshot", False),
+                                  ("negative", "settled_after_termination", 1), ("negative", "pending_after", 1),
+                                  ("negative", "accepted_sequence", 1), ("negative", "post_termination_rejected", False)):
+            bad = copy.deepcopy(tests)
+            bad[key][field] = value
+            with self.subTest(key=key, field=field), self.assertRaises(RuntimeError):
+                self.feedback.browser_worker_result_evidence(browser_worker_report(bad), assets, binding)
+        for mutation in ("missing", "duplicate", "misplaced", "oversized", "outside"):
+            report = browser_worker_report(tests)
+            attachments = report["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"]
+            if mutation == "missing":
+                attachments.clear()
+            elif mutation == "duplicate":
+                attachments.append(copy.deepcopy(attachments[0]))
+            elif mutation == "misplaced":
+                attachments[0]["name"] = "m9e-current-worker-negative"
+            elif mutation == "oversized":
+                attachments[0]["body"] = base64.b64encode(b" " * 4097).decode()
+            else:
+                outside = self.root / "outside.json"
+                outside.write_text(json.dumps(tests["positive"]))
+                attachments[0].pop("body")
+                attachments[0]["path"] = str(outside)
+            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                self.feedback.browser_worker_result_evidence(report, assets, binding)
+
+    def test_browser_worker_build_rehashes_exact_sources_assets_and_installed_version(self):
+        self.configure_browser_worker_scope()
+        import m9e_phases as phases
+        selection = self.feedback.plan()
+        _, assets, _, cohort = browser_worker_fixture(phases)
+        manifest = assets["manifest"]
+        binding = selection["browser_worker_binding"]
+        manifest.update({"source_hashes": binding["source_hashes"], "pnpm_lock_sha256": binding["pnpm_lock_sha256"],
+                         "builder_sha256": binding["source_hashes"][phases.WORKER_SOURCE_PATHS[-1]]})
+        output = self.root / "web-output"
+        output.mkdir()
+        (output / manifest["entry"]).write_bytes(b"entry")
+        (output / manifest["worker"]).write_bytes(b"worker")
+        (output / "m9e-v7-worker-assets.json").write_bytes(phases.encoded(manifest))
+        package = self.root / "node_modules/vite/package.json"
+        package.parent.mkdir(parents=True)
+        package.write_text('{"version":"8.0.10"}')
+        summary = {"product_sha": CANDIDATE, "plan": selection, "browser_assets": {"assets": cohort}}
+        self.feedback.verify_browser_worker_build(output, summary)
+        self.assertEqual(summary["browser_worker_assets"]["manifest"], manifest)
+        (output / manifest["worker"]).write_bytes(b"tamper")
+        with self.assertRaisesRegex(RuntimeError, "asset hash"):
+            self.feedback.verify_browser_worker_build(output, summary)
+        (output / manifest["worker"]).write_bytes(b"worker")
+        (output / "current-extra.js").write_bytes(b"unlisted")
+        with self.assertRaisesRegex(RuntimeError, "unlisted"):
+            self.feedback.verify_browser_worker_build(output, summary)
+        (output / "current-extra.js").unlink()
+        (self.root / phases.WORKER_SOURCE_PATHS[0]).write_text("wrong source")
+        with self.assertRaisesRegex(RuntimeError, "checked-out source"):
+            self.feedback.verify_browser_worker_build(output, summary)
+
+    def test_browser_worker_codec_requires_all_three_exact_numeric_boundary_witnesses(self):
+        import m9e_phases as phases
+        report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+            "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+            "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
+        evidence = self.feedback.browser_worker_codec_evidence(report)
+        phases.validate_browser_worker_codec(evidence)
+        self.assertEqual(evidence["selected_test_ids"], ["current V2 canonical payload preserves signed state values",
+                         "current V2 canonical payload rejects ambiguous numeric values",
+                         "current V2 envelope keeps correlation IDs nonnegative"])
+        for mutation in ("missing", "duplicate", "renamed", "skipped", "wrong_file", "false_success"):
+            bad = copy.deepcopy(report)
+            suite = bad["testResults"][0]
+            if mutation == "missing":
+                suite["assertionResults"].pop()
+            elif mutation == "duplicate":
+                suite["assertionResults"][0] = copy.deepcopy(suite["assertionResults"][1])
+            elif mutation == "renamed":
+                suite["assertionResults"][0]["fullName"] = "unrelated unit"
+            elif mutation == "skipped":
+                suite["assertionResults"][0]["status"] = "pending"
+            elif mutation == "wrong_file":
+                suite["name"] = "test/node/rust-browser/engineering/browser-effects-v2.test.ts"
+            else:
+                bad["success"] = False
+            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                self.feedback.browser_worker_codec_evidence(bad)
+
+    def test_browser_worker_orchestration_adds_bundle_and_reports_without_replacing_old_bridge(self):
+        self.configure_browser_worker_scope()
+        import m9e_phases as phases
+        summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test",
+                   "plan": self.feedback.plan()}
+        summary["cli_executable"] = self.feedback.discover_cli_executable([self.cli_executable_artifact()], summary)
+        _, bridge, _ = self.bridge_report()
+        bridge["executable_sha256"] = summary["cli_executable"]["sha256"]
+        old_report = self.bridge_report(bridge)[0]
+        _, typed_report = self.browser_reports()
+        binding, worker_assets, worker_tests, _ = browser_worker_fixture(phases)
+        output = self.root / "runner/m9e-v7-web"
+        output.mkdir(parents=True)
+        old_assets = {}
+        for name in ("er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json",
+                     "coop-authority-snapshot.json", "coop-replica-snapshot.json"):
+            path = output / name
+            path.write_bytes(b"existing browser cohort")
+            old_assets[name] = {"bytes": path.stat().st_size, "sha256": self.feedback.digest(path)}
+        (output / "m9e-v7-web-assets.json").write_text(json.dumps({"source_sha": CANDIDATE,
+            "assets": old_assets, "browser_worker_protocol_version": 2}))
+        (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        codec_report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+            "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+            "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
+        calls = []
+        def run_browser(args, name, cwd=None, env=None):
+            calls.append((name, list(args), dict(env) if env else None))
+            reports = {"browser-journey": ("browser-results.json", old_report),
+                       "browser-effects": ("browser-effect-results.json", typed_report),
+                       "browser-worker-codec": ("browser-worker-codec-results.json", codec_report),
+                       "browser-worker-journey": ("browser-worker-results.json", browser_worker_report(worker_tests))}
+            if name in reports:
+                filename, value = reports[name]
+                (self.full / filename).write_text(json.dumps(value))
+            return self.full / (name + ".log")
+        def verified_build(directory, value):
+            self.assertEqual(directory, output)
+            value["browser_worker_assets"] = worker_assets
+        # Asset/source admission has a separate filesystem/hash fault test above;
+        # isolate only that step here to observe all existing and added commands.
+        summary["plan"]["browser_worker_binding"] = binding
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(self.root / "runner")}), \
+                patch.object(self.feedback, "run", side_effect=run_browser), \
+                patch.object(self.feedback, "verify_browser_worker_build", side_effect=verified_build):
+            self.feedback.browser_checks(summary)
+        self.assertEqual(summary["browser_current_repro_bridge"], bridge)
+        self.assertEqual(summary["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(summary["browser_tests"]["typed_effects"]["passed"], 1)
+        self.assertEqual(summary["browser_worker_tests"], worker_tests)
+        self.assertEqual(summary["browser_worker_codec"]["passed"], 3)
+        self.assertEqual([name for name, _, _ in calls], ["browser-dependencies", "browser-build", "browser-chromium-install",
+                         "browser-journey", "browser-effects", "browser-worker-codec", "browser-worker-journey"])
+        build_env = next(env for name, _, env in calls if name == "browser-build")
+        self.assertEqual(build_env["M9E_BUILD_CURRENT_WORKER"], "1")
+        for name, args, env in calls:
+            if name in ("browser-journey", "browser-worker-journey"):
+                self.assertIn("--workers=1", args)
+                self.assertEqual(env["ER_M9E_CLI_SHA256"], bridge["executable_sha256"])
+                self.assertIn("browser-worker-results" if name == "browser-worker-journey" else "browser-results",
+                              env["PLAYWRIGHT_JSON_OUTPUT_FILE"])
+
     def configure_material_retention_scope(self):
         self.configure_timer_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["material_retention_focus"]
@@ -3388,6 +3687,76 @@ class PhaseTransferTests(unittest.TestCase):
         proof["plan_sha256"] = "0" * 64
         with self.assertRaisesRegex(RuntimeError, "identity"):
             self.phases.validate_platform(proof, self.native, self.native_hash)
+
+    def test_browser_worker_manifest_rejects_rehashed_path_source_role_and_bound_tampering(self):
+        binding, assets, _, cohort = browser_worker_fixture(self.phases)
+        self.phases.validate_browser_worker_assets(assets, binding, cohort)
+        for mutation in ("path", "source", "missing_source", "builder", "cohort", "role", "too_many", "too_large", "boolean_bytes", "wrong_hash"):
+            bad = copy.deepcopy(assets)
+            manifest = bad["manifest"]
+            if mutation == "path":
+                manifest["assets"]["../escape.js"] = manifest["assets"].pop(manifest["worker"])
+                manifest["worker"] = "../escape.js"
+            elif mutation == "source":
+                manifest["source_sha"] = "0" * 40
+            elif mutation == "missing_source":
+                manifest["source_hashes"].pop(self.phases.WORKER_SOURCE_PATHS[0])
+            elif mutation == "builder":
+                manifest["builder_sha256"] = "0" * 64
+            elif mutation == "cohort":
+                manifest["cohort"]["wasm_sha256"] = "0" * 64
+            elif mutation == "role":
+                manifest["assets"][manifest["worker"]]["role"] = "chunk"
+            elif mutation == "too_many":
+                for index in range(7):
+                    manifest["assets"][f"chunk-{index}.js"] = {"bytes": 1, "sha256": "a" * 64, "role": "chunk"}
+            elif mutation == "too_large":
+                manifest["assets"][manifest["worker"]]["bytes"] = 4_194_304
+            elif mutation == "boolean_bytes":
+                manifest["assets"][manifest["worker"]]["bytes"] = True
+            bad["manifest_sha256"] = self.phases.sha(self.phases.encoded(manifest)) if mutation != "wrong_hash" else "0" * 64
+            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                self.phases.validate_browser_worker_assets(bad, binding, cohort)
+
+    def test_worker_required_aggregate_preserves_old_witnesses_and_rejects_missing_or_false_evidence(self):
+        binding, assets, tests, cohort = browser_worker_fixture(self.phases)
+        # Frozen old plans and their old two-witness platform proof still validate.
+        self.phases.validate_platform(self.platform, self.native, self.native_hash)
+        self.native["plan"].update({"requires_browser_worker": True, "browser_worker_binding": binding})
+        self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
+        self.other["plan"] = copy.deepcopy(self.native["plan"])
+        self.other["plan_sha256"] = self.native["plan_sha256"]
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
+                              "browser_worker_assets": assets, "browser_worker_tests": tests,
+                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                                                       "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)}})
+        self.platform["browser_assets"]["assets"] = cohort
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            aggregate = self.phases.aggregate(None)
+        self.assertEqual(aggregate["qualification"], "passed")
+        self.assertEqual(aggregate["browser_worker_tests"], tests)
+        self.assertEqual(aggregate["browser_worker_assets"], assets)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(aggregate["browser_tests"]["typed_effects"]["passed"], 1)
+        self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
+        for key in ("browser_worker_tests", "browser_worker_assets", "browser_worker_codec", "browser_tests", "browser_current_repro_bridge"):
+            bad = copy.deepcopy(self.platform)
+            del bad[key]
+            self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", bad)
+            with self.subTest(key=key), self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+                with self.assertRaises(RuntimeError):
+                    self.phases.aggregate(None)
+        for field, value in (("observed_worker_count", 0), ("presentation_count", 0), ("disposed", False)):
+            bad = copy.deepcopy(self.platform)
+            bad["browser_worker_tests"]["positive"][field] = value
+            self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", bad)
+            with self.subTest(field=field), self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+                with self.assertRaises(RuntimeError):
+                    self.phases.aggregate(None)
 
     def test_platform_requires_exact_parity_and_every_browser_witness(self):
         for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge"):
