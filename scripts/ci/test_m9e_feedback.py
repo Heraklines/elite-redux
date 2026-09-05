@@ -1944,13 +1944,14 @@ class FeedbackTests(unittest.TestCase):
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
         self.binary_ids["m9e_parity"] = ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
         self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
-        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica, patch.object(self.feedback, "ledger_behavioral_mutant") as ledger:
             code, summary = self.invoke()
         self.assertEqual(code, 0)
         wasm.assert_called_once()
         browser.assert_called_once()
         mutant.assert_called_once()
         replica.assert_called_once()
+        ledger.assert_called_once()
         self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
         parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
         self.assertIn("--nocapture", parity_execution)
@@ -2226,11 +2227,33 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(sorted(item[0] for item in retention), sorted(item[0] for item in retention_items))
         self.assertEqual(self.feedback.native_execution_order({}, enumerated), enumerated)
 
+    def test_ledger_mutant_policy_is_retention_only_and_keeps_both_prior_mutants(self):
+        self.configure_material_retention_scope()
+        self.changed = self.config["material_retention_focus"]["paths"]
+        selection = self.feedback.plan()
+        policy = selection["ledger_mutant"]
+        self.assertEqual(policy, self.config["material_retention_focus"]["ledger_mutant"])
+        self.assertEqual((policy["package"], policy["target"], policy["source"]),
+                         ("er-game", "m9e_material_retention", "rust/crates/er-game/src/m9e_material_v6.rs"))
+        self.assertEqual(policy["original"], "        ledger.records.remove(0);")
+        self.assertEqual(policy["replacement"], "        return Err(GameMaterialV6Error::Ledger);")
+        self.assertEqual(policy["test"], "small_suffix_retained_conflicts_late_invalid_and_stale_material_preserve_full_frontier")
+        self.assertIn(policy["test"], selection["required_native_test_ids"]["er-game:m9e_material_retention"])
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.changed = ["rust/crates/er-kernel/src/game_kernel_v7.rs"]
+        ordinary = self.feedback.plan()
+        self.assertTrue(ordinary["timer_focus"])
+        self.assertIsNone(ordinary["ledger_mutant"])
+        self.changed = ["docs/plans/rust-kernel/m9e-retention-next.md"]
+        self.assertIsNone(self.feedback.plan()["ledger_mutant"])
+
     def invoke_synthetic_timer_mutant(self, mode, mutant="timer", expected_failure_phase=None):
         key = f"{mutant}_mutant"
         label = f"{mutant}-mutant"
-        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"][
-            "mutant" if mutant == "timer" else "replica_mutant"]
+        policies = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        policy = (policies["material_retention_focus"]["ledger_mutant"] if mutant == "ledger" else
+                  policies["timer_focus"]["mutant" if mutant == "timer" else "replica_mutant"])
         source = self.root / policy["source"]
         source.parent.mkdir(parents=True, exist_ok=True)
         original = ("fn synthetic() {\n" + policy["original"] + "\n}\n").encode()
@@ -2256,7 +2279,7 @@ class FeedbackTests(unittest.TestCase):
                 binary.write_bytes(b"synthetic artifact, never executed")
                 artifact = {"reason": "compiler-artifact", "profile": {"test": True},
                     "target": {"name": policy["target"], "kind": ["test"]}, "executable": str(binary),
-                    "manifest_path": str(self.rust / "crates" / ("er-other" if mode == "wrong_manifest" else "er-kernel") / "Cargo.toml")}
+                    "manifest_path": str(self.rust / "crates" / ("er-other" if mode == "wrong_manifest" else policy["package"]) / "Cargo.toml")}
                 path.write_text(json.dumps(artifact) + "\n")
                 if mode == "ambiguous_artifact":
                     other = Path(env["CARGO_TARGET_DIR"]) / "other-mutant-test"
@@ -2272,6 +2295,7 @@ class FeedbackTests(unittest.TestCase):
 
         def mutant_process(args, cwd=None, stdout=None, **kwargs):
             self.assertEqual(args[1:], [witness, "--exact", "--format", "pretty"])
+            self.assertEqual(kwargs["timeout"], 120)
             if mode == "timeout":
                 raise subprocess.TimeoutExpired(args, 120)
             if mode == "green":
@@ -2279,6 +2303,11 @@ class FeedbackTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0)
             assertion = ('assertion `left == right` failed\n  left: []\n right: ["battle/command/fight"]\n'
                          if mutant == "timer" else 'assertion `left == right` failed: ' + policy["assertion_message"] + '\n left: Ok(())\n right: Err(Invalid)\n')
+            if mutant == "ledger":
+                assertion = ('assertion `left == right` failed: ' + policy["assertion_message"] +
+                             '\n left: Some(Material("material V6 applied-material ledger is full or invalid"))\n right: None\n')
+                if mode == "wrong_result":
+                    assertion = assertion.replace('Some(Material("material V6 applied-material ledger is full or invalid"))', 'Some(Invalid)')
             if mode == "wrong_assertion":
                 assertion = "assertion `left == right` failed: unrelated\n"
             panic_name = "another_test" if mode == "wrong_panic" else witness
@@ -2287,7 +2316,9 @@ class FeedbackTests(unittest.TestCase):
 
         try:
             with patch.object(self.feedback, "capture", side_effect=tracked_diff), patch.object(self.feedback, "run", side_effect=mutant_run), patch.object(self.feedback.subprocess, "run", side_effect=mutant_process):
-                callback = self.feedback.timer_behavioral_mutant if mutant == "timer" else self.feedback.replica_behavioral_mutant
+                callback = {"timer": self.feedback.timer_behavioral_mutant,
+                            "replica": self.feedback.replica_behavioral_mutant,
+                            "ledger": self.feedback.ledger_behavioral_mutant}[mutant]
                 callback({key: policy}, summary, [f'{policy["target"]}::{witness}'])
         finally:
             self.assertEqual(source.read_bytes(), original)
@@ -2297,6 +2328,39 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(summary[key]["failure_phase"], expected_failure_phase)
                 self.assertEqual(summary[key]["status"], "failed")
         return summary
+
+    def test_ledger_mutant_detects_only_typed_capacity_failure_and_restores_source(self):
+        summary = self.invoke_synthetic_timer_mutant("detected", mutant="ledger")
+        evidence = summary["ledger_mutant"]
+        self.assertEqual(evidence["status"], "detected")
+        self.assertEqual(evidence["exit_code"], 101)
+        self.assertEqual(evidence["tests"], {"executed": 1, "passed": 0, "failed": 1, "skipped": 0})
+        self.assertEqual(evidence["original_sha256"], evidence["restored_sha256"])
+        self.assertNotEqual(evidence["original_sha256"], evidence["mutant_sha256"])
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["material_retention_focus"]["ledger_mutant"]
+        witness = f'{policy["target"]}::{policy["test"]}'
+        for passed in ([], [witness, witness], ["unrelated::" + policy["test"]]):
+            with self.assertRaisesRegex(RuntimeError, "passing ordinary behavioral witness"):
+                self.feedback.ledger_behavioral_mutant({"ledger_mutant": policy}, {}, passed)
+        source = self.root / policy["source"]
+        for text in ("unrelated source", policy["original"] * 2):
+            source.write_text(text)
+            with patch.object(self.feedback, "capture", return_value=""), self.assertRaisesRegex(RuntimeError, "occur exactly once"):
+                self.feedback.ledger_behavioral_mutant({"ledger_mutant": policy}, {}, [witness])
+            self.assertEqual(source.read_text(), text)
+
+    def test_ledger_mutant_rejects_infrastructure_and_wrong_assertions(self):
+        for mode, reason, phase in (
+                ("build", "build exited", "build"), ("unknown", "exactly its named", "enumeration"),
+                ("timeout", "timed out", "execution"), ("green", "did not fail", "behavioral_assertion"),
+                ("crash", "did not fail", "behavioral_assertion"), ("wrong_assertion", "did not fail", "behavioral_assertion"),
+                ("wrong_result", "did not fail", "behavioral_assertion"), ("wrong_panic", "did not fail", "behavioral_assertion"),
+                ("wrong_counts", "did not fail", "behavioral_assertion"),
+                ("wrong_manifest", "exactly one matching", "artifact_validation"),
+                ("outside_artifact", "exactly one matching", "artifact_validation"),
+                ("ambiguous_artifact", "exactly one matching", "artifact_validation")):
+            with self.subTest(mode=mode), self.assertRaisesRegex(RuntimeError, reason):
+                self.invoke_synthetic_timer_mutant(mode, mutant="ledger", expected_failure_phase=phase)
 
     def test_timer_mutant_detects_the_behavioral_failure_and_restores_source(self):
         summary = self.invoke_synthetic_timer_mutant("detected")
@@ -3086,6 +3150,79 @@ class PhaseTransferTests(unittest.TestCase):
                 proof[key] = {"status": "detected"}
                 with self.assertRaisesRegex(RuntimeError, "lane B cannot claim lane A mutant"):
                     self.phases.validate_native(proof, self.identity)
+
+    def test_retention_ledger_mutant_requires_owned_restored_evidence_through_aggregate(self):
+        config = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        policies = {"timer_mutant": config["timer_focus"]["mutant"],
+                    "replica_mutant": config["timer_focus"]["replica_mutant"],
+                    "ledger_mutant": config["material_retention_focus"]["ledger_mutant"]}
+        proof = copy.deepcopy(self.native)
+        proof["plan"]["material_retention_focus"] = True
+        proof["plan"]["required_native_test_ids"] = {}
+        for key, policy in policies.items():
+            proof["plan"][key] = policy
+            proof["inventory"].append({"crate": policy["package"], "target": policy["target"],
+                                       "ids": [policy["test"]], "historical_excluded_ids": []})
+            proof["plan"]["required_native_targets"].setdefault(policy["package"], []).append(policy["target"])
+            identity = f'{policy["package"]}:{policy["target"]}'
+            proof["plan"]["required_native_test_ids"][identity] = [policy["test"]]
+            proof["required_native_target_counts"][identity] = 1
+            proof[key] = {"status": "detected", "source": policy["source"], "test": policy["test"],
+                          "target": policy["target"], "original_sha256": "a" * 64, "restored_sha256": "a" * 64,
+                          "tests": {"executed": 1, "passed": 0, "failed": 1, "skipped": 0}}
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        proof["assigned_targets"] = self.phases.partition(proof["inventory"])["a"]
+        proof["completed_targets"] = proof["assigned_targets"]
+        proof["tests"].update({"selected": 16, "executed": 14, "passed": 14})
+        self.phases.validate_native(proof, self.identity)
+        for label in ("missing", "restoration", "counts", "source", "test", "target", "policy", "scope"):
+            with self.subTest(label=label):
+                bad = copy.deepcopy(proof)
+                if label == "missing":
+                    bad.pop("ledger_mutant")
+                elif label == "restoration":
+                    bad["ledger_mutant"]["restored_sha256"] = "b" * 64
+                elif label == "counts":
+                    bad["ledger_mutant"]["tests"]["failed"] = 0
+                elif label in {"source", "test", "target"}:
+                    bad["ledger_mutant"][label] = "different"
+                elif label == "policy":
+                    bad["plan"].pop("ledger_mutant")
+                elif label == "scope":
+                    bad["plan"]["material_retention_focus"] = False
+                bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+                with self.assertRaisesRegex(RuntimeError, "mutant"):
+                    self.phases.validate_native(bad, self.identity)
+        other = copy.deepcopy(proof)
+        other["lane"] = "b"
+        other["assigned_targets"] = self.phases.partition(other["inventory"])["b"]
+        other["completed_targets"] = other["assigned_targets"]
+        other["tests"].update({"executed": 2, "passed": 2})
+        other["native_timer_parity_digest"] = None
+        for key in policies:
+            other.pop(key)
+        self.phases.validate_native(other, self.identity)
+        other["ledger_mutant"] = proof["ledger_mutant"]
+        with self.assertRaisesRegex(RuntimeError, "lane B"):
+            self.phases.validate_native(other, self.identity)
+        other.pop("ledger_mutant")
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", proof)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", other)
+        self.platform["native_manifest_sha256"] = self.native_hash
+        self.platform["plan_sha256"] = proof["plan_sha256"]
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+        for key in policies:
+            self.assertEqual(result[key], proof[key])
+        self.assertEqual(result["tests"], {"selected": 16, "executed": 16, "passed": 16, "failed": 0, "skipped": 0})
+        missing = copy.deepcopy(proof)
+        missing.pop("ledger_mutant")
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", missing)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+                self.assertRaisesRegex(RuntimeError, "mutant"):
+            self.phases.aggregate(None)
 
     def test_transfer_rejects_manifest_path_size_hash_and_extra_files(self):
         for key, value in (("file", "../er-cli"), ("bytes", self.phases.CLI_LIMIT + 1),

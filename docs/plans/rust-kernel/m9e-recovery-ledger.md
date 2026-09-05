@@ -1716,3 +1716,68 @@ stopped at formatting before native test execution. The remote formatter's
 patch was retrieved inside the inspected 1734-byte native A compact archive
 and applied locally as text; no formatter or other workload ran on this PC.
 The following rerun retains the same behavior, test selection and limits.
+
+### Qualified material retention and bounded feedback (78572603)
+
+Exact candidate 78572603c13f34fe9920790a8724fc435d3e3f9e passed full focused
+qualification in run33975283643. All125 harness checks, remote formatting, full
+reverse-cone compilation and required Clippy passed. Native A passed642 tests
+across72 targets; B passed20 across4, preserving all662 selected tests, zero
+failures/skips, exact inventory/partition union and matching CLI/worker artifacts.
+Both real timer and replica mutation controls were detected and source-restored.
+Platform passed2 Wasm,2 Chromium and1 typed-effect tests; aggregate passed.
+The comparison baseline now advances from3aa4a0c to this exact candidate/run.
+This qualifies the configured material retention scope, not all M9 requirements.
+
+The full run lasted31m29s from creation to completion. A ran15:35:49-15:54:38UTC,
+B15:35:50-15:58:00, platform15:54:40-16:06:49 and aggregate16:06:51-16:07:15.
+Retention helper3tests passed287325ms; the12289-action loop was285567ms total,
+189410ms dispatch and94093ms replica apply, with a final full-ledger sample8488us.
+V7 retention2tests passed133024ms. B reload372377ms, host193077ms, CLIbatch323617ms,
+CLIrepro189271ms. These observed times establish run headroom under unchanged
+limits; differing runner speeds prevent attributing an isolated speedup ratio.
+
+CLI SHA256 0c5c86f4ff78f43c7a527c22ac0a3875045f72722b43511d8b1d620862d1c60d
+(86043224bytes); worker27dd6f1b1b15e59e64cb641e851b062fe20092bfe06cc373d0706e1ec9a834f7
+(73931064bytes), identical across lanes and source-bound to78572603. Native/Wasm
+held parity remains8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+Chromium current capsule replay through that exact CLI covered1417->1433/16attempts,
+snapshot blake3-v1:3ebd6118c4d9500bbbde971eb9100eb199cd0496c94ec367200b7a24ddeb8690;
+omitted time diverged at1428. Browser coverage remains in-page V7 Wasm plus typed
+effects and byte relay, not actual Worker/WebRTC topology.
+
+Native A proof4ea9667c2cf199597fb32b4609722bcc30ef75d2e6068a148d066d7e4679d907;
+B1d8b4b2221e005a798e6b1e2c7d04066c93bc7a8ecc3f953e2b52a830f8a62dc;
+platform0c021f1f377e021166b0f29d5d343df6945290181c5181866a47e0947f93db4a;
+aggregatee403180eb08683d82bbbcf48d178cc6d6e1d54bd8833667fd5799a80b2bd26a9.
+Content manifest, lock and pinned source oracle remain unchanged. Inspected compact
+artifacts A2131/B3180/platform2084/aggregate3651 compressed bytes were retrieved.
+The needed A proof17796 compressed/63513 raw bytes was retrieved to measure headroom;
+its SHA matches the compact. Only the needed3517-byte timing member (823 compressed)
+was extracted by bounded ranges from inspected135317-byte A diagnostics. Full logs,
+binaries and assets stayed remote.
+
+### Explicit retention hard-stop negative control (execution pending)
+
+The existing three-record/ten-action retention test now asserts typed success
+before propagating each dispatch result. A retention-only remote mutation replaces
+the unique oldest-record retirement with a Ledger rejection. The fourth actual
+valid action must fail the exact success assertion with the expected typed error;
+this witnesses the window hard-stop failure class. The ordinary12289-action test
+through three full4096-record windows and all existing cases remain unchanged.
+The deliberately small negative window is not a full4096-window mutant journey.
+
+The existing isolated mutation runner requires the ordinary witness to have passed,
+one exact mutation, private rebuilt test artifact, correct package/manifest/test,
+exact assertion and1failed/0passed/0ignored/exit101. Compile failures, timeouts and
+unrelated assertions are not detection. Source bytes/hashes are restored in finally.
+The120-second mutant timeout remains unchanged. Both prior controls remain; all
+three are A-owned, enforced by native export/validation and aggregate evidence.
+Four new mocked regressions retain all125 earlier declarations, for129 total.
+
+No evidence encoding or bound is changed. The measured63513-byte A proof plus the
+608-byte policy,733-byte evidence and34-byte field overhead projects64888bytes,
+648bytes below64KiB. All affected paths already occur in that measured plan; no
+baseline shrinkage was assumed. Other metadata length/timing digit assumptions
+still apply, so actual next proof publication must enforce the cap. The control
+and its exact next candidate remain unqualified until their remote run completes.

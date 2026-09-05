@@ -557,6 +557,7 @@ def plan():
                                           else cli_reload_focus.get("required_targets", {}) if cli_reload_session else {}),
               "timer_mutant": timer_focus.get("mutant") if timer_session else None,
               "replica_mutant": timer_focus.get("replica_mutant") if timer_session else None,
+              "ledger_mutant": retention_focus.get("ledger_mutant") if retention_session else None,
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
@@ -831,6 +832,13 @@ def replica_behavioral_mutant(selection, summary, passed_test_ids):
     policy = selection["replica_mutant"]
     behavioral_mutant(policy, summary, passed_test_ids, "replica_mutant",
                       (policy["assertion_message"],), "presentation-ownership")
+
+
+def ledger_behavioral_mutant(selection, summary, passed_test_ids):
+    policy = selection["ledger_mutant"]
+    behavioral_mutant(policy, summary, passed_test_ids, "ledger_mutant",
+                      (policy["assertion_message"], 'left: Some(Material("material V6 applied-material ledger is full or invalid"))',
+                       "right: None"), "bounded-ledger-acceptance")
 
 
 def behavioral_mutant(policy, summary, passed_test_ids, evidence_key, assertion_tokens, assertion_name):
@@ -1184,6 +1192,9 @@ def main(preflight_failure=None):
         if owns_mutants and selection.get("replica_mutant"):
             write_progress(summary, "mutant", "replica")
             replica_behavioral_mutant(selection, summary, ordinary_passed_ids)
+        if owns_mutants and selection.get("ledger_mutant"):
+            write_progress(summary, "mutant", "ledger")
+            ledger_behavioral_mutant(selection, summary, ordinary_passed_ids)
         if os.environ.get("M9E_PHASE") == "native":
             from m9e_phases import export_native
             export_native(sys.modules[__name__], summary)

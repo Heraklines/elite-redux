@@ -264,7 +264,11 @@ def validate_native(proof, expected_identity):
             raise RuntimeError("native inventory changed historical exclusion ownership")
     if lane == "a" and plan["requires_wasm"] and not re.fullmatch(r"[0-9a-f]{64}", proof.get("native_timer_parity_digest", "")):
         raise RuntimeError("native parity evidence is missing")
-    for key in ("timer_mutant", "replica_mutant"):
+    if bool(plan.get("ledger_mutant")) != bool(plan.get("material_retention_focus")):
+        raise RuntimeError("retention phase requires its exact ledger mutant policy")
+    if "ledger_mutant" in proof and not plan.get("ledger_mutant"):
+        raise RuntimeError("ledger mutant evidence is outside the retention scope")
+    for key in ("timer_mutant", "replica_mutant", "ledger_mutant"):
         if lane == "b" and key in proof:
             raise RuntimeError("lane B cannot claim lane A mutant evidence")
         if lane == "a" and plan.get(key):
@@ -329,7 +333,7 @@ def export_native(feedback, summary):
         if file_hash(Path(worker["path"])) != worker["sha256"] or Path(worker["path"]).stat().st_size != worker["bytes"]:
             raise RuntimeError("native worker artifact changed after execution")
         proof["worker"] = {key: value for key, value in worker.items() if key != "path"}
-    for key in ("timer_mutant", "replica_mutant"):
+    for key in ("timer_mutant", "replica_mutant", "ledger_mutant"):
         if key in summary:
             proof[key] = summary[key]
     transfer = Path(os.environ["M9E_PHASE_DIR"])
@@ -483,7 +487,7 @@ def aggregate(feedback):
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge") if key in result},
-            **{key: native[key] for key in ("timer_mutant", "replica_mutant") if key in native}}
+            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
 
 
 def main():
@@ -522,7 +526,7 @@ def main():
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
             "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge",
-            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant") if key in summary}
+            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
             compact["first_failure"] = summary["first_failure"]

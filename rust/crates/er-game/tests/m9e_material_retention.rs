@@ -302,7 +302,13 @@ fn small_suffix_retained_conflicts_late_invalid_and_stale_material_preserve_full
     )?;
     let mut materials = Vec::new();
     for _ in 0..10 {
-        materials.push(execute(&mut runtime)?.material_bytes);
+        let result = runtime.execute(action(), context(runtime.next_authority_revision())?);
+        assert_eq!(
+            result.as_ref().err(),
+            None,
+            "bounded retention window must accept valid actions beyond capacity"
+        );
+        materials.push(result?.material_bytes);
     }
     let before = runtime.snapshot();
     assert_eq!(

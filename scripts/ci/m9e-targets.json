@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "3aa4a0cd4488d82ef739cd9a204a45374e3eb98d",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33963418110",
+  "baseline": "78572603c13f34fe9920790a8724fc435d3e3f9e",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33975283643",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -243,6 +243,16 @@
   ]
 },
   "material_retention_focus": {
+  "ledger_mutant": {
+    "package": "er-game",
+    "target": "m9e_material_retention",
+    "test": "small_suffix_retained_conflicts_late_invalid_and_stale_material_preserve_full_frontier",
+    "source": "rust/crates/er-game/src/m9e_material_v6.rs",
+    "original": "        ledger.records.remove(0);",
+    "replacement": "        return Err(GameMaterialV6Error::Ledger);",
+    "assertion_message": "bounded retention window must accept valid actions beyond capacity",
+    "reason": "A configured three-record suffix must accept the fourth real action; hard-stop mutation must fail the typed success assertion. Ordinary coverage still crosses three full 4096-record windows."
+  },
   "trigger_paths": [
     "rust/crates/er-game/src/m9e_material_v6.rs",
     "rust/crates/er-game/src/m9e_runtime_v6.rs",
