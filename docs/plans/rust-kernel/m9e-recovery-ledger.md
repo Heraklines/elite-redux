@@ -991,3 +991,11 @@ availability reference identify four runner.temp expressions in platform/aggrega
 job-level env, where runner context is unavailable. Move those path settings into
 the corresponding execution step env. No product tests or artifacts were produced;
 this is a workflow syntax/context correction, with no baseline advancement.
+
+Candidate `4dc49797c1158186235a09ad45644caff8385a41`, run `33952690935`,
+started both native jobs and passed expanded harness preflight. Both stopped
+at formatting before product compilation/selection/execution. Downloaded only
+the inspected native-A compact artifact (6,566 compressed bytes); native-A/B
+9,606-byte diagnostics remain remote, as do duplicate B summaries. Applied the
+complete 7,834-byte formatter patch for m9e_host_v2.rs (zero omitted bytes).
+The aggregate failed closed on missing successful phase proofs. Baseline stays9459.

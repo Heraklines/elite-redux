@@ -242,60 +242,106 @@ fn reached_active_snapshot()
 -> Result<&'static er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, Box<dyn Error>> {
     static SNAPSHOT: OnceLock<Result<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, String>> =
         OnceLock::new();
-    SNAPSHOT.get_or_init(|| {
-        let build = || -> Result<_, Box<dyn Error>> {
-            let initial = context();
-            let mut session = CurrentGameSession::natural_start_with_scheduler(
-                profile()?, "browser-v2-natural".to_owned(), initial.local_seat,
-                vec!["preview-slot".to_owned()], true, shared_content()?,
-                initial.scheduler, initial.protocol,
-            )?;
-            assert_eq!(session.observe()?.control.ok_or("title control")?.kind, GameControlKindV2::Title);
-            for _ in 0..3 {
-                setup_press(&mut session, PhysicalKey::Space)?;
-            }
-            let bound = session.observe()?.control.ok_or("starter control")?
-                .menu.ok_or("starter menu")?.options.len() + 1;
-            for _ in 0..bound {
-                if session.kernel_ref()?.current_control().and_then(|control| control.menu.as_ref())
-                    .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
-                {
-                    break;
+    SNAPSHOT
+        .get_or_init(|| {
+            let build = || -> Result<_, Box<dyn Error>> {
+                let initial = context();
+                let mut session = CurrentGameSession::natural_start_with_scheduler(
+                    profile()?,
+                    "browser-v2-natural".to_owned(),
+                    initial.local_seat,
+                    vec!["preview-slot".to_owned()],
+                    true,
+                    shared_content()?,
+                    initial.scheduler,
+                    initial.protocol,
+                )?;
+                assert_eq!(
+                    session.observe()?.control.ok_or("title control")?.kind,
+                    GameControlKindV2::Title
+                );
+                for _ in 0..3 {
+                    setup_press(&mut session, PhysicalKey::Space)?;
                 }
-                setup_press(&mut session, PhysicalKey::ArrowDown)?;
-            }
-            assert_eq!(session.observe()?.control.ok_or("starter control")?.menu.ok_or("starter menu")?
-                .selected_option_id.as_str(), "bootstrap/starter/confirm");
-            for _ in 0..4 {
-                setup_press(&mut session, PhysicalKey::Space)?;
-            }
-            assert_eq!(session.observe()?.control.ok_or("active control")?.kind, GameControlKindV2::BattleCommand);
-            // Keep the actual pending presentation barrier and all allocator/context state.
-            // These setup inputs are not advertised as a captured browser history.
-            Ok(session.snapshot()?)
-        };
-        build().map_err(|error| error.to_string())
-    }).as_ref().map_err(|error| error.clone().into())
+                let bound = session
+                    .observe()?
+                    .control
+                    .ok_or("starter control")?
+                    .menu
+                    .ok_or("starter menu")?
+                    .options
+                    .len()
+                    + 1;
+                for _ in 0..bound {
+                    if session
+                        .kernel_ref()?
+                        .current_control()
+                        .and_then(|control| control.menu.as_ref())
+                        .is_some_and(|menu| {
+                            menu.selected_option_id.as_str() == "bootstrap/starter/confirm"
+                        })
+                    {
+                        break;
+                    }
+                    setup_press(&mut session, PhysicalKey::ArrowDown)?;
+                }
+                assert_eq!(
+                    session
+                        .observe()?
+                        .control
+                        .ok_or("starter control")?
+                        .menu
+                        .ok_or("starter menu")?
+                        .selected_option_id
+                        .as_str(),
+                    "bootstrap/starter/confirm"
+                );
+                for _ in 0..4 {
+                    setup_press(&mut session, PhysicalKey::Space)?;
+                }
+                assert_eq!(
+                    session.observe()?.control.ok_or("active control")?.kind,
+                    GameControlKindV2::BattleCommand
+                );
+                // Keep the actual pending presentation barrier and all allocator/context state.
+                // These setup inputs are not advertised as a captured browser history.
+                Ok(session.snapshot()?)
+            };
+            build().map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map_err(|error| error.clone().into())
 }
 
 fn active_host() -> Result<(BrowserKernelHostV2, u64), Box<dyn Error>> {
     let snapshot = reached_active_snapshot()?;
     let mut host = BrowserKernelHostV2::from_content(shared_content()?);
-    let response = send(&mut host, 0, BrowserRequestV2::Initialize {
-        initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
-            context: BrowserSessionContextV2 {
-                scheduler: snapshot.scheduler.clone(),
-                protocol: snapshot.protocol.clone(),
-                ..context()
-            },
-            snapshot: snapshot.clone(),
-        }),
-    })?;
+    let response = send(
+        &mut host,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+                context: BrowserSessionContextV2 {
+                    scheduler: snapshot.scheduler.clone(),
+                    protocol: snapshot.protocol.clone(),
+                    ..context()
+                },
+                snapshot: snapshot.clone(),
+            }),
+        },
+    )?;
     assert!(matches!(response, BrowserResponseV2::Ready));
-    assert_eq!(host.kernel_ref().ok_or("active kernel")?.snapshot()?, *snapshot);
-    assert_eq!(host.capture_status(), Some(CurrentCaptureStatusV1::Available {
-        base_position: 0, final_position: 0,
-    }));
+    assert_eq!(
+        host.kernel_ref().ok_or("active kernel")?.snapshot()?,
+        *snapshot
+    );
+    assert_eq!(
+        host.capture_status(),
+        Some(CurrentCaptureStatusV1::Available {
+            base_position: 0,
+            final_position: 0,
+        })
+    );
     Ok((host, 1))
 }
 
@@ -599,7 +645,9 @@ fn browser_host_survives_request_window() -> Result<(), Box<dyn Error>> {
     {
         let (mut title, sequence) = natural_host()?;
         let expected = title.kernel_ref().ok_or("title kernel")?.snapshot()?;
-        let BrowserResponseV2::Snapshot { snapshot } = send(&mut title, sequence, BrowserRequestV2::Snapshot)? else {
+        let BrowserResponseV2::Snapshot { snapshot } =
+            send(&mut title, sequence, BrowserRequestV2::Snapshot)?
+        else {
             return Err("title snapshot response missing".into());
         };
         assert_eq!(*snapshot, expected);
@@ -634,8 +682,14 @@ fn browser_host_survives_request_window() -> Result<(), Box<dyn Error>> {
     let capture = host.capture_status();
     assert_eq!(host.process_bytes(&last_bytes)?, accepted);
     assert_eq!(host.capture_status(), capture);
-    assert!(host.process_bytes(&first_bytes).is_err(), "evicted request must not be accepted as a new operation");
-    assert_eq!(host.kernel_ref().ok_or("active kernel")?.snapshot()?, before);
+    assert!(
+        host.process_bytes(&first_bytes).is_err(),
+        "evicted request must not be accepted as a new operation"
+    );
+    assert_eq!(
+        host.kernel_ref().ok_or("active kernel")?.snapshot()?,
+        before
+    );
     assert_eq!(host.process_bytes(&last_bytes)?, accepted);
     Ok(())
 }
