@@ -838,3 +838,66 @@ The hash fixture correction candidate `a29696510b478959f8a4f5bef5148da02d1e3a33`
 run `33947489507`, returned one complete 646-byte formatting patch for the core
 assertion. Applied as returned. Compact 3,583 compressed bytes downloaded;
 6,144-byte diagnostics remain remote. Zero selected/executed product tests.
+
+### Capsule execution candidate and independent source preparation
+
+Candidate `b58d5908ed5f4a311564d68b87a863c6af27cd69` is running in
+`33947601082` (job started 2026-09-05 05:35:25 UTC). No capsule pass is
+claimed pending the final compact result. The normal index is empty; future
+batch code remains separate. Its exact source-only tree is preserved in
+`.git/m9e-batch-tree.txt` and `.git/m9e-batch-next.patch` (133,730 bytes), based
+on b58d5908e. The saved batch gate still requires advancing to an actually
+qualified capsule baseline before submission. Its analogous validated-hash
+fixture compile mistake has also been corrected in that source-only tree.
+
+Source review identified an invalid core-test assumption that all natural starter
+navigation remains in a bounded capsule forever. A separate proposal at
+`.git/m9e-repro-fixture-next.rs` replays a real Title-to-Mode prefix and a declared
+real active checkpoint's held-time suffix independently, with natural raw-input
+setup between them. It preserves all nine core test IDs and actual browser/CLI
+full-natural capture witnesses. The actual test is unchanged while the run ends.
+
+The recorder currently serializes the full retained capsule twice after each
+append. An isolated exact byte-accounting proposal and independent encoder-boundary
+helper live at `.git/m9e-repro-byte-accounting-next.rs` and
+`.git/m9e-repro-byte-accounting-test-next.rs`. They are not applied or measured.
+Review covers import/rotation/cache gaps, decimal width, browser generation and
+escaped text. No codec/schema change or performance claim is implied. The
+current platform boundary source investigation is recorded separately in
+`m9e-platform-boundary-next.md`; it remains unimplemented and unqualified.
+
+### Outer timeout identified; capsule accounting and fixture correction
+
+Run `33947601082` on `b58d5908ed5f4a311564d68b87a863c6af27cd69` was
+cancelled at the 35-minute job limit. Compact summary upload failed because the
+harness finally block did not run. The named 31,039-byte diagnostics artifact
+was inspected but not downloaded. Its full files remain remote. After inspecting
+the 40,442-byte job log size, retrieved only the final 8,192 bytes through HTTP
+206 explicit range 32250-40441. Suffix-range requests were not honored and their
+bodies were not read. Existing GitHub keyring authentication was used; Desktop
+credentials were not read.
+
+The bounded log identifies execution progression: CLI reload began 05:45:24.808
+UTC, two actual CLI capsule tests began 05:54:37.582, and nine core capsule tests
+began 06:01:03.925. Cancellation occurred 06:10:38.736, about 575 seconds into
+the core target, before its 600-second limit. Phase transitions show the CLI
+capsule target completed in about 386 seconds and reload in about 553 seconds.
+No full native/Wasm/browser qualification or completed core-target result is
+claimed. Native execution had passed complete inventory validation and required
+lint. The baseline remains qualified `9459b9c`.
+
+Apply the reviewed core fixture with separate replayed real Title-to-Mode and
+real active held-time checkpoints; natural bootstrap setup still uses actual raw
+inputs. Actual browser/CLI full-natural capture tests remain. Apply exact cached
+JSON byte accounting to avoid serializing retained history twice per append.
+Independent full-encoding tests cover exact and one-byte-short bounds, decimal
+positions, escaped Unicode origins, rejection, import, rotation, gaps and a real
+accepted retained protocol generation 9-to-10 transition. Nine core and fourteen
+host test IDs remain. The schema, capture limits and replay validation do not
+change. This is a source complexity correction; the interrupted run is not a
+controlled speedup measurement.
+
+Also repair compact progress checkpointing so an outer interruption preserves an
+explicitly unfinished summary with source identities, completed prefix counts
+and the active phase/target. Final normal summaries must replace it; no timeout
+or execution limit is increased. All execution remains remote.

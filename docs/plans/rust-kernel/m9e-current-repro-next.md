@@ -21,7 +21,10 @@ Capture defaults to 256 events and 2 MiB, with explicit upper bounds. Rotation
 uses the actual verified checkpoint before the retained suffix and preserves
 absolute positions. Oversize attempts or unrecorded state changes make capture
 unavailable; a later verified event may establish a new explicitly bounded suffix.
-Appending does not clone retained history. Explicit export returns an owned copy.
+Appending does not clone retained history. Exact internal JSON byte accounting
+serializes each new attempt and changed metadata; it recounts the checkpoint only
+on creation, import or rotation. Independent full-encoding boundary witnesses
+remain required. Explicit export returns an owned copy.
 Import validates and replays once, preserving retained history and positions.
 
 Optional browser transport context records actual base/final generations and

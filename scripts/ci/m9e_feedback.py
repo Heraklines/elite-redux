@@ -804,6 +804,29 @@ def behavioral_mutant(policy, summary, passed_test_ids, evidence_key, assertion_
             raise RuntimeError("mutant source restoration did not recover the exact candidate")
 
 
+def write_progress(summary, phase, target=None):
+    # A cancelled process cannot run finally. Keep a small, honest checkpoint
+    # at the same compact path as the eventual final result. Counts describe
+    # completed native targets only; the active target has no result yet.
+    progress = {key: summary[key] for key in (
+        "product_sha", "workflow_sha", "harness_sha", "lockfile_hash",
+        "oracle_sha", "profile", "features", "tests")}
+    progress.update({"status": "in_progress", "completion": "unfinished",
+                     "active_phase": phase, "active_target": target,
+                     "selected_inventory_validated": summary.get("selected_inventory_validated", False)})
+    for key in ("content_manifest_hash", "target", "selected_test_ids"):
+        if key in summary:
+            progress[key] = summary[key]
+    encoded = (json.dumps(progress, indent=2) + "\n").encode()
+    if len(encoded) > 16000:
+        raise RuntimeError("in-progress summary exceeds compact byte bound")
+    # FULL and COMPACT share REPORT's filesystem. A partial temporary write is
+    # never published as JSON and adds no second compact artifact.
+    temporary = FULL / "in-progress-summary.tmp"
+    temporary.write_bytes(encoded)
+    temporary.replace(COMPACT / "summary.json")
+
+
 def main(preflight_failure=None):
     COMPACT.mkdir(parents=True, exist_ok=True)
     FULL.mkdir(parents=True, exist_ok=True)
@@ -817,6 +840,7 @@ def main(preflight_failure=None):
                "tests": {"selected": 0, "executed": 0, "passed": 0, "failed": 0, "skipped": 0}}
     tests = []
     try:
+        write_progress(summary, "preflight")
         if preflight_failure:
             raise RuntimeError(preflight_failure)
         if capture(["git", "rev-parse", "HEAD"]) != summary["product_sha"]:
@@ -829,6 +853,7 @@ def main(preflight_failure=None):
         summary["target"] = next(line.split(": ", 1)[1] for line in
                                  capture(["rustc", "-vV"], RUST).splitlines() if line.startswith("host: "))
         try:
+            write_progress(summary, "format")
             check_format(selection)
         except RuntimeError as error:
             # Return the bounded remote repair before long process witnesses.
@@ -840,6 +865,7 @@ def main(preflight_failure=None):
         args = ["cargo", "test", "--locked", "--tests", "--no-run", "--message-format=json"]
         for package in selection["packages"]:
             args.extend(["-p", package])
+        write_progress(summary, "build")
         build = run(args, "build")
         binaries = {}
         artifacts = []
@@ -882,6 +908,7 @@ def main(preflight_failure=None):
         enumerated = []
         for index, (binary, (name, cwd)) in enumerate(sorted(binaries.items())):
             env = native_target_env(cwd.name, name, worker_executable)
+            write_progress(summary, "discovery", f"{cwd.name}:{name}")
             listing = run([binary, "--list", "--format", "terse"], f"list-{index}", cwd, env)
             ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
             exclusions = [item for item in selection["historical_dispositions"]
@@ -901,27 +928,38 @@ def main(preflight_failure=None):
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
                 raise RuntimeError("historical disposition must identify exactly one enumerated test")
+        (FULL / "selected-tests.json").write_text(json.dumps(tests, indent=2) + "\n")
+        summary["selected_test_ids"] = {"file": "selected-tests.json", "sha256": digest(FULL / "selected-tests.json")}
+        summary["selected_inventory_validated"] = True
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
         if selection.get("requires_cli_clippy"):
+            write_progress(summary, "lint", "er-cli")
             run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
         if selection.get("menu_validation_focus"):
+            write_progress(summary, "lint", "er-types")
             run(["cargo", "clippy", "--locked", "-p", "er-types", "--all-targets", "--no-deps", "--", "-D", "warnings"], "types-clippy")
         if selection.get("requires_agent_protocol_clippy"):
+            write_progress(summary, "lint", "er-agent-protocol")
             run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
         if selection.get("current_repro_focus"):
             for package in ("er-repro", "er-env"):
+                write_progress(summary, "lint", package)
                 run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
         if selection["worker_session_focus"] or selection["requires_worker_executable"]:
+            write_progress(summary, "lint", "er-kernel-worker")
             run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
         if selection["requires_worker_executable"]:
+            write_progress(summary, "lint", "er-lab")
             run(["cargo", "clippy", "--locked", "-p", "er-lab", "--all-targets", "--no-deps", "--", "-D", "warnings"], "endpoint-clippy")
         if selection["requires_browser"]:
+            write_progress(summary, "lint", "er-web")
             run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
         if selection.get("cli_reload_focus") or selection.get("menu_validation_focus"):
             enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
+            write_progress(summary, "native", f"{cwd.name}:{name}")
             output = FULL / f"execute-{index}.log"
             start = time.monotonic()
             print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
@@ -957,12 +995,16 @@ def main(preflight_failure=None):
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
         if selection["requires_wasm"]:
+            write_progress(summary, "wasm", selection.get("wasm_test"))
             wasm_checks(selection, summary)
         if selection["requires_browser"]:
+            write_progress(summary, "browser")
             browser_checks(summary)
         if selection.get("timer_mutant"):
+            write_progress(summary, "mutant", "timer")
             timer_behavioral_mutant(selection, summary, tests)
         if selection.get("replica_mutant"):
+            write_progress(summary, "mutant", "replica")
             replica_behavioral_mutant(selection, summary, tests)
         summary["status"] = "passed"
     except Exception as error:

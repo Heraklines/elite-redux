@@ -1971,6 +1971,98 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["first_failure"], "candidate identity mismatch")
         self.assertEqual(self.commands, [])
 
+    def test_interrupted_native_target_has_validated_inventory_and_completed_prefix_checkpoint(self):
+        selection = self.feedback.plan()
+        selection["required_native_targets"] = {"er-native": ["a_suite", "b_suite"]}
+        selection["required_native_test_ids"] = {
+            "er-native:a_suite": ["first"], "er-native:b_suite": ["second"]}
+        checkpoints = []
+
+        def interrupt_second(args, **kwargs):
+            if Path(args[0]).name == "b_suite" and "--list" not in args:
+                encoded = (self.compact / "summary.json").read_bytes()
+                progress = json.loads(encoded)
+                checkpoints.append(progress)
+                self.assertLessEqual(len(encoded), 16000)
+                self.assertEqual(progress["status"], "in_progress")
+                self.assertEqual(progress["completion"], "unfinished")
+                self.assertEqual(progress["active_phase"], "native")
+                self.assertEqual(progress["active_target"], "er-native:b_suite")
+                self.assertTrue(progress["selected_inventory_validated"])
+                self.assertEqual(progress["tests"], {
+                    "selected": 2, "executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+                self.assertEqual(progress["product_sha"], CANDIDATE)
+                self.assertEqual(progress["workflow_sha"], CANDIDATE)
+                self.assertEqual(progress["harness_sha"], hashlib.sha256(HARNESS.read_bytes()).hexdigest())
+                selected = self.full / progress["selected_test_ids"]["file"]
+                self.assertEqual(json.loads(selected.read_text()), ["a_suite::first", "b_suite::second"])
+                self.assertEqual(progress["selected_test_ids"]["sha256"], hashlib.sha256(selected.read_bytes()).hexdigest())
+                self.assertEqual([path.name for path in self.compact.iterdir()], ["summary.json"])
+                self.assertEqual(self.executed, ["a_suite"])
+                raise subprocess.TimeoutExpired(args, 600)
+            return self.process(args, **kwargs)
+
+        with patch.object(self.feedback, "plan", return_value=selection), \
+                patch.object(self.feedback.subprocess, "run", side_effect=interrupt_second):
+            code, summary = self.invoke()
+        self.assertEqual(len(checkpoints), 1)
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["status"], "failed")
+        self.assertIn("b_suite exceeded 600 seconds", summary["first_failure"])
+        self.assertEqual(summary["tests"], checkpoints[0]["tests"])
+        self.assertNotIn("active_phase", summary)
+        self.assertNotIn("completion", summary)
+        self.assertLessEqual(sum(path.stat().st_size for path in self.compact.iterdir()), 65536)
+
+    def test_build_lint_and_native_checkpoints_are_replaced_by_final_success(self):
+        selection = self.feedback.plan()
+        selection["requires_cli_clippy"] = True
+        seen = []
+
+        def observe_process(args, **kwargs):
+            if args[:2] in (["cargo", "test"], ["cargo", "clippy"]) or (
+                    Path(args[0]).name in self.binary_ids and "--list" not in args):
+                progress = json.loads((self.compact / "summary.json").read_bytes())
+                seen.append((progress["active_phase"], progress["active_target"],
+                             progress["tests"], progress["selected_inventory_validated"]))
+                self.assertEqual(progress["status"], "in_progress")
+                self.assertEqual(progress["completion"], "unfinished")
+            return self.process(args, **kwargs)
+
+        with patch.object(self.feedback, "plan", return_value=selection), \
+                patch.object(self.feedback.subprocess, "run", side_effect=observe_process):
+            code, summary = self.invoke()
+        self.assertEqual([(phase, target, counts["selected"], counts["executed"], validated)
+                          for phase, target, counts, validated in seen], [
+            ("build", None, 0, 0, False), ("lint", "er-cli", 2, 0, True),
+            ("native", "er-native:a_suite", 2, 0, True),
+            ("native", "er-native:b_suite", 2, 1, True)])
+        self.assertEqual(code, 0)
+        self.assertEqual(summary["status"], "passed")
+        self.assertEqual(summary["tests"]["executed"], 2)
+        self.assertNotIn("active_phase", summary)
+        self.assertNotIn("completion", summary)
+        self.assertLessEqual((self.compact / "summary.json").stat().st_size, 16000)
+
+    def test_interrupted_checkpoint_write_preserves_previous_atomic_compact_summary(self):
+        _, summary = self.invoke()
+        self.feedback.write_progress(summary, "wasm", "m9e_parity")
+        previous = (self.compact / "summary.json").read_bytes()
+        write_bytes = Path.write_bytes
+
+        def partial_write(path, data):
+            self.assertEqual(path, self.full / "in-progress-summary.tmp")
+            write_bytes(path, data[:13])
+            raise OSError("synthetic interruption during temporary write")
+
+        with patch.object(Path, "write_bytes", partial_write):
+            with self.assertRaisesRegex(OSError, "synthetic interruption"):
+                self.feedback.write_progress(summary, "browser")
+        self.assertEqual((self.compact / "summary.json").read_bytes(), previous)
+        self.assertEqual(json.loads(previous)["active_phase"], "wasm")
+        self.assertEqual([path.name for path in self.compact.iterdir()], ["summary.json"])
+        self.assertLessEqual(len(previous), 16000)
+
     def test_every_binary_executes_and_evidence_binds_current_candidate(self):
         # The fake Cargo artifact is identical whether fresh or cache-restored.
         code, summary = self.invoke()

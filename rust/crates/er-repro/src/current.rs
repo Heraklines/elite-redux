@@ -263,6 +263,9 @@ pub struct CurrentReproRecorderV1 {
     position: u64,
     browser_context_required: bool,
     capsule: Option<CurrentReproCapsuleV1>,
+    // Exact serde_json byte length. This cache is internal and never part of the
+    // capsule schema; it exists iff the retained capsule exists.
+    capsule_bytes: Option<usize>,
     unavailable_reason: String,
 }
 
@@ -275,6 +278,8 @@ impl CurrentReproRecorderV1 {
         limits: CurrentReproLimitsV1,
     ) -> Result<(Self, CurrentGameSession), CurrentReproErrorV1> {
         let session = replay_current_capsule_v1(&capsule, Arc::clone(&content), limits)?;
+        let capsule_bytes = encoded_len(&capsule, limits.maximum_bytes)
+            .ok_or_else(|| invalid("imported capsule byte bound"))?;
         let browser_context_required = capsule.browser_transport.is_some();
         let recorder = Self {
             content,
@@ -283,6 +288,7 @@ impl CurrentReproRecorderV1 {
             limits,
             position: capsule.final_position,
             capsule: Some(capsule),
+            capsule_bytes: Some(capsule_bytes),
             unavailable_reason: String::new(),
             browser_context_required,
         };
@@ -305,14 +311,16 @@ impl CurrentReproRecorderV1 {
             position: 0,
             browser_context_required: false,
             capsule: None,
+            capsule_bytes: None,
             unavailable_reason: "initial checkpoint exceeds capture bound".to_owned(),
         };
         if fits(&checkpoint, limits.maximum_bytes) {
             recorder.verified_observation(&checkpoint)?;
             let digest = snapshot_digest(&checkpoint)?;
             let capsule = recorder.empty_capsule(checkpoint, 0, digest, None);
-            if fits(&capsule, limits.maximum_bytes) {
+            if let Some(bytes) = encoded_len(&capsule, limits.maximum_bytes) {
                 recorder.capsule = Some(capsule);
+                recorder.capsule_bytes = Some(bytes);
             }
         }
         Ok(recorder)
@@ -337,7 +345,8 @@ impl CurrentReproRecorderV1 {
                 base_generation: generation,
                 final_generation: generation,
             });
-            if !fits(capsule, limits.maximum_bytes) {
+            recorder.capsule_bytes = encoded_len(capsule, limits.maximum_bytes);
+            if recorder.capsule_bytes.is_none() {
                 let _ = recorder.gap("initial checkpoint exceeds capture bound");
             }
         }
@@ -424,8 +433,9 @@ impl CurrentReproRecorderV1 {
             origin,
             browser_transport,
         ) {
-            Ok(capsule) => {
+            Ok((capsule, bytes)) => {
                 self.capsule = Some(capsule);
+                self.capsule_bytes = Some(bytes);
                 self.status()
             }
             Err(error) => self.gap(&error.to_string()),
@@ -478,7 +488,7 @@ impl CurrentReproRecorderV1 {
         observation: &CurrentGameObservation,
         origin: Option<&str>,
         browser_transport: Option<CurrentReproBrowserTransitionV1>,
-    ) -> Result<CurrentReproCapsuleV1, CurrentReproErrorV1> {
+    ) -> Result<(CurrentReproCapsuleV1, usize), CurrentReproErrorV1> {
         if self.browser_context_required != browser_transport.is_some() {
             return Err(invalid("browser transport context missing or unexpected"));
         }
@@ -545,48 +555,42 @@ impl CurrentReproRecorderV1 {
             outcome,
         };
         let base_generation = browser_transport.map(|transition| transition.before_generation);
-        let mut capsule = self.capsule.take().unwrap_or_else(|| {
-            self.empty_capsule(
-                before.clone(),
-                self.position - 1,
-                before_digest.clone(),
-                base_generation,
-            )
-        });
-        capsule.attempts.push(attempt);
-        capsule.final_position = self.position;
-        capsule.final_snapshot_digest = after_digest.clone();
-        if let (Some(context), Some(transition)) =
-            (&mut capsule.browser_transport, browser_transport)
-        {
-            context.final_generation = transition.after_generation;
-        }
-        if capsule.attempts.len() > self.limits.maximum_events
-            || !fits(&capsule, self.limits.maximum_bytes)
-        {
-            let attempt = capsule
-                .attempts
-                .pop()
-                .ok_or_else(|| invalid("missing current attempt"))?;
+        // Encode the new attempt once; never traverse or clone retained history.
+        let attempt_bytes = encoded_len(&attempt, self.limits.maximum_bytes)
+            .ok_or_else(|| invalid("single attempt capture bound"))?;
+        let (mut capsule, bytes) = match (self.capsule.take(), self.capsule_bytes.take()) {
+            (Some(capsule), Some(bytes)) => (capsule, bytes),
+            (None, None) => {
+                let capsule = self.empty_capsule(before.clone(), self.position - 1,
+                    before_digest.clone(), base_generation);
+                let bytes = encoded_len(&capsule, self.limits.maximum_bytes)
+                    .ok_or_else(|| invalid("single attempt capture bound"))?;
+                (capsule, bytes)
+            }
+            _ => return Err(invalid("capsule byte cache continuity")),
+        };
+        let metadata = AppendMetadata { position: self.position, digest: &after_digest, browser_transport };
+        let mut next_bytes = append_size(&mut capsule, bytes, attempt_bytes,
+            metadata, self.limits.maximum_bytes)?;
+        if capsule.attempts.len() >= self.limits.maximum_events || next_bytes > self.limits.maximum_bytes {
+            // Only the replacement checkpoint and empty envelope are recounted;
+            // the evicted tail is dropped without serialization.
             capsule = self.empty_capsule(
                 before.clone(),
                 self.position - 1,
                 before_digest,
                 base_generation,
             );
-            capsule.attempts.push(attempt);
-            capsule.final_position = self.position;
-            capsule.final_snapshot_digest = after_digest;
-            if let (Some(context), Some(transition)) =
-                (&mut capsule.browser_transport, browser_transport)
-            {
-                context.final_generation = transition.after_generation;
-            }
+            let bytes = encoded_len(&capsule, self.limits.maximum_bytes)
+                .ok_or_else(|| invalid("single attempt capture bound"))?;
+            next_bytes = append_size(&mut capsule, bytes, attempt_bytes,
+                metadata, self.limits.maximum_bytes)?;
         }
-        if !fits(&capsule, self.limits.maximum_bytes) {
+        if next_bytes > self.limits.maximum_bytes {
             return Err(invalid("single attempt capture bound"));
         }
-        Ok(capsule)
+        capsule.attempts.push(attempt);
+        Ok((capsule, next_bytes))
     }
 
     fn verified_observation(
@@ -629,6 +633,7 @@ impl CurrentReproRecorderV1 {
 
     fn gap(&mut self, reason: &str) -> CurrentCaptureStatusV1 {
         self.capsule = None;
+        self.capsule_bytes = None;
         self.unavailable_reason = bounded_text(reason, MAXIMUM_ERROR_BYTES);
         self.status()
     }
@@ -761,7 +766,58 @@ fn valid_browser_transition(
 
 /// Count serialized bytes without allocating an unbounded temporary output.
 fn fits(value: &impl Serialize, maximum: usize) -> bool {
-    serde_json::to_writer(BoundedCounter { remaining: maximum }, value).is_ok()
+    encoded_len(value, maximum).is_some()
+}
+
+fn encoded_len(value: &impl Serialize, maximum: usize) -> Option<usize> {
+    let mut counter = BoundedCounter { remaining: maximum };
+    serde_json::to_writer(&mut counter, value).ok()?;
+    Some(maximum - counter.remaining)
+}
+
+// These are exactly the fields changed by appending a retained attempt. Encoding
+// both metadata views handles decimal-width changes, string escapes and optional
+// browser context without guessing their serialized byte deltas.
+#[derive(Serialize)]
+struct MutableCapsuleMetadata<'a> {
+    final_position: u64,
+    final_snapshot_digest: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    browser_transport: Option<CurrentReproBrowserTransportV1>,
+}
+
+fn metadata_bytes(capsule: &CurrentReproCapsuleV1, maximum: usize) -> Result<usize, CurrentReproErrorV1> {
+    encoded_len(&MutableCapsuleMetadata {
+        final_position: capsule.final_position,
+        final_snapshot_digest: &capsule.final_snapshot_digest,
+        browser_transport: capsule.browser_transport,
+    }, maximum).ok_or_else(|| invalid("capsule metadata byte bound"))
+}
+
+#[derive(Clone, Copy)]
+struct AppendMetadata<'a> {
+    position: u64,
+    digest: &'a str,
+    browser_transport: Option<CurrentReproBrowserTransitionV1>,
+}
+
+fn append_size(capsule: &mut CurrentReproCapsuleV1, bytes: usize, attempt_bytes: usize,
+    metadata: AppendMetadata<'_>, maximum: usize)
+    -> Result<usize, CurrentReproErrorV1>
+{
+    let previous_metadata = metadata_bytes(capsule, maximum)?;
+    capsule.final_position = metadata.position;
+    capsule.final_snapshot_digest = metadata.digest.to_owned();
+    if let (Some(context), Some(transition)) = (&mut capsule.browser_transport, metadata.browser_transport) {
+        context.final_generation = transition.after_generation;
+    }
+    let next_metadata = metadata_bytes(capsule, maximum)?;
+    // Existing [] delimiters remain; every append after the first adds one comma.
+    bytes.checked_sub(previous_metadata)
+        .and_then(|size| size.checked_add(next_metadata))
+        .and_then(|size| size.checked_add(attempt_bytes))
+        .and_then(|size| size.checked_add(usize::from(!capsule.attempts.is_empty())))
+        .ok_or_else(|| invalid("capsule byte count overflow"))
 }
 
 #[derive(Debug)]

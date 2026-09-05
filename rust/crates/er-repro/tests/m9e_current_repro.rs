@@ -98,6 +98,12 @@ fn press(
     Ok(())
 }
 
+fn setup_press(session: &mut CurrentGameSession, code: PhysicalKey) -> TestResult {
+    session.apply(key(code.clone(), true))?;
+    session.apply(key(code, false))?;
+    Ok(())
+}
+
 fn selected(session: &CurrentGameSession) -> TestResult<String> {
     Ok(session
         .observe()?
@@ -112,6 +118,8 @@ fn selected(session: &CurrentGameSession) -> TestResult<String> {
 
 struct Fixture {
     content: Arc<PreparedGameContentV2>,
+    title_capsule: CurrentReproCapsuleV1,
+    title_final_snapshot: CoreGameKernelSnapshotV7,
     active: CoreGameKernelSnapshotV7,
     capsule: CurrentReproCapsuleV1,
     final_snapshot: CoreGameKernelSnapshotV7,
@@ -146,8 +154,19 @@ fn create_fixture() -> TestResult<Fixture> {
         Arc::clone(&content),
         limits(),
     )?;
-    for _ in 0..3 {
-        press(&mut session, &mut recorder, PhysicalKey::Space)?;
+    press(&mut session, &mut recorder, PhysicalKey::Space)?;
+    assert_eq!(
+        session.observe()?.control.ok_or("mode missing")?.kind,
+        GameControlKindV2::ModeSelect
+    );
+    let title_capsule = recorder.export()?;
+    let title_final_snapshot = session.snapshot()?;
+    drop(recorder);
+
+    // Traverse the catalog using real inputs as setup, outside either capture.
+    // A bounded recorder need not retain this entire bootstrap traversal.
+    for _ in 0..2 {
+        setup_press(&mut session, PhysicalKey::Space)?;
     }
     let bound = session
         .observe()?
@@ -162,24 +181,33 @@ fn create_fixture() -> TestResult<Fixture> {
         if selected(&session)? == "bootstrap/starter/confirm" {
             break;
         }
-        press(&mut session, &mut recorder, PhysicalKey::ArrowDown)?;
+        setup_press(&mut session, PhysicalKey::ArrowDown)?;
     }
     assert_eq!(selected(&session)?, "bootstrap/starter/confirm");
     for _ in 0..4 {
-        press(&mut session, &mut recorder, PhysicalKey::Space)?;
+        setup_press(&mut session, PhysicalKey::Space)?;
     }
     for pending in session.snapshot()?.pending_presentations {
-        apply(
-            &mut session,
-            &mut recorder,
-            CurrentExternalEvent::PresentationOutcome {
-                event_id: pending.event_id,
-                outcome: KernelPresentationOutcomeV2::Settled,
-            },
-        )?;
+        session.apply(CurrentExternalEvent::PresentationOutcome {
+            event_id: pending.event_id,
+            outcome: KernelPresentationOutcomeV2::Settled,
+        })?;
     }
+    assert_eq!(
+        session.observe()?.control.ok_or("active control missing")?.kind,
+        GameControlKindV2::BattleCommand
+    );
     assert_eq!(selected(&session)?, "battle/command/fight");
     let active = session.snapshot()?;
+    // This is a new, explicit active checkpoint, not a claim that the Title
+    // capture retained the intervening catalog traversal.
+    let mut recorder = CurrentReproRecorderV1::new(
+        active.clone(),
+        seat(),
+        GameKernelRoleV7::Authority,
+        Arc::clone(&content),
+        limits(),
+    )?;
     apply(
         &mut session,
         &mut recorder,
@@ -211,6 +239,8 @@ fn create_fixture() -> TestResult<Fixture> {
     assert_eq!(selected(&session)?, "battle/command/fight");
     Ok(Fixture {
         content,
+        title_capsule,
+        title_final_snapshot,
         active,
         capsule: recorder.export()?,
         final_snapshot: session.snapshot()?,
@@ -257,9 +287,11 @@ fn replay(capsule: &CurrentReproCapsuleV1) -> TestResult<CurrentGameSession> {
 #[test]
 fn natural_title_to_battle_held_timer_capsule_replays_full_evidence() -> TestResult {
     let fixture = fixture()?;
-    assert_eq!(fixture.capsule.base_position, 0);
+    assert_eq!(fixture.title_capsule.base_position, 0);
+    assert_eq!(fixture.title_capsule.final_position, 2);
+    assert_eq!(fixture.title_capsule.attempts.len(), 2);
     let initial = CurrentGameSession::from_snapshot(
-        (*fixture.capsule.checkpoint).clone(),
+        (*fixture.title_capsule.checkpoint).clone(),
         seat(),
         GameKernelRoleV7::Authority,
         Arc::clone(&fixture.content),
@@ -267,6 +299,37 @@ fn natural_title_to_battle_held_timer_capsule_replays_full_evidence() -> TestRes
     assert_eq!(
         initial.observe()?.control.ok_or("initial control")?.kind,
         GameControlKindV2::Title
+    );
+    let title_encoded = serde_json::to_vec(&fixture.title_capsule)?;
+    let title_decoded: CurrentReproCapsuleV1 = serde_json::from_slice(&title_encoded)?;
+    let title_replayed = replay(&title_decoded)?;
+    assert_eq!(title_replayed.snapshot()?, fixture.title_final_snapshot);
+    assert_eq!(
+        title_replayed.observe()?.control.ok_or("mode control")?.kind,
+        GameControlKindV2::ModeSelect
+    );
+
+    assert_eq!(fixture.capsule.base_position, 0);
+    assert_eq!(fixture.capsule.final_position, 5);
+    assert_eq!(*fixture.capsule.checkpoint, fixture.active);
+    assert_eq!(
+        active()?.observe()?.control.ok_or("active control")?.kind,
+        GameControlKindV2::BattleCommand
+    );
+    assert_eq!(
+        fixture
+            .capsule
+            .attempts
+            .iter()
+            .map(|attempt| attempt.event.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            key(PhysicalKey::ArrowDown, true),
+            time(249),
+            time(1),
+            key(PhysicalKey::ArrowDown, false),
+            time(500),
+        ]
     );
     let encoded = serde_json::to_vec(&fixture.capsule)?;
     let decoded: CurrentReproCapsuleV1 = serde_json::from_slice(&encoded)?;
@@ -459,6 +522,7 @@ fn byte_rotation_uses_full_serialized_capsule_bound() -> TestResult {
             .snapshot()?,
         session.snapshot()?
     );
+    exact_incremental_capsule_byte_boundaries()?;
     Ok(())
 }
 
@@ -856,5 +920,146 @@ fn browser_transport_validation_checks_admission_continuity_and_outcome_separate
         .ok_or("capsule context")?
         .final_generation = safe(8);
     assert!(false_applied.validate(limits()).is_err());
+    Ok(())
+}
+
+const ACCOUNTING_ORIGIN: &str = r#"accounting "quoted" \ café 😀"#;
+
+fn accounting_capture(
+    session: &mut CurrentGameSession,
+    recorder: &mut CurrentReproRecorderV1,
+    event: CurrentExternalEvent,
+    generation: Option<u64>,
+) -> TestResult<Captured> {
+    let before = session.snapshot()?;
+    let result = session.apply(event.clone());
+    let after = session.snapshot()?;
+    let observation = session.observe()?;
+    let status = match generation {
+        Some(generation) => recorder.record_with_browser_transport(&before, event, result.as_ref(),
+            &after, &observation, Some(ACCOUNTING_ORIGIN), safe(generation), safe(generation)),
+        None => recorder.record_with_origin(&before, event, result.as_ref(), &after, &observation,
+            Some(ACCOUNTING_ORIGIN)),
+    };
+    Ok((result, status))
+}
+
+fn accounting_imported_frontier(frontier: u64, generation: Option<u64>) -> TestResult<CurrentReproCapsuleV1> {
+    let session = active()?;
+    let recorder = match generation {
+        Some(generation) => CurrentReproRecorderV1::new_with_browser_transport(
+            session.snapshot()?, seat(), GameKernelRoleV7::Authority,
+            Arc::clone(&fixture()?.content), limits(), safe(generation))?,
+        None => recorder(&session, limits())?,
+    };
+    // A restored suffix can begin at any safe absolute frontier. No fabricated
+    // gameplay history is inserted; replay validates this empty checkpoint.
+    let mut checkpoint = recorder.export()?;
+    checkpoint.base_position = frontier - 1;
+    checkpoint.final_position = frontier - 1;
+    let (mut recorder, mut session) = CurrentReproRecorderV1::from_capsule(
+        checkpoint, Arc::clone(&fixture()?.content), limits())?;
+    let (result, status) = accounting_capture(&mut session, &mut recorder, time(1), generation)?;
+    assert!(result.is_ok());
+    assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
+    let capsule = recorder.export()?;
+    assert_eq!(capsule.final_position, frontier);
+    assert_eq!(capsule.attempts.len(), 1);
+    Ok(capsule)
+}
+
+fn exact_incremental_capsule_byte_boundaries() -> TestResult {
+    // Independent complete serde encoding is the oracle. Cases straddle both
+    // 9->10 and 99->100 absolute positions, native and browser contexts, one- and
+    // two-digit browser generations, and accepted versus rejected attempts.
+    for (frontier, generation, rejected) in [
+        (9, None, false), (99, None, true), (9, Some(9), false),
+        (99, Some(9), true), (9, Some(10), true), (99, Some(10), false),
+    ] {
+        let baseline = accounting_imported_frontier(frontier, generation)?;
+        let event = if rejected { CurrentExternalEvent::ProposalFrame { bytes: vec![255] } } else { time(1) };
+        let (mut probe, mut session) = CurrentReproRecorderV1::from_capsule(
+            baseline.clone(), Arc::clone(&fixture()?.content), limits())?;
+        let (result, status) = accounting_capture(&mut session, &mut probe, event.clone(), generation)?;
+        assert_eq!(result.is_err(), rejected);
+        assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
+        let expected = probe.export()?;
+        let expected_snapshot = session.snapshot()?;
+        let bytes = serde_json::to_vec(&expected)?.len();
+        assert_eq!(expected.final_position, frontier + 1);
+        assert_eq!(expected.attempts.len(), 2);
+        assert!(expected.attempts.iter().all(|attempt| attempt.origin.as_deref() == Some(ACCOUNTING_ORIGIN)));
+        assert!(serde_json::to_vec(&baseline)?.len() < bytes);
+
+        for exact in [true, false] {
+            let bounded = CurrentReproLimitsV1 { maximum_bytes: bytes - usize::from(!exact), ..limits() };
+            let (mut recorder, mut resumed) = CurrentReproRecorderV1::from_capsule(
+                baseline.clone(), Arc::clone(&fixture()?.content), bounded)?;
+            let before = resumed.snapshot()?;
+            let (result, status) = accounting_capture(&mut resumed, &mut recorder, event.clone(), generation)?;
+            assert_eq!(result.is_err(), rejected);
+            assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
+            let actual = recorder.export()?;
+            assert!(serde_json::to_vec(&actual)?.len() <= bounded.maximum_bytes);
+            if exact {
+                assert_eq!(actual, expected, "exact byte fit must preserve both retained attempts");
+            } else {
+                assert_eq!((actual.base_position, actual.final_position), (frontier, frontier + 1));
+                assert_eq!(actual.attempts.len(), 1, "one-byte overflow must rotate, not publish the old tail");
+                assert_eq!(*actual.checkpoint, before);
+                assert_eq!(actual.attempts[0], expected.attempts[1]);
+            }
+            assert_eq!(resumed.snapshot()?, expected_snapshot);
+            let replayed = replay_current_capsule_v1(&actual, Arc::clone(&fixture()?.content), bounded)?;
+            assert_eq!(replayed.snapshot()?, expected_snapshot);
+            // Import the rotated or exact tail again, then append: this catches
+            // stale imported caches and commas counted against an empty array.
+            let (mut imported, mut continued) = CurrentReproRecorderV1::from_capsule(
+                actual, Arc::clone(&fixture()?.content), bounded)?;
+            let (result, status) = accounting_capture(&mut continued, &mut imported, time(1), generation)?;
+            assert!(result.is_ok());
+            assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
+            let tail = imported.export()?;
+            assert!(serde_json::to_vec(&tail)?.len() <= bounded.maximum_bytes);
+            assert_eq!(replay_current_capsule_v1(&tail, Arc::clone(&fixture()?.content), bounded)?.snapshot()?,
+                continued.snapshot()?);
+        }
+    }
+
+    // A browser adapter gap may recover at a new host generation. Test the
+    // concrete 9->10 digit-width change without inventing a successful kernel
+    // TransportChanged operation for this no-protocol fixture.
+    let previous = accounting_imported_frontier(99, Some(9))?;
+    let (mut recorder, mut session) = CurrentReproRecorderV1::from_capsule(
+        previous, Arc::clone(&fixture()?.content), limits())?;
+    assert!(matches!(recorder.invalidate_attempt("adapter generation changed across capture gap"),
+        CurrentCaptureStatusV1::Unavailable { position: 100, .. }));
+    assert!(recorder.export().is_err());
+    let (result, status) = browser_capture(&mut session, &mut recorder, time(1), 10, 10)?;
+    assert!(result.is_ok());
+    assert!(matches!(status, CurrentCaptureStatusV1::Available { base_position: 100, final_position: 101 }));
+    let recovered = recorder.export()?;
+    assert_eq!(recovered.browser_transport, Some(CurrentReproBrowserTransportV1 {
+        base_generation: safe(10), final_generation: safe(10) }));
+    let (mut probe, mut continued) = CurrentReproRecorderV1::from_capsule(
+        recovered.clone(), Arc::clone(&fixture()?.content),
+        CurrentReproLimitsV1 { maximum_events: 1, ..limits() })?;
+    let (result, status) = browser_capture(&mut continued, &mut probe, time(1), 10, 10)?;
+    assert!(result.is_ok());
+    assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
+    let expected_rotated = probe.export()?;
+    let exact = CurrentReproLimitsV1 { maximum_bytes: serde_json::to_vec(&recovered)?.len()
+        .max(serde_json::to_vec(&expected_rotated)?.len()), ..limits() };
+    let (mut imported, mut resumed) = CurrentReproRecorderV1::from_capsule(
+        recovered, Arc::clone(&fixture()?.content), exact)?;
+    let (result, status) = browser_capture(&mut resumed, &mut imported, time(1), 10, 10)?;
+    assert!(result.is_ok());
+    assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
+    let rotated = imported.export()?;
+    assert_eq!(rotated, expected_rotated);
+    assert_eq!(rotated.attempts.len(), 1);
+    assert_eq!((rotated.base_position, rotated.final_position), (101, 102));
+    assert!(serde_json::to_vec(&rotated)?.len() <= exact.maximum_bytes);
+    assert_eq!(replay_current_capsule_v1(&rotated, Arc::clone(&fixture()?.content), exact)?.snapshot()?, resumed.snapshot()?);
     Ok(())
 }
