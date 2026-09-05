@@ -285,7 +285,7 @@ fn run_campaign(
         FieldSubject::PositionalTag { registry_key } => run_tag_lifecycle(
             &fresh_suppression(),
             VolatileTagSubject::PositionalTag {
-                side: if index % 2 == 0 {
+                side: if index.is_multiple_of(2) {
                     BattleSide::Player
                 } else {
                     BattleSide::Enemy
@@ -529,7 +529,7 @@ fn field_campaigns_are_deterministic_and_rng_is_audited() -> Result<(), Box<dyn 
         er_battle::status::StatusApplicationOutcome::ChanceFailed { draw } => {
             assert!(draw.get() >= 50, "gate draw {draw} below the 50% threshold");
         }
-        other => panic!("chance campaign produced {other:?}"),
+        other => return Err(format!("chance campaign produced {other:?}").into()),
     }
     assert!(
         paralysis_report
@@ -617,7 +617,7 @@ fn field_campaigns_are_deterministic_and_rng_is_audited() -> Result<(), Box<dyn 
     )?;
     match failed {
         er_battle::status::StatusApplicationOutcome::ChanceFailed { .. } => {}
-        other => panic!("zero chance produced {other:?}"),
+        other => return Err(format!("zero chance produced {other:?}").into()),
     }
     assert_eq!(
         rng_zero.audit_entries().len(),
@@ -755,7 +755,7 @@ fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
         bypass: StatusBypass::None,
     })? {
         StatusApplicationOutcome::Applied { mutation } => mutation,
-        other => panic!("toxic admission produced {other:?}"),
+        other => return Err(format!("toxic admission produced {other:?}").into()),
     };
     assert_eq!(toxic_applied.after.kind, StatusKind::Toxic);
     assert!(
@@ -797,7 +797,7 @@ fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
                 count = mutation.status_after.toxic_turn_count;
                 hp = mutation.hp_after;
             }
-            other => panic!("toxic residual produced {other:?}"),
+            other => return Err(format!("toxic residual produced {other:?}").into()),
         }
     }
     assert_eq!(damages, vec![6, 12, 18], "toxic ramp diverged");
@@ -812,7 +812,7 @@ fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
     ));
     let mut sleeping = match apply_sleep_window(clean(), normal, false, 3)? {
         StatusApplicationOutcome::Applied { mutation } => mutation.after,
-        other => panic!("sleep admission produced {other:?}"),
+        other => return Err(format!("sleep admission produced {other:?}").into()),
     };
     assert_eq!(sleeping.sleep_turns_remaining, Some(3));
     let mut gate_sequence = Vec::new();
@@ -825,7 +825,7 @@ fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
                 gate_sequence.push(0);
                 break;
             }
-            SleepGateOutcome::NotAsleep => panic!("sleep gate lost its sleeper"),
+            SleepGateOutcome::NotAsleep => return Err("sleep gate lost its sleeper".into()),
         }
     }
     assert_eq!(gate_sequence, vec![2, 1, 0]);
@@ -835,11 +835,11 @@ fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
     // FREEZE carrier chip: maxHp/16 with minimum one, HP-capped.
     match resolve_frostbite_chip(80, 100)? {
         FrostbiteChipOutcome::Chipped { damage } => assert_eq!(damage, 6),
-        other => panic!("frostbite chip produced {other:?}"),
+        other => return Err(format!("frostbite chip produced {other:?}").into()),
     }
     match resolve_frostbite_chip(15, 15)? {
         FrostbiteChipOutcome::Chipped { damage } => assert_eq!(damage, 1),
-        other => panic!("frostbite chip produced {other:?}"),
+        other => return Err(format!("frostbite chip produced {other:?}").into()),
     }
 
     // Cures write the cleared sentinel; curing a cleared target rejects.
@@ -853,7 +853,7 @@ fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
             assert_eq!(mutation.before.kind, StatusKind::Burn);
             assert_eq!(mutation.after.kind, StatusKind::None);
         }
-        other => panic!("cure produced {other:?}"),
+        other => return Err(format!("cure produced {other:?}").into()),
     }
     assert!(matches!(
         cure_major_status(clean())?,

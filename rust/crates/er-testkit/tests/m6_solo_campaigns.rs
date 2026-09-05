@@ -201,7 +201,7 @@ impl KernelHost {
         let projection = self
             .kernel()?
             .battle_ui_projection()
-            .ok_or_else(|| "kernel exposed no battle UI projection")?;
+            .ok_or("kernel exposed no battle UI projection")?;
         let control = &projection.seat_control.control;
         let (kind, menu, outcome) = match control {
             BattleControl::CommandRoot(value) => {
@@ -276,11 +276,11 @@ impl KernelHost {
         let species = content
             .species
             .get(usize::try_from(plan.species_slot)?)
-            .ok_or_else(|| "planned species slot is outside selected content")?;
+            .ok_or("planned species slot is outside selected content")?;
         let move_definition = content
             .moves
             .get(usize::try_from(plan.move_slot)?)
-            .ok_or_else(|| "planned move slot is outside selected content")?;
+            .ok_or("planned move slot is outside selected content")?;
         let profile = plan.profile;
         PokemonState::new(
             PokemonId::new(safe(plan.pokemon_number)),
@@ -356,7 +356,7 @@ impl KernelHost {
                 battle_id,
                 wave,
                 turn,
-                enemy_slot.clone(),
+                enemy_slot,
                 safe(u64::from(cursor)),
             )?;
             scripts.push(ScriptedEnemyBattleCommandV1::new(
@@ -366,7 +366,7 @@ impl KernelHost {
                 turn,
                 safe(u64::from(cursor)),
                 enemy_pokemon,
-                enemy_slot.clone(),
+                enemy_slot,
                 enemy_command.clone(),
             )?);
         }
@@ -666,9 +666,11 @@ fn identical_seed_and_trace_replays_byte_identically() -> TestResult {
         solo_campaign::SoloTraceEntry::BattleOpened {
             frontier_digest, ..
         } => {
-            frontier_digest.insert_str(0, "f");
+            frontier_digest.insert(0, 'f');
         }
-        other => panic!("expected BattleOpened trace header, found {other:?}"),
+        other => {
+            return Err(format!("expected BattleOpened trace header, found {other:?}").into());
+        }
     }
     let tampered_run = SoloCampaignRun {
         report: first.report.clone(),

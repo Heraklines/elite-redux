@@ -803,6 +803,18 @@
   "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes",
   "ai_damage_query_focus": {
     "lint_repair_exact_test_ids": {
+      "er-testkit:m6_solo_campaigns": [
+        "planning_is_deterministic_and_fails_closed",
+        "seeded_solo_campaigns_reach_terminal_outcomes_over_prepared_full_content",
+        "identical_seed_and_trace_replays_byte_identically"
+      ],
+      "er-testkit:m6_field_parity": [
+        "field_inventory_is_exactly_once_with_zero_residual",
+        "field_lifecycles_satisfy_every_frozen_witness",
+        "field_campaigns_are_deterministic_and_rng_is_audited",
+        "first_divergence_localizes_exact_step_including_false_conditions",
+        "expanded_status_lane_semantics_are_exact"
+      ],
       "er-testkit:m6_native_wasm": [
         "full_m6_fixture_catalog_is_float_free_and_compiles_deterministically",
         "trace_round_trip_and_replay_are_canonical_and_deterministic",
@@ -874,7 +886,9 @@
         "m6_foundation",
         "m6_native_wasm",
         "m71_foundation",
-        "m7_system_proof"
+        "m7_system_proof",
+        "m6_solo_campaigns",
+        "m6_field_parity"
       ],
       "er-wasm": [
         "er_wasm"
@@ -918,7 +932,9 @@
         "m6_foundation",
         "m6_native_wasm",
         "m71_foundation",
-        "m7_system_proof"
+        "m7_system_proof",
+        "m6_solo_campaigns",
+        "m6_field_parity"
       ]
     },
     "lint_repair_doc_paths": ["rust/contracts/m71-api.md"],
@@ -967,7 +983,10 @@
       "rust/crates/er-state/tests/m4_foundation_properties.rs",
       "rust/crates/er-testkit/tests/m6_foundation.rs",
       "rust/crates/er-wasm/src/m6_parity.rs",
-      "rust/crates/er-world/src/runtime.rs"
+      "rust/crates/er-world/src/runtime.rs",
+      "rust/crates/er-sim/benches/m4_runtime_benchmark.rs",
+      "rust/crates/er-testkit/tests/m6_solo_campaigns.rs",
+      "rust/crates/er-testkit/tests/m6_field_parity.rs"
     ],
     "execute": {
       "er-batch": [

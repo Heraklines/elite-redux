@@ -2273,3 +2273,26 @@ covering nine changed files. The compact2155-byte summary and named35,890-byte
 harness log identify the result. Full patch came from the inspected8407-byte
 format-repair artifact; the compact patch alone omitted four paths. No local
 formatter or test execution. Coverage and qualification baseline stay unchanged.
+
+## Remaining benchmark and testkit lint repairs
+
+f073a19681049107e9617c012ec11382c599a378 / run33999208019 passed remote
+formatting and compilation (3.523/155.250 seconds). Discovery selected1,176 real
+native IDs with68 mandatory nonempty targets; the full selected-package Clippy
+command failed before any native execution. Failure-only diagnostics completed
+all25 packages in88.531 seconds:23 passed, er-sim and er-testkit failed. The3424-
+byte index SHA256 d743c93130ad59cd0d1235a5c873aa47a481d7ffda7ef2eade920482c45d66e7
+and only the named2687/9014-byte package logs were retrieved with bounded reads.
+
+Repair six benchmark output statements with explicit locked stdout writes and
+propagated I/O errors; retain every workload, output JSON and assertion. This
+uses direct I/O rather than libtest's print capture. All-target Clippy compiles
+this benchmark; this cut does not execute or make performance claims for it.
+Repair17 diagnostics in m6_solo_campaigns and m6_field_parity with equivalent
+Option/Copy/character/modulo idioms and fallible test errors. The exact7139-byte
+reviewed patch is9852d67737d86022ebf8341e71d6815d2453e11a600cf17077ca6ede9590e319;
+all eight existing test IDs and67 assertions remain. Both actual test targets
+and their eight exact IDs join mandatory native execution:70 nonempty targets,
+48 named companion repair paths. Existing165 harness IDs, pure-query50 targets,
+ordinary full Clippy, reverse compilation, controls, platform proofs, bounds and
+f140 qualification baseline remain. No local workload or qualification claim.

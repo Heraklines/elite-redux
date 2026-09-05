@@ -78,6 +78,9 @@ AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-testkit/tests/m6_foundation.rs",
     "rust/crates/er-wasm/src/m6_parity.rs",
     "rust/crates/er-world/src/runtime.rs",
+    "rust/crates/er-sim/benches/m4_runtime_benchmark.rs",
+    "rust/crates/er-testkit/tests/m6_solo_campaigns.rs",
+    "rust/crates/er-testkit/tests/m6_field_parity.rs",
 ]
 
 
@@ -91,7 +94,7 @@ AI_DAMAGE_QUERY_LINT_REPAIR_EXECUTE = {
     "er-scenario": ["er_scenario"],
     "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
     "er-state": ["er_state", "m4_foundation_properties"],
-    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity"],
     "er-wasm": ["er_wasm"],
     "er-world": ["er_world"],
 }
@@ -105,10 +108,22 @@ AI_DAMAGE_QUERY_LINT_REPAIR_REQUIRED_TARGETS = {
     "er-scenario": ["er_scenario"],
     "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
     "er-state": ["er_state", "m4_foundation_properties"],
-    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity"],
 }
 
 AI_DAMAGE_QUERY_LINT_REPAIR_EXACT_TEST_IDS = {
+    "er-testkit:m6_solo_campaigns": [
+        "planning_is_deterministic_and_fails_closed",
+        "seeded_solo_campaigns_reach_terminal_outcomes_over_prepared_full_content",
+        "identical_seed_and_trace_replays_byte_identically",
+    ],
+    "er-testkit:m6_field_parity": [
+        "field_inventory_is_exactly_once_with_zero_residual",
+        "field_lifecycles_satisfy_every_frozen_witness",
+        "field_campaigns_are_deterministic_and_rng_is_audited",
+        "first_divergence_localizes_exact_step_including_false_conditions",
+        "expanded_status_lane_semantics_are_exact",
+    ],
     "er-testkit:m6_native_wasm": [
         "full_m6_fixture_catalog_is_float_free_and_compiles_deterministically",
         "trace_round_trip_and_replay_are_canonical_and_deterministic",

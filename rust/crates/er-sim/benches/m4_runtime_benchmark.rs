@@ -3,6 +3,7 @@
 //! validates the remaining manifest workloads separately.
 
 use std::error::Error;
+use std::io::Write;
 use std::time::Instant;
 
 use er_game::battle_start_v2::start_battle_v2;
@@ -308,14 +309,15 @@ fn m4_run_surface_raw_key_events_100000() -> Result {
         kernel.live_resources(),
         er_types::LiveResourceSnapshot::default()
     );
-    println!(
+    writeln!(
+        std::io::stdout().lock(),
         "{}",
         json!({
             "id": "run-surface-raw-key-events-100000",
             "events": RAW_EVENT_COUNT,
             "execution_ms": elapsed_ms
         })
-    );
+    )?;
     Ok(())
 }
 
@@ -340,14 +342,15 @@ fn m4_two_client_transitions_1000() -> Result {
     let (host, guest) = pair.teardown("benchmark complete");
     assert_eq!(host, er_types::LiveResourceSnapshot::default());
     assert_eq!(guest, er_types::LiveResourceSnapshot::default());
-    println!(
+    writeln!(
+        std::io::stdout().lock(),
         "{}",
         json!({
             "id": "two-client-wave-transitions-1000",
             "transitions": PAIR_TRANSITION_COUNT,
             "execution_ms": elapsed_ms
         })
-    );
+    )?;
     Ok(())
 }
 
@@ -398,15 +401,17 @@ fn m4_reward_market_cycles_1000() -> Result {
         checksum = checksum.wrapping_add(u64::from(purchased.remaining_quantity));
     }
     std::hint::black_box(checksum);
-    println!(
+    let elapsed_ms = started.elapsed().as_millis();
+    writeln!(
+        std::io::stdout().lock(),
         "{}",
         json!({
             "id": "reward-market-cycles-1000",
             "transitions": 1000,
-            "execution_ms": started.elapsed().as_millis(),
+            "execution_ms": elapsed_ms,
             "checksum": checksum
         })
-    );
+    )?;
     Ok(())
 }
 
@@ -434,15 +439,17 @@ fn m4_biome_transitions_1000() -> Result {
         checksum = checksum.wrapping_add(selected.biome.get().get());
     }
     std::hint::black_box(checksum);
-    println!(
+    let elapsed_ms = started.elapsed().as_millis();
+    writeln!(
+        std::io::stdout().lock(),
         "{}",
         json!({
             "id": "biome-transitions-1000",
             "transitions": 1000,
-            "execution_ms": started.elapsed().as_millis(),
+            "execution_ms": elapsed_ms,
             "checksum": checksum
         })
-    );
+    )?;
     Ok(())
 }
 
@@ -494,15 +501,17 @@ fn m4_wave_transitions_10000() -> Result {
         );
     }
     std::hint::black_box(checksum);
-    println!(
+    let elapsed_ms = started.elapsed().as_millis();
+    writeln!(
+        std::io::stdout().lock(),
         "{}",
         json!({
             "id": "wave-transitions-10000",
             "transitions": 10000,
-            "execution_ms": started.elapsed().as_millis(),
+            "execution_ms": elapsed_ms,
             "checksum": checksum
         })
-    );
+    )?;
     Ok(())
 }
 
@@ -570,7 +579,9 @@ fn run_complete_worker(worker: u64) -> Result {
     let started = Instant::now();
     let (checksum, raw_events) = run_complete_batch(25)?;
     std::hint::black_box(checksum);
-    println!(
+    let elapsed_ms = started.elapsed().as_millis();
+    writeln!(
+        std::io::stdout().lock(),
         "{}",
         json!({
             "id": "complete-runs-200-waves-100",
@@ -580,10 +591,10 @@ fn run_complete_worker(worker: u64) -> Result {
             "workers": 4,
             "waves_each": 200,
             "events": raw_events,
-            "execution_ms": started.elapsed().as_millis(),
+            "execution_ms": elapsed_ms,
             "checksum": checksum
         })
-    );
+    )?;
     Ok(())
 }
 
