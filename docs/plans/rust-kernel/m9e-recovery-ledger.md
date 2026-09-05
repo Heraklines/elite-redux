@@ -833,3 +833,8 @@ blake3 hash and assert the content identity actually differs. This preserves the
 intended replay content-identity rejection rather than relying on malformed input.
 Zero product tests selected/executed. Compact 4,329 compressed bytes downloaded;
 15,973-byte diagnostics remain remote. Baseline remains qualified `9459b9c`.
+
+The hash fixture correction candidate `a29696510b478959f8a4f5bef5148da02d1e3a33`,
+run `33947489507`, returned one complete 646-byte formatting patch for the core
+assertion. Applied as returned. Compact 3,583 compressed bytes downloaded;
+6,144-byte diagnostics remain remote. Zero selected/executed product tests.
