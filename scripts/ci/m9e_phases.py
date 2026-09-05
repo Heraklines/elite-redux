@@ -33,7 +33,7 @@ WASM_IDS = {"wasm_replays_v7_raw_inputs_eventwise", "wasm_replays_v7_held_timers
 BROWSER_IDS = {"natural V7 browser startup reaches the real battle command",
                "two V7 browser hosts wait for both humans and converge one turn"}
 LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-                  ("er-cli", "m9e_current_batch")}
+                  ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")}
 
 
 def inventory_and_assignment(enumerated, lane):

@@ -3080,6 +3080,12 @@ class PhaseTransferTests(unittest.TestCase):
         proof["timer_mutant"]["test"] = "different_behavior"
         with self.assertRaisesRegex(RuntimeError, "mutant"):
             self.phases.validate_native(proof, self.identity)
+        for key in ("timer_mutant", "replica_mutant"):
+            with self.subTest(lane="b", mutant=key):
+                proof = copy.deepcopy(self.other)
+                proof[key] = {"status": "detected"}
+                with self.assertRaisesRegex(RuntimeError, "lane B cannot claim lane A mutant"):
+                    self.phases.validate_native(proof, self.identity)
 
     def test_transfer_rejects_manifest_path_size_hash_and_extra_files(self):
         for key, value in (("file", "../er-cli"), ("bytes", self.phases.CLI_LIMIT + 1),
@@ -3266,18 +3272,45 @@ class PhaseTransferTests(unittest.TestCase):
         inventory.extend([
             {"crate": "er-web", "target": "m9e_host_v2", "ids": ["host"], "historical_excluded_ids": []},
             {"crate": "er-cli", "target": "m9e_current_batch", "ids": ["batch"], "historical_excluded_ids": []},
+            {"crate": "er-cli", "target": "m9e_current_reload", "ids": ["reload"], "historical_excluded_ids": []},
+            {"crate": "er-other", "target": "m9e_current_reload", "ids": ["unrelated"], "historical_excluded_ids": []},
+            {"crate": "er-kernel", "target": "m9e_timers_v7", "ids": ["timer"], "historical_excluded_ids": []},
+            {"crate": "er-kernel", "target": "m9e_coop_v7", "ids": ["replica"], "historical_excluded_ids": []},
             {"crate": "er-other", "target": "m9e_host_v2", "ids": [], "historical_excluded_ids": []},
         ])
         assignment = self.phases.partition(inventory)
         self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
         self.assertIn(["er-cli", "m9e_current_batch"], assignment["b"])
+        self.assertIn(["er-cli", "m9e_current_reload"], assignment["b"])
+        self.assertNotIn(["er-cli", "m9e_current_reload"], assignment["a"])
+        self.assertIn(["er-other", "m9e_current_reload"], assignment["a"])
+        self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
+        self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
+        self.assertEqual(len(assignment["b"]), 4)
         self.assertEqual(len(assignment["a"]) + len(assignment["b"]), len(inventory))
+        self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
+        self.assertEqual(sorted(assignment["a"] + assignment["b"]),
+                         sorted([[item["crate"], item["target"]] for item in inventory]))
         inventory.append(copy.deepcopy(inventory[0]))
         with self.assertRaisesRegex(RuntimeError, "duplicated"):
             self.phases.partition(inventory)
 
     def test_native_partition_rejects_omission_overlap_and_unexecuted_target(self):
+        complete = copy.deepcopy(self.other)
+        complete["inventory"].append({"crate": "er-cli", "target": "m9e_current_reload",
+                                      "ids": ["reload"], "historical_excluded_ids": []})
+        complete["inventory_sha256"] = self.phases.sha(self.phases.encoded(complete["inventory"]))
+        complete["assigned_targets"] = self.phases.partition(complete["inventory"])["b"]
+        complete["completed_targets"] = copy.deepcopy(complete["assigned_targets"])
+        complete["tests"].update({"selected": 14, "executed": 3, "passed": 3})
+        self.phases.validate_native(complete, self.identity)
+        for key in ("assigned_targets", "completed_targets"):
+            with self.subTest(key=key, target="er-cli:m9e_current_reload"):
+                proof = copy.deepcopy(complete)
+                proof[key].remove(["er-cli", "m9e_current_reload"])
+                with self.assertRaises(RuntimeError):
+                    self.phases.validate_native(proof, self.identity)
         for key in ("assigned_targets", "completed_targets"):
             for mode in ("omit", "duplicate", "wrong_lane"):
                 with self.subTest(key=key, mode=mode):

@@ -329,12 +329,10 @@ impl AppliedGameMaterialLedgerV1 {
         {
             return Err(GameMaterialV6Error::Ledger);
         }
-        let mut operations = BTreeSet::new();
-        if self
-            .records
-            .iter()
-            .any(|record| !operations.insert(&record.operation_id))
-        {
+        let mut operations: Vec<&OperationId> =
+            self.records.iter().map(|record| &record.operation_id).collect();
+        operations.sort_unstable();
+        if operations.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(GameMaterialV6Error::Ledger);
         }
         if let Some(last) = self.records.last() {
@@ -652,7 +650,7 @@ fn valid_digest(value: &str) -> bool {
         body.len() == 64
             && body
                 .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
     })
 }
 

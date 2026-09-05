@@ -1670,3 +1670,42 @@ full-ledger validations in a dispatch-plus-replica iteration. It does not add a
 validation cache or claim measured speedup. Root and independent causal review
 approved the source; the same tests and bounded timing trace must verify it
 remotely with the separately committed125-test phase-manifest repair.
+
+### Native lane timeout and validation-cost repair (remote execution pending)
+
+Candidate 3a441203aa35330ad7d2fc7b918c7ee2fd368901, run 33972172531,
+was cancelled when native A exceeded its 35-minute job limit. Its last compact
+checkpoint reports 610 passing tests, zero failures/skips and unfinished native
+execution at er-batch:m9e_current_batch; it published no native A proof. Native B
+passed all 18 assigned tests and published its indexed bounded proof. Platform
+was skipped and aggregate failed. The fully qualified baseline remains
+3aa4a0c/run33963418110. Partial passing counts are not retention qualification.
+
+The retention helper target passed in 599060 ms, with the full 12289-operation
+loop taking 596687 ms (dispatch 392843 ms, replica apply 200472 ms). Full-ledger
+validation samples near the 4096-record capacity were about 17 ms. V7 retention
+passed in 255667 ms and current CLI reload in 567462 ms. Cross-run runner variance
+prevents attributing an absolute speedup or regression to private proof reuse.
+Only inspected A/B compact archives (1371/3162 compressed bytes) and the needed
+3563-byte retention progress member (849 compressed bytes) were retrieved, the
+latter through bounded ZIP ranges from the inspected 94394-byte A diagnostics.
+Complete logs, build outputs and proof artifacts remain remote.
+
+The next cut moves only er-cli:m9e_current_reload to native B. Both existing
+reload tests, worker/CLI bindings, full inventory validation, exact lane union,
+required IDs and A-owned timer/replica controls remain mandatory. Platform still
+uses A's parity and exact CLI; aggregate still requires successful complete B.
+Three existing harness test bodies add exact crate-qualified assignment,
+omission/completion, union and mutant ownership checks; all 125 declarations
+remain. Target limits stay 600 seconds and job limits stay 35 minutes.
+
+Ledger validation retains every existing check and error stage. Duplicate IDs
+are checked using one bounded vector of borrowed OperationId references, sorted
+and compared adjacently, replacing BTreeSet node insertion at the same stage.
+Derived String equality and ordering make these predicates equivalent; record
+order is untouched. The shared digest predicate uses explicit ASCII byte-range
+patterns with the same exact prefix, 64-byte length and lowercase-only acceptance.
+Full validation still runs on every invocation; no cache, trusted flag, skipped
+import validation, schema change or retention-bound change is introduced. These
+source changes require the unchanged remote ordinary and platform checks; no
+measured speedup is claimed before that run.
