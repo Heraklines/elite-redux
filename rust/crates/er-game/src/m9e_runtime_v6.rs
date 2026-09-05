@@ -42,9 +42,9 @@ use crate::m9e_content_v2::{
     PreparedGameContentV2, PresentationCueFamilyV1, PresentationSemanticIdV1,
 };
 use crate::m9e_material_v6::{
-    AppliedGameMaterialLedgerV1, AppliedMaterialRetentionV1, GameActionDomainV2, GameIdentityDomainV1,
-    GameMaterialApplyOutcomeV6, GameMaterialV6, GameMutationEvidenceV2, GameMutationKindV2,
-    GamePlatformEffectV2, GamePresentationEffectV2, GameTransitionMaterialV6,
+    AppliedGameMaterialLedgerV1, AppliedMaterialRetentionV1, GameActionDomainV2,
+    GameIdentityDomainV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GameMutationEvidenceV2,
+    GameMutationKindV2, GamePlatformEffectV2, GamePresentationEffectV2, GameTransitionMaterialV6,
     apply_game_material_v6_with_retention, empty_game_state_digest, game_state_digest,
 };
 use crate::m9e_new_run_v6::advance_to_next_encounter_v6;
@@ -150,7 +150,12 @@ impl GameRuntimeV6 {
         content: Arc<PreparedGameContentV2>,
         next_authority_revision: SafeU53,
     ) -> Result<Self, GameRuntimeV6Error> {
-        Self::new_with_retention(state, content, next_authority_revision, AppliedMaterialRetentionV1::HistoricalHardStop)
+        Self::new_with_retention(
+            state,
+            content,
+            next_authority_revision,
+            AppliedMaterialRetentionV1::HistoricalHardStop,
+        )
     }
 
     pub fn new_with_retention(
@@ -180,7 +185,11 @@ impl GameRuntimeV6 {
         snapshot: GameRuntimeSnapshotV6,
         content: Arc<PreparedGameContentV2>,
     ) -> Result<Self, GameRuntimeV6Error> {
-        Self::from_snapshot_with_retention(snapshot, content, AppliedMaterialRetentionV1::HistoricalHardStop)
+        Self::from_snapshot_with_retention(
+            snapshot,
+            content,
+            AppliedMaterialRetentionV1::HistoricalHardStop,
+        )
     }
 
     /// Policy is supplied explicitly by the restoring adapter, never by wire data.
@@ -400,7 +409,14 @@ impl GameActionDispatcherV1 {
         action: GameActionV1,
         context: GameActionDispatchContextV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
-        Self::prepare_with_retention(before, content, ledger, action, context, AppliedMaterialRetentionV1::HistoricalHardStop)
+        Self::prepare_with_retention(
+            before,
+            content,
+            ledger,
+            action,
+            context,
+            AppliedMaterialRetentionV1::HistoricalHardStop,
+        )
     }
 
     pub fn prepare_with_retention(
@@ -412,7 +428,9 @@ impl GameActionDispatcherV1 {
         retention: AppliedMaterialRetentionV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
         if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
-            ledger.validate_with_retention(retention).map_err(material_error)?;
+            ledger
+                .validate_with_retention(retention)
+                .map_err(material_error)?;
         }
         action.validate().map_err(|_| GameRuntimeV6Error::Action)?;
         if !context.authority

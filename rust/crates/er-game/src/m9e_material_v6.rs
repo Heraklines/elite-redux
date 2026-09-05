@@ -33,7 +33,9 @@ pub const MAX_APPLIED_MATERIAL_RECORDS_V1: usize = 4_096;
 pub enum AppliedMaterialRetentionV1 {
     #[default]
     HistoricalHardStop,
-    BoundedSuffix { maximum_records: usize },
+    BoundedSuffix {
+        maximum_records: usize,
+    },
 }
 
 impl AppliedMaterialRetentionV1 {
@@ -360,7 +362,10 @@ impl AppliedGameMaterialLedgerV1 {
         self.validate()?;
         if let AppliedMaterialRetentionV1::BoundedSuffix { maximum_records } = retention
             && (self.records.len() > maximum_records
-                || self.records.first().is_some_and(|record| record.authority_revision == SafeU53::ZERO)
+                || self
+                    .records
+                    .first()
+                    .is_some_and(|record| record.authority_revision == SafeU53::ZERO)
                 || self.records.windows(2).any(|pair| {
                     pair[0].authority_revision.get().checked_add(1)
                         != Some(pair[1].authority_revision.get())
@@ -379,7 +384,11 @@ pub fn apply_game_material_v6(
     bytes: &[u8],
 ) -> Result<GameMaterialApplyOutcomeV6, GameMaterialV6Error> {
     apply_game_material_v6_with_retention(
-        live, ledger, content, bytes, AppliedMaterialRetentionV1::HistoricalHardStop,
+        live,
+        ledger,
+        content,
+        bytes,
+        AppliedMaterialRetentionV1::HistoricalHardStop,
     )
 }
 
@@ -394,7 +403,12 @@ pub fn apply_game_material_v6_with_retention(
     let material = GameMaterialV6::decode(bytes)?;
     let transition = material.transition();
     if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
-        let floor = ledger.records.first().map_or(ledger.next_authority_revision, |record| record.authority_revision);
+        let floor = ledger
+            .records
+            .first()
+            .map_or(ledger.next_authority_revision, |record| {
+                record.authority_revision
+            });
         if transition.authority_revision < floor {
             return Err(GameMaterialV6Error::StaleUnverifiable);
         }

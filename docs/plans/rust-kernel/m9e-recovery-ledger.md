@@ -1450,3 +1450,12 @@ retention targets receive early execution priority before the existing timer
 sequence; all discovery/lint/membership/phase/platform/artifact requirements stay.
 Remote formatting/compilation/execution remain required; no local workloads ran.
 The separate native-capture product and combined126 gate are still unintegrated.
+
+Retentiona49579da3e1926235181c70b1c3ca4e62f5a78c2/run33965131277 passed122
+harness checks and stopped at formatting,0producttests. Downloaded only inspected
+8,822 compressed-byte nativeA summary. Its27,486-byte patch omitted19,530 bytes
+for the V7test, so it was NOT applied. Inspected/downloaded named7,854 compressed-byte
+repair artifact instead. Complete47,016-byte format-repair.patch verified SHA256
+33481d5e15c4ede77537fb297cc7cd361344e5a1e7432995918b6abbeb22d647
+and applied to all five touchedRustfiles. DuplicateB/full30,033-byte diagnostics
+remainremote. Baseline remains qualified3aa/run33963418110; no productqualification.
