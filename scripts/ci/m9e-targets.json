@@ -10,7 +10,7 @@
   "current_session_packages": ["er-env"],
   "current_session_wasm_test": "m9e_parity",
   "current_session_focus": {
-    "paths": ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs"],
+    "paths": ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/src/m72_lab.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs"],
     "execute": {"er-env": ["*"], "er-cli": ["*"], "er-wasm": ["m9e_parity"]},
     "reason": "CLI-only changes use current session/CLI and parity witnesses. Shared session changes additionally require the browser scope because BrowserKernelHostV2 consumes it. Compile the full reverse dependency cone."
   },

@@ -24,8 +24,8 @@ use crate::m72::{BoundedLineStatusV1, read_bounded_jsonl_line_v1};
 
 #[derive(Debug)]
 enum WarmCliSessionV1 {
-    Bootstrap(RunBootstrapMachineV1),
-    Game(GameEnvironment),
+    Bootstrap(Box<RunBootstrapMachineV1>),
+    Game(Box<GameEnvironment>),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -171,14 +171,14 @@ impl AgentDispatcherV1 for WarmCliDispatcherV1 {
                         seed,
                         owner_seat,
                         catalog,
-                    } => WarmCliSessionV1::Bootstrap(
+                    } => WarmCliSessionV1::Bootstrap(Box::new(
                         RunBootstrapMachineV1::new(profile, seed, owner_seat, catalog)
                             .map_err(backend_error)?,
-                    ),
-                    WarmCliStartV1::Snapshot { snapshot } => WarmCliSessionV1::Game(
+                    )),
+                    WarmCliStartV1::Snapshot { snapshot } => WarmCliSessionV1::Game(Box::new(
                         GameEnvironment::from_snapshot(snapshot, Arc::clone(&self.content))
                             .map_err(backend_error)?,
-                    ),
+                    )),
                     WarmCliStartV1::Scenario {
                         snapshot,
                         provenance,
@@ -189,10 +189,10 @@ impl AgentDispatcherV1 for WarmCliDispatcherV1 {
                         ) {
                             return Err(backend_error("invalid-negative scenario cannot start"));
                         }
-                        WarmCliSessionV1::Game(
+                        WarmCliSessionV1::Game(Box::new(
                             GameEnvironment::from_snapshot(snapshot, Arc::clone(&self.content))
                                 .map_err(backend_error)?,
-                        )
+                        ))
                     }
                     WarmCliStartV1::Preset {
                         id,
@@ -207,10 +207,10 @@ impl AgentDispatcherV1 for WarmCliDispatcherV1 {
                         {
                             return Err(backend_error("invalid preset"));
                         }
-                        WarmCliSessionV1::Game(
+                        WarmCliSessionV1::Game(Box::new(
                             GameEnvironment::from_snapshot(snapshot, Arc::clone(&self.content))
                                 .map_err(backend_error)?,
-                        )
+                        ))
                     }
                     WarmCliStartV1::Capsule {
                         capsule_digest,
@@ -219,10 +219,10 @@ impl AgentDispatcherV1 for WarmCliDispatcherV1 {
                         if capsule_digest.is_empty() {
                             return Err(backend_error("invalid capsule identity"));
                         }
-                        WarmCliSessionV1::Game(
+                        WarmCliSessionV1::Game(Box::new(
                             GameEnvironment::from_snapshot(snapshot, Arc::clone(&self.content))
                                 .map_err(backend_error)?,
-                        )
+                        ))
                     }
                 };
                 self.sessions.insert(request.session.clone(), session);

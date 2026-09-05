@@ -131,8 +131,13 @@ struct CommandFiles(PathBuf);
 
 impl CommandFiles {
     fn new() -> Result<Self, Box<dyn Error>> {
-        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_nanos();
-        let path = std::env::temp_dir().join(format!("m9e-current-command-{}-{nonce}", std::process::id()));
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "m9e-current-command-{}-{nonce}",
+            std::process::id()
+        ));
         std::fs::create_dir(&path)?;
         Ok(Self(path))
     }
@@ -150,25 +155,43 @@ impl Drop for CommandFiles {
     }
 }
 
-fn run_current_command(command: &str, options: &[(&str, String)], input: &str) -> Result<std::process::Output, Box<dyn Error>> {
+fn run_current_command(
+    command: &str,
+    options: &[(&str, String)],
+    input: &str,
+) -> Result<std::process::Output, Box<dyn Error>> {
     let mut process = Command::new(env!("CARGO_BIN_EXE_er-cli"));
     process.arg(command).arg("--content").arg(content_path());
     for (key, value) in options {
         process.arg(format!("--{key}")).arg(value);
     }
-    let mut child = process.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    let mut child = process
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
     let mut writer = child.stdin.take().ok_or("command stdin")?;
     let bytes = input.as_bytes().to_vec();
     let writing = std::thread::spawn(move || writer.write_all(&bytes));
     let output = child.wait_with_output()?;
-    writing.join().map_err(|_| "command input writer panicked")??;
+    writing
+        .join()
+        .map_err(|_| "command input writer panicked")??;
     Ok(output)
 }
 
 fn command_values(output: &std::process::Output) -> Result<Vec<Value>, Box<dyn Error>> {
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    Ok(output.stdout.split(|byte| *byte == b'\n').filter(|line| !line.is_empty())
-        .map(serde_json::from_slice).collect::<Result<Vec<Value>, _>>()?)
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(output
+        .stdout
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .map(serde_json::from_slice)
+        .collect::<Result<Vec<Value>, _>>()?)
 }
 
 #[test]
@@ -178,91 +201,193 @@ fn normal_new_run_resume_and_simulate_use_current_session_events() -> Result<(),
 
     let files = CommandFiles::new()?;
     let profile_path = files.write("profile.json", &profile()?)?;
-    let output = run_current_command("new-run", &[
-        ("profile", profile_path.to_string_lossy().into_owned()),
-        ("seed", "m9e-normal-current".into()), ("save-slot", "preview-slot".into()),
-    ], "space\nsnapshot\nq\n")?;
+    let output = run_current_command(
+        "new-run",
+        &[
+            ("profile", profile_path.to_string_lossy().into_owned()),
+            ("seed", "m9e-normal-current".into()),
+            ("save-slot", "preview-slot".into()),
+        ],
+        "space\nsnapshot\nq\n",
+    )?;
     let values = command_values(&output)?;
     assert_eq!(values[0]["observation"]["kernel_version"], 7);
-    let initial: CoreGameKernelSnapshotV7 = serde_json::from_value(values.iter()
-        .find_map(|value| value.get("snapshot")).ok_or("new-run snapshot")?.clone())?;
-    let mut direct = CurrentGameSession::from_snapshot(initial.clone(), SeatId::new(SafeU53::new(1)?), GameKernelRoleV7::Authority, content()?)?;
-    assert_eq!(direct.observe()?.control.ok_or("mode control")?.kind, GameControlKindV2::ModeSelect);
+    let initial: CoreGameKernelSnapshotV7 = serde_json::from_value(
+        values
+            .iter()
+            .find_map(|value| value.get("snapshot"))
+            .ok_or("new-run snapshot")?
+            .clone(),
+    )?;
+    let mut direct = CurrentGameSession::from_snapshot(
+        initial.clone(),
+        SeatId::new(SafeU53::new(1)?),
+        GameKernelRoleV7::Authority,
+        content()?,
+    )?;
+    assert_eq!(
+        direct.observe()?.control.ok_or("mode control")?.kind,
+        GameControlKindV2::ModeSelect
+    );
     let path = files.write("snapshot.json", &initial)?;
-    let event = CurrentExternalEvent::AdvanceTime { milliseconds: SafeU53::new(17)? };
+    let event = CurrentExternalEvent::AdvanceTime {
+        milliseconds: SafeU53::new(17)?,
+    };
     let expected = direct.apply(event.clone())?;
-    let output = run_current_command("resume", &[("snapshot", path.to_string_lossy().into_owned())],
-        &format!("  {}\nsnapshot\nq\n", serde_json::to_string(&event)?))?;
+    let output = run_current_command(
+        "resume",
+        &[("snapshot", path.to_string_lossy().into_owned())],
+        &format!("  {}\nsnapshot\nq\n", serde_json::to_string(&event)?),
+    )?;
     let values = command_values(&output)?;
-    assert_eq!(values.iter().find_map(|value| value.get("step")), Some(&serde_json::to_value(expected)?));
-    assert_eq!(values.iter().find_map(|value| value.get("snapshot")), Some(&serde_json::to_value(direct.snapshot()?)?));
+    assert_eq!(
+        values.iter().find_map(|value| value.get("step")),
+        Some(&serde_json::to_value(expected)?)
+    );
+    assert_eq!(
+        values.iter().find_map(|value| value.get("snapshot")),
+        Some(&serde_json::to_value(direct.snapshot()?)?)
+    );
 
-    let output = run_current_command("simulate", &[
-        ("snapshot", path.to_string_lossy().into_owned()), ("steps", "3".into()), ("milliseconds", "17".into()),
-    ], "")?;
+    let output = run_current_command(
+        "simulate",
+        &[
+            ("snapshot", path.to_string_lossy().into_owned()),
+            ("steps", "3".into()),
+            ("milliseconds", "17".into()),
+        ],
+        "",
+    )?;
     let values = command_values(&output)?;
     assert_eq!(values.len(), 4);
     direct.apply(event.clone())?;
     direct.apply(event)?;
     assert_eq!(values[3]["steps"], 3);
-    assert_eq!(values[3]["snapshot"], serde_json::to_value(direct.snapshot()?)?);
-    assert_eq!(values[3]["observation"], serde_json::to_value(direct.observe()?)?);
+    assert_eq!(
+        values[3]["snapshot"],
+        serde_json::to_value(direct.snapshot()?)?
+    );
+    assert_eq!(
+        values[3]["observation"],
+        serde_json::to_value(direct.observe()?)?
+    );
 
     // Continue the same natural setup into combat, then exercise simulate's
     // actual timer consequence rather than only an empty bootstrap clock.
-    let press = |session: &mut CurrentGameSession, code: PhysicalKey| -> Result<(), Box<dyn Error>> {
-        session.apply(CurrentExternalEvent::RawInput { input: RawInputEvent::KeyDown {
-            code: code.clone(), printable: false, browser_repeat: false, focus: InputFocus::Game,
-        } })?;
-        session.apply(CurrentExternalEvent::RawInput { input: RawInputEvent::KeyUp { code } })?;
-        for pending in session.snapshot()?.pending_presentations {
-            session.apply(CurrentExternalEvent::PresentationOutcome {
-                event_id: pending.event_id,
-                outcome: er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::Settled,
+    let press =
+        |session: &mut CurrentGameSession, code: PhysicalKey| -> Result<(), Box<dyn Error>> {
+            session.apply(CurrentExternalEvent::RawInput {
+                input: RawInputEvent::KeyDown {
+                    code: code.clone(),
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
             })?;
-        }
-        Ok(())
-    };
+            session.apply(CurrentExternalEvent::RawInput {
+                input: RawInputEvent::KeyUp { code },
+            })?;
+            for pending in session.snapshot()?.pending_presentations {
+                session.apply(CurrentExternalEvent::PresentationOutcome {
+                    event_id: pending.event_id,
+                    outcome: er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::Settled,
+                })?;
+            }
+            Ok(())
+        };
     press(&mut direct, PhysicalKey::Space)?;
     press(&mut direct, PhysicalKey::Space)?;
-    let menu = direct.observe()?.control.ok_or("starter control")?.menu.ok_or("starter menu")?;
+    let menu = direct
+        .observe()?
+        .control
+        .ok_or("starter control")?
+        .menu
+        .ok_or("starter menu")?;
     for _ in 0..menu.options.len() {
-        if direct.observe()?.control.and_then(|control| control.menu)
-            .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm") {
+        if direct
+            .observe()?
+            .control
+            .and_then(|control| control.menu)
+            .is_some_and(|menu| menu.selected_option_id.as_str() == "bootstrap/starter/confirm")
+        {
             break;
         }
         press(&mut direct, PhysicalKey::ArrowDown)?;
     }
-    assert_eq!(direct.observe()?.control.and_then(|control| control.menu)
-        .ok_or("starter menu")?.selected_option_id.as_str(), "bootstrap/starter/confirm");
-    for _ in 0..4 { press(&mut direct, PhysicalKey::Space)?; }
-    assert_eq!(direct.observe()?.control.ok_or("battle control")?.kind, GameControlKindV2::BattleCommand);
-    direct.apply(CurrentExternalEvent::RawInput { input: RawInputEvent::KeyDown {
-        code: PhysicalKey::ArrowDown, printable: false, browser_repeat: false, focus: InputFocus::Game,
-    } })?;
+    assert_eq!(
+        direct
+            .observe()?
+            .control
+            .and_then(|control| control.menu)
+            .ok_or("starter menu")?
+            .selected_option_id
+            .as_str(),
+        "bootstrap/starter/confirm"
+    );
+    for _ in 0..4 {
+        press(&mut direct, PhysicalKey::Space)?;
+    }
+    assert_eq!(
+        direct.observe()?.control.ok_or("battle control")?.kind,
+        GameControlKindV2::BattleCommand
+    );
+    direct.apply(CurrentExternalEvent::RawInput {
+        input: RawInputEvent::KeyDown {
+            code: PhysicalKey::ArrowDown,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+    })?;
     let path = files.write("held-snapshot.json", &direct.snapshot()?)?;
-    let output = run_current_command("simulate", &[
-        ("snapshot", path.to_string_lossy().into_owned()), ("steps", "2".into()), ("milliseconds", "250".into()),
-    ], "")?;
+    let output = run_current_command(
+        "simulate",
+        &[
+            ("snapshot", path.to_string_lossy().into_owned()),
+            ("steps", "2".into()),
+            ("milliseconds", "250".into()),
+        ],
+        "",
+    )?;
     let values = command_values(&output)?;
     assert_eq!(values.len(), 3);
-    for (index, selected) in ["battle/command/fight", "battle/command/party"].into_iter().enumerate() {
-        let step = direct.apply(CurrentExternalEvent::AdvanceTime { milliseconds: SafeU53::new(250)? })?;
+    for (index, selected) in ["battle/command/fight", "battle/command/party"]
+        .into_iter()
+        .enumerate()
+    {
+        let step = direct.apply(CurrentExternalEvent::AdvanceTime {
+            milliseconds: SafeU53::new(250)?,
+        })?;
         assert_eq!(values[index]["step"], serde_json::to_value(step)?);
-        assert_eq!(direct.observe()?.control.and_then(|control| control.menu)
-            .ok_or("battle menu")?.selected_option_id.as_str(), selected);
+        assert_eq!(
+            direct
+                .observe()?
+                .control
+                .and_then(|control| control.menu)
+                .ok_or("battle menu")?
+                .selected_option_id
+                .as_str(),
+            selected
+        );
     }
-    assert_eq!(values[2]["snapshot"], serde_json::to_value(direct.snapshot()?)?);
+    assert_eq!(
+        values[2]["snapshot"],
+        serde_json::to_value(direct.snapshot()?)?
+    );
     Ok(())
 }
 
 #[test]
-fn normal_commands_report_v2_content_and_reject_historical_state_injection() -> Result<(), Box<dyn Error>> {
+fn normal_commands_report_v2_content_and_reject_historical_state_injection()
+-> Result<(), Box<dyn Error>> {
     let output = run_current_command("inspect-content", &[], "")?;
     let values = command_values(&output)?;
     assert_eq!(values.len(), 1);
     assert_eq!(values[0]["kernel_version"], 7);
-    assert_eq!(values[0]["content_identity"], serde_json::to_value(content()?.identity())?);
+    assert_eq!(
+        values[0]["content_identity"],
+        serde_json::to_value(content()?.identity())?
+    );
     let output = run_current_command("new-run", &[("state", "unused-historical.json".into())], "")?;
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());

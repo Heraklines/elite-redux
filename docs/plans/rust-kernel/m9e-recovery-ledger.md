@@ -492,3 +492,21 @@ actual-process tests remain uncommitted for the following independent cut.
 B2 now also has an extended existing Chromium journey checking replica
 presentation vectors/settlement and exact duplicate snapshots; it remains
 unverified and outside the utility candidate. Full M9 remains unfinished.
+
+### Normal utilities: native pass and bounded lint repair
+
+Candidate `05393d4d47d2f150cf5fcb25da5c70635f9aabd1`, run `33937060679`,
+passed all 13 selected/executed native tests (zero failures/skips), including
+seven actual CLI entry witnesses and both native parity tests. It failed
+formatting and mandatory CLI Clippy: historical WarmCliSessionV1 stored a
+5,744-byte GameEnvironment inline. Both session variants and their five
+constructors are now boxed; borrowed calls and serde output remain unchanged.
+The existing CLI-wide execution scope also admits this exact compatibility
+module path. No lint allowance or test assertion was weakened.
+
+Applied the complete 19,094-byte remote format patch for current_commands.rs
+and m9e_current_entry.rs. Inspected compact download: 10,115 compressed bytes;
+full diagnostics (22,849 bytes) stayed remote. Build 42,945 ms; current CLI
+witnesses 28,489 ms; native parity 10,081 ms. Wasm was not reached after Clippy
+failed. Baseline remains fully green f8f6983; utilities are not yet qualified.
+Worker/reload and B2 edits remain excluded from this repair candidate.
