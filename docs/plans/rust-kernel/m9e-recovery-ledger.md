@@ -822,3 +822,14 @@ was verified and applied to all eight capsule-owned Rust files. Diagnostics
 49,851 bytes remain remote. Batch CLI edits were retained through a clean
 three-way source merge; the submitted index contains only the capsule repair.
 Baseline remains qualified `9459b9c`. No capsule execution pass is claimed.
+
+### Capsule compiler correction
+
+Candidate `e7e9f36e4897ce47e653118e815358ec57806fa1`, run `33947259124`,
+passed formatting and reached remote compilation. Build stopped after 68,547 ms
+on a test-only attempt to push a character into validated GameContentBundleHash.
+The same expression existed in the core witness; both now parse a valid different
+blake3 hash and assert the content identity actually differs. This preserves the
+intended replay content-identity rejection rather than relying on malformed input.
+Zero product tests selected/executed. Compact 4,329 compressed bytes downloaded;
+15,973-byte diagnostics remain remote. Baseline remains qualified `9459b9c`.

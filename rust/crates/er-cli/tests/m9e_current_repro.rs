@@ -613,7 +613,9 @@ fn actual_worker_capsule_import_rejects_tampering_without_claiming_session_id() 
             };
             "current replay diverged at attempt"
         } else {
-            bad.content_identity.bundle_hash.push('0');
+            bad.content_identity.bundle_hash =
+                er_types::GameContentBundleHash::parse(format!("blake3-v1:{}", "0".repeat(64)))?;
+            assert_ne!(bad.content_identity, fixture.capsule.content_identity);
             "content_identity"
         };
         let response = cli.request(

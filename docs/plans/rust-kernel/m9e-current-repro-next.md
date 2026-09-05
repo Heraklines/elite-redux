@@ -76,3 +76,38 @@ CLI capture. Such capture must preserve browser context or explicitly establish
 a new native checkpoint; it must not silently rewrite the original context.
 Minimization, full failure reproduction, final qualification and M9 completion
 remain outstanding. No deployment, legacy save migration or final-tag move.
+
+## Native capture continuation follow-up (source reviewed, not implemented)
+
+Keep one recorder and bounded ingress diagnostics in a CLI session wrapper outside
+CurrentBackend, so successful exact worker replacement retains capture history.
+Create capture before publishing IDs; import via from_capsule to preserve original
+attempts, absolute positions and origins. Capture successful full steps only after
+response admission. A postcommit diagnostic failure marks a gap without rejecting
+accepted gameplay. Read-only requests do not append game attempts. Fork capture
+independently; exact reload does not duplicate quarantined replay events. Successful
+restore declares a new capture boundary; failed restore/reload preserves history.
+Worker executable generation changes are not game TransportChanged events.
+
+Current worker faults lose the normalized reducer rejection identity: KernelFailure
+merges session variants, observation/serialization failures may be reported through
+other endpoint layers, and message truncation differs from recorder UTF-8 bounds.
+Add typed normalized rejection evidence specifically at reducer failure, preserving
+adapter/transport failures as explicit diagnostic gaps. Do not parse error strings
+or treat every backend error as a replayable kernel rejection. Worker response
+admission must receive the outer agent request-specific success allowance before
+commit; fixed worker/result caps cannot cover an arbitrarily escaped JSONL ID.
+
+AgentJsonlServerV1 rejects some ingress before dispatch. A default-no-op rejection
+hook can capture bounded attributable session metadata; unidentifiable malformed
+input stays in dispatcher diagnostics. Truncation must be explicit. Imported browser
+transport context needs explicit continuation semantics; ordinary native record
+currently rejects a recorder that requires browser context.
+
+Required actual-process witnesses cover both backends: non-key time and platform/
+network/presentation outcomes and rejection, normal export-to-CLI replay/full state,
+large-ID success-envelope rejection with unchanged game state and corrected retry,
+attributable versus unattributable malformed ingress, import/fork independent
+continuation, reload then export without duplicate attempts, failed restore/reload
+history preservation, explicit successful restore boundary and close/fencing.
+These are future requirements, not qualification evidence for this capsule cut.

@@ -320,7 +320,9 @@ fn replay_rejects_nonkey_omission_reordering_wrong_content_and_unsafe_positions(
         matches!(replay_current_capsule_v1(&reordered, Arc::clone(&fixture.content), limits()), Err(CurrentReproErrorV1::Divergence { position, .. }) if position == reordered.attempts[index].position)
     );
     let mut wrong_content = fixture.capsule.clone();
-    wrong_content.content_identity.bundle_hash.push('0');
+    wrong_content.content_identity.bundle_hash =
+        er_types::GameContentBundleHash::parse(format!("blake3-v1:{}", "0".repeat(64)))?;
+    assert_ne!(wrong_content.content_identity, fixture.capsule.content_identity);
     assert!(
         matches!(replay_current_capsule_v1(&wrong_content, Arc::clone(&fixture.content), limits()), Err(CurrentReproErrorV1::Invalid { field }) if field == "content_identity")
     );
