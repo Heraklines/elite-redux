@@ -1790,3 +1790,70 @@ Only that case's expectation now names the actual isolation guard. Artifact
 validation, failure phase, source restoration and all129 tests remain unchanged.
 The inspected3157-byte native A compact supplied the bounded failure excerpt;
 full diagnostic archives stayed remote. The qualified baseline remains785.
+
+### Qualified retention hard-stop control (597b545)
+
+Exact597b545fd2bd7d4edb0cc0845d8093c0c8b70840 passed run33977302847:
+129 harness tests, formatting, full compilation/required Clippy, all662 native
+(A642/B20) with zero failures/skips,2 Wasm,2 Chromium,1 typed-effect witness and
+aggregate. All three real mutation controls were detected and source-restored.
+The ledger mutant failed its required small-window typed assertion with exit101,
+1failed/0passed/0ignored. Original/restored material source hash:
+0506f2c4d093036aef38ebcac5a0c5c05818e8c78202bccfe7a921afa853b467;
+mutant9b84562ec0a296bd764838fe72e570b4749f5a6bf9c8cadd2236ccad57794a4c.
+The actual bounded native proof published without an encoding or limit change.
+This closes this material-window control; proposal/request recovery remains open.
+
+Total run34m44s (16:15:35-16:50:19UTC). A16:15:38-16:41:08, B16:15:38-16:47:25,
+platform16:41:11-16:49:51, aggregate16:49:53-16:50:18. Helper retention400842ms,
+V7 retention186201ms; B reload559236ms, host292601ms, batch472245ms, repro292996ms.
+These remain within the original limits; reload's proximity and cross-run timing
+variation do not establish stable throughput. CLI and both worker hashes match
+785's bytes, with provenance bound to597. Held parity, capsule1417->1433 replay,
+16attempts/final digest and time-omission divergence1428 are unchanged.
+
+A proof47254ef175e285c94e8962bd9949029c1a9e9c7ee6efaf0e38069431a938f9b6;
+Bc430a637089d73c8aeceee01e3adfb6318d96e94b345d10f00c548300e6300ae;
+platform1eb4c3757233fd044a61fb7f87d9e1ca3d2cfbe8097d7111dd7aa50cc99a57c0;
+aggregate84bfdeef3983b3ff144ee32f5dd0a3b724246b328c01a15f5991c2c49906b8a4.
+Only inspected compact A2407/B3196/platform2069/aggregate3936 compressed bytes
+were downloaded. A transient API connection failure retried only the same small
+aggregate read. All full diagnostics, binaries and other proofs stayed remote.
+The comparison baseline now advances to this exact qualified597/run33977302847.
+
+### Standalone native current-session capture (execution pending)
+
+The normal native agent now owns a bounded causal recorder for each standalone
+current session. It records all eight typed current external-event variants,
+accepted steps/observations/snapshots and real kernel rejections. Malformed or
+adapter-rejected ingress marks an explicit gap for its addressable owner, or all
+native owners when unaddressable. Read-only status/export errors preserve valid
+capture. Capture failure never rejects already accepted gameplay. The existing
+precommit4MiB successful response-envelope check still rolls gameplay back before
+publication if adapter output cannot fit; protocol output durability is not claimed.
+
+Create/import can set capture limits; defaults256 events/2MiB, maximum4096/2MiB.
+Native history import verifies before retention; browser-origin import establishes
+an explicit native checkpoint suffix at the original final position. Forks keep
+independent future histories, restore establishes a new boundary, close removes
+ownership, and startup --snapshot creates capture for session current. Exhausted
+positions leave capture unavailable without undoing valid accepted gameplay.
+Worker-backed sessions report unsupported capture and batch capture is unsupported.
+
+Normal replay and capsule-validate share the current4096-event maximum, retaining
+2MiB serialized capsule and4MiB file/result bounds. Recorder default stays256.
+The real CLI tests include257 retained attempts replayed through both commands,
+4096 configuration acceptance/4097 rejection, and a typed capsule exceeding2MiB
+rejected by both normal paths. Four actual native-capture test IDs cover natural
+and rejected events, rotation/byte gaps/fork/restore, response/ingress rejection,
+and browser-origin suffix import; two protocol hook tests retain all three earlier
+protocol identities. Bounded child-process/pipe deadlines and teardown are explicit.
+
+The gate owns exactly seven product paths and18 required native targets, including
+the existing normal validators. All129 current harness declarations and their
+phase, lane, retention-control checks survive; four capture checks bring it to133.
+Native capture is assigned to A; B retains host/reload/batch/repro. Retention's
+future required inventory includes the new capture/protocol identities. Existing
+mutant scope rules, full compile/discovery, early lint, platform/CLI bridge checks,
+byte caps and time limits remain unchanged. This source-reviewed combined cut
+has not yet executed remotely; its behavior and qualification remain pending.

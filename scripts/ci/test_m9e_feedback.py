@@ -467,7 +467,7 @@ class FeedbackTests(unittest.TestCase):
         exact = selection["required_native_test_ids"]
         for identity, count in (("er-web:er_web", 5), ("er-web:m9e_host_v2", 14),
                                 ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
-                                ("er-agent-protocol:er_agent_protocol", 3), ("er-repro:m9e_current_repro", 9),
+                                ("er-agent-protocol:er_agent_protocol", 5), ("er-repro:m9e_current_repro", 9),
                                 ("er-cli:m9e_current_repro", 2), ("er-cli:m9e_current_reload", 2),
                                 ("er-wasm:m9e_parity", 2)):
             self.assertEqual(len(exact[identity]), count)
@@ -600,7 +600,7 @@ class FeedbackTests(unittest.TestCase):
         exact = selection["required_native_test_ids"]
         for identity, count in (("er-web:er_web", 5), ("er-cli:m9e_current_validation", 2), ("er-web:m9e_host_v2", 14),
                                 ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
-                                ("er-agent-protocol:er_agent_protocol", 3), ("er-repro:m9e_current_repro", 9),
+                                ("er-agent-protocol:er_agent_protocol", 5), ("er-repro:m9e_current_repro", 9),
                                 ("er-cli:m9e_current_repro", 2), ("er-cli:m9e_current_reload", 2),
                                 ("er-wasm:m9e_parity", 2)):
             self.assertEqual(len(exact[identity]), count)
@@ -711,6 +711,203 @@ class FeedbackTests(unittest.TestCase):
         wasm.assert_called_once()
         browser.assert_called_once()
         self.binary_ids["m9e_current_validation"] = self.binary_ids["m9e_current_validation"][:-1]
+        self.executed.clear()
+        self.events.clear()
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("required native test identities", summary["first_failure"])
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+
+    def configure_native_capture_scope(self):
+        self.configure_browser_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["native_capture_focus"] = policy["native_capture_focus"]
+        for scope in ("current_repro_focus", "current_batch_focus", "cli_reload_focus", "timer_focus",
+                      "browser_cache_focus", "current_validation_focus", "material_retention_focus"):
+            self.config[scope] = policy[scope]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-game")
+        for package in policy["native_capture_focus"]["execute"]:
+            self.package(package)
+        self.package("er-reverse", '[dependencies]\ner-repro = { path = "../er-repro" }\ner-agent-protocol = { path = "../er-agent-protocol" }\n')
+
+    def test_native_capture_scope_requires_four_captures_and_all_current_witnesses(self):
+        self.configure_native_capture_scope()
+        policy = self.config["native_capture_focus"]
+        expected_paths = {
+            "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/main.rs",
+            "rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/src/current_native_capture.rs",
+            "rust/crates/er-repro/src/current.rs", "rust/crates/er-agent-protocol/src/lib.rs",
+            "rust/crates/er-cli/tests/m9e_current_native_capture.rs"}
+        self.assertEqual(set(policy["paths"]), expected_paths)
+        self.assertEqual(len(policy["paths"]), 7)
+        self.assertEqual(set(policy["trigger_paths"]), {
+            "rust/crates/er-cli/src/current_native_capture.rs",
+            "rust/crates/er-cli/tests/m9e_current_native_capture.rs"})
+        self.changed = self.config["native_capture_focus"]["paths"] + ["docs/plans/rust-kernel/m9e-native-capture-next.md"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["native_capture_focus"])
+        self.assertFalse(selection["timer_focus"])
+        self.assertIsNone(selection["timer_mutant"])
+        self.assertIsNone(selection["replica_mutant"])
+        for flag in ("requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable",
+                     "requires_cli_clippy", "requires_agent_protocol_clippy"):
+            self.assertTrue(selection[flag], flag)
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        for package in ("er-batch", "er-env", "er-cli", "er-agent-protocol", "er-repro", "er-web", "er-kernel-worker"):
+            self.assertEqual(selection["execution_scope"][package], ["*"])
+        exact = selection["required_native_test_ids"]
+        for identity, count in (("er-web:er_web", 5), ("er-cli:m9e_current_native_capture", 4), ("er-cli:m9e_current_validation", 2), ("er-web:m9e_host_v2", 14),
+                                ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
+                                ("er-agent-protocol:er_agent_protocol", 5), ("er-repro:m9e_current_repro", 9),
+                                ("er-cli:m9e_current_repro", 2), ("er-cli:m9e_current_reload", 2),
+                                ("er-wasm:m9e_parity", 2)):
+            self.assertEqual(len(exact[identity]), count)
+            crate, target = identity.split(":")
+            self.assertIn(target, selection["required_native_targets"][crate])
+        prefix = "host_v2::transaction_tests::"
+        self.assertEqual(set(exact["er-web:er_web"]), {prefix + name for name in (
+            "late_response_limit_rejection_preserves_state_cache_and_retry",
+            "read_only_response_limit_failure_preserves_capture",
+            "sequence_exhaustion_preflight_preserves_current_session_and_cached_response",
+            "retained_response_byte_boundary_evicts_by_acceptance_and_preserves_retry",
+            "single_response_cache_boundary_rejects_before_commit_and_disposal_clears_payloads")})
+        self.assertEqual(set(exact["er-cli:m9e_current_native_capture"]), {
+            "actual_native_capture_replays_natural_events_rejections_and_imported_history",
+            "actual_native_capture_rotation_fork_restore_and_byte_gaps_are_explicit",
+            "actual_native_capture_late_response_and_rejected_ingress_preserve_gameplay",
+            "actual_native_capture_browser_import_declares_native_suffix_at_original_frontier"})
+        protocol = {
+            "response_context_tests::inline_success_boundary_counts_escaping_nulls_and_newline",
+            "response_context_tests::contextual_server_rejects_before_mutation_and_accepts_corrected_retry",
+            "response_context_tests::default_context_preserves_historical_artifact_dispatch",
+            "ingress_diagnostic_tests::default_ingress_hook_preserves_legacy_responses_and_immutable_oversized_api",
+            "ingress_diagnostic_tests::rejected_ingress_hook_distinguishes_addressable_and_discarded_requests"}
+        self.assertEqual(set(exact["er-agent-protocol:er_agent_protocol"]), protocol)
+        for scope in ("current_batch_focus", "timer_focus", "browser_cache_focus", "current_validation_focus"):
+            self.assertEqual(set(self.config[scope]["exact_test_ids"]["er-agent-protocol:er_agent_protocol"]), protocol)
+        for scope in ("current_repro_focus", "current_batch_focus", "current_validation_focus", "browser_cache_focus"):
+            self.assertFalse(selection[scope])
+        for trigger in self.config["native_capture_focus"]["trigger_paths"]:
+            self.changed = [trigger]
+            trigger_only = self.feedback.plan()
+            self.assertTrue(trigger_only["native_capture_focus"])
+            self.assertEqual(trigger_only["required_native_test_ids"], exact)
+            self.changed = [trigger, "rust/crates/er-cli/src/current_commands.rs"]
+            replay_fix = self.feedback.plan()
+            self.assertTrue(replay_fix["native_capture_focus"])
+            self.assertEqual(replay_fix["required_native_test_ids"], exact)
+
+    def test_native_capture_rejects_mixed_paths_without_expanding_readiness(self):
+        self.configure_native_capture_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["timer_focus"] = policy["timer_focus"]
+        self.package("er-kernel")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-web/tests/m9e_host_v2.rs", "rust/crates/er-web/src/contracts_v2.rs",
+                      "rust/crates/er-web/Cargo.toml", "rust/crates/er-cli/Cargo.toml", "rust/crates/er-cli/src/current_commands_extra.rs", "rust/Cargo.lock",
+                      "rust/crates/er-repro/src/lib.rs", "rust/crates/er-agent-protocol/tests/unmapped.rs",
+                      "rust/crates/er-game/src/m9e_material_v6.rs", "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs",
+                      "rust/crates/er-cli/tests/m9e_current_validation.rs", "rust/crates/er-batch/src/current.rs",
+                      "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "unknown.json"):
+            with self.subTest(extra=extra):
+                self.changed = ["rust/crates/er-cli/tests/m9e_current_native_capture.rs", extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+                rejected = json.loads((self.full / "plan.json").read_text())
+                self.assertFalse(rejected["native_capture_focus"])
+        # main.rs is shared by prior cuts; the unique capture helper or witness activates
+        # this cumulative scope without changing ordinary utility planning.
+        self.changed = ["rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs"]
+        ordinary = self.feedback.plan()
+        self.assertFalse(ordinary["native_capture_focus"])
+        self.assertEqual(ordinary["execution_scope"], self.config["current_session_focus"]["execute"])
+        self.assertFalse(ordinary["requires_browser"])
+        self.changed = ["docs/plans/rust-kernel/m9e-native-capture-next.md", "scripts/ci/m9e_feedback.py"]
+        readiness = self.feedback.plan()
+        self.assertFalse(readiness["native_capture_focus"])
+        self.assertEqual(readiness["packages"], self.config["readiness_packages"])
+        self.assertIsNone(readiness["execution_scope"])
+        for flag in ("requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable"):
+            self.assertFalse(readiness[flag])
+
+    def test_native_capture_missing_capture_or_consumer_cannot_qualify(self):
+        self.configure_native_capture_scope()
+        self.changed = ["rust/crates/er-cli/tests/m9e_current_native_capture.rs",
+                        "rust/crates/er-cli/src/current_commands.rs"]
+        selection = self.feedback.plan()
+        required = selection["required_native_test_ids"]
+        inventory = [(identity.split(":")[0], identity.split(":")[1], ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, inventory)
+        for identity in required:
+            for omit_target in (True, False):
+                with self.subTest(identity=identity, omit_target=omit_target):
+                    reduced = [(crate, target, ids[:-1] if f"{crate}:{target}" == identity else ids)
+                               for crate, target, ids in inventory if not omit_target or f"{crate}:{target}" != identity]
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(required, reduced)
+        for identity in ("er-cli:m9e_current_native_capture", "er-agent-protocol:er_agent_protocol"):
+            for missing_id in required[identity]:
+                with self.subTest(identity=identity, missing_id=missing_id):
+                    reduced = [(crate, target, [value for value in ids if value != missing_id]
+                                if f"{crate}:{target}" == identity else ids) for crate, target, ids in inventory]
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(required, reduced)
+        targets = selection["required_native_targets"]
+        rows = [(crate, target, ["witness"]) for crate, names in targets.items() for target in names]
+        self.feedback.required_native_target_counts(targets, rows)
+        for index in range(len(rows)):
+            with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                self.feedback.required_native_target_counts(targets, rows[:index] + rows[index + 1:])
+
+    def test_native_capture_orchestration_keeps_full_discovery_early_lint_and_bindings(self):
+        self.configure_native_capture_scope()
+        self.changed = self.config["native_capture_focus"]["paths"]
+        policy = self.config["native_capture_focus"]
+        self.assertIn("rust/crates/er-cli/src/current_commands.rs", self.changed)
+        self.binary_ids = {}
+        for crate, names in policy["execute"].items():
+            if names == ["*"]:
+                names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
+            for target in names:
+                binary = target if target not in self.binary_ids else crate + "--" + target
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_crates[binary] = crate
+                self.binary_targets[binary] = target
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:er_web"], 5)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_native_capture"], 4)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_validation"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 5)
+        self.assertEqual(len(summary["required_native_target_counts"]), 18)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:m9e_host_v2"], 14)
+        self.assertEqual([(self.binary_crates[name], self.binary_targets[name]) for name in self.executed[:2]],
+                         [("er-cli", "m9e_current_native_capture"), ("er-cli", "m9e_current_reload")])
+        first_execution = self.events.index("execute:m9e_current_native_capture")
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, first_execution)
+        for lint in ("cli-clippy", "agent-protocol-clippy", "er-batch-clippy", "er-env-clippy", "er-repro-clippy",
+                     "worker-clippy", "endpoint-clippy", "browser-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        for name, _, env in self.binary_envs:
+            if (self.binary_crates[name], self.binary_targets.get(name, name)) in self.feedback.WORKER_BOUND_TARGETS:
+                self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+            else:
+                self.assertIsNone(env)
+        self.assertEqual(summary["cli_executable"]["source_sha"], CANDIDATE)
+        self.assertNotIn(("er-cli", "m9e_current_native_capture"), self.feedback.WORKER_BOUND_TARGETS)
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.binary_ids["m9e_current_native_capture"] = self.binary_ids["m9e_current_native_capture"][:-1]
         self.executed.clear()
         self.events.clear()
         code, summary = self.invoke()
@@ -1295,7 +1492,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["required_native_targets"]["er-cli"],
                          ["m9e_current_batch", "m9e_current_repro", "m9e_current_entry", "m9e_current_reload"])
         expected_counts = {"er-batch:m9e_current_batch": 6, "er-cli:m9e_current_batch": 2,
-                           "er-agent-protocol:er_agent_protocol": 3,
+                           "er-agent-protocol:er_agent_protocol": 5,
                            "er-repro:m9e_current_repro": 9, "er-cli:m9e_current_repro": 2,
                            "er-cli:m9e_current_reload": 2, "er-cli:m9e_current_entry": 7,
                            "er-kernel-worker:current_process_v2": 5, "er-lab:current_kernel_supervisor_v2": 9,
@@ -1796,7 +1993,7 @@ class FeedbackTests(unittest.TestCase):
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["material_retention_focus"]
         self.config["material_retention_focus"] = policy
         complete = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
-        for scope in ("browser_cache_focus", "current_validation_focus"):
+        for scope in ("browser_cache_focus", "current_validation_focus", "native_capture_focus"):
             self.config[scope] = complete[scope]
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
         self.package("er-game")
@@ -1846,6 +2043,16 @@ class FeedbackTests(unittest.TestCase):
             "ordinary_validate_save_accepts_v2_and_rejects_legacy_or_wrong_content",
             "ordinary_capsule_validation_replays_current_and_rejects_tampered_or_legacy_input"})
 
+        self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_native_capture"],
+                         self.config["native_capture_focus"]["exact_test_ids"]["er-cli:m9e_current_native_capture"])
+        self.assertEqual(len(selection["required_native_test_ids"]["er-cli:m9e_current_native_capture"]), 4)
+        self.assertEqual(set(selection["required_native_test_ids"]["er-agent-protocol:er_agent_protocol"]), {
+            "response_context_tests::inline_success_boundary_counts_escaping_nulls_and_newline",
+            "response_context_tests::contextual_server_rejects_before_mutation_and_accepts_corrected_retry",
+            "response_context_tests::default_context_preserves_historical_artifact_dispatch",
+            "ingress_diagnostic_tests::default_ingress_hook_preserves_legacy_responses_and_immutable_oversized_api",
+            "ingress_diagnostic_tests::rejected_ingress_hook_distinguishes_addressable_and_discarded_requests"})
+
         lint_paths = {
             "rust/crates/er-game/src/m6/coop_campaign.rs",
             "rust/crates/er-game/src/m6/runtime_v4.rs",
@@ -1889,7 +2096,8 @@ class FeedbackTests(unittest.TestCase):
                       "rust/crates/er-game/src/m9e_internal_event.rs",
                       "rust/crates/er-kernel/src/game_kernel_v6_extra.rs", "rust/crates/er-kernel/src/snapshot_v3_extra.rs",
                       "rust/crates/er-kernel/tests/m9e_domain_journeys_v7_extra.rs",
-                      "rust/crates/er-kernel/tests/m9e_coop_v7_extra.rs"):
+                      "rust/crates/er-kernel/tests/m9e_coop_v7_extra.rs",
+                      "rust/crates/er-cli/src/current_native_capture.rs", "rust/crates/er-cli/tests/m9e_current_native_capture.rs"):
             with self.subTest(extra=extra):
                 self.changed = paths + [extra]
                 with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
@@ -1955,19 +2163,20 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
         parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
         self.assertIn("--nocapture", parity_execution)
-        self.assertEqual(len(summary["required_native_target_counts"]), 33)
+        self.assertEqual(len(summary["required_native_target_counts"]), 34)
         self.assertEqual(summary["required_native_target_counts"]["er-repro:m9e_current_repro"], 9)
         self.assertEqual(summary["required_native_target_counts"]["er-game:m9e_material_retention"], 3)
         self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_material_retention_v7"], 2)
         self.assertEqual(summary["required_native_target_counts"]["er-web:er_web"], 5)
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_validation"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_native_capture"], 4)
         for lint in ("er-game-clippy", "er-kernel-clippy", "er-batch-clippy", "er-repro-clippy", "er-env-clippy",
                      "cli-clippy", "agent-protocol-clippy", "worker-clippy", "endpoint-clippy", "browser-clippy"):
             self.assertIn(lint, summary["timing_ms"])
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_repro"], 2)
         self.assertEqual(summary["required_native_target_counts"]["er-batch:m9e_current_batch"], 6)
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_batch"], 2)
-        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 3)
+        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 5)
         first = [("er-kernel", target) for target in (
             "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
         first[:0] = [("er-game", "m9e_material_retention"), ("er-kernel", "m9e_material_retention_v7")]
@@ -2060,7 +2269,7 @@ class FeedbackTests(unittest.TestCase):
                                         ("er-kernel:m9e_domain_journeys_v7", 12),
                                         ("er-repro:m9e_current_repro", 9), ("er-cli:m9e_current_repro", 2),
                                         ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
-                                        ("er-agent-protocol:er_agent_protocol", 3)):
+                                        ("er-agent-protocol:er_agent_protocol", 5)):
                     self.assertEqual(len(exact[identity]), count)
                     package, target = identity.split(":")
                     self.assertIn(target, selection["required_native_targets"][package])
@@ -2155,7 +2364,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_repro"], 2)
         self.assertEqual(summary["required_native_target_counts"]["er-batch:m9e_current_batch"], 6)
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_batch"], 2)
-        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 3)
+        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 5)
         first = [("er-kernel", target) for target in (
             "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
         first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
@@ -2213,6 +2422,16 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(validation, [enumerated[15], enumerated[1], *enumerated[:1], *enumerated[2:15]])
         self.assertEqual(sorted(item[0] for item in validation), list(range(len(enumerated))))
         self.assertEqual(enumerated, original)
+        capture_items = [
+            (100, "decoy-capture", "m9e_current_native_capture", ["decoy"], self.rust / "crates/er-other", set(), None),
+            *enumerated,
+            (101, "capture", "m9e_current_native_capture", ["capture"], self.rust / "crates/er-cli", set(), None)]
+        capture_original = list(capture_items)
+        capture = self.feedback.native_execution_order({"native_capture_focus": True}, capture_items)
+        self.assertEqual(capture, [capture_items[-1], enumerated[1], capture_items[0],
+                                   *enumerated[:1], *enumerated[2:]])
+        self.assertEqual(capture_items, capture_original)
+        self.assertEqual(sorted(item[0] for item in capture), sorted(item[0] for item in capture_items))
         retention_items = [
             (200, "wrong-material", "m9e_material_retention", ["decoy"], self.rust / "crates/er-other", set(), None),
             (201, "wrong-kernel", "m9e_material_retention_v7", ["decoy"], self.rust / "crates/er-game", set(), None),

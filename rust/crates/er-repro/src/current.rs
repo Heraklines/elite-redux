@@ -302,13 +302,29 @@ impl CurrentReproRecorderV1 {
         content: Arc<PreparedGameContentV2>,
         limits: CurrentReproLimitsV1,
     ) -> Result<Self, CurrentReproErrorV1> {
+        Self::new_at_position(checkpoint, local_seat, role, content, limits, 0)
+    }
+
+    /// Begin a declared native checkpoint suffix, with no browser transport context.
+    /// The caller supplies a previously verified logical frontier, not new events.
+    pub fn new_at_position(
+        checkpoint: CoreGameKernelSnapshotV7,
+        local_seat: SeatId,
+        role: GameKernelRoleV7,
+        content: Arc<PreparedGameContentV2>,
+        limits: CurrentReproLimitsV1,
+        position: u64,
+    ) -> Result<Self, CurrentReproErrorV1> {
+        if position > MAXIMUM_CURRENT_REPRO_POSITION_V1 {
+            return Err(invalid("initial position"));
+        }
         limits.validate()?;
         let mut recorder = Self {
             content,
             local_seat,
             role,
             limits,
-            position: 0,
+            position,
             browser_context_required: false,
             capsule: None,
             capsule_bytes: None,
@@ -317,7 +333,7 @@ impl CurrentReproRecorderV1 {
         if fits(&checkpoint, limits.maximum_bytes) {
             recorder.verified_observation(&checkpoint)?;
             let digest = snapshot_digest(&checkpoint)?;
-            let capsule = recorder.empty_capsule(checkpoint, 0, digest, None);
+            let capsule = recorder.empty_capsule(checkpoint, position, digest, None);
             if let Some(bytes) = encoded_len(&capsule, limits.maximum_bytes) {
                 recorder.capsule = Some(capsule);
                 recorder.capsule_bytes = Some(bytes);

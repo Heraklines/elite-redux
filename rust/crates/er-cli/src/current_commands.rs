@@ -228,7 +228,12 @@ fn replay_result(options: &Options, report_validation: bool) -> Result<(), Box<d
     let session = er_repro::current::replay_current_capsule_v1(
         &capsule,
         content,
-        er_repro::current::CurrentReproLimitsV1::default(),
+        // Recorder defaults choose a short history; replay accepts any supported
+        // event count while retaining the default 2 MiB serialized capsule bound.
+        er_repro::current::CurrentReproLimitsV1 {
+            maximum_events: er_repro::current::MAXIMUM_CURRENT_REPRO_EVENTS_V1,
+            ..er_repro::current::CurrentReproLimitsV1::default()
+        },
     )?;
     let mut result = json!({
         "kernel_version": 7, "processed_attempts": capsule.attempts.len(),

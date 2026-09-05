@@ -3,6 +3,7 @@
 mod current_agent;
 mod current_batch_agent;
 mod current_commands;
+mod current_native_capture;
 mod current_worker_agent;
 mod m72;
 mod m72_lab;
