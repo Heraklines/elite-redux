@@ -295,7 +295,8 @@ mod tests {
             },
             unit_kind: BehaviorUnitKind::IntrinsicMoveRule,
             ordinal: BehaviorUnitOrdinal::ZERO,
-            provenance_hash: ProvenanceHash::parse("0".repeat(64)).expect("fixture provenance is a 64-digit hex hash"),
+            provenance_hash: ProvenanceHash::parse("0".repeat(64))
+                .expect("fixture provenance is a 64-digit hex hash"),
         }
     }
 
@@ -318,27 +319,35 @@ mod tests {
 
     #[test]
     fn migration_preserves_instance_order_and_ids() {
-        let source = MechanicSourceId::numeric(MechanicSourceKind::Move, SafeU53::new(1).expect("fixture source ID or ordinal fits SafeU53"));
+        let source = MechanicSourceId::numeric(
+            MechanicSourceKind::Move,
+            SafeU53::new(1).expect("fixture source ID or ordinal fits SafeU53"),
+        );
         let address = MechanicAddress {
             scope: er_types::mechanics::MechanicScope::Battle,
             source,
             source_ordinal: er_types::mechanics::SourceOrdinal::ZERO,
-            instance_id: MechanicInstanceId::new(SafeU53::new(2).expect("fixture instance ID or ordinal fits SafeU53")),
+            instance_id: MechanicInstanceId::new(
+                SafeU53::new(2).expect("fixture instance ID or ordinal fits SafeU53"),
+            ),
         };
         let mut v1 = MechanicStateStoreV1 {
             next_instance_id: MechanicInstanceId::new(
                 SafeU53::new(3).expect("fixture next instance ID fits SafeU53"),
             ),
-            next_creation_ordinal: SafeU53::new(2).expect("fixture next creation ordinal fits SafeU53"),
+            next_creation_ordinal: SafeU53::new(2)
+                .expect("fixture next creation ordinal fits SafeU53"),
             ..Default::default()
         };
         v1.instances
             .push(crate::mechanic_state::MechanicInstanceStateV1 {
                 address,
-                program_id: MechanicsProgramId::try_from_u64(1).expect("fixture program ID is valid"),
+                program_id: MechanicsProgramId::try_from_u64(1)
+                    .expect("fixture program ID is valid"),
                 owner: er_types::mechanics::MechanicScope::Battle,
                 stored_target: None,
-                creation_ordinal: SafeU53::new(1).expect("fixture source ID or ordinal fits SafeU53"),
+                creation_ordinal: SafeU53::new(1)
+                    .expect("fixture source ID or ordinal fits SafeU53"),
                 remaining_turns: None,
                 counters: Vec::new(),
                 payload: er_mechanics::MechanicStatePayload::Empty,

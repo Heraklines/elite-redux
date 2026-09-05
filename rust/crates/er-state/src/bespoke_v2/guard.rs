@@ -317,7 +317,9 @@ mod tests {
 
     fn pokemon_scope(id: u64) -> MechanicScope {
         MechanicScope::Pokemon {
-            pokemon: er_types::battle_ids::PokemonId::new(SafeU53::new(id).expect("fixture Pokemon ID fits SafeU53")),
+            pokemon: er_types::battle_ids::PokemonId::new(
+                SafeU53::new(id).expect("fixture Pokemon ID fits SafeU53"),
+            ),
         }
     }
 
@@ -331,7 +333,9 @@ mod tests {
 
     #[test]
     fn default_state_validates() {
-        GuardFamilyState::default().validate().expect("default guard state is valid");
+        GuardFamilyState::default()
+            .validate()
+            .expect("default guard state is valid");
     }
 
     #[test]
@@ -493,7 +497,9 @@ mod tests {
         state.enduring_owners = vec![pokemon_scope(12)];
         state.sturdy_owners = vec![pokemon_scope(13)];
         state.next_creation_ordinal = ordinal(3);
-        state.validate().expect("coherent mixed guard state is valid");
+        state
+            .validate()
+            .expect("coherent mixed guard state is valid");
 
         assert!(state.has_side_guard(BattleSide::Enemy, SideGuardKind::QuickGuard));
         assert!(!state.has_side_guard(BattleSide::Player, SideGuardKind::QuickGuard));

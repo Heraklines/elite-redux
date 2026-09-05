@@ -146,10 +146,13 @@ class FeedbackTests(unittest.TestCase):
         self.results = {}
         capture_patch = patch.object(self.feedback, "capture", side_effect=self.capture)
         process_patch = patch.object(self.feedback.subprocess, "run", side_effect=self.process)
+        diagnostic_patch = patch.object(self.feedback.subprocess, "Popen", side_effect=self.diagnostic_process)
         capture_patch.start()
         process_patch.start()
+        diagnostic_patch.start()
         self.addCleanup(capture_patch.stop)
         self.addCleanup(process_patch.stop)
+        self.addCleanup(diagnostic_patch.stop)
 
     def package(self, name, dependencies=""):
         manifest = self.rust / f"crates/{name}/Cargo.toml"
@@ -232,6 +235,134 @@ class FeedbackTests(unittest.TestCase):
         code, output = self.results.get(name, (0, self.result_line(len(self.binary_ids[name]))))
         stdout.write(output)
         return subprocess.CompletedProcess(args, code)
+
+    def diagnostic_process(self, args, **kwargs):
+        result = self.process(args, **kwargs)
+        return SimpleNamespace(pid=987654, wait=lambda timeout: result.returncode)
+
+    def test_failed_clippy_diagnostics_preserve_original_gate_failure_and_all_selected_provenance(self):
+        self.configure_ai_damage_query_scope()
+        self.changed = self.config["ai_damage_query_focus"]["paths"]
+        self.ai_damage_query_binaries()
+        self.clippy_codes["er-game"] = 1
+        with patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "wasm_checks") as wasm:
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["status"], "failed")
+        self.assertIn("selected-packages-clippy exited 1", summary["first_failure"])
+        self.assertEqual(summary["tests"]["executed"], 0)
+        self.assertEqual(summary["tests"]["passed"], 0)
+        self.assertEqual(self.executed, [])
+        browser.assert_not_called()
+        wasm.assert_not_called()
+        index_path = self.compact / "clippy-diagnostics.json"
+        index = json.loads(index_path.read_bytes())
+        selection = json.loads((self.full / "plan.json").read_text())
+        self.assertEqual([row[0] for row in index["packages"]], selection["packages"])
+        self.assertEqual(index["source_sha"], CANDIDATE)
+        self.assertEqual(index["stop_reason"], "complete")
+        commands = [args for args in self.commands if args[:2] == ["cargo", "clippy"]]
+        self.assertEqual(commands[0], ["cargo", "clippy", "--locked",
+            *[part for name in selection["packages"] for part in ("-p", name)],
+            "--all-targets", "--no-deps", "--", "-D", "warnings"])
+        self.assertEqual(commands[1:], [[*index["command_prefix"], name, *index["command_suffix"]]
+                                      for name in selection["packages"]])
+        for name, outcome, returncode, window, elapsed, size, manifest_hash in index["packages"]:
+            self.assertEqual(outcome, "exit-nonzero" if name == "er-game" else "exit-zero")
+            self.assertEqual(returncode, 1 if name == "er-game" else 0)
+            self.assertTrue(0 < window <= 60000)
+            self.assertEqual(manifest_hash, self.feedback.digest(self.rust / "crates" / name / "Cargo.toml"))
+            self.assertEqual(size, (self.full / "clippy-diagnostics" / (name + ".log")).stat().st_size)
+        self.assertEqual(index_path.read_bytes(), (self.full / "clippy-diagnostics/index.json").read_bytes())
+        self.assertEqual(summary["clippy_failure_diagnostics"]["sha256"], self.feedback.digest(index_path))
+        self.assertLessEqual(sum(path.stat().st_size for path in self.compact.iterdir() if path.is_file()), 65536)
+
+    def diagnostic_fixture(self, packages):
+        for package in packages:
+            self.package(package)
+        self.compact.mkdir(exist_ok=True)
+        (self.full / "selected-packages-clippy.log").write_text("error: original gate failed\n")
+        return {"packages": packages}, {"product_sha": CANDIDATE, "status": "failed"}
+
+    def test_failed_clippy_diagnostics_timeout_kills_group_and_reserves_total_cleanup_budget(self):
+        selection, summary = self.diagnostic_fixture(["er-a", "er-b", "er-c"])
+        now, waits = [0.0], []
+        def wait(timeout):
+            waits.append(timeout)
+            now[0] += timeout
+            if len(waits) == 1:
+                raise subprocess.TimeoutExpired("cargo", timeout)
+            return -9
+        process = SimpleNamespace(pid=54321, wait=wait)
+        with patch.object(self.feedback.time, "monotonic", side_effect=lambda: now[0]), \
+                patch.object(self.feedback, "CLIPPY_DIAGNOSTIC_TOTAL_SECONDS", 12), \
+                patch.object(self.feedback, "CLIPPY_DIAGNOSTIC_PACKAGE_SECONDS", 10), \
+                patch.object(self.feedback, "CLIPPY_DIAGNOSTIC_CLEANUP_SECONDS", 2), \
+                patch.object(self.feedback.subprocess, "Popen", return_value=process) as spawn, \
+                patch.object(self.feedback.os, "killpg", create=True) as kill:
+            self.feedback.collect_clippy_failure_diagnostics(selection, summary)
+        self.assertEqual(waits, [8, 2])
+        kill.assert_called_once_with(54321, self.feedback.signal.SIGKILL)
+        self.assertTrue(spawn.call_args.kwargs["start_new_session"])
+        self.assertEqual(spawn.call_args.kwargs["cwd"], self.rust)
+        spawn.assert_called_once()
+        index = json.loads((self.compact / "clippy-diagnostics.json").read_text())
+        self.assertEqual([row[1] for row in index["packages"]], ["timeout", "not-attempted", "not-attempted"])
+        self.assertEqual(index["packages"][0][2:5], [-9, 10000, 10000])
+        self.assertEqual(index["stop_reason"], "total-budget")
+        self.assertLessEqual(index["elapsed_ms"], 12000)
+        self.assertEqual(summary["status"], "failed")
+
+    def test_failed_clippy_diagnostics_record_spawn_error_then_attempt_remaining_packages(self):
+        selection, summary = self.diagnostic_fixture(["er-a", "er-b", "er-c"])
+        outcomes = [OSError("synthetic spawn failure"), SimpleNamespace(pid=2, wait=lambda timeout: 7),
+                    SimpleNamespace(pid=3, wait=lambda timeout: 0)]
+        with patch.object(self.feedback.subprocess, "Popen", side_effect=outcomes) as spawn:
+            self.feedback.collect_clippy_failure_diagnostics(selection, summary)
+        index = json.loads((self.compact / "clippy-diagnostics.json").read_text())
+        self.assertEqual([row[1] for row in index["packages"]], ["process-error", "exit-nonzero", "exit-zero"])
+        self.assertEqual([row[2] for row in index["packages"]], [None, 7, 0])
+        self.assertEqual(spawn.call_count, 3)
+        self.assertIn("synthetic spawn failure", (self.full / "clippy-diagnostics/er-a.log").read_text())
+        self.assertEqual(summary["clippy_failure_diagnostics"]["attempted"], 3)
+
+    def test_failed_clippy_diagnostics_cleanup_failure_stops_new_work_with_partial_inventory(self):
+        selection, summary = self.diagnostic_fixture(["er-a", "er-b"])
+        def wait(timeout):
+            raise subprocess.TimeoutExpired("cargo", timeout)
+        with patch.object(self.feedback.subprocess, "Popen", return_value=SimpleNamespace(pid=12345, wait=wait)) as spawn, \
+                patch.object(self.feedback.os, "killpg", create=True):
+            self.feedback.collect_clippy_failure_diagnostics(selection, summary)
+        index = json.loads((self.compact / "clippy-diagnostics.json").read_text())
+        self.assertEqual(index["stop_reason"], "cleanup-error")
+        self.assertEqual([row[1] for row in index["packages"]], ["cleanup-error", "not-attempted"])
+        spawn.assert_called_once()
+
+    def test_failed_clippy_diagnostic_collection_error_cannot_replace_failure_or_execute_tests(self):
+        self.configure_ai_damage_query_scope()
+        self.changed = self.config["ai_damage_query_focus"]["paths"]
+        self.ai_damage_query_binaries()
+        self.clippy_codes["er-game"] = 1
+        with patch.object(self.feedback, "collect_clippy_failure_diagnostics", side_effect=OSError("index unavailable")):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("selected-packages-clippy exited 1", summary["first_failure"])
+        self.assertIn("index unavailable", summary["clippy_diagnostic_collection_error"])
+        self.assertEqual(self.executed, [])
+        self.assertEqual(summary["tests"]["passed"], 0)
+
+    def test_failed_clippy_diagnostic_inventory_and_index_are_bounded_without_heuristic_skips(self):
+        names = ["er-" + str(index).zfill(2) + "-" + "a" * 42 for index in range(64)]
+        selection, summary = self.diagnostic_fixture(names)
+        self.feedback.collect_clippy_failure_diagnostics(selection, summary)
+        raw = (self.compact / "clippy-diagnostics.json").read_bytes()
+        self.assertLessEqual(len(raw), 16000)
+        self.assertEqual([row[0] for row in json.loads(raw)["packages"]], names)
+        self.assertEqual(summary["clippy_failure_diagnostics"]["attempted"], 64)
+        for packages in (["er-a", "er-a"], ["../other"], ["er-a"] * 65, []):
+            with patch.object(self.feedback.subprocess, "Popen") as spawn, self.assertRaises(RuntimeError):
+                self.feedback.collect_clippy_failure_diagnostics({"packages": packages}, summary)
+            spawn.assert_not_called()
 
     @staticmethod
     def result_line(passed=0, failed=0, skipped=0):

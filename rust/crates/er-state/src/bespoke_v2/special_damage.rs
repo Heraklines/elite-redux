@@ -289,8 +289,12 @@ mod tests {
     #[test]
     fn records_eligible_attacks_in_receipt_order() {
         let base = SpecialDamageStateV2::default();
-        let after_physical = base.record_attack(request(120, 0)).expect("physical fixture attack is eligible");
-        let after_special = after_physical.record_attack(request(40, 1)).expect("special fixture attack is eligible");
+        let after_physical = base
+            .record_attack(request(120, 0))
+            .expect("physical fixture attack is eligible");
+        let after_special = after_physical
+            .record_attack(request(40, 1))
+            .expect("special fixture attack is eligible");
         assert_eq!(after_special.records.len(), 2);
         assert_eq!(
             after_special.records[0].category,
@@ -300,7 +304,10 @@ mod tests {
             after_special.records[1].category,
             SpecialDamageCategory::Special
         );
-        assert_eq!(after_special.records[0].damage, SafeU53::new(120).expect("fixture damage fits SafeU53"),);
+        assert_eq!(
+            after_special.records[0].damage,
+            SafeU53::new(120).expect("fixture damage fits SafeU53"),
+        );
     }
 
     #[test]
@@ -314,7 +321,9 @@ mod tests {
             base.record_attack(request(0, 0)),
             Err(SpecialDamageStateError::ZeroRecordDamage),
         );
-        let seeded = base.record_attack(request(10, 0)).expect("seed attack is eligible");
+        let seeded = base
+            .record_attack(request(10, 0))
+            .expect("seed attack is eligible");
         let stale = StoredDamageRequestV2 {
             turn_index: 6,
             ..request(10, 1)
@@ -351,16 +360,29 @@ mod tests {
         let opened = SpecialDamageStateV2::default()
             .begin_accumulation(TURN)
             .expect("default state can begin accumulation");
-        let first_hit = opened.record_attack(request(100, 0)).expect("first accumulation hit is eligible");
-        let closed_first = first_hit.close_accumulation_turn().expect("first accumulation turn can close");
-        let reopened = closed_first.open_next_accumulation_turn(TURN + 1).expect("next accumulation turn can open");
+        let first_hit = opened
+            .record_attack(request(100, 0))
+            .expect("first accumulation hit is eligible");
+        let closed_first = first_hit
+            .close_accumulation_turn()
+            .expect("first accumulation turn can close");
+        let reopened = closed_first
+            .open_next_accumulation_turn(TURN + 1)
+            .expect("next accumulation turn can open");
         let second_turn = StoredDamageRequestV2 {
             turn_index: TURN + 1,
             ..request(30, 1)
         };
-        let second_hit = reopened.record_attack(second_turn).expect("second-turn hit is eligible");
-        let (released_state, released) = second_hit.release_accumulation().expect("accumulated damage can be released");
-        assert_eq!(released, SafeU53::new(130).expect("expected released total fits SafeU53"));
+        let second_hit = reopened
+            .record_attack(second_turn)
+            .expect("second-turn hit is eligible");
+        let (released_state, released) = second_hit
+            .release_accumulation()
+            .expect("accumulated damage can be released");
+        assert_eq!(
+            released,
+            SafeU53::new(130).expect("expected released total fits SafeU53")
+        );
         assert!(!released_state.accumulating);
         assert_eq!(released_state.accumulated_damage, SafeU53::ZERO);
 
@@ -379,10 +401,15 @@ mod tests {
         let opened = SpecialDamageStateV2::default()
             .begin_accumulation(TURN)
             .expect("default state can begin accumulation");
-        let hit = opened.record_attack(request(55, 1)).expect("special accumulation hit is eligible");
+        let hit = opened
+            .record_attack(request(55, 1))
+            .expect("special accumulation hit is eligible");
         let cleared = hit.clear_record_window();
         assert!(cleared.records.is_empty());
-        assert_eq!(cleared.accumulated_damage, SafeU53::new(55).expect("expected retained total fits SafeU53"));
+        assert_eq!(
+            cleared.accumulated_damage,
+            SafeU53::new(55).expect("expected retained total fits SafeU53")
+        );
         assert!(cleared.accumulating);
         assert_eq!(cleared.reset(), SpecialDamageStateV2::default());
     }

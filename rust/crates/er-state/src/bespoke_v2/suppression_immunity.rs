@@ -4488,7 +4488,8 @@ mod tests {
             DispatchClass::SubjectDefinition
         );
         assert_eq!(
-            classify_behavior_unit(POROUS_CHARGE_HASH).expect("porous-charge fixture is classified"),
+            classify_behavior_unit(POROUS_CHARGE_HASH)
+                .expect("porous-charge fixture is classified"),
             DispatchClass::PostDefendTrigger
         );
     }
@@ -4508,6 +4509,8 @@ mod tests {
 
     #[test]
     fn default_state_validates() {
-        SuppressionImmunityStateV2::new().validate().expect("default suppression state is valid");
+        SuppressionImmunityStateV2::new()
+            .validate()
+            .expect("default suppression state is valid");
     }
 }

@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -69,6 +70,105 @@ def run(args, name, cwd=RUST, env=None):
     if result.returncode:
         raise RuntimeError(f"{name} exited {result.returncode}; see {path.name}")
     return path
+
+
+CLIPPY_DIAGNOSTIC_TOTAL_SECONDS = 300
+CLIPPY_DIAGNOSTIC_PACKAGE_SECONDS = 60
+CLIPPY_DIAGNOSTIC_CLEANUP_SECONDS = 5
+CLIPPY_DIAGNOSTIC_INDEX_BYTES = 16000
+
+
+def collect_clippy_failure_diagnostics(selection, summary):
+    """Failed-gate diagnostics only; never a substitute for the ordinary gate."""
+    start = time.monotonic()
+    deadline = start + CLIPPY_DIAGNOSTIC_TOTAL_SECONDS
+    packages = selection["packages"]
+    if (not isinstance(packages, list) or not 1 <= len(packages) <= 64
+            or any(not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,47}", name) for name in packages)
+            or len(set(packages)) != len(packages)):
+        raise RuntimeError("Clippy diagnostic package inventory exceeds its exact bounded scope")
+    directory = FULL / "clippy-diagnostics"
+    directory.mkdir(exist_ok=True)
+    # Row order is the actual selected package order; no crate is skipped based
+    # on compiler prose or inferred dependency failures. Commands retain the
+    # ordinary pinned environment and flags, with exactly one selected package.
+    index = {"schema_version": 1, "purpose": "failed-gate-diagnostics-only",
+             "source_sha": summary["product_sha"], "original_log": "selected-packages-clippy.log",
+             "original_log_sha256": digest(FULL / "selected-packages-clippy.log"),
+             "command_prefix": ["cargo", "clippy", "--locked", "-p"],
+             "command_suffix": ["--all-targets", "--no-deps", "--", "-D", "warnings"],
+             "cwd": "rust", "log_template": "clippy-diagnostics/{package}.log",
+             "total_seconds": CLIPPY_DIAGNOSTIC_TOTAL_SECONDS,
+             "package_seconds": CLIPPY_DIAGNOSTIC_PACKAGE_SECONDS,
+             "cleanup_seconds": CLIPPY_DIAGNOSTIC_CLEANUP_SECONDS,
+             "columns": ["package", "outcome", "returncode", "window_ms", "elapsed_ms", "log_bytes", "manifest_sha256"],
+             "packages": [[name, "not-attempted", None, 0, 0, 0,
+                           digest(RUST / "crates" / name / "Cargo.toml")] for name in packages],
+             "stop_reason": "complete"}
+    def publish_index():
+        index["elapsed_ms"] = round((time.monotonic() - start) * 1000)
+        encoded = (json.dumps(index, separators=(",", ":")) + "\n").encode()
+        if len(encoded) > CLIPPY_DIAGNOSTIC_INDEX_BYTES:
+            raise RuntimeError("Clippy diagnostic index exceeds 16 KiB")
+        (directory / "index.json").write_bytes(encoded)
+        (COMPACT / "clippy-diagnostics.json").write_bytes(encoded)
+        summary["clippy_failure_diagnostics"] = {"file": "clippy-diagnostics/index.json",
+            "sha256": hashlib.sha256(encoded).hexdigest(), "bytes": len(encoded),
+            "attempted": sum(row[1] != "not-attempted" for row in index["packages"]),
+            "selected": len(packages), "stop_reason": index["stop_reason"]}
+    index["stop_reason"] = "in-progress"
+    publish_index()
+    for row in index["packages"]:
+        package_start = time.monotonic()
+        window = min(CLIPPY_DIAGNOSTIC_PACKAGE_SECONDS, deadline - package_start)
+        if window <= CLIPPY_DIAGNOSTIC_CLEANUP_SECONDS:
+            index["stop_reason"] = "total-budget"
+            break
+        row[3] = int(window * 1000)
+        package_deadline = package_start + window
+        row[1] = "starting"
+        publish_index()
+        path = directory / (row[0] + ".log")
+        args = [*index["command_prefix"], row[0], *index["command_suffix"]]
+        process = None
+        stop = False
+        print(f"[m9e] failed-gate Clippy diagnostic: {row[0]}", flush=True)
+        with path.open("w") as output:
+            try:
+                # Remote runners are Linux. A dedicated group lets timeout
+                # cleanup kill Cargo and its compiler children together.
+                process = subprocess.Popen(args, cwd=RUST, stdout=output,
+                                           stderr=subprocess.STDOUT, start_new_session=True)
+                row[2] = process.wait(timeout=max(0, package_deadline - time.monotonic()
+                                                  - CLIPPY_DIAGNOSTIC_CLEANUP_SECONDS))
+                row[1] = "exit-zero" if row[2] == 0 else "exit-nonzero"
+            except subprocess.TimeoutExpired:
+                row[1] = "timeout"
+            except Exception as error:
+                row[1] = "process-error"
+                output.write(f"\nDiagnostic process error: {type(error).__name__}: {str(error)[:512]}\n")
+            finally:
+                if process is not None and row[2] is None:
+                    try:
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        row[2] = process.wait(timeout=max(0, min(CLIPPY_DIAGNOSTIC_CLEANUP_SECONDS,
+                                                                  package_deadline - time.monotonic())))
+                    except Exception as error:
+                        row[1] = "cleanup-error"
+                        index["stop_reason"] = "cleanup-error"
+                        output.write(f"\nDiagnostic cleanup error: {type(error).__name__}: {str(error)[:512]}\n")
+                        stop = True
+        row[4] = round((time.monotonic() - package_start) * 1000)
+        row[5] = path.stat().st_size
+        publish_index()
+        if stop:
+            break
+    else:
+        index["stop_reason"] = "complete"
+    publish_index()
 
 
 def compact_format_patch(patch, limit=32768):
@@ -1166,6 +1266,7 @@ def native_execution_order(selection, enumerated):
 def main(preflight_failure=None):
     COMPACT.mkdir(parents=True, exist_ok=True)
     FULL.mkdir(parents=True, exist_ok=True)
+    (COMPACT / "clippy-diagnostics.json").unlink(missing_ok=True)
     summary = {"status": "failed", "product_sha": os.environ.get("GITHUB_SHA"),
                "workflow_sha": os.environ.get("GITHUB_WORKFLOW_SHA"),
                "harness_sha": digest(Path(__file__)),
@@ -1271,9 +1372,16 @@ def main(preflight_failure=None):
         # while rejecting native lint errors before expensive test execution.
         if selection.get("ai_damage_query_focus"):
             write_progress(summary, "lint", "selected-packages")
-            run(["cargo", "clippy", "--locked",
-                 *[part for package in selection["packages"] for part in ("-p", package)],
-                 "--all-targets", "--no-deps", "--", "-D", "warnings"], "selected-packages-clippy")
+            try:
+                run(["cargo", "clippy", "--locked",
+                     *[part for package in selection["packages"] for part in ("-p", package)],
+                     "--all-targets", "--no-deps", "--", "-D", "warnings"], "selected-packages-clippy")
+            except RuntimeError:
+                try:
+                    collect_clippy_failure_diagnostics(selection, summary)
+                except Exception as error:
+                    summary["clippy_diagnostic_collection_error"] = f"{type(error).__name__}: {error}"[:512]
+                raise
         else:
             if selection.get("requires_cli_clippy"):
                 write_progress(summary, "lint", "er-cli")
@@ -1424,7 +1532,9 @@ def main(preflight_failure=None):
                     excerpt += f"\n--- {path.name} ---\n" + marker + text[-12000:]
             encoded = excerpt.encode()
             patch_size = (COMPACT / "format.patch").stat().st_size if (COMPACT / "format.patch").exists() else 0
-            diagnostic_limit = 48000 - patch_size
+            clippy_index = COMPACT / "clippy-diagnostics.json"
+            clippy_index_size = clippy_index.stat().st_size if clippy_index.is_file() else 0
+            diagnostic_limit = max(0, 48000 - patch_size - clippy_index_size)
             truncated = len(encoded) > diagnostic_limit
             summary["diagnostics_truncated"] |= truncated
             (COMPACT / "failure.txt").write_bytes(encoded[:diagnostic_limit] + (b"\n[TRUNCATED: see full remote diagnostics]\n" if truncated else b""))

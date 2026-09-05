@@ -2175,3 +2175,31 @@ the156 harness selftests:155 passed, the new repair-scope test asserted Worker
 activation without creating its source fixture. Initialize the existing exact
 Worker source/lock fixture before the AI scope setup, retaining that assertion.
 Production mapping and all Rust repairs remain unchanged. No native execution.
+
+## Expanded lint repair remote formatting
+
+96420e555fd57aaa1c67c1680b9af3a94b9574ab / run33996232575 passed all156
+harness selftests in4.268 seconds, including both lint-scope witnesses. It then
+stopped at remote Rust formatting before compilation or native execution.
+The bounded compact was1843 bytes; failure text10,515 bytes; named harness log
+28,345 bytes. Apply the exact8473-byte remote format.patch unchanged, SHA256
+9f4bc1e50f64f6953b7f46792fa5e8b56b861e02e2a3961e85f5f588220277be,
+covering only guard, special_damage, suppression_immunity and mechanic_state_v2.
+No local formatter or runtime workload. Qualification baseline remains f140.
+
+## Failure-only Clippy diagnostics
+
+After root and independent source review, add bounded diagnostics only after the
+unchanged complete selected-package Clippy command fails. Preserve that original
+failure even when diagnostic commands pass or collection fails; no native test,
+control or platform execution follows it. Probe each actual selected package in
+order with the same all-target/no-deps warning policy, subject to300 seconds total
+and60 seconds per package including5 seconds for process-group kill/reap. Record
+all packages, including unattempted ones, with exact command/source/manifest and
+exit/timeout provenance. Full probe logs remain remote. The bounded16,000-byte
+index consumes the existing failure-text allowance; no artifact cap increases.
+
+All156 prior harness test bodies are preserved; six new orchestration tests cover
+failure preservation, command provenance, timeout/spawn/cleanup/collector failure
+and inventory bounds. These162 authored tests await remote execution. Product
+scope, required targets, controls, execution policy and baseline are unchanged.
