@@ -1,7 +1,9 @@
 use er_types::battle_ids::MenuInstanceId;
 use er_types::m7_action::{GameActionError, GameActionV1, SaveActionV1};
 use er_types::m7_menu::{GameMenuCancelV2, GameMenuError, GameMenuOptionV2, GameMenuV2};
-use er_types::ui_menu::{LogicalMenuError, MenuNavigationEdge, MenuOptionLayout, NavigationDirection};
+use er_types::ui_menu::{
+    LogicalMenuError, MenuNavigationEdge, MenuOptionLayout, NavigationDirection,
+};
 use er_types::{MenuOptionId, SafeU53, SeatId};
 
 fn id(value: &str) -> MenuOptionId {
