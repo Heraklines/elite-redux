@@ -1781,3 +1781,12 @@ No evidence encoding or bound is changed. The measured63513-byte A proof plus th
 baseline shrinkage was assumed. Other metadata length/timing digit assumptions
 still apply, so actual next proof publication must enforce the cap. The control
 and its exact next candidate remain unqualified until their remote run completes.
+
+Run33977030356 on fe45b1600e88a4a8590d6586726c924223711177 stopped before
+native execution with one failure among129 harness selftests. The new synthetic
+outside-artifact case correctly hit the existing isolated-target-tree rejection,
+but its expected error string named the later matching-artifact-count guard.
+Only that case's expectation now names the actual isolation guard. Artifact
+validation, failure phase, source restoration and all129 tests remain unchanged.
+The inspected3157-byte native A compact supplied the bounded failure excerpt;
+full diagnostic archives stayed remote. The qualified baseline remains785.

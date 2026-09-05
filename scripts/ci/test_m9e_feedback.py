@@ -2357,7 +2357,7 @@ class FeedbackTests(unittest.TestCase):
                 ("wrong_result", "did not fail", "behavioral_assertion"), ("wrong_panic", "did not fail", "behavioral_assertion"),
                 ("wrong_counts", "did not fail", "behavioral_assertion"),
                 ("wrong_manifest", "exactly one matching", "artifact_validation"),
-                ("outside_artifact", "exactly one matching", "artifact_validation"),
+                ("outside_artifact", "not inside its isolated target tree", "artifact_validation"),
                 ("ambiguous_artifact", "exactly one matching", "artifact_validation")):
             with self.subTest(mode=mode), self.assertRaisesRegex(RuntimeError, reason):
                 self.invoke_synthetic_timer_mutant(mode, mutant="ledger", expected_failure_phase=phase)
