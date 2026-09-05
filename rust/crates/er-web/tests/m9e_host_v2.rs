@@ -554,7 +554,10 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
         BrowserResponseV2::Ready
     ));
     assert_eq!(
-        scenario_host.kernel_ref().ok_or("scenario kernel missing")?.snapshot()?,
+        scenario_host
+            .kernel_ref()
+            .ok_or("scenario kernel missing")?
+            .snapshot()?,
         scenario_snapshot
     );
     let response = send(&mut scenario_host, 1, BrowserRequestV2::ExportRepro)?;

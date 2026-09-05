@@ -424,7 +424,11 @@ fn final_wave_victory_terminates_the_run() -> Result<(), Box<dyn Error>> {
         field.slot,
         owner,
     )?;
-    let context = run.control.action_context.as_mut().ok_or("command context missing")?;
+    let context = run
+        .control
+        .action_context
+        .as_mut()
+        .ok_or("command context missing")?;
     assert_ne!(context.operation_id, operation);
     context.operation_id = operation;
     run.control.validate()?;
