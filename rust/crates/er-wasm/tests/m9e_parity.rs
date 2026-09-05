@@ -344,10 +344,13 @@ fn assert_eventwise_parity_contract() -> Result<(), Box<dyn Error>> {
     // B1 makes fresh allocation explicit (Some(0), formerly exhausted None)
     // and records held navigation registrations until key release. Full kernel
     // snapshot digests include those allocator and repeat ownership changes.
-    // Updated from native runner 33931362507; Wasm must match independently.
+    // The controlled fixture now starts with fresh ledger/replay bookkeeping,
+    // and private navigation retains its exact canonical/return controls. Both
+    // change snapshot evidence; canonical material also uses the retained root.
+    // Updated from native runner 33959674311; Wasm must match independently.
     assert_eq!(
         report_digest,
-        "ec51f4cd7f6e6232054583b9208ce28fb3bb84e0559258932109c82234552beb"
+        "4d5ef01099d9942c0dec32227366a3faf018a77aa5c5b6a1d60e84b3e75bf0c5"
     );
     Ok(())
 }

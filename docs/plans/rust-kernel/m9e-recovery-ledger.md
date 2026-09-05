@@ -1215,3 +1215,20 @@ Downloaded inspected nativeA compact4,993 compressed bytes only; full diagnostic
 remote formatter patch, zero omissions, SHA256
 cd6f8992b7176c3b819357029c175d0a89a0bfb0b76521f16205b98ae4bb1e26.
 Baseline and frozen golden remain unchanged pending execution.
+
+Remote11bd20bd9417c5e2673eb2ef5eff51f240dc0e27/run33959674311 passed110
+harness checks, formatting, reverse compilation and required lint. NativeA now
+ran all7 current-kernel,4 coop,4 snapshot,9 timer and12 domain tests successfully
+before native parity:38 executed/37 passed/1 failed of603 globally selected.
+Failure is only the old frozen raw-event report digest after all its gameplay
+assertions passed. Actual native report4d5ef01099d9942c0dec32227366a3faf018a77aa5c5b6a1d60e84b3e75bf0c5;
+held-timer test passed with8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+The controlled boosted fixture resets bootstrap ledger/replay bookkeeping; exact
+private root/return ownership now serializes into snapshots and canonical-root
+material affects fingerprints/effect evidence. Updated only the frozen digest
+from this actual remote result, preserving progression/reward/wave3/timer checks.
+Wasm must match independently in a later successful run; no qualification yet.
+Inspected and downloaded only nativeA compact3,697 compressed bytes;92,220-byte
+diagnostics stay remote. NativeB still running when superseding the failed cut.
+Build146,504ms; priority targets8,947/4,880/3,825/3,072/12,808/8,785ms.
+Baseline remains9a3/run33954961024; no rollout or tag changes.
