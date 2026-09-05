@@ -148,6 +148,14 @@ struct DomainExecutionV1 {
     allocated_identities: Vec<(GameIdentityDomainV1, SafeU53)>,
 }
 
+// Private proof produced by common material application, never supplied by a
+// caller through the public, mutable PreparedGameTransitionV2 value.
+struct PreparedGameTransitionProof {
+    prepared: PreparedGameTransitionV2,
+    state: Option<GameStateV6>,
+    ledger: AppliedGameMaterialLedgerV1,
+}
+
 impl GameRuntimeV6 {
     pub fn new(
         state: Option<GameStateV6>,
@@ -362,7 +370,7 @@ impl GameRuntimeV6 {
         action: GameActionV1,
         context: GameActionDispatchContextV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
-        let prepared = GameActionDispatcherV1::prepare_with_retention(
+        let proof = GameActionDispatcherV1::prepare_with_proof(
             self.state.as_ref(),
             self.content.as_ref(),
             &self.material_ledger,
@@ -370,24 +378,12 @@ impl GameRuntimeV6 {
             context,
             self.material_retention,
         )?;
-        let mut candidate_state = self.state.clone();
-        let mut candidate_ledger = self.material_ledger.clone();
-        let outcome = apply_game_material_v6_with_retention(
-            &mut candidate_state,
-            &mut candidate_ledger,
-            self.content.as_ref(),
-            &prepared.material_bytes,
-            self.material_retention,
-        )
-        .map_err(material_error)?;
-        if outcome != GameMaterialApplyOutcomeV6::Applied
-            || candidate_state.as_ref() != Some(&prepared.candidate)
-        {
-            return Err(GameRuntimeV6Error::CandidateMismatch);
-        }
-        self.state = candidate_state;
-        self.material_ledger = candidate_ledger;
-        Ok(prepared)
+        // Preparation already common-applied these bytes under this exact
+        // retention policy and checked equality with the returned candidate.
+        // No fallible work remains, and no live state changed during the proof.
+        self.state = proof.state;
+        self.material_ledger = proof.ledger;
+        Ok(proof.prepared)
     }
 
     pub fn apply_material_bytes(
@@ -431,6 +427,18 @@ impl GameActionDispatcherV1 {
         context: GameActionDispatchContextV1,
         retention: AppliedMaterialRetentionV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
+        Self::prepare_with_proof(before, content, ledger, action, context, retention)
+            .map(|proof| proof.prepared)
+    }
+
+    fn prepare_with_proof(
+        before: Option<&GameStateV6>,
+        content: &PreparedGameContentV2,
+        ledger: &AppliedGameMaterialLedgerV1,
+        action: GameActionV1,
+        context: GameActionDispatchContextV1,
+        retention: AppliedMaterialRetentionV1,
+    ) -> Result<PreparedGameTransitionProof, GameRuntimeV6Error> {
         if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
             ledger
                 .validate_with_retention(retention)
@@ -538,15 +546,19 @@ impl GameActionDispatcherV1 {
         {
             return Err(GameRuntimeV6Error::CandidateMismatch);
         }
-        Ok(PreparedGameTransitionV2 {
-            candidate,
-            material,
-            material_bytes,
-            next_control,
-            mutations,
-            rng_audit: execution.rng_audit,
-            presentation: execution.presentation,
-            platform_effects: execution.platform_effects,
+        Ok(PreparedGameTransitionProof {
+            prepared: PreparedGameTransitionV2 {
+                candidate,
+                material,
+                material_bytes,
+                next_control,
+                mutations,
+                rng_audit: execution.rng_audit,
+                presentation: execution.presentation,
+                platform_effects: execution.platform_effects,
+            },
+            state: proof_state,
+            ledger: proof_ledger,
         })
     }
 }

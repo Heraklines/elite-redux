@@ -1632,3 +1632,41 @@ is64935 bytes; this estimate is not a successful actual manifest or future-growt
 guarantee. Oversize evidence still fails closed. Independent source reviews passed.
 The fully qualified baseline remains3aa4a0c/run33963418110; the timing-only4145
 candidate remains bound to its separate remote run33970667797.
+
+### First complete native retention result and private proof reuse
+
+Timing-only4145afafcc95214372aa65b5773f7cf6e4811cf1/run33970667797 passed
+all662 native tests (A644 across73 targets, B18 across3 targets), all122 harness
+checks, full reverse compilation, formatting, required Clippy, native parity and
+both real compiled timer/replica mutation controls. Both lanes then failed only
+while writing the oversized phase manifest. Platform was skipped and aggregate
+failed, so this is native evidence, not a fully qualified retention baseline.
+It does not erase the earlier same-product600-second timeouts or prove stable
+throughput across runners. Baseline remains the fully qualified3aa4a0c.
+
+The helper retention target passed3 tests in422289 ms. Its12289-operation loop
+reported420797 ms total,314435 ms dispatch and103477 ms replica apply; near the
+full4096-record suffix, sampled validation cost was approximately8.6-9.2 ms.
+The two V7 retention cases passed in150913 ms. Current CLI reload passed349109 ms;
+all existing assertions, exact IDs and workload/window limits remained intact.
+Native B's18 tests also passed but were slower than the preceding run, so absolute
+cross-run timing comparisons require caution. Only inspected compact A/B artifacts
+(2883/3303 compressed bytes) and the specifically needed3526-byte timing log plus
+56767-byte full native summary were retrieved by bounded ZIP ranges from the
+inspected136783-byte diagnostic archive; complete logs/assets stayed remote.
+
+The reviewed runtime change now retains the private state and ledger already
+produced and checked by the dispatcher's common material application. Public
+prepare signatures still return only PreparedGameTransitionV2; callers cannot
+supply or forge the private proof. Runtime execute publishes that verified owned
+state/ledger and returns its prepared result, removing the second identical
+state/ledger clone and common application. Initial policy validation, action/
+content/context validation, canonical material encoding, common decoding/apply,
+Applied outcome and exact candidate equality remain in their original order.
+No Result-returning operation follows proof construction before publication.
+Replica application, historical defaults, material identity, retention caps and
+all rejection/restore boundaries remain unchanged. This removes one of the four
+full-ledger validations in a dispatch-plus-replica iteration. It does not add a
+validation cache or claim measured speedup. Root and independent causal review
+approved the source; the same tests and bounded timing trace must verify it
+remotely with the separately committed125-test phase-manifest repair.
