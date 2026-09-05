@@ -317,13 +317,19 @@ pub fn wave_for_difficulty(
 pub fn is_wave_final(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
     match mode.terminal_policy {
         crate::TerminalWavePolicyV1::Exact(terminal) => wave == terminal,
-        crate::TerminalWavePolicyV1::Interval(interval) => wave > 0 && wave % interval == 0,
+        crate::TerminalWavePolicyV1::Interval(interval) => wave > 0 && is_interval_multiple(wave, interval),
         crate::TerminalWavePolicyV1::Never => false,
     }
 }
 
+fn is_interval_multiple(wave: u32, interval: u32) -> bool {
+    // Preserve rejection of zero intervals on direct, unvalidated mode calls.
+    assert_ne!(interval, 0, "wave interval must be nonzero");
+    wave.is_multiple_of(interval)
+}
+
 pub fn legend_min_wave(base_stat_total: u32) -> u32 {
-    let delta = u64::from(base_stat_total).checked_sub(540).unwrap_or(0);
+    let delta = u64::from(base_stat_total).saturating_sub(540);
     let rounded_quarters = (delta + 2) / 4;
     u32::try_from((55 + rounded_quarters).clamp(55, 90)).unwrap_or(90)
 }
@@ -361,15 +367,15 @@ pub fn early_wave_move_power_ratio(
 }
 
 pub fn is_checkpoint_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
-    wave > 0 && wave % mode.checkpoint_interval == 0
+    wave > 0 && is_interval_multiple(wave, mode.checkpoint_interval)
 }
 
 pub fn is_chapter_start_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
-    wave > 0 && (wave - 1) % mode.checkpoint_interval == 0
+    wave > 0 && is_interval_multiple(wave - 1, mode.checkpoint_interval)
 }
 
 pub fn is_major_checkpoint_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
-    wave > 0 && wave % mode.major_checkpoint_interval == 0
+    wave > 0 && is_interval_multiple(wave, mode.major_checkpoint_interval)
 }
 
 pub fn story_source_wave(mode: &crate::GameModeDefinitionV1, wave: u32) -> u32 {
@@ -404,8 +410,7 @@ pub fn biome_overstay(
     world.overstay_anchor_wave.map_or(0, |anchor| {
         wave.get()
             .get()
-            .checked_sub(anchor.get().get())
-            .unwrap_or(0)
+            .saturating_sub(anchor.get().get())
     })
 }
 
@@ -485,7 +490,7 @@ fn notoriety_scaled_ceiling(
     let numerator = u64::from(scaled_tenths)
         .checked_mul(u64::from(ceiling))
         .ok_or(WorldRuntimeError::Wave)?;
-    Ok(u32::try_from((numerator + 50) / 100).map_err(|_| WorldRuntimeError::Wave)?)
+    u32::try_from((numerator + 50) / 100).map_err(|_| WorldRuntimeError::Wave)
 }
 
 /// Returns scaled overstay in tenths of a wave so all thresholds remain exact integers.
@@ -1207,7 +1212,7 @@ pub fn biome_should_end(world: &WorldStateV1, wave: WaveIndex) -> Result<bool, W
     let elapsed = waves_in_current_biome(world, wave)?;
     Ok(world
         .biome_length
-        .map_or(wave.get().get() % 10 == 0, |length| {
+        .map_or(wave.get().get().is_multiple_of(10), |length| {
             elapsed >= u64::from(length)
         }))
 }

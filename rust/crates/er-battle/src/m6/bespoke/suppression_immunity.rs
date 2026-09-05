@@ -826,25 +826,25 @@ mod tests {
         "8ccdbf8965d067c8390767eb77144e3a0ae9b147f01da49cf68be01e048fe846";
 
     fn pid(value: u64) -> PokemonId {
-        PokemonId::new(SafeU53::new(value).unwrap())
+        PokemonId::new(SafeU53::new(value).expect("pid: fixture operation succeeds"))
     }
 
     fn mid(value: u64) -> er_types::battle_ids::MoveId {
-        er_types::battle_ids::MoveId::new(SafeU53::new(value).unwrap())
+        er_types::battle_ids::MoveId::new(SafeU53::new(value).expect("mid: fixture operation succeeds"))
     }
 
     fn aid(value: u64) -> AbilityId {
-        AbilityId::new(SafeU53::new(value).unwrap())
+        AbilityId::new(SafeU53::new(value).expect("aid: fixture operation succeeds"))
     }
 
     fn behavior_unit(hash: &str) -> BehaviorUnitId {
         BehaviorUnitId {
             source: er_types::m6::BehaviorSourceId::ActiveAbility {
-                numeric_id: SafeU53::new(1).unwrap(),
+                numeric_id: SafeU53::new(1).expect("behavior_unit: fixture operation succeeds"),
             },
             unit_kind: er_types::m6::BehaviorUnitKind::AbilityAttribute,
             ordinal: er_types::m6::BehaviorUnitOrdinal::ZERO,
-            provenance_hash: er_types::m6::ProvenanceHash::parse(hash).unwrap(),
+            provenance_hash: er_types::m6::ProvenanceHash::parse(hash).expect("behavior_unit: fixture operation succeeds"),
         }
     }
 
@@ -868,11 +868,11 @@ mod tests {
         assert_eq!(CLASSIFIED_BEHAVIOR_UNITS, 1406);
         assert_eq!(CLASSIFIED_BEHAVIOR_UNIT_HASHES, 1002);
         assert_eq!(
-            classify_behavior_unit(CHARGED_TAG_HASH).unwrap(),
+            classify_behavior_unit(CHARGED_TAG_HASH).expect("closure_constants_match_frozen_counts: fixture operation succeeds"),
             DispatchClass::SubjectDefinition
         );
         assert_eq!(
-            classify_behavior_unit(POROUS_CHARGE_HASH).unwrap(),
+            classify_behavior_unit(POROUS_CHARGE_HASH).expect("closure_constants_match_frozen_counts: fixture operation succeeds"),
             DispatchClass::PostDefendTrigger
         );
     }
@@ -900,7 +900,7 @@ mod tests {
                 current_ability: loadout_before.active,
             },
         )
-        .unwrap();
+        .expect("suppression_preserves_all_four_slots_and_provenance: fixture operation succeeds");
         // The owning loadout is untouched: ids are never rewritten to NONE
         // and the evidence echoes the preserved identity.
         assert_eq!(loadout_before.active, aid(10));
@@ -911,7 +911,7 @@ mod tests {
             let expected = slot == AbilitySlot::Active;
             assert_eq!(transition.state.slot_is_suppressed(owner, slot), expected);
         }
-        transition.state.validate().unwrap();
+        transition.state.validate().expect("suppression_preserves_all_four_slots_and_provenance: fixture operation succeeds");
     }
 
     #[test]
@@ -931,7 +931,7 @@ mod tests {
                 current_ability: aid(5),
             },
         )
-        .unwrap_err();
+        .expect_err("unsuppressible_rejection_leaves_state_unchanged: expected rejection");
         assert_eq!(
             error,
             SuppressionTransitionError::UnsuppressibleAbility {
@@ -957,7 +957,7 @@ mod tests {
                 },
             ),
         )
-        .unwrap();
+        .expect("overlapping_suppressors_precede_then_restore: fixture operation succeeds");
         let with_field = apply_slot_suppression(
             &with_move.state,
             &suppressible(
@@ -968,12 +968,12 @@ mod tests {
                 },
             ),
         )
-        .unwrap();
+        .expect("overlapping_suppressors_precede_then_restore: fixture operation succeeds");
         let with_global = apply_slot_suppression(
             &with_field.state,
             &suppressible(owner, AbilitySlot::Active, SuppressionOrigin::GlobalIgnore),
         )
-        .unwrap();
+        .expect("overlapping_suppressors_precede_then_restore: fixture operation succeeds");
         // Global outranks field, which outranks move-applied.
         assert_eq!(
             with_global.evidence.governing_origin_after,
@@ -987,7 +987,7 @@ mod tests {
         );
         // Removing the global source falls back to field precedence.
         let after_clear =
-            clear_suppressions(&with_global.state, SuppressionCleanupEvent::GlobalCleared).unwrap();
+            clear_suppressions(&with_global.state, SuppressionCleanupEvent::GlobalCleared).expect("overlapping_suppressors_precede_then_restore: fixture operation succeeds");
         assert_eq!(
             after_clear
                 .state
@@ -1002,7 +1002,7 @@ mod tests {
             &after_clear.state,
             SuppressionCleanupEvent::FieldSourceLeft(pid(9)),
         )
-        .unwrap();
+        .expect("overlapping_suppressors_precede_then_restore: fixture operation succeeds");
         assert_eq!(
             after_source
                 .state
@@ -1016,7 +1016,7 @@ mod tests {
             &after_source.state,
             SuppressionCleanupEvent::OwnerLeftField(owner),
         )
-        .unwrap();
+        .expect("overlapping_suppressors_precede_then_restore: fixture operation succeeds");
         assert!(
             final_clear
                 .state
@@ -1046,7 +1046,7 @@ mod tests {
                 )
             },
         )
-        .unwrap();
+        .expect("identical_origin_refreshes_instead_of_stacking: fixture operation succeeds");
         let second = apply_slot_suppression(
             &first.state,
             &SlotSuppressionRequest {
@@ -1060,7 +1060,7 @@ mod tests {
                 )
             },
         )
-        .unwrap();
+        .expect("identical_origin_refreshes_instead_of_stacking: fixture operation succeeds");
         assert!(second.evidence.refreshed);
         assert_eq!(
             second.evidence.creation_ordinal,
@@ -1087,11 +1087,11 @@ mod tests {
                 )
             },
         )
-        .unwrap();
-        let tick_one = advance_suppression_turns(&applied.state).unwrap();
+        .expect("timed_windows_expire_and_restore: fixture operation succeeds");
+        let tick_one = advance_suppression_turns(&applied.state).expect("timed_windows_expire_and_restore: fixture operation succeeds");
         assert!(tick_one.evidence.removed.is_empty());
         assert_eq!(tick_one.state.slot_suppressions[0].remaining_turns, Some(1));
-        let tick_two = advance_suppression_turns(&tick_one.state).unwrap();
+        let tick_two = advance_suppression_turns(&tick_one.state).expect("timed_windows_expire_and_restore: fixture operation succeeds");
         assert_eq!(tick_two.evidence.removed.len(), 1);
         assert!(tick_two.state.slot_suppressions.is_empty());
         assert_eq!(
@@ -1117,7 +1117,7 @@ mod tests {
                 ImmunitySubject::Type(er_types::battle_model::PokemonType::Ground),
                 AbilityBypassInput::None,
             )
-            .unwrap(),
+            .expect("immunity_allow_deny_and_bypass_precedence: fixture operation succeeds"),
             ImmunityDecision::Denied
         );
         // Attacker bypass outranks native immunity.
@@ -1128,7 +1128,7 @@ mod tests {
                 ImmunitySubject::Type(er_types::battle_model::PokemonType::Ground),
                 AbilityBypassInput::IgnoreAbilities,
             )
-            .unwrap(),
+            .expect("immunity_allow_deny_and_bypass_precedence: fixture operation succeeds"),
             ImmunityDecision::Allowed {
                 reason: ImmunityAllowReason::BypassPrecedence,
             }
@@ -1139,7 +1139,7 @@ mod tests {
             &state,
             &suppressible(owner, AbilitySlot::Active, SuppressionOrigin::GlobalIgnore),
         )
-        .unwrap();
+        .expect("immunity_allow_deny_and_bypass_precedence: fixture operation succeeds");
         assert_eq!(
             evaluate_immunity(
                 &suppressed.state,
@@ -1147,7 +1147,7 @@ mod tests {
                 ImmunitySubject::Type(er_types::battle_model::PokemonType::Ground),
                 AbilityBypassInput::None,
             )
-            .unwrap(),
+            .expect("immunity_allow_deny_and_bypass_precedence: fixture operation succeeds"),
             ImmunityDecision::Allowed {
                 reason: ImmunityAllowReason::ClaimingSlotSuppressed,
             }
@@ -1163,7 +1163,7 @@ mod tests {
             ImmunitySubject::Status(StatusKind::Poison),
             AbilityBypassInput::None,
         )
-        .unwrap_err();
+        .expect_err("immunity_allow_deny_and_bypass_precedence: expected rejection");
         assert!(matches!(
             error,
             SuppressionTransitionError::NotAnImmunityUnit { .. }
@@ -1184,7 +1184,7 @@ mod tests {
             ImmunitySubject::Status(StatusKind::Burn),
             AbilityBypassInput::None,
         )
-        .unwrap();
+        .expect("second_immunity_lane_hash_also_denies_natively: fixture operation succeeds");
         assert_eq!(decision, ImmunityDecision::Denied);
     }
 
@@ -1203,7 +1203,7 @@ mod tests {
                 admission: TagAdmission::BlockedByNativeImmunity,
             },
         )
-        .unwrap_err();
+        .expect_err("tag_admission_stacks_refreshes_expires_and_respects_immunity: expected rejection");
         assert_eq!(denied, SuppressionTransitionError::TagDeniedByImmunity);
         // Fresh admission.
         let admitted = admit_volatile_tag(
@@ -1218,7 +1218,7 @@ mod tests {
                 admission: TagAdmission::Permitted,
             },
         )
-        .unwrap();
+        .expect("tag_admission_stacks_refreshes_expires_and_respects_immunity: fixture operation succeeds");
         assert!(!admitted.evidence.stacked);
         assert_eq!(admitted.evidence.layers_after, 2);
         // Stack + refresh: layers accumulate, window takes the max.
@@ -1234,7 +1234,7 @@ mod tests {
                 admission: TagAdmission::Permitted,
             },
         )
-        .unwrap();
+        .expect("tag_admission_stacks_refreshes_expires_and_respects_immunity: fixture operation succeeds");
         assert!(stacked.evidence.stacked);
         assert_eq!(stacked.evidence.layers_after, 5);
         assert_eq!(stacked.state.volatile_tags.len(), 1);
@@ -1252,15 +1252,15 @@ mod tests {
                 admission: TagAdmission::Permitted,
             },
         )
-        .unwrap_err();
+        .expect_err("tag_admission_stacks_refreshes_expires_and_respects_immunity: expected rejection");
         assert!(matches!(
             overflow,
             SuppressionTransitionError::State(SuppressionStateError::LayerOverflow { .. })
         ));
         // Expiry drops timed instances deterministically.
-        let lapsed = lapse_volatile_tags(&stacked.state).unwrap();
+        let lapsed = lapse_volatile_tags(&stacked.state).expect("tag_admission_stacks_refreshes_expires_and_respects_immunity: fixture operation succeeds");
         assert!(lapsed.evidence.is_empty());
-        let lapsed_again = lapse_volatile_tags(&lapsed.state).unwrap();
+        let lapsed_again = lapse_volatile_tags(&lapsed.state).expect("tag_admission_stacks_refreshes_expires_and_respects_immunity: fixture operation succeeds");
         assert!(lapsed_again.evidence.is_empty());
     }
 
@@ -1278,7 +1278,7 @@ mod tests {
                 admission: TagAdmission::Permitted,
             },
         )
-        .unwrap();
+        .expect("switch_out_preserves_major_status_faint_clears_all: fixture operation succeeds");
         let with_tag = admit_volatile_tag(
             &with_status.state,
             &VolatileTagAdmission {
@@ -1292,9 +1292,9 @@ mod tests {
                 admission: TagAdmission::Permitted,
             },
         )
-        .unwrap();
+        .expect("switch_out_preserves_major_status_faint_clears_all: fixture operation succeeds");
         let switched =
-            clear_volatile_tags(&with_tag.state, VolatileCleanupEvent::SwitchOut(owner)).unwrap();
+            clear_volatile_tags(&with_tag.state, VolatileCleanupEvent::SwitchOut(owner)).expect("switch_out_preserves_major_status_faint_clears_all: fixture operation succeeds");
         assert_eq!(switched.evidence.removed.len(), 1);
         assert_eq!(
             switched.evidence.preserved_major_statuses,
@@ -1302,7 +1302,7 @@ mod tests {
         );
         assert_eq!(switched.state.volatile_tags.len(), 1);
         let fainted =
-            clear_volatile_tags(&switched.state, VolatileCleanupEvent::Faint(owner)).unwrap();
+            clear_volatile_tags(&switched.state, VolatileCleanupEvent::Faint(owner)).expect("switch_out_preserves_major_status_faint_clears_all: fixture operation succeeds");
         assert_eq!(fainted.evidence.removed.len(), 1);
         assert!(fainted.state.volatile_tags.is_empty());
         assert!(fainted.evidence.preserved_major_statuses.is_empty());
@@ -1323,7 +1323,7 @@ mod tests {
                 SuppressionOrigin::GlobalIgnore,
             ),
         )
-        .unwrap();
+        .expect("dispatcher_orders_active_before_passive_and_reports_gates: fixture operation succeeds");
         let suppressed_a_passive = apply_slot_suppression(
             &suppressed_b.state,
             &suppressible(
@@ -1332,7 +1332,7 @@ mod tests {
                 SuppressionOrigin::GlobalIgnore,
             ),
         )
-        .unwrap();
+        .expect("dispatcher_orders_active_before_passive_and_reports_gates: fixture operation succeeds");
         let unsuppressible = [(owner_a, AbilitySlot::Passive0)];
         let context = DispatchContext {
             suppression: &suppressed_a_passive.state,
@@ -1371,7 +1371,7 @@ mod tests {
                 identity: &unit_passive0,
             },
         ];
-        let plan = route_ability_dispatch(&units, &context).unwrap();
+        let plan = route_ability_dispatch(&units, &context).expect("dispatcher_orders_active_before_passive_and_reports_gates: fixture operation succeeds");
         // Every unit is present exactly once: zero silent residuals.
         assert_eq!(plan.routed.len(), units.len());
         assert_eq!(
@@ -1423,7 +1423,7 @@ mod tests {
             }],
             &context,
         )
-        .unwrap_err();
+        .expect_err("dispatcher_rejects_units_outside_the_frozen_closure: expected rejection");
         assert!(matches!(
             error,
             SuppressionTransitionError::State(SuppressionStateError::UnknownBehaviorUnit { .. })

@@ -241,7 +241,7 @@ fn compile_species(
     evolutions: &[EvolutionDefinitionV2],
 ) -> Result<SpeciesProgressionDefinitionV2, ProgressionBuildErrorV1> {
     let species = SpeciesId::new(safe(entry.species_id)?);
-    if entry.evolution_moves.iter().any(|move_id| *move_id == 0) {
+    if entry.evolution_moves.contains(&0) {
         return Err(ProgressionBuildErrorV1::Invalid);
     }
     let _source_form_key = entry.form_key;

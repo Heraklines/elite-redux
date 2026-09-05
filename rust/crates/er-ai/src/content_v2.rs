@@ -293,7 +293,7 @@ impl AiPolicyPackV2 {
                     entry
                         .condition
                         .as_ref()
-                        .is_some_and(|condition| invalid_callback(condition))
+                        .is_some_and(invalid_callback)
                 })
         }) || self.registered_trainers.iter().any(|trainer| {
             let no_party = trainer.default_party.is_empty()

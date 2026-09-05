@@ -398,7 +398,7 @@ fn hp_after(
     Ok(match operation {
         HpOperationKind::Damage
         | HpOperationKind::IndirectDamage
-        | HpOperationKind::RecoilFromDamage => hp.checked_sub(amount).unwrap_or(0),
+        | HpOperationKind::RecoilFromDamage => hp.saturating_sub(amount),
         HpOperationKind::Heal | HpOperationKind::DrainFromDamage => {
             u32::try_from(u64::from(hp) + u64::from(amount))
                 .unwrap_or(u32::MAX)

@@ -802,6 +802,126 @@
   "boundary_prefixes": ["src/", "test/browser/", "test/node/", "workers/", "rust/crates/er-wasm/", "rust/crates/er-web/"],
   "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes",
   "ai_damage_query_focus": {
+    "lint_repair_exact_test_ids": {
+      "er-testkit:m6_native_wasm": [
+        "full_m6_fixture_catalog_is_float_free_and_compiles_deterministically",
+        "trace_round_trip_and_replay_are_canonical_and_deterministic",
+        "first_divergence_names_exact_event_and_field",
+        "tampered_traces_fail_closed",
+        "tampered_snapshot_v5_and_game_state_v4_fail_closed",
+        "tampered_turn_material_bytes_fail_closed",
+        "artifacts_agree_with_the_published_report",
+        "safe_helper_remains_total"
+      ],
+      "er-testkit:m71_foundation": [
+        "mechanical_compatibility_excludes_build_and_adapters",
+        "causal_ids_ignore_evidence_profile_and_graph_rejects_dangling_edges",
+        "diagnostic_diff_localizes_deepest_retained_path",
+        "observation_permissions_are_monotonic_and_hidden_state_gated",
+        "snapshot_v7_projection_preserves_wrapped_v6_bytes",
+        "checkpoint_telemetry_and_lineage_are_bounded",
+        "model_boundary_is_authority_only_and_legal_action_checked",
+        "render_scene_is_semantic_and_unknown_parent_rejected",
+        "core_crates_do_not_depend_on_developer_plane_and_semantic_methods_are_absent"
+      ],
+      "er-testkit:m7_system_proof": [
+        "capture_consumes_ball_and_moves_enemy_into_party",
+        "branching_routes_and_biome_structure_are_canonical_state",
+        "run_program_material_save_and_control_paths_agree",
+        "continuous_foundation_raw_key_journey_crosses_world_save_party_and_progression",
+        "raw_key_replica_emits_proposal_without_local_mutation",
+        "raw_key_mode_select_reaches_shared_terminal",
+        "two_hundred_wave_run_is_deterministic_to_terminal",
+        "randomized_campaign_profiles_replay_deterministically"
+      ]
+    },
+    "lint_repair_execute": {
+      "er-battle": [
+        "er_battle"
+      ],
+      "er-content-compiler": [
+        "er_content_compiler",
+        "er-content-compiler",
+        "m9e_bundle",
+        "m9e_full_content",
+        "m9e_progression"
+      ],
+      "er-devplane": [
+        "er_devplane"
+      ],
+      "er-progression": [
+        "er_progression"
+      ],
+      "er-run": [
+        "er_run"
+      ],
+      "er-save": [
+        "er_save"
+      ],
+      "er-scenario": [
+        "er_scenario"
+      ],
+      "er-sim": [
+        "er_sim",
+        "m4_pair_snapshot_v3",
+        "m4_raw_key_local"
+      ],
+      "er-state": [
+        "er_state",
+        "m4_foundation_properties"
+      ],
+      "er-testkit": [
+        "m6_foundation",
+        "m6_native_wasm",
+        "m71_foundation",
+        "m7_system_proof"
+      ],
+      "er-wasm": [
+        "er_wasm"
+      ],
+      "er-world": [
+        "er_world"
+      ]
+    },
+    "lint_repair_required_targets": {
+      "er-battle": [
+        "er_battle"
+      ],
+      "er-content-compiler": [
+        "er_content_compiler",
+        "m9e_bundle",
+        "m9e_full_content",
+        "m9e_progression"
+      ],
+      "er-progression": [
+        "er_progression"
+      ],
+      "er-run": [
+        "er_run"
+      ],
+      "er-save": [
+        "er_save"
+      ],
+      "er-scenario": [
+        "er_scenario"
+      ],
+      "er-sim": [
+        "er_sim",
+        "m4_pair_snapshot_v3",
+        "m4_raw_key_local"
+      ],
+      "er-state": [
+        "er_state",
+        "m4_foundation_properties"
+      ],
+      "er-testkit": [
+        "m6_foundation",
+        "m6_native_wasm",
+        "m71_foundation",
+        "m7_system_proof"
+      ]
+    },
+    "lint_repair_doc_paths": ["rust/contracts/m71-api.md"],
     "lint_repair_paths": [
       "rust/crates/er-state/src/bespoke_v2/forms.rs",
       "rust/crates/er-state/src/bespoke_v2/scheduled_effects.rs",
@@ -814,7 +934,40 @@
       "rust/crates/er-state/src/bespoke_v2/guard.rs",
       "rust/crates/er-state/src/bespoke_v2/item_lifecycle.rs",
       "rust/crates/er-state/src/bespoke_v2/special_damage.rs",
-      "rust/crates/er-state/src/mechanic_state_v2.rs"
+      "rust/crates/er-state/src/mechanic_state_v2.rs",
+      "rust/crates/er-ai/src/content_v2.rs",
+      "rust/crates/er-ai/src/trainer_party.rs",
+      "rust/crates/er-battle/src/m6/ability_executor.rs",
+      "rust/crates/er-battle/src/m6/bespoke/forms.rs",
+      "rust/crates/er-battle/src/m6/bespoke/guard.rs",
+      "rust/crates/er-battle/src/m6/bespoke/move_copy.rs",
+      "rust/crates/er-battle/src/m6/bespoke/scheduled_effects.rs",
+      "rust/crates/er-battle/src/m6/bespoke/special_damage.rs",
+      "rust/crates/er-battle/src/m6/bespoke/substitute.rs",
+      "rust/crates/er-battle/src/m6/bespoke/suppression_immunity.rs",
+      "rust/crates/er-battle/src/m6/move_executor.rs",
+      "rust/crates/er-battle/src/mechanics_mutation.rs",
+      "rust/crates/er-content-compiler/src/m6/moves.rs",
+      "rust/crates/er-content-compiler/src/m9e_bundle.rs",
+      "rust/crates/er-content-compiler/src/m9e_full_content.rs",
+      "rust/crates/er-content-compiler/src/m9e_progression.rs",
+      "rust/crates/er-content-compiler/src/main.rs",
+      "rust/crates/er-devplane/src/lib.rs",
+      "rust/crates/er-progression/src/oracle_surface.rs",
+      "rust/crates/er-progression/src/progression.rs",
+      "rust/crates/er-run/src/biome.rs",
+      "rust/crates/er-run/src/capture.rs",
+      "rust/crates/er-run/src/money.rs",
+      "rust/crates/er-run/src/reward.rs",
+      "rust/crates/er-run/src/rng_audit.rs",
+      "rust/crates/er-save/src/oracle_replay.rs",
+      "rust/crates/er-scenario/src/full_surface.rs",
+      "rust/crates/er-sim/src/snapshot_v3.rs",
+      "rust/crates/er-sim/tests/m4_raw_key_local.rs",
+      "rust/crates/er-state/tests/m4_foundation_properties.rs",
+      "rust/crates/er-testkit/tests/m6_foundation.rs",
+      "rust/crates/er-wasm/src/m6_parity.rs",
+      "rust/crates/er-world/src/runtime.rs"
     ],
     "execute": {
       "er-batch": [

@@ -2354,16 +2354,16 @@ mod tests {
 
     #[test]
     fn profiles_match_the_frozen_move_mapping() {
-        let counter = retaliation_profile(MOVE_COUNTER).unwrap();
+        let counter = retaliation_profile(MOVE_COUNTER).expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
         assert_eq!(counter.multiplier.numerator, 2);
         assert_eq!(counter.multiplier.denominator, 1);
         assert_eq!(counter.filter, SpecialDamageFilter::Physical);
 
-        let mirror_coat = retaliation_profile(MOVE_MIRROR_COAT).unwrap();
+        let mirror_coat = retaliation_profile(MOVE_MIRROR_COAT).expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
         assert_eq!(mirror_coat.filter, SpecialDamageFilter::Special);
 
         for move_id in [MOVE_METAL_BURST, MOVE_COMEUPPANCE] {
-            let burst = retaliation_profile(move_id).unwrap();
+            let burst = retaliation_profile(move_id).expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
             assert_eq!(burst.multiplier.numerator, 3);
             assert_eq!(burst.multiplier.denominator, 2);
             assert_eq!(burst.filter, SpecialDamageFilter::Both);
@@ -2379,7 +2379,7 @@ mod tests {
     fn counter_retaliates_at_double_recorded_damage_against_the_attacker() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 100, TURN))
-            .unwrap();
+            .expect("counter_retaliates_at_double_recorded_damage_against_the_attacker: fixture operation succeeds");
         let (successor, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2389,7 +2389,7 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         )
-        .unwrap();
+        .expect("counter_retaliates_at_double_recorded_damage_against_the_attacker: fixture operation succeeds");
         assert_eq!(transition.retaliation_damage, 200);
         assert_eq!(
             transition.selection,
@@ -2403,7 +2403,7 @@ mod tests {
     fn mirror_coat_rejects_wrong_category_without_consuming_records_or_rng() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 100, TURN))
-            .unwrap();
+            .expect("mirror_coat_rejects_wrong_category_without_consuming_records_or_rng: fixture operation succeeds");
         let outcome = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2413,7 +2413,7 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         );
-        assert_eq!(outcome.unwrap_err(), SpecialDamageError::NoEligibleSource);
+        assert_eq!(outcome.expect_err("mirror_coat_rejects_wrong_category_without_consuming_records_or_rng: expected rejection"), SpecialDamageError::NoEligibleSource);
         assert_eq!(state.records.len(), 1);
     }
 
@@ -2421,35 +2421,35 @@ mod tests {
     fn metal_burst_rounds_down_and_enforces_the_frozen_minimum() {
         assert_eq!(
             compute_retaliation_amount(
-                SafeU53::new(5).unwrap(),
+                SafeU53::new(5).expect("metal_burst_rounds_down_and_enforces_the_frozen_minimum: fixture operation succeeds"),
                 ExactRatioV2 {
                     numerator: 3,
                     denominator: 2
                 }
             )
-            .unwrap(),
+            .expect("metal_burst_rounds_down_and_enforces_the_frozen_minimum: fixture operation succeeds"),
             7,
         );
         assert_eq!(
             compute_retaliation_amount(
-                SafeU53::new(1).unwrap(),
+                SafeU53::new(1).expect("metal_burst_rounds_down_and_enforces_the_frozen_minimum: fixture operation succeeds"),
                 ExactRatioV2 {
                     numerator: 3,
                     denominator: 2
                 }
             )
-            .unwrap(),
+            .expect("metal_burst_rounds_down_and_enforces_the_frozen_minimum: fixture operation succeeds"),
             TO_DMG_VALUE_MINIMUM,
         );
         assert_eq!(
             compute_retaliation_amount(
-                SafeU53::new(0).unwrap(),
+                SafeU53::new(0).expect("metal_burst_rounds_down_and_enforces_the_frozen_minimum: fixture operation succeeds"),
                 ExactRatioV2 {
                     numerator: 2,
                     denominator: 1
                 }
             )
-            .unwrap(),
+            .expect("metal_burst_rounds_down_and_enforces_the_frozen_minimum: fixture operation succeeds"),
             TO_DMG_VALUE_MINIMUM,
         );
     }
@@ -2458,9 +2458,9 @@ mod tests {
     fn first_current_turn_match_wins_in_receipt_order() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 1, 40, TURN))
-            .unwrap()
+            .expect("first_current_turn_match_wins_in_receipt_order: fixture operation succeeds")
             .record_attack(hit(ENEMY_B, 0, 90, TURN))
-            .unwrap();
+            .expect("first_current_turn_match_wins_in_receipt_order: fixture operation succeeds");
         let (_, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2470,7 +2470,7 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A, ENEMY_B]),
             },
         )
-        .unwrap();
+        .expect("first_current_turn_match_wins_in_receipt_order: fixture operation succeeds");
         assert_eq!(transition.record.attacker_index, ENEMY_A);
         assert_eq!(
             transition.selection,
@@ -2483,7 +2483,7 @@ mod tests {
     fn stale_turn_evidence_is_rejected() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 100, TURN - 1))
-            .unwrap();
+            .expect("stale_turn_evidence_is_rejected: fixture operation succeeds");
         let outcome = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2493,14 +2493,14 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         );
-        assert_eq!(outcome.unwrap_err(), SpecialDamageError::StaleRecordsOnly);
+        assert_eq!(outcome.expect_err("stale_turn_evidence_is_rejected: expected rejection"), SpecialDamageError::StaleRecordsOnly);
     }
 
     #[test]
     fn ally_sourced_damage_is_never_eligible() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(1, 0, 100, TURN))
-            .unwrap();
+            .expect("ally_sourced_damage_is_never_eligible: fixture operation succeeds");
         let outcome = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2510,14 +2510,14 @@ mod tests {
                 field: doubles_field(&[OWNER, 1]),
             },
         );
-        assert_eq!(outcome.unwrap_err(), SpecialDamageError::NoEligibleSource);
+        assert_eq!(outcome.expect_err("ally_sourced_damage_is_never_eligible: expected rejection"), SpecialDamageError::NoEligibleSource);
     }
 
     #[test]
     fn disappeared_source_falls_back_to_alive_same_side_battler_in_doubles() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 100, TURN))
-            .unwrap();
+            .expect("disappeared_source_falls_back_to_alive_same_side_battler_in_doubles: fixture operation succeeds");
         let (_, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2527,7 +2527,7 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_B]),
             },
         )
-        .unwrap();
+        .expect("disappeared_source_falls_back_to_alive_same_side_battler_in_doubles: fixture operation succeeds");
         assert_eq!(
             transition.selection,
             CounterTargetSelection::SideFallback {
@@ -2541,7 +2541,7 @@ mod tests {
     fn fully_disappeared_side_yields_attacker_sentinel_and_failed_move() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 100, TURN))
-            .unwrap();
+            .expect("fully_disappeared_side_yields_attacker_sentinel_and_failed_move: fixture operation succeeds");
         let (successor, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2551,7 +2551,7 @@ mod tests {
                 field: doubles_field(&[OWNER]),
             },
         )
-        .unwrap();
+        .expect("fully_disappeared_side_yields_attacker_sentinel_and_failed_move: fixture operation succeeds");
         assert_eq!(
             transition.selection,
             CounterTargetSelection::AttackerSentinel {
@@ -2574,7 +2574,7 @@ mod tests {
     fn singles_skip_the_activity_check_like_the_oracle() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 10, TURN))
-            .unwrap();
+            .expect("singles_skip_the_activity_check_like_the_oracle: fixture operation succeeds");
         let (_, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2587,7 +2587,7 @@ mod tests {
                 },
             },
         )
-        .unwrap();
+        .expect("singles_skip_the_activity_check_like_the_oracle: fixture operation succeeds");
         assert_eq!(
             transition.selection,
             CounterTargetSelection::Direct(ENEMY_A)
@@ -2599,7 +2599,7 @@ mod tests {
         let huge = SafeU53::MAX;
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, huge.get(), TURN))
-            .unwrap();
+            .expect("overflow_is_a_typed_failure_that_preserves_input: fixture operation succeeds");
         let outcome = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2609,7 +2609,7 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         );
-        assert_eq!(outcome.unwrap_err(), SpecialDamageError::ArithmeticOverflow);
+        assert_eq!(outcome.expect_err("overflow_is_a_typed_failure_that_preserves_input: expected rejection"), SpecialDamageError::ArithmeticOverflow);
         assert_eq!(state.records.len(), 1);
     }
 
@@ -2617,13 +2617,13 @@ mod tests {
     fn accumulated_release_uses_the_same_frozen_rounding_rule() {
         let opened = SpecialDamageStateV2::default()
             .begin_accumulation(TURN)
-            .unwrap();
-        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).unwrap();
-        let closed = hit_one.close_accumulation_turn().unwrap();
-        let reopened = closed.open_next_accumulation_turn(TURN + 1).unwrap();
+            .expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
+        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
+        let closed = hit_one.close_accumulation_turn().expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
+        let reopened = closed.open_next_accumulation_turn(TURN + 1).expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
         let hit_two = reopened
             .record_attack(hit(ENEMY_B, 1, 25, TURN + 1))
-            .unwrap();
+            .expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
         let (successor, transition) = execute_accumulated_release(
             &hit_two,
             ExactRatioV2 {
@@ -2631,7 +2631,7 @@ mod tests {
                 denominator: 1,
             },
         )
-        .unwrap();
+        .expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
         assert_eq!(transition.retaliation_damage, 110);
         assert!(!successor.accumulating);
         assert_eq!(successor.accumulated_damage.get(), 0);
@@ -2643,7 +2643,7 @@ mod tests {
                     denominator: 1
                 }
             )
-            .unwrap_err(),
+            .expect_err("accumulated_release_uses_the_same_frozen_rounding_rule: expected rejection"),
             SpecialDamageError::State(SpecialDamageStateError::NotAccumulating),
         );
     }
@@ -2652,8 +2652,8 @@ mod tests {
     fn reset_clears_every_family_state_surface() {
         let opened = SpecialDamageStateV2::default()
             .begin_accumulation(TURN)
-            .unwrap();
-        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).unwrap();
+            .expect("reset_clears_every_family_state_surface: fixture operation succeeds");
+        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).expect("reset_clears_every_family_state_surface: fixture operation succeeds");
         let cleared = hit_one.clear_record_window();
         assert!(cleared.records.is_empty());
         assert_eq!(cleared.reset(), SpecialDamageStateV2::default());
@@ -2665,11 +2665,11 @@ mod tests {
     fn unit(move_id: u64, ordinal: u32, hash: &str) -> BehaviorUnitId {
         BehaviorUnitId {
             source: BehaviorSourceId::Move {
-                numeric_id: SafeU53::new(move_id).unwrap(),
+                numeric_id: SafeU53::new(move_id).expect("unit: fixture operation succeeds"),
             },
             unit_kind: BehaviorUnitKind::MoveAttribute,
             ordinal: BehaviorUnitOrdinal::new(ordinal),
-            provenance_hash: ProvenanceHash::parse(hash).unwrap(),
+            provenance_hash: ProvenanceHash::parse(hash).expect("unit: fixture operation succeeds"),
         }
     }
 
@@ -2700,7 +2700,7 @@ mod tests {
             "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
         );
         assert_eq!(
-            classify_special_damage_unit(&counter_amount).unwrap(),
+            classify_special_damage_unit(&counter_amount).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
             SpecialDamageUnitClass::RetaliationAmount,
         );
         // HitsTagForDoubleDamageAttr for MOVE 16, ordinal 0.
@@ -2710,7 +2710,7 @@ mod tests {
             "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
         );
         assert_eq!(
-            classify_special_damage_unit(&hits_tag).unwrap(),
+            classify_special_damage_unit(&hits_tag).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
             SpecialDamageUnitClass::DamageFormulaQuery(
                 DamageQueryAttribute::HitsTagForDoubleDamageAttr
             ),
@@ -2719,32 +2719,32 @@ mod tests {
         // passive slots share one provenance hash, active is ordinal 2).
         let synchronize_active = BehaviorUnitId {
             source: BehaviorSourceId::ActiveAbility {
-                numeric_id: SafeU53::new(28).unwrap(),
+                numeric_id: SafeU53::new(28).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
             },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
             provenance_hash: ProvenanceHash::parse(
                 "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
             )
-            .unwrap(),
+            .expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
         };
         assert_eq!(
-            classify_special_damage_unit(&synchronize_active).unwrap(),
+            classify_special_damage_unit(&synchronize_active).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
             SpecialDamageUnitClass::EncounterNatureSync,
         );
         let synchronize_passive = BehaviorUnitId {
             source: BehaviorSourceId::PassiveAbility {
-                numeric_id: SafeU53::new(28).unwrap(),
+                numeric_id: SafeU53::new(28).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
             },
             unit_kind: BehaviorUnitKind::PassiveAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
             provenance_hash: ProvenanceHash::parse(
                 "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
             )
-            .unwrap(),
+            .expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
         };
         assert_eq!(
-            classify_special_damage_unit(&synchronize_passive).unwrap(),
+            classify_special_damage_unit(&synchronize_passive).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
             SpecialDamageUnitClass::EncounterNatureSync,
         );
         // Unknown identity fails closed.
@@ -2760,14 +2760,14 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_resolves_each_class_to_a_closed_outcome() {
+    fn dispatch_resolves_each_class_to_a_closed_outcome() -> Result<(), String> {
         let counter_amount = unit(
             68,
             1,
             "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
         );
         let any_request = &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false);
-        match dispatch_special_damage_unit(&counter_amount, any_request).unwrap() {
+        match dispatch_special_damage_unit(&counter_amount, any_request).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds") {
             SpecialDamageDispatchOutcomeV2::RetaliationAmountPath {
                 move_id,
                 multiplier,
@@ -2777,7 +2777,7 @@ mod tests {
                 assert_eq!(multiplier.numerator, 2);
                 assert_eq!(filter, SpecialDamageFilter::Physical);
             }
-            other => panic!("unexpected outcome: {other:?}"),
+            other => return Err(format!("unexpected outcome: {other:?}")),
         }
 
         let hits_tag = unit(
@@ -2785,7 +2785,7 @@ mod tests {
             0,
             "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
         );
-        match dispatch_special_damage_unit(&hits_tag, any_request).unwrap() {
+        match dispatch_special_damage_unit(&hits_tag, any_request).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds") {
             SpecialDamageDispatchOutcomeV2::DamageQueryFold {
                 attribute,
                 hook,
@@ -2795,7 +2795,7 @@ mod tests {
                 assert_eq!(hook, MechanicHookV2::DamageQuery);
                 assert_eq!(query, MechanicQueryV2::Damage);
             }
-            other => panic!("unexpected outcome: {other:?}"),
+            other => return Err(format!("unexpected outcome: {other:?}")),
         }
 
         let on_hit_site = BehaviorUnitId {
@@ -2807,14 +2807,14 @@ mod tests {
             provenance_hash: ProvenanceHash::parse(
                 "639fe3d81cbbdeb848f523ae78ee9b52c1c0d0f032d1059d1907029dc089e862",
             )
-            .unwrap(),
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
         };
         assert_eq!(
             dispatch_special_damage_unit(
                 &on_hit_site,
                 &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(true),
             )
-            .unwrap(),
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
             SpecialDamageDispatchOutcomeV2::OnHitCounterArmed,
         );
         assert_eq!(
@@ -2822,26 +2822,26 @@ mod tests {
                 &on_hit_site,
                 &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false),
             )
-            .unwrap(),
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
             SpecialDamageDispatchOutcomeV2::OnHitCounterDormant,
         );
 
         let synchronize_active = BehaviorUnitId {
             source: BehaviorSourceId::ActiveAbility {
-                numeric_id: SafeU53::new(28).unwrap(),
+                numeric_id: SafeU53::new(28).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
             },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
             provenance_hash: ProvenanceHash::parse(
                 "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
             )
-            .unwrap(),
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
         };
         let synchronize_holder = &SpecialDamageDispatchRequestV2::EncounterNatureSync {
             holder_has_synchronize: true,
         };
         assert_eq!(
-            dispatch_special_damage_unit(&synchronize_active, synchronize_holder).unwrap(),
+            dispatch_special_damage_unit(&synchronize_active, synchronize_holder).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
             SpecialDamageDispatchOutcomeV2::EncounterNatureSyncApplied,
         );
         assert_eq!(
@@ -2851,7 +2851,7 @@ mod tests {
                     holder_has_synchronize: false,
                 },
             )
-            .unwrap(),
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
             SpecialDamageDispatchOutcomeV2::EncounterNatureSyncUnchanged,
         );
 
@@ -2859,25 +2859,26 @@ mod tests {
         let weather_gate_unit = REGISTRY
             .iter()
             .find(|e| e.class == SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage))
-            .unwrap();
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds");
         let weather_gate_id = registry_entry_to_id(weather_gate_unit);
         assert_eq!(
             dispatch_special_damage_unit(&weather_gate_id, any_request),
             Err(SpecialDamageError::DispatchRequestMismatch),
         );
+        Ok(())
     }
 
     fn registry_entry_to_id(entry: &RegistryEntry) -> BehaviorUnitId {
         BehaviorUnitId {
             source: match entry.source_kind {
                 SourceKindTag::Move => BehaviorSourceId::Move {
-                    numeric_id: SafeU53::new(entry.numeric_id).unwrap(),
+                    numeric_id: SafeU53::new(entry.numeric_id).expect("registry_entry_to_id: fixture operation succeeds"),
                 },
                 SourceKindTag::ActiveAbility => BehaviorSourceId::ActiveAbility {
-                    numeric_id: SafeU53::new(entry.numeric_id).unwrap(),
+                    numeric_id: SafeU53::new(entry.numeric_id).expect("registry_entry_to_id: fixture operation succeeds"),
                 },
                 SourceKindTag::PassiveAbility => BehaviorSourceId::PassiveAbility {
-                    numeric_id: SafeU53::new(entry.numeric_id).unwrap(),
+                    numeric_id: SafeU53::new(entry.numeric_id).expect("registry_entry_to_id: fixture operation succeeds"),
                 },
                 SourceKindTag::BattlerTag => BehaviorSourceId::BattlerTag {
                     registry_key: entry.registry_key.to_string(),
@@ -2888,7 +2889,7 @@ mod tests {
             },
             unit_kind: entry.unit_kind,
             ordinal: BehaviorUnitOrdinal::new(entry.ordinal),
-            provenance_hash: ProvenanceHash::parse(entry.provenance_hash).unwrap(),
+            provenance_hash: ProvenanceHash::parse(entry.provenance_hash).expect("registry_entry_to_id: fixture operation succeeds"),
         }
     }
 
@@ -2963,7 +2964,7 @@ mod tests {
         );
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 40, TURN))
-            .unwrap();
+            .expect("gated_admission_feeds_the_retaliation_pipeline_end_to_end: fixture operation succeeds");
         let (_, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
@@ -2973,7 +2974,7 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         )
-        .unwrap();
+        .expect("gated_admission_feeds_the_retaliation_pipeline_end_to_end: fixture operation succeeds");
         assert_eq!(
             transition.outcome,
             RetaliationOutcome::Delivered { damage: 80 },

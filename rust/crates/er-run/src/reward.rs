@@ -98,7 +98,7 @@ pub fn pay_for_reroll(
     if !rules.supports_reroll {
         return Err(ShopError::RerollUnsupported);
     }
-    let cost = u64::from(rules.reroll_base_cost.get().get())
+    let cost = rules.reroll_base_cost.get().get()
         .checked_mul(u64::from(reroll_count) + 1)
         .ok_or(ShopError::InsufficientMoney)?;
     let next = debit_shop(balance, cost)?;
@@ -172,11 +172,10 @@ pub fn buy_stock(
     stock_id: RunStockId,
     offered_price: Money,
 ) -> Result<(Money, MarketStockView), ShopError> {
-    let entry = stock
+    let entry = *stock
         .iter()
         .find(|entry| entry.stock_id == stock_id)
-        .ok_or(ShopError::UnknownStock)?
-        .clone();
+        .ok_or(ShopError::UnknownStock)?;
     entry.validate()?;
     if entry.sold || entry.remaining_quantity == 0 {
         return Err(ShopError::StockDepleted);

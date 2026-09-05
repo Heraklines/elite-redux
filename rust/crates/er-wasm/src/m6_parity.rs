@@ -279,10 +279,7 @@ impl fmt::Display for M6ParityError {
 impl std::error::Error for M6ParityError {}
 
 fn safe(value: u64) -> SafeU53 {
-    match SafeU53::new(value) {
-        Ok(value) => value,
-        Err(error) => panic!("fixture safe integer is invalid: {error}"),
-    }
+    SafeU53::new(value).expect("fixture safe integer is invalid")
 }
 
 fn seat(value: u64) -> SeatId {
@@ -1190,7 +1187,7 @@ pub fn replay_with_artifacts(
                 cross_snapshot_boundary(
                     kernel,
                     &content,
-                    &evidence,
+                    evidence,
                     safe((index + 1) as u64),
                     event.virtual_time_ms,
                     &fixture.seed,

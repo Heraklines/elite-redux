@@ -45,7 +45,104 @@ AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-state/src/bespoke_v2/item_lifecycle.rs",
     "rust/crates/er-state/src/bespoke_v2/special_damage.rs",
     "rust/crates/er-state/src/mechanic_state_v2.rs",
+    "rust/crates/er-ai/src/content_v2.rs",
+    "rust/crates/er-ai/src/trainer_party.rs",
+    "rust/crates/er-battle/src/m6/ability_executor.rs",
+    "rust/crates/er-battle/src/m6/bespoke/forms.rs",
+    "rust/crates/er-battle/src/m6/bespoke/guard.rs",
+    "rust/crates/er-battle/src/m6/bespoke/move_copy.rs",
+    "rust/crates/er-battle/src/m6/bespoke/scheduled_effects.rs",
+    "rust/crates/er-battle/src/m6/bespoke/special_damage.rs",
+    "rust/crates/er-battle/src/m6/bespoke/substitute.rs",
+    "rust/crates/er-battle/src/m6/bespoke/suppression_immunity.rs",
+    "rust/crates/er-battle/src/m6/move_executor.rs",
+    "rust/crates/er-battle/src/mechanics_mutation.rs",
+    "rust/crates/er-content-compiler/src/m6/moves.rs",
+    "rust/crates/er-content-compiler/src/m9e_bundle.rs",
+    "rust/crates/er-content-compiler/src/m9e_full_content.rs",
+    "rust/crates/er-content-compiler/src/m9e_progression.rs",
+    "rust/crates/er-content-compiler/src/main.rs",
+    "rust/crates/er-devplane/src/lib.rs",
+    "rust/crates/er-progression/src/oracle_surface.rs",
+    "rust/crates/er-progression/src/progression.rs",
+    "rust/crates/er-run/src/biome.rs",
+    "rust/crates/er-run/src/capture.rs",
+    "rust/crates/er-run/src/money.rs",
+    "rust/crates/er-run/src/reward.rs",
+    "rust/crates/er-run/src/rng_audit.rs",
+    "rust/crates/er-save/src/oracle_replay.rs",
+    "rust/crates/er-scenario/src/full_surface.rs",
+    "rust/crates/er-sim/src/snapshot_v3.rs",
+    "rust/crates/er-sim/tests/m4_raw_key_local.rs",
+    "rust/crates/er-state/tests/m4_foundation_properties.rs",
+    "rust/crates/er-testkit/tests/m6_foundation.rs",
+    "rust/crates/er-wasm/src/m6_parity.rs",
+    "rust/crates/er-world/src/runtime.rs",
 ]
+
+
+AI_DAMAGE_QUERY_LINT_REPAIR_EXECUTE = {
+    "er-battle": ["er_battle"],
+    "er-content-compiler": ["er_content_compiler", "er-content-compiler", "m9e_bundle", "m9e_full_content", "m9e_progression"],
+    "er-devplane": ["er_devplane"],
+    "er-progression": ["er_progression"],
+    "er-run": ["er_run"],
+    "er-save": ["er_save"],
+    "er-scenario": ["er_scenario"],
+    "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
+    "er-state": ["er_state", "m4_foundation_properties"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof"],
+    "er-wasm": ["er_wasm"],
+    "er-world": ["er_world"],
+}
+
+AI_DAMAGE_QUERY_LINT_REPAIR_REQUIRED_TARGETS = {
+    "er-battle": ["er_battle"],
+    "er-content-compiler": ["er_content_compiler", "m9e_bundle", "m9e_full_content", "m9e_progression"],
+    "er-progression": ["er_progression"],
+    "er-run": ["er_run"],
+    "er-save": ["er_save"],
+    "er-scenario": ["er_scenario"],
+    "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
+    "er-state": ["er_state", "m4_foundation_properties"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof"],
+}
+
+AI_DAMAGE_QUERY_LINT_REPAIR_EXACT_TEST_IDS = {
+    "er-testkit:m6_native_wasm": [
+        "full_m6_fixture_catalog_is_float_free_and_compiles_deterministically",
+        "trace_round_trip_and_replay_are_canonical_and_deterministic",
+        "first_divergence_names_exact_event_and_field",
+        "tampered_traces_fail_closed",
+        "tampered_snapshot_v5_and_game_state_v4_fail_closed",
+        "tampered_turn_material_bytes_fail_closed",
+        "artifacts_agree_with_the_published_report",
+        "safe_helper_remains_total",
+    ],
+    "er-testkit:m71_foundation": [
+        "mechanical_compatibility_excludes_build_and_adapters",
+        "causal_ids_ignore_evidence_profile_and_graph_rejects_dangling_edges",
+        "diagnostic_diff_localizes_deepest_retained_path",
+        "observation_permissions_are_monotonic_and_hidden_state_gated",
+        "snapshot_v7_projection_preserves_wrapped_v6_bytes",
+        "checkpoint_telemetry_and_lineage_are_bounded",
+        "model_boundary_is_authority_only_and_legal_action_checked",
+        "render_scene_is_semantic_and_unknown_parent_rejected",
+        "core_crates_do_not_depend_on_developer_plane_and_semantic_methods_are_absent",
+    ],
+    "er-testkit:m7_system_proof": [
+        "capture_consumes_ball_and_moves_enemy_into_party",
+        "branching_routes_and_biome_structure_are_canonical_state",
+        "run_program_material_save_and_control_paths_agree",
+        "continuous_foundation_raw_key_journey_crosses_world_save_party_and_progression",
+        "raw_key_replica_emits_proposal_without_local_mutation",
+        "raw_key_mode_select_reaches_shared_terminal",
+        "two_hundred_wave_run_is_deterministic_to_terminal",
+        "randomized_campaign_profiles_replay_deterministically",
+    ],
+}
+
+AI_DAMAGE_QUERY_LINT_REPAIR_DOC_PATHS = ["rust/contracts/m71-api.md"]
 
 
 def digest(path):
@@ -470,8 +567,19 @@ def plan():
     damage_lint_paths = damage_focus.get("lint_repair_paths", [])
     if damage_focus and damage_lint_paths != AI_DAMAGE_QUERY_LINT_REPAIR_PATHS:
         raise RuntimeError("AI damage query lint repair policy identities disagree")
+    for field, expected in (("lint_repair_execute", AI_DAMAGE_QUERY_LINT_REPAIR_EXECUTE),
+                            ("lint_repair_required_targets", AI_DAMAGE_QUERY_LINT_REPAIR_REQUIRED_TARGETS),
+                            ("lint_repair_doc_paths", AI_DAMAGE_QUERY_LINT_REPAIR_DOC_PATHS),
+                            ("lint_repair_exact_test_ids", AI_DAMAGE_QUERY_LINT_REPAIR_EXACT_TEST_IDS)):
+        if damage_focus and damage_focus.get(field) != expected:
+            raise RuntimeError("AI damage query lint repair target/doc policy identities disagree")
+    damage_doc_paths = damage_focus.get("lint_repair_doc_paths", [])
+    damage_docs_paired = all(path not in product_changes or "rust/crates/er-devplane/src/lib.rs" in product_changes
+                            for path in damage_doc_paths)
     damage_changed = any(path in damage_focus.get("trigger_paths", []) for path in product_changes)
-    damage_session = damage_changed and all(path in damage_paths or path in damage_lint_paths for path in product_changes)
+    damage_session = damage_changed and damage_docs_paired and all(
+        path in damage_paths or path in damage_lint_paths or path in damage_doc_paths for path in product_changes)
+    damage_lint_session = damage_session and any(path in damage_lint_paths for path in product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
     timer_session = timer_session or retention_session or browser_worker_session or damage_session
@@ -548,7 +656,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (damage_session and path in damage_doc_paths) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -633,9 +741,20 @@ def plan():
         browser_required = True
         boundaries = [path for path in boundaries if path not in capture_paths]
     if damage_session:
-        execution_scope = damage_focus["execute"]
+        execution_scope = {crate: list(targets) for crate, targets in damage_focus["execute"].items()}
+        damage_required_targets = {crate: list(targets) for crate, targets in damage_focus["required_targets"].items()}
+        damage_exact_test_ids = dict(damage_focus["exact_test_ids"])
+        if damage_lint_session:
+            damage_exact_test_ids.update(damage_focus["lint_repair_exact_test_ids"])
+            for destination, additions in ((execution_scope, damage_focus["lint_repair_execute"]),
+                                           (damage_required_targets, damage_focus["lint_repair_required_targets"])):
+                for crate, targets in additions.items():
+                    current = destination.setdefault(crate, [])
+                    if "*" not in current:
+                        current.extend(target for target in targets if target not in current)
         browser_required = True
-        boundaries = [path for path in boundaries if path not in damage_paths and path not in damage_lint_paths]
+        boundaries = [path for path in boundaries if path not in damage_paths and path not in damage_lint_paths
+                      and path not in damage_doc_paths]
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -691,8 +810,9 @@ def plan():
               "material_retention_focus": retention_session,
               "native_capture_focus": capture_session,
               "ai_damage_query_focus": damage_session,
+              "ai_damage_query_lint_repair_focus": damage_lint_session,
               "requires_cli_executable": cli_executable_required,
-              "required_native_test_ids": (damage_focus.get("exact_test_ids", {}) if damage_session
+              "required_native_test_ids": (damage_exact_test_ids if damage_session
                                            else cache_focus.get("exact_test_ids", {}) if cache_session
                                            else validation_focus.get("exact_test_ids", {}) if validation_session
                                            else retention_focus.get("exact_test_ids", {}) if retention_session
@@ -703,7 +823,7 @@ def plan():
                                            else timer_focus.get("exact_test_ids", {}) if timer_session else {}),
               "requires_agent_protocol_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
-              "required_native_targets": (damage_focus.get("required_targets", {}) if damage_session
+              "required_native_targets": (damage_required_targets if damage_session
                                           else cache_focus.get("required_targets", {}) if cache_session
                                           else validation_focus.get("required_targets", {}) if validation_session
                                           else retention_focus.get("required_targets", {}) if retention_session

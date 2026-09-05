@@ -795,11 +795,13 @@ fn build_field_content(
     })
 }
 
+type NumericDefinitionSlots = Vec<Option<(SafeU53, Vec<MechanicsProgramId>)>>;
+
 fn numeric_definitions(
     sources: &[BehaviorSourceId],
     source_programs: &BTreeMap<BehaviorSourceId, Vec<MechanicsProgramId>>,
     key: impl Fn(&BehaviorSourceId) -> Option<SafeU53>,
-) -> Result<Vec<Option<(SafeU53, Vec<MechanicsProgramId>)>>, FullContentBuildErrorV1> {
+) -> Result<NumericDefinitionSlots, FullContentBuildErrorV1> {
     let mut groups = BTreeMap::<SafeU53, Vec<MechanicsProgramId>>::new();
     for source in sources {
         if let Some(id) = key(source) {

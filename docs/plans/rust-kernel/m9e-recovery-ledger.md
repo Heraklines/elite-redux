@@ -2203,3 +2203,51 @@ All156 prior harness test bodies are preserved; six new orchestration tests cove
 failure preservation, command provenance, timeout/spawn/cleanup/collector failure
 and inventory bounds. These162 authored tests await remote execution. Product
 scope, required targets, controls, execution policy and baseline are unchanged.
+
+## Complete companion lint diagnostics
+
+a98931699d26c16b638590831eab707b733757eb / run33997398777 passed remote
+formatting and compilation. All162 harness tests passed in2.326 seconds. Discovery
+selected1,006 native IDs; zero executed because complete selected-package Clippy
+failed. The failure-only collector attempted all25 actual selected packages in
+99.970 seconds:12 exited zero and13 exited101, with no timeout or skipped probe.
+Its3491-byte index is bound to the original failed log and source/manifest hashes;
+SHA256 b1ecb91785f578cda664bc6d9ba1071938972ad2c0c659a17d09eb0e1852d296.
+This diagnostic result does not qualify any package or replace the failed gate.
+
+The inspected native-A compact ZIP was7328 bytes: summary11,498 bytes, failure
+10,816 bytes and index3491 bytes. Retrieved only the13 named failed-package logs
+(each at most143,440 bytes) plus the35,335-byte harness log from the inspected
+138,770-byte diagnostic ZIP. No full archive, local formatter or runtime workload.
+The logs report334 primary errors across34 exact source files, mostly test helper
+unwraps/panics. The qualification baseline remains the fully green f140 checkpoint.
+
+## Companion lint repair and affected execution
+
+Repair the34 reported Rust files, with one corresponding API contract update.
+The battle subset preserves121 tests and532 assertion sites; unwrap/panic helpers
+retain success/failure expectations, while production copy/subtraction expressions
+remain equivalent. Other repairs retain typed deserialization, unsigned bounds,
+error ordering and existing test assertions. Explicit Rust helper API changes box
+the captured-Pokemon error and both developer-session enum payloads, and group
+four replay-constructor options into a typed value. The replay wire schema,
+defaults and fields remain unchanged. Full reverse compilation must verify all
+consumers; no lint suppression, dependency update or test exclusion is introduced.
+
+The AI repair scope names the exact45 companion Rust paths accumulated from these
+remote diagnostics. The existing query trigger is still required. The single
+m71-api.md contract exception additionally requires its devplane source repair;
+no documentation-prefix or arbitrary product-path exception is added. Repair
+sessions retain the original50 mandatory native targets and add18 nonempty
+companion targets, selecting22 companion harnesses in all. Empty compiler-binary,
+devplane, wasm and world harnesses are not counted as nonempty proof. Required
+consumer tests cover content construction, runtime/world, parity and developer
+checkpoint behavior; existing source has no direct developer-session enum
+constructor test, so compilation is the check for that representation change.
+
+The full selected-package Clippy command, query-first native execution, causal
+controls, Worker/platform/CLI bridge checks, proof bounds and f140 qualification
+baseline remain unchanged. Three new CI selftests cover exact paired scope,
+mandatory inventory/partition and full execution;165 authored tests await remote
+validation. New native ID counts will come from real discovery, never the prior
+1,006 count. No local formatter, compiler, test or other runtime workload ran.

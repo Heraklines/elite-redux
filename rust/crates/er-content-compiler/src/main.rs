@@ -131,26 +131,26 @@ fn take_path(
 #[serde(deny_unknown_fields)]
 struct CatalogNumericEntry {
     numeric_id: Option<SafeU53>,
-    #[serde(default)]
-    enum_name: String,
+    #[serde(default, rename = "enum_name")]
+    _enum_name: String,
     #[serde(default)]
     member: String,
-    #[serde(default)]
-    initializer: Option<String>,
-    #[serde(default)]
-    ordinal: usize,
-    #[serde(default)]
-    source: serde_json::Value,
+    #[serde(default, rename = "initializer")]
+    _initializer: Option<String>,
+    #[serde(default, rename = "ordinal")]
+    _ordinal: usize,
+    #[serde(default, rename = "source")]
+    _source: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CatalogRegistryEntry {
     key: String,
-    #[serde(default)]
-    initializer: String,
-    #[serde(default)]
-    source: serde_json::Value,
+    #[serde(default, rename = "initializer")]
+    _initializer: String,
+    #[serde(default, rename = "source")]
+    _source: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -167,7 +167,7 @@ struct SourceCatalog {
     arena_tags: Vec<CatalogNumericEntry>,
     positional_tags: Vec<CatalogNumericEntry>,
     #[serde(flatten)]
-    remaining: BTreeMap<String, serde_json::Value>,
+    _remaining: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

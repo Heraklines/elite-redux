@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn overflow_beyond_safe_integer_is_typed() {
         assert_eq!(
-            credit(money(u64::from(er_types::SafeU53::MAX.get())), 1),
+            credit(money(er_types::SafeU53::MAX.get()), 1),
             Err(MoneyError::Overflow)
         );
     }

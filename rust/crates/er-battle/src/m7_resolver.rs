@@ -462,7 +462,7 @@ fn execute_move(
     let actor_snapshot = pokemon(run, actor_id)
         .ok_or(BattleV5Error::InactiveActor(actor_id))?
         .clone();
-    let slot_snapshot = move_slot_state(&actor_snapshot, move_slot)?.clone();
+    let slot_snapshot = *move_slot_state(&actor_snapshot, move_slot)?;
     let definition = content
         .move_definition(slot_snapshot.move_id)
         .map_err(|error| BattleV5Error::Content(error.to_string()))?;
@@ -531,11 +531,7 @@ fn execute_move(
         }
         let target = pokemon_mut(run, target_id).ok_or(BattleV5Error::Target)?;
         let before_hp = target.hp;
-        target.hp = if damage >= target.hp {
-            0
-        } else {
-            target.hp - damage
-        };
+        target.hp = target.hp.saturating_sub(damage);
         target.fainted = target.hp == 0;
         mutations.push(BattleMutation::HpChanged {
             pokemon: target_id,

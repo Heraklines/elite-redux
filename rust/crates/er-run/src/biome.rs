@@ -55,7 +55,7 @@ pub fn plan_er_biome_structure(
     let start = start_value as u16;
     // Finale safety: never roll once at/inside the late zone or when the
     // biome's worst case could spill into it.
-    if start >= late_game_threshold() || start + BIOME_LENGTH_MAX - 1 >= late_game_threshold() {
+    if start >= late_game_threshold() || start + BIOME_LENGTH_MAX > late_game_threshold() {
         return Ok(BiomeStructurePlan {
             length: None,
             start_wave,
@@ -87,7 +87,7 @@ pub fn crossroads_due(start_wave: WaveIndex, wave: WaveIndex) -> bool {
         return false;
     }
     let spent = (current - start + 1) as u16;
-    spent % 5 == 0
+    spent.is_multiple_of(5)
 }
 
 /// Arms the overstay anchor exactly once, only when the player deliberately

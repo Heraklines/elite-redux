@@ -540,7 +540,7 @@ fn companion(
         source_party_index: source_index,
         stable_roster_index: stable_index,
         owner_seat,
-        experience: Experience::new(safe(u64::from(id))?),
+        experience: Experience::new(safe(id)?),
         growth_rate: GrowthRateId::new(3),
         ivs: [Iv::new(31)?; 6],
         nature: NatureId::new(0),

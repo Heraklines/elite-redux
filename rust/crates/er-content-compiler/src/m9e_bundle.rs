@@ -202,7 +202,6 @@ fn complete_meta(
                 || behavior.source.line == 0
                 || behavior.source.column == 0
                 || behavior.symbol.is_empty()
-                || behavior.parameter_count > u16::MAX
                 || (behavior.asynchronous && behavior.parameter_count == u16::MAX)
                 || !implemented.remove(&behavior.id)
             {

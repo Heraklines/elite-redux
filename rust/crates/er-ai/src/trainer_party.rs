@@ -189,9 +189,7 @@ pub fn post_process_rival_slot_v1(
 }
 
 pub fn rival_party_size_for_type_v1(trainer_rank: u8, wave: u32) -> u8 {
-    let base = u32::from(trainer_rank)
-        .checked_add(wave / 50)
-        .unwrap_or(u32::MAX);
+    let base = u32::from(trainer_rank).saturating_add(wave / 50);
     base.clamp(1, 6) as u8
 }
 

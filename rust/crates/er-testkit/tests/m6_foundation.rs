@@ -115,7 +115,7 @@ fn missing_bespoke_assignment_fails_at_first_unit() -> Result<(), Box<dyn Error>
     })
     .expect_err("unassigned bespoke gap must fail");
     let SemanticCompileError::UnassignedBespokeGap { context } = error else {
-        panic!("expected first unassigned bespoke gap");
+        return Err("expected first unassigned bespoke gap".into());
     };
     assert!(context.provenance_path.contains("src/"));
     Ok(())

@@ -257,7 +257,7 @@ mod tests {
     use er_types::{BehaviorUnitId, BehaviorUnitOrdinal, ProvenanceHash};
 
     fn provenance_hash() -> ProvenanceHash {
-        ProvenanceHash::parse(&"0123456789abcdef".repeat(4)).expect("valid test hash")
+        ProvenanceHash::parse("0123456789abcdef".repeat(4)).expect("valid test hash")
     }
 
     fn unit(kind: BehaviorUnitKind, ordinal: u32) -> BehaviorUnitId {
@@ -289,10 +289,10 @@ mod tests {
     fn owner(slot: AbilitySourceKindV1, suppressed: bool) -> AbilityOwnerState {
         let source = match slot {
             AbilitySourceKindV1::Active => BehaviorSourceId::ActiveAbility {
-                numeric_id: SafeU53::new(9).unwrap(),
+                numeric_id: SafeU53::new(9).expect("owner: fixture operation succeeds"),
             },
             _ => BehaviorSourceId::PassiveAbility {
-                numeric_id: SafeU53::new(9).unwrap(),
+                numeric_id: SafeU53::new(9).expect("owner: fixture operation succeeds"),
             },
         };
         AbilityOwnerState {

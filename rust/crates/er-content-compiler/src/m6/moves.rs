@@ -872,7 +872,7 @@ mod tests {
                 provenance_hash: ProvenanceHash::parse(
                     "850e45b88e66fd215c32701204a2c5785ed938a508f2285e1a813254fa86279f",
                 )
-                .unwrap(),
+                .expect("fixture provenance hash is valid"),
             },
             provenance: CatalogProvenance {
                 path: "src/data/moves/move.ts".into(),
@@ -918,21 +918,25 @@ mod tests {
             CatalogEffectKind::UnresolvedEffect,
             vec![],
         );
-        let spec = map_moves_unit(&unit).unwrap().unwrap();
+        let spec = map_moves_unit(&unit)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
         assert_eq!(spec.rule.ordinal, HIGH_CRIT_RULE_ORDINAL);
         assert!(spec.bindings[0].hook.is_query());
         assert_eq!(
             spec.operations,
             vec![MechanicOperationV2::Query {
-                query: MechanicHookV2::CriticalQuery.query().unwrap(),
+                query: MechanicHookV2::CriticalQuery
+                    .query()
+                    .expect("critical hook is a query"),
                 stage: QueryModifierStageV2::EarlyAdd,
                 modifier: QueryModifierV2::Add {
                     value: ValueNodeId(0)
                 },
             }]
         );
-        spec.build(MechanicsProgramId::try_from_u64(1).unwrap())
-            .unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(1).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
     }
 
     #[test]
@@ -943,7 +947,11 @@ mod tests {
             CatalogEffectKind::UnresolvedEffect,
             vec![],
         );
-        assert!(map_moves_unit(&unit).unwrap().is_none());
+        assert!(
+            map_moves_unit(&unit)
+                .expect("unowned move fixture maps without error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -954,7 +962,11 @@ mod tests {
             CatalogEffectKind::UnresolvedEffect,
             vec![],
         );
-        assert!(map_moves_unit(&unit).unwrap().is_none());
+        assert!(
+            map_moves_unit(&unit)
+                .expect("unowned move fixture maps without error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -971,11 +983,13 @@ mod tests {
                 CatalogOperand::Boolean { value: true },
             ],
         );
-        let spec = map_moves_unit(&unit).unwrap().unwrap();
+        let spec = map_moves_unit(&unit)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
         assert_eq!(spec.operations.len(), 2);
         assert_eq!(spec.selectors, SelectorArenaV2(vec![SelectorNodeV2::Actor]));
-        spec.build(MechanicsProgramId::try_from_u64(2).unwrap())
-            .unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(2).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
     }
 
     #[test]
@@ -1005,7 +1019,11 @@ mod tests {
             CatalogEffectKind::UnresolvedEffect,
             vec![],
         );
-        assert!(map_moves_unit(&unit).unwrap().is_none());
+        assert!(
+            map_moves_unit(&unit)
+                .expect("unowned move fixture maps without error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -1016,10 +1034,12 @@ mod tests {
             CatalogEffectKind::UnresolvedEffect,
             vec![symbol("MultiHitType", "TWO")],
         );
-        let spec = map_moves_unit(&unit).unwrap().unwrap();
+        let spec = map_moves_unit(&unit)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
         assert_eq!(spec.rule.ordinal, MULTI_HIT_FIXED_RULE_ORDINAL);
-        spec.build(MechanicsProgramId::try_from_u64(3).unwrap())
-            .unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(3).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
     }
 
     #[test]
@@ -1030,7 +1050,9 @@ mod tests {
             CatalogEffectKind::UnresolvedEffect,
             vec![],
         );
-        let spec = map_moves_unit(&unit).unwrap().unwrap();
+        let spec = map_moves_unit(&unit)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
         assert_eq!(
             spec.operations,
             vec![MechanicOperationV2::RecoilFraction {
@@ -1038,8 +1060,8 @@ mod tests {
                 denominator: 4
             }]
         );
-        spec.build(MechanicsProgramId::try_from_u64(4).unwrap())
-            .unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(4).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
     }
 
     #[test]
@@ -1055,7 +1077,11 @@ mod tests {
                 },
             ],
         );
-        assert!(map_moves_unit(&unit).unwrap().is_none());
+        assert!(
+            map_moves_unit(&unit)
+                .expect("unowned move fixture maps without error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -1071,7 +1097,11 @@ mod tests {
                 },
             ],
         );
-        assert!(map_moves_unit(&unit).unwrap().is_none());
+        assert!(
+            map_moves_unit(&unit)
+                .expect("unowned move fixture maps without error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -1082,7 +1112,9 @@ mod tests {
             CatalogEffectKind::Heal,
             vec![],
         );
-        let spec = map_moves_unit(&unit).unwrap().unwrap();
+        let spec = map_moves_unit(&unit)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
         assert_eq!(
             spec.operations,
             vec![MechanicOperationV2::DrainFraction {
@@ -1090,8 +1122,8 @@ mod tests {
                 denominator: 2
             }]
         );
-        spec.build(MechanicsProgramId::try_from_u64(5).unwrap())
-            .unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(5).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
     }
 
     #[test]
@@ -1102,7 +1134,11 @@ mod tests {
             CatalogEffectKind::Heal,
             vec![CatalogOperand::Null {}, symbol("Stat", "ATK")],
         );
-        assert!(map_moves_unit(&unit).unwrap().is_none());
+        assert!(
+            map_moves_unit(&unit)
+                .expect("unowned move fixture maps without error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -1113,9 +1149,11 @@ mod tests {
             CatalogEffectKind::ModifyOrApplyDamage,
             vec![CatalogOperand::SafeInteger { value: 40 }],
         );
-        let spec = map_moves_unit(&fixed).unwrap().unwrap();
-        spec.build(MechanicsProgramId::try_from_u64(6).unwrap())
-            .unwrap();
+        let spec = map_moves_unit(&fixed)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
+        spec.build(MechanicsProgramId::try_from_u64(6).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
 
         let status = attribute_unit(
             "StatusEffectAttr",
@@ -1123,10 +1161,12 @@ mod tests {
             CatalogEffectKind::ApplyOrBlockStatus,
             vec![symbol("StatusEffect", "BURN")],
         );
-        let spec = map_moves_unit(&status).unwrap().unwrap();
+        let spec = map_moves_unit(&status)
+            .expect("move fixture maps without error")
+            .expect("move fixture has a compiled specification");
         assert_eq!(spec.operations, vec![MechanicOperationV2::StatusApply]);
-        spec.build(MechanicsProgramId::try_from_u64(7).unwrap())
-            .unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(7).expect("fixture program id is valid"))
+            .expect("move specification builds a valid program");
     }
 
     #[test]
@@ -1143,7 +1183,7 @@ mod tests {
             provenance_hash: ProvenanceHash::parse(
                 "7c5c17ce935bb6dbb3c763cb451d5d7f57fd88d9480867e419279fe1c93d9da2",
             )
-            .unwrap(),
+            .expect("fixture provenance hash is valid"),
             source: SourceLocation {
                 path: "src/data/moves/move.ts".into(),
                 line: 0,

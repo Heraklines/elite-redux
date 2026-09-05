@@ -2406,7 +2406,7 @@ mod tests {
         }
         assert_eq!(next.actors[0].entries.len(), 32);
         assert_eq!(next.actors[0].entries[0].move_id, move_id(14));
-        let newest = next.actors[0].entries.last().expect("nonempty").clone();
+        let newest = *next.actors[0].entries.last().expect("nonempty");
         assert_eq!(newest.move_id, move_id(45));
         assert_eq!(
             newest.execution_ordinal,
@@ -2544,7 +2544,7 @@ mod tests {
     }
 
     #[test]
-    fn copycat_casts_battle_last_move_as_free_follow_up() {
+    fn copycat_casts_battle_last_move_as_free_follow_up() -> Result<(), String> {
         let state = empty_state();
         let request = RecordedLastCopyRequest {
             caller: caller(),
@@ -2566,13 +2566,14 @@ mod tests {
                 assert_eq!(plan.pp_decision, PpOwnershipDecision::FollowUpNoCharge);
                 assert_eq!(plan.targeting, CallTargeting::NormalTargeting);
             }
-            other => panic!("expected cast, got {other:?}"),
+            other => return Err(format!("expected cast, got {other:?}")),
         }
         assert_eq!(resolved.evidence.copied_move, move_id(33));
+        Ok(())
     }
 
     #[test]
-    fn mirror_move_fails_without_history_and_retaliates_with_it() {
+    fn mirror_move_fails_without_history_and_retaliates_with_it() -> Result<(), String> {
         let state = empty_state();
         let request = RecordedLastCopyRequest {
             caller: caller(),
@@ -2605,12 +2606,13 @@ mod tests {
                     CallTargeting::Retaliate { target: target() }
                 );
             }
-            other => panic!("expected retaliating cast, got {other:?}"),
+            other => return Err(format!("expected retaliating cast, got {other:?}")),
         }
+        Ok(())
     }
 
     #[test]
-    fn mimic_adopts_slot_but_refuses_incomplete_charging_moves() {
+    fn mimic_adopts_slot_but_refuses_incomplete_charging_moves() -> Result<(), String> {
         let mut charging = BTreeSet::new();
         charging.insert(move_id(60));
         let sets = ContentMoveSets {
@@ -2667,12 +2669,13 @@ mod tests {
                     PpOwnershipDecision::SlotReplacementAdopted
                 );
             }
-            other => panic!("expected slot adoption, got {other:?}"),
+            other => return Err(format!("expected slot adoption, got {other:?}")),
         }
+        Ok(())
     }
 
     #[test]
-    fn sketch_is_permanent_and_refuses_known_moves() {
+    fn sketch_is_permanent_and_refuses_known_moves() -> Result<(), String> {
         let mut state = empty_state();
         state = record(&state, 9, 70, MoveUseModeV2::Normal);
         let request = RecordedLastCopyRequest {
@@ -2705,8 +2708,9 @@ mod tests {
                 assert!(replacement.permanent);
                 assert_eq!(replacement.copied_move, move_id(70));
             }
-            other => panic!("expected sketch adoption, got {other:?}"),
+            other => return Err(format!("expected sketch adoption, got {other:?}")),
         }
+        Ok(())
     }
 
     #[test]
@@ -3057,7 +3061,7 @@ mod tests {
     }
 
     #[test]
-    fn recorded_last_decision_routes_into_family_transition() {
+    fn recorded_last_decision_routes_into_family_transition() -> Result<(), String> {
         let copycat = desc(
             "h",
             0,
@@ -3095,7 +3099,8 @@ mod tests {
         .expect("copycat resolves");
         match routed.outcome {
             CopyCallOutcome::Cast(plan) => assert_eq!(plan.called_move, move_id(44)),
-            other => panic!("expected cast, got {other:?}"),
+            other => return Err(format!("expected cast, got {other:?}")),
         }
+        Ok(())
     }
 }

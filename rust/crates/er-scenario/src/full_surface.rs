@@ -402,7 +402,11 @@ pub struct ScenarioCoopLedgerV1 {
 
 impl ScenarioCoopLedgerV1 {
     pub fn expected_owner(counter: u64, host: SeatId, guest: SeatId) -> SeatId {
-        if counter % 2 == 0 { host } else { guest }
+        if counter.is_multiple_of(2) {
+            host
+        } else {
+            guest
+        }
     }
 
     pub fn admit(&mut self, choice: ScenarioCoopChoiceV1) -> Result<bool, ScenarioSurfaceErrorV1> {

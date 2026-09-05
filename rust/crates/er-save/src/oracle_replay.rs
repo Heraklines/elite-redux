@@ -162,26 +162,31 @@ pub fn validate_oracle_replay_trace_v2(trace: &OracleReplayTraceV2) -> OracleRep
     }
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct OracleReplayTraceOptionsV2 {
+    pub difficulty: Option<String>,
+    pub challenges: Option<Vec<String>>,
+    pub end_state: Option<OracleReplayEndStateV2>,
+    pub checkpoint: Option<OracleReplayCheckpointV2>,
+}
+
 pub fn make_oracle_replay_trace_v2(
     seed: String,
     game_mode_id: i64,
-    difficulty: Option<String>,
-    challenges: Option<Vec<String>>,
+    options: OracleReplayTraceOptionsV2,
     roster: Vec<OracleReplayPokemonV2>,
     events: Vec<OracleReplayEventV2>,
-    end_state: Option<OracleReplayEndStateV2>,
-    checkpoint: Option<OracleReplayCheckpointV2>,
 ) -> OracleReplayTraceV2 {
     OracleReplayTraceV2 {
         version: REPLAY_TRACE_VERSION_V2,
         seed,
         game_mode_id,
-        difficulty: difficulty.unwrap_or_else(|| "youngster".to_owned()),
-        challenges: challenges.unwrap_or_default(),
+        difficulty: options.difficulty.unwrap_or_else(|| "youngster".to_owned()),
+        challenges: options.challenges.unwrap_or_default(),
         roster,
         events,
-        end_state,
-        checkpoint,
+        end_state: options.end_state,
+        checkpoint: options.checkpoint,
     }
 }
 
@@ -193,23 +198,12 @@ struct BufferedReplayEventV2 {
     event: OracleReplayEventV2,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct OracleReplayRecorderV2 {
     header: Option<OracleReplayTraceV2>,
     buffer: Vec<BufferedReplayEventV2>,
     highest_wave: i64,
     checkpoints: BTreeMap<i64, OracleReplayCheckpointV2>,
-}
-
-impl Default for OracleReplayRecorderV2 {
-    fn default() -> Self {
-        Self {
-            header: None,
-            buffer: Vec::new(),
-            highest_wave: 0,
-            checkpoints: BTreeMap::new(),
-        }
-    }
 }
 
 impl OracleReplayRecorderV2 {
@@ -502,28 +496,39 @@ mod tests {
         let trace = make_oracle_replay_trace_v2(
             "seed".to_owned(),
             0,
-            None,
-            None,
+            OracleReplayTraceOptionsV2::default(),
             vec![pokemon()],
             vec![command, interaction],
-            None,
-            None,
         );
         assert_eq!(trace.version, REPLAY_TRACE_VERSION_V2);
+        assert_eq!(trace.difficulty, "youngster");
+        assert!(trace.challenges.is_empty());
         assert!(validate_oracle_replay_trace_v2(&trace).ok);
+        let configured = make_oracle_replay_trace_v2(
+            "seed".to_owned(),
+            0,
+            OracleReplayTraceOptionsV2 {
+                difficulty: Some("elite".to_owned()),
+                challenges: Some(vec!["challenge".to_owned()]),
+                ..Default::default()
+            },
+            trace.roster.clone(),
+            trace.events.clone(),
+        );
+        assert_eq!(configured.difficulty, "elite");
+        assert_eq!(configured.challenges, ["challenge"]);
+        assert_eq!(configured.roster, trace.roster);
+        assert_eq!(configured.events, trace.events);
     }
 
     #[test]
-    fn replay_recorder_is_idempotent_and_wave_bounded() {
+    fn replay_recorder_is_idempotent_and_wave_bounded() -> Result<(), &'static str> {
         let header = make_oracle_replay_trace_v2(
             "seed".to_owned(),
             0,
-            None,
-            None,
+            OracleReplayTraceOptionsV2::default(),
             vec![pokemon()],
             Vec::new(),
-            None,
-            None,
         );
         let mut recorder = OracleReplayRecorderV2::default();
         recorder.begin(header.clone());
@@ -540,12 +545,12 @@ mod tests {
         let trace = recorder.trace().expect("trace");
         assert_eq!(trace.events.len(), 10);
         let OracleReplayEventV2::Command { wave, .. } = &trace.events[0] else {
-            assert!(false, "command");
-            return;
+            return Err("expected retained command event");
         };
         assert_eq!(*wave, 3);
         recorder.clear();
         assert!(!recorder.is_recording());
+        Ok(())
     }
 
     #[test]
@@ -562,12 +567,12 @@ mod tests {
         let trace = make_oracle_replay_trace_v2(
             "seed".to_owned(),
             0,
-            None,
-            None,
+            OracleReplayTraceOptionsV2 {
+                end_state: Some(end),
+                ..Default::default()
+            },
             vec![pokemon()],
             Vec::new(),
-            Some(end),
-            None,
         );
         let mut recorder = OracleReplayRecorderV2::default();
         let mut runtime = SinglePlayerReplayRuntimeV2::default();

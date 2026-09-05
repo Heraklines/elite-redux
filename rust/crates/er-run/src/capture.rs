@@ -141,12 +141,12 @@ pub fn pokeball_bounce_plan_v1(
     let mut numerator = 1_u32;
     while numerator > 0 {
         plan.push(PokeballPresentationStepV1::Fall {
-            duration_ms: base_duration_ms.checked_mul(numerator).unwrap_or(u32::MAX),
+            duration_ms: base_duration_ms.saturating_mul(numerator),
         });
         numerator /= 2;
         if numerator > 0 {
             plan.push(PokeballPresentationStepV1::Bounce {
-                duration_ms: base_duration_ms.checked_mul(numerator).unwrap_or(u32::MAX),
+                duration_ms: base_duration_ms.saturating_mul(numerator),
             });
         }
     }
@@ -207,9 +207,9 @@ pub fn add_captured_pokemon_to_party_v1(
     party: &mut Vec<PokemonStateV5>,
     pokemon: PokemonStateV5,
     party_limit: usize,
-) -> Result<(), PokemonStateV5> {
+) -> Result<(), Box<PokemonStateV5>> {
     if party.len() >= party_limit || party.iter().any(|member| member.id == pokemon.id) {
-        return Err(pokemon);
+        return Err(Box::new(pokemon));
     }
     party.push(pokemon);
     Ok(())

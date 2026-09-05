@@ -176,18 +176,17 @@ fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("safe u53")
 }
 
+type CrossroadsStateAndControl = (
+    er_state::game_v2::GameStateV2,
+    er_types::battle_ids::ContentPackHash,
+    er_types::run_ids::RunContentPackHash,
+    er_types::run_control::GameControlPlan,
+    er_types::SeatId,
+);
+
 fn crossroads_state_and_control(
     fixture: &serde_json::Value,
-) -> Result<
-    (
-        er_state::game_v2::GameStateV2,
-        er_types::battle_ids::ContentPackHash,
-        er_types::run_ids::RunContentPackHash,
-        er_types::run_control::GameControlPlan,
-        er_types::SeatId,
-    ),
-    Box<dyn Error>,
-> {
+) -> Result<CrossroadsStateAndControl, Box<dyn Error>> {
     use er_state::run_v2::{
         CrossroadsSurfaceState, RUN_SURFACE_STATE_SCHEMA_VERSION, RunSurfaceState, SurfaceHeader,
     };

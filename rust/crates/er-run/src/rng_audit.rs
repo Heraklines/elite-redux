@@ -206,13 +206,13 @@ impl RunRngAuditLog {
 
     pub fn push(&mut self, draw: RunRngDraw) -> Result<(), RunRngError> {
         draw.validate()?;
-        if let Some(expected) = self.next_sequence {
-            if draw.sequence != expected {
-                return Err(RunRngError::Sequence {
-                    expected,
-                    actual: draw.sequence,
-                });
-            }
+        if let Some(expected) = self.next_sequence
+            && draw.sequence != expected
+        {
+            return Err(RunRngError::Sequence {
+                expected,
+                actual: draw.sequence,
+            });
         }
         let next = u64::from(draw.sequence)
             .checked_add(1)

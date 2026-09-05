@@ -714,7 +714,7 @@ class FeedbackTests(unittest.TestCase):
                 names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary] = crate
                 self.binary_targets[binary] = target
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
@@ -857,7 +857,7 @@ class FeedbackTests(unittest.TestCase):
                 names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary] = crate
                 self.binary_targets[binary] = target
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
@@ -1052,7 +1052,7 @@ class FeedbackTests(unittest.TestCase):
                 names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary] = crate
                 self.binary_targets[binary] = target
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
@@ -2427,7 +2427,7 @@ class FeedbackTests(unittest.TestCase):
         for name in ("ai_damage_query_focus", "material_retention_focus", "current_batch_focus",
                      "native_capture_focus", "current_validation_focus", "browser_cache_focus", "current_repro_focus"):
             self.config[name] = actual[name]
-        for crate in actual["ai_damage_query_focus"]["execute"]:
+        for crate in set(actual["ai_damage_query_focus"]["execute"]) | set(actual["ai_damage_query_focus"]["lint_repair_execute"]):
             self.package(crate)
         self.package("er-game", '[dependencies]\ner-battle = { path = "../er-battle" }\n')
         self.package("er-kernel", '[dependencies]\ner-game = { path = "../er-game" }\n')
@@ -2435,19 +2435,23 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-target-reverse", '[target.\'cfg(unix)\'.dev-dependencies]\nai = { package = "er-ai", path = "../er-ai" }\n')
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
 
-    def ai_damage_query_binaries(self):
+    def ai_damage_query_binaries(self, selection=None):
         policy = self.config["ai_damage_query_focus"]
         self.binary_ids = {}
-        for crate, targets in policy["execute"].items():
+        execution = selection["execution_scope"] if selection else policy["execute"]
+        required = selection["required_native_targets"] if selection else policy["required_targets"]
+        exact = selection["required_native_test_ids"] if selection else policy["exact_test_ids"]
+        for crate, targets in execution.items():
             if targets == ["*"]:
-                targets = policy["required_targets"].get(crate, [crate.replace("-", "_")])
+                targets = required.get(crate, [crate.replace("-", "_")])
             for target in targets:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary], self.binary_targets[binary] = crate, target
         # A real all-target discovery may include empty unit harnesses; run
         # those too, while retaining reverse consumers as compilation evidence.
-        self.binary_ids["er_battle"] = []
+        if selection is None:
+            self.binary_ids["er_battle"] = []
         self.binary_crates["er_battle"] = "er-battle"
         self.binary_targets["er_battle"] = "er_battle"
         self.binary_ids["er_game"] = []
@@ -2533,6 +2537,126 @@ class FeedbackTests(unittest.TestCase):
         self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
         self.assertEqual(self.feedback.plan()["packages"], ["er-canonical"])
 
+    def ai_lint_repair_expected_scope(self):
+        additions = {
+            "er-battle": ["er_battle"],
+            "er-content-compiler": ["er_content_compiler", "er-content-compiler", "m9e_bundle", "m9e_full_content", "m9e_progression"],
+            "er-devplane": ["er_devplane"], "er-progression": ["er_progression"], "er-run": ["er_run"],
+            "er-save": ["er_save"], "er-scenario": ["er_scenario"],
+            "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
+            "er-state": ["er_state", "m4_foundation_properties"],
+            "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof"],
+            "er-wasm": ["er_wasm"], "er-world": ["er_world"],
+        }
+        empty = {"er-content-compiler", "er_devplane", "er_wasm", "er_world"}
+        mandatory = {crate: [target for target in targets if target not in empty]
+                     for crate, targets in additions.items() if any(target not in empty for target in targets)}
+        policy = self.config["ai_damage_query_focus"]
+        self.assertEqual(policy["lint_repair_execute"], additions)
+        self.assertEqual(policy["lint_repair_required_targets"], mandatory)
+        execution, required = copy.deepcopy(policy["execute"]), copy.deepcopy(policy["required_targets"])
+        for destination, source in ((execution, additions), (required, mandatory)):
+            for crate, targets in source.items():
+                current = destination.setdefault(crate, [])
+                if "*" not in current:
+                    current.extend(target for target in targets if target not in current)
+        return execution, required
+
+    def test_ai_damage_query_lint_targets_and_contract_pair_fail_closed(self):
+        self.configure_ai_damage_query_scope()
+        policy = self.config["ai_damage_query_focus"]
+        query, owner, document = policy["paths"][0], "rust/crates/er-devplane/src/lib.rs", "rust/contracts/m71-api.md"
+        self.changed = [query, owner, document]
+        execution, required = self.ai_lint_repair_expected_scope()
+        selection = self.feedback.plan()
+        self.assertEqual(selection["execution_scope"], execution)
+        self.assertEqual(selection["required_native_targets"], required)
+        for changed in ([query, document], [owner, document], [document],
+                        [query, owner, "rust/contracts/m71-api-other.md"]):
+            self.changed = changed
+            with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                self.feedback.plan()
+        self.changed = [query, owner, document]
+        for field in ("lint_repair_execute", "lint_repair_required_targets", "lint_repair_doc_paths", "lint_repair_exact_test_ids"):
+            original = copy.deepcopy(policy[field])
+            for bad in ({}, {"er-testkit": ["*"]}, {"er-testkit": ["m7_system_proof_extra"]}):
+                policy[field] = bad
+                (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+                with self.assertRaisesRegex(RuntimeError, "lint repair target/doc policy identities disagree"):
+                    self.feedback.plan()
+            policy[field] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.assertNotIn("rust/contracts/", self.config["documentation_prefixes"])
+
+    def test_ai_damage_query_lint_companion_inventory_is_mandatory_and_assigned_to_a(self):
+        self.configure_ai_damage_query_scope()
+        policy = self.config["ai_damage_query_focus"]
+        self.changed = policy["paths"] + policy["lint_repair_paths"]
+        selection = self.feedback.plan()
+        execution, required = self.ai_lint_repair_expected_scope()
+        self.assertEqual(selection["execution_scope"], execution)
+        self.assertEqual(selection["required_native_targets"], required)
+        self.assertEqual(sum(map(len, policy["required_targets"].values())), 50)
+        self.assertEqual(sum(map(len, required.values())), 68)
+        exact = selection["required_native_test_ids"]
+        enumerated = [(crate, target, exact.get(f"{crate}:{target}", ["behavior"]))
+                      for crate, targets in required.items() for target in targets]
+        self.assertEqual(len(self.feedback.required_native_target_counts(required, enumerated)), 68)
+        for index, (crate, target, ids) in enumerate(enumerated):
+            if target not in policy["lint_repair_required_targets"].get(crate, []):
+                continue
+            for replacement in ([], [(crate, target, [])], [(crate, target + "_renamed", ids)],
+                                [("wrong-crate", target, ids)], [(crate, target, ids)] * 2):
+                with self.subTest(crate=crate, target=target, replacement=replacement):
+                    with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                        self.feedback.required_native_target_counts(required, enumerated[:index] + replacement + enumerated[index + 1:])
+        spec = importlib.util.spec_from_file_location("m9e_lint_partition_under_test", HARNESS.with_name("m9e_phases.py"))
+        phases = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(phases)
+        inventory = [{"crate": crate, "target": target, "ids": ids, "historical_excluded_ids": []}
+                     for crate, target, ids in enumerated]
+        assignments = phases.partition(inventory)
+        for crate, targets in policy["lint_repair_required_targets"].items():
+            for target in targets:
+                self.assertIn([crate, target], assignments["a"])
+                self.assertNotIn([crate, target], assignments["b"])
+        self.assertEqual(len(assignments["a"]) + len(assignments["b"]), 68)
+
+    def test_ai_damage_query_lint_companions_execute_with_full_clippy_and_platform(self):
+        self.configure_ai_damage_query_scope()
+        policy = self.config["ai_damage_query_focus"]
+        self.changed = policy["paths"] + policy["lint_repair_paths"]
+        selection = self.feedback.plan()
+        self.ai_damage_query_binaries(selection)
+        for target in ("er-content-compiler", "er_devplane", "er_wasm", "er_world"):
+            self.binary_ids[target] = []
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        if (self.full / "full-summary.json").is_file():
+            summary = json.loads((self.full / "full-summary.json").read_text())
+        self.assertEqual(len(summary["required_native_target_counts"]), 68)
+        for crate, targets in policy["lint_repair_execute"].items():
+            for target in targets:
+                self.assertTrue(any(self.binary_crates[binary] == crate and self.binary_targets[binary] == target
+                                    for binary in self.executed), (crate, target))
+        self.assertNotIn("reverse_compiled_only", self.executed)
+        self.assertEqual(self.executed[0], "m9e_damage_query")
+        for command in [command for command in self.commands if command[:2] in (["cargo", "test"], ["cargo", "clippy"])]:
+            self.assertEqual([command[index + 1] for index, part in enumerate(command) if part == "-p"], selection["packages"])
+        lint = [command for command in self.commands if command[:2] == ["cargo", "clippy"]]
+        self.assertEqual(len(lint), 1)
+        self.assertEqual(lint[0][-5:], ["--all-targets", "--no-deps", "--", "-D", "warnings"])
+        self.assertLess(self.events.index("clippy"), self.events.index("execute:m9e_damage_query"))
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        timer.assert_called_once()
+        replica.assert_called_once()
+        count = sum(len(self.binary_ids[binary]) for binary in self.executed)
+        self.assertEqual(summary["tests"], {"selected": count, "executed": count, "passed": count, "failed": 0, "skipped": 0})
+
     def test_ai_damage_query_lint_repairs_keep_full_execution_and_reverse_lint_scope(self):
         self.configure_browser_worker_scope()
         self.configure_ai_damage_query_scope()
@@ -2541,17 +2665,54 @@ class FeedbackTests(unittest.TestCase):
             "bespoke_v2/forms.rs", "bespoke_v2/scheduled_effects.rs", "bespoke_v2/substitute.rs",
             "bespoke_v2/suppression_immunity.rs", "m7_state.rs", "migration.rs", "run_v2.rs", "world_v2.rs",
             "bespoke_v2/guard.rs", "bespoke_v2/item_lifecycle.rs", "bespoke_v2/special_damage.rs", "mechanic_state_v2.rs")]
+        expected += [
+            "rust/crates/er-ai/src/content_v2.rs",
+            "rust/crates/er-ai/src/trainer_party.rs",
+            "rust/crates/er-battle/src/m6/ability_executor.rs",
+            "rust/crates/er-battle/src/m6/bespoke/forms.rs",
+            "rust/crates/er-battle/src/m6/bespoke/guard.rs",
+            "rust/crates/er-battle/src/m6/bespoke/move_copy.rs",
+            "rust/crates/er-battle/src/m6/bespoke/scheduled_effects.rs",
+            "rust/crates/er-battle/src/m6/bespoke/special_damage.rs",
+            "rust/crates/er-battle/src/m6/bespoke/substitute.rs",
+            "rust/crates/er-battle/src/m6/bespoke/suppression_immunity.rs",
+            "rust/crates/er-battle/src/m6/move_executor.rs",
+            "rust/crates/er-battle/src/mechanics_mutation.rs",
+            "rust/crates/er-content-compiler/src/m6/moves.rs",
+            "rust/crates/er-content-compiler/src/m9e_bundle.rs",
+            "rust/crates/er-content-compiler/src/m9e_full_content.rs",
+            "rust/crates/er-content-compiler/src/m9e_progression.rs",
+            "rust/crates/er-content-compiler/src/main.rs",
+            "rust/crates/er-devplane/src/lib.rs",
+            "rust/crates/er-progression/src/oracle_surface.rs",
+            "rust/crates/er-progression/src/progression.rs",
+            "rust/crates/er-run/src/biome.rs",
+            "rust/crates/er-run/src/capture.rs",
+            "rust/crates/er-run/src/money.rs",
+            "rust/crates/er-run/src/reward.rs",
+            "rust/crates/er-run/src/rng_audit.rs",
+            "rust/crates/er-save/src/oracle_replay.rs",
+            "rust/crates/er-scenario/src/full_surface.rs",
+            "rust/crates/er-sim/src/snapshot_v3.rs",
+            "rust/crates/er-sim/tests/m4_raw_key_local.rs",
+            "rust/crates/er-state/tests/m4_foundation_properties.rs",
+            "rust/crates/er-testkit/tests/m6_foundation.rs",
+            "rust/crates/er-wasm/src/m6_parity.rs",
+            "rust/crates/er-world/src/runtime.rs",
+        ]
         self.assertEqual(policy["lint_repair_paths"], expected)
         self.assertEqual(self.feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS, expected)
         self.package("er-lint-consumer", '[dependencies]\ner-state = { path = "../er-state" }\n')
+        expected_execution, expected_required = self.ai_lint_repair_expected_scope()
         before = copy.deepcopy(self.config)
         for repairs in (expected, *[[path] for path in expected]):
             self.changed = policy["paths"] + repairs
             selection = self.feedback.plan()
             self.assertTrue(selection["ai_damage_query_focus"])
-            self.assertEqual(selection["execution_scope"], policy["execute"])
-            self.assertEqual(selection["required_native_targets"], policy["required_targets"])
-            self.assertEqual(selection["required_native_test_ids"], policy["exact_test_ids"])
+            self.assertTrue(selection["ai_damage_query_lint_repair_focus"])
+            self.assertEqual(selection["execution_scope"], expected_execution)
+            self.assertEqual(selection["required_native_targets"], expected_required)
+            self.assertEqual(selection["required_native_test_ids"], policy["exact_test_ids"] | policy["lint_repair_exact_test_ids"])
             self.assertIn("er-lint-consumer", selection["packages"])
             for flag in ("timer_focus", "requires_browser", "requires_browser_worker", "requires_wasm",
                          "requires_cli_executable", "requires_worker_executable"):

@@ -178,9 +178,9 @@ pub fn encounter_level_for_wave_v1(wave: u32, offset: i32, minimum: u16) -> u16 
         wave as u16
     };
     let adjusted = if offset >= 0 {
-        base.checked_add(offset as u16).unwrap_or(u16::MAX)
+        base.saturating_add(offset as u16)
     } else {
-        base.checked_sub(offset.unsigned_abs() as u16).unwrap_or(0)
+        base.saturating_sub(offset.unsigned_abs() as u16)
     };
     if adjusted < minimum {
         minimum

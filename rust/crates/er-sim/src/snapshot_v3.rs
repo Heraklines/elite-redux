@@ -123,7 +123,7 @@ fn validate_digest(value: &str, path: &str) -> Result<(), SnapshotError> {
 
 fn validate_packet_body(body: &CanonicalHexBytes, path: &str) -> Result<(), SnapshotError> {
     if body.as_str().is_empty()
-        || body.as_str().len() % 2 != 0
+        || !body.as_str().len().is_multiple_of(2)
         || !body
             .as_str()
             .bytes()

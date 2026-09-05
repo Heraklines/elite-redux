@@ -1114,8 +1114,10 @@ mod tests {
 
     #[test]
     fn creation_ordinal_exhaustion_fails_closed() {
-        let mut state = ScheduledEffectsState::default();
-        state.next_creation_ordinal = SafeU53::MAX;
+        let state = ScheduledEffectsState {
+            next_creation_ordinal: SafeU53::MAX,
+            ..Default::default()
+        };
         let outcome = schedule_delayed_effect(
             &state,
             0,

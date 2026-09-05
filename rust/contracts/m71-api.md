@@ -62,7 +62,7 @@ Only `mechanical` controls compatibility. Features and model backends are sorted
 
 ```rust
 pub enum SessionTopologyV1 { Solo, Pair }
-pub enum SessionMachineV1 { Solo(SoloSessionMachineV1), Pair(PairSessionMachineV1) }
+pub enum SessionMachineV1 { Solo(Box<SoloSessionMachineV1>), Pair(Box<PairSessionMachineV1>) }
 
 pub struct DeveloperSession {
     pub identity: ExecutionIdentityV1,

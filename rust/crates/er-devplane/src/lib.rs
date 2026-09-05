@@ -30,8 +30,8 @@ pub const DEVELOPER_SESSION_VERSION_V1: u32 = 1;
 
 #[derive(Debug)]
 pub enum SessionMachineV1 {
-    Solo(SoloSessionMachineV1),
-    Pair(PairSessionMachineV1),
+    Solo(Box<SoloSessionMachineV1>),
+    Pair(Box<PairSessionMachineV1>),
 }
 
 #[derive(Debug)]
