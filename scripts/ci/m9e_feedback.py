@@ -24,6 +24,7 @@ COMPACT = REPORT / "compact"
 FULL = REPORT / "full"
 RUST = ROOT / "rust"
 TIMINGS = {}
+WORKER_BOUND_TARGETS = {"current_kernel_endpoint_v2", "current_kernel_supervisor_v2"}
 
 
 def digest(path):
@@ -50,6 +51,25 @@ def run(args, name, cwd=RUST, env=None):
     return path
 
 
+def compact_format_patch(patch, limit=32768):
+    selected = []
+    included_paths = []
+    omitted_paths = []
+    size = 0
+    for chunk in filter(None, re.split(rb"(?=^diff --git )", patch, flags=re.MULTILINE)):
+        header = chunk.split(b"\n", 1)[0]
+        path = header.rsplit(b" b/", 1)[-1].decode(errors="replace") if header.startswith(b"diff --git ") else "unrecognized-format-diff"
+        if size + len(chunk) <= limit:
+            selected.append(chunk)
+            included_paths.append(path)
+            size += len(chunk)
+        else:
+            omitted_paths.append(path)
+    return b"".join(selected), {"bytes": len(patch), "compact_bytes": size,
+                               "omitted_bytes": len(patch) - size,
+                               "included_paths": included_paths, "omitted_paths": omitted_paths}
+
+
 def check_format(selection):
     try:
         run(["cargo", "fmt", "--all", "--", "--check"], "format")
@@ -60,10 +80,14 @@ def check_format(selection):
         if paths:
             try:
                 run(["cargo", "fmt", "--all"], "format-patch")
-                patch = subprocess.check_output(["git", "diff", "--", *paths], cwd=ROOT)
+                patch = subprocess.check_output(["git", "diff", "--unified=1", "--", *paths], cwd=ROOT)
                 (FULL / "format.patch").write_bytes(patch)
-                if len(patch) <= 32768:
-                    (COMPACT / "format.patch").write_bytes(patch)
+                compact, metadata = compact_format_patch(patch)
+                (FULL / "format-patch-metadata.json").write_text(json.dumps(metadata) + "\n")
+                if compact:
+                    (COMPACT / "format.patch").write_bytes(compact)
+                else:
+                    (COMPACT / "format.patch").unlink(missing_ok=True)
             finally:
                 subprocess.run(["git", "restore", "--worktree", "--", "rust"], cwd=ROOT, check=True)
         raise
@@ -141,7 +165,10 @@ def plan():
     endpoint_paths = endpoint_focus.get("paths", [])
     endpoint_session = any(path in endpoint_paths for path in rust_changes) and all(
         path in endpoint_paths or path in worker_paths or path == "rust/Cargo.lock" for path in rust_changes)
-    native_worker_delta = worker_session or endpoint_session
+    supervisor_focus = config.get("supervisor_focus", {})
+    supervisor_paths = supervisor_focus.get("paths", [])
+    supervisor_session = bool(product_changes) and all(path in supervisor_paths for path in product_changes)
+    native_worker_delta = worker_session or endpoint_session or supervisor_session
     worker_lock_guard = None
     if native_worker_delta and "rust/Cargo.lock" in changed:
         worker_lock_guard = verify_worker_lock_change(
@@ -208,6 +235,8 @@ def plan():
         execution_scope = worker_focus["execute"]
     if endpoint_session:
         execution_scope = endpoint_focus["execute"]
+    if supervisor_session:
+        execution_scope = supervisor_focus["execute"]
     if timer_session:
         execution_scope = timer_focus["execute"]
         browser_required = True
@@ -218,7 +247,7 @@ def plan():
             current_session = True
     endpoint_execution = "er-lab" in selected and (
         execution_scope is None or "*" in execution_scope.get("er-lab", [])
-        or "current_kernel_endpoint_v2" in execution_scope.get("er-lab", []))
+        or bool(WORKER_BOUND_TARGETS.intersection(execution_scope.get("er-lab", []))))
     if endpoint_execution:
         selected.add("er-kernel-worker")
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
@@ -230,8 +259,10 @@ def plan():
               "requires_browser": browser_required,
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
+              "supervisor_focus": supervisor_session,
               "timer_focus": timer_session,
-              "required_native_targets": timer_focus.get("required_targets", {}) if timer_session else {},
+              "required_native_targets": (timer_focus.get("required_targets", {}) if timer_session
+                                          else supervisor_focus.get("required_targets", {}) if supervisor_session else {}),
               "timer_mutant": timer_focus.get("mutant") if timer_session else None,
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
@@ -278,7 +309,7 @@ def discover_worker_executable(artifacts, summary):
 
 
 def native_target_env(crate, target, worker_executable):
-    if (crate, target) != ("er-lab", "current_kernel_endpoint_v2"):
+    if crate != "er-lab" or target not in WORKER_BOUND_TARGETS:
         return None
     if worker_executable is None:
         raise RuntimeError("current endpoint target has no bound worker executable")
@@ -293,6 +324,27 @@ def native_target_env(crate, target, worker_executable):
     return env
 
 
+def timer_parity_digest(text, platform):
+    markers = re.findall(r"M9E_TIMER_PARITY_DIGEST=([^\s]+)", text)
+    if len(markers) != 1 or not re.fullmatch(r"[0-9a-f]{64}", markers[0]):
+        raise RuntimeError(f"{platform} timer parity digest missing, malformed or duplicated")
+    return markers[0]
+
+
+def wasm_parity_evidence(text, native_digest):
+    expected = {"wasm_replays_v7_raw_inputs_eventwise", "wasm_replays_v7_held_timers_eventwise"}
+    counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", text)
+    names = re.findall(r"\btest (?:[A-Za-z0-9_]+::)*(wasm_replays_v7_[A-Za-z0-9_]+)", text)
+    if counts != [("2", "0", "0")] or len(names) != 2 or set(names) != expected:
+        raise RuntimeError("Wasm eventwise witness identities/counts disagree")
+    wasm_digest = timer_parity_digest(text, "Wasm")
+    if native_digest is None or wasm_digest != native_digest:
+        raise RuntimeError("native/Wasm held timer eventwise digests disagree or native evidence is missing")
+    return {"expected": 2, "passed": 2, "failed": 0, "skipped": 0,
+            "selected_test_ids": sorted(expected), "timer_parity_digest": wasm_digest,
+            "native_timer_parity_digest": native_digest, "scope": "V7 raw-input and held-timer eventwise parity"}
+
+
 def wasm_checks(selection, summary):
     # Existing V7 eventwise witness; this does not claim shipping browser topology
     # or that the current native facade is already the browser host's entry.
@@ -304,19 +356,8 @@ def wasm_checks(selection, summary):
         run(["cargo", "install", "wasm-bindgen-cli", "--version", "0.2.127", "--locked", "--force"], "wasm-tools")
     run(["cargo", "check", "--locked", "-p", "er-env", "--target", "wasm32-unknown-unknown"], "current-session-wasm-check", env=env)
     output = run(["cargo", "test", "--locked", "-p", "er-wasm", "--test", selection["wasm_test"],
-                  "--target", "wasm32-unknown-unknown"], "wasm-eventwise", env=env)
-    text = output.read_text()
-    counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", text)
-    if not counts:
-        raise RuntimeError("missing Wasm eventwise result counts")
-    passed, failed, skipped = map(int, counts.groups())
-    # This pinned test target contains one real wasm_bindgen_test; require its
-    # executed name as well as counts so a zero-test cargo invocation cannot pass.
-    witness = "wasm_replays_v7_raw_inputs_eventwise"
-    summary["wasm_tests"] = {"expected": 1, "passed": passed, "failed": failed, "skipped": skipped,
-                             "selected_test_ids": [witness], "scope": "existing V7 eventwise parity"}
-    if passed != 1 or failed or skipped or witness not in text:
-        raise RuntimeError("Wasm eventwise witness missing or counts disagree")
+                  "--target", "wasm32-unknown-unknown", "--", "--nocapture"], "wasm-eventwise", env=env)
+    summary["wasm_tests"] = wasm_parity_evidence(output.read_text(), summary.get("native_timer_parity_digest"))
 
 
 def browser_result_counts(playwright, vitest):
@@ -534,8 +575,8 @@ def main(preflight_failure=None):
             binaries = selected_binaries
         worker_executable = None
         if selection["requires_worker_executable"]:
-            if not any(name == "current_kernel_endpoint_v2" and cwd.name == "er-lab" for name, cwd in binaries.values()):
-                raise RuntimeError("required current endpoint test target is missing")
+            if not any(name in WORKER_BOUND_TARGETS and cwd.name == "er-lab" for name, cwd in binaries.values()):
+                raise RuntimeError("required current process test target is missing")
             worker_executable = discover_worker_executable(artifacts, summary)
             summary["worker_executable"] = worker_executable
         enumerated = []
@@ -564,6 +605,9 @@ def main(preflight_failure=None):
             start = time.monotonic()
             print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
             command = [binary, "--format", "terse"]
+            native_timer_parity = (cwd.name, name) == ("er-wasm", "m9e_parity")
+            if native_timer_parity:
+                command.append("--nocapture")
             for test_id in sorted(excluded_ids):
                 command.extend(["--skip", test_id])
             try:
@@ -584,6 +628,11 @@ def main(preflight_failure=None):
                 summary["tests"][key] += count
             if code or failed or skipped or passed != len(ids):
                 raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
+            if native_timer_parity:
+                expected = {"native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"}
+                if len(ids) != 2 or set(ids) != expected:
+                    raise RuntimeError("native eventwise parity witness identities/counts disagree")
+                summary["native_timer_parity_digest"] = timer_parity_digest(output.read_text(), "native")
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
         if selection["worker_session_focus"] or selection["requires_worker_executable"]:
@@ -602,6 +651,13 @@ def main(preflight_failure=None):
     except Exception as error:
         summary["first_failure"] = str(error)[:4096]
     finally:
+        format_patch = FULL / "format.patch"
+        summary["format_patch_bytes"] = format_patch.stat().st_size if format_patch.exists() else 0
+        patch_metadata = FULL / "format-patch-metadata.json"
+        metadata = json.loads(patch_metadata.read_text()) if patch_metadata.exists() else {}
+        summary["format_patch_omitted_bytes"] = metadata.get("omitted_bytes", 0)
+        summary["format_patch_omitted_paths"] = metadata.get("omitted_paths", [])
+        summary["format_patch_included_paths"] = metadata.get("included_paths", [])
         (FULL / "selected-tests.json").write_text(json.dumps(tests, indent=2) + "\n")
         summary["selected_test_ids"] = {"file": "selected-tests.json", "sha256": digest(FULL / "selected-tests.json")}
         summary["expected_test_count"] = summary["tests"]["selected"]

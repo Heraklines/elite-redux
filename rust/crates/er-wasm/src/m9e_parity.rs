@@ -21,6 +21,7 @@ pub const M9E_PARITY_REPORT_SCHEMA_VERSION_V1: u32 = 1;
 pub enum M9EParityEventV2 {
     RawInput { event: RawInputEvent },
     PresentationSettled { event_id: PresentationEventId },
+    AdvanceTime { milliseconds: SafeU53 },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -80,7 +81,7 @@ pub fn replay_m9e_eventwise_native(
             request.local_is_host,
             content.clone(),
             KernelSchedulerSnapshotV2 {
-                next_timer_id: None,
+                next_timer_id: Some(SafeU53::ZERO),
                 timers: Vec::new(),
                 pauses: Vec::new(),
                 disposed: false,
@@ -102,6 +103,9 @@ pub fn replay_m9e_eventwise_native(
                     .settle_presentation(event_id)
                     .map_err(|error| error.to_string())?;
                 GameKernelStepV7::default()
+            }
+            M9EParityEventV2::AdvanceTime { milliseconds } => {
+                kernel.advance_time(milliseconds).map_err(|error| error.to_string())?
             }
         };
         let snapshot = kernel.snapshot().map_err(|error| error.to_string())?;

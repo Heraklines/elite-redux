@@ -246,7 +246,7 @@ class FeedbackTests(unittest.TestCase):
         patch_bytes = b"diff --git a/rust/crates/er-native/src/lib.rs b/rust/crates/er-native/src/lib.rs\n"
         with patch.object(self.feedback.subprocess, "check_output", return_value=patch_bytes) as diff:
             code, summary = self.invoke()
-        diff.assert_called_once_with(["git", "diff", "--", source], cwd=self.root)
+        diff.assert_called_once_with(["git", "diff", "--unified=1", "--", source], cwd=self.root)
         self.assertEqual(code, 1)
         self.assertEqual(summary["tests"]["passed"], 2)
         self.assertEqual(self.executed, ["a_suite", "b_suite"])
@@ -254,7 +254,42 @@ class FeedbackTests(unittest.TestCase):
         self.assertLess(self.events.index("restore"), self.events.index("build"))
         self.assertEqual((self.compact / "format.patch").read_bytes(), patch_bytes)
         self.assertEqual((self.full / "format.patch").read_bytes(), patch_bytes)
+        self.assertEqual(summary["format_patch_bytes"], len(patch_bytes))
+        self.assertEqual(summary["format_patch_omitted_bytes"], 0)
         self.assertLessEqual(sum(path.stat().st_size for path in self.compact.iterdir()), 64 * 1024)
+
+    def test_oversized_format_patch_reports_omitted_bytes_without_raising_cap(self):
+        self.format_code = 1
+        self.changed = ["rust/crates/er-native/src/lib.rs"]
+        patch_bytes = b"x" * 32769
+        with patch.object(self.feedback.subprocess, "check_output", return_value=patch_bytes):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertFalse((self.compact / "format.patch").exists())
+        self.assertEqual(summary["format_patch_bytes"], 32769)
+        self.assertEqual(summary["format_patch_omitted_bytes"], 32769)
+        self.assertEqual((self.full / "format.patch").read_bytes(), patch_bytes)
+        self.assertLessEqual(sum(path.stat().st_size for path in self.compact.iterdir()), 64 * 1024)
+
+    def test_compact_format_patch_keeps_whole_files_and_reports_omitted_paths(self):
+        def file_diff(name, size):
+            return f"diff --git a/{name} b/{name}\n".encode() + b"x" * size + b"\n"
+        first = file_diff("first.rs", 20000)
+        oversized = file_diff("large.rs", 40000)
+        last = file_diff("last.rs", 10000)
+        compact, metadata = self.feedback.compact_format_patch(first + oversized + last)
+        self.assertEqual(compact, first + last)
+        self.assertLessEqual(len(compact), 32768)
+        self.assertEqual(metadata["included_paths"], ["first.rs", "last.rs"])
+        self.assertEqual(metadata["omitted_paths"], ["large.rs"])
+        self.assertEqual(metadata["omitted_bytes"], len(oversized))
+        self.format_code = 1
+        self.changed = ["rust/crates/er-native/src/lib.rs"]
+        with patch.object(self.feedback.subprocess, "check_output", return_value=first + oversized + last):
+            _, summary = self.invoke()
+        self.assertEqual((self.compact / "format.patch").read_bytes(), first + last)
+        self.assertEqual(summary["format_patch_omitted_bytes"], len(oversized))
+        self.assertEqual(summary["format_patch_omitted_paths"], ["large.rs"])
 
     def test_compiler_failure_cannot_become_green_after_report_generation(self):
         self.build_code = 101
@@ -518,6 +553,94 @@ class FeedbackTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
                     self.feedback.plan()
 
+    @staticmethod
+    def wasm_timer_output():
+        return ("test wasm_replays_v7_raw_inputs_eventwise ... ok\n"
+                "test wasm_replays_v7_held_timers_eventwise ... ok\n"
+                "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n"
+                "test result: ok. 2 passed; 0 failed; 0 ignored; 0 filtered out\n")
+
+    def test_wasm_timer_parity_requires_two_exact_witnesses_and_equal_digest(self):
+        text = self.wasm_timer_output()
+        evidence = self.feedback.wasm_parity_evidence(text, "d" * 64)
+        self.assertEqual(evidence["expected"], 2)
+        self.assertEqual(evidence["timer_parity_digest"], "d" * 64)
+        cases = [text.replace("2 passed", "1 passed"), text.replace("2 passed", "0 passed"),
+                 text.replace("0 ignored", "1 ignored"), text.replace("0 failed", "1 failed"),
+                 text.replace("wasm_replays_v7_held_timers_eventwise", "wasm_replays_v7_raw_inputs_eventwise"),
+                 text.replace("test wasm_replays_v7_held_timers_eventwise ... ok\n", ""),
+                 text + "test result: ok. 2 passed; 0 failed; 0 ignored;\n"]
+        for invalid in cases:
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "identities/counts"):
+                self.feedback.wasm_parity_evidence(invalid, "d" * 64)
+        for native in (None, "e" * 64):
+            with self.subTest(native=native), self.assertRaisesRegex(RuntimeError, "digests disagree"):
+                self.feedback.wasm_parity_evidence(text, native)
+
+    def test_timer_parity_markers_reject_missing_duplicate_and_malformed_values(self):
+        marker = "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n"
+        self.assertEqual(self.feedback.timer_parity_digest(marker, "native"), "d" * 64)
+        for invalid in ("", marker * 2, marker.replace("d", "g"), marker.rstrip() + "extra\n"):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "digest missing, malformed or duplicated"):
+                self.feedback.timer_parity_digest(invalid, "native")
+
+    def test_wasm_gate_requests_visible_timer_digest_without_native_rerun(self):
+        summary = {"native_timer_parity_digest": "d" * 64}
+        def wasm_run(args, name, cwd=None, env=None):
+            path = self.full / (name + ".log")
+            path.write_text(self.wasm_timer_output() if name == "wasm-eventwise" else "")
+            return path
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(self.root)}), patch.object(self.feedback.shutil, "which", return_value="wasm-bindgen"), patch.object(self.feedback, "capture", return_value="wasm-bindgen 0.2.127"), patch.object(self.feedback, "run", side_effect=wasm_run) as run:
+            self.feedback.wasm_checks({"wasm_test": "m9e_parity"}, summary)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args.args[0][-2:], ["--", "--nocapture"])
+        self.assertEqual(summary["wasm_tests"]["passed"], 2)
+
+    def configure_supervisor_scope(self):
+        self.configure_endpoint_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["supervisor_focus"] = policy["supervisor_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-lab", '[dependencies]\ner-kernel-worker = { path = "../er-kernel-worker" }\n')
+        self.package("er-reverse", '[dependencies]\ner-lab = { path = "../er-lab" }\n')
+
+    def test_supervisor_scope_requires_real_process_targets_without_browser(self):
+        self.configure_supervisor_scope()
+        self.changed = self.config["supervisor_focus"]["paths"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["supervisor_focus"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertFalse(selection["requires_browser"])
+        self.assertFalse(selection["requires_wasm"])
+        self.assertIsNone(selection["worker_lock_guard"])
+        self.assertIsNone(selection["timer_mutant"])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        self.assertEqual(selection["execution_scope"]["er-kernel-worker"], ["*"])
+        self.assertEqual(selection["execution_scope"]["er-cli"], ["*"])
+        self.assertEqual(selection["execution_scope"]["er-lab"], [
+            "current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2",
+            "kernel_reload_acceptance", "kernel_reload_artifact"])
+        self.assertEqual(selection["required_native_targets"], {
+            "er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"]})
+
+    def test_supervisor_mixed_paths_preserve_shared_and_browser_gates(self):
+        self.configure_supervisor_scope()
+        supervisor = "rust/crates/er-lab/src/kernel_reload/supervisor_v2.rs"
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-web/src/host_v2.rs",
+                      "rust/Cargo.lock", "unknown.json"):
+            with self.subTest(extra=extra):
+                self.changed = [supervisor, extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+        self.changed = [supervisor, "rust/crates/er-env/src/current.rs"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["supervisor_focus"])
+        self.assertIsNone(selection["execution_scope"])
+        self.assertTrue(selection["requires_browser"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertTrue(selection["requires_worker_executable"])
+
     def configure_timer_scope(self):
         self.configure_endpoint_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
@@ -592,12 +715,17 @@ class FeedbackTests(unittest.TestCase):
                 self.binary_ids[name] = ["behavior"]
                 self.binary_crates[name] = package
         self.extra_artifacts = [self.worker_executable_artifact()]
+        self.binary_ids["m9e_parity"] = ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
         with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant:
             code, summary = self.invoke()
         self.assertEqual(code, 0)
         wasm.assert_called_once()
         browser.assert_called_once()
         mutant.assert_called_once()
+        self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
+        parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
+        self.assertIn("--nocapture", parity_execution)
         self.assertEqual(len(summary["required_native_target_counts"]), 5)
         self.assertIn("current_kernel_endpoint_v2", self.executed)
         self.assertIn("current_kernel_endpoint_faults_v2", self.executed)
@@ -731,12 +859,17 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(binding["sha256"], hashlib.sha256(Path(valid["executable"]).read_bytes()).hexdigest())
         self.assertEqual(binding["source_sha"], CANDIDATE)
 
-    def test_bound_worker_environment_reaches_only_current_endpoint_execution(self):
+    def test_bound_worker_environment_reaches_only_actual_current_process_targets(self):
         self.package("er-lab")
+        self.assertIsNone(self.feedback.native_target_env("er-other", "current_kernel_supervisor_v2", None))
+        with self.assertRaisesRegex(RuntimeError, "no bound worker executable"):
+            self.feedback.native_target_env("er-lab", "current_kernel_supervisor_v2", None)
         self.binary_ids = {"a_suite": ["unrelated"], "current_kernel_endpoint_v2": ["real_process"],
-                           "current_kernel_endpoint_faults_v2": ["synthetic_fault_peer"]}
+                           "current_kernel_endpoint_faults_v2": ["synthetic_fault_peer"],
+                           "current_kernel_supervisor_v2": ["real_supervisor_process"]}
         self.binary_crates["current_kernel_endpoint_v2"] = "er-lab"
         self.binary_crates["current_kernel_endpoint_faults_v2"] = "er-lab"
+        self.binary_crates["current_kernel_supervisor_v2"] = "er-lab"
         self.extra_artifacts = [self.worker_executable_artifact()]
         selection = self.feedback.plan()
         selection["packages"] = ["er-native", "er-lab", "er-kernel-worker"]
@@ -745,10 +878,10 @@ class FeedbackTests(unittest.TestCase):
             code, summary = self.invoke()
         self.assertEqual(code, 0)
         binding = summary["worker_executable"]
-        self.assertEqual(self.executed, ["a_suite", "current_kernel_endpoint_faults_v2", "current_kernel_endpoint_v2"])
+        self.assertEqual(self.executed, ["a_suite", "current_kernel_endpoint_faults_v2", "current_kernel_endpoint_v2", "current_kernel_supervisor_v2"])
         for name, phase, env in self.binary_envs:
             with self.subTest(name=name, phase=phase):
-                if name != "current_kernel_endpoint_v2":
+                if name not in ("current_kernel_endpoint_v2", "current_kernel_supervisor_v2"):
                     self.assertIsNone(env)
                 else:
                     self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE"], binding["path"])

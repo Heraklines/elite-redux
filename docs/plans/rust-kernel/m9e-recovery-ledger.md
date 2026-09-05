@@ -323,3 +323,38 @@ stage for direct-call atomicity; CurrentGameSession currently stages them again.
 Transaction reuse remains a measured optimization task, not a claimed speedup.
 The source-only current supervisor and acknowledged-context binding are queued
 separately and are not included in this B1 commit or its evidence.
+
+### B1 first remote feedback and explicit timer parity
+
+Candidate `7910ab85b8964e037e6a24a1210ad6bbcec6c83f`, run `33931362507`,
+failed at the existing native eventwise golden after 542 passing tests and one
+failure (543 executed of 560 selected, zero skips). Compilation succeeded.
+The five required kernel targets were inventoried, but the nine timer tests
+were not reached before the alphabetical parity failure. Wasm, browser and
+the behavioral mutant were not reached. The compact artifact was inspected
+before download: 5,539 bytes; full diagnostics remain remote.
+
+The frozen parity digest changed from `ee3f694f9f766c2a8e730fbad3c81d533b0ce39dd97c7e673da3f67478cd584b`
+to `ec51f4cd7f6e6232054583b9208ce28fb3bb84e0559258932109c82234552beb`.
+Source comparison confirms that the fresh scheduler changed from exhausted
+None to Some(0); full snapshot digests include that field and subsequent
+directional timer allocations. Gameplay/control assertions passed. The next
+candidate retains those assertions and additionally checks that allocation
+matches directional presses and no repeats remain after releases. Its golden
+is explicitly tied to this observed native result, with independent Wasm
+confirmation still mandatory. The boosted three-wave fixture remains synthetic.
+
+A separate six-event parity trace starts from a genuinely natural active
+checkpoint without stat edits. It holds Down, advances 249/1/250 ms, releases,
+then advances 500 ms. Independent cursor/effect assertions and complete
+midpoint-restored step/snapshot equality accompany the parity report. Native
+and the Wasm JSON export must emit the same full-record digest; the focused
+gate requires both exact test names per platform and rejects absent, duplicate,
+malformed or mismatched digests. This is kernel/JSON parity, not real browser
+clock or transport proof.
+
+Formatting is still pending. The first patch exceeded the compact bound;
+the next report uses minimal diff context and bounded complete-file patches,
+with omitted bytes recorded. No local formatter or test has been run.
+The current-supervisor CI mapping is prepared but inert until its separate
+source cut is committed. Baseline remains the last fully green `c2c3ca6`.
