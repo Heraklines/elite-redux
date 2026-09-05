@@ -977,7 +977,7 @@ class FeedbackTests(unittest.TestCase):
 
     def test_environment_plus_ordinary_cli_change_keeps_browser_on_broad_scope(self):
         self.configure_browser_scope()
-        self.changed = ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/main.rs"]
+        self.changed = ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/m72.rs"]
         selection = self.feedback.plan()
         self.assertIsNone(selection["execution_scope"])
         self.assertTrue(selection["requires_browser"])

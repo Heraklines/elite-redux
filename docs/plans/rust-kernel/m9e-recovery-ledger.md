@@ -432,3 +432,15 @@ JSONL worker/reload adapter and two process tests; replica presentation delivery
 The following causal capsule is designed but not implemented. These are not
 covered by the B1 pass. Full M9 remains incomplete; no deployment, final-tag
 change, production-default change, or legacy player-save access has occurred.
+
+### Supervisor/budget preflight correction
+
+Run `33935654690` at `579e7a839f3013720fda00b0068c40588fdab197` stopped
+before product compilation: 53 harness selftests passed and one failed.
+The broad environment-plus-ordinary-CLI regression still used `main.rs`, which
+is now explicitly mapped by the separately prepared utility scope. The actual
+selection correctly retained browser/Wasm coverage in its focused scope. The
+test now uses unmapped historical `m72.rs` so its unchanged assertions continue
+to verify the broad fallback, browser and Wasm requirements. No production
+assertion or gate was relaxed. The inspected compact artifact was 2,763 bytes;
+full diagnostics remained remote. Baseline remains fully passing `7557e92`.
