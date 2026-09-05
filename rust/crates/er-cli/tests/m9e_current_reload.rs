@@ -1,9 +1,9 @@
 //! Actual JSONL CLI and exact-build worker reload witnesses. Run remotely.
 
 use std::error::Error;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
@@ -20,6 +20,8 @@ use serde_json::{Value, json};
 
 const SESSION: &str = "current-cli-reload";
 const SEED: &str = "current-cli-reload";
+const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_STDERR_BYTES: usize = 64 * 1024;
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("safe test integer")
@@ -113,9 +115,41 @@ enum Expected {
     Error { code: &'static str, message: &'static str },
 }
 
+enum RetainedExpected {
+    ExactDigest(String),
+    Fields(Value),
+    Error { code: &'static str, message: &'static str },
+}
+
+fn result_digest(value: &Value) -> Result<String, Box<dyn Error>> {
+    Ok(format!("{:?}", er_canonical::content_digest(value)?))
+}
+
+// Reap the CLI and its worker process group even if a response assertion panics.
+struct CliProcess {
+    child: Child,
+    writer: Option<std::thread::JoinHandle<Result<(), String>>>,
+    stderr: Option<std::thread::JoinHandle<std::io::Result<Vec<u8>>>>,
+}
+
+impl Drop for CliProcess {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        {
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", "--", &format!("-{}", self.child.id())])
+                .stdout(Stdio::null()).stderr(Stdio::null()).status();
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        if let Some(writer) = self.writer.take() { let _ = writer.join(); }
+        if let Some(stderr) = self.stderr.take() { let _ = stderr.join(); }
+    }
+}
+
 struct Script {
     requests: Vec<Value>,
-    expected: Vec<Expected>,
+    expected: Vec<RetainedExpected>,
     reference: CurrentGameSession,
     frontier: u64,
 }
@@ -146,7 +180,13 @@ impl Script {
             "protocol_version": 1, "id": format!("reload-{}", self.requests.len()),
             "method": method, "params": params
         }));
-        self.expected.push(expected);
+        self.expected.push(match expected {
+            Expected::Exact(value) => RetainedExpected::ExactDigest(
+                result_digest(&value).expect("valid finite fixture JSON canonicalizes"),
+            ),
+            Expected::Fields(value) => RetainedExpected::Fields(value),
+            Expected::Error { code, message } => RetainedExpected::Error { code, message },
+        });
     }
 
     fn snapshot(&mut self) -> Result<(), Box<dyn Error>> {
@@ -221,54 +261,88 @@ impl Script {
         let identity_path = directory.0.join("identity.json");
         std::fs::write(&identity_path, serde_json::to_vec(&fixture.identity)?)?;
         // Cargo supplies the CLI binary; the worker path is separately bound by F.
-        let mut child = Command::new(env!("CARGO_BIN_EXE_er-cli"))
-            .args(["agent", "--protocol", "jsonl", "--content"])
+        let mut command = Command::new(env!("CARGO_BIN_EXE_er-cli"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        let child = command.args(["agent", "--protocol", "jsonl", "--content"])
             .arg(content_path())
             .arg("--worker-executable").arg(&fixture.executable)
             .arg("--worker-root").arg(&fixture.root)
             .arg("--worker-identity").arg(identity_path)
             .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
             .spawn()?;
-        let mut input = child.stdin.take().ok_or("CLI stdin missing")?;
-        let requests = self.requests.clone();
-        let writer = std::thread::spawn(move || -> Result<(), String> {
+        let mut process = CliProcess { child, writer: None, stderr: None };
+        let mut input = process.child.stdin.take().ok_or("CLI stdin missing")?;
+        let mut stdout = BufReader::new(process.child.stdout.take().ok_or("CLI stdout missing")?);
+        let mut stderr = process.child.stderr.take().ok_or("CLI stderr missing")?;
+        process.stderr = Some(std::thread::spawn(move || -> std::io::Result<Vec<u8>> {
+            let mut retained = Vec::new();
+            let mut buffer = [0_u8; 8192];
+            loop {
+                let count = stderr.read(&mut buffer)?;
+                if count == 0 { break; }
+                let keep = count.min(MAX_STDERR_BYTES.saturating_sub(retained.len()));
+                retained.extend_from_slice(&buffer[..keep]);
+            }
+            Ok(retained)
+        }));
+        let Self { requests, expected, reference, .. } = self;
+        drop(reference);
+        let methods: Vec<String> = requests.iter()
+            .map(|request| request["method"].as_str().expect("script method").to_owned())
+            .collect();
+        process.writer = Some(std::thread::spawn(move || -> Result<(), String> {
             for request in requests {
                 serde_json::to_writer(&mut input, &request).map_err(|error| error.to_string())?;
                 input.write_all(b"\n").map_err(|error| error.to_string())?;
             }
             Ok(())
-        });
-        let output = child.wait_with_output()?;
-        let write_result = writer.join().map_err(|_| "CLI writer panicked")?;
-        assert!(output.status.success(), "CLI failed: {}", String::from_utf8_lossy(&output.stderr));
-        write_result?;
-        let responses = output.stdout.split(|byte| *byte == b'\n')
-            .filter(|line| !line.is_empty()).map(serde_json::from_slice)
-            .collect::<Result<Vec<Value>, _>>()?;
-        assert_eq!(responses.len(), self.requests.len(), "one JSONL response per request");
-        for ((response, request), expected) in responses.iter().zip(&self.requests).zip(&self.expected) {
+        }));
+        let mut line = Vec::new();
+        for (index, (method, expected)) in methods.iter().zip(&expected).enumerate() {
+            line.clear();
+            let count = stdout.by_ref().take(MAX_RESPONSE_BYTES + 1).read_until(b'\n', &mut line)?;
+            assert!(count > 0, "missing response {index} ({method})");
+            assert!(line.len() as u64 <= MAX_RESPONSE_BYTES,
+                "response {index} ({method}) exceeds byte cap");
+            assert_eq!(line.last(), Some(&b'\n'), "unterminated response {index} ({method})");
+            let response: Value = serde_json::from_slice(&line)?;
             assert_eq!(response["protocol_version"], 1);
-            assert_eq!(response["id"], request["id"]);
+            assert_eq!(response["id"], format!("reload-{index}"));
             match expected {
-                Expected::Error { code, message } => {
-                    assert!(response["error"].is_object(), "expected rejection: {request}: {response}");
-                    assert_eq!(response["error"]["code"], *code, "request: {request}");
+                RetainedExpected::Error { code, message } => {
+                    assert!(response["error"].is_object(), "expected rejection: {index} ({method})");
+                    assert_eq!(response["error"]["code"], *code, "request: {index} ({method})");
                     assert!(response["error"]["message"].as_str().is_some_and(|text| text.contains(*message)),
-                        "wrong rejection category: {request}: {response}");
+                        "wrong rejection category: {index} ({method})");
                     assert!(response["result"].is_null());
                 }
-                Expected::Exact(expected) => {
-                    assert!(response["error"].is_null(), "request rejected: {request}: {response}");
-                    assert_eq!(&response["result"], expected, "request: {request}");
+                RetainedExpected::ExactDigest(expected) => {
+                    assert!(response["error"].is_null(), "request rejected: {index} ({method})");
+                    assert_eq!(&result_digest(&response["result"])?, expected,
+                        "full canonical result differs: {index} ({method})");
                 }
-                Expected::Fields(expected) => {
-                    assert!(response["error"].is_null(), "request rejected: {request}: {response}");
+                RetainedExpected::Fields(expected) => {
+                    assert!(response["error"].is_null(), "request rejected: {index} ({method})");
                     for (key, value) in expected.as_object().ok_or("expected fields missing")? {
-                        assert_eq!(&response["result"][key], value, "request: {request}");
+                        assert_eq!(&response["result"][key], value, "request: {index} ({method})");
                     }
                 }
             }
         }
+        let mut extra = [0_u8; 1];
+        assert_eq!(stdout.read(&mut extra)?, 0, "extra JSONL response or trailing output");
+        let status = process.child.wait()?;
+        let write_result = process.writer.take().ok_or("CLI writer missing")?
+            .join().map_err(|_| "CLI writer panicked")?;
+        let diagnostic = process.stderr.take().ok_or("CLI stderr reader missing")?
+            .join().map_err(|_| "CLI stderr reader panicked")??;
+        assert!(status.success(), "CLI failed (stderr prefix, capped at {MAX_STDERR_BYTES} bytes): {}",
+            String::from_utf8_lossy(&diagnostic));
+        write_result?;
         Ok(())
     }
 }

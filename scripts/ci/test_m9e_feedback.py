@@ -229,20 +229,21 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(selection["boundary_paths"], [])
 
-    def test_format_failure_without_changed_rust_still_runs_original_tests(self):
+    def test_format_failure_returns_without_starting_product_tests(self):
         self.format_code = 1
         code, summary = self.invoke()
         self.assertEqual(code, 1)
         self.assertEqual(summary["status"], "failed")
         self.assertIn("format exited 1", summary["format_failure"])
         self.assertEqual(summary["first_failure"], summary["format_failure"])
-        self.assertEqual(summary["tests"]["passed"], 2)
-        self.assertEqual(self.executed, ["a_suite", "b_suite"])
+        self.assertEqual(summary["tests"]["passed"], 0)
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("build", self.events)
         self.assertNotIn("format-patch", self.events)
         self.assertNotIn("restore", self.events)
         self.assertFalse((self.compact / "format.patch").exists())
 
-    def test_format_patch_is_scoped_and_restore_precedes_compilation(self):
+    def test_format_patch_is_scoped_and_restored_before_early_return(self):
         self.format_code = 1
         source = "rust/crates/er-native/src/lib.rs"
         self.changed = [source, "docs/plans/rust-kernel/m9e-progress.md"]
@@ -251,10 +252,10 @@ class FeedbackTests(unittest.TestCase):
             code, summary = self.invoke()
         diff.assert_called_once_with(["git", "diff", "--unified=1", "--", source], cwd=self.root)
         self.assertEqual(code, 1)
-        self.assertEqual(summary["tests"]["passed"], 2)
-        self.assertEqual(self.executed, ["a_suite", "b_suite"])
+        self.assertEqual(summary["tests"]["passed"], 0)
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("build", self.events)
         self.assertLess(self.events.index("format-patch"), self.events.index("restore"))
-        self.assertLess(self.events.index("restore"), self.events.index("build"))
         self.assertEqual((self.compact / "format.patch").read_bytes(), patch_bytes)
         self.assertEqual((self.full / "format.patch").read_bytes(), patch_bytes)
         self.assertEqual(summary["format_patch_bytes"], len(patch_bytes))

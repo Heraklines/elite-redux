@@ -605,14 +605,13 @@ def main(preflight_failure=None):
         summary["toolchain"] = capture(["rustc", "--version"], RUST)
         summary["target"] = next(line.split(": ", 1)[1] for line in
                                  capture(["rustc", "-vV"], RUST).splitlines() if line.startswith("host: "))
-        format_failure = None
         try:
             check_format(selection)
         except RuntimeError as error:
-            # Formatting alone need not consume an entire remote feedback turn.
-            # check_format restores the original candidate before compilation.
-            format_failure = str(error)
-            summary["format_failure"] = format_failure
+            # Return the bounded remote repair before long process witnesses.
+            # check_format restores the exact candidate; no test pass is claimed.
+            summary["format_failure"] = str(error)
+            raise
         # --tests includes unit and integration targets without requiring a
         # library target in binary-only packages such as er-cli.
         args = ["cargo", "test", "--locked", "--tests", "--no-run", "--message-format=json"]
@@ -723,8 +722,6 @@ def main(preflight_failure=None):
             wasm_checks(selection, summary)
         if selection["requires_browser"]:
             browser_checks(summary)
-        if format_failure:
-            raise RuntimeError(format_failure)
         if selection.get("timer_mutant"):
             timer_behavioral_mutant(selection, summary, tests)
         summary["status"] = "passed"

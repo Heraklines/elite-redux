@@ -544,3 +544,39 @@ normal batch execution. Batch protocol names currently exist without normal
 agent handlers; the historical er-batch V1 library still owns DeveloperSession.
 Reuse CurrentGameSession with shared V2 content, staged all-or-nothing batch
 results and bounded aggregate responses. Full M9 remains incomplete.
+
+### CLI reload interrupted; bounded process witness and early format feedback
+
+Candidate `d415db11e2739ada6aa09819297e389df053487f`, run `33937932009`
+attempt 1, was terminated when the runner received a shutdown signal (exit143).
+All artifact and cache-save steps were skipped. No completed product result is
+claimed. A HEAD request inspected the single job log size (31,229 bytes); only
+an HTTP206 final8,192-byte excerpt was retrieved. It shows compile completion,
+test discovery, prior target progress and entry into the two CLI reload tests,
+then explicit runner shutdown. Complete logs and build assets were not fetched.
+One unchanged-candidate retry was started; this repair supersedes it through
+the existing same-branch concurrency policy. Shutdown cause remains unproven.
+
+Independent source review found avoidable O(events * full snapshot) retention
+in the new CLI process test: full expected Values, a cloned request list, entire
+stdout bytes and all parsed responses. The test now retains canonical full-JSON
+result digests and checks one bounded response at a time. Every original event,
+snapshot, scenario and rejection assertion remains; explicit field/error checks
+stay structural. Stderr is continuously drained with a64KiB retained prefix.
+A dedicated test CLI process group is killed/reaped on failure to collect its
+worker descendants. This resource correction does not assert a runner diagnosis.
+
+Formatting now returns its bounded source repair immediately, before compilation
+or process tests. Previously a known format failure waited through long tests,
+and the interrupted run lost that repair entirely. Updated two harness tests
+require zero executed product tests on format failure and exact scoped patch /
+source restoration. Final passing candidates still require every selected test,
+Clippy and platform gate; no test count or timeout is relaxed. Baseline remains
+fully qualified `da73baa`. Only this test/feedback repair is submitted now.
+
+B2 remains unstaged with native+Chromium delivery tests and two isolated compiled
+behavioral mutants (existing timer plus replica presentation omission). Current
+capsule recorder/replay, browser host and TS transport integration are also
+unstaged and unverified. Parent is wiring normal replay and session.from_capsule;
+actual browser-to-CLI witness and focused gate are still required. Full M9 is not
+complete; no deploy, final-tag change or legacy player-save access occurred.
