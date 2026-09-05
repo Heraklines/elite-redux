@@ -2,13 +2,18 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_game::m7_progression_control::generic_vertical_control_v2;
-use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_content_v2::{
+    GameContentBundleV2, PreparedGameContentV2, PresentationCueFamilyV1, PresentationSemanticIdV1,
+};
+use er_game::m9e_material_v6::{GameMaterialV6, GamePlatformEffectV2, GamePresentationEffectV2};
 use er_kernel::game_kernel_v7::{
-    GameKernelEffectV7, GameKernelRoleV7, GameKernelV7, GameProposalEnvelopeV2,
+    GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7, GameKernelV7Error,
+    GameProposalEnvelopeV2,
 };
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
+use er_kernel::snapshot_v7::{PendingPlatformRequestV2, PendingPresentationV3};
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
 use er_protocol::recovery::RecoveryTransactionConfig;
@@ -22,7 +27,8 @@ use er_types::input::{PhysicalKey, RawInputEvent};
 use er_types::{
     ConnectionGeneration, FrameContext, GAME_ACTION_SCHEMA_VERSION_V1, GameActionContextV1,
     GameActionV1, GameControlKindV2, GameMenuCancelV2, GameProposalV1, InputFocus,
-    MembershipRevision, OperationId, RunId, SafeU53, SaveActionV1, SeatId, SessionId, TimeClass,
+    MembershipRevision, OperationId, PresentationEventId, RunId, SafeU53, SaveActionV1, SeatId,
+    SessionId, TimeClass,
 };
 
 const BUNDLE: &[u8] =
@@ -485,13 +491,28 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
             .and_then(|control| control.owner_seat),
         Some(guest)
     );
-    replica
+    let retained_delivery = replica
         .apply_authority_material(&retained_material[0])
         .map_err(|error| format!("retention replica apply failed: {error}"))?;
     assert_eq!(replica.state(), authority.state());
+    for effect in retained_delivery.effects {
+        if let GameKernelEffectV7::Presentation(presentation) = effect {
+            replica.settle_presentation(presentation.event_id)?;
+        }
+    }
 
     press(&mut replica, PhysicalKey::Space)
         .map_err(|error| format!("guest Fight navigation failed: {error}"))?;
+    assert_eq!(
+        replica.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleMove)
+    );
+    let private_move_menu = replica.snapshot()?;
+    assert_eq!(
+        replica.apply_authority_material(&retained_material[0])?,
+        GameKernelStepV7::default()
+    );
+    assert_eq!(replica.snapshot()?, private_move_menu);
     let proposal_step = press(&mut replica, PhysicalKey::Space)
         .map_err(|error| format!("guest proposal failed: {error}"))?;
     let proposal = proposal_step
@@ -525,5 +546,119 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     assert_eq!(replica.state(), authority.state());
     assert_eq!(replica.current_control(), authority.current_control());
     assert!(authority.admit_game_proposal(&proposal)?.effects.is_empty());
+    Ok(())
+}
+
+#[test]
+fn replica_delivers_save_presentation_once_without_repeating_authority_storage() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(1));
+    let (mut state, revision, menu_instance) = natural_coop_state(content.clone(), host)?;
+    // The run is natural; the Save menu is an explicit controlled action seam.
+    let mut control = generic_vertical_control_v2(
+        menu_instance, revision, guest, OperationId::new("save/guest/presentation")?,
+        GameControlKindV2::Save, "m9e/coop/save-presentation",
+        &[("save/write".to_owned(), GameActionV1::Save {
+            action: SaveActionV1::Write { slot: "preview-slot".to_owned() },
+        })],
+        GameMenuCancelV2::Disabled,
+    )?;
+    control.action_context.as_mut().ok_or("save context missing")?.authority_seat = host;
+    state.active_run.as_mut().ok_or("run missing")?.control = control;
+    state.validate_with(content.as_ref())?;
+    let mut authority = GameKernelV7::from_active(
+        state.clone(), revision, host, GameKernelRoleV7::Authority, content.clone(),
+        input(), scheduler(), Some(initial_battle_protocol_snapshot_v2(
+            &authority_protocol(host, guest, generation)?, host,
+        )?),
+    )?;
+    let mut replica = GameKernelV7::from_active(
+        state, revision, guest, GameKernelRoleV7::Replica, content.clone(),
+        input(), scheduler(), Some(initial_battle_protocol_snapshot_v2(
+            &replica_protocol(host, guest, generation)?, guest,
+        )?),
+    )?;
+    let proposal_step = press(&mut replica, PhysicalKey::Space)?;
+    let proposal = proposal_step.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::ProposalReady { bytes, .. } => Some(bytes),
+        _ => None,
+    }).ok_or("guest Save proposal missing")?;
+    let before_delivery = replica.snapshot()?;
+    let authority_step = authority.admit_game_proposal(proposal)?;
+    let material = authority_step.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
+        _ => None,
+    }).ok_or("Save material missing")?;
+    let decoded = GameMaterialV6::decode(material)?;
+
+    let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Save);
+    let mapping = content.presentation(semantic).ok_or("Save presentation mapping missing")?;
+    let expected_presentation = GamePresentationEffectV2 {
+        event_id: PresentationEventId::new(revision), semantic,
+        blocking: mapping.blocking, skip: mapping.skip,
+    };
+    let authority_presentations: Vec<_> = authority_step.effects.iter().filter_map(|effect| match effect {
+        GameKernelEffectV7::Presentation(presentation) => Some(presentation.clone()),
+        _ => None,
+    }).collect();
+    assert_eq!(authority_presentations, [expected_presentation.clone()]);
+    assert_eq!(decoded.transition().presentation, authority_presentations);
+    let platforms: Vec<_> = authority_step.effects.iter().filter_map(|effect| match effect {
+        GameKernelEffectV7::Platform(platform) => Some(platform.clone()),
+        _ => None,
+    }).collect();
+    let [GamePlatformEffectV2::StorageWrite { request, slot, generation, bytes }] = platforms.as_slice() else {
+        return Err("Save must issue exactly one authority StorageWrite".into());
+    };
+    assert_eq!(slot, "preview-slot");
+    assert_eq!(*generation, safe(1));
+    assert!(!bytes.is_empty());
+    assert_eq!(decoded.transition().platform_effects, platforms);
+    let authority_snapshot = authority.snapshot()?;
+    assert_eq!(authority_snapshot.pending_platform, [PendingPlatformRequestV2 {
+        request_id: *request, effect: platforms[0].clone(),
+    }]);
+    let pending = PendingPresentationV3 {
+        event_id: expected_presentation.event_id, semantic: expected_presentation.semantic,
+        blocking: expected_presentation.blocking, skip: expected_presentation.skip,
+    };
+    assert_eq!(authority_snapshot.pending_presentations, [pending.clone()]);
+
+    // This is a valid pre-delivery snapshot. The collision is detected only
+    // when presentation ownership is installed after common material apply.
+    let mut collision_snapshot = before_delivery.clone();
+    collision_snapshot.pending_presentations.push(pending.clone());
+    let mut collision = GameKernelV7::from_snapshot(
+        collision_snapshot.clone(), guest, GameKernelRoleV7::Replica, content,
+    )?;
+    assert_eq!(collision.apply_authority_material(material), Err(GameKernelV7Error::Invalid), "replica material must claim pending presentation ownership");
+    assert_eq!(collision.snapshot()?, collision_snapshot);
+
+    let delivered = replica.apply_authority_material(material)?;
+    assert_eq!(delivered, GameKernelStepV7 {
+        effects: vec![
+            GameKernelEffectV7::Presentation(expected_presentation.clone()),
+            GameKernelEffectV7::UiChanged(authority.current_control().cloned().ok_or("authority control missing")?),
+        ],
+        internal_events: Vec::new(),
+    });
+    assert_eq!(replica.state(), authority.state());
+    assert_eq!(replica.current_control(), authority.current_control());
+    let delivered_snapshot = replica.snapshot()?;
+    assert_eq!(delivered_snapshot.pending_presentations, [pending]);
+    assert!(delivered_snapshot.pending_platform.is_empty());
+    assert_eq!(delivered_snapshot.storage_frontiers, before_delivery.storage_frontiers);
+    assert_eq!(replica.apply_authority_material(material)?, GameKernelStepV7::default());
+    assert_eq!(replica.snapshot()?, delivered_snapshot);
+
+    replica.settle_presentation(expected_presentation.event_id)?;
+    let settled = replica.snapshot()?;
+    assert!(settled.pending_presentations.is_empty());
+    assert_eq!(replica.apply_authority_material(material)?, GameKernelStepV7::default());
+    assert_eq!(replica.snapshot()?, settled);
+    assert!(authority.admit_game_proposal(proposal)?.effects.is_empty());
+    assert_eq!(authority.snapshot()?, authority_snapshot);
     Ok(())
 }

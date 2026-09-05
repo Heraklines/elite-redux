@@ -78,10 +78,10 @@ const navigate = async option => {
 };
 const createClient = async (snapshot, seat, role) => {
   const clientHost = new BrowserKernelHostV2(bundle); let clientSequence = 0; let clientRequest = 1;
-  const clientSend = async request => {
+  const clientSend = async (request, settlePresentation = true) => {
     const envelope = { request, request_id: clientRequest++, sequence: clientSequence++, version: 2 };
     const response = JSON.parse(decoder.decode(clientHost.process(bytes(envelope)))).response;
-    if (response.kind === "EFFECTS") for (const effect of response.batch.effects) if (effect.kind === "PRESENTATION") await clientSend({ kind: "PRESENTATION_SETTLED", event_id: effect.effect.event_id, outcome: { kind: "SETTLED" } });
+    if (settlePresentation && response.kind === "EFFECTS") for (const effect of response.batch.effects) if (effect.kind === "PRESENTATION") await clientSend({ kind: "PRESENTATION_SETTLED", event_id: effect.effect.event_id, outcome: { kind: "SETTLED" } });
     return response;
   };
   await clientSend({ kind: "INITIALIZE", initialization: { kind: "SNAPSHOT", context: { local_seat: seat, role, protocol: null, scheduler: { disposed: false, next_timer_id: null, pauses: [], timers: [] } }, snapshot } });
@@ -93,6 +93,14 @@ const rawPress = async client => {
   return [down, up];
 };
 const networkBytes = responses => (Array.isArray(responses) ? responses : [responses]).flatMap(response => response.kind === "EFFECTS" ? response.batch.effects : []).find(effect => effect.kind === "SEND_NETWORK_FRAME")?.bytes;
+const effectsOf = response => {
+  if (response.kind !== "EFFECTS") throw new Error("expected browser effects: " + response.kind);
+  return response.batch.effects;
+};
+const presentationsOf = response => effectsOf(response).filter(effect => effect.kind === "PRESENTATION").map(effect => effect.effect);
+const sameSnapshot = (left, right) => JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+// Two Wasm hosts in one Chromium page relay real canonical material bytes in-page.
+// This harness does not provide Worker or WebRTC transport coverage.
 const coop = async () => {
   const authoritySnapshot = await (await fetch("/m9e-assets/coop-authority-snapshot.json")).json();
   const replicaSnapshot = await (await fetch("/m9e-assets/coop-replica-snapshot.json")).json();
@@ -102,14 +110,45 @@ const coop = async () => {
   await rawPress(authority); const retained = await rawPress(authority);
   const retainedBytes = networkBytes(retained); if (retainedBytes == null) throw new Error("retention material missing");
   await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: retainedBytes });
-  await rawPress(replica); const proposal = await rawPress(replica);
+  await rawPress(replica);
+  const privateMove = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
+  const privateDuplicate = await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: retainedBytes });
+  const privateAfterDuplicate = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
+  const proposal = await rawPress(replica);
   const proposalBytes = networkBytes(proposal); if (proposalBytes == null) throw new Error("guest proposal missing");
   const resolved = await authority.send({ kind: "NETWORK_FRAME", generation: 1, bytes: proposalBytes });
   const materialBytes = networkBytes(resolved); if (materialBytes == null) throw new Error("turn material missing");
-  await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: materialBytes });
+  const material = JSON.parse(decoder.decode(new Uint8Array(materialBytes)));
+  const expectedPresentation = material.value.presentation;
+  const delivered = await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: materialBytes }, false);
+  const pending = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
+  const duplicateBefore = await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: materialBytes }, false);
+  const afterDuplicateBefore = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
+  // Acknowledge only the actual replica-delivered IDs, through the public host boundary.
+  for (const effect of presentationsOf(delivered)) {
+    await replica.send({ kind: "PRESENTATION_SETTLED", event_id: effect.event_id, outcome: { kind: "SETTLED" } });
+  }
+  const settled = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
+  const duplicateAfter = await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: materialBytes }, false);
   const authorityAfter = (await authority.send({ kind: "SNAPSHOT" })).snapshot;
   const replicaAfter = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
-  return { converged: JSON.stringify(canonical(authorityAfter.lifecycle)) === JSON.stringify(canonical(replicaAfter.lifecycle)), turnAdvanced: authorityAfter.lifecycle.value.active_run.battle.turn > initialTurn };
+  return {
+    converged: sameSnapshot(authorityAfter.lifecycle, replicaAfter.lifecycle),
+    turnAdvanced: authorityAfter.lifecycle.value.active_run.battle.turn > initialTurn,
+    privateControlKind: control(privateMove).kind,
+    privateDuplicateEffects: effectsOf(privateDuplicate),
+    privateSnapshotUnchanged: sameSnapshot(privateMove, privateAfterDuplicate),
+    expectedPresentation,
+    authorityPresentation: presentationsOf(resolved),
+    replicaPresentation: presentationsOf(delivered),
+    replicaScenes: effectsOf(delivered).filter(effect => effect.kind === "PRESENTATION_SCENE_CHANGED").map(effect => effect.semantic),
+    pendingPresentation: pending.pending_presentations,
+    settledPresentation: settled.pending_presentations,
+    duplicateBeforeEffects: effectsOf(duplicateBefore),
+    duplicateAfterEffects: effectsOf(duplicateAfter),
+    pendingSnapshotUnchanged: sameSnapshot(pending, afterDuplicateBefore),
+    settledSnapshotUnchanged: sameSnapshot(settled, replicaAfter)
+  };
 };
 globalThis.__m9eV7 = { idle: () => pending, snapshot, send, navigate, coop };
 status.textContent = "ready";
@@ -137,6 +176,26 @@ interface ResponseWire {
 interface CoopResult {
   converged: boolean;
   turnAdvanced: boolean;
+  privateControlKind: string;
+  privateDuplicateEffects: unknown[];
+  privateSnapshotUnchanged: boolean;
+  expectedPresentation: PresentationWire[];
+  authorityPresentation: PresentationWire[];
+  replicaPresentation: PresentationWire[];
+  replicaScenes: unknown[];
+  pendingPresentation: PresentationWire[];
+  settledPresentation: PresentationWire[];
+  duplicateBeforeEffects: unknown[];
+  duplicateAfterEffects: unknown[];
+  pendingSnapshotUnchanged: boolean;
+  settledSnapshotUnchanged: boolean;
+}
+
+interface PresentationWire {
+  event_id: number;
+  semantic: unknown;
+  blocking: unknown;
+  skip: unknown;
 }
 
 declare global {
@@ -268,4 +327,22 @@ test("two V7 browser hosts wait for both humans and converge one turn", async ({
   const result = await page.evaluate(() => globalThis.__m9eV7.coop());
   expect(result.turnAdvanced).toBe(true);
   expect(result.converged).toBe(true);
+  expect(result.privateControlKind).toBe("BATTLE_MOVE");
+  expect(result.privateDuplicateEffects).toEqual([]);
+  expect(result.privateSnapshotUnchanged).toBe(true);
+  expect(result.expectedPresentation.length).toBeGreaterThan(0);
+  expect(new Set(result.expectedPresentation.map(effect => effect.event_id)).size).toBe(
+    result.expectedPresentation.length,
+  );
+  expect(result.authorityPresentation).toEqual(result.expectedPresentation);
+  expect(result.replicaPresentation).toEqual(result.expectedPresentation);
+  expect(result.replicaScenes).toEqual(result.expectedPresentation.map(effect => effect.semantic));
+  expect(result.pendingPresentation).toEqual(
+    [...result.expectedPresentation].sort((left, right) => left.event_id - right.event_id),
+  );
+  expect(result.settledPresentation).toEqual([]);
+  expect(result.duplicateBeforeEffects).toEqual([]);
+  expect(result.duplicateAfterEffects).toEqual([]);
+  expect(result.pendingSnapshotUnchanged).toBe(true);
+  expect(result.settledSnapshotUnchanged).toBe(true);
 });

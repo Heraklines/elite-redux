@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "5cbba49ec726fe6e4260f11ad9acfc7ad40c1d10",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33941386739",
+  "baseline": "823bcc3522683c3f9903b1e521e2a7cd3c551701",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33943804197",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -63,6 +63,7 @@
     "execute": {"er-kernel": ["*"], "er-state": ["*"], "er-protocol": ["*"], "er-env": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
     "required_targets": {"er-kernel": ["m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"]},
     "mutant": {"source": "rust/crates/er-kernel/src/game_kernel_v7.rs", "original": "        self.handle_button(repeat.button)", "replacement": "        Ok(GameKernelStepV7::default())", "package": "er-kernel", "target": "m9e_timers_v7", "test": "held_navigation_repeats_at_250ms_with_real_cursor_effects", "reason": "Suppress the due navigation timer's real button consequence; the cursor-effect assertion must detect the missing battle/command/fight effect."},
+    "replica_mutant": {"source": "rust/crates/er-kernel/src/game_kernel_v7.rs", "original": "\n                .map(GameKernelEffectV7::Presentation)", "replacement": "\n                .filter_map(|_| None)", "package": "er-kernel", "target": "m9e_coop_v7", "test": "replica_delivers_save_presentation_once_without_repeating_authority_storage", "assertion_message": "replica material must claim pending presentation ownership", "reason": "Omit replica material presentation effects before pending ownership installation; the real presentation-ID collision must no longer reject and its exact ownership assertion must fail."},
     "reason": "Bounded V7 timer execution and snapshot validation with exact fresh allocator fixtures. Compile the full reverse cone; explicitly exercise state and protocol dependency regressions, current native adapters and exact worker endpoint, native/Wasm eventwise parity and existing Chromium/effect witnesses. Any other product path requires additional mapping; no Cargo.lock exception."
   },
   "historical_dispositions": [{

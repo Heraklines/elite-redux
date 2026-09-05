@@ -13,7 +13,7 @@ use er_game::m9e_internal_event_v2::{
     GameInternalEventV2,
 };
 use er_game::m9e_material_v6::{
-    AppliedGameMaterialLedgerV1, GameMaterialApplyOutcomeV6, GamePlatformEffectV2,
+    AppliedGameMaterialLedgerV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GamePlatformEffectV2,
     GamePresentationEffectV2,
 };
 use er_game::m9e_new_run_v6::{construct_natural_run_v6, expand_cooperative_topology_v6};
@@ -891,18 +891,34 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        self.normalize_local_battle_leaf()?;
-        let runtime = self.active_runtime_mut()?;
+        let mut candidate = self.clone();
+        candidate.normalize_local_battle_leaf()?;
+        let runtime = candidate.active_runtime_mut()?;
         let outcome = runtime.apply_material_bytes(bytes).map_err(runtime_error)?;
-        if outcome == GameMaterialApplyOutcomeV6::Applied {
-            self.advance_replay_sequence()?;
+        if outcome == GameMaterialApplyOutcomeV6::DuplicateApplied {
+            // Duplicate delivery must not reset a locally opened menu or
+            // resurrect presentation ownership after the renderer settles it.
+            return Ok(GameKernelStepV7::default());
         }
-        self.synchronize_menu_allocator()?;
-        let mut step = GameKernelStepV7::default();
-        if let Some(control) = self.current_control().cloned() {
+        let material = GameMaterialV6::decode(bytes)
+            .map_err(|error| GameKernelV7Error::Runtime(error.to_string()))?;
+        candidate.advance_replay_sequence()?;
+        candidate.synchronize_menu_allocator()?;
+        let mut step = GameKernelStepV7 {
+            effects: material.transition().presentation.iter().cloned()
+                .map(GameKernelEffectV7::Presentation).collect(),
+            internal_events: Vec::new(),
+        };
+        // This slice delivers presentations and preserves no platform fan-out,
+        // including no duplicate storage work. Per-endpoint audio, asset and
+        // telemetry routing require separate completion ownership and tests.
+        candidate.install_step_effects(&step.effects)?;
+        if let Some(control) = candidate.current_control().cloned() {
             step.effects.push(GameKernelEffectV7::UiChanged(control));
         }
-        self.synchronize_terminal(&mut step)?;
+        candidate.synchronize_terminal(&mut step)?;
+        candidate.validate()?;
+        *self = candidate;
         Ok(step)
     }
 

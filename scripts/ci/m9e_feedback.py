@@ -349,6 +349,7 @@ def plan():
                                           else supervisor_focus.get("required_targets", {}) if supervisor_session
                                           else cli_reload_focus.get("required_targets", {}) if cli_reload_session else {}),
               "timer_mutant": timer_focus.get("mutant") if timer_session else None,
+              "replica_mutant": timer_focus.get("replica_mutant") if timer_session else None,
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
@@ -515,7 +516,18 @@ def browser_checks(summary):
 
 
 def timer_behavioral_mutant(selection, summary, passed_test_ids):
-    policy = selection["timer_mutant"]
+    behavioral_mutant(selection["timer_mutant"], summary, passed_test_ids, "timer_mutant",
+                      ('left: []', 'right: ["battle/command/fight"]'), "cursor-effect")
+
+
+def replica_behavioral_mutant(selection, summary, passed_test_ids):
+    policy = selection["replica_mutant"]
+    behavioral_mutant(policy, summary, passed_test_ids, "replica_mutant",
+                      (policy["assertion_message"],), "presentation-ownership")
+
+
+def behavioral_mutant(policy, summary, passed_test_ids, evidence_key, assertion_tokens, assertion_name):
+    label = evidence_key.replace("_", "-")
     witness = policy["test"]
     if passed_test_ids.count(f'{policy["target"]}::{witness}') != 1:
         raise RuntimeError("mutant requires exactly one passing ordinary behavioral witness")
@@ -532,18 +544,21 @@ def timer_behavioral_mutant(selection, summary, passed_test_ids):
                 "target": policy["target"], "reason": policy["reason"],
                 "original_sha256": hashlib.sha256(original).hexdigest(),
                 "mutant_sha256": hashlib.sha256(mutated).hexdigest()}
-    summary["timer_mutant"] = evidence
+    summary[evidence_key] = evidence
+    phase = "source_mutation"
     try:
         source.write_bytes(mutated)
         if capture(["git", "diff", "--name-only", "HEAD", "--"]) != policy["source"]:
             raise RuntimeError("mutant changed unexpected tracked source paths")
         # Share the runner's registry/git dependency cache, never target outputs.
         # This private target tree is deleted and cannot become a passing cache.
-        with tempfile.TemporaryDirectory(prefix="m9e-timer-mutant-", dir=REPORT) as scratch:
+        with tempfile.TemporaryDirectory(prefix=f"m9e-{label}-", dir=REPORT) as scratch:
             env = os.environ.copy()
             env["CARGO_TARGET_DIR"] = scratch
+            phase = "build"
             build = run(["cargo", "test", "--locked", "-p", policy["package"], "--test", policy["target"],
-                         "--no-run", "--message-format=json"], "timer-mutant-build", RUST, env)
+                         "--no-run", "--message-format=json"], f"{label}-build", RUST, env)
+            phase = "artifact_validation"
             if digest(source) != evidence["mutant_sha256"] or capture(["git", "diff", "--name-only", "HEAD", "--"]) != policy["source"]:
                 raise RuntimeError("mutant build changed its exact tracked source delta")
             candidates = set()
@@ -565,11 +580,13 @@ def timer_behavioral_mutant(selection, summary, passed_test_ids):
                 raise RuntimeError("mutant build must emit exactly one matching test binary")
             binary = candidates.pop()
             cwd = expected_manifest.parent
-            listing = run([str(binary), witness, "--exact", "--list", "--format", "terse"], "timer-mutant-list", cwd, env)
+            phase = "enumeration"
+            listing = run([str(binary), witness, "--exact", "--list", "--format", "terse"], f"{label}-list", cwd, env)
             ids = [line[:-6] for line in listing.read_text().splitlines() if line.endswith(": test")]
             if ids != [witness]:
                 raise RuntimeError("mutant must enumerate exactly its named behavioral test")
-            output = FULL / "timer-mutant-execute.log"
+            output = FULL / f"{label}-execute.log"
+            phase = "execution"
             start = time.monotonic()
             try:
                 with output.open("w") as stream:
@@ -578,7 +595,8 @@ def timer_behavioral_mutant(selection, summary, passed_test_ids):
             except subprocess.TimeoutExpired as error:
                 raise RuntimeError("mutant timed out instead of failing its behavioral assertion") from error
             finally:
-                TIMINGS["timer-mutant-execute"] = round((time.monotonic() - start) * 1000)
+                TIMINGS[f"{label}-execute"] = round((time.monotonic() - start) * 1000)
+            phase = "behavioral_assertion"
             text = output.read_text()
             evidence["exit_code"] = result.returncode
             counts = re.findall(r"test result: FAILED\. (\d+) passed; (\d+) failed; (\d+) ignored;", text)
@@ -586,10 +604,14 @@ def timer_behavioral_mutant(selection, summary, passed_test_ids):
                 or f"test {witness} ... FAILED" not in text
                 or not re.search(r"thread '" + re.escape(witness) + r"'(?: \(\d+\))? panicked at", text)
                 or "assertion `left == right` failed" not in text
-                or 'left: []' not in text or 'right: ["battle/command/fight"]' not in text):
-                raise RuntimeError("mutant did not fail the exact cursor-effect assertion with one failed test")
+                or any(token not in text for token in assertion_tokens)):
+                raise RuntimeError(f"mutant did not fail the exact {assertion_name} assertion with one failed test")
             evidence["tests"] = {"executed": 1, "passed": 0, "failed": 1, "skipped": 0}
             evidence["status"] = "detected"
+    except Exception as error:
+        evidence["failure_phase"] = phase
+        evidence["failure"] = str(error)[:512]
+        raise
     finally:
         source.write_bytes(original)
         evidence["restored_sha256"] = digest(source)
@@ -747,6 +769,8 @@ def main(preflight_failure=None):
             browser_checks(summary)
         if selection.get("timer_mutant"):
             timer_behavioral_mutant(selection, summary, tests)
+        if selection.get("replica_mutant"):
+            replica_behavioral_mutant(selection, summary, tests)
         summary["status"] = "passed"
     except Exception as error:
         summary["first_failure"] = str(error)[:4096]

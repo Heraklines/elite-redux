@@ -703,3 +703,43 @@ worker 98,639 ms; current browser host 246,806 ms. The menu test target took
 4 ms. The native timer parity digest remains unchanged. These runner timings
 do not demonstrate a speedup from the menu optimization; full qualification
 and any controlled performance comparison remain outstanding.
+
+### Shared menu qualification passed; submit replica effects
+
+Candidate `823bcc3522683c3f9903b1e521e2a7cd3c551701`, run `33943804197`,
+passed all 680 selected/executed native tests, both Wasm parity tests, both
+Chromium journeys, the typed effect-route test, formatting and all required
+CLI/types/protocol/worker/lab/browser Clippy checks. Zero failures/skips. The
+workflow completed successfully in 33 minutes 31 seconds. Baseline advances to
+this exact candidate and run. The historical types repair changed assertion
+messages only. The five menu semantics tests passed; unchanged canonical timer
+parity remains `9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e`.
+
+Inspected/downloaded compact artifact 4,340 compressed bytes. Diagnostics 107,724
+bytes and browser assets 4,239,714 bytes remain remote. Harness SHA-256
+`3c34e167119924029dfb028e68c6737039496206b35da77c2e3f2a82620e587b`;
+selected IDs SHA-256
+`bba162b11cac9471b30938b725f6772ac366c544fa8e3434c128e8d744369588`.
+Content manifest SHA-256
+`aa8da070c2f929dc4e9903d4adf0455e164d5980d9be506ce5700267cd187698`;
+oracle `399d5d368f0b5642ebf8f45bd8a5e73350fa4de7`.
+Browser asset manifest SHA-256
+`cad7b125e85686dd018079482bc2a0ef9adea9a96c37651f6102edadcab773ec`.
+Worker executable SHA-256
+`22a3bff369cbc4dd4aaa7db63d439406d96cd8c3b4bbb146842f0466be9f39a5`.
+
+Build 143,384 ms; CLI reload 556,966 ms; supervisor 232,150 ms; worker 96,042 ms;
+current host 258,966 ms; Wasm eventwise 73,758 ms; browser build 313,482 ms;
+Chromium journeys 23,377 ms. These uncontrolled runner timings do not prove a
+menu speedup; the source complexity improvement preserves behavior but requires
+separate controlled performance evidence. Chromium remains two Wasm hosts with
+in-page byte relay, without production Worker/WebRTC or renderer qualification.
+
+The next isolated B2 cut delivers exact replica presentations once, suppresses
+all duplicate delivery effects, preserves private snapshots on duplicates and
+rolls back ownership collisions after material application. It retains authority
+storage ownership and adds native/browser witnesses plus a compiled replica
+presentation-omission mutant alongside the existing timer mutant. See
+`m9e-replica-effects-next.md`. Capsules, current batch code, dependency changes
+and the prepared early-lint ordering repair are excluded from this submission.
+Those source-reviewed future cuts remain unqualified; full M9 is incomplete.

@@ -1055,6 +1055,8 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["execution_scope"][package], ["*"])
         self.assertEqual(set(selection["required_native_targets"]["er-kernel"]), {
             "m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"})
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
 
     def test_timer_scope_rejects_unmapped_mixed_product_and_lock_changes(self):
         self.configure_timer_scope()
@@ -1103,12 +1105,13 @@ class FeedbackTests(unittest.TestCase):
         self.extra_artifacts = [self.worker_executable_artifact()]
         self.binary_ids["m9e_parity"] = ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
         self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
-        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant:
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica:
             code, summary = self.invoke()
         self.assertEqual(code, 0)
         wasm.assert_called_once()
         browser.assert_called_once()
         mutant.assert_called_once()
+        replica.assert_called_once()
         self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
         parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
         self.assertIn("--nocapture", parity_execution)
@@ -1122,8 +1125,11 @@ class FeedbackTests(unittest.TestCase):
                 else:
                     self.assertIsNone(env)
 
-    def invoke_synthetic_timer_mutant(self, mode):
-        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"]["mutant"]
+    def invoke_synthetic_timer_mutant(self, mode, mutant="timer", expected_failure_phase=None):
+        key = f"{mutant}_mutant"
+        label = f"{mutant}-mutant"
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"][
+            "mutant" if mutant == "timer" else "replica_mutant"]
         source = self.root / policy["source"]
         source.parent.mkdir(parents=True, exist_ok=True)
         original = ("fn synthetic() {\n" + policy["original"] + "\n}\n").encode()
@@ -1139,18 +1145,24 @@ class FeedbackTests(unittest.TestCase):
             path = self.full / (name + ".log")
             self.assertNotEqual(env["CARGO_TARGET_DIR"], str(self.rust / "target"))
             self.assertEqual(source.read_bytes(), original.replace(policy["original"].encode(), policy["replacement"].encode()))
-            if name == "timer-mutant-build":
+            if name == f"{label}-build":
                 self.assertIn("--locked", args)
                 self.assertIn("--no-run", args)
                 if mode == "build":
                     path.write_text("error: synthetic compiler rejection\n")
-                    raise RuntimeError("timer-mutant-build exited 101")
-                binary = Path(env["CARGO_TARGET_DIR"]) / "synthetic-timer-test"
+                    raise RuntimeError(f"{label}-build exited 101")
+                binary = (self.root if mode == "outside_artifact" else Path(env["CARGO_TARGET_DIR"])) / "synthetic-mutant-test"
                 binary.write_bytes(b"synthetic artifact, never executed")
-                path.write_text(json.dumps({"reason": "compiler-artifact", "profile": {"test": True},
+                artifact = {"reason": "compiler-artifact", "profile": {"test": True},
                     "target": {"name": policy["target"], "kind": ["test"]}, "executable": str(binary),
-                    "manifest_path": str(self.rust / "crates/er-kernel/Cargo.toml")}) + "\n")
-            elif name == "timer-mutant-list":
+                    "manifest_path": str(self.rust / "crates" / ("er-other" if mode == "wrong_manifest" else "er-kernel") / "Cargo.toml")}
+                path.write_text(json.dumps(artifact) + "\n")
+                if mode == "ambiguous_artifact":
+                    other = Path(env["CARGO_TARGET_DIR"]) / "other-mutant-test"
+                    other.write_bytes(b"second synthetic artifact")
+                    artifact["executable"] = str(other)
+                    path.write_text(path.read_text() + json.dumps(artifact) + "\n")
+            elif name == f"{label}-list":
                 self.assertIn("--exact", args)
                 path.write_text(("wrong_test" if mode == "unknown" else witness) + ": test\n")
             else:
@@ -1165,17 +1177,24 @@ class FeedbackTests(unittest.TestCase):
                 stdout.write(self.result_line(passed=1))
                 return subprocess.CompletedProcess(args, 0)
             assertion = ('assertion `left == right` failed\n  left: []\n right: ["battle/command/fight"]\n'
-                         if mode != "wrong_assertion" else "assertion failed: unrelated\n")
-            stdout.write(f"test {witness} ... FAILED\nthread '{witness}' (123) panicked at test.rs:147:5:\n" + assertion + self.result_line(failed=1))
-            return subprocess.CompletedProcess(args, 101)
+                         if mutant == "timer" else 'assertion `left == right` failed: ' + policy["assertion_message"] + '\n left: Ok(())\n right: Err(Invalid)\n')
+            if mode == "wrong_assertion":
+                assertion = "assertion `left == right` failed: unrelated\n"
+            panic_name = "another_test" if mode == "wrong_panic" else witness
+            stdout.write(f"test {witness} ... FAILED\nthread '{panic_name}' (123) panicked at test.rs:147:5:\n" + assertion + self.result_line(failed=2 if mode == "wrong_counts" else 1))
+            return subprocess.CompletedProcess(args, -9 if mode == "crash" else 101)
 
         try:
             with patch.object(self.feedback, "capture", side_effect=tracked_diff), patch.object(self.feedback, "run", side_effect=mutant_run), patch.object(self.feedback.subprocess, "run", side_effect=mutant_process):
-                self.feedback.timer_behavioral_mutant({"timer_mutant": policy}, summary, [f'{policy["target"]}::{witness}'])
+                callback = self.feedback.timer_behavioral_mutant if mutant == "timer" else self.feedback.replica_behavioral_mutant
+                callback({key: policy}, summary, [f'{policy["target"]}::{witness}'])
         finally:
             self.assertEqual(source.read_bytes(), original)
-            self.assertEqual(summary["timer_mutant"]["restored_sha256"], hashlib.sha256(original).hexdigest())
-            self.assertEqual(list((self.root / "report").glob("m9e-timer-mutant-*")), [])
+            self.assertEqual(summary[key]["restored_sha256"], hashlib.sha256(original).hexdigest())
+            self.assertEqual(list((self.root / "report").glob(f"m9e-{label}-*")), [])
+            if expected_failure_phase is not None:
+                self.assertEqual(summary[key]["failure_phase"], expected_failure_phase)
+                self.assertEqual(summary[key]["status"], "failed")
         return summary
 
     def test_timer_mutant_detects_the_behavioral_failure_and_restores_source(self):
@@ -1211,6 +1230,69 @@ class FeedbackTests(unittest.TestCase):
             code, _ = self.invoke()
         self.assertEqual(code, 1)
         mutant.assert_not_called()
+
+    def test_replica_mutant_detects_only_the_ownership_assertion_and_restores_source(self):
+        summary = self.invoke_synthetic_timer_mutant("detected", mutant="replica")
+        evidence = summary["replica_mutant"]
+        self.assertEqual(evidence["status"], "detected")
+        self.assertEqual(evidence["exit_code"], 101)
+        self.assertNotEqual(evidence["original_sha256"], evidence["mutant_sha256"])
+        self.assertEqual(evidence["restored_sha256"], evidence["original_sha256"])
+        self.assertEqual(evidence["tests"], {"executed": 1, "passed": 0, "failed": 1, "skipped": 0})
+        self.assertNotIn("timer_mutant", summary)
+
+    def test_replica_mutant_classifies_infrastructure_and_wrong_behavior_failures(self):
+        cases = [("green", "presentation-ownership assertion", "behavioral_assertion"),
+                 ("build", "build exited", "build"), ("timeout", "timed out", "execution"),
+                 ("unknown", "enumerate exactly", "enumeration"),
+                 ("wrong_assertion", "presentation-ownership assertion", "behavioral_assertion"),
+                 ("wrong_panic", "presentation-ownership assertion", "behavioral_assertion"),
+                 ("wrong_counts", "presentation-ownership assertion", "behavioral_assertion"),
+                 ("crash", "presentation-ownership assertion", "behavioral_assertion"),
+                 ("outside_artifact", "isolated target tree", "artifact_validation"),
+                 ("wrong_manifest", "exactly one matching", "artifact_validation"),
+                 ("ambiguous_artifact", "exactly one matching", "artifact_validation")]
+        for mode, reason, phase in cases:
+            with self.subTest(mode=mode), self.assertRaisesRegex(RuntimeError, reason):
+                self.invoke_synthetic_timer_mutant(mode, mutant="replica", expected_failure_phase=phase)
+
+    def test_replica_mutant_requires_passing_witness_clean_source_and_unique_replica_needle(self):
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"]["replica_mutant"]
+        witness = f'{policy["target"]}::{policy["test"]}'
+        for passed in ([], [witness, witness], ["another_target::" + policy["test"]]):
+            with self.assertRaisesRegex(RuntimeError, "passing ordinary behavioral witness"):
+                self.feedback.replica_behavioral_mutant({"replica_mutant": policy}, {}, passed)
+        source = self.root / policy["source"]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(policy["original"])
+        with patch.object(self.feedback, "capture", return_value=policy["source"]), self.assertRaisesRegex(RuntimeError, "clean exact candidate"):
+            self.feedback.replica_behavioral_mutant({"replica_mutant": policy}, {}, [witness])
+        for text in ("unrelated source", policy["original"] * 2):
+            source.write_text(text)
+            with patch.object(self.feedback, "capture", return_value=""), self.assertRaisesRegex(RuntimeError, "occur exactly once"):
+                self.feedback.replica_behavioral_mutant({"replica_mutant": policy}, {}, [witness])
+            self.assertEqual(source.read_text(), text)
+        # The authority conversion has deeper indentation and must not match
+        # the replica needle, even though both call the same enum constructor.
+        both = policy["original"] + '\n                        .map(GameKernelEffectV7::Presentation)'
+        self.assertEqual(both.count(policy["original"]), 1)
+        self.assertIn('\n                        .map(GameKernelEffectV7::Presentation)',
+                      both.replace(policy["original"], policy["replacement"], 1))
+
+    def test_replica_mutant_is_not_run_when_the_timer_mutant_fails(self):
+        selection = self.feedback.plan()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["timer_focus"]
+        selection["timer_mutant"] = policy["mutant"]
+        selection["replica_mutant"] = policy["replica_mutant"]
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(
+            self.feedback, "timer_behavioral_mutant", side_effect=RuntimeError("timer behavioral failure")
+        ) as timer, patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertIn("timer behavioral failure", summary["first_failure"])
+        timer.assert_called_once()
+        replica.assert_not_called()
 
     def worker_executable_artifact(self, filename="candidate-worker"):
         self.package("er-kernel-worker")
