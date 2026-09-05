@@ -2,7 +2,9 @@
 //! This is not a V7 campaign, transport recovery or external storage witness.
 
 use std::error::Error;
+use std::io::Write;
 use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_material_v6::{
@@ -151,8 +153,13 @@ fn bounded_material_suffix_crosses_three_full_4096_windows_through_dispatch_and_
     assert_eq!(replica.material_retention(), retention);
     let count = 3 * MAX_APPLIED_MATERIAL_RECORDS_V1 as u64 + 1;
     let mut first = Vec::new();
+    let started = Instant::now();
+    let mut dispatch_elapsed = Duration::ZERO;
+    let mut apply_elapsed = Duration::ZERO;
     for revision in 1..=count {
+        let dispatch_started = Instant::now();
         let prepared = execute(&mut authority)?;
+        dispatch_elapsed += dispatch_started.elapsed();
         if revision == 1 {
             first = prepared.material_bytes.clone();
         }
@@ -169,10 +176,12 @@ fn bounded_material_suffix_crosses_three_full_4096_windows_through_dispatch_and_
             PresentationEventId::new(safe(revision))
         );
         assert_eq!(prepared.next_control.revision, safe(revision + 1));
+        let apply_started = Instant::now();
         assert_eq!(
             replica.apply_material_bytes(&prepared.material_bytes)?,
             GameMaterialApplyOutcomeV6::Applied
         );
+        apply_elapsed += apply_started.elapsed();
         let mut expected = initial.clone();
         expected.identities.next_platform_request_id = safe(revision + 1);
         assert_eq!(authority.state(), Some(&expected));
@@ -196,6 +205,21 @@ fn bounded_material_suffix_crosses_three_full_4096_windows_through_dispatch_and_
                     .max(1)
             )
         );
+        if revision == 1 || revision.is_multiple_of(512) || revision == count {
+            // Write directly so bounded remote timeout diagnostics retain progress.
+            // Timings overlap total time; they are diagnostic, not performance gates.
+            let validation_started = Instant::now();
+            ledger.validate_with_retention(retention)?;
+            let validation_micros = validation_started.elapsed().as_micros();
+            writeln!(
+                std::io::stderr().lock(),
+                "retention-progress revision={revision} records={} total_ms={} dispatch_ms={} replica_apply_ms={} sample_validate_us={validation_micros}",
+                ledger.records.len(),
+                started.elapsed().as_millis(),
+                dispatch_elapsed.as_millis(),
+                apply_elapsed.as_millis(),
+            )?;
+        }
         if revision.is_multiple_of(MAX_APPLIED_MATERIAL_RECORDS_V1 as u64) {
             let before = authority.snapshot();
             let preview = GameActionDispatcherV1::prepare_with_retention(

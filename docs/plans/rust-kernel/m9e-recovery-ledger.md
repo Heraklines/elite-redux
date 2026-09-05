@@ -1578,3 +1578,27 @@ Outer runtime execute/dispatcher proof staging remains for CandidateMismatch
 rollback. No Result-returning work is left after mutation; no new panic/OOM
 guarantee or measured speedup is claimed. The unchanged five regressions/full
 selected cone must still pass remotely. Baseline remains qualified3aa.
+
+### Retention cost repair result and bounded timing follow-up
+
+The exact 94645744d62500a61d62dd1445eebd88c81956c2 candidate, run
+33969172226, again passed all 122 harness checks, formatting, full reverse-cone
+compilation and required Clippy checks. Native A validated the 662-test inventory
+but its first target, er-game:m9e_material_retention, timed out at 600003 ms;
+the two short cases completed, while the 12289-material case remained active.
+The first cost repair is therefore insufficient; no retention qualification or
+measured speedup is claimed. Native B completed all 18 assigned tests (host
+182284 ms, batch CLI 281424 ms, repro CLI 170610 ms) and then failed while writing
+its phase manifest because the existing 64 KiB limit was exceeded. Platform was
+skipped; aggregate failed. The qualified comparison baseline remains 3aa4a0c.
+Only the inspected native A/B compact summaries (3414/3309 compressed bytes)
+were retrieved; complete diagnostics remain remote.
+
+The long helper test now emits bounded progress directly to stderr at revision1,
+every512 revisions, and completion. It records cumulative real dispatcher and
+replica-apply duration, total loop duration and one sampled full-ledger validation.
+At most26 lines are emitted. These diagnostic timings have no pass threshold,
+are from the existing unoptimized test profile, and overlap total duration.
+The 12289 operations, real4096-record windows, independent effects/state/frontier
+assertions, restore/preview, historical hard stop and stale/conflict checks remain
+unchanged. The 600-second target and 35-minute job limits remain unchanged.
