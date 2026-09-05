@@ -561,18 +561,33 @@ impl CurrentReproRecorderV1 {
         let (mut capsule, bytes) = match (self.capsule.take(), self.capsule_bytes.take()) {
             (Some(capsule), Some(bytes)) => (capsule, bytes),
             (None, None) => {
-                let capsule = self.empty_capsule(before.clone(), self.position - 1,
-                    before_digest.clone(), base_generation);
+                let capsule = self.empty_capsule(
+                    before.clone(),
+                    self.position - 1,
+                    before_digest.clone(),
+                    base_generation,
+                );
                 let bytes = encoded_len(&capsule, self.limits.maximum_bytes)
                     .ok_or_else(|| invalid("single attempt capture bound"))?;
                 (capsule, bytes)
             }
             _ => return Err(invalid("capsule byte cache continuity")),
         };
-        let metadata = AppendMetadata { position: self.position, digest: &after_digest, browser_transport };
-        let mut next_bytes = append_size(&mut capsule, bytes, attempt_bytes,
-            metadata, self.limits.maximum_bytes)?;
-        if capsule.attempts.len() >= self.limits.maximum_events || next_bytes > self.limits.maximum_bytes {
+        let metadata = AppendMetadata {
+            position: self.position,
+            digest: &after_digest,
+            browser_transport,
+        };
+        let mut next_bytes = append_size(
+            &mut capsule,
+            bytes,
+            attempt_bytes,
+            metadata,
+            self.limits.maximum_bytes,
+        )?;
+        if capsule.attempts.len() >= self.limits.maximum_events
+            || next_bytes > self.limits.maximum_bytes
+        {
             // Only the replacement checkpoint and empty envelope are recounted;
             // the evicted tail is dropped without serialization.
             capsule = self.empty_capsule(
@@ -583,8 +598,13 @@ impl CurrentReproRecorderV1 {
             );
             let bytes = encoded_len(&capsule, self.limits.maximum_bytes)
                 .ok_or_else(|| invalid("single attempt capture bound"))?;
-            next_bytes = append_size(&mut capsule, bytes, attempt_bytes,
-                metadata, self.limits.maximum_bytes)?;
+            next_bytes = append_size(
+                &mut capsule,
+                bytes,
+                attempt_bytes,
+                metadata,
+                self.limits.maximum_bytes,
+            )?;
         }
         if next_bytes > self.limits.maximum_bytes {
             return Err(invalid("single attempt capture bound"));
@@ -786,12 +806,19 @@ struct MutableCapsuleMetadata<'a> {
     browser_transport: Option<CurrentReproBrowserTransportV1>,
 }
 
-fn metadata_bytes(capsule: &CurrentReproCapsuleV1, maximum: usize) -> Result<usize, CurrentReproErrorV1> {
-    encoded_len(&MutableCapsuleMetadata {
-        final_position: capsule.final_position,
-        final_snapshot_digest: &capsule.final_snapshot_digest,
-        browser_transport: capsule.browser_transport,
-    }, maximum).ok_or_else(|| invalid("capsule metadata byte bound"))
+fn metadata_bytes(
+    capsule: &CurrentReproCapsuleV1,
+    maximum: usize,
+) -> Result<usize, CurrentReproErrorV1> {
+    encoded_len(
+        &MutableCapsuleMetadata {
+            final_position: capsule.final_position,
+            final_snapshot_digest: &capsule.final_snapshot_digest,
+            browser_transport: capsule.browser_transport,
+        },
+        maximum,
+    )
+    .ok_or_else(|| invalid("capsule metadata byte bound"))
 }
 
 #[derive(Clone, Copy)]
@@ -801,19 +828,25 @@ struct AppendMetadata<'a> {
     browser_transport: Option<CurrentReproBrowserTransitionV1>,
 }
 
-fn append_size(capsule: &mut CurrentReproCapsuleV1, bytes: usize, attempt_bytes: usize,
-    metadata: AppendMetadata<'_>, maximum: usize)
-    -> Result<usize, CurrentReproErrorV1>
-{
+fn append_size(
+    capsule: &mut CurrentReproCapsuleV1,
+    bytes: usize,
+    attempt_bytes: usize,
+    metadata: AppendMetadata<'_>,
+    maximum: usize,
+) -> Result<usize, CurrentReproErrorV1> {
     let previous_metadata = metadata_bytes(capsule, maximum)?;
     capsule.final_position = metadata.position;
     capsule.final_snapshot_digest = metadata.digest.to_owned();
-    if let (Some(context), Some(transition)) = (&mut capsule.browser_transport, metadata.browser_transport) {
+    if let (Some(context), Some(transition)) =
+        (&mut capsule.browser_transport, metadata.browser_transport)
+    {
         context.final_generation = transition.after_generation;
     }
     let next_metadata = metadata_bytes(capsule, maximum)?;
     // Existing [] delimiters remain; every append after the first adds one comma.
-    bytes.checked_sub(previous_metadata)
+    bytes
+        .checked_sub(previous_metadata)
         .and_then(|size| size.checked_add(next_metadata))
         .and_then(|size| size.checked_add(attempt_bytes))
         .and_then(|size| size.checked_add(usize::from(!capsule.attempts.is_empty())))

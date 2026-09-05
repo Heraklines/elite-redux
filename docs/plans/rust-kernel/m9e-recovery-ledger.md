@@ -901,3 +901,10 @@ Also repair compact progress checkpointing so an outer interruption preserves an
 explicitly unfinished summary with source identities, completed prefix counts
 and the active phase/target. Final normal summaries must replace it; no timeout
 or execution limit is increased. All execution remains remote.
+
+Candidate `a860d19f85d2c2edb969d78b68907c313c432d6d`, run `33949789445`,
+passed the expanded harness preflight and returned a complete 24,081-byte remote
+formatting patch for the three capsule/accounting Rust files. Zero product tests
+selected/executed. Compact artifact 9,945 compressed bytes was inspected and
+downloaded; 15,173-byte diagnostics remain remote. Applied the complete patch;
+baseline remains qualified `9459b9c`. No execution or speedup claim yet.
