@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 er-agent-protocol = { path = "../er-agent-protocol" }
+er-batch = { path = "../er-batch" }
 er-canonical = { path = "../er-canonical" }
 er-env = { path = "../er-env" }
 er-game = { path = "../er-game" }

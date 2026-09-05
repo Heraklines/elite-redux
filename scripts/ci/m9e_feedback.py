@@ -199,6 +199,69 @@ def verify_current_repro_dependencies(before_lock, after_lock, before_manifests,
         owner: sorted(names) for owner, names in additions.items()}}
 
 
+def verify_current_batch_dependencies(before_lock, after_lock, before_manifests, after_manifests):
+    """Exact current batch and CLI edges to packages already in the lock."""
+    additions = {"er-batch": {"er-env", "er-game", "er-kernel", "er-state", "serde_json"},
+                 "er-cli": {"er-batch"}}
+    if set(before_manifests) != set(additions) or set(after_manifests) != set(additions):
+        raise RuntimeError("batch dependency guard: both owner manifests are required")
+    for owner in additions:
+        old, new = map(tomllib.loads, (before_manifests[owner], after_manifests[owner]))
+        tables = ({"dependencies": {name: {"path": "../" + name}
+                                    for name in ("er-env", "er-game", "er-kernel")},
+                   "dev-dependencies": {"er-state": {"path": "../er-state"}}}
+                  if owner == "er-batch" else
+                  {"dependencies": {"er-batch": {"path": "../er-batch"}}})
+        if owner == "er-batch":
+            tables["dependencies"]["serde_json"] = {"workspace": True}
+        expected = dict(old)
+        for table, entries in tables.items():
+            if set(old.get(table, {})) & set(entries):
+                raise RuntimeError("batch dependency guard: dependency already present")
+            expected[table] = {**old.get(table, {}), **entries}
+        if new != expected:
+            raise RuntimeError("batch dependency guard: only exact owner additions may change")
+    before, after = map(tomllib.loads, (before_lock, after_lock))
+    def records(lock):
+        packages = lock.get("package", [])
+        result = {(item["name"], item["version"], item.get("source")): item for item in packages}
+        if len(result) != len(packages):
+            raise RuntimeError("batch lock guard: duplicate package identity")
+        return result
+    old, new = records(before), records(after)
+    if old.keys() != new.keys() or {key: value for key, value in before.items() if key != "package"} != {
+        key: value for key, value in after.items() if key != "package"
+    }:
+        raise RuntimeError("batch lock guard: lock metadata or inventory changed")
+    owners = {}
+    for name in set(additions) | set().union(*additions.values()):
+        keys = [key for key in old if key[0] == name]
+        if len(keys) != 1:
+            raise RuntimeError("batch lock guard: unambiguous existing packages required")
+        source = keys[0][2]
+        if (name == "serde_json" and (not isinstance(source, str) or not source.startswith("registry+"))) or (
+            name != "serde_json" and source is not None
+        ):
+            raise RuntimeError("batch lock guard: dependency source must retain workspace or registry identity")
+        if name in additions:
+            owners[keys[0]] = additions[name]
+    for key in old:
+        if key not in owners:
+            if old[key] != new[key]:
+                raise RuntimeError("batch lock guard: another package record changed")
+            continue
+        if {field: value for field, value in old[key].items() if field != "dependencies"} != {
+            field: value for field, value in new[key].items() if field != "dependencies"
+        }:
+            raise RuntimeError("batch lock guard: owner metadata changed")
+        old_deps, new_deps = old[key].get("dependencies", []), new[key].get("dependencies", [])
+        if len(old_deps) != len(set(old_deps)) or len(new_deps) != len(set(new_deps)) or (
+            set(new_deps) - set(old_deps) != owners[key] or set(old_deps) - set(new_deps)
+        ):
+            raise RuntimeError("batch lock guard: only exact owner dependency additions are allowed")
+    return {"status": "verified", "added_dependencies": {owner: sorted(names) for owner, names in additions.items()}}
+
+
 def verify_worker_lock_change(before_text, after_text):
     """Allow only the ABI2 worker's three existing workspace dependencies."""
     before = tomllib.loads(before_text)
@@ -294,6 +357,20 @@ def plan():
     menu_focus = config.get("menu_validation_focus", {})
     menu_session = any(path in menu_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in menu_focus.get("paths", []) or path in cli_reload_paths for path in product_changes)
+    batch_focus = config.get("current_batch_focus", {})
+    batch_session = any(path in batch_focus.get("trigger_paths", []) for path in product_changes) and all(
+        path in batch_focus.get("paths", []) for path in product_changes)
+    batch_guard = None
+    batch_manifests = {owner: f"rust/crates/{owner}/Cargo.toml" for owner in ("er-batch", "er-cli")}
+    batch_guard_paths = ["rust/Cargo.lock", *batch_manifests.values()]
+    if batch_session and any(path in changed for path in batch_guard_paths):
+        if not all(path in changed for path in batch_guard_paths):
+            raise RuntimeError("batch dependency guard: both manifests and lock must be paired")
+        batch_guard = verify_current_batch_dependencies(
+            capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text(),
+            {owner: capture(["git", "show", f"{base}:{path}"]) for owner, path in batch_manifests.items()},
+            {owner: (ROOT / path).read_text() for owner, path in batch_manifests.items()})
+        batch_guard["baseline_sha"] = base
     cli_reload_guard = None
     cli_manifest = "rust/crates/er-cli/Cargo.toml"
     if (cli_reload_session or menu_session) and any(path in changed for path in (cli_manifest, "rust/Cargo.lock")):
@@ -322,7 +399,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -385,6 +462,9 @@ def plan():
     if menu_session:
         execution_scope = menu_focus["execute"]
         browser_required = True
+    if batch_session:
+        execution_scope = batch_focus["execute"]
+        browser_required = True
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -392,13 +472,13 @@ def plan():
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
-    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session or repro_session or menu_session
+    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session or repro_session or menu_session or batch_session
         or (RUST / "crates/er-cli/tests" / (target + ".rs")).is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
     if endpoint_execution:
         selected.add("er-kernel-worker")
-    cli_executable_required = browser_required and (repro_session or (
+    cli_executable_required = browser_required and (repro_session or batch_session or (
         ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
     if cli_executable_required:
         selected.add("er-cli")
@@ -417,7 +497,7 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
-              "requires_cli_clippy": repro_session or menu_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
+              "requires_cli_clippy": repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
@@ -426,12 +506,16 @@ def plan():
               "cli_reload_dependency_guard": cli_reload_guard,
               "current_repro_focus": repro_session,
               "current_repro_dependency_guard": repro_guard,
+              "current_batch_focus": batch_session,
+              "current_batch_dependency_guard": batch_guard,
               "requires_cli_executable": cli_executable_required,
-              "required_native_test_ids": (repro_focus.get("exact_test_ids", {}) if repro_session
+              "required_native_test_ids": (batch_focus.get("exact_test_ids", {}) if batch_session
+                                           else repro_focus.get("exact_test_ids", {}) if repro_session
                                            else menu_focus.get("exact_test_ids", {}) if menu_session else {}),
-              "requires_agent_protocol_clippy": cli_reload_session or menu_session,
+              "requires_agent_protocol_clippy": cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
-              "required_native_targets": (repro_focus.get("required_targets", {}) if repro_session
+              "required_native_targets": (batch_focus.get("required_targets", {}) if batch_session
+                                          else repro_focus.get("required_targets", {}) if repro_session
                                           else menu_focus.get("required_targets", {}) if menu_session
                                           else timer_focus.get("required_targets", {}) if timer_session
                                           else supervisor_focus.get("required_targets", {}) if supervisor_session
@@ -442,7 +526,11 @@ def plan():
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
-    if unknown or boundaries or (shared and not timer_session and not repro_session and not menu_session):
+    # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
+    # to broad native success or bypass the timer and replica mutant gate.
+    batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
+                        for path in product_changes)
+    if unknown or boundaries or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -956,6 +1044,10 @@ def main(preflight_failure=None):
             for package in ("er-repro", "er-env"):
                 write_progress(summary, "lint", package)
                 run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
+        if selection.get("current_batch_focus"):
+            for package in ("er-batch", "er-env"):
+                write_progress(summary, "lint", package)
+                run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
         if selection["worker_session_focus"] or selection["requires_worker_executable"]:
             write_progress(summary, "lint", "er-kernel-worker")
             run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
@@ -965,7 +1057,7 @@ def main(preflight_failure=None):
         if selection["requires_browser"]:
             write_progress(summary, "lint", "er-web")
             run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
-        if selection.get("cli_reload_focus") or selection.get("menu_validation_focus"):
+        if selection.get("cli_reload_focus") or selection.get("menu_validation_focus") or selection.get("current_batch_focus"):
             enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
         if os.environ.get("M9E_PHASE") == "native":
             from m9e_phases import inventory_and_assignment

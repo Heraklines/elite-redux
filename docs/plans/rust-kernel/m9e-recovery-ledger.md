@@ -999,3 +999,67 @@ the inspected native-A compact artifact (6,566 compressed bytes); native-A/B
 9,606-byte diagnostics remain remote, as do duplicate B summaries. Applied the
 complete 7,834-byte formatter patch for m9e_host_v2.rs (zero omitted bytes).
 The aggregate failed closed on missing successful phase proofs. Baseline stays9459.
+
+Candidate `d6fd1c426d8a5e9769a5e3f78e5b3f7c0e456268`, run `33952840591`,
+has completed native lane B successfully: 16 executed/passed (2 actual CLI capsule,
+14 browser-host), zero failed/skipped, global inventory72 validated. Qualification
+is explicitly pending lane A and platform/aggregate. Native-B compact 2,422 bytes
+was inspected/downloaded; 36,254-byte diagnostics and 4,510-byte proof remain remote.
+Native-B proof SHA `9155a094f1bc3737c4a983b19d9bbf846f17f223ab195675edd35febf8e728d7`.
+Selected-ID hash remains bb197580c4145dc841726ce7a9f7619d47f0cc885c749b13ad1b7af400bfecdf.
+Target timings: CLI capsule 186,596 ms, host 194,662 ms; build 77,193 ms. These establish
+completion under their limits, not a controlled source-only speedup measurement.
+The future batch tree has been regenerated against d6fd1c4:
+4b9471954b3a056ba66f173730113737b6fb126e, 15 files, patch 133,733 bytes.
+It includes 106 source-declared harness tests (99 current + 7 batch) and still needs an
+actually qualified capsule baseline. The normal index is empty.
+
+### Current capsule and split feedback qualification passed
+
+Candidate `d6fd1c426d8a5e9769a5e3f78e5b3f7c0e456268`, run `33952840591`,
+passed all four jobs and the exact aggregate. Native A passed 56 and B passed 16,
+with all 72 selected tests executed once, zero failures/skips. All required lint
+and 99 harness selftests passed. Two Wasm, two Chromium and one typed-effect test
+passed without failures/skips/retries. No behavioral mutant was selected by this
+capsule-only scope; prior B2 mutant qualification remains separately recorded.
+
+The actual Chromium capsule replayed through the normal native CLI: declared
+base 1417, final 1433, 16 retained attempts, full final snapshot digest
+`blake3-v1:f4e7ad23f09dd59e1e1e7bf678e052f754c334a04261bb1e44d187e1ccb9dc4b`.
+Removing a retained applied time event produced the required causal divergence
+at 1428. CLI artifact SHA
+`e2861dc9e93c7b924d621f7944f64a8be6e851365a136efd0c3b34be0ba2f9b0`,
+80,124,264 bytes, was transferred only between remote jobs. This remains in-page
+Wasm-host/byte-relay Chromium coverage, not production Worker/WebRTC topology.
+
+Native-A proof 4273faa5cd05cf695bf5d5be4c530553b4638a87092ed352d16e3eea91c86eb2;
+native-B proof 9155a094f1bc3737c4a983b19d9bbf846f17f223ab195675edd35febf8e728d7;
+platform proof 6d90e4b089d9deb269503ae8474df8461d7382665df4b688e2bd65dc0a11c07e.
+Global inventory SHA
+`b13477b261ee5988a289bf52746733aac01d3f7648c575b3af3756c9bcd1ff6f`;
+plan SHA 08a088122979fbe94aa2f6e3311e9bfac9b5c1623444ac2088160353c0370560.
+Native/Wasm timer digest remains 9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e.
+Harness SHA 140054ed41d469668e7a12f2e794c81b91328c7121adc7d5713297d40de42e31;
+phase helper 5b9ce02a68c3e4dd9f78af0b52db5525a2740981977b0749fbc3f9aaadb42038.
+Content manifest and pinned oracle remain unchanged.
+
+Browser asset manifest SHA
+`f29a6da3d01a7ab25cb5def7b96a2011c6baa30dd0231c5efcdb4a4cbc2728e3`;
+Wasm SHA edbf9ea386c9c1f9bae98f89a5105a4f33dc678cca5aefc893d664ae7a6dc716,
+16,168,477 bytes. Content JSON remains 15,810,979 bytes and SHA
+640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4.
+
+Downloaded only inspected compact summaries: native A 2,709 bytes, native B 2,422,
+platform 2,067, aggregate 2,562 compressed bytes. The 80,124,390-byte CLI archive,
+4,579,529-byte browser assets, all full diagnostics/proofs and aggregate evidence
+remain remote. Native A ran 19m44, B 9m09, platform 9m40, aggregate 26s; overall
+07:32:29-08:02:24 UTC. Platform timings: Wasm check 24,932 ms, parity 81,451 ms,
+browser build 315,912 ms, Chromium 72,850 ms, typed effects 867 ms. No controlled
+performance comparison is claimed. Each job stayed within 35 minutes.
+
+Advance the focused baseline to this exact qualified capsule commit/run.
+Submit the separately preserved current batch implementation and its 106-test
+harness next: typed shared V7 environments, global order/rollback/fork/limits,
+actual CLI batch commands and exact outer success-envelope precommit bounds.
+Private-control and response-cache changes remain separate, unqualified work.
+This capsule milestone is not full M9 completion.

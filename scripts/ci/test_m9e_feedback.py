@@ -80,6 +80,7 @@ class FeedbackTests(unittest.TestCase):
         self.baseline_lock = None
         self.baseline_cli_manifest = None
         self.baseline_repro_manifest = None
+        self.baseline_batch_manifest = None
         self.capture_calls = []
         self.commands = []
         self.events = []
@@ -120,6 +121,8 @@ class FeedbackTests(unittest.TestCase):
             return self.baseline_cli_manifest
         if args == ["git", "show", f"{BASE}:rust/crates/er-repro/Cargo.toml"] and self.baseline_repro_manifest is not None:
             return self.baseline_repro_manifest
+        if args == ["git", "show", f"{BASE}:rust/crates/er-batch/Cargo.toml"] and self.baseline_batch_manifest is not None:
+            return self.baseline_batch_manifest
         if args == ["rustc", "--version"]:
             return "rustc 1.97.1 (synthetic)"
         if args == ["rustc", "-vV"]:
@@ -962,6 +965,244 @@ class FeedbackTests(unittest.TestCase):
                      [(valid[0][0], valid[0][1], valid[0][2] + [valid[0][2][0]]), valid[1]]):
             with self.assertRaisesRegex(RuntimeError, "required native test identities"):
                 self.feedback.require_native_test_ids(required, rows)
+
+    @staticmethod
+    def batch_lock_fixture(batch_dependencies, cli_dependencies):
+        owners = {"er-batch": batch_dependencies, "er-cli": cli_dependencies}
+        return "version = 4\n" + "".join(
+            f'\n[[package]]\nname = "{name}"\nversion = "0.1.0"\n'
+            + ("dependencies = " + json.dumps(owners[name]) + "\n" if name in owners else "")
+            for name in ("er-batch", "er-cli", "er-env", "er-game", "er-kernel", "er-state", "er-types")) + (
+                '\n[[package]]\nname = "serde_json"\nversion = "1.0.0"\n'
+                'source = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "fixed"\n')
+
+    def configure_batch_scope(self):
+        self.configure_browser_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["current_batch_focus"] = policy["current_batch_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for package in ("er-game", "er-state", "er-types", "er-lab", "er-kernel-worker", "er-repro", "er-agent-protocol"):
+            self.package(package)
+        self.package("er-batch", '[dependencies]\ner-types = { path = "../er-types" }\n')
+        self.baseline_batch_manifest = (self.rust / "crates/er-batch/Cargo.toml").read_text()
+        with (self.rust / "crates/er-batch/Cargo.toml").open("a") as output:
+            output.write('er-env = { path = "../er-env" }\ner-game = { path = "../er-game" }\n'
+                         'er-kernel = { path = "../er-kernel" }\nserde_json.workspace = true\n'
+                         '[dev-dependencies]\ner-state = { path = "../er-state" }\n')
+        self.package("er-cli", '[dependencies]\ner-env = { path = "../er-env" }\n')
+        self.baseline_cli_manifest = (self.rust / "crates/er-cli/Cargo.toml").read_text()
+        with (self.rust / "crates/er-cli/Cargo.toml").open("a") as output:
+            output.write('er-batch = { path = "../er-batch" }\n')
+        self.package("er-reverse", '[target.\'cfg(unix)\'.build-dependencies]\n'
+                     'alias = { package = "er-cli", path = "../er-cli" }\n')
+        self.baseline_lock = self.batch_lock_fixture(["er-types"], ["er-env"])
+        (self.rust / "Cargo.lock").write_text(self.batch_lock_fixture(
+            ["er-types", "er-env", "er-game", "er-kernel", "er-state", "serde_json"], ["er-env", "er-batch"]))
+
+    def test_current_batch_scope_requires_exact_native_and_shipping_witnesses(self):
+        self.configure_batch_scope()
+        self.changed = self.config["current_batch_focus"]["paths"]
+        selection = self.feedback.plan()
+        for flag in ("current_batch_focus", "requires_wasm", "requires_browser", "requires_cli_executable",
+                     "requires_worker_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(selection["boundary_paths"], [])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        for crate in ("er-batch", "er-env", "er-cli", "er-agent-protocol", "er-repro", "er-web", "er-kernel-worker"):
+            self.assertEqual(selection["execution_scope"][crate], ["*"])
+        self.assertEqual(selection["required_native_targets"]["er-cli"],
+                         ["m9e_current_batch", "m9e_current_repro", "m9e_current_entry", "m9e_current_reload"])
+        expected_counts = {"er-batch:m9e_current_batch": 6, "er-cli:m9e_current_batch": 2,
+                           "er-agent-protocol:er_agent_protocol": 3,
+                           "er-repro:m9e_current_repro": 9, "er-cli:m9e_current_repro": 2,
+                           "er-cli:m9e_current_reload": 2, "er-cli:m9e_current_entry": 7,
+                           "er-kernel-worker:current_process_v2": 5, "er-lab:current_kernel_supervisor_v2": 9,
+                           "er-wasm:m9e_parity": 2}
+        self.assertEqual({key: len(ids) for key, ids in selection["required_native_test_ids"].items()}, expected_counts)
+        self.assertEqual(selection["current_batch_dependency_guard"], {
+            "status": "verified", "baseline_sha": BASE, "added_dependencies": {
+                "er-batch": ["er-env", "er-game", "er-kernel", "er-state", "serde_json"], "er-cli": ["er-batch"]}})
+        self.assertIsNone(selection["timer_mutant"])
+        self.assertIsNone(selection["replica_mutant"])
+
+    def test_current_batch_guard_rejects_manifest_resolution_and_registry_drift(self):
+        self.configure_batch_scope()
+        before = {"er-batch": self.baseline_batch_manifest, "er-cli": self.baseline_cli_manifest}
+        after = {owner: (self.rust / f"crates/{owner}/Cargo.toml").read_text() for owner in before}
+        lock = (self.rust / "Cargo.lock").read_text()
+        verify = self.feedback.verify_current_batch_dependencies
+        self.assertEqual(verify(self.baseline_lock, lock, before, after)["status"], "verified")
+        for changed in (self.baseline_lock, lock.replace(', "serde_json"', ''),
+                        lock.replace('"er-state"', '"er-state 0.1.0"', 1),
+                        lock.replace('"er-env", "er-batch"', '"er-batch"'),
+                        lock.replace('"er-env", "er-batch"', '"er-env", "er-batch", "er-batch"'),
+                        lock.replace('version = 4', 'version = 3'),
+                        lock.replace('checksum = "fixed"', 'checksum = "changed"'),
+                        lock.replace('name = "er-cli"\n', 'name = "er-cli"\nchecksum = "changed"\n'),
+                        lock.replace('name = "er-types"\n', 'name = "er-types"\nchecksum = "changed"\n'),
+                        lock + '\n[[package]]\nname = "er-env"\nversion = "0.1.0"\n',
+                        lock + '\n[[package]]\nname = "unrelated"\nversion = "0.1.0"\n'):
+            with self.subTest(lock=changed), self.assertRaisesRegex(RuntimeError, "batch lock guard"):
+                verify(self.baseline_lock, changed, before, after)
+        for owner in after:
+            for changed in (after[owner].replace('path = "../er-', 'path = "../wrong-er-'),
+                            after[owner] + '\n[features]\nextra = []\n',
+                            after[owner].replace('version = "0.1.0"', 'version = "0.2.0"'),
+                            after[owner].replace(' }', ', optional = true }')):
+                with self.subTest(owner=owner), self.assertRaisesRegex(RuntimeError, "batch dependency guard"):
+                    verify(self.baseline_lock, lock, before, {**after, owner: changed})
+        for changed in (after["er-batch"].replace('serde_json.workspace = true', 'serde_json = "1"'),
+                        after["er-batch"].replace('[dev-dependencies]', '[build-dependencies]')):
+            with self.assertRaisesRegex(RuntimeError, "batch dependency guard"):
+                verify(self.baseline_lock, lock, before, {**after, "er-batch": changed})
+        with self.assertRaisesRegex(RuntimeError, "both owner manifests"):
+            verify(self.baseline_lock, lock, {"er-batch": before["er-batch"]}, after)
+        registry = 'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+        with self.assertRaisesRegex(RuntimeError, "dependency source"):
+            verify(self.baseline_lock.replace(registry, ''), lock.replace(registry, ''), before, after)
+        for name in ("er-env", "serde_json"):
+            ambiguous = f'\n[[package]]\nname = "{name}"\nversion = "9.0.0"\n'
+            with self.assertRaisesRegex(RuntimeError, "unambiguous existing"):
+                verify(self.baseline_lock + ambiguous, lock + ambiguous, before, after)
+
+    def test_current_batch_scope_rejects_unpaired_manifest_and_mixed_product_changes(self):
+        self.configure_batch_scope()
+        trigger = "rust/crates/er-batch/src/current.rs"
+        for extra in ("rust/Cargo.lock", "rust/crates/er-batch/Cargo.toml", "rust/crates/er-cli/Cargo.toml"):
+            self.changed = [trigger, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "must be paired"):
+                self.feedback.plan()
+        guard_paths = ["rust/Cargo.lock", "rust/crates/er-batch/Cargo.toml", "rust/crates/er-cli/Cargo.toml"]
+        for missing in guard_paths:
+            self.changed = [trigger] + [path for path in guard_paths if path != missing]
+            with self.subTest(missing=missing), self.assertRaisesRegex(RuntimeError, "must be paired"):
+                self.feedback.plan()
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-batch/build.rs",
+                      "rust/crates/er-cli/src/current_worker_agent.rs", "rust/crates/er-repro/src/current.rs",
+                      "rust/crates/er-web/Cargo.toml", "src/rust-browser/other.ts", "unmapped.json"):
+            self.changed = [trigger, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        self.changed = ["rust/crates/er-batch/src/lib.rs"]
+        with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+            self.feedback.plan()
+        for trigger in self.config["current_batch_focus"]["trigger_paths"]:
+            self.changed = [trigger]
+            self.assertTrue(self.feedback.plan()["current_batch_focus"])
+
+    def test_current_batch_required_ids_distinguish_core_and_cli_same_target_name(self):
+        self.configure_batch_scope()
+        required = self.config["current_batch_focus"]["exact_test_ids"]
+        valid = [(*identity.split(":"), ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, valid)
+        for index in range(len(valid)):
+            for replacement in ([], valid[index][2][:-1], valid[index][2] + [valid[index][2][0]]):
+                rows = list(valid)
+                rows[index] = (*rows[index][:2], replacement)
+                with self.subTest(index=index), self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                    self.feedback.require_native_test_ids(required, rows)
+        for rows in (valid[1:], valid + [valid[0]], [("er-cli", *valid[0][1:]), *valid[1:]]):
+            with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                self.feedback.require_native_test_ids(required, rows)
+        targets = self.config["current_batch_focus"]["required_targets"]
+        enumerated = [(crate, name, ["witness"]) for crate, names in targets.items() for name in names]
+        self.feedback.required_native_target_counts(targets, enumerated)
+        for index in range(len(enumerated)):
+            with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                self.feedback.required_native_target_counts(targets, enumerated[:index] + enumerated[index + 1:])
+
+    def test_current_batch_orchestration_keeps_reload_first_and_distinct_bindings(self):
+        self.configure_batch_scope()
+        self.changed = ["rust/crates/er-batch/src/current.rs"]
+        selection = self.feedback.plan()
+        targets = ["m9e_current_batch", "m9e_current_reload"]
+        selection["execution_scope"] = {"er-cli": targets}
+        selection["required_native_targets"] = {"er-cli": targets}
+        selection["required_native_test_ids"] = {"er-cli:" + target:
+            selection["required_native_test_ids"]["er-cli:" + target] for target in targets}
+        self.binary_ids = {target: selection["required_native_test_ids"]["er-cli:" + target] for target in targets}
+        self.binary_crates = {target: "er-cli" for target in targets}
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.executed, ["m9e_current_reload", "m9e_current_batch"])
+        self.assertLess(max(self.events.index("list:" + target) for target in targets),
+                        self.events.index("clippy"))
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, self.events.index("execute:m9e_current_reload"))
+        for name, _, env in self.binary_envs:
+            if name == "m9e_current_batch":
+                self.assertIsNone(env)
+            else:
+                self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+                self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+        self.assertEqual(summary["cli_executable"]["source_sha"], CANDIDATE)
+        for lint in ("cli-clippy", "agent-protocol-clippy", "er-batch-clippy", "er-env-clippy", "worker-clippy", "endpoint-clippy", "browser-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.events.clear()
+        self.executed.clear()
+        self.clippy_codes = {"er-batch": 1}
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["tests"]["selected"], 4)
+        self.assertEqual(summary["tests"]["executed"], 0)
+        self.assertEqual(summary["required_native_target_counts"], {
+            "er-cli:m9e_current_batch": 2, "er-cli:m9e_current_reload": 2})
+        self.assertEqual(self.executed, [])
+        self.assertIn("er-batch-clippy exited 1", summary["first_failure"])
+        for target in targets:
+            self.assertLess(self.events.index("list:" + target), self.events.index("clippy"))
+        wasm.assert_not_called()
+        browser.assert_not_called()
+        # Inventory failure is detected before any test executes, including the
+        # prioritized reload. Core and CLI batch IDs cannot substitute each other.
+        self.clippy_codes = {}
+        self.events.clear()
+        self.executed.clear()
+        self.binary_ids["m9e_current_batch"] = ["wrong_core_or_cli_witness"]
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+        self.assertIn("required native test identities", summary["first_failure"])
+
+    def test_current_batch_missing_candidate_artifacts_fail_before_listing(self):
+        self.configure_batch_scope()
+        self.changed = ["rust/crates/er-batch/src/current.rs"]
+        selection = self.feedback.plan()
+        selection["execution_scope"] = {"er-cli": ["m9e_current_reload"]}
+        selection["required_native_targets"] = {"er-cli": ["m9e_current_reload"]}
+        selection["required_native_test_ids"] = {"er-cli:m9e_current_reload":
+            selection["required_native_test_ids"]["er-cli:m9e_current_reload"]}
+        self.binary_ids = {"m9e_current_reload": selection["required_native_test_ids"]["er-cli:m9e_current_reload"]}
+        self.binary_crates = {"m9e_current_reload": "er-cli"}
+        for artifacts, message in (([], "real worker executable"),
+                                   ([self.worker_executable_artifact()], "real CLI executable")):
+            self.extra_artifacts = artifacts
+            self.binary_envs.clear()
+            with patch.object(self.feedback, "plan", return_value=selection):
+                code, summary = self.invoke()
+            self.assertEqual(code, 1)
+            self.assertIn(message, summary["first_failure"])
+            self.assertEqual(self.binary_envs, [])
+
+    def test_current_batch_mapping_does_not_expand_infrastructure_readiness(self):
+        self.configure_batch_scope()
+        self.changed = ["scripts/ci/m9e_feedback.py", "docs/plans/rust-kernel/m9e-batch-next.md"]
+        selection = self.feedback.plan()
+        self.assertEqual(selection["packages"], ["er-canonical"])
+        self.assertIsNone(selection["execution_scope"])
+        for flag in ("current_batch_focus", "requires_browser", "requires_wasm", "requires_worker_executable",
+                     "requires_cli_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+            self.assertFalse(selection[flag], flag)
 
     def configure_menu_scope(self):
         self.configure_cli_reload_scope()

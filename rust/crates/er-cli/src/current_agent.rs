@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use er_agent_protocol::{
     AgentDispatchErrorV1, AgentDispatcherV1, AgentErrorCodeV1, AgentJsonlServerV1,
-    AgentProtocolLimitsV1,
+    AgentProtocolLimitsV1, AgentResponseContextV1,
 };
 use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -19,6 +19,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::current_worker_agent::{CurrentBackend, WorkerConfiguration};
+use crate::current_batch_agent::CurrentBatches;
 use crate::m72::{BoundedLineStatusV1, read_bounded_jsonl_line_v1};
 
 // A full current snapshot is larger than the historical 64 KiB inline threshold.
@@ -29,7 +30,7 @@ const MAXIMUM_SESSIONS: usize = 256;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
-enum CurrentStart {
+pub(crate) enum CurrentStart {
     Natural {
         profile: Box<ProfileStateV1>,
         seed: String,
@@ -55,6 +56,7 @@ struct CreateRequest {
 struct CurrentDispatcher {
     content: Arc<PreparedGameContentV2>,
     sessions: BTreeMap<String, CurrentBackend>,
+    batches: CurrentBatches,
     worker: Option<WorkerConfiguration>,
     maximum_sessions: usize,
     next_reload_ticket: u64,
@@ -91,7 +93,7 @@ impl CurrentDispatcher {
                 "session identity is empty, too long, or already exists",
             ));
         }
-        if self.sessions.len() >= self.maximum_sessions {
+        if self.sessions.len() + self.batches.environment_count() >= self.maximum_sessions {
             return Err(backend("current session capacity reached"));
         }
         Ok(())
@@ -107,35 +109,7 @@ impl CurrentDispatcher {
                 owner_seat, role, ..
             } => (*owner_seat, *role),
         };
-        let session = match request.start {
-            CurrentStart::Natural {
-                profile,
-                seed,
-                owner_seat,
-                save_slots,
-                local_is_host,
-            } => CurrentGameSession::natural_start(
-                *profile,
-                seed,
-                owner_seat,
-                save_slots,
-                local_is_host,
-                Arc::clone(&self.content),
-                None,
-            )
-            .map_err(backend)?,
-            CurrentStart::Snapshot {
-                snapshot,
-                owner_seat,
-                role,
-            } => CurrentGameSession::from_snapshot(
-                *snapshot,
-                owner_seat,
-                role,
-                Arc::clone(&self.content),
-            )
-            .map_err(backend)?,
-        };
+        let session = request.start.into_session(Arc::clone(&self.content))?;
         let response = json!({"session": request.session, "kernel_version": 7});
         let session = match &self.worker {
             Some(worker) => worker.adopt(&request.session, &session, owner_seat, role)?,
@@ -181,7 +155,55 @@ impl CurrentDispatcher {
     }
 }
 
+impl CurrentStart {
+    pub(crate) fn into_session(self, content: Arc<PreparedGameContentV2>) -> Result<CurrentGameSession, AgentDispatchErrorV1> {
+        match self {
+            CurrentStart::Natural {
+                profile,
+                seed,
+                owner_seat,
+                save_slots,
+                local_is_host,
+            } => CurrentGameSession::natural_start(
+                *profile,
+                seed,
+                owner_seat,
+                save_slots,
+                local_is_host,
+                content,
+                None,
+            )
+            .map_err(backend),
+            CurrentStart::Snapshot {
+                snapshot,
+                owner_seat,
+                role,
+            } => CurrentGameSession::from_snapshot(
+                *snapshot,
+                owner_seat,
+                role,
+                content,
+            )
+            .map_err(backend),
+        }
+    }
+}
+
 impl AgentDispatcherV1 for CurrentDispatcher {
+    fn dispatch_with_response_context(&mut self, method: &str, params: &Value,
+        context: AgentResponseContextV1<'_>) -> Result<Value, AgentDispatchErrorV1>
+    {
+        if method.starts_with("batch.") {
+            // A process batch needs a generation that owns many environments;
+            // never substitute native execution or one process per environment.
+            if self.worker.is_some() {
+                return Err(invalid("current batch operations require the in-process backend; worker batches are unsupported"));
+            }
+            return self.batches.dispatch(method, params, self.sessions.len(), self.maximum_sessions, context);
+        }
+        self.dispatch(method, params)
+    }
+
     fn dispatch(&mut self, method: &str, params: &Value) -> Result<Value, AgentDispatchErrorV1> {
         match method {
             "protocol.hello" => Ok(json!({
@@ -292,8 +314,13 @@ impl AgentDispatcherV1 for CurrentDispatcher {
             }
             "lab.health" | "lab.resources" => Ok(json!({
                 "sessions": self.sessions.len(), "maximum_sessions": self.maximum_sessions,
+                "batches": self.batches.len(), "batch_environments": self.batches.environment_count(),
+                "total_environments": self.sessions.len() + self.batches.environment_count(),
                 "kernel_version": 7, "content_identity": self.content.identity()
             })),
+            method if method.starts_with("batch.") => {
+                Err(invalid("current batch dispatch requires response admission context"))
+            }
             _ => Err(backend(format!(
                 "method {method} is not implemented by the current V7 adapter; historical tools require agent-v6"
             ))),
@@ -321,6 +348,7 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
         return Err("maximum-sessions must be between 1 and 256".into());
     }
     let mut dispatcher = CurrentDispatcher {
+        batches: CurrentBatches::new(Arc::clone(&content)),
         content,
         sessions: BTreeMap::new(),
         worker,

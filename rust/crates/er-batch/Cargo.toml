@@ -8,9 +8,16 @@ publish = false
 [dependencies]
 er-dev-types = { path = "../er-dev-types" }
 er-devplane = { path = "../er-devplane" }
+er-env = { path = "../er-env" }
+er-game = { path = "../er-game" }
+er-kernel = { path = "../er-kernel" }
 er-types = { path = "../er-types" }
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+er-state = { path = "../er-state" }
 
 [lints]
 workspace = true

@@ -1,5 +1,7 @@
 //! Single-thread deterministic batch execution over production DeveloperSession.
 
+/// Current V7 batches; the root V1 API remains historical compatibility.
+pub mod current;
 pub mod environment;
 pub mod operations;
 

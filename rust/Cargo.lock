@@ -252,8 +252,13 @@ version = "0.1.0"
 dependencies = [
  "er-dev-types",
  "er-devplane",
+ "er-env",
+ "er-game",
+ "er-kernel",
+ "er-state",
  "er-types",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 
@@ -288,6 +293,7 @@ name = "er-cli"
 version = "0.1.0"
 dependencies = [
  "er-agent-protocol",
+ "er-batch",
  "er-canonical",
  "er-env",
  "er-game",
