@@ -333,7 +333,7 @@ impl AppliedGameMaterialLedgerV1 {
         if self
             .records
             .iter()
-            .any(|record| !operations.insert(record.operation_id.clone()))
+            .any(|record| !operations.insert(&record.operation_id))
         {
             return Err(GameMaterialV6Error::Ledger);
         }
@@ -456,18 +456,18 @@ pub fn apply_game_material_v6_with_retention(
     };
     // Complete all fallible checks before retiring evidence or publishing state.
     let next = next_revision(transition.authority_revision)?;
-    let mut candidate_ledger = ledger.clone();
-    if let AppliedMaterialRetentionV1::BoundedSuffix { maximum_records } = retention
-        && candidate_ledger.records.len() == maximum_records
-    {
-        candidate_ledger.records.remove(0);
-    }
-    candidate_ledger.records.push(record);
-    candidate_ledger.next_authority_revision = next;
-    candidate_ledger.validate_with_retention(retention)?;
     let candidate = transition.after_state.clone();
+    // The validated ledger, unique new operation and checked next revision
+    // preserve every ledger invariant. Retiring only the oldest record keeps
+    // a bounded suffix contiguous; no fallible work remains after this point.
+    if let AppliedMaterialRetentionV1::BoundedSuffix { maximum_records } = retention
+        && ledger.records.len() == maximum_records
+    {
+        ledger.records.remove(0);
+    }
+    ledger.records.push(record);
+    ledger.next_authority_revision = next;
     *live = Some(candidate);
-    *ledger = candidate_ledger;
     Ok(GameMaterialApplyOutcomeV6::Applied)
 }
 

@@ -1551,3 +1551,30 @@ allowlist(18total); the122 existing gate tests pin it and reject its adjacent
 unknown name. Co-op was already an exact required target; all33 targets, both
 mutants, platform and limits remain. No product logic/API or baseline changed.
 Remote lint and actual retention execution remain pending.
+
+976da3722d9d61d3a911d570dd064c7fe45f5004/run33968266289 passed122 harness,
+formatting, full reverse compilation and ALL required early Clippy targets:
+CLI/protocol/repro/env/game/kernel/batch/worker/lab/web. Build151,862ms.
+Actual662-test discovery validated all33 required targets. NativeA then timed
+out at600,002ms on the FIRST target er-game:m9e_material_retention. Its two short
+tests emitted success dots, but the12289-material three-full-window test remained
+running; no target completed, so aggregate executed/passed counts correctly remain0.
+No capacity/window/time limit is raised or reduced. Only inspected3,411 compressed-
+byte nativeA summary downloaded; the complete needed timeout excerpt fit there.
+Full101,623-byte diagnostics stayremote. B was still running when this repair was
+prepared and will be superseded on the same focused branch; no mixed-SHA reuse.
+
+Applied independently reviewed one-file cost repair, patch SHA256
+5c3000d627e09d1731a6a25d45fa75aa70099d7e3808d7d23c694a0fd2e98c94.
+Ledger uniqueness validation borrows OperationIds instead of cloning them.
+The initial full ledger validation and every stale/duplicate/conflict/hardstop/
+revision/content/state/frontier/checked-next rejection remain in original order.
+After state cloning, the append tail now prunes/pushes/updates/publishes directly.
+The former inner candidate-ledger clone and full revalidation added no reachable
+Result rejection: the validated prefix, absent new operation, valid new digests,
+exact next revision and oldest-only retirement preserve all ledger invariants,
+including capacity1 and the historical gapped-ledger compatibility policy.
+Outer runtime execute/dispatcher proof staging remains for CandidateMismatch
+rollback. No Result-returning work is left after mutation; no new panic/OOM
+guarantee or measured speedup is claimed. The unchanged five regressions/full
+selected cone must still pass remotely. Baseline remains qualified3aa.
