@@ -1371,3 +1371,10 @@ fail-closed mixed-product scope remain. New regression process witnesses exercis
 valid-checksum absent-species validation, exact causal divergence and byte-limit
 errors. They remain unformatted/uncompiled/unexecuted until the remote run.
 No local build, formatter, lint, test, dependency or browser workload ran.
+
+Validator4218ea4303f6eda7ea262a1f531e2d91c686f95a/run33963278951 passed the
+118-test harness and failed formatting before any product test. Downloaded only
+the inspected11,991 compressed-byte nativeA summary; duplicateB11,992 and18,370-byte
+diagnostics stayremote. Complete22,849-byte newvalidator-test formatterpatch had
+zeroomissions and verified SHA25673f64a121e37f6cb1b0f323685bf4fdb69cd243443750a3ccdad03aed7f40aa4;
+applied exactly that remote patch. Baseline remains qualified1b/run33961778505.
