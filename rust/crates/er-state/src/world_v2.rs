@@ -15,10 +15,10 @@ pub fn resolve_battle_world(state: &GameStateV2) -> Option<ResolvedBattleWorldV2
     battle_world(state).map(|world| world.resolve())
 }
 
-pub fn resolve_player_party<'a>(state: &'a GameStateV2) -> &'a [PokemonStateV2] {
+pub fn resolve_player_party(state: &GameStateV2) -> &[PokemonStateV2] {
     &state.player_party
 }
 
-pub fn resolve_battle<'a>(state: &'a GameStateV2) -> Option<&'a BattleStateV2> {
+pub fn resolve_battle(state: &GameStateV2) -> Option<&BattleStateV2> {
     state.battle.as_ref()
 }

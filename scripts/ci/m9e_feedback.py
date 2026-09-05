@@ -30,6 +30,22 @@ WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-cli", "m9e_current_reload"),
                         ("er-cli", "m9e_current_repro")}
 
+# Exact source repairs required by the first full selected-package Clippy run.
+AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
+    "rust/crates/er-state/src/bespoke_v2/forms.rs",
+    "rust/crates/er-state/src/bespoke_v2/scheduled_effects.rs",
+    "rust/crates/er-state/src/bespoke_v2/substitute.rs",
+    "rust/crates/er-state/src/bespoke_v2/suppression_immunity.rs",
+    "rust/crates/er-state/src/m7_state.rs",
+    "rust/crates/er-state/src/migration.rs",
+    "rust/crates/er-state/src/run_v2.rs",
+    "rust/crates/er-state/src/world_v2.rs",
+    "rust/crates/er-state/src/bespoke_v2/guard.rs",
+    "rust/crates/er-state/src/bespoke_v2/item_lifecycle.rs",
+    "rust/crates/er-state/src/bespoke_v2/special_damage.rs",
+    "rust/crates/er-state/src/mechanic_state_v2.rs",
+]
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -351,8 +367,11 @@ def plan():
     capture_session = capture_changed and all(path in capture_paths for path in product_changes)
     damage_focus = config.get("ai_damage_query_focus", {})
     damage_paths = damage_focus.get("paths", [])
+    damage_lint_paths = damage_focus.get("lint_repair_paths", [])
+    if damage_focus and damage_lint_paths != AI_DAMAGE_QUERY_LINT_REPAIR_PATHS:
+        raise RuntimeError("AI damage query lint repair policy identities disagree")
     damage_changed = any(path in damage_focus.get("trigger_paths", []) for path in product_changes)
-    damage_session = damage_changed and all(path in damage_paths for path in product_changes)
+    damage_session = damage_changed and all(path in damage_paths or path in damage_lint_paths for path in product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
     timer_session = timer_session or retention_session or browser_worker_session or damage_session
@@ -516,7 +535,7 @@ def plan():
     if damage_session:
         execution_scope = damage_focus["execute"]
         browser_required = True
-        boundaries = [path for path in boundaries if path not in damage_paths]
+        boundaries = [path for path in boundaries if path not in damage_paths and path not in damage_lint_paths]
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:

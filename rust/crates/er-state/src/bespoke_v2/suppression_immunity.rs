@@ -216,10 +216,10 @@ impl VolatileTagInstanceV2 {
         if self.remaining_turns == Some(0) {
             return Err(SuppressionStateError::ZeroRemainingTurns);
         }
-        if let Some(key) = self.subject.registry_key() {
-            if key.is_empty() {
-                return Err(SuppressionStateError::EmptyRegistryKey);
-            }
+        if let Some(key) = self.subject.registry_key()
+            && key.is_empty()
+        {
+            return Err(SuppressionStateError::EmptyRegistryKey);
         }
         Ok(())
     }
@@ -4478,17 +4478,17 @@ mod tests {
         let mut sorted = CLASSIFICATION_TABLE.to_vec();
         sorted.sort_by_key(|row| row.0);
         assert_eq!(sorted.as_slice(), CLASSIFICATION_TABLE);
-        assert!(CLASSIFIED_BEHAVIOR_UNITS == 134 + 910 + 360 + 2);
+        const { assert!(CLASSIFIED_BEHAVIOR_UNITS == 134 + 910 + 360 + 2) };
     }
 
     #[test]
     fn handoff_units_classify_into_typed_lanes() {
         assert_eq!(
-            classify_behavior_unit(CHARGED_TAG_HASH).unwrap(),
+            classify_behavior_unit(CHARGED_TAG_HASH).expect("charged-tag fixture is classified"),
             DispatchClass::SubjectDefinition
         );
         assert_eq!(
-            classify_behavior_unit(POROUS_CHARGE_HASH).unwrap(),
+            classify_behavior_unit(POROUS_CHARGE_HASH).expect("porous-charge fixture is classified"),
             DispatchClass::PostDefendTrigger
         );
     }
@@ -4508,6 +4508,6 @@ mod tests {
 
     #[test]
     fn default_state_validates() {
-        SuppressionImmunityStateV2::new().validate().unwrap();
+        SuppressionImmunityStateV2::new().validate().expect("default suppression state is valid");
     }
 }

@@ -651,10 +651,10 @@ impl RunStateV3 {
             if !ids.insert(pokemon.id) {
                 return Err(M7StateError::DuplicatePokemon(pokemon.id));
             }
-            if let Some(fusion) = &pokemon.fusion {
-                if !ids.insert(fusion.partner.id) {
-                    return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
-                }
+            if let Some(fusion) = &pokemon.fusion
+                && !ids.insert(fusion.partner.id)
+            {
+                return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
             }
         }
         let mut storage_slots = BTreeSet::new();
@@ -666,10 +666,10 @@ impl RunStateV3 {
             if !ids.insert(stored.pokemon.id) {
                 return Err(M7StateError::DuplicatePokemon(stored.pokemon.id));
             }
-            if let Some(fusion) = &stored.pokemon.fusion {
-                if !ids.insert(fusion.partner.id) {
-                    return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
-                }
+            if let Some(fusion) = &stored.pokemon.fusion
+                && !ids.insert(fusion.partner.id)
+            {
+                return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
             }
         }
         if let Some(scenario) = &self.scenario {
@@ -678,10 +678,10 @@ impl RunStateV3 {
                 if !ids.insert(pokemon.id) {
                     return Err(M7StateError::DuplicatePokemon(pokemon.id));
                 }
-                if let Some(fusion) = &pokemon.fusion {
-                    if !ids.insert(fusion.partner.id) {
-                        return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
-                    }
+                if let Some(fusion) = &pokemon.fusion
+                    && !ids.insert(fusion.partner.id)
+                {
+                    return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
                 }
             }
             if scenario

@@ -323,11 +323,12 @@ mod tests {
     /// can hold instances without tripping the ahead-of-cursor invariants
     /// before the property under test is reached.
     fn seeded() -> ItemLifecycleStateV2 {
-        let mut state = ItemLifecycleStateV2::default();
-        state.next_instance_id = 3;
-        state.next_creation_ordinal = SafeU53::new(3).expect("test creation cursor fits SafeU53");
-        state.next_ledger_ordinal = SafeU53::new(3).expect("test ledger cursor fits SafeU53");
-        state
+        ItemLifecycleStateV2 {
+            next_instance_id: 3,
+            next_creation_ordinal: SafeU53::new(3).expect("test creation cursor fits SafeU53"),
+            next_ledger_ordinal: SafeU53::new(3).expect("test ledger cursor fits SafeU53"),
+            ..Default::default()
+        }
     }
 
     #[test]

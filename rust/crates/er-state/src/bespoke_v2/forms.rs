@@ -431,7 +431,7 @@ impl SpeciesFormRegistryV2 {
         if self.entries.windows(2).any(|window| window[0] >= window[1]) {
             return Err(FormsStateError::SpeciesRegistryOutOfOrder);
         }
-        if self.entries.iter().any(|entry| *entry == SafeU53::ZERO) {
+        if self.entries.contains(&SafeU53::ZERO) {
             return Err(FormsStateError::ZeroSpecies);
         }
         Ok(())

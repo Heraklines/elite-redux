@@ -2402,6 +2402,57 @@ class FeedbackTests(unittest.TestCase):
         self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
         self.assertEqual(self.feedback.plan()["packages"], ["er-canonical"])
 
+    def test_ai_damage_query_lint_repairs_keep_full_execution_and_reverse_lint_scope(self):
+        self.configure_ai_damage_query_scope()
+        policy = self.config["ai_damage_query_focus"]
+        expected = ["rust/crates/er-state/src/" + path for path in (
+            "bespoke_v2/forms.rs", "bespoke_v2/scheduled_effects.rs", "bespoke_v2/substitute.rs",
+            "bespoke_v2/suppression_immunity.rs", "m7_state.rs", "migration.rs", "run_v2.rs", "world_v2.rs",
+            "bespoke_v2/guard.rs", "bespoke_v2/item_lifecycle.rs", "bespoke_v2/special_damage.rs", "mechanic_state_v2.rs")]
+        self.assertEqual(policy["lint_repair_paths"], expected)
+        self.assertEqual(self.feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS, expected)
+        self.package("er-lint-consumer", '[dependencies]\ner-state = { path = "../er-state" }\n')
+        before = copy.deepcopy(self.config)
+        for repairs in (expected, *[[path] for path in expected]):
+            self.changed = policy["paths"] + repairs
+            selection = self.feedback.plan()
+            self.assertTrue(selection["ai_damage_query_focus"])
+            self.assertEqual(selection["execution_scope"], policy["execute"])
+            self.assertEqual(selection["required_native_targets"], policy["required_targets"])
+            self.assertEqual(selection["required_native_test_ids"], policy["exact_test_ids"])
+            self.assertIn("er-lint-consumer", selection["packages"])
+            for flag in ("timer_focus", "requires_browser", "requires_browser_worker", "requires_wasm",
+                         "requires_cli_executable", "requires_worker_executable"):
+                self.assertTrue(selection[flag], flag)
+            self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+            self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+        for extra in ("rust/crates/er-state/src/bespoke_v2/other.rs", "rust/crates/er-state/Cargo.toml", "rust/Cargo.lock"):
+            self.changed = policy["paths"] + expected + [extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+
+    def test_ai_damage_query_lint_repair_policy_cannot_widen_or_omit_named_sources(self):
+        self.configure_ai_damage_query_scope()
+        policy = self.config["ai_damage_query_focus"]
+        original = list(policy["lint_repair_paths"])
+        self.changed = policy["paths"] + original
+        for bad in ([], original[:-1], original + ["rust/crates/er-state/src/other.rs"], list(reversed(original))):
+            policy["lint_repair_paths"] = bad
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "lint repair policy identities disagree"):
+                self.feedback.plan()
+        policy["lint_repair_paths"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = original
+        # These repairs do not independently activate the damage-query exception.
+        try:
+            selection = self.feedback.plan()
+        except RuntimeError as error:
+            self.assertIn("planning requires additional mapping", str(error))
+        else:
+            self.assertFalse(selection["ai_damage_query_focus"])
+
     def test_ai_damage_query_all_required_targets_and_exact_ids_fail_on_omission_or_renaming(self):
         self.configure_ai_damage_query_scope()
         self.changed = self.config["ai_damage_query_focus"]["paths"]

@@ -317,10 +317,14 @@ impl FieldConditionInstance {
             .validate()
             .map_err(|_| ScheduledEffectsStateError::InvalidBehaviorUnit)?;
         match self.kind {
-            FieldConditionKind::Weather { weather } if weather == WeatherId::None => {
+            FieldConditionKind::Weather {
+                weather: WeatherId::None,
+            } => {
                 return Err(ScheduledEffectsStateError::ReservedNoneWeather);
             }
-            FieldConditionKind::Terrain { terrain } if terrain == TerrainId::None => {
+            FieldConditionKind::Terrain {
+                terrain: TerrainId::None,
+            } => {
                 return Err(ScheduledEffectsStateError::ReservedNoneTerrain);
             }
             _ => {}

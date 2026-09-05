@@ -802,6 +802,20 @@
   "boundary_prefixes": ["src/", "test/browser/", "test/node/", "workers/", "rust/crates/er-wasm/", "rust/crates/er-web/"],
   "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes",
   "ai_damage_query_focus": {
+    "lint_repair_paths": [
+      "rust/crates/er-state/src/bespoke_v2/forms.rs",
+      "rust/crates/er-state/src/bespoke_v2/scheduled_effects.rs",
+      "rust/crates/er-state/src/bespoke_v2/substitute.rs",
+      "rust/crates/er-state/src/bespoke_v2/suppression_immunity.rs",
+      "rust/crates/er-state/src/m7_state.rs",
+      "rust/crates/er-state/src/migration.rs",
+      "rust/crates/er-state/src/run_v2.rs",
+      "rust/crates/er-state/src/world_v2.rs",
+      "rust/crates/er-state/src/bespoke_v2/guard.rs",
+      "rust/crates/er-state/src/bespoke_v2/item_lifecycle.rs",
+      "rust/crates/er-state/src/bespoke_v2/special_damage.rs",
+      "rust/crates/er-state/src/mechanic_state_v2.rs"
+    ],
     "execute": {
       "er-batch": [
         "*"

@@ -102,7 +102,6 @@ impl SubstituteProxyStoreV2 {
     /// # Errors
     /// Returns [`SubstituteProxyStateError`] when the doll violates its
     /// invariants.
-    #[must_use]
     pub fn upsert(
         mut self,
         proxy: SubstituteProxyStateV2,

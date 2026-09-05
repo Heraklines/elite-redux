@@ -210,10 +210,10 @@ fn validate_provenance(
             return Err(MigrationError::DuplicateCompanion);
         }
     }
-    if let Some(battle) = &context.battle {
-        if battle.fixture_id != context.fixture_id || battle.state_side != context.state_side {
-            return Err(MigrationError::UnknownCompanion);
-        }
+    if let Some(battle) = &context.battle
+        && (battle.fixture_id != context.fixture_id || battle.state_side != context.state_side)
+    {
+        return Err(MigrationError::UnknownCompanion);
     }
     Ok(())
 }

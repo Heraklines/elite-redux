@@ -2145,3 +2145,26 @@ The battle command constructor returns Result; propagate its error before
 passing the actual command to ScriptedEnemyBattleCommandV1::new. The1545-byte
 compact and5363-byte bounded diagnostic identify this one compile error; no
 native tests executed. No product damage arithmetic or baseline changes.
+
+## Damage-query expanded lint repair
+
+cf430eef7f36f51620215051699db419bfb2a84d / run33993594064 passed remote
+formatting and compilation. Discovery found1,006 native IDs across96 targets,
+including every50 mandatory target and all four damage-query witnesses. The154
+harness selftests passed in5.956 seconds, including bounded native compression.
+No native test executed because the early full selected-package Clippy check
+found existing er-state source/test lint errors (lib12; lib-test51 including
+overlap). The inspected compact was11,241 bytes, bounded failure12,148 bytes,
+exact needed lint log34,211 bytes and harness log27,959 bytes; full evidence
+remains remote.
+
+The repair changes only the twelve er-state files named by that diagnostic.
+Conditional forms, patterns and lifetimes preserve their existing semantics;
+test setup retains assertions with informative failures and direct initializers.
+No lint suppression, test exclusion, cap or baseline adjustment is included.
+The AI scope admits exactly these named companion repairs only when its existing
+damage-query product trigger is present. Two new remote selftests pin that
+scope and reject adjacent paths/policy drift; all154 prior test bodies remain.
+The full selected-package Clippy command,1,006-test execution scope,50 required
+targets, causal controls and every current platform witness remain mandatory.
+Remote formatting/lint/execution of this repair remains pending.

@@ -347,13 +347,13 @@ impl RunStateV2 {
                 },
             );
         }
-        if let Some(index) = self.progression.active_index {
-            if usize::try_from(index).map_or(true, |index| index >= self.progression.tasks.len()) {
-                return Err(RunStateValidationError::ProgressionActiveIndexOutOfRange {
-                    index,
-                    length: self.progression.tasks.len(),
-                });
-            }
+        if let Some(index) = self.progression.active_index
+            && usize::try_from(index).map_or(true, |index| index >= self.progression.tasks.len())
+        {
+            return Err(RunStateValidationError::ProgressionActiveIndexOutOfRange {
+                index,
+                length: self.progression.tasks.len(),
+            });
         }
         let mut task_ids = BTreeSet::new();
         for envelope in &self.progression.tasks {

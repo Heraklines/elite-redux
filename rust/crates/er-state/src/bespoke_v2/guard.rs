@@ -317,7 +317,7 @@ mod tests {
 
     fn pokemon_scope(id: u64) -> MechanicScope {
         MechanicScope::Pokemon {
-            pokemon: er_types::battle_ids::PokemonId::new(SafeU53::new(id).unwrap()),
+            pokemon: er_types::battle_ids::PokemonId::new(SafeU53::new(id).expect("fixture Pokemon ID fits SafeU53")),
         }
     }
 
@@ -326,25 +326,29 @@ mod tests {
     }
 
     fn ordinal(value: u64) -> SafeU53 {
-        SafeU53::new(value).unwrap()
+        SafeU53::new(value).expect("fixture creation ordinal fits SafeU53")
     }
 
     #[test]
     fn default_state_validates() {
-        GuardFamilyState::default().validate().unwrap();
+        GuardFamilyState::default().validate().expect("default guard state is valid");
     }
 
     #[test]
     fn arbitrarily_deep_chains_validate() {
-        let mut state = GuardFamilyState::default();
-        state.chain_depth = 100_000;
-        state.validate().unwrap();
+        let state = GuardFamilyState {
+            chain_depth: 100_000,
+            ..Default::default()
+        };
+        state.validate().expect("deep guard chains remain valid");
     }
 
     #[test]
     fn rejects_wrong_schema_version() {
-        let mut state = GuardFamilyState::default();
-        state.schema_version = GUARD_FAMILY_STATE_SCHEMA_VERSION + 1;
+        let state = GuardFamilyState {
+            schema_version: GUARD_FAMILY_STATE_SCHEMA_VERSION + 1,
+            ..Default::default()
+        };
         assert_eq!(
             state.validate(),
             Err(GuardFamilyStateError::SchemaVersion {
@@ -460,8 +464,10 @@ mod tests {
 
     #[test]
     fn rejects_unordered_endure_owner_vectors() {
-        let mut state = GuardFamilyState::default();
-        state.enduring_owners = vec![pokemon_scope(4), pokemon_scope(3)];
+        let state = GuardFamilyState {
+            enduring_owners: vec![pokemon_scope(4), pokemon_scope(3)],
+            ..Default::default()
+        };
         assert_eq!(
             state.validate(),
             Err(GuardFamilyStateError::EndureOwnersOutOfOrder)
@@ -470,8 +476,10 @@ mod tests {
 
     #[test]
     fn coherent_state_with_mixed_activity_validates_and_queries() {
-        let mut state = GuardFamilyState::default();
-        state.chain_depth = 6;
+        let mut state = GuardFamilyState {
+            chain_depth: 6,
+            ..Default::default()
+        };
         state.self_guards.push(ActiveSelfGuardEntry {
             kind: GuardKind::KingsShield,
             owner: pokemon_scope(11),
@@ -485,7 +493,7 @@ mod tests {
         state.enduring_owners = vec![pokemon_scope(12)];
         state.sturdy_owners = vec![pokemon_scope(13)];
         state.next_creation_ordinal = ordinal(3);
-        state.validate().unwrap();
+        state.validate().expect("coherent mixed guard state is valid");
 
         assert!(state.has_side_guard(BattleSide::Enemy, SideGuardKind::QuickGuard));
         assert!(!state.has_side_guard(BattleSide::Player, SideGuardKind::QuickGuard));
