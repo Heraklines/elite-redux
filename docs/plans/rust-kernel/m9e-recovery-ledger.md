@@ -2136,3 +2136,12 @@ Rust formatting check before native test execution. The inspected native-A
 compact was1681 bytes. Its exact18,763-byte remote format.patch names only
 the resolver and new damage-query test; it is applied unchanged here.
 No formatter or test ran locally. Baseline remains fully qualified f140.
+
+## Damage-query remote constructor repair
+
+8f269332c0714508913f9aab0dd9327a3425db45 / run33993178613 passed formatting
+and failed remote compilation with E0308 at the scripted enemy command setup.
+The battle command constructor returns Result; propagate its error before
+passing the actual command to ScriptedEnemyBattleCommandV1::new. The1545-byte
+compact and5363-byte bounded diagnostic identify this one compile error; no
+native tests executed. No product damage arithmetic or baseline changes.

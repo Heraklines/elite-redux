@@ -324,7 +324,7 @@ fn current_damage_queries_preserve_full_turn_and_rng_audit_after_reordering() ->
             actor,
             MoveSlotIndex::new(1)?,
             BattleTargetSelection::selected(vec![target])?,
-        ),
+        )?,
     )?;
     let commands = CommandSet::new(vec![AcceptedBattleCommand::scripted_enemy(command)])?;
     let authority = TurnAuthorityContextV1 {
