@@ -212,8 +212,6 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
       M9E_PHASE: platform
-      M9E_REPORT_DIR: ${{ runner.temp }}/m9e-platform-feedback
-      M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
       M9E_NATIVE_MANIFEST_SHA256: ${{ needs.native_a.outputs.manifest_sha256 }}
     steps:
       - uses: actions/checkout@v6
@@ -298,6 +296,9 @@ jobs:
           merge-multiple: true
       - name: Exact platform checks and evidence
         id: platform
+        env:
+          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-platform-feedback
+          M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
         run: python3 scripts/ci/m9e_phases.py
       - name: Bound platform proof
         id: platform-proof
@@ -355,8 +356,6 @@ jobs:
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
       M9E_PHASE: aggregate
-      M9E_REPORT_DIR: ${{ runner.temp }}/m9e-aggregate-feedback
-      M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
       M9E_NATIVE_A_RESULT: ${{ needs.native_a.result }}
       M9E_NATIVE_B_RESULT: ${{ needs.native_b.result }}
       M9E_NATIVE_B_MANIFEST_SHA256: ${{ needs.native_b.outputs.manifest_sha256 }}
@@ -400,6 +399,9 @@ jobs:
           merge-multiple: true
       - name: Require every exact phase
         if: always()
+        env:
+          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-aggregate-feedback
+          M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
         run: python3 scripts/ci/m9e_phases.py
       - name: Final compact result
         if: always()

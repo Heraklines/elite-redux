@@ -984,3 +984,10 @@ real current-session raw input. Dedicated full natural browser/current parity an
 capsule/import witnesses remain. Shared prepared content and actual snapshot
 setup avoid repeated construction; no product cache/memory or speedup claim.
 Future batch and private-control product files remain unstaged.
+
+Candidate `724a42a64d4b125a3b024ac9b2d76763ad219aca`, run `33952611842`,
+was rejected before any job started. Source inspection and GitHub's context
+availability reference identify four runner.temp expressions in platform/aggregate
+job-level env, where runner context is unavailable. Move those path settings into
+the corresponding execution step env. No product tests or artifacts were produced;
+this is a workflow syntax/context correction, with no baseline advancement.
