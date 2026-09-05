@@ -444,3 +444,17 @@ test now uses unmapped historical `m72.rs` so its unchanged assertions continue
 to verify the broad fallback, browser and Wasm requirements. No production
 assertion or gate was relaxed. The inspected compact artifact was 2,763 bytes;
 full diagnostics remained remote. Baseline remains fully passing `7557e92`.
+
+### Supervisor remote compile/format repair
+
+Run `33935940054` at `fcfe58e9dee45cebad5544c7d573b11a24a7f767` passed
+harness preflight and selected the exact native supervisor scope. Compilation
+then found one E0308: the new `reach_active_battle` test helper declared Result
+but omitted its final `Ok(())`. Added that return; no product tests executed in
+this run. The remote formatter also produced a 53,062-byte patch. The optional
+named repair artifact was inspected (10,021 compressed bytes), downloaded, and
+its exact SHA-256 verified as
+`74615d9f1a84d8170dbd1d05d08ade58608d36b1f926c5a8a59a0216a37e1747`
+before applying its six complete source-file edits. Compact summary: 10,559
+bytes. Full diagnostics stayed remote; no local formatter/build/test ran.
+Baseline remains passing `7557e92`; unrelated CLI/B2 changes remain excluded.

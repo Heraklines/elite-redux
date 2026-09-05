@@ -17,8 +17,8 @@ use er_kernel_worker::{
     KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelGenerationV1,
     KernelSessionIdV1, KernelWorkerBootstrapV2, KernelWorkerFaultCodeV2,
     KernelWorkerInitializationV2, KernelWorkerRequestEnvelopeV2, KernelWorkerRequestV2,
-    KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, read_frame_v1, write_frame_v1,
-    MAXIMUM_WORKER_FRAME_BYTES_V2,
+    KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, MAXIMUM_WORKER_FRAME_BYTES_V2,
+    read_frame_v1, write_frame_v1,
 };
 use er_types::{
     GameControlKindV2, InputFocus, PhysicalKey, PresentationEventId, RawInputEvent, SafeU53, SeatId,
@@ -172,38 +172,54 @@ fn raw_key(code: PhysicalKey, pressed: bool) -> CurrentExternalEvent {
 }
 
 #[test]
-fn tiny_success_cap_reports_faults_without_initializing_or_disposing() -> Result<(), Box<dyn Error>> {
+fn tiny_success_cap_reports_faults_without_initializing_or_disposing() -> Result<(), Box<dyn Error>>
+{
     let (bundle, identity) = fixture()?;
     let mut worker = WorkerProcess::spawn_with_success_response_limit(identity, 1)?;
-    for request in [KernelWorkerRequestV2::Hello, initialization(bundle)?, KernelWorkerRequestV2::Dispose] {
+    for request in [
+        KernelWorkerRequestV2::Hello,
+        initialization(bundle)?,
+        KernelWorkerRequestV2::Dispose,
+    ] {
         let fault = worker.exchange(0, request)?;
         assert!(serde_json::to_vec(&fault)?.len() > 1);
         assert_fault(fault, KernelWorkerFaultCodeV2::ResponseTooLarge, None);
     }
     // Neither rejected Initialize nor rejected Dispose committed, and a fault
     // larger than the success cap can still explain the unchanged frontier.
-    assert_fault(worker.exchange(0, KernelWorkerRequestV2::Observe)?, KernelWorkerFaultCodeV2::NotInitialized, None);
+    assert_fault(
+        worker.exchange(0, KernelWorkerRequestV2::Observe)?,
+        KernelWorkerFaultCodeV2::NotInitialized,
+        None,
+    );
     assert!(worker.child.try_wait()?.is_none());
     Ok(())
 }
 
 #[test]
-fn invalid_success_cap_rejects_bootstrap_and_omission_keeps_transport_default() -> Result<(), Box<dyn Error>> {
+fn invalid_success_cap_rejects_bootstrap_and_omission_keeps_transport_default()
+-> Result<(), Box<dyn Error>> {
     let (_, identity) = fixture()?;
     let legacy_shape: KernelWorkerBootstrapV2 = serde_json::from_value(serde_json::json!({
         "abi_version": KERNEL_WORKER_ABI_VERSION_V2, "identity": identity,
     }))?;
     legacy_shape.validate()?;
-    assert_eq!(legacy_shape.maximum_success_response_bytes, MAXIMUM_WORKER_FRAME_BYTES_V2);
+    assert_eq!(
+        legacy_shape.maximum_success_response_bytes,
+        MAXIMUM_WORKER_FRAME_BYTES_V2
+    );
     for maximum in [0, MAXIMUM_WORKER_FRAME_BYTES_V2 + 1] {
-        let mut worker = WorkerProcess::spawn_with_success_response_limit(identity.clone(), maximum)?;
+        let mut worker =
+            WorkerProcess::spawn_with_success_response_limit(identity.clone(), maximum)?;
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             if let Some(status) = worker.child.try_wait()? {
                 assert!(!status.success());
                 break;
             }
-            if Instant::now() >= deadline { return Err("invalid-budget worker did not exit".into()); }
+            if Instant::now() >= deadline {
+                return Err("invalid-budget worker did not exit".into());
+            }
             thread::sleep(Duration::from_millis(5));
         }
     }

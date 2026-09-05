@@ -13,8 +13,9 @@ use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_kernel_worker::{
     KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelWorkerBootstrapV2,
     KernelWorkerHealthV2, KernelWorkerInitializationV2, KernelWorkerRequestEnvelopeV2,
-    KernelWorkerRequestV2, KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, read_frame_v1,
-    write_frame_v1, MAXIMUM_WORKER_FRAME_BYTES_V2, validate_success_response_bytes_v2,
+    KernelWorkerRequestV2, KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2,
+    MAXIMUM_WORKER_FRAME_BYTES_V2, read_frame_v1, validate_success_response_bytes_v2,
+    write_frame_v1,
 };
 use er_types::SeatId;
 
@@ -60,7 +61,8 @@ impl ChildKernelGenerationV2 {
         deadlines: KernelWorkerDeadlinesV2,
         maximum_success_response_bytes: usize,
     ) -> Result<Self, KernelEndpointErrorV2> {
-        validate_success_response_bytes_v2(maximum_success_response_bytes).map_err(protocol_error)?;
+        validate_success_response_bytes_v2(maximum_success_response_bytes)
+            .map_err(protocol_error)?;
         for timeout in [deadlines.request_timeout, deadlines.shutdown_timeout] {
             if timeout.is_zero() || timeout > Duration::from_secs(60) {
                 return Err(KernelEndpointErrorV2::Protocol(
@@ -115,10 +117,14 @@ impl ChildKernelGenerationV2 {
                     let response = (|| {
                         stdin.write_all(&bytes).map_err(|error| error.to_string())?;
                         stdin.flush().map_err(|error| error.to_string())?;
-                        let mut counted = CountingReaderV2 { reader: &mut reader, bytes: 0 };
-                        let response = read_frame_v1::<_, KernelWorkerResponseEnvelopeV2>(&mut counted)
-                            .map_err(|error| error.to_string())?
-                            .ok_or_else(|| "worker closed its response stream".to_owned())?;
+                        let mut counted = CountingReaderV2 {
+                            reader: &mut reader,
+                            bytes: 0,
+                        };
+                        let response =
+                            read_frame_v1::<_, KernelWorkerResponseEnvelopeV2>(&mut counted)
+                                .map_err(|error| error.to_string())?
+                                .ok_or_else(|| "worker closed its response stream".to_owned())?;
                         Ok((response, counted.bytes.saturating_sub(4)))
                     })();
                     let failed = response.is_err();
@@ -317,23 +323,24 @@ impl ChildKernelGenerationV2 {
             self.fence();
             return Err(process_error("worker request channel unavailable"));
         }
-        let (response, response_bytes) = match self.responses.recv_timeout(self.deadlines.request_timeout) {
-            Ok(Ok(response)) => response,
-            Ok(Err(error)) => {
-                self.fence();
-                return Err(process_error(error));
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                self.fence();
-                return Err(KernelEndpointErrorV2::Deadline(
-                    "worker request write or response read",
-                ));
-            }
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                self.fence();
-                return Err(process_error("worker response channel disconnected"));
-            }
-        };
+        let (response, response_bytes) =
+            match self.responses.recv_timeout(self.deadlines.request_timeout) {
+                Ok(Ok(response)) => response,
+                Ok(Err(error)) => {
+                    self.fence();
+                    return Err(process_error(error));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    self.fence();
+                    return Err(KernelEndpointErrorV2::Deadline(
+                        "worker request write or response read",
+                    ));
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.fence();
+                    return Err(process_error("worker response channel disconnected"));
+                }
+            };
         if response.abi_version != KERNEL_WORKER_ABI_VERSION_V2
             || response.session_id != self.identity.session_id
             || response.generation != self.identity.generation
@@ -364,7 +371,9 @@ impl ChildKernelGenerationV2 {
             KernelWorkerRequestV2::Initialize { initialization, .. } => {
                 self.session_context = Some(initialization.session_context());
             }
-            KernelWorkerRequestV2::Restore { local_seat, role, .. } => {
+            KernelWorkerRequestV2::Restore {
+                local_seat, role, ..
+            } => {
                 self.session_context = Some((*local_seat, *role));
             }
             KernelWorkerRequestV2::Dispose => self.session_context = None,

@@ -46,7 +46,9 @@ pub struct KernelWorkerBootstrapV2 {
     pub maximum_success_response_bytes: usize,
 }
 
-fn default_success_response_bytes_v2() -> usize { MAXIMUM_WORKER_FRAME_BYTES_V2 }
+fn default_success_response_bytes_v2() -> usize {
+    MAXIMUM_WORKER_FRAME_BYTES_V2
+}
 
 impl KernelWorkerBootstrapV2 {
     pub fn validate(&self) -> Result<(), KernelWorkerProtocolErrorV2> {
@@ -58,7 +60,9 @@ impl KernelWorkerBootstrapV2 {
     }
 }
 
-pub fn validate_success_response_bytes_v2(maximum: usize) -> Result<(), KernelWorkerProtocolErrorV2> {
+pub fn validate_success_response_bytes_v2(
+    maximum: usize,
+) -> Result<(), KernelWorkerProtocolErrorV2> {
     if maximum == 0 || maximum > MAXIMUM_WORKER_FRAME_BYTES_V2 {
         return Err(KernelWorkerProtocolErrorV2::ResponseBudget);
     }
@@ -94,16 +98,24 @@ impl KernelWorkerInitializationV2 {
     /// derives role from protocol configuration, defaulting to authority.
     pub fn session_context(&self) -> (SeatId, GameKernelRoleV7) {
         match self {
-            Self::Natural { local_seat, protocol, .. } => {
-                let role = protocol.as_ref().as_ref().map_or(GameKernelRoleV7::Authority, |value| {
-                    match value.role {
-                        er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
-                        er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
-                    }
-                });
+            Self::Natural {
+                local_seat,
+                protocol,
+                ..
+            } => {
+                let role =
+                    protocol
+                        .as_ref()
+                        .as_ref()
+                        .map_or(GameKernelRoleV7::Authority, |value| match value.role {
+                            er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
+                            er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
+                        });
                 (*local_seat, role)
             }
-            Self::Snapshot { local_seat, role, .. } => (*local_seat, *role),
+            Self::Snapshot {
+                local_seat, role, ..
+            } => (*local_seat, *role),
         }
     }
 }
