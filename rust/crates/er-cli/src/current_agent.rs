@@ -18,8 +18,8 @@ use er_types::{RawInputEvent, SafeU53, SeatId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::m72::{BoundedLineStatusV1, read_bounded_jsonl_line_v1};
 use crate::current_worker_agent::{CurrentBackend, WorkerConfiguration};
+use crate::m72::{BoundedLineStatusV1, read_bounded_jsonl_line_v1};
 
 // A full current snapshot is larger than the historical 64 KiB inline threshold.
 // Keep all accepted responses inline; oversized results are rejected, never turned
@@ -103,7 +103,9 @@ impl CurrentDispatcher {
         self.reserve_id(&request.session)?;
         let (owner_seat, role) = match &request.start {
             CurrentStart::Natural { owner_seat, .. } => (*owner_seat, GameKernelRoleV7::Authority),
-            CurrentStart::Snapshot { owner_seat, role, .. } => (*owner_seat, *role),
+            CurrentStart::Snapshot {
+                owner_seat, role, ..
+            } => (*owner_seat, *role),
         };
         let session = match request.start {
             CurrentStart::Natural {
@@ -179,18 +181,16 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                     "role": required::<GameKernelRoleV7>(params, "role")?
                 }
             })),
-            "session.observe" => bounded(
-                serde_json::to_value(self.session(params)?.observe()?)
-                    .map_err(backend)?,
-            ),
+            "session.observe" => {
+                bounded(serde_json::to_value(self.session(params)?.observe()?).map_err(backend)?)
+            }
             "session.invariants" => {
                 self.session(params)?.validate()?;
                 Ok(json!({"valid": true, "kernel_version": 7}))
             }
-            "session.snapshot" | "session.checkpoint" => bounded(
-                serde_json::to_value(self.session(params)?.snapshot()?)
-                    .map_err(backend)?,
-            ),
+            "session.snapshot" | "session.checkpoint" => {
+                bounded(serde_json::to_value(self.session(params)?.snapshot()?).map_err(backend)?)
+            }
             "session.raw_input" => self.apply(
                 params,
                 CurrentExternalEvent::RawInput {
@@ -236,12 +236,12 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                 },
             ),
             "platform.event" => self.apply(params, required(params, "event")?),
-            "session.restore" => {
-                self.session(params)?.restore(required(params, "snapshot")?)
-            }
+            "session.restore" => self.session(params)?.restore(required(params, "snapshot")?),
             "session.reload" => {
                 let ticket = self.next_reload_ticket;
-                let next = ticket.checked_add(1).ok_or_else(|| backend("reload ticket counter exhausted"))?;
+                let next = ticket
+                    .checked_add(1)
+                    .ok_or_else(|| backend("reload ticket counter exhausted"))?;
                 let result = self.session(params)?.reload(params, ticket)?;
                 self.next_reload_ticket = next;
                 Ok(result)
@@ -282,11 +282,12 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
         return Err("agent requires --protocol jsonl".into());
     }
     let path = crate::option_path(options, "content", "ER_M9_CONTENT")?;
-    let bundle: GameContentBundleV2 = crate::current_commands::read_json(&path, 64 << 20).map_err(|error| {
-        format!(
-            "current agent requires V2 content; use agent-v6 for historical V1 content: {error}"
-        )
-    })?;
+    let bundle: GameContentBundleV2 =
+        crate::current_commands::read_json(&path, 64 << 20).map_err(|error| {
+            format!(
+                "current agent requires V2 content; use agent-v6 for historical V1 content: {error}"
+            )
+        })?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
     let worker = WorkerConfiguration::from_options(options, &content)?;
     let maximum_sessions = options
@@ -303,7 +304,8 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
         next_reload_ticket: 1,
     };
     if let Some(path) = options.get("snapshot") {
-        let snapshot: CoreGameKernelSnapshotV7 = crate::current_commands::read_json(std::path::Path::new(path), 8 << 20)?;
+        let snapshot: CoreGameKernelSnapshotV7 =
+            crate::current_commands::read_json(std::path::Path::new(path), 8 << 20)?;
         let owner = options
             .get("seat")
             .map_or(Ok(1), |value| value.parse::<u64>())?;
@@ -323,7 +325,8 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
             Arc::clone(&dispatcher.content),
         )?;
         let session = match &dispatcher.worker {
-            Some(worker) => worker.adopt("current", &session, SeatId::new(SafeU53::new(owner)?), role)
+            Some(worker) => worker
+                .adopt("current", &session, SeatId::new(SafeU53::new(owner)?), role)
                 .map_err(|error| error.message)?,
             None => CurrentBackend::Native(Box::new(session)),
         };

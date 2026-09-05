@@ -580,3 +580,20 @@ capsule recorder/replay, browser host and TS transport integration are also
 unstaged and unverified. Parent is wiring normal replay and session.from_capsule;
 actual browser-to-CLI witness and focused gate are still required. Full M9 is not
 complete; no deploy, final-tag change or legacy player-save access occurred.
+
+### Early format gate returned the complete CLI repair
+
+Run `33939479499`, candidate `c7886b5866a3ef2c288906e2a4fc3ae19a9e6e98`,
+passed harness preflight and stopped at formatting with zero product tests, as
+intended. Format check and repair took3,322ms each. Inspected/downloaded compact
+artifact8,985bytes and named repair9,070bytes; the complete47,903-byte source
+patch was verified against SHA-256
+`5edf2079ef918d14e393a53a0c12e7eb046dee8400e9910591067922fd516b6e`
+before applying its four complete CLI source/test edits. Full diagnostics stayed
+remote. The repair includes the bounded streaming process witness; future B2 /
+current-capsule sources remain excluded. Remote full reload validation is next.
+
+Correction to preceding retry note: d415 run33937932009 attempt2 had already
+ended with exit143 before the c788 push; it was not canceled by that push.
+Its artifact steps again produced no report. No full test pass is claimed for
+either terminated attempt; da73baa remains the qualified baseline.
