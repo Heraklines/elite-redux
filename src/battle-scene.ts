@@ -1049,17 +1049,18 @@ export class BattleScene extends SceneBase {
    * Initialize the variant data.
    * If experimental sprites are enabled, their entries are replaced via this method.
    */
-  async initVariantData(): Promise<void> {
+  async initVariantData(fetchMetadata = cachedFetch): Promise<void> {
+    const otherVariantData = await fetchMetadata("./images/pokemon/variant/_masterlist.json").then(r => r.json());
+    if (this.experimentalSprites) {
+      const expVariantData = await fetchMetadata("./images/pokemon/variant/_exp_masterlist.json").then(r => r.json());
+      deepMergeSpriteData(otherVariantData, expVariantData);
+    }
+    // Keep the last complete registry usable while either download is pending
+    // (or fails). Publish the replacement synchronously, with no empty window.
     clearVariantData();
-    const otherVariantData = await cachedFetch("./images/pokemon/variant/_masterlist.json").then(r => r.json());
     for (const k of Object.keys(otherVariantData)) {
       variantData[k] = otherVariantData[k];
     }
-    if (!this.experimentalSprites) {
-      return;
-    }
-    const expVariantData = await cachedFetch("./images/pokemon/variant/_exp_masterlist.json").then(r => r.json());
-    deepMergeSpriteData(variantData, expVariantData);
   }
 
   async initStarterColors(): Promise<void> {
@@ -1712,7 +1713,9 @@ export class BattleScene extends SceneBase {
 
     if (clearScene) {
       // Reload variant data in case sprite set has changed
-      this.initVariantData();
+      void this.initVariantData().catch(error => {
+        console.warn("Could not reload variant data; keeping the previous sprite metadata", error);
+      });
 
       this.fadeOutBgm(250, false);
       this.tweens.add({

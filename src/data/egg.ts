@@ -237,7 +237,7 @@ export class Egg {
       this._hatchWaves = eggOptions?.hatchWaves ?? this.getEggTierDefaultHatchWaves();
       this._timestamp = eggOptions?.timestamp ?? Date.now();
 
-      // First roll shiny and variant so we can filter if species with an variant exist
+      // Shiny tiers are gameplay rewards, independent of downloaded sprite metadata.
       this._isShiny = eggOptions?.isShiny ?? (Overrides.EGG_SHINY_OVERRIDE || this.rollShiny());
       this._variantTier = eggOptions?.variantTier ?? Overrides.EGG_VARIANT_OVERRIDE ?? this.rollVariant();
       this._species = eggOptions?.species ?? this.rollSpecies()!; // TODO: Is this bang correct?
@@ -249,12 +249,9 @@ export class Egg {
         this._tier = this.getEggTier();
         this._hatchWaves = eggOptions.hatchWaves ?? this.getEggTierDefaultHatchWaves();
       }
-      // If species has no variant, set variantTier to common. This needs to
-      // be done because species with no variants get filtered at rollSpecies but if the
-      // species is set via options or the legendary gacha pokemon gets choosen the check never happens
-      if (this._species && !getPokemonSpecies(this._species).hasVariants()) {
-        this._variantTier = VariantTier.STANDARD;
-      }
+      // Preserve both new rolls and saved tiers even while sprite metadata is
+      // unavailable. hasVariants() queries that transient registry; using it here
+      // silently demoted candy eggs (including restored T2/T3 eggs) to T1.
       // Needs this._tier so it needs to be generated afer the tier override if bought from same species
       this._eggMoveIndex = eggOptions?.eggMoveIndex ?? this.rollEggMoveIndex();
       if (eggOptions?.pulled) {
@@ -606,10 +603,8 @@ export class Egg {
       }
     }
 
-    // If egg variant is set to RARE or EPIC, filter species pool to only include ones with variants.
-    if (this.variantTier && (this.variantTier === VariantTier.RARE || this.variantTier === VariantTier.EPIC)) {
-      speciesPool = speciesPool.filter(s => getPokemonSpecies(s).hasVariants());
-    }
+    // Do not narrow the gameplay pool using downloaded sprite metadata. A slow
+    // reload must not exclude vanilla species from higher-tier shiny eggs.
 
     /**
      * Pokemon that are cheaper in their tier get a weight boost.
