@@ -926,6 +926,20 @@ def write_progress(summary, phase, target=None):
     temporary.replace(COMPACT / "summary.json")
 
 
+def native_execution_order(selection, enumerated):
+    # Discovery and lint already covered every selected target. Exercise current
+    # kernel changes before long process witnesses without changing membership.
+    if selection.get("timer_focus"):
+        first = [("er-kernel", name) for name in (
+            "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
+        first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
+        priority = {identity: index for index, identity in enumerate(first)}
+        return sorted(enumerated, key=lambda item: priority.get((item[4].name, item[2]), len(priority)))
+    if selection.get("cli_reload_focus") or selection.get("menu_validation_focus") or selection.get("current_batch_focus"):
+        return sorted(enumerated, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
+    return enumerated
+
+
 def main(preflight_failure=None):
     COMPACT.mkdir(parents=True, exist_ok=True)
     FULL.mkdir(parents=True, exist_ok=True)
@@ -1058,8 +1072,7 @@ def main(preflight_failure=None):
         if selection["requires_browser"]:
             write_progress(summary, "lint", "er-web")
             run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
-        if selection.get("cli_reload_focus") or selection.get("menu_validation_focus") or selection.get("timer_focus") or selection.get("current_batch_focus"):
-            enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
+        enumerated = native_execution_order(selection, enumerated)
         if os.environ.get("M9E_PHASE") == "native":
             from m9e_phases import inventory_and_assignment
             lane = os.environ.get("M9E_NATIVE_LANE")

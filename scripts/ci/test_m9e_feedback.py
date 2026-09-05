@@ -1669,7 +1669,18 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["required_native_target_counts"]["er-batch:m9e_current_batch"], 6)
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_batch"], 2)
         self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 3)
-        self.assertEqual(self.executed[0], "m9e_current_reload")
+        first = [("er-kernel", target) for target in (
+            "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
+        first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
+        self.assertEqual([(self.binary_crates[name], self.binary_targets.get(name, name)) for name in self.executed[:8]], first)
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        first_execution = self.events.index("execute:" + self.executed[0])
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, first_execution)
+        expected_count = sum(len(ids) for ids in self.binary_ids.values())
+        self.assertEqual(summary["tests"], {"selected": expected_count, "executed": expected_count,
+                                           "passed": expected_count, "failed": 0, "skipped": 0})
         self.assertIn("current_kernel_endpoint_v2", self.executed)
         self.assertIn("current_kernel_endpoint_faults_v2", self.executed)
         for name, phase, env in self.binary_envs:
@@ -1678,6 +1689,31 @@ class FeedbackTests(unittest.TestCase):
                     self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
                 else:
                     self.assertIsNone(env)
+
+    def test_native_execution_priority_is_crate_bound_and_timer_scope_only(self):
+        identities = [("er-other", "m9e_game_kernel_v7"), ("er-cli", "m9e_current_reload"),
+                      ("er-kernel", "m9e_domain_journeys_v7"), ("er-other", "m9e_parity"),
+                      ("er-wasm", "m9e_parity"), ("er-kernel", "m9e_timers_v7"),
+                      ("er-kernel", "m9e_snapshot_v7"), ("er-kernel", "m9e_coop_v7"),
+                      ("er-kernel", "m9e_game_kernel_v7"), ("er-other", "m9e_current_reload"),
+                      ("er-other", "m9e_host_v2"), ("er-web", "m9e_host_v2")]
+        enumerated = [(index, f"binary-{index}", target, [f"test-{index}"], self.rust / "crates" / crate, set(), None)
+                      for index, (crate, target) in enumerate(identities)]
+        original = list(enumerated)
+        ordered = self.feedback.native_execution_order({"timer_focus": True}, enumerated)
+        self.assertEqual([(item[4].name, item[2]) for item in ordered], [
+            ("er-kernel", "m9e_game_kernel_v7"), ("er-kernel", "m9e_coop_v7"),
+            ("er-kernel", "m9e_snapshot_v7"), ("er-kernel", "m9e_timers_v7"),
+            ("er-kernel", "m9e_domain_journeys_v7"), ("er-wasm", "m9e_parity"),
+            ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload"), ("er-other", "m9e_game_kernel_v7"),
+            ("er-other", "m9e_parity"), ("er-other", "m9e_current_reload"), ("er-other", "m9e_host_v2")])
+        self.assertEqual(sorted(item[0] for item in ordered), list(range(len(enumerated))))
+        self.assertEqual(enumerated, original)
+        for scope in ("cli_reload_focus", "menu_validation_focus", "current_batch_focus"):
+            with self.subTest(scope=scope):
+                other = self.feedback.native_execution_order({scope: True}, enumerated)
+                self.assertEqual(other, [enumerated[1], *enumerated[:1], *enumerated[2:]])
+        self.assertEqual(self.feedback.native_execution_order({}, enumerated), enumerated)
 
     def invoke_synthetic_timer_mutant(self, mode, mutant="timer", expected_failure_phase=None):
         key = f"{mutant}_mutant"

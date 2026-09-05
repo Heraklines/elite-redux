@@ -6,7 +6,9 @@ use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
 };
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
-use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
+use er_kernel::snapshot_v7::{
+    CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7, SnapshotV7Error,
+};
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
@@ -171,6 +173,40 @@ fn complete_natural_start(kernel: &mut GameKernelV7) -> Result<(), Box<dyn Error
     Ok(())
 }
 
+fn controlled_active_fixture(
+    snapshot: CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<GameKernelV7, Box<dyn Error>> {
+    // The real bootstrap material describes the original state. Deliberately
+    // edited battle setup cannot restore with that material as canonical evidence.
+    assert_eq!(snapshot.validate(&content), Err(SnapshotV7Error::Invalid));
+    let GameKernelLifecycleSnapshotV7::Active(state) = snapshot.lifecycle else {
+        return Err("controlled fixture is not active".into());
+    };
+    state.validate_with(content.as_ref())?;
+    let fixture = GameKernelV7::from_active(
+        state,
+        snapshot.material_ledger.next_authority_revision,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content.clone(),
+        snapshot.input_router,
+        snapshot.scheduler,
+        snapshot.protocol,
+    )?;
+    // This explicitly starts fresh fixture bookkeeping at the same frontier;
+    // it does not rewrite the old ledger or claim retained bootstrap history.
+    let fresh = fixture.snapshot()?;
+    let restored = GameKernelV7::from_snapshot(
+        serde_json::from_slice(&serde_json::to_vec(&fresh)?)?,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content,
+    )?;
+    assert_eq!(restored.snapshot()?, fresh);
+    Ok(restored)
+}
+
 #[test]
 fn raw_keys_complete_natural_start_and_install_serialized_v6_state() -> Result<(), Box<dyn Error>> {
     let content = content()?;
@@ -273,12 +309,7 @@ fn nonterminal_battle_progresses_to_next_wave() -> Result<(), Box<dyn Error>> {
         .ok_or("enemy is absent")?;
     enemy.hp = 1;
     enemy.fainted = false;
-    kernel = GameKernelV7::from_snapshot(
-        snapshot,
-        SeatId::new(safe(1)),
-        GameKernelRoleV7::Authority,
-        content.clone(),
-    )?;
+    kernel = controlled_active_fixture(snapshot, content.clone())?;
     let initial_wave = kernel
         .state()
         .and_then(|state| state.active_run.as_ref())
@@ -370,13 +401,39 @@ fn final_wave_victory_terminates_the_run() -> Result<(), Box<dyn Error>> {
     let enemy = battle.enemy_party.first_mut().ok_or("enemy missing")?;
     enemy.hp = 1;
     enemy.fainted = false;
-    kernel = GameKernelV7::from_snapshot(
-        snapshot,
-        SeatId::new(safe(1)),
-        GameKernelRoleV7::Authority,
-        content.clone(),
+    // Command operation IDs include the wave. Rebind the controlled root to
+    // wave 200 using the same actor/field semantics as the kernel's builder.
+    let owner = run.control.owner_seat.ok_or("command owner missing")?;
+    let field = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| {
+            slot.slot.side == er_types::battle_ids::BattleSide::Player
+                && slot.occupant.is_some_and(|id| {
+                    run.party
+                        .iter()
+                        .any(|pokemon| pokemon.id == id && pokemon.owner_seat == Some(owner))
+                })
+        })
+        .ok_or("command owner has no active player")?;
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        field.slot,
+        owner,
     )?;
+    let context = run.control.action_context.as_mut().ok_or("command context missing")?;
+    assert_ne!(context.operation_id, operation);
+    context.operation_id = operation;
+    run.control.validate()?;
+    kernel = controlled_active_fixture(snapshot, content.clone())?;
     press(&mut kernel, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleMove)
+    );
     let step = submit_strongest_move(&mut kernel, &content)?;
     assert!(step.effects.iter().any(|effect| matches!(
         effect,
@@ -510,12 +567,7 @@ fn authority_ai_can_choose_a_legal_enemy_switch() -> Result<(), Box<dyn Error>> 
     let bench_id = bench.id;
     battle.enemy_party.push(bench);
     assert_eq!(battle.enemy_party[1].id, bench_id);
-    kernel = GameKernelV7::from_snapshot(
-        snapshot,
-        SeatId::new(safe(1)),
-        GameKernelRoleV7::Authority,
-        content,
-    )?;
+    kernel = controlled_active_fixture(snapshot, content)?;
     let commands = kernel.prepare_authority_ai_commands()?;
     assert_eq!(commands.len(), 1);
     let er_types::battle_command::AcceptedBattleCommand::ScriptedEnemy { command, .. } =

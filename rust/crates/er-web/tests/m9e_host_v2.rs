@@ -506,6 +506,37 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
         reserved_pokemon: Vec::new(),
         visit_count: SafeU53::ZERO,
     });
+    let scenario_state = state.clone();
+    // Editing the reached state does not rewrite the material that originally
+    // produced it. That contradictory restoration must remain rejected.
+    assert_eq!(
+        scenario_snapshot.validate(prepared.as_ref()),
+        Err(er_kernel::snapshot_v7::SnapshotV7Error::Invalid)
+    );
+    // Scenario initialization is a controlled fresh boundary. Construct its
+    // runtime explicitly, preserving state/revision/input/scheduler/protocol;
+    // the natural checkpoint's material and pending effects belong to that
+    // earlier execution and are not a history of this constructed scenario.
+    let scenario_snapshot = GameKernelV7::from_active(
+        scenario_state.clone(),
+        snapshot.material_ledger.next_authority_revision,
+        context().local_seat,
+        GameKernelRoleV7::Authority,
+        Arc::clone(&prepared),
+        snapshot.input_router.clone(),
+        snapshot.scheduler.clone(),
+        snapshot.protocol.clone(),
+    )?
+    .snapshot()?;
+    assert_eq!(
+        scenario_snapshot.lifecycle,
+        GameKernelLifecycleSnapshotV7::Active(scenario_state)
+    );
+    assert!(scenario_snapshot.material_ledger.records.is_empty());
+    assert_eq!(
+        scenario_snapshot.material_ledger.next_authority_revision,
+        snapshot.material_ledger.next_authority_revision
+    );
     let mut scenario_host = BrowserKernelHostV2::from_content(shared_content()?);
     assert!(matches!(
         send(
@@ -514,13 +545,18 @@ fn all_five_initialization_modes_and_repro_effect_are_live() -> Result<(), Box<d
             BrowserRequestV2::Initialize {
                 initialization: Box::new(BrowserSessionInitializationV2::Scenario {
                     context: context(),
-                    snapshot: scenario_snapshot,
+                    snapshot: scenario_snapshot.clone(),
                     scenario: scenario_id,
                 }),
             },
-        )?,
+        )
+        .map_err(|error| format!("scenario initialization failed: {error}"))?,
         BrowserResponseV2::Ready
     ));
+    assert_eq!(
+        scenario_host.kernel_ref().ok_or("scenario kernel missing")?.snapshot()?,
+        scenario_snapshot
+    );
     let response = send(&mut scenario_host, 1, BrowserRequestV2::ExportRepro)?;
     let BrowserResponseV2::Effects { batch } = response else {
         return Err("repro export did not return effects".into());

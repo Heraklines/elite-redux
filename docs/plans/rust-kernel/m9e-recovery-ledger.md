@@ -1168,3 +1168,42 @@ redundant B evidence and both16,251-byte diagnostics remain remote. Its complete
 24,194-byte four-file formatting patch had zero omissions and verified SHA
 eff01661a78a009928dbce185e377ab14b0cb763a2a33f81cee5a4595cd4721e.
 Applied that remote-generated patch; baseline remains fully qualified9a3e8db3.
+Private candidate8fb78aae243d4e633593fc3617a88243c17565d1/run33956904749
+compiled and passed required formatting/lint and109 harness tests, then failed
+four existing constructed fixtures. NativeA selected603, executed566, passed563,
+failed3; B executed18, passed17, failed1. Aggregate failed closed, platform skipped;
+19 selected tests were not executed. No private qualification/baseline advance.
+All four coop/private-control tests,12 domain journeys, six core batch and both
+actual CLI batch/capsule suites completed successfully before these failures.
+
+Native failures: authority_ai_can_choose_a_legal_enemy_switch,
+final_wave_victory_terminates_the_run and nonterminal_battle_progresses_to_next_wave
+in m9e_game_kernel_v7. Each changed a naturally reached battle state while retaining
+material records for the original state. Browser all_five_initialization_modes_and_repro_effect_are_live
+likewise injected a Scenario into the reached BattleCommand state and retained its
+old ledger. Each now requires rejection of that contradictory snapshot, then uses
+GameKernelV7::from_active to construct an explicit fresh controlled boundary with
+preserved intended state/revision/seat/role/input/scheduler/protocol. Native tests
+also serialize/restore a genuine fresh snapshot and assert full equality; Scenario
+initialization compares the full host snapshot. Existing seven native test IDs,
+fourteen host IDs, five initialization modes and gameplay/repro assertions remain.
+No ledger hash is fabricated and validation is not weakened. These controlled
+one-HP/enemy-switch/Scenario fixtures do not certify natural campaigns.
+
+Downloaded only inspected nativeA4108/B3563 compressed-byte compact artifacts;
+108,236/91,134-byte full diagnostics remain remote. A09:02:46-09:23:53 UTC,
+B09:02:46-09:24:34. Actual CLIreload561,169 ms, supervisor221,964 ms,
+worker92,214 ms preceded native kernel failures; B CLIbatch468,226 andCLIcaps295,203
+ms preceded host target296,083 ms. To shorten the next relevant failure feedback,
+timer scope now prioritizes current kernel, native parity and affected host targets
+before long CLI/process suites. Exact crate/target ordering retains all inventories,
+phase membership, required checks, mutants and limits. Other scopes keep their
+existing order. Expanded mocked ordering assertions require110 selftests, still
+unexecuted at this edit. No measured speedup or test-count reduction is claimed.
+
+Frozen native/Wasm parity digest has not yet been reached in this failed run and
+remains unchanged. Baseline stays exact fully qualified9a3e8db3/run33954961024.
+The wave200 controlled fixture also regenerates its root operation identifier
+through player_command_operation_id using its actual player field and owner;
+its wave1 identifier is asserted different. OpenFight must reach BattleMove
+before the existing strongest-move/terminal assertions. No ledger digest changes.
