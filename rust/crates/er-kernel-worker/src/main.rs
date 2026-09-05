@@ -33,7 +33,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         Some(version) if version == u64::from(KERNEL_WORKER_ABI_VERSION_V2) => {
             let bootstrap: KernelWorkerBootstrapV2 = serde_json::from_value(value)?;
-            let mut runtime = KernelWorkerRuntimeV2::new(bootstrap.identity)?;
+            bootstrap.validate()?;
+            let mut runtime = KernelWorkerRuntimeV2::with_success_response_limit(
+                bootstrap.identity, bootstrap.maximum_success_response_bytes,
+            )?;
             while let Some(request) =
                 read_frame_v1::<_, KernelWorkerRequestEnvelopeV2>(&mut reader)?
             {

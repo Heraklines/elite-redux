@@ -83,6 +83,15 @@ def check_format(selection):
                 patch = subprocess.check_output(["git", "diff", "--unified=1", "--", *paths], cwd=ROOT)
                 (FULL / "format.patch").write_bytes(patch)
                 compact, metadata = compact_format_patch(patch)
+                # Optional named failure repair, within the handoff's 256 KiB
+                # diagnostic budget. Routine summaries retain their 64 KiB cap.
+                # Retrieve only after inspecting artifact size; never download
+                # the full diagnostic archive to obtain this source-only patch.
+                if metadata["omitted_bytes"] and len(patch) <= 262144:
+                    repair = REPORT / "format-repair.patch"
+                    repair.write_bytes(patch)
+                    metadata["repair_bytes"] = len(patch)
+                    metadata["repair_sha256"] = hashlib.sha256(patch).hexdigest()
                 (FULL / "format-patch-metadata.json").write_text(json.dumps(metadata) + "\n")
                 if compact:
                     (COMPACT / "format.patch").write_bytes(compact)
@@ -257,6 +266,7 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
+              "requires_cli_clippy": any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
@@ -635,6 +645,8 @@ def main(preflight_failure=None):
                 summary["native_timer_parity_digest"] = timer_parity_digest(output.read_text(), "native")
         if not summary["tests"]["executed"]:
             raise RuntimeError("zero tests executed")
+        if selection.get("requires_cli_clippy"):
+            run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
         if selection["worker_session_focus"] or selection["requires_worker_executable"]:
             run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
         if selection["requires_worker_executable"]:
@@ -657,6 +669,8 @@ def main(preflight_failure=None):
         metadata = json.loads(patch_metadata.read_text()) if patch_metadata.exists() else {}
         summary["format_patch_omitted_bytes"] = metadata.get("omitted_bytes", 0)
         summary["format_patch_omitted_paths"] = metadata.get("omitted_paths", [])
+        summary["format_repair_bytes"] = metadata.get("repair_bytes", 0)
+        summary["format_repair_sha256"] = metadata.get("repair_sha256")
         summary["format_patch_included_paths"] = metadata.get("included_paths", [])
         (FULL / "selected-tests.json").write_text(json.dumps(tests, indent=2) + "\n")
         summary["selected_test_ids"] = {"file": "selected-tests.json", "sha256": digest(FULL / "selected-tests.json")}

@@ -400,6 +400,45 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-cli", '[dependencies]\ner-env = { path = "../er-env" }\n')
         self.package("er-web", '[dependencies]\ner-env = { path = "../er-env" }\n')
 
+    def test_current_cli_utility_paths_keep_focused_parity_and_require_clippy(self):
+        self.configure_browser_scope()
+        self.changed = ["rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs",
+                        "rust/crates/er-cli/tests/m9e_current_entry.rs"]
+        selection = self.feedback.plan()
+        self.assertEqual(selection["execution_scope"], self.config["current_session_focus"]["execute"])
+        self.assertTrue(selection["requires_cli_clippy"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertFalse(selection["requires_browser"])
+        for changed in (["rust/crates/er-cli/src/current_agent.rs"], ["rust/crates/er-cli/tests/m9e_current_entry.rs"]):
+            self.changed = changed
+            self.assertTrue(self.feedback.plan()["requires_cli_clippy"])
+        for changed in (["docs/plans/rust-kernel/m9e-progress.md"], ["rust/crates/er-env/src/current.rs"]):
+            self.changed = changed
+            self.assertFalse(self.feedback.plan()["requires_cli_clippy"])
+
+    def test_current_cli_clippy_executes_and_its_failure_fails_feedback(self):
+        self.configure_browser_scope()
+        self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
+        self.binary_ids = {"env_suite": ["session"], "cli_suite": ["commands"], "m9e_parity": [
+            "native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]}
+        self.binary_crates = {"env_suite": "er-env", "cli_suite": "er-cli", "m9e_parity": "er-wasm"}
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        for clippy_code in (0, 1):
+            with self.subTest(clippy_code=clippy_code):
+                self.clippy_code = clippy_code
+                with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+                    code, summary = self.invoke()
+                self.assertEqual(code, clippy_code)
+                self.assertIn("cli-clippy", summary["timing_ms"])
+                self.assertIn(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], self.commands)
+                browser.assert_not_called()
+                if clippy_code:
+                    self.assertIn("cli-clippy exited 1", summary["first_failure"])
+                    wasm.assert_not_called()
+                else:
+                    wasm.assert_called_once()
+
     def configure_worker_scope(self):
         self.configure_browser_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
@@ -622,7 +661,31 @@ class FeedbackTests(unittest.TestCase):
             "current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2",
             "kernel_reload_acceptance", "kernel_reload_artifact"])
         self.assertEqual(selection["required_native_targets"], {
-            "er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"]})
+            "er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"],
+            "er-kernel-worker": ["current_process_v2"]})
+        for path in ("rust/crates/er-kernel-worker/src/runtime_v2.rs", "rust/crates/er-kernel-worker/src/main.rs",
+                     "rust/crates/er-kernel-worker/tests/current_process_v2.rs"):
+            self.assertIn(path, self.config["supervisor_focus"]["paths"])
+
+    def test_supervisor_budget_union_stays_native_and_requires_worker_process_witness(self):
+        self.configure_supervisor_scope()
+        self.changed = ["rust/crates/er-lab/src/kernel_reload/supervisor_v2.rs",
+                        "rust/crates/er-kernel-worker/src/runtime_v2.rs",
+                        "rust/crates/er-kernel-worker/src/main.rs",
+                        "rust/crates/er-kernel-worker/tests/current_process_v2.rs"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["supervisor_focus"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertFalse(selection["requires_browser"])
+        self.assertFalse(selection["requires_wasm"])
+        self.assertEqual(selection["required_native_targets"]["er-kernel-worker"], ["current_process_v2"])
+        required = selection["required_native_targets"]
+        lab_only = [("er-lab", target, ["real_process"]) for target in required["er-lab"]]
+        with self.assertRaisesRegex(RuntimeError, "er-kernel-worker:current_process_v2"):
+            self.feedback.required_native_target_counts(required, lab_only)
+        counts = self.feedback.required_native_target_counts(required, lab_only + [
+            ("er-kernel-worker", "current_process_v2", ["real_worker_budget"])])
+        self.assertEqual(counts["er-kernel-worker:current_process_v2"], 1)
 
     def test_supervisor_mixed_paths_preserve_shared_and_browser_gates(self):
         self.configure_supervisor_scope()

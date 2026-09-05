@@ -14,7 +14,7 @@ use crate::protocol_v2::{
     KernelWorkerFaultV2, KernelWorkerHealthV2, KernelWorkerInitializationV2,
     KernelWorkerProtocolErrorV2, KernelWorkerRequestEnvelopeV2, KernelWorkerRequestV2,
     KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, MAXIMUM_SNAPSHOT_BYTES_V2,
-    MAXIMUM_WORKER_FRAME_BYTES_V2,
+    MAXIMUM_WORKER_FRAME_BYTES_V2, validate_success_response_bytes_v2,
 };
 
 #[derive(Debug, Error)]
@@ -51,11 +51,20 @@ pub struct KernelWorkerRuntimeV2 {
     accepted_sequence: Option<u64>,
     applied_events: u64,
     disposed: bool,
+    maximum_success_response_bytes: usize,
 }
 
 impl KernelWorkerRuntimeV2 {
     pub fn new(identity: KernelGenerationIdentityV2) -> Result<Self, KernelWorkerRuntimeErrorV2> {
+        Self::with_success_response_limit(identity, MAXIMUM_WORKER_FRAME_BYTES_V2)
+    }
+
+    pub fn with_success_response_limit(
+        identity: KernelGenerationIdentityV2,
+        maximum_success_response_bytes: usize,
+    ) -> Result<Self, KernelWorkerRuntimeErrorV2> {
         identity.validate()?;
+        validate_success_response_bytes_v2(maximum_success_response_bytes)?;
         Ok(Self {
             identity,
             content: None,
@@ -63,6 +72,7 @@ impl KernelWorkerRuntimeV2 {
             accepted_sequence: None,
             applied_events: 0,
             disposed: false,
+            maximum_success_response_bytes,
         })
     }
 
@@ -99,6 +109,7 @@ impl KernelWorkerRuntimeV2 {
                         message: error.to_string().chars().take(1_024).collect(),
                         retryable: false,
                     }),
+                    MAXIMUM_WORKER_FRAME_BYTES_V2,
                 )
             }
         }
@@ -121,6 +132,7 @@ impl KernelWorkerRuntimeV2 {
                 accepted,
                 self.observation_digest()?,
                 KernelWorkerResponseV2::Ready(Box::new(self.identity.clone())),
+                self.maximum_success_response_bytes,
             ),
             KernelWorkerRequestV2::Initialize {
                 content_bundle,
@@ -172,6 +184,7 @@ impl KernelWorkerRuntimeV2 {
                     KernelWorkerResponseV2::Initialized {
                         observation: Box::new(observation),
                     },
+                    self.maximum_success_response_bytes,
                 )?;
                 self.session = Some(session);
                 self.content = Some(content);
@@ -196,6 +209,7 @@ impl KernelWorkerRuntimeV2 {
                     KernelWorkerResponseV2::Restored {
                         observation: Box::new(observation),
                     },
+                    self.maximum_success_response_bytes,
                 )?;
                 self.session = Some(session);
                 Ok(bytes)
@@ -206,6 +220,7 @@ impl KernelWorkerRuntimeV2 {
                     .checked_add(1)
                     .ok_or(KernelWorkerRuntimeErrorV2::Exhausted)?;
                 let identity = &self.identity;
+                let maximum_success_response_bytes = self.maximum_success_response_bytes;
                 let bytes = self
                     .session
                     .as_mut()
@@ -221,6 +236,7 @@ impl KernelWorkerRuntimeV2 {
                                 step,
                                 observation: Box::new(observation),
                             },
+                            maximum_success_response_bytes,
                         )
                     })?;
                 self.applied_events = next_count;
@@ -234,6 +250,7 @@ impl KernelWorkerRuntimeV2 {
                     accepted,
                     observation.mechanical_digest.clone(),
                     KernelWorkerResponseV2::Observation(Box::new(observation)),
+                    self.maximum_success_response_bytes,
                 )
             }
             KernelWorkerRequestV2::Snapshot => {
@@ -250,6 +267,7 @@ impl KernelWorkerRuntimeV2 {
                     KernelWorkerResponseV2::Snapshot {
                         snapshot: Box::new(snapshot),
                     },
+                    self.maximum_success_response_bytes,
                 )
             }
             KernelWorkerRequestV2::ExportRepro => Err(KernelWorkerRuntimeErrorV2::Unsupported),
@@ -265,6 +283,7 @@ impl KernelWorkerRuntimeV2 {
                     applied_events: self.applied_events,
                     prepared_content_retained: self.content.is_some(),
                 }),
+                self.maximum_success_response_bytes,
             ),
             KernelWorkerRequestV2::Dispose => {
                 let bytes = encode_response(
@@ -273,6 +292,7 @@ impl KernelWorkerRuntimeV2 {
                     accepted,
                     None,
                     KernelWorkerResponseV2::Disposed,
+                    self.maximum_success_response_bytes,
                 )?;
                 if let Some(session) = &mut self.session {
                     session.dispose();
@@ -335,6 +355,7 @@ fn encode_response(
     accepted_sequence: Option<u64>,
     after_mechanical_digest: Option<String>,
     response: KernelWorkerResponseV2,
+    maximum_response_bytes: usize,
 ) -> Result<Vec<u8>, KernelWorkerRuntimeErrorV2> {
     let bytes = serde_json::to_vec(&KernelWorkerResponseEnvelopeV2 {
         abi_version: KERNEL_WORKER_ABI_VERSION_V2,
@@ -346,7 +367,7 @@ fn encode_response(
         response,
     })
     .map_err(serialization)?;
-    if bytes.len() > MAXIMUM_WORKER_FRAME_BYTES_V2 {
+    if bytes.len() > maximum_response_bytes {
         return Err(KernelWorkerRuntimeErrorV2::ResponseTooLarge);
     }
     Ok(bytes)

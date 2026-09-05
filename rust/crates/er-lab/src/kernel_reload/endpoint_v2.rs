@@ -1,6 +1,6 @@
 //! Current ABI2 process ownership. Historical ABI1 endpoints remain separate.
 
-use std::io::{BufReader, Write};
+use std::io::{BufReader, Read, Write};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::thread::{self, JoinHandle};
@@ -14,7 +14,7 @@ use er_kernel_worker::{
     KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelWorkerBootstrapV2,
     KernelWorkerHealthV2, KernelWorkerInitializationV2, KernelWorkerRequestEnvelopeV2,
     KernelWorkerRequestV2, KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, read_frame_v1,
-    write_frame_v1,
+    write_frame_v1, MAXIMUM_WORKER_FRAME_BYTES_V2, validate_success_response_bytes_v2,
 };
 use er_types::SeatId;
 
@@ -30,13 +30,15 @@ pub struct ChildKernelGenerationV2 {
     worker: OwnedWorkerV2,
     process_id: u32,
     jobs: Option<SyncSender<Vec<u8>>>,
-    responses: Receiver<Result<KernelWorkerResponseEnvelopeV2, String>>,
+    responses: Receiver<Result<(KernelWorkerResponseEnvelopeV2, usize), String>>,
     io_thread: Option<JoinHandle<()>>,
     bootstrap: Option<Vec<u8>>,
     deadlines: KernelWorkerDeadlinesV2,
+    maximum_success_response_bytes: usize,
     next_request: u64,
     accepted_sequence: Option<u64>,
     mechanical_digest: Option<String>,
+    session_context: Option<(SeatId, GameKernelRoleV7)>,
     fenced: bool,
     disposed: bool,
 }
@@ -50,6 +52,15 @@ impl ChildKernelGenerationV2 {
         artifact: &VerifiedKernelExecutableV2,
         deadlines: KernelWorkerDeadlinesV2,
     ) -> Result<Self, KernelEndpointErrorV2> {
+        Self::spawn_with_limits(artifact, deadlines, MAXIMUM_WORKER_FRAME_BYTES_V2)
+    }
+
+    pub fn spawn_with_limits(
+        artifact: &VerifiedKernelExecutableV2,
+        deadlines: KernelWorkerDeadlinesV2,
+        maximum_success_response_bytes: usize,
+    ) -> Result<Self, KernelEndpointErrorV2> {
+        validate_success_response_bytes_v2(maximum_success_response_bytes).map_err(protocol_error)?;
         for timeout in [deadlines.request_timeout, deadlines.shutdown_timeout] {
             if timeout.is_zero() || timeout > Duration::from_secs(60) {
                 return Err(KernelEndpointErrorV2::Protocol(
@@ -64,6 +75,7 @@ impl ChildKernelGenerationV2 {
             &KernelWorkerBootstrapV2 {
                 abi_version: KERNEL_WORKER_ABI_VERSION_V2,
                 identity: artifact.identity().clone(),
+                maximum_success_response_bytes,
             },
         )
         .map_err(protocol_error)?;
@@ -103,9 +115,11 @@ impl ChildKernelGenerationV2 {
                     let response = (|| {
                         stdin.write_all(&bytes).map_err(|error| error.to_string())?;
                         stdin.flush().map_err(|error| error.to_string())?;
-                        read_frame_v1::<_, KernelWorkerResponseEnvelopeV2>(&mut reader)
+                        let mut counted = CountingReaderV2 { reader: &mut reader, bytes: 0 };
+                        let response = read_frame_v1::<_, KernelWorkerResponseEnvelopeV2>(&mut counted)
                             .map_err(|error| error.to_string())?
-                            .ok_or_else(|| "worker closed its response stream".to_owned())
+                            .ok_or_else(|| "worker closed its response stream".to_owned())?;
+                        Ok((response, counted.bytes.saturating_sub(4)))
                     })();
                     let failed = response.is_err();
                     if responses_tx.send(response).is_err() || failed {
@@ -123,9 +137,11 @@ impl ChildKernelGenerationV2 {
             io_thread: Some(io_thread),
             bootstrap: Some(bootstrap),
             deadlines,
+            maximum_success_response_bytes,
             next_request: 1,
             accepted_sequence: None,
             mechanical_digest: None,
+            session_context: None,
             fenced: false,
             disposed: false,
         };
@@ -141,6 +157,17 @@ impl ChildKernelGenerationV2 {
     }
     pub fn accepted_sequence(&self) -> Option<u64> {
         self.accepted_sequence
+    }
+    pub fn maximum_success_response_bytes(&self) -> usize {
+        self.maximum_success_response_bytes
+    }
+    pub fn deadlines(&self) -> KernelWorkerDeadlinesV2 {
+        self.deadlines
+    }
+    /// Context acknowledged by the last successful initialization or restore.
+    /// Uninitialized, fenced and disposed endpoints expose no usable context.
+    pub fn session_context(&self) -> Option<(SeatId, GameKernelRoleV7)> {
+        self.session_context
     }
     pub fn is_fenced(&self) -> bool {
         self.fenced
@@ -290,7 +317,7 @@ impl ChildKernelGenerationV2 {
             self.fence();
             return Err(process_error("worker request channel unavailable"));
         }
-        let response = match self.responses.recv_timeout(self.deadlines.request_timeout) {
+        let (response, response_bytes) = match self.responses.recv_timeout(self.deadlines.request_timeout) {
             Ok(Ok(response)) => response,
             Ok(Err(error)) => {
                 self.fence();
@@ -325,6 +352,7 @@ impl ChildKernelGenerationV2 {
             return Err(KernelEndpointErrorV2::Fault(fault.clone()));
         }
         if response.accepted_sequence != Some(sequence)
+            || response_bytes > self.maximum_success_response_bytes
             || !self.matches_response(&envelope.request, &response)
         {
             return Err(self.invalid_response("worker response kind, sequence or observation"));
@@ -332,6 +360,16 @@ impl ChildKernelGenerationV2 {
         self.next_request = next_request;
         self.accepted_sequence = response.accepted_sequence;
         self.mechanical_digest = response.after_mechanical_digest;
+        match &envelope.request {
+            KernelWorkerRequestV2::Initialize { initialization, .. } => {
+                self.session_context = Some(initialization.session_context());
+            }
+            KernelWorkerRequestV2::Restore { local_seat, role, .. } => {
+                self.session_context = Some((*local_seat, *role));
+            }
+            KernelWorkerRequestV2::Dispose => self.session_context = None,
+            _ => {}
+        }
         Ok(response.response)
     }
 
@@ -389,6 +427,7 @@ impl ChildKernelGenerationV2 {
 
     fn fence(&mut self) {
         self.fenced = true;
+        self.session_context = None;
         self.jobs.take();
         let deadline = Instant::now() + self.deadlines.shutdown_timeout;
         self.worker.stop_until(deadline);
@@ -491,4 +530,20 @@ fn process_error(error: impl ToString) -> KernelEndpointErrorV2 {
 }
 fn protocol_error(error: impl ToString) -> KernelEndpointErrorV2 {
     KernelEndpointErrorV2::Protocol(error.to_string())
+}
+
+/// Count bytes consumed by the shared decoder, including the length prefix.
+/// Buffer read-ahead cannot hide oversized success-envelope whitespace.
+#[derive(Debug)]
+struct CountingReaderV2<'a, R> {
+    reader: &'a mut R,
+    bytes: usize,
+}
+
+impl<R: Read> Read for CountingReaderV2<'_, R> {
+    fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.reader.read(bytes)?;
+        self.bytes += count;
+        Ok(count)
+    }
 }

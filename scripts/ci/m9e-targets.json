@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "c2c3ca6383762cc411582e089e2cf26e1caf20d6",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33930869104",
+  "baseline": "7557e92eb1873314370013980e81132a8605489f",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33934326265",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -10,7 +10,7 @@
   "current_session_packages": ["er-env"],
   "current_session_wasm_test": "m9e_parity",
   "current_session_focus": {
-    "paths": ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs"],
+    "paths": ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs"],
     "execute": {"er-env": ["*"], "er-cli": ["*"], "er-wasm": ["m9e_parity"]},
     "reason": "CLI-only changes use current session/CLI and parity witnesses. Shared session changes additionally require the browser scope because BrowserKernelHostV2 consumes it. Compile the full reverse dependency cone."
   },
@@ -31,10 +31,10 @@
     "reason": "Current native endpoint and immutable artifact validation, optionally cumulative with the exact worker ABI2 paths and guarded lock delta. Compile the complete reverse cone plus worker executable; bind the actual non-test Cargo artifact to endpoint process tests. Preserve ABI1 reload compatibility and current CLI witnesses."
   },
   "supervisor_focus": {
-    "paths": ["rust/crates/er-kernel-worker/src/protocol_v2.rs", "rust/crates/er-lab/src/kernel_reload/endpoint_v2.rs", "rust/crates/er-lab/src/kernel_reload/supervisor_v2.rs", "rust/crates/er-lab/src/kernel_reload/mod.rs", "rust/crates/er-lab/tests/current_kernel_supervisor_v2.rs"],
+    "paths": ["rust/crates/er-kernel-worker/src/protocol_v2.rs", "rust/crates/er-kernel-worker/src/runtime_v2.rs", "rust/crates/er-kernel-worker/src/main.rs", "rust/crates/er-kernel-worker/tests/current_process_v2.rs", "rust/crates/er-lab/src/kernel_reload/endpoint_v2.rs", "rust/crates/er-lab/src/kernel_reload/supervisor_v2.rs", "rust/crates/er-lab/src/kernel_reload/mod.rs", "rust/crates/er-lab/tests/current_kernel_supervisor_v2.rs"],
     "execute": {"er-kernel-worker": ["*"], "er-cli": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"]},
-    "required_targets": {"er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"]},
-    "reason": "Bounded current process supervisor with acknowledged worker context. Compile the full reverse cone and explicitly build the exact worker executable; bind it only to actual endpoint/supervisor process witnesses. Preserve CLI, worker and historical reload coverage, with worker/lab Clippy. Shared session, timer and browser changes require their existing broader platform mapping; no lock exception."
+    "required_targets": {"er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"], "er-kernel-worker": ["current_process_v2"]},
+    "reason": "Bounded current process supervisor with acknowledged worker context and bounded success-response serialization. Compile the full reverse cone and explicitly build the exact worker executable; bind it only to actual endpoint/supervisor process witnesses. Require the worker process target, preserve CLI and historical reload coverage, and run worker/lab Clippy. Shared session, timer and browser changes require their existing broader platform mapping; no lock exception."
   },
   "timer_focus": {
     "trigger_paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-kernel/tests/m9e_timers_v7.rs"],

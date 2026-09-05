@@ -40,6 +40,29 @@ pub struct KernelGenerationIdentityV2 {
 pub struct KernelWorkerBootstrapV2 {
     pub abi_version: u32,
     pub identity: KernelGenerationIdentityV2,
+    /// Complete successful JSON envelope bound; the four-byte frame prefix is
+    /// excluded. Fault envelopes retain the fixed transport bound.
+    #[serde(default = "default_success_response_bytes_v2")]
+    pub maximum_success_response_bytes: usize,
+}
+
+fn default_success_response_bytes_v2() -> usize { MAXIMUM_WORKER_FRAME_BYTES_V2 }
+
+impl KernelWorkerBootstrapV2 {
+    pub fn validate(&self) -> Result<(), KernelWorkerProtocolErrorV2> {
+        if self.abi_version != KERNEL_WORKER_ABI_VERSION_V2 {
+            return Err(KernelWorkerProtocolErrorV2::Abi);
+        }
+        self.identity.validate()?;
+        validate_success_response_bytes_v2(self.maximum_success_response_bytes)
+    }
+}
+
+pub fn validate_success_response_bytes_v2(maximum: usize) -> Result<(), KernelWorkerProtocolErrorV2> {
+    if maximum == 0 || maximum > MAXIMUM_WORKER_FRAME_BYTES_V2 {
+        return Err(KernelWorkerProtocolErrorV2::ResponseBudget);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -64,6 +87,25 @@ pub enum KernelWorkerInitializationV2 {
         local_seat: SeatId,
         role: GameKernelRoleV7,
     },
+}
+
+impl KernelWorkerInitializationV2 {
+    /// Context used by the current session initializer. Natural initialization
+    /// derives role from protocol configuration, defaulting to authority.
+    pub fn session_context(&self) -> (SeatId, GameKernelRoleV7) {
+        match self {
+            Self::Natural { local_seat, protocol, .. } => {
+                let role = protocol.as_ref().as_ref().map_or(GameKernelRoleV7::Authority, |value| {
+                    match value.role {
+                        er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
+                        er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
+                    }
+                });
+                (*local_seat, role)
+            }
+            Self::Snapshot { local_seat, role, .. } => (*local_seat, *role),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -194,6 +236,8 @@ pub enum KernelWorkerProtocolErrorV2 {
     Fingerprint,
     #[error("current worker frame exceeds its bound")]
     Oversized,
+    #[error("current worker success response budget must be between one byte and 16 MiB")]
+    ResponseBudget,
     #[error("current worker protocol serialization failed: {0}")]
     Serialization(String),
 }

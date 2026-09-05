@@ -1,9 +1,12 @@
 # B1a: current V7 held-navigation timer consequence
 
-Status: IMPLEMENTED_PENDING_REMOTE. Nine behavioral tests and the focused remote
-mutation gate are ready. Independent source review corrections cover rejected
-horizontal input atomicity, global timer ID uniqueness and fresh allocator
-construction. No local build, test, or formatter ran.
+Status: B1a REMOTELY_VERIFIED at `7557e92eb1873314370013980e81132a8605489f`,
+run `33934326265`. All nine timer regressions passed within 561 native tests,
+two Wasm tests, two Chromium journeys, typed-effect routing, formatting and
+Clippy. Native/Wasm held-timer digests match. The isolated compiled mutation
+removing the navigation consequence failed the exact cursor-effect assertion;
+the runner then restored exact candidate source. Other timer purposes remain
+outstanding. No local build, test, or formatter ran.
 
 Base: `5c21f3dc9e899a0d1902ee3637af1b58a29fbd24`.
 
@@ -90,4 +93,7 @@ targets. All fixtures remain on the remote runner. A later integration gate
 must exercise the same event sequence through current native and Wasm
 entries. This report is source evidence, not a passing gate or M9 completion.
 
-Handoff commit/report artifact: pending implementation and remote execution.
+Evidence: https://github.com/Heraklines/elite-redux/actions/runs/33934326265,
+named compact artifact `m9e-summary-7557e92eb1873314370013980e81132a8605489f`
+(3,969 bytes inspected before transfer). Full evidence and browser assets remain
+remote. This verifies held-navigation consequences only, not M9 completion.

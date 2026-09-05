@@ -386,3 +386,49 @@ edits were matched uniquely and applied as text; their resulting Git patch is
 Only these five formatting changes and this ledger are staged for the next
 candidate. The independent supervisor, normal-command, and B2 presentation
 patches remain uncommitted and are excluded from B1 evidence.
+
+### B1a complete focused gate; supervisor/budget candidate follows
+
+Candidate `7557e92eb1873314370013980e81132a8605489f`, run `33934326265`,
+passed the complete focused gate: 561/561 native tests, zero failures/skips;
+2/2 exact Wasm parity tests; 2/2 Chromium journeys; 1/1 typed-effect test;
+formatting and worker/lab/browser Clippy. All nine held-navigation regressions
+ran. The native/Wasm timer digest remained
+`9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e`.
+
+The isolated timer mutant compiled and failed exactly the intended cursor-effect
+assertion (exit 101, one failed test, zero passed/skipped). Mutant status:
+`detected`; source hash before/after restoration:
+`698318e68b134b7bdb0955ff9060f3190a28be601818e16619c0771d498fa7c6`.
+This failure is successful mutation detection, separate from ordinary pass
+counts. Mutant build took 40,815 ms and execution 2,820 ms.
+
+Harness SHA-256 `fee9125c8ded700dcf70936bbb34a74da7216f34ec6ea6e801d2b00a04d17bd8`;
+selected IDs SHA-256 `5e83fa16946c157b392746ed6175ed04fa9d847c30126d406c84651260b9ff8e`.
+Actual worker executable SHA-256
+`3f2d2c6ae3090265e6b0089dcb83f5c59a171a278440946fdf87d70d6567f649`,
+73,767,208 bytes, bound to this source SHA. The named compact artifact was
+3,969 bytes, inspected before download. Diagnostics (92,330 bytes) and browser
+assets (4,234,375 bytes) were not downloaded. The comparison baseline now
+advances to this fully passing candidate. Browser evidence remains in-page
+Wasm/byte relay, not production Worker/WebRTC certification.
+
+Next submitted cut: acknowledged current-worker context, bounded process
+supervisor with exact-preservation replay, and negotiated precommit success
+response caps inherited across generations. Nine actual supervisor tests and
+five worker process tests are prepared; runtime execution remains pending.
+Independent source review found no blockers. Required native process targets
+and worker/lab Clippy stay mandatory. Future utility mappings and CLI Clippy
+are inert until their source is submitted separately.
+
+The focused workflow also offers a separately named source formatting repair
+patch only when the routine compact patch omits files and the full repair fits
+256 KiB (the handoff's failure-diagnostic budget). Inspect its size and summary
+SHA before any necessary transfer. Routine summaries keep the existing 64 KiB
+budget; full diagnostics/assets remain remote. No local formatter executes.
+
+Preserved uncommitted subsequent work: normal terminal utilities; actual normal
+JSONL worker/reload adapter and two process tests; replica presentation delivery.
+The following causal capsule is designed but not implemented. These are not
+covered by the B1 pass. Full M9 remains incomplete; no deployment, final-tag
+change, production-default change, or legacy player-save access has occurred.

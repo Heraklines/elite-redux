@@ -93,6 +93,14 @@ jobs:
           path: ${{ runner.temp }}/m9e-feedback/compact/
           if-no-files-found: error
           retention-days: 14
+      - name: Optional bounded source formatting repair
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-format-repair-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/format-repair.patch
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Full remote diagnostics
         if: always()
         uses: actions/upload-artifact@v6
