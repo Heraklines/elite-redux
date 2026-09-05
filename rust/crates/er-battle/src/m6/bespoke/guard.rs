@@ -776,7 +776,9 @@ mod tests {
 
     fn pokemon(id: u64) -> MechanicScope {
         MechanicScope::Pokemon {
-            pokemon: er_types::battle_ids::PokemonId::new(SafeU53::new(id).expect("pokemon: fixture operation succeeds")),
+            pokemon: er_types::battle_ids::PokemonId::new(
+                SafeU53::new(id).expect("pokemon: fixture operation succeeds"),
+            ),
         }
     }
 
@@ -839,7 +841,8 @@ mod tests {
         let state = fresh_state();
         let request = self_request(OWNER_A, GuardKind::Protect);
 
-        let clean = apply_guard_use(&state, &request, None).expect("first_use_is_guaranteed_and_rejects_any_draw: fixture operation succeeds");
+        let clean = apply_guard_use(&state, &request, None)
+            .expect("first_use_is_guaranteed_and_rejects_any_draw: fixture operation succeeds");
         assert!(clean.evidence.succeeded);
         assert_eq!(clean.evidence.chain_depth_after, 1);
         assert_eq!(clean.evidence.threshold_range, Some(1));
@@ -864,7 +867,9 @@ mod tests {
         let base = fresh_state();
         let first = self_request(OWNER_A, GuardKind::Protect);
         let second = self_request(OWNER_B, GuardKind::Detect);
-        let depth_one = apply_guard_use(&base, &first, None).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds").state;
+        let depth_one = apply_guard_use(&base, &first, None)
+            .expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds")
+            .state;
 
         assert_eq!(
             apply_guard_use(&depth_one, &second, None),
@@ -881,13 +886,24 @@ mod tests {
                 actual: 4
             })
         );
-        let out_of_range = AuditedGuardDraw::new(SafeU53::new(7).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds"), 3);
+        let out_of_range = AuditedGuardDraw::new(
+            SafeU53::new(7).expect(
+                "consecutive_use_consumes_exact_threshold_once: fixture operation succeeds",
+            ),
+            3,
+        );
         assert_eq!(
             apply_guard_use(&depth_one, &second, Some(out_of_range)),
             Err(GuardTransitionError::RollOutOfRange { roll: 7, range: 3 })
         );
-        let miss = AuditedGuardDraw::new(SafeU53::new(1).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds"), 3);
-        let failed = apply_guard_use(&depth_one, &second, Some(miss)).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds");
+        let miss = AuditedGuardDraw::new(
+            SafeU53::new(1).expect(
+                "consecutive_use_consumes_exact_threshold_once: fixture operation succeeds",
+            ),
+            3,
+        );
+        let failed = apply_guard_use(&depth_one, &second, Some(miss))
+            .expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds");
         assert!(!failed.evidence.succeeded);
         assert_eq!(failed.state.chain_depth, 0);
         // A failed chained attempt breaks only the chain: every guard from
@@ -902,11 +918,16 @@ mod tests {
         assert!(failed.state.self_guard_for(&pokemon(OWNER_B)).is_none());
 
         // Turn-end expiry clears those tags; the next chain starts fresh.
-        let renewed = expire_turn_end(&failed.state).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds").state;
+        let renewed = expire_turn_end(&failed.state)
+            .expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds")
+            .state;
         assert!(renewed.self_guards.is_empty());
-        let rebuilt = apply_guard_use(&renewed, &first, None).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds").state;
+        let rebuilt = apply_guard_use(&renewed, &first, None)
+            .expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds")
+            .state;
         let hit = AuditedGuardDraw::new(SafeU53::ZERO, 3);
-        let passed = apply_guard_use(&rebuilt, &second, Some(hit)).expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds");
+        let passed = apply_guard_use(&rebuilt, &second, Some(hit))
+            .expect("consecutive_use_consumes_exact_threshold_once: fixture operation succeeds");
         assert!(passed.evidence.succeeded);
         assert_eq!(passed.state.chain_depth, 2);
         assert_eq!(
@@ -919,7 +940,9 @@ mod tests {
     fn quick_and_wide_extend_chain_while_others_break_it() {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
-        let depth_one = apply_guard_use(&base, &protect, None).expect("quick_and_wide_extend_chain_while_others_break_it: fixture operation succeeds").state;
+        let depth_one = apply_guard_use(&base, &protect, None)
+            .expect("quick_and_wide_extend_chain_while_others_break_it: fixture operation succeeds")
+            .state;
 
         let quick = apply_guard_use(
             &depth_one,
@@ -961,7 +984,9 @@ mod tests {
     fn chains_run_deep_past_six_with_exact_powers_of_three() {
         let mut deep = fresh_state();
         deep.chain_depth = 7;
-        deep.validate().expect("chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds");
+        deep.validate().expect(
+            "chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds",
+        );
         let request = self_request(OWNER_A, GuardKind::Protect);
 
         assert_eq!(
@@ -971,14 +996,23 @@ mod tests {
                 expected: 2187
             })
         );
-        let miss = AuditedGuardDraw::new(SafeU53::new(1).expect("chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds"), 2187);
-        let failed = apply_guard_use(&deep, &request, Some(miss)).expect("chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds");
+        let miss = AuditedGuardDraw::new(
+            SafeU53::new(1).expect(
+                "chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds",
+            ),
+            2187,
+        );
+        let failed = apply_guard_use(&deep, &request, Some(miss)).expect(
+            "chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds",
+        );
         assert!(!failed.evidence.succeeded);
         assert_eq!(failed.state.chain_depth, 0);
 
         deep.chain_depth = 6;
         let hit = AuditedGuardDraw::new(SafeU53::ZERO, 729);
-        let passed = apply_guard_use(&deep, &request, Some(hit)).expect("chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds");
+        let passed = apply_guard_use(&deep, &request, Some(hit)).expect(
+            "chains_run_deep_past_six_with_exact_powers_of_three: fixture operation succeeds",
+        );
         assert!(passed.evidence.succeeded);
         assert_eq!(passed.state.chain_depth, 7);
     }
@@ -992,7 +1026,9 @@ mod tests {
 
         let mut deepest = fresh_state();
         deepest.chain_depth = 33;
-        deepest.validate().expect("boundary_is_the_safe_draw_domain_not_a_depth_cap: fixture operation succeeds");
+        deepest
+            .validate()
+            .expect("boundary_is_the_safe_draw_domain_not_a_depth_cap: fixture operation succeeds");
         let request = self_request(OWNER_A, GuardKind::Protect);
         assert_eq!(
             apply_guard_use(&deepest, &request, None),
@@ -1002,7 +1038,8 @@ mod tests {
             })
         );
         let last_hit = AuditedGuardDraw::new(SafeU53::ZERO, 5_559_060_566_555_523);
-        let survived = apply_guard_use(&deepest, &request, Some(last_hit)).expect("boundary_is_the_safe_draw_domain_not_a_depth_cap: fixture operation succeeds");
+        let survived = apply_guard_use(&deepest, &request, Some(last_hit))
+            .expect("boundary_is_the_safe_draw_domain_not_a_depth_cap: fixture operation succeeds");
         assert!(survived.evidence.succeeded);
         assert_eq!(survived.state.chain_depth, 34);
 
@@ -1361,7 +1398,9 @@ mod tests {
     fn duplicate_active_guards_conflict() {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
-        let once = apply_guard_use(&base, &protect, None).expect("duplicate_active_guards_conflict: fixture operation succeeds").state;
+        let once = apply_guard_use(&base, &protect, None)
+            .expect("duplicate_active_guards_conflict: fixture operation succeeds")
+            .state;
         // The odds gate runs before any coherence check: a chained
         // re-request without its audited draw reports the missing draw
         // first, exactly as the oracle evaluates the move condition before
@@ -1382,7 +1421,9 @@ mod tests {
         );
 
         let endure = self_request(OWNER_A, GuardKind::Endure);
-        let enduring = apply_guard_use(&base, &endure, None).expect("duplicate_active_guards_conflict: fixture operation succeeds").state;
+        let enduring = apply_guard_use(&base, &endure, None)
+            .expect("duplicate_active_guards_conflict: fixture operation succeeds")
+            .state;
         assert_eq!(
             apply_guard_use(&enduring, &endure, None),
             Err(GuardTransitionError::MissingAuditedDraw {
@@ -1397,7 +1438,9 @@ mod tests {
         );
 
         let wide = side_request(BattleSide::Player, SideGuardKind::WideGuard);
-        let widened = apply_guard_use(&base, &wide, None).expect("duplicate_active_guards_conflict: fixture operation succeeds").state;
+        let widened = apply_guard_use(&base, &wide, None)
+            .expect("duplicate_active_guards_conflict: fixture operation succeeds")
+            .state;
         assert_eq!(
             apply_guard_use(&widened, &wide, None),
             Err(GuardTransitionError::ActiveGuardConflict)
@@ -1442,14 +1485,16 @@ mod tests {
             damage: 250,
             prevent_endure: false,
         };
-        let fainted = apply_lethal_damage(&base, &bare).expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
+        let fainted = apply_lethal_damage(&base, &bare)
+            .expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
         assert_eq!(fainted.decision, DamageSurvivalDecision::Fainted);
         assert_eq!(fainted.evidence.hp_after, 0);
 
         // Endure survives at exactly 1 HP and consumes the flag.
         let mut enduring = base.clone();
         enduring.enduring_owners = vec![pokemon(OWNER_A)];
-        let survived = apply_lethal_damage(&enduring, &bare).expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
+        let survived = apply_lethal_damage(&enduring, &bare)
+            .expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
         assert_eq!(
             survived.decision,
             DamageSurvivalDecision::SurvivedAtMinimumHp {
@@ -1492,7 +1537,8 @@ mod tests {
         let mut layered = base.clone();
         layered.enduring_owners = vec![pokemon(OWNER_A)];
         layered.sturdy_owners = vec![pokemon(OWNER_A)];
-        let picked_enduring = apply_lethal_damage(&layered, &bare).expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
+        let picked_enduring = apply_lethal_damage(&layered, &bare)
+            .expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
         assert!(matches!(
             picked_enduring.decision,
             DamageSurvivalDecision::SurvivedAtMinimumHp {
@@ -1503,7 +1549,8 @@ mod tests {
 
         let mut tokens = base.clone();
         tokens.endure_token_owners = vec![pokemon(OWNER_A)];
-        let picked_token = apply_lethal_damage(&tokens, &bare).expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
+        let picked_token = apply_lethal_damage(&tokens, &bare)
+            .expect("endure_survival_precedence_and_minimum_hp: fixture operation succeeds");
         assert!(matches!(
             picked_token.decision,
             DamageSurvivalDecision::SurvivedAtMinimumHp {
@@ -1564,9 +1611,12 @@ mod tests {
         armed.enduring_owners = vec![pokemon(OWNER_B)];
         armed.endure_token_owners = vec![pokemon(OWNER_A)];
         armed.sturdy_owners = vec![pokemon(OWNER_A), pokemon(OWNER_B)];
-        armed.validate().expect("turn_end_expires_actives_but_preserves_chain: fixture operation succeeds");
+        armed
+            .validate()
+            .expect("turn_end_expires_actives_but_preserves_chain: fixture operation succeeds");
 
-        let expired = expire_turn_end(&armed).expect("turn_end_expires_actives_but_preserves_chain: fixture operation succeeds");
+        let expired = expire_turn_end(&armed)
+            .expect("turn_end_expires_actives_but_preserves_chain: fixture operation succeeds");
         assert_eq!(expired.evidence.self_guards_expired, 1);
         assert_eq!(expired.evidence.side_guards_expired, 1);
         assert_eq!(expired.evidence.enduring_flags_expired, 1);
@@ -1590,7 +1640,9 @@ mod tests {
     fn reset_breaks_the_chain_without_touching_actives() {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
-        let chained = apply_guard_use(&base, &protect, None).expect("reset_breaks_the_chain_without_touching_actives: fixture operation succeeds").state;
+        let chained = apply_guard_use(&base, &protect, None)
+            .expect("reset_breaks_the_chain_without_touching_actives: fixture operation succeeds")
+            .state;
         let chained_again = apply_guard_use(
             &chained,
             &self_request(OWNER_B, GuardKind::Detect),
@@ -1598,7 +1650,8 @@ mod tests {
         )
         .expect("reset_breaks_the_chain_without_touching_actives: fixture operation succeeds")
         .state;
-        let reset = reset_guard_chain(&chained_again).expect("reset_breaks_the_chain_without_touching_actives: fixture operation succeeds");
+        let reset = reset_guard_chain(&chained_again)
+            .expect("reset_breaks_the_chain_without_touching_actives: fixture operation succeeds");
         assert_eq!(reset.self_guards.len(), chained_again.self_guards.len());
         assert_eq!(reset.chain_depth, 0);
         assert_eq!(
@@ -1612,8 +1665,12 @@ mod tests {
         let base = fresh_state();
         let snapshot = base.clone();
         let protect = self_request(OWNER_A, GuardKind::Protect);
-        let run_a = apply_guard_use(&base, &protect, None).expect("transitions_are_deterministic_and_never_mutate_input: fixture operation succeeds");
-        let run_b = apply_guard_use(&base, &protect, None).expect("transitions_are_deterministic_and_never_mutate_input: fixture operation succeeds");
+        let run_a = apply_guard_use(&base, &protect, None).expect(
+            "transitions_are_deterministic_and_never_mutate_input: fixture operation succeeds",
+        );
+        let run_b = apply_guard_use(&base, &protect, None).expect(
+            "transitions_are_deterministic_and_never_mutate_input: fixture operation succeeds",
+        );
         assert_eq!(run_a, run_b);
         assert_eq!(base, snapshot);
     }

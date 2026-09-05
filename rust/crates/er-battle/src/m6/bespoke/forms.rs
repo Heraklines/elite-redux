@@ -540,7 +540,12 @@ mod tests {
             field_scope(BattleSide::Player, 0),
             identity(SPECIES_AEGISLASH, "blade"),
         );
-        assert_eq!(duplicate.expect_err("register_rejects_duplicate_scope_and_unknown_lookups_are_none: expected rejection"), FormsStateError::DuplicateScope);
+        assert_eq!(
+            duplicate.expect_err(
+                "register_rejects_duplicate_scope_and_unknown_lookups_are_none: expected rejection"
+            ),
+            FormsStateError::DuplicateScope
+        );
         assert!(state.battler(&field_scope(BattleSide::Player, 2)).is_none());
     }
 
@@ -582,7 +587,9 @@ mod tests {
             identity(SPECIES_AEGISLASH, "shield"),
         );
         assert_eq!(
-            conflict.expect_err("stance_stage_resolve_swap_and_repeat_resolution_is_rejected: expected rejection"),
+            conflict.expect_err(
+                "stance_stage_resolve_swap_and_repeat_resolution_is_rejected: expected rejection"
+            ),
             FormsTransitionError::StanceRequestConflict {
                 staged_request_id: 7
             }
@@ -596,7 +603,9 @@ mod tests {
             identity(SPECIES_AEGISLASH, "blade"),
         );
         assert_eq!(
-            busy.expect_err("stance_stage_resolve_swap_and_repeat_resolution_is_rejected: expected rejection"),
+            busy.expect_err(
+                "stance_stage_resolve_swap_and_repeat_resolution_is_rejected: expected rejection"
+            ),
             FormsTransitionError::StanceRequestPending {
                 pending_request_id: 7
             }
@@ -619,7 +628,9 @@ mod tests {
 
         // Repeated resolution: rejected, resolved state untouched.
         assert_eq!(
-            resolve_pending_stance(&resolved.state, &scope).expect_err("stance_stage_resolve_swap_and_repeat_resolution_is_rejected: expected rejection"),
+            resolve_pending_stance(&resolved.state, &scope).expect_err(
+                "stance_stage_resolve_swap_and_repeat_resolution_is_rejected: expected rejection"
+            ),
             FormsTransitionError::NoStancePending
         );
         assert!(
@@ -639,19 +650,25 @@ mod tests {
         // Cross-species stance target.
         assert_eq!(
             stage_stance_request(&state, &scope, 1, identity(SPECIES_CASTFORM, "sunny"))
-                .expect_err("stance_requests_are_validated_against_false_conditions: expected rejection"),
+                .expect_err(
+                    "stance_requests_are_validated_against_false_conditions: expected rejection"
+                ),
             FormsTransitionError::StanceCrossSpecies
         );
         // Target equals the currently presented form.
         assert_eq!(
             stage_stance_request(&state, &scope, 1, identity(SPECIES_AEGISLASH, "shield"))
-                .expect_err("stance_requests_are_validated_against_false_conditions: expected rejection"),
+                .expect_err(
+                    "stance_requests_are_validated_against_false_conditions: expected rejection"
+                ),
             FormsTransitionError::StanceTargetEqualsCurrent
         );
         // Zero request id.
         assert_eq!(
             stage_stance_request(&state, &scope, 0, identity(SPECIES_AEGISLASH, "blade"))
-                .expect_err("stance_requests_are_validated_against_false_conditions: expected rejection"),
+                .expect_err(
+                    "stance_requests_are_validated_against_false_conditions: expected rejection"
+                ),
             FormsTransitionError::ZeroStanceRequestId
         );
         // Unknown scope.
@@ -662,7 +679,9 @@ mod tests {
                 1,
                 identity(SPECIES_AEGISLASH, "blade")
             )
-            .expect_err("stance_requests_are_validated_against_false_conditions: expected rejection"),
+            .expect_err(
+                "stance_requests_are_validated_against_false_conditions: expected rejection"
+            ),
             FormsTransitionError::UnknownBattlerScope
         );
         // Nothing above mutated the seed.
@@ -724,13 +743,17 @@ mod tests {
 
         // Second admission: rejected one-time rule, no mutation.
         assert_eq!(
-            admit_mega(&mega.state, &scope, identity(SPECIES_AEGISLASH, "mega")).expect_err("mega_admission_is_one_time_and_survives_switch_cleanup: expected rejection"),
+            admit_mega(&mega.state, &scope, identity(SPECIES_AEGISLASH, "mega")).expect_err(
+                "mega_admission_is_one_time_and_survives_switch_cleanup: expected rejection"
+            ),
             FormsTransitionError::MegaAlreadyUsed
         );
         // Any overlay blocks a stance request while active.
         assert_eq!(
             stage_stance_request(&mega.state, &scope, 3, identity(SPECIES_AEGISLASH, "blade"))
-                .expect_err("mega_admission_is_one_time_and_survives_switch_cleanup: expected rejection"),
+                .expect_err(
+                    "mega_admission_is_one_time_and_survives_switch_cleanup: expected rejection"
+                ),
             FormsTransitionError::OverlayActive {
                 active: FormOverlayKindV2::Mega
             }
@@ -743,7 +766,9 @@ mod tests {
         assert_eq!(battler.current.form_key, "shield");
         assert!(battler.mega_used);
         assert_eq!(
-            admit_mega(&cleaned.state, &scope, identity(SPECIES_AEGISLASH, "mega")).expect_err("mega_admission_is_one_time_and_survives_switch_cleanup: expected rejection"),
+            admit_mega(&cleaned.state, &scope, identity(SPECIES_AEGISLASH, "mega")).expect_err(
+                "mega_admission_is_one_time_and_survives_switch_cleanup: expected rejection"
+            ),
             FormsTransitionError::MegaAlreadyUsed
         );
         // Cleanup again: nothing to lapse.
@@ -757,11 +782,13 @@ mod tests {
         let state = seeded();
         let scope = field_scope(BattleSide::Player, 0);
         assert_eq!(
-            admit_mega(&state, &scope, identity(SPECIES_CASTFORM, "mega")).expect_err("mega_admission_rejects_invalid_targets: expected rejection"),
+            admit_mega(&state, &scope, identity(SPECIES_CASTFORM, "mega"))
+                .expect_err("mega_admission_rejects_invalid_targets: expected rejection"),
             FormsTransitionError::MegaCrossSpecies
         );
         assert_eq!(
-            admit_mega(&state, &scope, identity(SPECIES_AEGISLASH, "shield")).expect_err("mega_admission_rejects_invalid_targets: expected rejection"),
+            admit_mega(&state, &scope, identity(SPECIES_AEGISLASH, "shield"))
+                .expect_err("mega_admission_rejects_invalid_targets: expected rejection"),
             FormsTransitionError::MegaTargetEqualsBase
         );
         assert_eq!(
@@ -843,7 +870,9 @@ mod tests {
         // Mega blocks Tera (canSpeciesTera: isMega() || isMax() ...).
         let mega = admit_mega(&state, &player, identity(SPECIES_AEGISLASH, "mega")).expect("mega");
         assert_eq!(
-            admit_tera(&mega.state, BattleSide::Player, &player, 0).expect_err("tera_admission_enforces_evidence_based_exclusions: expected rejection"),
+            admit_tera(&mega.state, BattleSide::Player, &player, 0).expect_err(
+                "tera_admission_enforces_evidence_based_exclusions: expected rejection"
+            ),
             FormsTransitionError::OverlayActive {
                 active: FormOverlayKindV2::Mega
             }
@@ -851,27 +880,35 @@ mod tests {
 
         // Ordinal above MAX_POKEMON_TYPE_ORDINAL (STELLAR = 19) is illegal.
         assert_eq!(
-            admit_tera(&state, BattleSide::Player, &player, 20).expect_err("tera_admission_enforces_evidence_based_exclusions: expected rejection"),
+            admit_tera(&state, BattleSide::Player, &player, 20).expect_err(
+                "tera_admission_enforces_evidence_based_exclusions: expected rejection"
+            ),
             FormsTransitionError::InvalidTeraTypeOrdinal
         );
 
         // Side/scope agreement is checked before any mutation.
         assert_eq!(
-            admit_tera(&state, BattleSide::Enemy, &player, 0).expect_err("tera_admission_enforces_evidence_based_exclusions: expected rejection"),
+            admit_tera(&state, BattleSide::Enemy, &player, 0).expect_err(
+                "tera_admission_enforces_evidence_based_exclusions: expected rejection"
+            ),
             FormsTransitionError::TeraSideMismatch {
                 side: BattleSide::Enemy
             }
         );
         // Non-field scopes cannot carry a side-scoped admission.
         assert_eq!(
-            admit_tera(&state, BattleSide::Player, &MechanicScope::Battle, 0).expect_err("tera_admission_enforces_evidence_based_exclusions: expected rejection"),
+            admit_tera(&state, BattleSide::Player, &MechanicScope::Battle, 0).expect_err(
+                "tera_admission_enforces_evidence_based_exclusions: expected rejection"
+            ),
             FormsTransitionError::ScopeNotFieldBattler
         );
         // A conditional overlay equally excludes Tera.
         let rainy = apply_conditional_overlay(&state, &enemy, identity(SPECIES_CASTFORM, "rainy"))
             .expect("weather");
         assert_eq!(
-            admit_tera(&rainy.state, BattleSide::Enemy, &enemy, 0).expect_err("tera_admission_enforces_evidence_based_exclusions: expected rejection"),
+            admit_tera(&rainy.state, BattleSide::Enemy, &enemy, 0).expect_err(
+                "tera_admission_enforces_evidence_based_exclusions: expected rejection"
+            ),
             FormsTransitionError::OverlayActive {
                 active: FormOverlayKindV2::Conditional
             }
@@ -966,7 +1003,9 @@ mod tests {
         let mut corrupt = state.clone();
         corrupt.schema_version = FORMS_STATE_SCHEMA_VERSION + 1;
         assert_eq!(
-            corrupt.validate().expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
+            corrupt
+                .validate()
+                .expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
             FormsStateError::SchemaVersion {
                 expected: FORMS_STATE_SCHEMA_VERSION,
                 actual: FORMS_STATE_SCHEMA_VERSION + 1,
@@ -977,7 +1016,9 @@ mod tests {
         let mut corrupt = state.clone();
         corrupt.battlers[1].current.form_key = "ghost".into();
         assert_eq!(
-            corrupt.validate().expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
+            corrupt
+                .validate()
+                .expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
             FormsStateError::CurrentFormMismatch
         );
 
@@ -985,7 +1026,9 @@ mod tests {
         let mut corrupt = state.clone();
         corrupt.battlers.swap(0, 1);
         assert_eq!(
-            corrupt.validate().expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
+            corrupt
+                .validate()
+                .expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
             FormsStateError::BattlersOutOfOrder
         );
 
@@ -993,7 +1036,9 @@ mod tests {
         let mut corrupt = state.clone();
         corrupt.teras_used_player_side = TERAS_PER_SIDE_MAX + 1;
         assert_eq!(
-            corrupt.validate().expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
+            corrupt
+                .validate()
+                .expect_err("canonical_validation_rejects_corrupt_states: expected rejection"),
             FormsStateError::SideTeraBudgetExceeded
         );
 
@@ -1023,11 +1068,13 @@ mod tests {
 
         // Duplicates and zero ids are contract failures.
         assert_eq!(
-            SpeciesFormRegistryV2::from_species_ids([7u64, 7]).expect_err("species_registry_validates_closed_membership: expected rejection"),
+            SpeciesFormRegistryV2::from_species_ids([7u64, 7])
+                .expect_err("species_registry_validates_closed_membership: expected rejection"),
             FormsStateError::DuplicateSpeciesEntry
         );
         assert_eq!(
-            SpeciesFormRegistryV2::from_species_ids([0u64]).expect_err("species_registry_validates_closed_membership: expected rejection"),
+            SpeciesFormRegistryV2::from_species_ids([0u64])
+                .expect_err("species_registry_validates_closed_membership: expected rejection"),
             FormsStateError::ZeroSpecies
         );
 
@@ -1064,8 +1111,10 @@ mod tests {
 
     #[test]
     fn custom_dispatch_species_subset_is_exactly_covered() {
-        let raw = std::fs::read_to_string(resolve_cluster_fixture().expect("frozen bespoke cluster fixture is discoverable"))
-            .expect("frozen bespoke clusters fixture exists");
+        let raw = std::fs::read_to_string(
+            resolve_cluster_fixture().expect("frozen bespoke cluster fixture is discoverable"),
+        )
+        .expect("frozen bespoke clusters fixture exists");
         let fixture: serde_json::Value = serde_json::from_str(&raw).expect("fixture parses");
 
         let clusters = fixture["clusters"].as_array().expect("clusters array");

@@ -98,7 +98,10 @@ pub fn pay_for_reroll(
     if !rules.supports_reroll {
         return Err(ShopError::RerollUnsupported);
     }
-    let cost = rules.reroll_base_cost.get().get()
+    let cost = rules
+        .reroll_base_cost
+        .get()
+        .get()
         .checked_mul(u64::from(reroll_count) + 1)
         .ok_or(ShopError::InsufficientMoney)?;
     let next = debit_shop(balance, cost)?;

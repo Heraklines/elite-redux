@@ -2262,3 +2262,14 @@ retain the new AI helper's conditional exact-ID lookup and all its assertions.
 The bounded compact was1358 bytes and failure excerpt12,125 bytes. No Rust format,
 compile or native execution occurred. Product repairs, coverage and baseline stay
 unchanged. The earlier source preservation claim applies after these restorations.
+
+## Companion repair remote formatting
+
+12c623857a7d438dbcbdda7ae29a19ab24c06590 / run33999040368 passed all165
+harness tests in2.657 seconds, then stopped at Rust formatting before compilation
+or native execution. Apply the exact55,422-byte remote format repair, SHA256
+26284ca8fa293f4849d7aecc562c3c62666fe9fa34b44c30d3917b50a9822561,
+covering nine changed files. The compact2155-byte summary and named35,890-byte
+harness log identify the result. Full patch came from the inspected8407-byte
+format-repair artifact; the compact patch alone omitted four paths. No local
+formatter or test execution. Coverage and qualification baseline stay unchanged.

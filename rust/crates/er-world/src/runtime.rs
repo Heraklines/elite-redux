@@ -317,7 +317,9 @@ pub fn wave_for_difficulty(
 pub fn is_wave_final(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
     match mode.terminal_policy {
         crate::TerminalWavePolicyV1::Exact(terminal) => wave == terminal,
-        crate::TerminalWavePolicyV1::Interval(interval) => wave > 0 && is_interval_multiple(wave, interval),
+        crate::TerminalWavePolicyV1::Interval(interval) => {
+            wave > 0 && is_interval_multiple(wave, interval)
+        }
         crate::TerminalWavePolicyV1::Never => false,
     }
 }
@@ -408,9 +410,7 @@ pub fn biome_overstay(
         return 0;
     }
     world.overstay_anchor_wave.map_or(0, |anchor| {
-        wave.get()
-            .get()
-            .saturating_sub(anchor.get().get())
+        wave.get().get().saturating_sub(anchor.get().get())
     })
 }
 

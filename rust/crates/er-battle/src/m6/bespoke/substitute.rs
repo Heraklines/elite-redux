@@ -469,28 +469,41 @@ mod tests {
     fn creation_cost_matches_oracle_boundaries() {
         // floor(100 * 1/4) = 25; proxy floor(100 / 4) = 25.
         assert_eq!(
-            compute_creation_cost(hp(100), HpCostFraction::SUBSTITUTE, false).expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
+            compute_creation_cost(hp(100), HpCostFraction::SUBSTITUTE, false)
+                .expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
             hp(25)
         );
-        assert_eq!(compute_proxy_hp(hp(100)).expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"), hp(25));
+        assert_eq!(
+            compute_proxy_hp(hp(100))
+                .expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
+            hp(25)
+        );
         // toDmgValue floors but enforces the minimum of 1.
         assert_eq!(
-            compute_creation_cost(hp(3), HpCostFraction::SUBSTITUTE, false).expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
+            compute_creation_cost(hp(3), HpCostFraction::SUBSTITUTE, false)
+                .expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
             hp(1)
         );
         // Shed Tail rounds up: ceil(101 * 1/2) = 51 while the doll stays 25.
         assert_eq!(
-            compute_creation_cost(hp(101), HpCostFraction::SHED_TAIL, true).expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
+            compute_creation_cost(hp(101), HpCostFraction::SHED_TAIL, true)
+                .expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
             hp(51)
         );
-        assert_eq!(compute_proxy_hp(hp(101)).expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"), hp(25));
+        assert_eq!(
+            compute_proxy_hp(hp(101))
+                .expect("creation_cost_matches_oracle_boundaries: fixture operation succeeds"),
+            hp(25)
+        );
     }
 
     #[test]
     fn creation_eligibility_is_strict_at_the_cost_boundary() {
         let store = SubstituteProxyStoreV2::new();
         // hp == cost fails the strict `hp > cost` condition...
-        let failed = create(&store, 7, 25, 100).expect("creation_eligibility_is_strict_at_the_cost_boundary: fixture operation succeeds");
+        let failed = create(&store, 7, 25, 100).expect(
+            "creation_eligibility_is_strict_at_the_cost_boundary: fixture operation succeeds",
+        );
         assert_eq!(
             failed.outcome,
             SubstituteCreationOutcome::Failed(SubstituteCreationFailure::InsufficientHp {
@@ -503,7 +516,9 @@ mod tests {
         // ...and pays nothing.
         assert_eq!(failed.store, store);
         // hp == cost + 1 succeeds and pays exactly the cost.
-        let created = create(&store, 7, 26, 100).expect("creation_eligibility_is_strict_at_the_cost_boundary: fixture operation succeeds");
+        let created = create(&store, 7, 26, 100).expect(
+            "creation_eligibility_is_strict_at_the_cost_boundary: fixture operation succeeds",
+        );
         assert_eq!(
             created.outcome,
             SubstituteCreationOutcome::Created {
@@ -513,7 +528,9 @@ mod tests {
         );
         assert_eq!(created.owner_hp_after, hp(1));
         assert_eq!(created.owner_hp_paid, hp(25));
-        created.store.validate().expect("creation_eligibility_is_strict_at_the_cost_boundary: fixture operation succeeds");
+        created.store.validate().expect(
+            "creation_eligibility_is_strict_at_the_cost_boundary: fixture operation succeeds",
+        );
         assert!(created.store.is_active(owner(7)));
     }
 
@@ -522,9 +539,12 @@ mod tests {
         let store = SubstituteProxyStoreV2::new();
 
         // Overlap failure.
-        let seeded = create(&store, 3, 80, 100).expect("failed_creations_leave_input_unmutated: fixture operation succeeds").store;
+        let seeded = create(&store, 3, 80, 100)
+            .expect("failed_creations_leave_input_unmutated: fixture operation succeeds")
+            .store;
         let seeded_baseline = seeded.clone();
-        let overlapped = create(&seeded, 3, 80, 100).expect("failed_creations_leave_input_unmutated: fixture operation succeeds");
+        let overlapped = create(&seeded, 3, 80, 100)
+            .expect("failed_creations_leave_input_unmutated: fixture operation succeeds");
         assert_eq!(
             overlapped.outcome,
             SubstituteCreationOutcome::Failed(SubstituteCreationFailure::ProxyAlreadyActive)
@@ -578,10 +598,14 @@ mod tests {
     #[test]
     fn damage_below_proxy_is_intercepted_without_breaking() {
         let store = create(&SubstituteProxyStoreV2::new(), 5, 80, 100)
-            .expect("damage_below_proxy_is_intercepted_without_breaking: fixture operation succeeds")
+            .expect(
+                "damage_below_proxy_is_intercepted_without_breaking: fixture operation succeeds",
+            )
             .store;
         // 10 < 25: the doll takes the full hit and survives with 15 HP.
-        let transition = intercept_damage(&store, owner(5), &direct_hit(), hp(10), hp(55)).expect("damage_below_proxy_is_intercepted_without_breaking: fixture operation succeeds");
+        let transition = intercept_damage(&store, owner(5), &direct_hit(), hp(10), hp(55)).expect(
+            "damage_below_proxy_is_intercepted_without_breaking: fixture operation succeeds",
+        );
         assert_eq!(
             transition.outcome,
             SubstituteDamageOutcome::Absorbed {
@@ -594,7 +618,13 @@ mod tests {
         assert!(transition.target_effects_blocked);
         assert_eq!(transition.owner_hp_after, hp(55));
         assert_eq!(
-            transition.store.active_proxy(owner(5)).expect("damage_below_proxy_is_intercepted_without_breaking: fixture operation succeeds").proxy_hp,
+            transition
+                .store
+                .active_proxy(owner(5))
+                .expect(
+                    "damage_below_proxy_is_intercepted_without_breaking: fixture operation succeeds"
+                )
+                .proxy_hp,
             hp(15)
         );
         assert!(!matches!(
@@ -691,7 +721,9 @@ mod tests {
     #[test]
     fn target_effects_are_blocked_exactly_while_intercepted() {
         let store = create(&SubstituteProxyStoreV2::new(), 5, 80, 100)
-            .expect("target_effects_are_blocked_exactly_while_intercepted: fixture operation succeeds")
+            .expect(
+                "target_effects_are_blocked_exactly_while_intercepted: fixture operation succeeds",
+            )
             .store;
         // Status moves and stat-stage changes reuse the same predicate.
         assert!(intercepts_hit(&store, owner(5), &direct_hit()));
@@ -713,20 +745,28 @@ mod tests {
             .store;
         let store = create(&store, 6, 80, 100).expect("switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds").store;
 
-        let switch_out = clear_proxy(&store, owner(5), SubstituteClearReason::SwitchOut).expect("switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds");
+        let switch_out = clear_proxy(&store, owner(5), SubstituteClearReason::SwitchOut).expect(
+            "switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds",
+        );
         assert_eq!(switch_out.cleared.len(), 1);
         assert_eq!(switch_out.cleared[0].owner, owner(5));
         assert_eq!(switch_out.reason, SubstituteClearReason::SwitchOut);
         assert!(!switch_out.store.is_active(owner(5)));
         assert!(switch_out.store.is_active(owner(6)));
 
-        let faint = clear_proxy(&switch_out.store, owner(6), SubstituteClearReason::Faint).expect("switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds");
+        let faint = clear_proxy(&switch_out.store, owner(6), SubstituteClearReason::Faint).expect(
+            "switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds",
+        );
         assert_eq!(faint.cleared.len(), 1);
-        faint.store.validate().expect("switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds");
+        faint.store.validate().expect(
+            "switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds",
+        );
         assert!(faint.store.proxies.is_empty());
 
         // Clearing an absent doll is a deterministic no-op.
-        let noop = clear_proxy(&faint.store, owner(5), SubstituteClearReason::SwitchOut).expect("switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds");
+        let noop = clear_proxy(&faint.store, owner(5), SubstituteClearReason::SwitchOut).expect(
+            "switch_and_faint_cleanup_clears_only_the_leaving_battler: fixture operation succeeds",
+        );
         assert!(noop.cleared.is_empty());
         assert_eq!(noop.store, faint.store);
     }
@@ -735,9 +775,12 @@ mod tests {
     fn remove_all_clears_every_doll_in_owner_order() {
         let mut store = SubstituteProxyStoreV2::new();
         for id in [11u64, 4, 7] {
-            store = create(&store, id, 80, 100).expect("remove_all_clears_every_doll_in_owner_order: fixture operation succeeds").store;
+            store = create(&store, id, 80, 100)
+                .expect("remove_all_clears_every_doll_in_owner_order: fixture operation succeeds")
+                .store;
         }
-        let cleared = clear_all_proxies(&store).expect("remove_all_clears_every_doll_in_owner_order: fixture operation succeeds");
+        let cleared = clear_all_proxies(&store)
+            .expect("remove_all_clears_every_doll_in_owner_order: fixture operation succeeds");
         assert_eq!(cleared.reason, SubstituteClearReason::RemoveAll);
         let owners: Vec<u64> = cleared
             .cleared
@@ -760,7 +803,9 @@ mod tests {
             source_behavior_unit: substitute_unit(),
         });
         assert_eq!(
-            result.expect_err("canonical_state_enforces_positive_bounded_proxies: expected rejection"),
+            result.expect_err(
+                "canonical_state_enforces_positive_bounded_proxies: expected rejection"
+            ),
             SubstituteProxyStateError::ProxyHpAboveBound
         );
 
@@ -779,7 +824,9 @@ mod tests {
             source_behavior_unit: substitute_unit(),
         });
         assert_eq!(
-            disordered.validate().expect_err("canonical_state_enforces_positive_bounded_proxies: expected rejection"),
+            disordered.validate().expect_err(
+                "canonical_state_enforces_positive_bounded_proxies: expected rejection"
+            ),
             SubstituteProxyStateError::ProxiesOutOfOrder
         );
 
@@ -799,7 +846,9 @@ mod tests {
             .expect("canonical_state_enforces_positive_bounded_proxies: fixture operation succeeds")
             .store;
         assert_eq!(
-            intercept_damage(&store, owner(5), &direct_hit(), SafeU53::ZERO, hp(55)).expect_err("canonical_state_enforces_positive_bounded_proxies: expected rejection"),
+            intercept_damage(&store, owner(5), &direct_hit(), SafeU53::ZERO, hp(55)).expect_err(
+                "canonical_state_enforces_positive_bounded_proxies: expected rejection"
+            ),
             SubstituteMechanicError::ZeroIncomingDamage
         );
 
@@ -807,7 +856,9 @@ mod tests {
         let degenerate = create(&SubstituteProxyStoreV2::new(), 2, 3, 3)
             .expect("canonical_state_enforces_positive_bounded_proxies: fixture operation succeeds")
             .store;
-        degenerate.validate().expect("canonical_state_enforces_positive_bounded_proxies: fixture operation succeeds");
+        degenerate.validate().expect(
+            "canonical_state_enforces_positive_bounded_proxies: fixture operation succeeds",
+        );
         assert!(degenerate.is_active(owner(2)));
     }
 }

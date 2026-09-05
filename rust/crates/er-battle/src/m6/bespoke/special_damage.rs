@@ -2354,16 +2354,19 @@ mod tests {
 
     #[test]
     fn profiles_match_the_frozen_move_mapping() {
-        let counter = retaliation_profile(MOVE_COUNTER).expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
+        let counter = retaliation_profile(MOVE_COUNTER)
+            .expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
         assert_eq!(counter.multiplier.numerator, 2);
         assert_eq!(counter.multiplier.denominator, 1);
         assert_eq!(counter.filter, SpecialDamageFilter::Physical);
 
-        let mirror_coat = retaliation_profile(MOVE_MIRROR_COAT).expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
+        let mirror_coat = retaliation_profile(MOVE_MIRROR_COAT)
+            .expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
         assert_eq!(mirror_coat.filter, SpecialDamageFilter::Special);
 
         for move_id in [MOVE_METAL_BURST, MOVE_COMEUPPANCE] {
-            let burst = retaliation_profile(move_id).expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
+            let burst = retaliation_profile(move_id)
+                .expect("profiles_match_the_frozen_move_mapping: fixture operation succeeds");
             assert_eq!(burst.multiplier.numerator, 3);
             assert_eq!(burst.multiplier.denominator, 2);
             assert_eq!(burst.filter, SpecialDamageFilter::Both);
@@ -2493,7 +2496,10 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         );
-        assert_eq!(outcome.expect_err("stale_turn_evidence_is_rejected: expected rejection"), SpecialDamageError::StaleRecordsOnly);
+        assert_eq!(
+            outcome.expect_err("stale_turn_evidence_is_rejected: expected rejection"),
+            SpecialDamageError::StaleRecordsOnly
+        );
     }
 
     #[test]
@@ -2510,7 +2516,10 @@ mod tests {
                 field: doubles_field(&[OWNER, 1]),
             },
         );
-        assert_eq!(outcome.expect_err("ally_sourced_damage_is_never_eligible: expected rejection"), SpecialDamageError::NoEligibleSource);
+        assert_eq!(
+            outcome.expect_err("ally_sourced_damage_is_never_eligible: expected rejection"),
+            SpecialDamageError::NoEligibleSource
+        );
     }
 
     #[test]
@@ -2609,7 +2618,11 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         );
-        assert_eq!(outcome.expect_err("overflow_is_a_typed_failure_that_preserves_input: expected rejection"), SpecialDamageError::ArithmeticOverflow);
+        assert_eq!(
+            outcome
+                .expect_err("overflow_is_a_typed_failure_that_preserves_input: expected rejection"),
+            SpecialDamageError::ArithmeticOverflow
+        );
         assert_eq!(state.records.len(), 1);
     }
 
@@ -2618,9 +2631,15 @@ mod tests {
         let opened = SpecialDamageStateV2::default()
             .begin_accumulation(TURN)
             .expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
-        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
-        let closed = hit_one.close_accumulation_turn().expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
-        let reopened = closed.open_next_accumulation_turn(TURN + 1).expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
+        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).expect(
+            "accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds",
+        );
+        let closed = hit_one.close_accumulation_turn().expect(
+            "accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds",
+        );
+        let reopened = closed.open_next_accumulation_turn(TURN + 1).expect(
+            "accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds",
+        );
         let hit_two = reopened
             .record_attack(hit(ENEMY_B, 1, 25, TURN + 1))
             .expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
@@ -2631,7 +2650,9 @@ mod tests {
                 denominator: 1,
             },
         )
-        .expect("accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds");
+        .expect(
+            "accumulated_release_uses_the_same_frozen_rounding_rule: fixture operation succeeds",
+        );
         assert_eq!(transition.retaliation_damage, 110);
         assert!(!successor.accumulating);
         assert_eq!(successor.accumulated_damage.get(), 0);
@@ -2643,7 +2664,9 @@ mod tests {
                     denominator: 1
                 }
             )
-            .expect_err("accumulated_release_uses_the_same_frozen_rounding_rule: expected rejection"),
+            .expect_err(
+                "accumulated_release_uses_the_same_frozen_rounding_rule: expected rejection"
+            ),
             SpecialDamageError::State(SpecialDamageStateError::NotAccumulating),
         );
     }
@@ -2653,7 +2676,9 @@ mod tests {
         let opened = SpecialDamageStateV2::default()
             .begin_accumulation(TURN)
             .expect("reset_clears_every_family_state_surface: fixture operation succeeds");
-        let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).expect("reset_clears_every_family_state_surface: fixture operation succeeds");
+        let hit_one = opened
+            .record_attack(hit(ENEMY_A, 0, 30, TURN))
+            .expect("reset_clears_every_family_state_surface: fixture operation succeeds");
         let cleared = hit_one.clear_record_window();
         assert!(cleared.records.is_empty());
         assert_eq!(cleared.reset(), SpecialDamageStateV2::default());
@@ -2700,7 +2725,9 @@ mod tests {
             "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
         );
         assert_eq!(
-            classify_special_damage_unit(&counter_amount).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
+            classify_special_damage_unit(&counter_amount).expect(
+                "classifies_known_units_from_every_closed_class: fixture operation succeeds"
+            ),
             SpecialDamageUnitClass::RetaliationAmount,
         );
         // HitsTagForDoubleDamageAttr for MOVE 16, ordinal 0.
@@ -2710,7 +2737,9 @@ mod tests {
             "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
         );
         assert_eq!(
-            classify_special_damage_unit(&hits_tag).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
+            classify_special_damage_unit(&hits_tag).expect(
+                "classifies_known_units_from_every_closed_class: fixture operation succeeds"
+            ),
             SpecialDamageUnitClass::DamageFormulaQuery(
                 DamageQueryAttribute::HitsTagForDoubleDamageAttr
             ),
@@ -2719,7 +2748,9 @@ mod tests {
         // passive slots share one provenance hash, active is ordinal 2).
         let synchronize_active = BehaviorUnitId {
             source: BehaviorSourceId::ActiveAbility {
-                numeric_id: SafeU53::new(28).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
+                numeric_id: SafeU53::new(28).expect(
+                    "classifies_known_units_from_every_closed_class: fixture operation succeeds",
+                ),
             },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
@@ -2729,12 +2760,16 @@ mod tests {
             .expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
         };
         assert_eq!(
-            classify_special_damage_unit(&synchronize_active).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
+            classify_special_damage_unit(&synchronize_active).expect(
+                "classifies_known_units_from_every_closed_class: fixture operation succeeds"
+            ),
             SpecialDamageUnitClass::EncounterNatureSync,
         );
         let synchronize_passive = BehaviorUnitId {
             source: BehaviorSourceId::PassiveAbility {
-                numeric_id: SafeU53::new(28).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
+                numeric_id: SafeU53::new(28).expect(
+                    "classifies_known_units_from_every_closed_class: fixture operation succeeds",
+                ),
             },
             unit_kind: BehaviorUnitKind::PassiveAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
@@ -2744,7 +2779,9 @@ mod tests {
             .expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
         };
         assert_eq!(
-            classify_special_damage_unit(&synchronize_passive).expect("classifies_known_units_from_every_closed_class: fixture operation succeeds"),
+            classify_special_damage_unit(&synchronize_passive).expect(
+                "classifies_known_units_from_every_closed_class: fixture operation succeeds"
+            ),
             SpecialDamageUnitClass::EncounterNatureSync,
         );
         // Unknown identity fails closed.
@@ -2767,7 +2804,9 @@ mod tests {
             "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
         );
         let any_request = &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false);
-        match dispatch_special_damage_unit(&counter_amount, any_request).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds") {
+        match dispatch_special_damage_unit(&counter_amount, any_request)
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds")
+        {
             SpecialDamageDispatchOutcomeV2::RetaliationAmountPath {
                 move_id,
                 multiplier,
@@ -2785,7 +2824,9 @@ mod tests {
             0,
             "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
         );
-        match dispatch_special_damage_unit(&hits_tag, any_request).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds") {
+        match dispatch_special_damage_unit(&hits_tag, any_request)
+            .expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds")
+        {
             SpecialDamageDispatchOutcomeV2::DamageQueryFold {
                 attribute,
                 hook,
@@ -2828,7 +2869,9 @@ mod tests {
 
         let synchronize_active = BehaviorUnitId {
             source: BehaviorSourceId::ActiveAbility {
-                numeric_id: SafeU53::new(28).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
+                numeric_id: SafeU53::new(28).expect(
+                    "dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds",
+                ),
             },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
@@ -2841,7 +2884,9 @@ mod tests {
             holder_has_synchronize: true,
         };
         assert_eq!(
-            dispatch_special_damage_unit(&synchronize_active, synchronize_holder).expect("dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"),
+            dispatch_special_damage_unit(&synchronize_active, synchronize_holder).expect(
+                "dispatch_resolves_each_class_to_a_closed_outcome: fixture operation succeeds"
+            ),
             SpecialDamageDispatchOutcomeV2::EncounterNatureSyncApplied,
         );
         assert_eq!(
@@ -2872,13 +2917,16 @@ mod tests {
         BehaviorUnitId {
             source: match entry.source_kind {
                 SourceKindTag::Move => BehaviorSourceId::Move {
-                    numeric_id: SafeU53::new(entry.numeric_id).expect("registry_entry_to_id: fixture operation succeeds"),
+                    numeric_id: SafeU53::new(entry.numeric_id)
+                        .expect("registry_entry_to_id: fixture operation succeeds"),
                 },
                 SourceKindTag::ActiveAbility => BehaviorSourceId::ActiveAbility {
-                    numeric_id: SafeU53::new(entry.numeric_id).expect("registry_entry_to_id: fixture operation succeeds"),
+                    numeric_id: SafeU53::new(entry.numeric_id)
+                        .expect("registry_entry_to_id: fixture operation succeeds"),
                 },
                 SourceKindTag::PassiveAbility => BehaviorSourceId::PassiveAbility {
-                    numeric_id: SafeU53::new(entry.numeric_id).expect("registry_entry_to_id: fixture operation succeeds"),
+                    numeric_id: SafeU53::new(entry.numeric_id)
+                        .expect("registry_entry_to_id: fixture operation succeeds"),
                 },
                 SourceKindTag::BattlerTag => BehaviorSourceId::BattlerTag {
                     registry_key: entry.registry_key.to_string(),
@@ -2889,7 +2937,8 @@ mod tests {
             },
             unit_kind: entry.unit_kind,
             ordinal: BehaviorUnitOrdinal::new(entry.ordinal),
-            provenance_hash: ProvenanceHash::parse(entry.provenance_hash).expect("registry_entry_to_id: fixture operation succeeds"),
+            provenance_hash: ProvenanceHash::parse(entry.provenance_hash)
+                .expect("registry_entry_to_id: fixture operation succeeds"),
         }
     }
 
@@ -2974,7 +3023,9 @@ mod tests {
                 field: doubles_field(&[OWNER, ENEMY_A]),
             },
         )
-        .expect("gated_admission_feeds_the_retaliation_pipeline_end_to_end: fixture operation succeeds");
+        .expect(
+            "gated_admission_feeds_the_retaliation_pipeline_end_to_end: fixture operation succeeds",
+        );
         assert_eq!(
             transition.outcome,
             RetaliationOutcome::Delivered { damage: 80 },

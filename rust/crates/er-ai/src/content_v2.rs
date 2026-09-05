@@ -289,12 +289,10 @@ impl AiPolicyPackV2 {
                 || profile.party_template_count == 0
                 || !policy_ids.contains(&profile.policy)
                 || invalid_callbacks(&profile.callbacks)
-                || profile.instant_tera.iter().any(|entry| {
-                    entry
-                        .condition
-                        .as_ref()
-                        .is_some_and(invalid_callback)
-                })
+                || profile
+                    .instant_tera
+                    .iter()
+                    .any(|entry| entry.condition.as_ref().is_some_and(invalid_callback))
         }) || self.registered_trainers.iter().any(|trainer| {
             let no_party = trainer.default_party.is_empty()
                 && trainer.insane_party.as_ref().is_none_or(Vec::is_empty)

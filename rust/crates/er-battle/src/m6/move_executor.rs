@@ -170,7 +170,8 @@ mod tests {
             },
             unit_kind: er_types::BehaviorUnitKind::MoveAttribute,
             ordinal: BehaviorUnitOrdinal::default(),
-            provenance_hash: ProvenanceHash::parse(TEST_PROVENANCE_HASH).expect("move_unit: fixture operation succeeds"),
+            provenance_hash: ProvenanceHash::parse(TEST_PROVENANCE_HASH)
+                .expect("move_unit: fixture operation succeeds"),
         }
     }
 
@@ -185,7 +186,8 @@ mod tests {
         let unit = move_unit();
         MechanicsProgramV2 {
             schema_version: M6_MECHANICS_PROGRAM_VERSION,
-            id: MechanicsProgramId::try_from_u64(id).expect("program_with: fixture operation succeeds"),
+            id: MechanicsProgramId::try_from_u64(id)
+                .expect("program_with: fixture operation succeeds"),
             source: unit.source.clone(),
             behavior_units: vec![unit.clone()],
             bindings: vec![HookBindingV2 {
@@ -230,7 +232,8 @@ mod tests {
             Some(SelectorNodeIdV2::ZERO),
             MechanicOperationV2::StatusApply,
         );
-        let prepared = prepare_move_routine(program).expect("status_program_admits_direct_execution: fixture operation succeeds");
+        let prepared = prepare_move_routine(program)
+            .expect("status_program_admits_direct_execution: fixture operation succeeds");
         let steps: Vec<_> = prepared.steps().collect();
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].hook, MechanicHookV2::AfterHit);
@@ -256,7 +259,8 @@ mod tests {
             value: 1,
         }]);
         program.budget.value_nodes = 1;
-        let prepared = prepare_move_routine(program).expect("crit_query_step_exposes_staged_modifier: fixture operation succeeds");
+        let prepared = prepare_move_routine(program)
+            .expect("crit_query_step_exposes_staged_modifier: fixture operation succeeds");
         let steps: Vec<_> = prepared.steps().collect();
         assert_eq!(steps[0].hook, MechanicHookV2::CriticalQuery);
         assert!(steps[0].selector_root.is_none());
@@ -275,7 +279,8 @@ mod tests {
             },
         );
         program.source = BehaviorSourceId::Weather {
-            numeric_id: SafeU53::new(3).expect("non_move_source_is_rejected: fixture operation succeeds"),
+            numeric_id: SafeU53::new(3)
+                .expect("non_move_source_is_rejected: fixture operation succeeds"),
         };
         assert!(matches!(
             prepare_move_routine(program),
