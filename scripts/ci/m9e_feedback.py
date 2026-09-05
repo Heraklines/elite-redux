@@ -674,6 +674,8 @@ def main(preflight_failure=None):
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
                 raise RuntimeError("historical disposition must identify exactly one enumerated test")
+        if selection.get("cli_reload_focus"):
+            enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             output = FULL / f"execute-{index}.log"

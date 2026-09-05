@@ -766,10 +766,10 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         # This orchestration fixture isolates CLI binding. The full required
         # target inventory and exact two parity tests have separate witnesses.
-        selection["execution_scope"] = {"er-cli": ["m9e_current_reload"]}
+        selection["execution_scope"] = {"er-cli": ["a_suite", "m9e_current_reload"]}
         selection["required_native_targets"] = {"er-cli": ["m9e_current_reload"]}
-        self.binary_ids = {"m9e_current_reload": ["actual_cli_reload"]}
-        self.binary_crates = {"m9e_current_reload": "er-cli"}
+        self.binary_ids = {"a_suite": ["ordinary_cli"], "m9e_current_reload": ["actual_cli_reload"]}
+        self.binary_crates = {"a_suite": "er-cli", "m9e_current_reload": "er-cli"}
         self.extra_artifacts = [self.worker_executable_artifact()]
         self.assertIsNone(self.feedback.native_target_env("er-lab", "m9e_current_reload", None))
         self.assertIsNone(self.feedback.native_target_env("er-cli", "current_kernel_endpoint_v2", None))
@@ -779,9 +779,15 @@ class FeedbackTests(unittest.TestCase):
             code, summary = self.invoke()
         self.assertEqual(code, 0)
         self.assertEqual([(name, phase) for name, phase, _ in self.binary_envs],
-                         [("m9e_current_reload", "list"), ("m9e_current_reload", "execute")])
+                         [("a_suite", "list"), ("m9e_current_reload", "list"),
+                          ("m9e_current_reload", "execute"), ("a_suite", "execute")])
+        self.assertEqual(self.executed, ["m9e_current_reload", "a_suite"])
+        self.assertLess(self.events.index("list:m9e_current_reload"), self.events.index("execute:m9e_current_reload"))
         binding = summary["worker_executable"]
-        for _, _, env in self.binary_envs:
+        for name, _, env in self.binary_envs:
+            if name == "a_suite":
+                self.assertIsNone(env)
+                continue
             self.assertEqual({key: env[key] for key in env if key.startswith("ER_M9E_WORKER_")}, {
                 "ER_M9E_WORKER_EXECUTABLE": binding["path"], "ER_M9E_WORKER_EXECUTABLE_SHA256": binding["sha256"],
                 "ER_M9E_WORKER_SOURCE_SHA": CANDIDATE, "ER_M9E_WORKER_BUILD_TARGET": summary["target"],

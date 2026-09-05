@@ -597,3 +597,58 @@ Correction to preceding retry note: d415 run33937932009 attempt2 had already
 ended with exit143 before the c788 push; it was not canceled by that push.
 Its artifact steps again produced no report. No full test pass is claimed for
 either terminated attempt; da73baa remains the qualified baseline.
+
+### Current capsule source and cross-entry witnesses prepared
+
+While `e9442e69139ad5adfebcdf3d69e05abd27957890` runs the formatted,
+bounded actual CLI reload gate (`33939661739`), the next capsule sources have
+independent source review. No capsule execution pass is claimed. Shared recorder
+tests cover nine cases; the native Rust browser host exports into two actual CLI
+process tests, including optional worker import, failed-ID reuse, fork isolation
+and continued raw/time input. Production browser capture may rotate at its bound;
+the witness checks absolute positions and retained recent non-key evidence instead
+of demanding an unbounded natural journey history.
+
+The first existing Chromium journey is extended in the worktree to export a
+capsule from actual Wasm and invoke the normal native `replay` command through a
+verified non-test Cargo artifact. The helper compares the full final snapshot
+and observation, then removes a time event, repairs positions and requires a
+causal divergence at that position. CLI output, runtime and cleanup are bounded.
+The B2 version of this browser test is staged separately; the capsule extension
+will not be included in B2. The pending capsule gate must bind both actual worker
+and CLI artifacts, enforce exact existing-workspace dependency additions and run
+native, Wasm, Chromium and typed effect witnesses.
+
+Source contracts and limits are in `m9e-current-repro-next.md`. Admitted read-only
+host requests preserve capture even when their response exceeds its cap; invalid
+admission attempts mark a gap even if labelled Snapshot/ExportRepro. Capsule
+build/executable identity, all adapter-failure replay, production download/upload
+wiring, minimization and continued CLI recording remain outstanding.
+
+The source-only retention investigation in `m9e-retention-next.md` confirms the
+current material lifetime cap and missing duplicate-proposal reply recovery;
+no retention repair has been implemented or qualified. Full M9 remains incomplete.
+
+### CLI reload timeout is now captured; diagnostic repair next
+
+Candidate `e9442e69139ad5adfebcdf3d69e05abd27957890`, run `33939661739`,
+passed format and 36 native tests, then the two-test `m9e_current_reload` target
+exceeded its unchanged 600-second limit. One test printed a completion dot; the
+terse log cannot identify which one. No pass is claimed for that target, the
+remaining eight selected tests, Clippy or Wasm. All 44 tests were enumerated with
+required crate-qualified target counts. Baseline remains fully green `da73baa`.
+
+The inspected compact artifact was4,490compressed bytes; diagnostics24,231bytes
+remained remote. The243-byte failed-target excerpt contains both tests' over60s
+notices and one dot. Build107,717ms; supervisor266,109ms; worker114,382ms; current
+entry48,757ms; reload600,003ms. This completed report distinguishes an actual
+target timeout from the earlier runner shutdowns, without establishing its cause.
+
+Source review found no definite pipe cycle. The natural reference and worker
+journey perform repeated validation, hashing and serialization, and the test still
+has blocking response/EOF/exit waits. Add uncaptured bounded phase/progress
+diagnostics and response/exit deadlines while keeping all events and assertions.
+Execute this required target first after full discovery in its explicit reload
+scope; the remaining inventory must still execute before a passing result. No
+timeout increase or reduction in qualification is authorized by this repair.
+B2 and capsule changes remain excluded from the diagnostic candidate.
