@@ -349,9 +349,13 @@ def plan():
     capture_paths = capture_focus.get("paths", [])
     capture_changed = any(path in capture_focus.get("trigger_paths", []) for path in product_changes)
     capture_session = capture_changed and all(path in capture_paths for path in product_changes)
+    damage_focus = config.get("ai_damage_query_focus", {})
+    damage_paths = damage_focus.get("paths", [])
+    damage_changed = any(path in damage_focus.get("trigger_paths", []) for path in product_changes)
+    damage_session = damage_changed and all(path in damage_paths for path in product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -509,6 +513,10 @@ def plan():
         execution_scope = capture_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in capture_paths]
+    if damage_session:
+        execution_scope = damage_focus["execute"]
+        browser_required = True
+        boundaries = [path for path in boundaries if path not in damage_paths]
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -563,8 +571,10 @@ def plan():
               "current_validation_focus": validation_session,
               "material_retention_focus": retention_session,
               "native_capture_focus": capture_session,
+              "ai_damage_query_focus": damage_session,
               "requires_cli_executable": cli_executable_required,
-              "required_native_test_ids": (cache_focus.get("exact_test_ids", {}) if cache_session
+              "required_native_test_ids": (damage_focus.get("exact_test_ids", {}) if damage_session
+                                           else cache_focus.get("exact_test_ids", {}) if cache_session
                                            else validation_focus.get("exact_test_ids", {}) if validation_session
                                            else retention_focus.get("exact_test_ids", {}) if retention_session
                                            else capture_focus.get("exact_test_ids", {}) if capture_session
@@ -574,7 +584,8 @@ def plan():
                                            else timer_focus.get("exact_test_ids", {}) if timer_session else {}),
               "requires_agent_protocol_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
-              "required_native_targets": (cache_focus.get("required_targets", {}) if cache_session
+              "required_native_targets": (damage_focus.get("required_targets", {}) if damage_session
+                                          else cache_focus.get("required_targets", {}) if cache_session
                                           else validation_focus.get("required_targets", {}) if validation_session
                                           else retention_focus.get("required_targets", {}) if retention_session
                                           else capture_focus.get("required_targets", {}) if capture_session
@@ -595,7 +606,7 @@ def plan():
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
-    if unknown or boundaries or (browser_worker_changed and not browser_worker_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
+    if unknown or boundaries or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -1114,6 +1125,8 @@ def native_execution_order(selection, enumerated):
             "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
         if selection.get("material_retention_focus"):
             first[:0] = [("er-game", "m9e_material_retention"), ("er-kernel", "m9e_material_retention_v7")]
+        if selection.get("ai_damage_query_focus"):
+            first[:0] = [("er-game", "m9e_damage_query")]
         first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
         priority = {identity: index for index, identity in enumerate(first)}
         return sorted(enumerated, key=lambda item: priority.get((item[4].name, item[2]), len(priority)))
@@ -1237,40 +1250,46 @@ def main(preflight_failure=None):
         summary["selected_inventory_validated"] = True
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
-        if selection.get("requires_cli_clippy"):
-            write_progress(summary, "lint", "er-cli")
-            run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
-        if selection.get("menu_validation_focus"):
-            write_progress(summary, "lint", "er-types")
-            run(["cargo", "clippy", "--locked", "-p", "er-types", "--all-targets", "--no-deps", "--", "-D", "warnings"], "types-clippy")
-        if selection.get("requires_agent_protocol_clippy"):
-            write_progress(summary, "lint", "er-agent-protocol")
-            run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
-        if selection.get("current_repro_focus") or selection.get("timer_focus"):
-            for package in ("er-repro", "er-env"):
-                write_progress(summary, "lint", package)
-                run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
-        if selection.get("current_batch_focus"):
-            for package in ("er-batch", "er-env"):
-                write_progress(summary, "lint", package)
-                run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
-        if selection.get("browser_cache_focus") or selection.get("current_validation_focus") or selection.get("native_capture_focus"):
-            for package in ("er-batch", "er-env", "er-repro"):
-                write_progress(summary, "lint", package)
-                run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
-        if selection.get("material_retention_focus"):
-            for package in ("er-game", "er-kernel", "er-batch"):
-                write_progress(summary, "lint", package)
-                run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
-        if selection["worker_session_focus"] or selection["requires_worker_executable"]:
-            write_progress(summary, "lint", "er-kernel-worker")
-            run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
-        if selection["requires_worker_executable"]:
-            write_progress(summary, "lint", "er-lab")
-            run(["cargo", "clippy", "--locked", "-p", "er-lab", "--all-targets", "--no-deps", "--", "-D", "warnings"], "endpoint-clippy")
-        if selection["requires_browser"]:
-            write_progress(summary, "lint", "er-web")
-            run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
+        if selection.get("ai_damage_query_focus"):
+            write_progress(summary, "lint", "selected-packages")
+            run(["cargo", "clippy", "--locked",
+                 *[part for package in selection["packages"] for part in ("-p", package)],
+                 "--all-targets", "--no-deps", "--", "-D", "warnings"], "selected-packages-clippy")
+        else:
+            if selection.get("requires_cli_clippy"):
+                write_progress(summary, "lint", "er-cli")
+                run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
+            if selection.get("menu_validation_focus"):
+                write_progress(summary, "lint", "er-types")
+                run(["cargo", "clippy", "--locked", "-p", "er-types", "--all-targets", "--no-deps", "--", "-D", "warnings"], "types-clippy")
+            if selection.get("requires_agent_protocol_clippy"):
+                write_progress(summary, "lint", "er-agent-protocol")
+                run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
+            if selection.get("current_repro_focus") or selection.get("timer_focus"):
+                for package in ("er-repro", "er-env"):
+                    write_progress(summary, "lint", package)
+                    run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
+            if selection.get("current_batch_focus"):
+                for package in ("er-batch", "er-env"):
+                    write_progress(summary, "lint", package)
+                    run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
+            if selection.get("browser_cache_focus") or selection.get("current_validation_focus") or selection.get("native_capture_focus"):
+                for package in ("er-batch", "er-env", "er-repro"):
+                    write_progress(summary, "lint", package)
+                    run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
+            if selection.get("material_retention_focus"):
+                for package in ("er-game", "er-kernel", "er-batch"):
+                    write_progress(summary, "lint", package)
+                    run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
+            if selection["worker_session_focus"] or selection["requires_worker_executable"]:
+                write_progress(summary, "lint", "er-kernel-worker")
+                run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
+            if selection["requires_worker_executable"]:
+                write_progress(summary, "lint", "er-lab")
+                run(["cargo", "clippy", "--locked", "-p", "er-lab", "--all-targets", "--no-deps", "--", "-D", "warnings"], "endpoint-clippy")
+            if selection["requires_browser"]:
+                write_progress(summary, "lint", "er-web")
+                run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
         enumerated = native_execution_order(selection, enumerated)
         if os.environ.get("M9E_PHASE") == "native":
             from m9e_phases import inventory_and_assignment

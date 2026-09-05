@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "a19d337b8a20c068315e539b558258d35676d80c",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33983872608",
+  "baseline": "f140b7687d44559e38e775147ad91835f62de8e8",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33990371692",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -800,5 +800,279 @@
     "reason": "Historical M3 ancestor/blob freeze does not describe M9; identical exact exclusion in published M9 qualification shard 16 at baseline 5c21f3dc. Remaining API-bypass tests and current CLI execution witnesses remain mandatory."
   }],
   "boundary_prefixes": ["src/", "test/browser/", "test/node/", "workers/", "rust/crates/er-wasm/", "rust/crates/er-web/"],
-  "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes"
+  "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes",
+  "ai_damage_query_focus": {
+    "execute": {
+      "er-batch": [
+        "*"
+      ],
+      "er-kernel": [
+        "*"
+      ],
+      "er-state": [
+        "*"
+      ],
+      "er-protocol": [
+        "*"
+      ],
+      "er-agent-protocol": [
+        "*"
+      ],
+      "er-env": [
+        "*"
+      ],
+      "er-repro": [
+        "*"
+      ],
+      "er-cli": [
+        "*"
+      ],
+      "er-web": [
+        "*"
+      ],
+      "er-kernel-worker": [
+        "*"
+      ],
+      "er-lab": [
+        "current_kernel_endpoint_v2",
+        "current_kernel_endpoint_faults_v2",
+        "current_kernel_supervisor_v2",
+        "kernel_reload_acceptance",
+        "kernel_reload_artifact"
+      ],
+      "er-wasm": [
+        "m9e_parity"
+      ],
+      "er-battle": [
+        "*"
+      ],
+      "er-ai": [
+        "*"
+      ],
+      "er-game": [
+        "er_game",
+        "m3_command_menus",
+        "m3_internal_event_boundary",
+        "m3_local_battle",
+        "m3_party_menus",
+        "m3_runtime",
+        "m9e_content_v2",
+        "m9e_material_v6",
+        "m9e_new_run_v6",
+        "m9e_runtime_v6",
+        "m9e_damage_query"
+      ]
+    },
+    "trigger_paths": [
+      "rust/crates/er-battle/src/m7_resolver.rs",
+      "rust/crates/er-game/tests/m9e_damage_query.rs"
+    ],
+    "reason": "Current immutable damage-query extraction only. Preserve complete causal22 inventories, both timer/replica controls, native/Wasm parity, Chromium/typed effects and actual CLI bridge; add full battle/AI execution and named non-retention game targets plus query4. Compile the full reverse/witness cone and lint all selected packages before any execution. Exact two-path product scope, no dependency exception. The save/delete-only full er-game retention witness remains required by retention scope, not this resolver-only cut; V7 retention2 remains required here. Rulechange reload target and variant bindings are not introduced by this policy.",
+    "paths": [
+      "rust/crates/er-battle/src/m7_resolver.rs",
+      "rust/crates/er-game/tests/m9e_damage_query.rs"
+    ],
+    "exact_test_ids": {
+      "er-kernel:m9e_timers_v7": [
+        "transport_resume_preserves_unrelated_pause_reasons_and_clock_classes",
+        "staged_transport_generation_remains_paused_and_rejections_are_atomic",
+        "held_navigation_repeats_at_250ms_with_real_cursor_effects",
+        "snapshot_resume_and_time_chunking_preserve_ordered_consequences",
+        "release_blur_text_focus_and_duplicate_sources_cancel_or_suppress_repeats",
+        "menu_transition_retires_repeat_and_stale_snapshot_ownership_is_rejected",
+        "pause_reasons_preserve_remaining_delay_until_last_reason_is_removed",
+        "unequal_and_tied_deadlines_dispatch_in_chronological_timer_order",
+        "exhausted_allocator_and_consequence_budget_fail_atomically",
+        "invalid_directional_keyboard_and_gamepad_presses_preserve_full_snapshot",
+        "unsupported_later_timer_rolls_back_earlier_real_navigation"
+      ],
+      "er-cli:m9e_current_native_capture": [
+        "actual_native_capture_replays_natural_events_rejections_and_imported_history",
+        "actual_native_capture_rotation_fork_restore_and_byte_gaps_are_explicit",
+        "actual_native_capture_late_response_and_rejected_ingress_preserve_gameplay",
+        "actual_native_capture_browser_import_declares_native_suffix_at_original_frontier"
+      ],
+      "er-cli:m9e_current_validation": [
+        "ordinary_validate_save_accepts_v2_and_rejects_legacy_or_wrong_content",
+        "ordinary_capsule_validation_replays_current_and_rejects_tampered_or_legacy_input"
+      ],
+      "er-web:er_web": [
+        "host_v2::transaction_tests::late_response_limit_rejection_preserves_state_cache_and_retry",
+        "host_v2::transaction_tests::read_only_response_limit_failure_preserves_capture",
+        "host_v2::transaction_tests::retained_response_byte_boundary_evicts_by_acceptance_and_preserves_retry",
+        "host_v2::transaction_tests::single_response_cache_boundary_rejects_before_commit_and_disposal_clears_payloads",
+        "host_v2::transaction_tests::sequence_exhaustion_preflight_preserves_current_session_and_cached_response"
+      ],
+      "er-web:m9e_host_v2": [
+        "natural_browser_route_produces_typed_ui_transport_presentation_audio_and_assets",
+        "all_five_initialization_modes_and_repro_effect_are_live",
+        "save_and_terminal_controls_produce_storage_and_terminal_effects",
+        "browser_host_survives_request_window",
+        "browser_requests_are_atomic_and_conflicting_retries_fail_closed",
+        "browser_time_and_lifecycle_requests_execute_kernel_state_changes",
+        "browser_network_and_transport_requests_execute_protocol_state",
+        "browser_storage_results_apply_cas_and_loaded_state",
+        "presentation_failure_retains_barrier_until_successful_settlement",
+        "exported_current_repro_replays_raw_non_key_rejection_and_continues",
+        "current_repro_exact_cached_retry_does_not_record_twice",
+        "invalid_current_capsule_initialization_is_atomic_and_can_retry",
+        "current_session_and_browser_match_natural_input_and_external_outcomes",
+        "rejected_browser_sequence_preserves_state_and_exact_cached_response"
+      ],
+      "er-kernel:m9e_material_retention_v7": [
+        "v7_material_rollover_restores_pending_effects_and_continues_exact_snapshots",
+        "v7_restore_rejects_historical_gapped_evidence_and_continues_a_valid_suffix"
+      ],
+      "er-batch:m9e_current_batch": [
+        "current_batch_natural_controls_and_held_time_return_ordered_typed_results",
+        "rejected_event_rolls_back_every_affected_environment_and_allows_continuation",
+        "aggregate_completion_rejection_preserves_all_snapshots_and_effect_retry",
+        "aggregate_result_byte_limit_is_exact_atomic_and_resets_each_call",
+        "equal_prepared_content_normalizes_and_forks_without_changing_private_state",
+        "limits_missing_duplicate_disposed_and_wrong_content_are_atomic"
+      ],
+      "er-cli:m9e_current_batch": [
+        "actual_current_batch_preserves_order_timers_rollback_and_fork",
+        "actual_current_batch_import_reset_limits_and_global_quota_are_atomic"
+      ],
+      "er-agent-protocol:er_agent_protocol": [
+        "response_context_tests::inline_success_boundary_counts_escaping_nulls_and_newline",
+        "response_context_tests::contextual_server_rejects_before_mutation_and_accepts_corrected_retry",
+        "response_context_tests::default_context_preserves_historical_artifact_dispatch",
+        "ingress_diagnostic_tests::default_ingress_hook_preserves_legacy_responses_and_immutable_oversized_api",
+        "ingress_diagnostic_tests::rejected_ingress_hook_distinguishes_addressable_and_discarded_requests"
+      ],
+      "er-kernel:m9e_coop_v7": [
+        "natural_coop_raw_proposal_converges_and_generation_is_fenced",
+        "coop_waits_for_all_human_commands",
+        "replica_delivers_save_presentation_once_without_repeating_authority_storage",
+        "private_party_reopens_restore_exact_root_and_apply_canonical_material"
+      ],
+      "er-kernel:m9e_snapshot_v7": [
+        "active_snapshot_round_trips_at_a_quiescent_boundary",
+        "typed_pending_effects_cross_validate_allocator_and_content",
+        "terminal_lifecycle_requires_complete_control_and_terminal_identity",
+        "quiescent_v6_snapshot_migrates_without_gameplay_side_effects"
+      ],
+      "er-kernel:m9e_domain_journeys_v7": [
+        "capture_success_with_full_party_uses_allocator_backed_storage",
+        "raw_capture_uses_audited_rng",
+        "raw_reward_resolves_the_committed_content_offer",
+        "raw_inventory_use_resolves_content_and_target",
+        "scenario_choices_apply_source_compiled_graph_effects",
+        "unimplemented_source_program_fails_closed",
+        "message_in_a_bottle_applies_source_map_effects",
+        "observatory_applies_source_landmark_effect",
+        "lost_at_sea_applies_source_party_damage",
+        "progression_evolution_and_fusion_actions_execute_through_raw_input",
+        "inventory_reward_world_and_scenario_actions_execute_through_raw_input",
+        "game_save_v2_restores_every_control_kind"
+      ],
+      "er-repro:m9e_current_repro": [
+        "natural_title_to_battle_held_timer_capsule_replays_full_evidence",
+        "replay_rejects_nonkey_omission_reordering_wrong_content_and_unsafe_positions",
+        "rejected_attempt_retains_game_frontier_and_replays_valid_retry",
+        "count_rotation_retains_checkpoint_before_current_timer_consequence",
+        "byte_rotation_uses_full_serialized_capsule_bound",
+        "oversized_attempt_adapter_gap_and_origin_failure_are_explicit_then_recover",
+        "broken_capture_continuity_cannot_export_a_false_complete_tail",
+        "browser_generation_survives_rotation_import_and_kernel_rejections_without_protocol",
+        "browser_transport_validation_checks_admission_continuity_and_outcome_separately"
+      ],
+      "er-cli:m9e_current_repro": [
+        "native_browser_capsule_replays_through_actual_cli_and_continues",
+        "actual_worker_capsule_import_rejects_tampering_without_claiming_session_id"
+      ],
+      "er-cli:m9e_current_reload": [
+        "actual_worker_cli_reload_replays_held_timer_tail_and_preserves_failed_ticket",
+        "actual_worker_cli_rejects_bad_artifacts_then_forks_and_restores"
+      ],
+      "er-wasm:m9e_parity": [
+        "native_replays_v7_raw_inputs_eventwise",
+        "native_replays_v7_held_timers_eventwise"
+      ],
+      "er-game:m9e_damage_query": [
+        "current_damage_query_distinguishes_equal_power_by_physical_and_special_bulk",
+        "current_damage_queries_preserve_full_turn_and_rng_audit_after_reordering",
+        "current_damage_query_honors_pp_up_and_override_bounds_without_mutation",
+        "current_damage_query_zero_and_inactive_inputs_leave_state_unchanged"
+      ]
+    },
+    "required_targets": {
+      "er-batch": [
+        "m9e_current_batch"
+      ],
+      "er-agent-protocol": [
+        "er_agent_protocol"
+      ],
+      "er-kernel": [
+        "m9e_timers_v7",
+        "m9e_domain_journeys_v7",
+        "m9e_coop_v7",
+        "m9e_game_kernel_v7",
+        "m9e_snapshot_v7",
+        "m9e_material_retention_v7"
+      ],
+      "er-repro": [
+        "m9e_current_repro"
+      ],
+      "er-cli": [
+        "m9e_current_batch",
+        "m9e_current_repro",
+        "m9e_current_entry",
+        "m9e_current_reload",
+        "m9e_current_native_capture",
+        "m9e_current_validation"
+      ],
+      "er-web": [
+        "m9e_host_v2",
+        "er_web"
+      ],
+      "er-kernel-worker": [
+        "current_process_v2"
+      ],
+      "er-lab": [
+        "current_kernel_endpoint_v2",
+        "current_kernel_endpoint_faults_v2",
+        "current_kernel_supervisor_v2"
+      ],
+      "er-wasm": [
+        "m9e_parity"
+      ],
+      "er-battle": [
+        "m3_ability_pipeline",
+        "m3_accuracy_critical",
+        "m3_action_order",
+        "m3_command_legality",
+        "m3_damage",
+        "m3_faint_replacement",
+        "m3_mechanics_properties",
+        "m3_move_pipeline",
+        "m3_oracle_differential",
+        "m3_presentation",
+        "m3_status_stage",
+        "m3_switch",
+        "m3_turn_outcome",
+        "m3_type_effectiveness",
+        "m5_executor",
+        "m5_mechanic_sources",
+        "m5_properties"
+      ],
+      "er-ai": [
+        "er_ai"
+      ],
+      "er-game": [
+        "m3_command_menus",
+        "m3_internal_event_boundary",
+        "m3_local_battle",
+        "m3_party_menus",
+        "m3_runtime",
+        "m9e_content_v2",
+        "m9e_material_v6",
+        "m9e_new_run_v6",
+        "m9e_runtime_v6",
+        "m9e_damage_query"
+      ]
+    }
+  }
 }

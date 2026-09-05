@@ -8,6 +8,8 @@ Consumers never receive worker/test binaries or a target tree. No archive
 supplied by a manifest is opened.
 """
 
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -15,10 +17,12 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import zlib
 
 
 MANIFEST_LIMIT = 64 * 1024
 NATIVE_ID_ENCODING = "native-inventory-indices-v1"
+NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
     "harness": "scripts/ci/m9e_feedback.py",
@@ -98,7 +102,7 @@ def file_hash(path):
 
 
 def write_bounded(path, value):
-    data = encoded(pack_native_ids(value))
+    data = encoded(pack_native_inventory(value))
     if len(data) > MANIFEST_LIMIT:
         raise RuntimeError("phase manifest exceeds 64 KiB")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -162,6 +166,8 @@ def pack_native_ids(value):
 
 
 def unpack_native_ids(value):
+    if isinstance(value, dict) and value.get("encoding") == NATIVE_COMPRESSED_ID_ENCODING:
+        value = unpack_compressed_native_inventory(value)
     if not isinstance(value, dict) or "encoding" not in value:
         return value
     if set(value) != {"encoding", "proof"} or value["encoding"] != NATIVE_ID_ENCODING:
@@ -206,6 +212,79 @@ def unpack_native_ids(value):
             or expanded.get("inventory_sha256") != sha(encoded(inventory))):
         raise RuntimeError("reconstructed native plan or inventory digest mismatch")
     return expanded
+
+
+def pack_native_inventory(value):
+    """Compress only ID lists when the unchanged indexed proof cannot fit.
+
+    Inline/v1 output stays byte-identical. Invalid or over-expanded proofs are
+    not repaired by compression; write_bounded retains its wire-size failure.
+    """
+    indexed = pack_native_ids(value)
+    if (len(encoded(indexed)) <= MANIFEST_LIMIT or not isinstance(indexed, dict)
+            or indexed.get("encoding") != NATIVE_ID_ENCODING
+            or len(encoded(value)) > 2 * MANIFEST_LIMIT):
+        return indexed
+    proof = indexed["proof"]
+    inventory = proof["inventory"]
+    ids = encoded([[item["ids"], item["historical_excluded_ids"]] for item in inventory])
+    return {"encoding": NATIVE_COMPRESSED_ID_ENCODING,
+            "proof": {**proof, "inventory": [{"crate": item["crate"], "target": item["target"]}
+                                              for item in inventory]},
+            "inventory_ids": {"decoded_bytes": len(ids),
+                              "data": base64.b64encode(zlib.compress(ids, level=9)).decode("ascii")}}
+
+
+def unpack_compressed_native_inventory(value):
+    """Bound zlib output before JSON allocation, then reuse every v1 check."""
+    if set(value) != {"encoding", "proof", "inventory_ids"}:
+        raise RuntimeError("native compressed encoding fields are invalid")
+    proof, payload = value["proof"], value["inventory_ids"]
+    if (not isinstance(proof, dict) or type(proof.get("version")) is not int or proof["version"] != 1
+            or proof.get("phase") != "native" or not isinstance(proof.get("plan"), dict)
+            or not isinstance(proof.get("inventory"), list)
+            or not isinstance(payload, dict) or set(payload) != {"decoded_bytes", "data"}):
+        raise RuntimeError("native compressed proof or payload fields are invalid")
+    inventory = proof["inventory"]
+    seen = set()
+    for item in inventory:
+        if (not isinstance(item, dict) or set(item) != {"crate", "target"}
+                or any(not isinstance(item[field], str) or not item[field] for field in ("crate", "target"))):
+            raise RuntimeError("native compressed target fields are invalid")
+        pair = (item["crate"], item["target"])
+        if pair in seen:
+            raise RuntimeError("native compressed target is duplicated")
+        seen.add(pair)
+    size, text = payload["decoded_bytes"], payload["data"]
+    if (type(size) is not int or size <= 0 or size > 2 * MANIFEST_LIMIT
+            or not isinstance(text, str) or not text or len(text) > MANIFEST_LIMIT):
+        raise RuntimeError("native compressed payload bounds are invalid")
+    try:
+        compressed = base64.b64decode(text, validate=True)
+        if base64.b64encode(compressed).decode("ascii") != text:
+            raise ValueError("noncanonical base64")
+        stream = zlib.decompressobj()
+        # Never use an unbounded decompress or flush. One extra byte detects a
+        # lying length; EOF and both tails reject truncation/concatenation/junk.
+        raw = stream.decompress(compressed, size + 1)
+        if len(raw) != size or not stream.eof or stream.unused_data or stream.unconsumed_tail:
+            raise ValueError("incomplete, trailing or oversized zlib stream")
+    except (ValueError, binascii.Error, zlib.error) as error:
+        raise RuntimeError("native compressed payload is invalid or exceeds its bound") from error
+    try:
+        lists = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise RuntimeError("native compressed ID JSON is invalid") from error
+    if (not isinstance(lists, list) or len(lists) != len(inventory)
+            or any(not isinstance(item, list) or len(item) != 2
+                   or any(not isinstance(ids, list) for ids in item) for item in lists)):
+        raise RuntimeError("native compressed ID list shape is invalid")
+    restored = [{**target, "ids": names[0], "historical_excluded_ids": names[1]}
+                for target, names in zip(inventory, lists)]
+    # Existing partition/permutation validation checks full ID strings, exact
+    # uniqueness, selected/excluded separation and target ownership. Existing
+    # semantic hashes and the complete 128 KiB expansion bound remain required.
+    return {"encoding": NATIVE_ID_ENCODING, "proof": {**proof, "inventory": restored}}
 
 
 def output(name, value):

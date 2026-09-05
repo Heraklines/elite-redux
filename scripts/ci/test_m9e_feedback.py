@@ -194,9 +194,10 @@ class FeedbackTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0)
         if args[:2] == ["cargo", "clippy"]:
             self.events.append("clippy")
-            package = args[args.index("-p") + 1]
-            self.events.append("clippy:" + package)
-            code = self.clippy_codes.get(package, self.clippy_code)
+            packages = [args[index + 1] for index, value in enumerate(args) if value == "-p"]
+            self.events.extend("clippy:" + package for package in packages)
+            code = next((self.clippy_codes.get(package, self.clippy_code) for package in packages
+                         if self.clippy_codes.get(package, self.clippy_code)), 0)
             if code:
                 stdout.write("error: synthetic worker lint failure\n")
             return subprocess.CompletedProcess(args, code)
@@ -2289,6 +2290,230 @@ class FeedbackTests(unittest.TestCase):
                 self.assertIn("browser-worker-results" if name == "browser-worker-journey" else "browser-results",
                               env["PLAYWRIGHT_JSON_OUTPUT_FILE"])
 
+    def configure_ai_damage_query_scope(self):
+        self.configure_timer_scope()
+        actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for name in ("ai_damage_query_focus", "material_retention_focus", "current_batch_focus",
+                     "native_capture_focus", "current_validation_focus", "browser_cache_focus", "current_repro_focus"):
+            self.config[name] = actual[name]
+        for crate in actual["ai_damage_query_focus"]["execute"]:
+            self.package(crate)
+        self.package("er-game", '[dependencies]\ner-battle = { path = "../er-battle" }\n')
+        self.package("er-kernel", '[dependencies]\ner-game = { path = "../er-game" }\n')
+        self.package("er-reverse", '[build-dependencies]\nquery = { package = "er-battle", path = "../er-battle" }\n')
+        self.package("er-target-reverse", '[target.\'cfg(unix)\'.dev-dependencies]\nai = { package = "er-ai", path = "../er-ai" }\n')
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+
+    def ai_damage_query_binaries(self):
+        policy = self.config["ai_damage_query_focus"]
+        self.binary_ids = {}
+        for crate, targets in policy["execute"].items():
+            if targets == ["*"]:
+                targets = policy["required_targets"].get(crate, [crate.replace("-", "_")])
+            for target in targets:
+                binary = target if target not in self.binary_ids else crate + "--" + target
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_crates[binary], self.binary_targets[binary] = crate, target
+        # A real all-target discovery may include empty unit harnesses; run
+        # those too, while retaining reverse consumers as compilation evidence.
+        self.binary_ids["er_battle"] = []
+        self.binary_crates["er_battle"] = "er-battle"
+        self.binary_targets["er_battle"] = "er_battle"
+        self.binary_ids["er_game"] = []
+        self.binary_ids["reverse_compiled_only"] = ["reverse_build_witness"]
+        self.binary_crates["reverse_compiled_only"] = "er-reverse"
+        self.binary_targets["reverse_compiled_only"] = "reverse_compiled_only"
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+
+    def test_ai_damage_query_scope_inherits_causal_inventory_and_adds_exact_source_witnesses(self):
+        self.configure_ai_damage_query_scope()
+        policy, causal = self.config["ai_damage_query_focus"], self.config["timer_focus"]
+        paths = ["rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-game/tests/m9e_damage_query.rs"]
+        self.assertEqual(set(policy["paths"]), set(paths))
+        self.assertEqual(set(policy["trigger_paths"]), set(paths))
+        for changed in (paths, paths[:1], paths[1:]):
+            with self.subTest(changed=changed):
+                self.changed = changed
+                selection = self.feedback.plan()
+                for flag in ("ai_damage_query_focus", "timer_focus", "requires_wasm", "requires_browser",
+                             "requires_cli_executable", "requires_worker_executable", "requires_cli_clippy",
+                             "requires_agent_protocol_clippy"):
+                    self.assertTrue(selection[flag], flag)
+                self.assertFalse(selection["material_retention_focus"])
+                self.assertIsNone(selection["ledger_mutant"])
+                self.assertEqual(selection["timer_mutant"], causal["mutant"])
+                self.assertEqual(selection["replica_mutant"], causal["replica_mutant"])
+                self.assertEqual(selection["wasm_test"], "m9e_parity")
+                self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 50)
+                for field, configured in (("execution_scope", "execute"), ("required_native_targets", "required_targets"),
+                                          ("required_native_test_ids", "exact_test_ids")):
+                    for key, value in causal[configured].items():
+                        self.assertEqual(selection[field][key], value, (field, key))
+                self.assertEqual(set(selection["required_native_test_ids"]["er-game:m9e_damage_query"]), {
+                    "current_damage_query_distinguishes_equal_power_by_physical_and_special_bulk",
+                    "current_damage_queries_preserve_full_turn_and_rng_audit_after_reordering",
+                    "current_damage_query_honors_pp_up_and_override_bounds_without_mutation",
+                    "current_damage_query_zero_and_inactive_inputs_leave_state_unchanged"})
+                self.assertEqual(set(selection["required_native_targets"]["er-battle"]), {
+                    "m3_ability_pipeline", "m3_accuracy_critical", "m3_action_order", "m3_command_legality", "m3_damage",
+                    "m3_faint_replacement", "m3_mechanics_properties", "m3_move_pipeline", "m3_oracle_differential",
+                    "m3_presentation", "m3_status_stage", "m3_switch", "m3_turn_outcome", "m3_type_effectiveness",
+                    "m5_executor", "m5_mechanic_sources", "m5_properties"})
+                self.assertEqual(set(selection["required_native_targets"]["er-game"]), {
+                    "m3_command_menus", "m3_internal_event_boundary", "m3_local_battle", "m3_party_menus", "m3_runtime",
+                    "m9e_content_v2", "m9e_material_v6", "m9e_new_run_v6", "m9e_runtime_v6", "m9e_damage_query"})
+                self.assertEqual(selection["required_native_targets"]["er-ai"], ["er_ai"])
+                for crate in ("er-battle", "er-ai"):
+                    self.assertEqual(selection["execution_scope"][crate], ["*"])
+                self.assertIn("er_game", selection["execution_scope"]["er-game"])
+                self.assertNotIn("m9e_material_retention", selection["execution_scope"]["er-game"])
+                for reverse in ("er-reverse", "er-target-reverse"):
+                    self.assertIn(reverse, selection["packages"])
+                    self.assertNotIn(reverse, selection["execution_scope"])
+                self.assertNotIn("m9e_current_rulechange_reload", selection["required_native_targets"]["er-cli"])
+                self.assertNotIn(("er-cli", "m9e_current_rulechange_reload"), self.feedback.WORKER_BOUND_TARGETS)
+
+    def test_ai_damage_query_mixed_and_dependency_paths_fail_closed_without_changing_old_scopes(self):
+        self.configure_ai_damage_query_scope()
+        query = "rust/crates/er-battle/src/m7_resolver.rs"
+        for extra in ("rust/crates/er-battle/src/m7_other.rs", "rust/crates/er-game/tests/m9e_damage_query_extra.rs",
+                      "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-game/src/m9e_material_v6.rs",
+                      "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-ai/src/full_surface.rs",
+                      "rust/crates/er-repro/src/current.rs", "rust/crates/er-batch/src/current.rs",
+                      "rust/crates/er-web/src/host_v2.rs", "test/browser/rust-browser/m9e-v7-corrective.spec.ts",
+                      "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", "rust/Cargo.lock",
+                      "rust/crates/er-battle/Cargo.toml", "rust/crates/er-game/Cargo.toml", "unknown.json"):
+            with self.subTest(extra=extra):
+                self.changed = [query, extra]
+                with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                    self.feedback.plan()
+                rejected = json.loads((self.full / "plan.json").read_text())
+                self.assertFalse(rejected["ai_damage_query_focus"])
+                self.assertTrue(rejected["packages"])
+        for scope, path in (("timer_focus", "rust/crates/er-kernel/src/game_kernel_v7.rs"),
+                            ("material_retention_focus", "rust/crates/er-game/src/m9e_material_v6.rs")):
+            self.changed = [path]
+            old = self.feedback.plan()
+            self.assertTrue(old[scope])
+            self.assertFalse(old["ai_damage_query_focus"])
+            self.assertEqual(old["execution_scope"], self.config[scope]["execute"])
+            self.assertEqual(old["required_native_test_ids"], self.config[scope]["exact_test_ids"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        self.assertEqual(self.feedback.plan()["packages"], ["er-canonical"])
+
+    def test_ai_damage_query_all_required_targets_and_exact_ids_fail_on_omission_or_renaming(self):
+        self.configure_ai_damage_query_scope()
+        self.changed = self.config["ai_damage_query_focus"]["paths"]
+        selection = self.feedback.plan()
+        exact = selection["required_native_test_ids"]
+        enumerated = [(crate, target, exact.get(f"{crate}:{target}", ["behavior"]))
+                      for crate, targets in selection["required_native_targets"].items() for target in targets]
+        self.assertEqual(len(self.feedback.required_native_target_counts(selection["required_native_targets"], enumerated)), 50)
+        self.feedback.require_native_test_ids(exact, enumerated)
+        for index, (crate, target, ids) in enumerate(enumerated):
+            for replacement in ([], [(crate, target, [])], [("wrong-crate", target, ids)],
+                                [(crate, target + "_renamed", ids)], [(crate, target, ids)] * 2):
+                with self.subTest(target=(crate, target), replacement=replacement):
+                    bad = enumerated[:index] + replacement + enumerated[index + 1:]
+                    with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                        self.feedback.required_native_target_counts(selection["required_native_targets"], bad)
+        for identity, ids in exact.items():
+            index = next(index for index, (crate, target, _) in enumerate(enumerated) if f"{crate}:{target}" == identity)
+            crate, target, _ = enumerated[index]
+            for position in range(len(ids)):
+                for action in ("omit", "rename", "duplicate"):
+                    with self.subTest(identity=identity, position=position, action=action):
+                        changed = list(ids)
+                        if action == "omit":
+                            changed.pop(position)
+                        elif action == "rename":
+                            changed[position] += "_renamed"
+                        else:
+                            changed.append(ids[position])
+                        bad = enumerated[:index] + [(crate, target, changed)] + enumerated[index + 1:]
+                        with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                            self.feedback.require_native_test_ids(exact, bad)
+
+    def test_ai_damage_query_full_compile_single_early_lint_and_platform_controls(self):
+        self.configure_ai_damage_query_scope()
+        self.changed = self.config["ai_damage_query_focus"]["paths"]
+        self.ai_damage_query_binaries()
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica, \
+                patch.object(self.feedback, "ledger_behavioral_mutant") as ledger:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        if (self.full / "full-summary.json").is_file():
+            summary = json.loads((self.full / "full-summary.json").read_text())
+        selection = json.loads((self.full / "plan.json").read_text())
+        self.assertEqual(len(summary["required_native_target_counts"]), 50)
+        self.assertEqual(summary["required_native_target_counts"]["er-game:m9e_damage_query"], 4)
+        self.assertEqual(self.executed[0], "m9e_damage_query")
+        self.assertNotIn("reverse_compiled_only", self.executed)
+        self.assertIn("er_battle", self.executed)
+        self.assertIn("er_game", self.executed)
+        build = next(command for command in self.commands if command[:2] == ["cargo", "test"])
+        lint = [command for command in self.commands if command[:2] == ["cargo", "clippy"]]
+        self.assertEqual(len(lint), 1)
+        for command in (build, lint[0]):
+            self.assertEqual([command[index + 1] for index, part in enumerate(command) if part == "-p"], selection["packages"])
+            self.assertIn("--locked", command)
+        self.assertIn("--no-run", build)
+        self.assertIn("--tests", build)
+        self.assertEqual(lint[0][-5:], ["--all-targets", "--no-deps", "--", "-D", "warnings"])
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        self.assertLess(self.events.index("clippy"), self.events.index("execute:m9e_damage_query"))
+        count = sum(len(self.binary_ids[name]) for name in self.executed)
+        self.assertEqual(summary["tests"], {"selected": count, "executed": count, "passed": count, "failed": 0, "skipped": 0})
+        self.assertEqual(summary["cli_executable"]["source_sha"], CANDIDATE)
+        self.assertEqual(summary["worker_executable"]["source_sha"], CANDIDATE)
+        self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        timer.assert_called_once()
+        replica.assert_called_once()
+        ledger.assert_not_called()
+
+    def test_ai_damage_query_lint_and_identity_failures_stop_before_any_native_execution(self):
+        self.configure_ai_damage_query_scope()
+        self.changed = self.config["ai_damage_query_focus"]["paths"]
+        self.ai_damage_query_binaries()
+        self.clippy_codes["er-game"] = 1
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        if (self.full / "full-summary.json").is_file():
+            summary = json.loads((self.full / "full-summary.json").read_text())
+        self.assertIn("selected-packages-clippy", summary["first_failure"])
+        self.assertGreater(summary["tests"]["selected"], 0)
+        self.assertEqual(summary["tests"]["executed"], 0)
+        self.assertTrue(summary["selected_inventory_validated"])
+        self.assertEqual(len(summary["required_native_target_counts"]), 50)
+        self.assertEqual(self.executed, [])
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        self.clippy_codes.clear()
+        self.events.clear()
+        self.binary_ids["m9e_damage_query"] = self.binary_ids["m9e_damage_query"][:-1]
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("required native test identities", summary["first_failure"])
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+
+    def test_ai_damage_query_priority_is_crate_bound_with_stable_causal_remainder(self):
+        items = [(index, f"bin{index}", name, ["case"], Path(crate), set(), None)
+                 for index, (crate, name) in enumerate([
+                     ("er-other", "m9e_damage_query"), ("er-cli", "m9e_current_reload"),
+                     ("er-kernel", "m9e_coop_v7"), ("er-game", "m9e_damage_query"),
+                     ("er-kernel", "m9e_game_kernel_v7"), ("er-other", "last")])]
+        old = self.feedback.native_execution_order({"timer_focus": True}, items)
+        ordered = self.feedback.native_execution_order({"timer_focus": True, "ai_damage_query_focus": True}, items)
+        self.assertEqual(ordered[0], items[3])
+        self.assertEqual(ordered[1:], [item for item in old if item != items[3]])
+        self.assertEqual({item[0] for item in ordered}, {item[0] for item in items})
+        self.assertEqual(self.feedback.native_execution_order({}, items), items)
+
     def configure_material_retention_scope(self):
         self.configure_timer_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["material_retention_focus"]
@@ -3807,6 +4032,88 @@ class PhaseTransferTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "lane B cannot claim lane A mutant"):
                     self.phases.validate_native(proof, self.identity)
 
+    def test_ai_damage_query_proof_keeps_full_required_ids_both_mutants_and_platform_bridge(self):
+        config = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        policy = config["ai_damage_query_focus"]
+        proof = copy.deepcopy(self.native)
+        proof["plan"].update({"ai_damage_query_focus": True, "timer_focus": True, "material_retention_focus": False,
+                               "required_native_targets": policy["required_targets"],
+                               "required_native_test_ids": policy["exact_test_ids"], "ledger_mutant": None})
+        proof["inventory"] = [{"crate": crate, "target": target,
+                               "ids": policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"]),
+                               "historical_excluded_ids": []}
+                              for crate, targets in policy["required_targets"].items() for target in targets]
+        proof["required_native_target_counts"] = {f'{item["crate"]}:{item["target"]}': len(item["ids"])
+                                                    for item in proof["inventory"]}
+        policies = {"timer_mutant": config["timer_focus"]["mutant"],
+                    "replica_mutant": config["timer_focus"]["replica_mutant"]}
+        for key, selected in policies.items():
+            proof["plan"][key] = selected
+            proof[key] = {"status": "detected", "source": selected["source"], "test": selected["test"],
+                          "target": selected["target"], "original_sha256": "a" * 64, "restored_sha256": "a" * 64,
+                          "tests": {"executed": 1, "passed": 0, "failed": 1, "skipped": 0}}
+        assignment = self.phases.partition(proof["inventory"])
+        proof["assigned_targets"] = assignment["a"]
+        proof["completed_targets"] = assignment["a"]
+        selected = sum(len(item["ids"]) for item in proof["inventory"])
+        passed = sum(len(item["ids"]) for item in proof["inventory"] if [item["crate"], item["target"]] in assignment["a"])
+        proof["tests"].update({"selected": selected, "executed": passed, "passed": passed})
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        self.phases.validate_native(proof, self.identity)
+        self.assertIn(["er-game", "m9e_damage_query"], assignment["a"])
+        self.assertIn(["er-ai", "er_ai"], assignment["a"])
+        self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
+            ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+            ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+        for key in policies:
+            for damage in ("missing", "restoration", "wrong_test"):
+                with self.subTest(key=key, damage=damage):
+                    bad = copy.deepcopy(proof)
+                    if damage == "missing":
+                        bad.pop(key)
+                    elif damage == "restoration":
+                        bad[key]["restored_sha256"] = "b" * 64
+                    else:
+                        bad[key]["test"] = "different_behavior"
+                    with self.assertRaisesRegex(RuntimeError, "mutant"):
+                        self.phases.validate_native(bad, self.identity)
+        bad = copy.deepcopy(proof)
+        bad["ledger_mutant"] = {"status": "detected"}
+        with self.assertRaisesRegex(RuntimeError, "outside the retention scope"):
+            self.phases.validate_native(bad, self.identity)
+        bad = copy.deepcopy(proof)
+        query = next(item for item in bad["inventory"] if (item["crate"], item["target"]) == ("er-game", "m9e_damage_query"))
+        query["ids"] = list(query["ids"])
+        query["ids"][0] += "_renamed"
+        bad["inventory_sha256"] = self.phases.sha(self.phases.encoded(bad["inventory"]))
+        with self.assertRaisesRegex(RuntimeError, "exact test identities"):
+            self.phases.validate_native(bad, self.identity)
+        other = copy.deepcopy(proof)
+        other["lane"] = "b"
+        other["assigned_targets"] = assignment["b"]
+        other["completed_targets"] = assignment["b"]
+        other["tests"].update({"executed": selected - passed, "passed": selected - passed})
+        other["native_timer_parity_digest"] = None
+        for key in policies:
+            other.pop(key)
+        self.phases.validate_native(other, self.identity)
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", proof)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", other)
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": proof["plan_sha256"]})
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            aggregate = self.phases.aggregate(None)
+        self.assertEqual(aggregate["tests"]["passed"], selected)
+        self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
+        for key in policies:
+            self.assertEqual(aggregate[key], proof[key])
+        self.platform["browser_current_repro_bridge"]["time_omission_rejected"] = False
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+                self.assertRaisesRegex(RuntimeError, "bridge"):
+            self.phases.aggregate(None)
+
     def test_retention_ledger_mutant_requires_owned_restored_evidence_through_aggregate(self):
         config = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
         policies = {"timer_mutant": config["timer_focus"]["mutant"],
@@ -4004,6 +4311,218 @@ class PhaseTransferTests(unittest.TestCase):
         packed["proof"]["plan"]["required_native_test_ids"]["er-repro:m9e_current_repro"] = [0] * 100_000
         with self.assertRaisesRegex(RuntimeError, "permutation"):
             self.phases.unpack_native_ids(packed)
+
+    def native_requiring_inventory_compression(self):
+        proof = copy.deepcopy(self.native)
+        ids = [f"case_{index:04d}_" + "current_damage_and_effect_preservation_" * 2 for index in range(900)]
+        proof["inventory"].append({"crate": "er-battle", "target": "m7_query_cases", "ids": ids,
+                                   "historical_excluded_ids": ["explicit_legacy_case"]})
+        proof["plan"]["historical_dispositions"] = [
+            {"crate": "er-battle", "target": "m7_query_cases", "test": "explicit_legacy_case"}]
+        proof["plan"]["required_native_targets"]["er-battle"] = ["m7_query_cases"]
+        proof["plan"]["required_native_test_ids"] = {
+            "er-repro:m9e_current_repro": list(reversed(proof["inventory"][1]["ids"]))}
+        proof["required_native_target_counts"]["er-battle:m7_query_cases"] = len(ids)
+        proof["tests"].update({"selected": 13 + len(ids), "executed": 11 + len(ids), "passed": 11 + len(ids)})
+        proof["assigned_targets"] = self.phases.partition(proof["inventory"])["a"]
+        proof["completed_targets"] = list(reversed(proof["assigned_targets"]))
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        return proof
+
+    def replace_compressed_id_bytes(self, wire, raw):
+        wire["inventory_ids"] = {"decoded_bytes": len(raw),
+                                 "data": base64.b64encode(self.phases.zlib.compress(raw, level=9)).decode("ascii")}
+
+    def test_compressed_native_ids_roundtrip_both_lanes_without_changing_semantics(self):
+        proof = self.native_requiring_inventory_compression()
+        self.assertGreater(len(self.phases.encoded(self.phases.pack_native_ids(proof))), self.phases.MANIFEST_LIMIT)
+        self.assertLessEqual(len(self.phases.encoded(proof)), 2 * self.phases.MANIFEST_LIMIT)
+        for lane in ("a", "b"):
+            with self.subTest(lane=lane):
+                candidate = copy.deepcopy(proof)
+                candidate["lane"] = lane
+                candidate["assigned_targets"] = self.phases.partition(candidate["inventory"])[lane]
+                candidate["completed_targets"] = list(reversed(candidate["assigned_targets"]))
+                if lane == "b":
+                    candidate["tests"].update({"executed": 2, "passed": 2})
+                    candidate["native_timer_parity_digest"] = None
+                before = copy.deepcopy(candidate)
+                self.phases.validate_native(candidate, self.identity)
+                path = self.root / "proof" / f"native-{lane}.json"
+                digest = self.phases.write_bounded(path, candidate)
+                if lane == "a":
+                    self.native_hash = digest
+                else:
+                    self.other_hash = digest
+                wire = json.loads(path.read_bytes())
+                self.assertEqual(wire["encoding"], "native-inventory-zlib-indices-v2")
+                self.assertLessEqual(path.stat().st_size, self.phases.MANIFEST_LIMIT)
+                self.assertEqual(wire["proof"]["inventory"],
+                                 [{"crate": item["crate"], "target": item["target"]} for item in before["inventory"]])
+                self.assertEqual(wire["proof"]["plan"]["required_native_test_ids"]["er-repro:m9e_current_repro"],
+                                 list(reversed(range(9))))
+                restored = self.phases.read_bounded(path, digest)
+                self.assertEqual(restored, before)
+                self.assertEqual(candidate, before)
+                self.phases.validate_native(restored, self.identity)
+                restored["tests"]["passed"] -= 1
+                with self.assertRaisesRegex(RuntimeError, "counts"):
+                    self.phases.validate_native(restored, self.identity)
+        self.assertEqual(self.phases.pack_native_inventory(self.native), self.native)
+        inline_path = self.root / "inline-unchanged.json"
+        self.phases.write_bounded(inline_path, self.native)
+        self.assertEqual(inline_path.read_bytes(), self.phases.encoded(self.native))
+        legacy = self.native_with_repeated_required_ids()
+        self.assertEqual(self.phases.pack_native_inventory(legacy), self.phases.pack_native_ids(legacy))
+        legacy_path = self.root / "indexed-unchanged.json"
+        self.phases.write_bounded(legacy_path, legacy)
+        self.assertEqual(legacy_path.read_bytes(), self.phases.encoded(self.phases.pack_native_ids(legacy)))
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": proof["plan_sha256"]})
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+        self.assertEqual(result["tests"], {"selected": 913, "executed": 913, "passed": 913, "failed": 0, "skipped": 0})
+        self.assertEqual(result["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
+        self.assertEqual(result["inventory_sha256"], proof["inventory_sha256"])
+        candidate["completed_targets"] = []
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", candidate)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+                self.assertRaisesRegex(RuntimeError, "completed targets"):
+            self.phases.aggregate(None)
+
+    def test_compressed_native_ids_reject_malformed_wrapper_and_base64(self):
+        packed = self.phases.pack_native_inventory(self.native_requiring_inventory_compression())
+        for label in ("version", "extra", "missing_payload", "payload_type", "payload_extra", "bool_size", "float_size",
+                      "zero_size", "negative_size", "over_size", "data_type", "empty_data", "bad_base64",
+                      "base64_whitespace", "extra_padding", "over_base64", "target_extra", "target_missing",
+                      "target_duplicate", "target_type"):
+            with self.subTest(label=label):
+                wire = copy.deepcopy(packed)
+                payload = wire["inventory_ids"]
+                if label == "version":
+                    wire["encoding"] = "native-inventory-zlib-indices-v3"
+                elif label == "extra":
+                    wire["extra"] = True
+                elif label == "missing_payload":
+                    wire.pop("inventory_ids")
+                elif label == "payload_type":
+                    wire["inventory_ids"] = []
+                elif label == "payload_extra":
+                    payload["extra"] = True
+                elif label in {"bool_size", "float_size", "zero_size", "negative_size", "over_size"}:
+                    payload["decoded_bytes"] = {"bool_size": True, "zero_size": 0, "negative_size": -1,
+                                                "float_size": float(payload["decoded_bytes"]),
+                                                "over_size": 2 * self.phases.MANIFEST_LIMIT + 1}[label]
+                elif label == "data_type":
+                    payload["data"] = []
+                elif label == "empty_data":
+                    payload["data"] = ""
+                elif label == "bad_base64":
+                    payload["data"] = "%not-base64%"
+                elif label == "base64_whitespace":
+                    payload["data"] += "\n"
+                elif label == "extra_padding":
+                    payload["data"] += "="
+                elif label == "over_base64":
+                    payload["data"] = "A" * (self.phases.MANIFEST_LIMIT + 1)
+                elif label == "target_extra":
+                    wire["proof"]["inventory"][0]["ids"] = []
+                elif label == "target_missing":
+                    wire["proof"]["inventory"][0].pop("target")
+                elif label == "target_duplicate":
+                    wire["proof"]["inventory"][1] = copy.deepcopy(wire["proof"]["inventory"][0])
+                elif label == "target_type":
+                    wire["proof"]["inventory"][0]["crate"] = True
+                with self.assertRaisesRegex(RuntimeError, "native"):
+                    self.phases.unpack_native_ids(wire)
+
+    def test_compressed_native_ids_reject_truncated_trailing_and_oversized_streams_before_json(self):
+        packed = self.phases.pack_native_inventory(self.native_requiring_inventory_compression())
+        compressed = base64.b64decode(packed["inventory_ids"]["data"])
+        for label, stream in (("truncated", compressed[:-1]), ("trailing", compressed + b"junk"),
+                              ("concatenated", compressed + compressed), ("not_zlib", b"not a zlib stream")):
+            with self.subTest(label=label):
+                wire = copy.deepcopy(packed)
+                wire["inventory_ids"]["data"] = base64.b64encode(stream).decode("ascii")
+                with patch.object(self.phases.json, "loads") as parse, self.assertRaisesRegex(RuntimeError, "payload"):
+                    self.phases.unpack_native_ids(wire)
+                parse.assert_not_called()
+        wire = copy.deepcopy(packed)
+        self.replace_compressed_id_bytes(wire, b"x" * (2 * self.phases.MANIFEST_LIMIT + 1))
+        wire["inventory_ids"]["decoded_bytes"] = 2 * self.phases.MANIFEST_LIMIT
+        with patch.object(self.phases.json, "loads") as parse, self.assertRaisesRegex(RuntimeError, "bound"):
+            self.phases.unpack_native_ids(wire)
+        parse.assert_not_called()
+        for difference in (-1, 1):
+            wire = copy.deepcopy(packed)
+            wire["inventory_ids"]["decoded_bytes"] += difference
+            with self.assertRaisesRegex(RuntimeError, "payload"):
+                self.phases.unpack_native_ids(wire)
+
+    def test_compressed_native_ids_reject_semantic_tampering_with_correct_wire_hash(self):
+        proof = self.native_requiring_inventory_compression()
+        packed = self.phases.pack_native_inventory(proof)
+        original = [[item["ids"], item["historical_excluded_ids"]] for item in proof["inventory"]]
+        for label in ("missing_target", "extra_target", "row_type", "list_type", "id_type", "empty_id",
+                      "json_text", "json_utf8", "outer_type", "nested_id",
+                      "duplicate_id", "excluded_collision", "reordered_ids", "changed_id", "required_bool"):
+            with self.subTest(label=label):
+                wire, lists = copy.deepcopy(packed), copy.deepcopy(original)
+                if label == "missing_target":
+                    lists.pop()
+                elif label == "extra_target":
+                    lists.append([[], []])
+                elif label == "row_type":
+                    lists[0] = {}
+                elif label == "list_type":
+                    lists[0][0] = "not a list"
+                elif label == "id_type":
+                    lists[0][0][0] = True
+                elif label == "nested_id":
+                    lists[0][0][0] = [["not an ID"]]
+                elif label == "empty_id":
+                    lists[0][0][0] = ""
+                elif label == "duplicate_id":
+                    lists[3][0][1] = lists[3][0][0]
+                elif label == "excluded_collision":
+                    lists[3][1] = [lists[3][0][0]]
+                elif label == "reordered_ids":
+                    lists[3][0].reverse()
+                elif label == "changed_id":
+                    lists[3][0][0] += "_changed"
+                elif label == "required_bool":
+                    wire["proof"]["plan"]["required_native_test_ids"]["er-repro:m9e_current_repro"][0] = True
+                raw = {"json_text": b"not JSON", "json_utf8": b"\xff", "outer_type": b"{}"}.get(
+                    label, self.phases.encoded(lists))
+                self.replace_compressed_id_bytes(wire, raw)
+                path = self.root / "tampered-compressed.json"
+                data = self.phases.encoded(wire)
+                self.assertLessEqual(len(data), self.phases.MANIFEST_LIMIT)
+                path.write_bytes(data)
+                with self.assertRaisesRegex(RuntimeError, "native"):
+                    self.phases.read_bounded(path, self.phases.sha(data))
+
+    def test_compressed_native_ids_keep_exact_output_wire_and_expanded_bounds(self):
+        proof = self.native_requiring_inventory_compression()
+        wire = self.phases.pack_native_inventory(proof)
+        raw = self.phases.encoded([[item["ids"], item["historical_excluded_ids"]] for item in proof["inventory"]])
+        # Valid JSON whitespace reaches the exact output ceiling without
+        # inventing IDs or changing the restored semantic proof.
+        raw += b" " * (2 * self.phases.MANIFEST_LIMIT - len(raw))
+        self.replace_compressed_id_bytes(wire, raw)
+        self.assertEqual(self.phases.unpack_native_ids(wire), proof)
+        wire["inventory_ids"]["decoded_bytes"] += 1
+        with self.assertRaisesRegex(RuntimeError, "bounds"):
+            self.phases.unpack_native_ids(wire)
+        wire = self.phases.pack_native_inventory(proof)
+        wire["proof"]["plan"]["required_native_test_ids"]["er-battle:m7_query_cases"] = list(range(900))
+        self.assertLessEqual(len(self.phases.encoded(wire)), self.phases.MANIFEST_LIMIT)
+        with self.assertRaisesRegex(RuntimeError, "bounded expansion"):
+            self.phases.unpack_native_ids(wire)
+        proof["padding"] = "x" * self.phases.MANIFEST_LIMIT
+        with self.assertRaisesRegex(RuntimeError, "64 KiB"):
+            self.phases.write_bounded(self.root / "compressed-still-oversized.json", proof)
 
     def phase_environment(self):
         return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",

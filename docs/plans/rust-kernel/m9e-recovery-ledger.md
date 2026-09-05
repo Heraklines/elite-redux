@@ -2083,3 +2083,48 @@ zero, boolean and oversized counts. Existing142 test identities, native/causal
 inventories, platform witnesses, mutants and all limits remain. No transport or
 Rust implementation change is made. This is a pending remote correction, not
 qualification or RTC delivery evidence.
+
+## Worker correction fully qualified: f140 / run33990371692
+
+The entire exact f140b7687d44559e38e775147ad91835f62de8e8 cut qualified in
+run33990371692. All617 selected native IDs passed (A597/B20),142 harness tests
+passed,22 required native targets were present, full reverse compile/lint and
+formatting passed, both real timer/replica mutants were detected and restored,
+and Wasm2/in-page2/typed1/Worker2/codec3 plus the actual CLI replay bridge passed.
+The positive Worker observed one actual committed authority material and one
+presentation settled by its real ID, reached BattleCommand from Title, retained
+the exact held249/1ms cursor consequence and full snapshot rejection invariants,
+and acknowledged Dispose. Its accepted sequence was2151 and final snapshot
+SHA256106e15d7551d782e13c6489108b0414b02333dc06a1d9e02e7192b0fa40490c6.
+This qualifies the Worker capability, not RTC/storage/full M9.
+
+NativeA proof fc11c46e926011bcb5538f7e0cce52452dd7d7b340cefd6f779a6ae22b4dbc72;
+NativeB b58c0f41b3759ab7b6f7b44973127ef11a263133353c0f919c8dab221d676d93;
+platform bfaa9b33cfe2b4f4468130a089d212ddfa4390f184ad5e7d4eccf0b41b0a6b2b;
+aggregate c3161f4a13b6649dd8bbb69dd9f6f1f8329b8eba4f58e145d71cad39262a7ede.
+Compact aggregate14505 bytes; full evidence/assets/binaries remain remote.
+Only inspected compact summaries and the named25,553-byte harness log were read.
+The comparison baseline advances to this fully qualified commit/run.
+
+## Pending ordinary damage-query cut
+
+The isolated resolver extraction exposes immutable ordinary-move damage queries
+and shares their arithmetic with real turn damage. Real execution draws its
+variance lazily at the same prior point; queries supply100 percent/noncritical
+and never acquire an RNG handle, consume PP, mutate HP or execute move hooks.
+Four controlled current-content witnesses pin equal-power Cut/Confusion damage
+46/13 and its defensive reversal, PP Up/override bounds, zero/inactive cases,
+and complete actual turn/RNG-audit conservation around reordered queries.
+Existing minimum-one immunity behavior is explicitly preserved; full source
+AI fidelity, scoring and profiles are not claimed. See m9e-current-damage-query.md.
+
+The gate adds battle/AI and named non-retention game execution,50 mandatory
+native targets, complete selected-package early Clippy and query-first execution.
+All existing causal/Worker/platform/CLI-bridge checks and both controls remain.
+The154 authored harness identities comprise the142 qualified Worker tests,
+7 exact damage-query policy/orchestration tests and5 bounded inventory tests.
+Native inventory uses lossless bounded zlib only when the existing indexed form
+exceeds64KiB; every ID/order/partition/required permutation and semantic hash is
+restored and validated, with128KiB expanded maximum unchanged. Actual remote
+inventory bytes, formatting, compiler/lint and test behavior remain pending.
+No rollout, deployment, real saves or final-tag change is included.

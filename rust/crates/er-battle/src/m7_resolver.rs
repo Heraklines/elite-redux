@@ -690,6 +690,56 @@ fn critical_hits(
     Ok(draw == SafeU53::ZERO)
 }
 
+/// Query current-resolver damage for one active move/target without changing state.
+///
+/// This is an ordinary noncritical, full-variance (100%) estimate. It shares the
+/// current move-power/damage queries, stats, STAB and type calculation; it does
+/// not roll accuracy/critical/variance or execute move hooks, PP/HP mutations.
+/// It is not the complete source AI simulation: forced criticals, defender/ally
+/// ability knowledge and other missing current-resolver modifiers are not added.
+/// The current resolver's minimum-one floor (including its immunity limitation)
+/// is preserved here; callers must not claim source-equivalent immune damage.
+/// No RNG runtime is accepted or constructed.
+pub fn query_simulated_move_damage_v5(
+    content: &PreparedBattleContentV3,
+    run: &RunStateV3,
+    source_slot: FieldSlot,
+    move_slot: MoveSlotIndex,
+    target_slot: FieldSlot,
+) -> Result<u32, BattleV5Error> {
+    verify_v5_dispatch_closure(content)?;
+    run.validate()
+        .map_err(|error| BattleV5Error::State(error.to_string()))?;
+    let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
+    let actor_id = occupant(run, source_slot).ok_or(BattleV5Error::Target)?;
+    if !actor_is_active(run, source_slot, actor_id) {
+        return Err(BattleV5Error::InactiveActor(actor_id));
+    }
+    let actor = pokemon(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
+    let slot = move_slot_state(actor, move_slot)?;
+    let definition = content
+        .move_definition(slot.move_id)
+        .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+    let max_pp = calculate_max_pp(definition.base_pp, slot.pp_ups, slot.max_pp_override)
+        .map_err(|_| BattleV5Error::MoveSlot)?;
+    if slot.pp_used >= max_pp {
+        return Err(BattleV5Error::MoveSlot);
+    }
+    let target_id = occupant(run, target_slot).ok_or(BattleV5Error::Target)?;
+    let target = pokemon(run, target_id).ok_or(BattleV5Error::Target)?;
+    if target.fainted {
+        return Err(BattleV5Error::Target);
+    }
+    if matches!(definition.category, MoveCategory::Status)
+        || matches!(definition.power, MovePower::None)
+    {
+        return Ok(0);
+    }
+    let sources = active_sources(actor, definition.id);
+    let context = mechanics_context(actor, battle, &sources);
+    calculate_damage_with_variance(content, &context, definition, actor, target, false, || Ok(100))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn calculate_damage(
     content: &PreparedBattleContentV3,
@@ -699,6 +749,28 @@ fn calculate_damage(
     target: &PokemonStateV5,
     critical: bool,
     rng: &mut RngRuntime,
+) -> Result<u32, BattleV5Error> {
+    calculate_damage_with_variance(content, context, definition, actor, target, critical, || {
+        rng.battle_rand_seed_int_range(
+            SafeU53::new(85).map_err(|_| BattleV5Error::Overflow)?,
+            SafeU53::new(100).map_err(|_| BattleV5Error::Overflow)?,
+            RngReason::DamageVariance,
+            RngCallsiteId::damage_variance(),
+        )
+        .map(SafeU53::get)
+        .map_err(|error| BattleV5Error::Rng(error.to_string()))
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn calculate_damage_with_variance(
+    content: &PreparedBattleContentV3,
+    context: &MechanicsContextV2<'_>,
+    definition: &MoveDefinitionV3,
+    actor: &PokemonStateV5,
+    target: &PokemonStateV5,
+    critical: bool,
+    variance: impl FnOnce() -> Result<u64, BattleV5Error>,
 ) -> Result<u32, BattleV5Error> {
     let MovePower::Value(base_power) = definition.power else {
         return Ok(0);
@@ -753,16 +825,9 @@ fn calculate_damage(
             .and_then(|value| value.checked_div(2))
             .ok_or(BattleV5Error::Overflow)?;
     }
-    let variance = rng
-        .battle_rand_seed_int_range(
-            SafeU53::new(85).map_err(|_| BattleV5Error::Overflow)?,
-            SafeU53::new(100).map_err(|_| BattleV5Error::Overflow)?,
-            RngReason::DamageVariance,
-            RngCallsiteId::damage_variance(),
-        )
-        .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
+    let variance = variance()?;
     damage = damage
-        .checked_mul(variance.get())
+        .checked_mul(variance)
         .and_then(|value| value.checked_div(100))
         .ok_or(BattleV5Error::Overflow)?;
     let query = execute_query_v2(
