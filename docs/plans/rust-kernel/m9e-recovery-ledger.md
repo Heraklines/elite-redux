@@ -1232,3 +1232,77 @@ Inspected and downloaded only nativeA compact3,697 compressed bytes;92,220-byte
 diagnostics stay remote. NativeB still running when superseding the failed cut.
 Build146,504ms; priority targets8,947/4,880/3,825/3,072/12,808/8,785ms.
 Baseline remains9a3/run33954961024; no rollout or tag changes.
+
+Superseded11bd/run33959674311 nativeB compact (inspected706 compressed bytes)
+records all14 host tests passed in188,359ms before cancellation during CLIbatch.
+All four original controlled-fixture failures are thus repaired remotely, but
+this interrupted candidate did not qualify. B diagnostics68,721 bytes remain
+remote. Current golden candidate977200b02251d7a736876bba6549410a06205274
+is executing run33959991266; no baseline advance pending allphase success.
+
+977200b/run33959991266 nativeA succeeded10:12:25-10:31:16 UTC:
+585 assigned native tests passed,0 failed/skipped;60/60 assigned targets complete
+of63 globally selected targets and603 globaltests. Both realcompiled timer and
+replica mutants were detected by their required exact tests; each restored source
+SHA25676edbd7a4a36df7644ef2916387be6dafd8d18c238d43811383f20a6d0e3ae89.
+Native held-timer digest8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+CLI b1dd190f8c149bda89227fbab885505f5d89f85b843614c4023a76027def26f7
+(86,023,448 bytes); worker53516b5cc003b9bf3c6952339d0e1a9d34dc16136693777da70c3e0221e723a9
+(73,928,432 bytes). Downloaded only inspected nativeA2,128-byte compact artifact;
+120,642-byte diagnostics,16,953-byte proof archive and86,023,574-byte CLI archive
+remain remote. Native manifestcc50d1147cbfb680bfaa653bf0981cb6fc9566eddcdc74169b0a6393240dd84c.
+LaneB/platform/aggregate still required; qualification remains pending.
+
+977200b/run33959991266 nativeB succeeded10:12:25-10:34:39 UTC:
+18/18 passed,0 failed/skipped; combined native603/603. Its CLI and worker hashes
+match laneA exactly. Host297,089ms, CLIbatch472,145ms, CLIcaps295,846ms.
+Inspected/downloaded only3,057-byte compressed Bcompact;90,901-byte diagnostics
+and15,797-byte proof archive remain remote. Bmanifest
+0576b149d4fddca4a58cbfaf1ea3fc6aac79b6d9c9b42bbacda2879844c6b793.
+Platform started10:31:19 UTC; its exact CLI bridge and aggregate are pending.
+
+FULL FOCUSED QUALIFICATION PASSED for977200b02251d7a736876bba6549410a06205274
+run33959991266:603 native,2 Wasm,2 Chromium and1 typed-effect witness, zero
+failures/skips;110 harness, requiredformat/lint and both restored mutants passed.
+Native/Wasm held-timer digest8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942;
+raw-event frozen4d5ef01099d9942c0dec32227366a3faf018a77aa5c5b6a1d60e84b3e75bf0c5 passedboth.
+Actual Chromium capsule-to-exactCLI:base1417/final1433,16attempts, fullsnapshot
+blake3-v1:3ebd6118c4d9500bbbde971eb9100eb199cd0496c94ec367200b7a24ddeb8690;
+omitted appliedtime rejected at1428. This remains in-page V2 Wasm-host/byte-relay
+evidence, not realWorker/WebRTC/renderer integration or wholeM9completion.
+Aggregate binds nativeA/B/platform proofs to same source/toolchain/defaultprofile,
+full disjoint targetunion and exactexecutable hash. Inventory
+aefdcdb1222f3ecd0018b5d9da1133694399c816dae3ec00e1710e64038c4534;
+normalizedplana0e3aebdb25345ad32fedb375e8e75f7f7510e25cebae21a73e7759e637c82cb;
+aggregatec353fe157e7d0cfb3a3efcb46ea049f4af0a00032920bc3e18a025563755ce7d;
+platformf5a9c8b43130fed5e09e2cf037fa713460e98aefda488fa8f183647b58ab5d2f.
+Browserassetmanifest75ac19e0c5a4bda90412eb82d1073c4713d9d101fa3877d5ca219819cc1582b2;
+Wasm44872678c37a6eacb9bf656a885632bd5f42b2545440d2eed0cdd332856d6a50
+(16,249,212bytes); contentJSON remains640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4.
+Inspected/downloaded only platform2,072/aggregate3,461 compressed-byte summaries.
+Fullbrowserassets4,527,969, platformdiagnostics14,736, platformproof4,575 and
+aggregateevidence3,419 compressedbytes remainremote. Browserbuild322,585ms,
+Wasmparity73,935ms, Chromium75,575ms, typed1,016ms. Timings describe this run;
+no controlledoptimization/allocation claim. Advance focusedbaseline only to this
+qualified exact977200b/run33959991266. Existing finaltag andproduction untouched.
+
+### Next isolated cut: bounded browser response payload retention
+
+Integrated the separately reviewed BrowserKernelHostV2 cache proposal on the
+fully qualified977200b baseline. Serialized retained responses are bounded by
+2,048 entries and64MiB; per-response32MiB remains. Newresponse completion fits
+before gamecommit, eviction follows accepted sequence, onlynewreply iscloned,
+and disposal clears payloads/counter. Metadata/temporary/returnedbuffer/session
+memory isadditional; no wholeheap/peakmemory or protocolrecovery claim.
+Two exact realrequest unitIDs check independent encodedbyte exactfit/onebyte
+boundaries, chronologyvsrequestID, state/sequence/cache/counterrollback, retries,
+conflicts, correctedcontinuation anddisposal; all14 hostjourneys are retained.
+Focused gate admits onlyhost_v2.rs plusCI/docs, rejects mixedproduct/dependency
+changes, pins allfivehostunitIDs andexistingcurrentcapsule/batch/protocol/reload/
+worker/supervisor/parity consumers. MandatoryWasm/Chromium/typed/CLIbridge and
+evidenceidentity/limits remain. Native order unit→host→CLIreload yields Aunit
+first andBhost first without changingpartition or membership. Four meaningful
+mocked gate tests addto110, for114 source tests awaitingremoteexecution.
+Product base blob125318ee46ea52735a5e5454071ad916076993f9 matched actualHEAD
+before application. No local compilation/format/lint/tests ran. Cachecandidate
+is not yet qualified; currentbaseline remains exact977200b/run33959991266.

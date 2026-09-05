@@ -29,6 +29,9 @@ use crate::contracts_v2::{
 };
 
 const MAXIMUM_RETAINED_REQUESTS_V2: usize = 2_048;
+// Serialized response payloads only. Map nodes, IDs, fingerprints, allocation
+// capacity, and the currently returned response are additional memory.
+const MAXIMUM_RETAINED_RESPONSE_BYTES_V2: usize = 64 << 20;
 
 #[derive(Debug)]
 enum BrowserCompletionErrorV2 {
@@ -81,6 +84,7 @@ pub struct BrowserKernelHostV2 {
     next_sequence: SafeU53,
     generation: SafeU53,
     retained: BTreeMap<SafeU53, RetainedBrowserRequestV2>,
+    retained_response_bytes: usize,
     repro: Option<CurrentReproRecorderV1>,
     disposed: bool,
 }
@@ -116,6 +120,7 @@ impl BrowserKernelHostV2 {
             next_sequence: SafeU53::ZERO,
             generation: safe_one(),
             retained: BTreeMap::new(),
+            retained_response_bytes: 0,
             repro: None,
             disposed: false,
         }
@@ -130,10 +135,21 @@ impl BrowserKernelHostV2 {
         request_bytes: &[u8],
         maximum_response_bytes: usize,
     ) -> Result<Vec<u8>, BrowserWebErrorV2> {
+        self.process_bytes_with_limits(
+            request_bytes, maximum_response_bytes, MAXIMUM_RETAINED_RESPONSE_BYTES_V2,
+        )
+    }
+
+    fn process_bytes_with_limits(
+        &mut self,
+        request_bytes: &[u8],
+        maximum_response_bytes: usize,
+        maximum_retained_response_bytes: usize,
+    ) -> Result<Vec<u8>, BrowserWebErrorV2> {
         let previous_capture = self.capture_status();
         let mut read_only = false;
         let result =
-            self.process_bytes_inner(request_bytes, maximum_response_bytes, &mut read_only);
+            self.process_bytes_inner(request_bytes, maximum_response_bytes, maximum_retained_response_bytes, &mut read_only);
         if let Err(error) = &result
             && !read_only
             && self.capture_status() == previous_capture
@@ -153,10 +169,18 @@ impl BrowserKernelHostV2 {
         &mut self,
         request_bytes: &[u8],
         maximum_response_bytes: usize,
+        maximum_retained_response_bytes: usize,
         read_only: &mut bool,
     ) -> Result<Vec<u8>, BrowserWebErrorV2> {
-        let maximum_response_bytes = maximum_response_bytes.min(MAXIMUM_BROWSER_RESPONSE_BYTES_V2);
-        if self.disposed
+        // Private test limits may be smaller. Admit any new response against
+        // both limits before its session transaction can commit. Production's
+        // 64 MiB cache always fits every valid <=32 MiB response.
+        let maximum_response_bytes = maximum_response_bytes
+            .min(MAXIMUM_BROWSER_RESPONSE_BYTES_V2)
+            .min(maximum_retained_response_bytes);
+        if maximum_retained_response_bytes == 0
+            || maximum_retained_response_bytes > MAXIMUM_RETAINED_RESPONSE_BYTES_V2
+            || self.disposed
             || request_bytes.is_empty()
             || request_bytes.len() > MAXIMUM_BROWSER_REQUEST_BYTES_V2
         {
@@ -181,17 +205,6 @@ impl BrowserKernelHostV2 {
             return Err(BrowserWebErrorV2::Invalid);
         }
         let next_sequence = increment(self.next_sequence)?;
-        let evicted = if self.retained.len() == MAXIMUM_RETAINED_REQUESTS_V2 {
-            Some(
-                self.retained
-                    .iter()
-                    .min_by_key(|(_, retained)| retained.accepted_sequence)
-                    .map(|(request_id, _)| *request_id)
-                    .ok_or(BrowserWebErrorV2::Invalid)?,
-            )
-        } else {
-            None
-        };
         *read_only = matches!(
             &envelope.request,
             BrowserRequestV2::Snapshot | BrowserRequestV2::ExportRepro
@@ -203,9 +216,27 @@ impl BrowserKernelHostV2 {
             maximum_response_bytes,
         )?;
         self.next_sequence = next_sequence;
-        if let Some(evicted) = evicted {
-            self.retained.remove(&evicted);
+        if self.disposed {
+            // Disposed hosts reject all further requests, including retries.
+            self.retained.clear();
+            self.retained_response_bytes = 0;
+            return Ok(bytes);
         }
+        // Encoding already proved bytes.len() <= the retained payload budget.
+        // Eviction/accounting cannot introduce a new rejected-operation result
+        // after process_request has committed the game. Only the new response
+        // is cloned; retained response payloads are never copied during append.
+        while (self.retained.len() >= MAXIMUM_RETAINED_REQUESTS_V2
+            || self.retained_response_bytes > maximum_retained_response_bytes - bytes.len())
+            && let Some(oldest) = self.retained.iter()
+                .min_by_key(|(_, retained)| retained.accepted_sequence)
+                .map(|(request_id, _)| *request_id)
+        {
+            if let Some(evicted) = self.retained.remove(&oldest) {
+                self.retained_response_bytes -= evicted.response.len();
+            }
+        }
+        self.retained_response_bytes += bytes.len();
         self.retained.insert(
             envelope.request_id,
             RetainedBrowserRequestV2 {
@@ -846,6 +877,7 @@ mod transaction_tests {
             host.next_sequence,
             host.generation,
             retained,
+            host.retained_response_bytes,
             host.disposed,
         ))?)
     }
@@ -937,6 +969,118 @@ mod transaction_tests {
         let dispose = request(SafeU53::new(2)?, safe_one(), BrowserRequestV2::Dispose)?;
         host.process_bytes(&dispose)?;
         assert_eq!(host.capture_status(), None);
+        assert!(host.retained.is_empty());
+        assert_eq!(host.retained_response_bytes, 0);
+        Ok(())
+    }
+
+    fn assert_retained_accounting(host: &BrowserKernelHostV2, limit: usize) {
+        assert_eq!(host.retained_response_bytes,
+            host.retained.values().map(|entry| entry.response.len()).sum::<usize>());
+        assert!(host.retained_response_bytes <= limit);
+        assert!(host.retained.len() <= MAXIMUM_RETAINED_REQUESTS_V2);
+    }
+
+    #[test]
+    fn retained_response_byte_boundary_evicts_by_acceptance_and_preserves_retry()
+    -> Result<(), Box<dyn Error>> {
+        let (mut oracle, initialization, _) = initialized()?;
+        let first = request(SafeU53::new(90)?, safe_one(), enter())?;
+        let second = request(SafeU53::new(20)?, SafeU53::new(2)?,
+            BrowserRequestV2::AdvanceTime { milliseconds: safe_one() })?;
+        let third = request(SafeU53::new(50)?, SafeU53::new(3)?,
+            BrowserRequestV2::AdvanceTime { milliseconds: safe_one() })?;
+        let first_response = oracle.process_bytes(&first)?;
+        assert_eq!(oracle.session()?.observe()?.control.ok_or("mode control")?.kind,
+            GameControlKindV2::ModeSelect);
+        let second_response = oracle.process_bytes(&second)?;
+        let after_second = oracle.session()?.snapshot()?;
+        let capture_after_second = oracle.capture_status();
+        let third_response = oracle.process_bytes(&third)?;
+        let after_third = oracle.session()?.snapshot()?;
+        let pair_bytes = first_response.len() + second_response.len();
+        assert!(second_response.len() + third_response.len() < pair_bytes);
+
+        for exact in [true, false] {
+            let budget = pair_bytes - usize::from(!exact);
+            let mut host = BrowserKernelHostV2::from_content(Arc::clone(&oracle.content));
+            host.process_bytes_with_limits(&initialization, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget)?;
+            assert_eq!(host.process_bytes_with_limits(&first, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget)?, first_response);
+            assert_eq!(host.process_bytes_with_limits(&second, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget)?, second_response);
+            assert_retained_accounting(&host, budget);
+            assert!(!host.retained.contains_key(&safe_one()), "initialization is oldest");
+            assert_eq!(host.retained.contains_key(&SafeU53::new(90)?), exact);
+            assert!(host.retained.contains_key(&SafeU53::new(20)?));
+            if exact {
+                assert_eq!(host.retained_response_bytes, budget);
+            } else {
+                assert_eq!(host.retained_response_bytes, second_response.len());
+            }
+            let before_retry = evidence(&host)?;
+            assert_eq!(host.process_bytes_with_limits(&second, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget)?, second_response);
+            assert_eq!(evidence(&host)?, before_retry);
+            assert_eq!(host.capture_status(), capture_after_second);
+            assert_eq!(host.session()?.snapshot()?, after_second);
+
+            assert_eq!(host.process_bytes_with_limits(&third, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget)?, third_response);
+            assert_retained_accounting(&host, budget);
+            // ID90 is older than ID20 even though BTreeMap orders ID20 first.
+            assert!(!host.retained.contains_key(&SafeU53::new(90)?));
+            assert!(host.retained.contains_key(&SafeU53::new(20)?));
+            assert!(host.retained.contains_key(&SafeU53::new(50)?));
+            assert_eq!(host.session()?.snapshot()?, after_third);
+            let before_rejection = evidence(&host)?;
+            assert!(matches!(host.process_bytes_with_limits(&first, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget),
+                Err(BrowserWebErrorV2::Invalid)));
+            assert_eq!(evidence(&host)?, before_rejection);
+            assert!(matches!(host.capture_status(), Some(CurrentCaptureStatusV1::Unavailable { .. })));
+            let conflict = request(SafeU53::new(50)?, SafeU53::new(3)?, BrowserRequestV2::Snapshot)?;
+            assert!(matches!(host.process_bytes_with_limits(&conflict, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget),
+                Err(BrowserWebErrorV2::Conflict)));
+            assert_eq!(evidence(&host)?, before_rejection);
+            let capture = host.capture_status();
+            assert_eq!(host.process_bytes_with_limits(&third, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, budget)?, third_response);
+            assert_eq!(evidence(&host)?, before_rejection);
+            assert_eq!(host.capture_status(), capture);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn single_response_cache_boundary_rejects_before_commit_and_disposal_clears_payloads()
+    -> Result<(), Box<dyn Error>> {
+        let (mut oracle, initialization, _) = initialized()?;
+        let event = request(SafeU53::new(2)?, safe_one(), enter())?;
+        let response = oracle.process_bytes(&event)?;
+        let mut host = BrowserKernelHostV2::from_content(Arc::clone(&oracle.content));
+        host.process_bytes(&initialization)?;
+        let before = evidence(&host)?;
+        assert!(matches!(host.process_bytes_with_limits(&event, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, response.len() - 1),
+            Err(BrowserWebErrorV2::Invalid)));
+        assert_eq!(evidence(&host)?, before);
+        assert!(matches!(host.capture_status(), Some(CurrentCaptureStatusV1::Unavailable { position: 1, .. })));
+        assert_eq!(host.process_bytes_with_limits(&event, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, response.len())?, response);
+        assert_eq!(host.session()?.snapshot()?, oracle.session()?.snapshot()?);
+        assert_retained_accounting(&host, response.len());
+        assert_eq!(host.retained.len(), 1);
+        assert_eq!(host.retained_response_bytes, response.len());
+        let accepted = evidence(&host)?;
+        let capture = host.capture_status();
+        assert_eq!(host.process_bytes_with_limits(&event, MAXIMUM_BROWSER_RESPONSE_BYTES_V2, response.len())?, response);
+        assert_eq!(evidence(&host)?, accepted);
+        assert_eq!(host.capture_status(), capture);
+        let dispose = request(SafeU53::new(3)?, SafeU53::new(2)?, BrowserRequestV2::Dispose)?;
+        host.process_bytes(&dispose)?;
+        assert!(host.retained.is_empty());
+        assert_eq!(host.retained_response_bytes, 0);
+        assert!(host.session.is_none());
+        assert!(host.repro.is_none());
+        assert!(host.disposed);
+        assert!(matches!(host.process_bytes(&dispose), Err(BrowserWebErrorV2::Invalid)));
+        let replacement = BrowserKernelHostV2::from_content(Arc::clone(&oracle.content));
+        assert!(replacement.retained.is_empty());
+        assert_eq!(replacement.retained_response_bytes, 0);
+        assert_eq!(replacement.next_sequence, SafeU53::ZERO);
         Ok(())
     }
 

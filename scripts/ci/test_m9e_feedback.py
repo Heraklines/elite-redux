@@ -440,6 +440,139 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-cli", '[dependencies]\ner-env = { path = "../er-env" }\n')
         self.package("er-web", '[dependencies]\ner-env = { path = "../er-env" }\n')
 
+    def configure_browser_cache_scope(self):
+        self.configure_browser_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["browser_cache_focus"] = policy["browser_cache_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for package in policy["browser_cache_focus"]["execute"]:
+            self.package(package)
+        self.package("er-reverse", '[dependencies]\ner-web = { path = "../er-web" }\n')
+
+    def test_browser_cache_scope_requires_five_transactions_and_all_current_witnesses(self):
+        self.configure_browser_cache_scope()
+        self.changed = ["rust/crates/er-web/src/host_v2.rs", "docs/plans/rust-kernel/m9e-browser-cache-next.md"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["browser_cache_focus"])
+        self.assertFalse(selection["timer_focus"])
+        self.assertIsNone(selection["timer_mutant"])
+        self.assertIsNone(selection["replica_mutant"])
+        for flag in ("requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable",
+                     "requires_cli_clippy", "requires_agent_protocol_clippy"):
+            self.assertTrue(selection[flag], flag)
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        for package in ("er-batch", "er-env", "er-cli", "er-agent-protocol", "er-repro", "er-web", "er-kernel-worker"):
+            self.assertEqual(selection["execution_scope"][package], ["*"])
+        exact = selection["required_native_test_ids"]
+        for identity, count in (("er-web:er_web", 5), ("er-web:m9e_host_v2", 14),
+                                ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
+                                ("er-agent-protocol:er_agent_protocol", 3), ("er-repro:m9e_current_repro", 9),
+                                ("er-cli:m9e_current_repro", 2), ("er-cli:m9e_current_reload", 2),
+                                ("er-wasm:m9e_parity", 2)):
+            self.assertEqual(len(exact[identity]), count)
+            crate, target = identity.split(":")
+            self.assertIn(target, selection["required_native_targets"][crate])
+        prefix = "host_v2::transaction_tests::"
+        self.assertEqual(set(exact["er-web:er_web"]), {prefix + name for name in (
+            "late_response_limit_rejection_preserves_state_cache_and_retry",
+            "read_only_response_limit_failure_preserves_capture",
+            "sequence_exhaustion_preflight_preserves_current_session_and_cached_response",
+            "retained_response_byte_boundary_evicts_by_acceptance_and_preserves_retry",
+            "single_response_cache_boundary_rejects_before_commit_and_disposal_clears_payloads")})
+
+    def test_browser_cache_rejects_mixed_paths_without_expanding_readiness(self):
+        self.configure_browser_cache_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["timer_focus"] = policy["timer_focus"]
+        self.package("er-kernel")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-web/tests/m9e_host_v2.rs", "rust/crates/er-web/src/contracts_v2.rs",
+                      "rust/crates/er-web/Cargo.toml", "rust/crates/er-cli/src/current_agent.rs", "rust/Cargo.lock",
+                      "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "unknown.json"):
+            with self.subTest(extra=extra):
+                self.changed = ["rust/crates/er-web/src/host_v2.rs", extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+                rejected = json.loads((self.full / "plan.json").read_text())
+                self.assertFalse(rejected["browser_cache_focus"])
+        self.changed = ["docs/plans/rust-kernel/m9e-browser-cache-next.md", "scripts/ci/m9e_feedback.py"]
+        readiness = self.feedback.plan()
+        self.assertFalse(readiness["browser_cache_focus"])
+        self.assertEqual(readiness["packages"], self.config["readiness_packages"])
+        self.assertIsNone(readiness["execution_scope"])
+        for flag in ("requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable"):
+            self.assertFalse(readiness[flag])
+
+    def test_browser_cache_missing_transaction_or_consumer_cannot_qualify(self):
+        self.configure_browser_cache_scope()
+        self.changed = ["rust/crates/er-web/src/host_v2.rs"]
+        selection = self.feedback.plan()
+        required = selection["required_native_test_ids"]
+        inventory = [(identity.split(":")[0], identity.split(":")[1], ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, inventory)
+        for identity in required:
+            for omit_target in (True, False):
+                with self.subTest(identity=identity, omit_target=omit_target):
+                    reduced = [(crate, target, ids[:-1] if f"{crate}:{target}" == identity else ids)
+                               for crate, target, ids in inventory if not omit_target or f"{crate}:{target}" != identity]
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(required, reduced)
+        targets = selection["required_native_targets"]
+        rows = [(crate, target, ["witness"]) for crate, names in targets.items() for target in names]
+        self.feedback.required_native_target_counts(targets, rows)
+        for index in range(len(rows)):
+            with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                self.feedback.required_native_target_counts(targets, rows[:index] + rows[index + 1:])
+
+    def test_browser_cache_orchestration_keeps_full_discovery_early_lint_and_bindings(self):
+        self.configure_browser_cache_scope()
+        self.changed = ["rust/crates/er-web/src/host_v2.rs"]
+        policy = self.config["browser_cache_focus"]
+        self.binary_ids = {}
+        for crate, names in policy["execute"].items():
+            if names == ["*"]:
+                names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
+            for target in names:
+                binary = target if target not in self.binary_ids else crate + "--" + target
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_crates[binary] = crate
+                self.binary_targets[binary] = target
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:er_web"], 5)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:m9e_host_v2"], 14)
+        self.assertEqual([(self.binary_crates[name], self.binary_targets[name]) for name in self.executed[:3]],
+                         [("er-web", "er_web"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
+        first_execution = self.events.index("execute:er_web")
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, first_execution)
+        for lint in ("cli-clippy", "agent-protocol-clippy", "er-batch-clippy", "er-env-clippy", "er-repro-clippy",
+                     "worker-clippy", "endpoint-clippy", "browser-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        for name, _, env in self.binary_envs:
+            if (self.binary_crates[name], self.binary_targets.get(name, name)) in self.feedback.WORKER_BOUND_TARGETS:
+                self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+            else:
+                self.assertIsNone(env)
+        self.assertEqual(summary["cli_executable"]["source_sha"], CANDIDATE)
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.binary_ids["er_web"] = self.binary_ids["er_web"][:-1]
+        self.executed.clear()
+        self.events.clear()
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("required native test identities", summary["first_failure"])
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+
     def test_current_cli_utility_paths_keep_focused_parity_and_require_clippy(self):
         self.configure_browser_scope()
         self.changed = ["rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs",
@@ -1696,7 +1829,8 @@ class FeedbackTests(unittest.TestCase):
                       ("er-wasm", "m9e_parity"), ("er-kernel", "m9e_timers_v7"),
                       ("er-kernel", "m9e_snapshot_v7"), ("er-kernel", "m9e_coop_v7"),
                       ("er-kernel", "m9e_game_kernel_v7"), ("er-other", "m9e_current_reload"),
-                      ("er-other", "m9e_host_v2"), ("er-web", "m9e_host_v2")]
+                      ("er-other", "m9e_host_v2"), ("er-web", "m9e_host_v2"),
+                      ("er-other", "er_web"), ("er-web", "er_web")]
         enumerated = [(index, f"binary-{index}", target, [f"test-{index}"], self.rust / "crates" / crate, set(), None)
                       for index, (crate, target) in enumerate(identities)]
         original = list(enumerated)
@@ -1706,13 +1840,19 @@ class FeedbackTests(unittest.TestCase):
             ("er-kernel", "m9e_snapshot_v7"), ("er-kernel", "m9e_timers_v7"),
             ("er-kernel", "m9e_domain_journeys_v7"), ("er-wasm", "m9e_parity"),
             ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload"), ("er-other", "m9e_game_kernel_v7"),
-            ("er-other", "m9e_parity"), ("er-other", "m9e_current_reload"), ("er-other", "m9e_host_v2")])
+            ("er-other", "m9e_parity"), ("er-other", "m9e_current_reload"), ("er-other", "m9e_host_v2"),
+            ("er-other", "er_web"), ("er-web", "er_web")])
         self.assertEqual(sorted(item[0] for item in ordered), list(range(len(enumerated))))
         self.assertEqual(enumerated, original)
         for scope in ("cli_reload_focus", "menu_validation_focus", "current_batch_focus"):
             with self.subTest(scope=scope):
                 other = self.feedback.native_execution_order({scope: True}, enumerated)
                 self.assertEqual(other, [enumerated[1], *enumerated[:1], *enumerated[2:]])
+        cache = self.feedback.native_execution_order({"browser_cache_focus": True}, enumerated)
+        self.assertEqual(cache, [enumerated[13], enumerated[11], enumerated[1], *enumerated[:1],
+                                 *enumerated[2:11], enumerated[12]])
+        self.assertEqual(sorted(item[0] for item in cache), list(range(len(enumerated))))
+        self.assertEqual(enumerated, original)
         self.assertEqual(self.feedback.native_execution_order({}, enumerated), enumerated)
 
     def invoke_synthetic_timer_mutant(self, mode, mutant="timer", expected_failure_phase=None):
