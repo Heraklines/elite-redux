@@ -88,6 +88,7 @@ class FeedbackTests(unittest.TestCase):
         self.binary_workdirs = []
         self.binary_envs = []
         self.binary_crates = {}
+        self.binary_targets = {}
         self.extra_artifacts = []
         self.format_code = 0
         self.clippy_code = 0
@@ -165,7 +166,7 @@ class FeedbackTests(unittest.TestCase):
                         "reason": "compiler-artifact", "profile": {"test": True},
                         "executable": str(self.rust / "target" / name),
                         "manifest_path": str(self.rust / "crates" / self.binary_crates.get(name, "er-native") / "Cargo.toml"),
-                        "target": {"name": name},
+                        "target": {"name": self.binary_targets.get(name, name)},
                     }) + "\n")
                 for artifact in self.extra_artifacts:
                     stdout.write(json.dumps(artifact) + "\n")
@@ -1525,7 +1526,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["unknown_paths"], [])
         self.assertIn("er-reverse", selection["packages"])
         self.assertNotIn("er-reverse", selection["execution_scope"])
-        for package in ("er-kernel", "er-state", "er-protocol", "er-env", "er-cli", "er-web", "er-kernel-worker"):
+        for package in ("er-batch", "er-kernel", "er-state", "er-protocol", "er-env", "er-cli", "er-web", "er-kernel-worker"):
             self.assertIn(package, selection["packages"])
             self.assertEqual(selection["execution_scope"][package], ["*"])
         self.assertEqual(set(selection["required_native_targets"]["er-kernel"]), {
@@ -1544,6 +1545,76 @@ class FeedbackTests(unittest.TestCase):
                 self.changed = [core, extra]
                 with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
                     self.feedback.plan()
+
+    def test_private_control_paths_require_core_capsules_exact_journeys_and_both_platform_mutants(self):
+        self.configure_timer_scope()
+        private_paths = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
+                         "rust/crates/er-kernel/src/snapshot_v7.rs",
+                         "rust/crates/er-kernel/tests/m9e_coop_v7.rs",
+                         "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs",
+                         "rust/crates/er-kernel/tests/m9e_domain_journeys_v7.rs",
+                         "rust/crates/er-wasm/tests/m9e_parity.rs"]
+        for changed in (private_paths, private_paths[:1], private_paths[1:2]):
+            with self.subTest(changed=changed):
+                self.changed = changed + ["docs/plans/rust-kernel/m9e-retention-next.md"]
+                selection = self.feedback.plan()
+                self.assertTrue(selection["timer_focus"])
+                self.assertFalse(selection["current_repro_focus"])
+                for requirement in ("requires_wasm", "requires_browser", "requires_cli_executable",
+                                    "requires_worker_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+                    self.assertTrue(selection[requirement], requirement)
+                self.assertEqual(selection["wasm_test"], "m9e_parity")
+                for package in ("er-kernel", "er-state", "er-protocol", "er-agent-protocol",
+                                "er-env", "er-batch", "er-repro", "er-cli", "er-web", "er-kernel-worker"):
+                    self.assertEqual(selection["execution_scope"][package], ["*"])
+                self.assertIn("current_kernel_supervisor_v2", selection["execution_scope"]["er-lab"])
+                exact = selection["required_native_test_ids"]
+                for identity, count in (("er-kernel:m9e_coop_v7", 4), ("er-kernel:m9e_snapshot_v7", 4),
+                                        ("er-kernel:m9e_domain_journeys_v7", 12),
+                                        ("er-repro:m9e_current_repro", 9), ("er-cli:m9e_current_repro", 2),
+                                        ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
+                                        ("er-agent-protocol:er_agent_protocol", 3)):
+                    self.assertEqual(len(exact[identity]), count)
+                    package, target = identity.split(":")
+                    self.assertIn(target, selection["required_native_targets"][package])
+                self.assertIn("private_party_reopens_restore_exact_root_and_apply_canonical_material",
+                              exact["er-kernel:m9e_coop_v7"])
+                self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+                self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+                self.assertEqual(selection["base_sha"], BASE)
+
+    def test_private_control_missing_capsule_or_private_witness_cannot_qualify(self):
+        self.configure_timer_scope()
+        self.changed = ["rust/crates/er-kernel/src/snapshot_v7.rs"]
+        required = self.feedback.plan()["required_native_test_ids"]
+        inventory = [(identity.split(":")[0], identity.split(":")[1], ids)
+                     for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, inventory)
+        for identity in ("er-kernel:m9e_coop_v7", "er-kernel:m9e_snapshot_v7",
+                         "er-kernel:m9e_domain_journeys_v7", "er-repro:m9e_current_repro",
+                         "er-cli:m9e_current_repro", "er-batch:m9e_current_batch", "er-cli:m9e_current_batch",
+                         "er-agent-protocol:er_agent_protocol"):
+            for omit_target in (False, True):
+                with self.subTest(identity=identity, omit_target=omit_target):
+                    missing = [(crate, target, ids if f"{crate}:{target}" != identity else ids[:-1])
+                               for crate, target, ids in inventory
+                               if not omit_target or f"{crate}:{target}" != identity]
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(required, missing)
+
+    def test_private_control_unmapped_kernel_or_later_capsule_product_change_fails_closed(self):
+        self.configure_timer_scope()
+        for extra in ("rust/crates/er-kernel/src/new_owner.rs", "rust/crates/er-kernel/src/snapshot.rs",
+                      "rust/crates/er-repro/src/current.rs", "rust/Cargo.lock"):
+            with self.subTest(extra=extra):
+                self.changed = ["rust/crates/er-kernel/src/snapshot_v7.rs", extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+                rejected = json.loads((self.full / "plan.json").read_text())
+                self.assertFalse(rejected["timer_focus"])
+                self.assertIsNone(rejected["execution_scope"])
+                self.assertIn("er-reverse", rejected["packages"])
+                self.assertEqual(self.executed, [])
 
     def test_timer_named_witnesses_are_nonempty_unique_and_package_bound(self):
         required = {"er-kernel": ["m9e_timers_v7", "m9e_snapshot_v7"]}
@@ -1575,9 +1646,11 @@ class FeedbackTests(unittest.TestCase):
             if names == ["*"]:
                 names = policy["required_targets"].get(package, [package.replace("-", "_")])
             for name in names:
-                self.binary_ids[name] = ["behavior"]
-                self.binary_crates[name] = package
-        self.extra_artifacts = [self.worker_executable_artifact()]
+                binary = name if name not in self.binary_ids else package + "--" + name
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{package}:{name}", ["behavior"])
+                self.binary_crates[binary] = package
+                self.binary_targets[binary] = name
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
         self.binary_ids["m9e_parity"] = ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
         self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
         with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica:
@@ -1590,12 +1663,18 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
         parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
         self.assertIn("--nocapture", parity_execution)
-        self.assertEqual(len(summary["required_native_target_counts"]), 5)
+        self.assertEqual(len(summary["required_native_target_counts"]), 18)
+        self.assertEqual(summary["required_native_target_counts"]["er-repro:m9e_current_repro"], 9)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_repro"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-batch:m9e_current_batch"], 6)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_batch"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 3)
+        self.assertEqual(self.executed[0], "m9e_current_reload")
         self.assertIn("current_kernel_endpoint_v2", self.executed)
         self.assertIn("current_kernel_endpoint_faults_v2", self.executed)
         for name, phase, env in self.binary_envs:
             with self.subTest(name=name, phase=phase):
-                if name == "current_kernel_endpoint_v2":
+                if (self.binary_crates[name], self.binary_targets.get(name, name)) in self.feedback.WORKER_BOUND_TARGETS:
                     self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
                 else:
                     self.assertIsNone(env)

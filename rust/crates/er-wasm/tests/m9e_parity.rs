@@ -215,10 +215,20 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
         enemy.hp = 1;
         enemy.fainted = false;
     }
-    snapshot.pending_presentations.clear();
-    let initial_snapshot = snapshot.clone();
-    let mut driver =
-        GameKernelV7::from_snapshot(snapshot, seat, GameKernelRoleV7::Authority, content.clone())?;
+    // Boosting is an explicit controlled fixture boundary. The original
+    // bootstrap material digest describes the unmodified state and cannot be
+    // retained as evidence for this fixture's canonical state.
+    let mut driver = GameKernelV7::from_active(
+        state.clone(),
+        snapshot.material_ledger.next_authority_revision,
+        seat,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+        snapshot.input_router,
+        snapshot.scheduler,
+        snapshot.protocol,
+    )?;
+    let initial_snapshot = driver.snapshot()?;
     let mut events = Vec::new();
     for _ in 0..300 {
         let wave = driver

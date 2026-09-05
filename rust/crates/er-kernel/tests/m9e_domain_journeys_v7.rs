@@ -1087,7 +1087,15 @@ fn game_save_v2_restores_every_control_kind() -> Result<(), Box<dyn Error>> {
             input(),
             scheduler(),
             None,
-        )?;
+        );
+        if matches!(kind, GameControlKindV2::BattleMove | GameControlKindV2::BattleTarget | GameControlKindV2::BattleSwitch) {
+            // These synthetic old save leaves omit the exact canonical parent.
+            // Decoding preserves them, but current kernel restoration must not
+            // guess ownership. Genuine V7 private roundtrips live in coop tests.
+            assert!(restored.is_err());
+            continue;
+        }
+        let restored = restored?;
         assert_eq!(restored.current_control(), Some(&control));
     }
     Ok(())

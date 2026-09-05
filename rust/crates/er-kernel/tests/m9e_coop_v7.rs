@@ -459,12 +459,30 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         revision,
         guest,
         GameKernelRoleV7::Replica,
-        content,
+        content.clone(),
         input(),
         scheduler(),
         Some(replica_protocol),
     )?;
 
+    let shared_host_root = authority.current_control().cloned().ok_or("host root missing")?;
+    // Local guest leaves must retain the exact host-owned canonical root.
+    for _ in 0..3 {
+        press(&mut replica, PhysicalKey::Space)?;
+        let private = replica.snapshot()?;
+        let owner = private.private_battle_control.as_ref().ok_or("private owner missing")?;
+        assert_eq!(owner.owner_seat, guest);
+        assert_eq!(owner.canonical_control, shared_host_root);
+        assert_eq!(owner.canonical_control.owner_seat, Some(host));
+        press(&mut replica, PhysicalKey::Escape)?;
+        assert_eq!(replica.current_control(), Some(&shared_host_root));
+    }
+    press(&mut replica, PhysicalKey::Space)?;
+    for _ in 0..3 {
+        press(&mut authority, PhysicalKey::Space)?;
+        press(&mut authority, PhysicalKey::Escape)?;
+        assert_eq!(authority.current_control(), Some(&shared_host_root));
+    }
     press(&mut authority, PhysicalKey::Space)
         .map_err(|error| format!("host Fight navigation failed: {error}"))?;
     let retained = press(&mut authority, PhysicalKey::Space)
@@ -495,6 +513,10 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         .apply_authority_material(&retained_material[0])
         .map_err(|error| format!("retention replica apply failed: {error}"))?;
     assert_eq!(replica.state(), authority.state());
+    let pending_delivery = replica.snapshot()?;
+    assert!(pending_delivery.private_battle_control.is_none());
+    assert_eq!(replica.apply_authority_material(&retained_material[0])?, GameKernelStepV7::default());
+    assert_eq!(replica.snapshot()?, pending_delivery);
     for effect in retained_delivery.effects {
         if let GameKernelEffectV7::Presentation(presentation) = effect {
             replica.settle_presentation(presentation.event_id)?;
@@ -508,6 +530,34 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         Some(GameControlKindV2::BattleMove)
     );
     let private_move_menu = replica.snapshot()?;
+    let encoded_private = serde_json::to_vec(&private_move_menu)?;
+    let mut continued = GameKernelV7::from_snapshot(
+        serde_json::from_slice(&encoded_private)?, guest, GameKernelRoleV7::Replica, content.clone(),
+    )?;
+    assert_eq!(continued.snapshot()?, private_move_menu);
+    let mut missing_owner = private_move_menu.clone();
+    missing_owner.private_battle_control = None;
+    assert!(GameKernelV7::from_snapshot(missing_owner, guest, GameKernelRoleV7::Replica, content.clone()).is_err());
+    let mut wrong_context = private_move_menu.clone();
+    wrong_context.private_battle_control.as_mut().ok_or("owner missing")?
+        .canonical_control.action_context.as_mut().ok_or("context missing")?.authority_revision = safe(1);
+    assert!(GameKernelV7::from_snapshot(wrong_context, guest, GameKernelRoleV7::Replica, content.clone()).is_err());
+    let mut wrong_owner = private_move_menu.clone();
+    wrong_owner.private_battle_control.as_mut().ok_or("owner missing")?.owner_seat = host;
+    assert!(GameKernelV7::from_snapshot(wrong_owner, guest, GameKernelRoleV7::Replica, content.clone()).is_err());
+    let mut wrong_canonical_selection = private_move_menu.clone();
+    let canonical_menu = wrong_canonical_selection.private_battle_control.as_mut()
+        .ok_or("owner missing")?.canonical_control.menu.as_mut().ok_or("canonical menu missing")?;
+    canonical_menu.selected_option_id = canonical_menu.options.iter()
+        .find(|option| option.option_id != canonical_menu.selected_option_id)
+        .ok_or("alternative canonical option missing")?.option_id.clone();
+    assert!(GameKernelV7::from_snapshot(wrong_canonical_selection, guest, GameKernelRoleV7::Replica, content.clone()).is_err());
+    for _ in 0..3 {
+        assert_eq!(press(&mut replica, PhysicalKey::Escape)?, press(&mut continued, PhysicalKey::Escape)?);
+        assert_eq!(press(&mut replica, PhysicalKey::Space)?, press(&mut continued, PhysicalKey::Space)?);
+        assert_eq!(replica.snapshot()?, continued.snapshot()?);
+    }
+    let private_move_menu = replica.snapshot()?;
     assert_eq!(
         replica.apply_authority_material(&retained_material[0])?,
         GameKernelStepV7::default()
@@ -515,6 +565,8 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     assert_eq!(replica.snapshot()?, private_move_menu);
     let proposal_step = press(&mut replica, PhysicalKey::Space)
         .map_err(|error| format!("guest proposal failed: {error}"))?;
+    assert_eq!(proposal_step, press(&mut continued, PhysicalKey::Space)?);
+    assert_eq!(replica.snapshot()?, continued.snapshot()?);
     let proposal = proposal_step
         .effects
         .iter()
@@ -535,6 +587,21 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         })
         .collect::<Vec<_>>();
     assert_eq!(turn_material.len(), 1);
+    let presentation = resolved.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::Presentation(presentation) => Some(presentation),
+        _ => None,
+    }).ok_or("resolved turn presentation missing")?;
+    let mut collision_snapshot = replica.snapshot()?;
+    collision_snapshot.pending_presentations.push(PendingPresentationV3 {
+        event_id: presentation.event_id, semantic: presentation.semantic,
+        blocking: presentation.blocking, skip: presentation.skip,
+    });
+    collision_snapshot.pending_presentations.sort_by_key(|pending| pending.event_id);
+    let mut collision = GameKernelV7::from_snapshot(
+        collision_snapshot.clone(), guest, GameKernelRoleV7::Replica, content.clone(),
+    )?;
+    assert_eq!(collision.apply_authority_material(&turn_material[0]), Err(GameKernelV7Error::Invalid));
+    assert_eq!(collision.snapshot()?, collision_snapshot);
     let resolved_turn = authority
         .state()
         .and_then(|state| state.active_run.as_ref())
@@ -748,5 +815,89 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     assert_eq!(replica.snapshot()?, settled);
     assert!(authority.admit_game_proposal(proposal)?.effects.is_empty());
     assert_eq!(authority.snapshot()?, authority_snapshot);
+    Ok(())
+}
+
+#[test]
+fn private_party_reopens_restore_exact_root_and_apply_canonical_material() -> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(1));
+    let (mut state, revision, _) = natural_coop_state(content.clone(), host)?;
+    er_game::m9e_new_run_v6::expand_cooperative_topology_v6(&mut state, content.as_ref(), guest)?;
+    // Natural startup plus explicit legal bench fixtures for both Party menus.
+    for seat in [host, guest] {
+        let id = state.identities.allocate_pokemon_id()?;
+        let run = state.active_run.as_mut().ok_or("run missing")?;
+        let mut bench = run.party.iter().find(|pokemon| pokemon.owner_seat == Some(seat))
+            .ok_or("seat actor missing")?.clone();
+        bench.id = id;
+        run.party.push(bench);
+    }
+    state.validate_with(content.as_ref())?;
+    let canonical_digest = er_game::m9e_material_v6::game_state_digest(&state)?;
+    let canonical_root = state.active_run.as_ref().ok_or("run missing")?.control.clone();
+    let mut authority = GameKernelV7::from_active(
+        state.clone(), revision, host, GameKernelRoleV7::Authority, content.clone(), input(), scheduler(),
+        Some(initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)?),
+    )?;
+    let mut replica = GameKernelV7::from_active(
+        state, revision, guest, GameKernelRoleV7::Replica, content.clone(), input(), scheduler(),
+        Some(initial_battle_protocol_snapshot_v2(&replica_protocol(host, guest, generation)?, guest)?),
+    )?;
+    for kernel in [&mut authority, &mut replica] {
+        navigate_down_to(kernel, "battle/command/party")?;
+        let selected_root = kernel.current_control().cloned().ok_or("root missing")?;
+        assert_eq!(selected_root.menu.as_ref().ok_or("menu missing")?.selected_option_id.as_str(), "battle/command/party");
+        for _ in 0..3 {
+            press(kernel, PhysicalKey::Space)?;
+            assert_eq!(kernel.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleSwitch));
+            let snapshot = kernel.snapshot()?;
+            let owner = snapshot.private_battle_control.as_ref().ok_or("owner missing")?;
+            assert_eq!(owner.canonical_control, canonical_root);
+            assert_eq!(owner.return_control, selected_root);
+            press(kernel, PhysicalKey::Escape)?;
+            assert_eq!(kernel.current_control(), Some(&selected_root));
+        }
+        press(kernel, PhysicalKey::Space)?;
+    }
+    let private_authority = authority.snapshot()?;
+    let mut restored = GameKernelV7::from_snapshot(
+        serde_json::from_slice(&serde_json::to_vec(&private_authority)?)?,
+        host, GameKernelRoleV7::Authority, content.clone(),
+    )?;
+    assert_eq!(restored.snapshot()?, private_authority);
+    let applied = press(&mut authority, PhysicalKey::Space)?;
+    assert_eq!(applied, press(&mut restored, PhysicalKey::Space)?);
+    assert_eq!(authority.snapshot()?, restored.snapshot()?);
+    let material = applied.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
+        _ => None,
+    }).ok_or("Party command retention material missing")?;
+    assert_eq!(GameMaterialV6::decode(material)?.transition().before_digest, canonical_digest);
+    replica.apply_authority_material(material)?;
+    assert_eq!(replica.state(), authority.state());
+    let pending = replica.snapshot()?;
+    assert!(pending.private_battle_control.is_none());
+    assert_eq!(replica.apply_authority_material(material)?, GameKernelStepV7::default());
+    assert_eq!(replica.snapshot()?, pending);
+    for presentation in pending.pending_presentations {
+        replica.settle_presentation(presentation.event_id)?;
+    }
+    let canonical_snapshot = replica.snapshot()?;
+    assert!(canonical_snapshot.private_battle_control.is_none());
+    assert_eq!(GameKernelV7::from_snapshot(canonical_snapshot.clone(), guest,
+        GameKernelRoleV7::Replica, content.clone())?.snapshot()?, canonical_snapshot);
+    navigate_down_to(&mut replica, "battle/command/party")?;
+    let mut stripped_root = replica.snapshot()?;
+    assert!(stripped_root.private_battle_control.is_some());
+    stripped_root.private_battle_control = None;
+    assert!(GameKernelV7::from_snapshot(stripped_root, guest,
+        GameKernelRoleV7::Replica, content.clone()).is_err());
+    press(&mut replica, PhysicalKey::Space)?;
+    let settled_private = replica.snapshot()?;
+    assert_eq!(replica.apply_authority_material(material)?, GameKernelStepV7::default());
+    assert_eq!(replica.snapshot()?, settled_private);
     Ok(())
 }

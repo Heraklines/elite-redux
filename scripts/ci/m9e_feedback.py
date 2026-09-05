@@ -478,7 +478,7 @@ def plan():
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
     if endpoint_execution:
         selected.add("er-kernel-worker")
-    cli_executable_required = browser_required and (repro_session or batch_session or (
+    cli_executable_required = browser_required and (timer_session or repro_session or batch_session or (
         ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
     if cli_executable_required:
         selected.add("er-cli")
@@ -497,7 +497,7 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
-              "requires_cli_clippy": repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
+              "requires_cli_clippy": timer_session or repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
@@ -511,8 +511,9 @@ def plan():
               "requires_cli_executable": cli_executable_required,
               "required_native_test_ids": (batch_focus.get("exact_test_ids", {}) if batch_session
                                            else repro_focus.get("exact_test_ids", {}) if repro_session
-                                           else menu_focus.get("exact_test_ids", {}) if menu_session else {}),
-              "requires_agent_protocol_clippy": cli_reload_session or menu_session or batch_session,
+                                           else menu_focus.get("exact_test_ids", {}) if menu_session
+                                           else timer_focus.get("exact_test_ids", {}) if timer_session else {}),
+              "requires_agent_protocol_clippy": timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
               "required_native_targets": (batch_focus.get("required_targets", {}) if batch_session
                                           else repro_focus.get("required_targets", {}) if repro_session
@@ -1040,7 +1041,7 @@ def main(preflight_failure=None):
         if selection.get("requires_agent_protocol_clippy"):
             write_progress(summary, "lint", "er-agent-protocol")
             run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
-        if selection.get("current_repro_focus"):
+        if selection.get("current_repro_focus") or selection.get("timer_focus"):
             for package in ("er-repro", "er-env"):
                 write_progress(summary, "lint", package)
                 run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
@@ -1057,7 +1058,7 @@ def main(preflight_failure=None):
         if selection["requires_browser"]:
             write_progress(summary, "lint", "er-web")
             run(["cargo", "clippy", "--locked", "-p", "er-web", "--all-targets", "--no-deps", "--", "-D", "warnings"], "browser-clippy")
-        if selection.get("cli_reload_focus") or selection.get("menu_validation_focus") or selection.get("current_batch_focus"):
+        if selection.get("cli_reload_focus") or selection.get("menu_validation_focus") or selection.get("timer_focus") or selection.get("current_batch_focus"):
             enumerated.sort(key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
         if os.environ.get("M9E_PHASE") == "native":
             from m9e_phases import inventory_and_assignment

@@ -10,7 +10,7 @@ use er_types::battle_ids::MenuInstanceId;
 use er_types::battle_ui::{PresentationBlockingPolicy, PresentationSkipPolicy};
 use er_types::{
     GameControlKindV2, GameControlPlanV2, PhysicalKey, PlatformRequestId, PresentationEventId,
-    SafeU53, TerminalState, TimeClass, TimerOwner,
+    SafeU53, SeatId, TerminalState, TimeClass, TimerOwner,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -61,11 +61,23 @@ pub struct StorageFrontierSnapshotV1 {
     pub generation: SafeU53,
 }
 
+/// Exact authoritative control and local return selection for private battle UI.
+/// Neither control is reconstructed from the allocator or a neighbouring ID.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrivateBattleControlSnapshotV7 {
+    pub owner_seat: SeatId,
+    pub canonical_control: GameControlPlanV2,
+    pub return_control: GameControlPlanV2,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CoreGameKernelSnapshotV7 {
     pub schema_version: u32,
     pub lifecycle: GameKernelLifecycleSnapshotV7,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub private_battle_control: Option<PrivateBattleControlSnapshotV7>,
     pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
@@ -142,7 +154,8 @@ impl CoreGameKernelSnapshotV7 {
         match &self.lifecycle {
             GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
                 bootstrap.validate().map_err(|_| SnapshotV7Error::Invalid)?;
-                if !self.input_router.pressed.is_empty()
+                if self.private_battle_control.is_some()
+                    || !self.input_router.pressed.is_empty()
                     || !self.input_router.held_buttons.is_empty()
                     || !self.input_router.locks.is_empty()
                     || !self.input_router.repeats.is_empty()
@@ -153,6 +166,28 @@ impl CoreGameKernelSnapshotV7 {
             }
             GameKernelLifecycleSnapshotV7::Active(state) => {
                 validate_active_state(state, self, content)?;
+                crate::game_kernel_v7::validate_private_battle_control_v7(
+                    state,
+                    self.private_battle_control.as_ref(),
+                    self.material_ledger.next_authority_revision,
+                )
+                .map_err(|_| SnapshotV7Error::Invalid)?;
+                let canonical_control = self.private_battle_control.as_ref()
+                    .map(|owner| &owner.canonical_control)
+                    .or_else(|| state.active_run.as_ref()
+                        .filter(|run| run.control.kind == GameControlKindV2::BattleCommand)
+                        .map(|run| &run.control));
+                if let Some(control) = canonical_control
+                    && let Some(record) = self.material_ledger.records.iter().max_by_key(|record| record.authority_revision)
+                {
+                    let mut canonical_state = state.clone();
+                    canonical_state.active_run.as_mut().ok_or(SnapshotV7Error::Invalid)?.control = control.clone();
+                    if er_game::m9e_material_v6::game_state_digest(&canonical_state)
+                        .map_err(|_| SnapshotV7Error::Invalid)? != record.after_digest
+                    {
+                        return Err(SnapshotV7Error::Invalid);
+                    }
+                }
             }
             GameKernelLifecycleSnapshotV7::Terminal {
                 state,
@@ -161,7 +196,8 @@ impl CoreGameKernelSnapshotV7 {
             } => {
                 validate_active_state(state, self, content)?;
                 control.validate().map_err(|_| SnapshotV7Error::Invalid)?;
-                if control.kind != GameControlKindV2::Complete
+                if self.private_battle_control.is_some()
+                    || control.kind != GameControlKindV2::Complete
                     || terminal.terminal_id.is_empty()
                     || terminal.reason.is_empty()
                 {
@@ -273,6 +309,7 @@ impl CoreGameKernelSnapshotV7 {
         let value = Self {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
+            private_battle_control: None,
             input_router: source.input_router,
             scheduler: source.scheduler,
             protocol: source.protocol,

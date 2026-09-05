@@ -56,7 +56,7 @@ use crate::snapshot::{
 use crate::snapshot_v7::{
     CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7, CoreGameKernelSnapshotV7,
     GameKernelLifecycleSnapshotV7, PendingPlatformRequestV2, PendingPresentationV3,
-    StorageFrontierSnapshotV1,
+    PrivateBattleControlSnapshotV7, StorageFrontierSnapshotV1,
 };
 
 pub(crate) const NAVIGATION_REPEAT_INTERVAL_MS_V7: SafeU53 = match SafeU53::new(250) {
@@ -135,6 +135,7 @@ enum GameKernelLifecycleV7 {
 #[derive(Clone, Debug)]
 pub struct GameKernelV7 {
     lifecycle: GameKernelLifecycleV7,
+    private_battle_control: Option<PrivateBattleControlSnapshotV7>,
     content: Arc<PreparedGameContentV2>,
     local_seat: SeatId,
     role: GameKernelRoleV7,
@@ -205,6 +206,7 @@ impl GameKernelV7 {
             (role == GameKernelRoleV7::Authority).then(|| AuthorityAiV2::new(content.ai.clone()));
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Bootstrap(bootstrap),
+            private_battle_control: None,
             content,
             local_seat,
             role,
@@ -240,6 +242,7 @@ impl GameKernelV7 {
             (role == GameKernelRoleV7::Authority).then(|| AuthorityAiV2::new(content.ai.clone()));
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Active(runtime),
+            private_battle_control: None,
             content,
             local_seat,
             role,
@@ -308,6 +311,7 @@ impl GameKernelV7 {
         };
         let value = Self {
             lifecycle,
+            private_battle_control: snapshot.private_battle_control,
             content,
             local_seat,
             role,
@@ -375,6 +379,7 @@ impl GameKernelV7 {
         let snapshot = CoreGameKernelSnapshotV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
+            private_battle_control: self.private_battle_control.clone(),
             authority_ai: self.authority_ai.as_ref().map(AuthorityAiV2::snapshot),
             input_router: self.input_router.clone(),
             scheduler: self.scheduler.clone(),
@@ -666,8 +671,10 @@ impl GameKernelV7 {
             }
             _ => false,
         };
-        if directional_press {
-            // Navigation can reject after registering physical and timer owners.
+        let battle_press = matches!(&event, RawInputEvent::KeyDown { .. } | RawInputEvent::GamepadDown { .. })
+            && self.current_control().is_some_and(|control| is_battle_navigation_control(control.kind));
+        if directional_press || battle_press {
+            // Battle UI can reject after registering physical, menu and timer owners.
             // Keep direct kernel calls atomic; shared sessions currently stage
             // this bounded path a second time until transaction reuse is added.
             let mut candidate = self.clone();
@@ -892,7 +899,7 @@ impl GameKernelV7 {
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let mut candidate = self.clone();
-        candidate.normalize_local_battle_leaf()?;
+        candidate.restore_canonical_battle_control()?;
         let runtime = candidate.active_runtime_mut()?;
         let outcome = runtime.apply_material_bytes(bytes).map_err(runtime_error)?;
         if outcome == GameMaterialApplyOutcomeV6::DuplicateApplied {
@@ -900,6 +907,7 @@ impl GameKernelV7 {
             // resurrect presentation ownership after the renderer settles it.
             return Ok(GameKernelStepV7::default());
         }
+        candidate.private_battle_control = None;
         let material = GameMaterialV6::decode(bytes)
             .map_err(|error| GameKernelV7Error::Runtime(error.to_string()))?;
         candidate.advance_replay_sequence()?;
@@ -1023,6 +1031,7 @@ impl GameKernelV7 {
                     GameRuntimeV6::new(Some(save.state), self.content.clone(), next_revision)
                         .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.private_battle_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot.clone(), save.generation);
                 self.synchronize_menu_allocator()?;
@@ -1114,12 +1123,12 @@ impl GameKernelV7 {
             };
         }
         if !proposal_is_rooted_in_control(
-            self.current_control(),
+            self.canonical_battle_control(),
             envelope.sender_seat,
             &envelope.proposal,
         ) && !battle_proposal_is_rooted_in_control(
             self.state(),
-            self.current_control(),
+            self.canonical_battle_control(),
             envelope.sender_seat,
             &envelope.proposal,
         ) {
@@ -1156,11 +1165,15 @@ impl GameKernelV7 {
             authority: true,
         };
         let mut staged_runtime = self.active_runtime()?.clone();
+        if let Some(owner) = &self.private_battle_control {
+            staged_runtime.install_control(owner.canonical_control.clone()).map_err(runtime_error)?;
+        }
         let step = execute_action_transaction(&mut staged_runtime, action, context)?;
         let mut staged_protocol = protocol;
         remember_proposal_fingerprint(&mut staged_protocol, operation_id, fingerprint)?;
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged_runtime);
+        self.private_battle_control = None;
         self.synchronize_menu_allocator()?;
         self.protocol = Some(staged_protocol);
         self.advance_replay_sequence()?;
@@ -1169,6 +1182,9 @@ impl GameKernelV7 {
         Ok(step)
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
+        if self.private_battle_control.as_ref().is_some_and(|owner| owner.owner_seat != self.local_seat) {
+            return Err(GameKernelV7Error::Invalid);
+        }
         if self
             .input_router
             .repeats
@@ -1514,6 +1530,7 @@ impl GameKernelV7 {
                     GameButton::Right => NavigationDirection::Right,
                     _ => return Err(GameKernelV7Error::Invalid),
                 };
+                self.retain_canonical_battle_control()?;
                 self.active_runtime_mut()?
                     .navigate_control(direction)
                     .map_err(runtime_error)?;
@@ -1521,6 +1538,11 @@ impl GameKernelV7 {
                     .current_control()
                     .cloned()
                     .ok_or(GameKernelV7Error::Invalid)?;
+                if control.kind == GameControlKindV2::BattleCommand
+                    && let Some(owner) = &mut self.private_battle_control
+                {
+                    owner.return_control = control.clone();
+                }
                 Ok(GameKernelStepV7 {
                     effects: vec![GameKernelEffectV7::UiChanged(control)],
                     internal_events: Vec::new(),
@@ -1546,6 +1568,17 @@ impl GameKernelV7 {
         &mut self,
         button: GameButton,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if button == GameButton::Cancel
+            && self.current_control().is_some_and(|control| is_private_battle_leaf(control.kind))
+        {
+            let control = self.private_battle_control.as_ref()
+                .ok_or(GameKernelV7Error::Invalid)?.return_control.clone();
+            self.active_runtime_mut()?.install_control(control.clone()).map_err(runtime_error)?;
+            return Ok(GameKernelStepV7 {
+                effects: vec![GameKernelEffectV7::UiChanged(control)],
+                internal_events: Vec::new(),
+            });
+        }
         let (action, action_context) = if button == GameButton::Action {
             self.active_runtime()?
                 .selected_action()
@@ -1559,6 +1592,7 @@ impl GameKernelV7 {
             GameActionV1::Battle {
                 action: er_types::BattleUiActionV1::OpenFight,
             } => {
+                self.retain_canonical_battle_control()?;
                 let instance = self.allocate_menu_instance()?;
                 let revision = self.active_runtime()?.next_authority_revision();
                 let mut control = move_select_control(
@@ -1583,6 +1617,7 @@ impl GameKernelV7 {
             GameActionV1::Battle {
                 action: er_types::BattleUiActionV1::OpenParty,
             } => {
+                self.retain_canonical_battle_control()?;
                 let instance = self.allocate_menu_instance()?;
                 let revision = self.active_runtime()?.next_authority_revision();
                 let mut control = switch_select_control(
@@ -1649,9 +1684,13 @@ impl GameKernelV7 {
             authority: true,
         };
         let mut staged = self.active_runtime()?.clone();
+        if let Some(owner) = &self.private_battle_control {
+            staged.install_control(owner.canonical_control.clone()).map_err(runtime_error)?;
+        }
         let step = execute_action_transaction(&mut staged, action, context)?;
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
+        self.private_battle_control = None;
         self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         let mut step = step;
@@ -1795,36 +1834,12 @@ impl GameKernelV7 {
             }
         };
         let mut canonical_state = state;
-        if canonical_state
-            .active_run
-            .as_ref()
-            .is_some_and(|run| run.control.kind != GameControlKindV2::BattleCommand)
-        {
-            let root_value = action_context
-                .menu_instance
-                .get()
-                .get()
-                .checked_sub(1)
-                .ok_or(GameKernelV7Error::Invalid)?;
-            let root_instance = MenuInstanceId::new(
-                SafeU53::new(root_value).map_err(|_| GameKernelV7Error::Invalid)?,
-            );
-            let mut root_control = command_root_control(
-                &canonical_state,
-                command_seat,
-                root_instance,
-                action_context.authority_revision,
-            )?;
-            root_control
-                .action_context
-                .as_mut()
-                .ok_or(GameKernelV7Error::Invalid)?
-                .authority_seat = action_context.authority_seat;
+        if let Some(owner) = &self.private_battle_control {
             canonical_state
                 .active_run
                 .as_mut()
                 .ok_or(GameKernelV7Error::Invalid)?
-                .control = root_control;
+                .control = owner.canonical_control.clone();
         }
         let runtime_snapshot = self.active_runtime()?.snapshot();
         let mut staged = GameRuntimeV6::from_snapshot(
@@ -1843,6 +1858,7 @@ impl GameKernelV7 {
         let mut step = execute_action_transaction(&mut staged, action, context)?;
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
+        self.private_battle_control = None;
         self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         self.synchronize_terminal(&mut step)?;
@@ -1918,6 +1934,7 @@ impl GameKernelV7 {
             runtime,
             terminal: terminal.clone(),
         };
+        self.private_battle_control = None;
         self.clear_input()?;
         step.effects.push(GameKernelEffectV7::Terminal(terminal));
         Ok(())
@@ -2049,40 +2066,31 @@ impl GameKernelV7 {
         }
     }
 
-    fn normalize_local_battle_leaf(&mut self) -> Result<(), GameKernelV7Error> {
+    fn retain_canonical_battle_control(&mut self) -> Result<(), GameKernelV7Error> {
         let Some(control) = self.current_control().cloned() else {
             return Ok(());
         };
-        if !matches!(
-            control.kind,
-            GameControlKindV2::BattleMove
-                | GameControlKindV2::BattleTarget
-                | GameControlKindV2::BattleSwitch
-        ) {
+        if control.kind != GameControlKindV2::BattleCommand || self.private_battle_control.is_some() {
             return Ok(());
         }
-        let context = control
-            .action_context
-            .as_ref()
-            .ok_or(GameKernelV7Error::Invalid)?;
-        let root_value = context
-            .menu_instance
-            .get()
-            .get()
-            .checked_sub(1)
-            .ok_or(GameKernelV7Error::Invalid)?;
-        let root_instance =
-            MenuInstanceId::new(SafeU53::new(root_value).map_err(|_| GameKernelV7Error::Invalid)?);
-        let mut root = command_root_control(
-            self.state().ok_or(GameKernelV7Error::Invalid)?,
-            self.local_seat,
-            root_instance,
-            control.revision,
-        )?;
-        root.action_context
-            .as_mut()
-            .ok_or(GameKernelV7Error::Invalid)?
-            .authority_seat = context.authority_seat;
+        self.private_battle_control = Some(PrivateBattleControlSnapshotV7 {
+            owner_seat: self.local_seat,
+            canonical_control: control.clone(),
+            return_control: control,
+        });
+        Ok(())
+    }
+
+    fn canonical_battle_control(&self) -> Option<&GameControlPlanV2> {
+        self.private_battle_control.as_ref().map(|owner| &owner.canonical_control)
+            .or_else(|| self.current_control())
+    }
+
+    fn restore_canonical_battle_control(&mut self) -> Result<(), GameKernelV7Error> {
+        let Some(owner) = &self.private_battle_control else {
+            return Ok(());
+        };
+        let root = owner.canonical_control.clone();
         self.active_runtime_mut()?
             .install_control(root)
             .map_err(runtime_error)
@@ -2351,6 +2359,82 @@ fn execute_action_transaction(
         effects,
         internal_events: queue.processed_kinds().to_vec(),
     })
+}
+
+fn is_private_battle_leaf(kind: GameControlKindV2) -> bool {
+    matches!(kind, GameControlKindV2::BattleMove | GameControlKindV2::BattleTarget | GameControlKindV2::BattleSwitch)
+}
+
+fn is_battle_navigation_control(kind: GameControlKindV2) -> bool {
+    kind == GameControlKindV2::BattleCommand || is_private_battle_leaf(kind)
+}
+
+fn controls_differ_only_in_selection(left: &GameControlPlanV2, right: &GameControlPlanV2) -> bool {
+    let (Some(_), Some(right_menu)) = (&left.menu, &right.menu) else {
+        return false;
+    };
+    let mut comparable = left.clone();
+    if let Some(menu) = &mut comparable.menu {
+        menu.selected_option_id = right_menu.selected_option_id.clone();
+    }
+    comparable == *right
+}
+
+pub(crate) fn validate_private_battle_control_v7(
+    state: &GameStateV6,
+    owner: Option<&PrivateBattleControlSnapshotV7>,
+    revision: SafeU53,
+) -> Result<(), GameKernelV7Error> {
+    let control = state.active_run.as_ref().map(|run| &run.control);
+    let Some(owner) = owner else {
+        // Old private leaf snapshots cannot identify their exact canonical root.
+        return if control.is_some_and(|control| is_private_battle_leaf(control.kind)) {
+            Err(GameKernelV7Error::Invalid)
+        } else {
+            Ok(())
+        };
+    };
+    let control = control.ok_or(GameKernelV7Error::Invalid)?;
+    let canonical = &owner.canonical_control;
+    canonical.validate().map_err(|_| GameKernelV7Error::Invalid)?;
+    owner.return_control.validate().map_err(|_| GameKernelV7Error::Invalid)?;
+    let context = canonical.action_context.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+    let menu = canonical.menu.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+    let canonical_seat = canonical.owner_seat.ok_or(GameKernelV7Error::Invalid)?;
+    let (battle, _, field) = local_battle_actor(state, canonical_seat)?;
+    let _ = local_battle_actor(state, owner.owner_seat)?;
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id, battle.wave, battle.turn, field, canonical_seat,
+    ).map_err(|_| GameKernelV7Error::Invalid)?;
+    if canonical.kind != GameControlKindV2::BattleCommand
+        || !canonical.actionable
+        || canonical.revision != revision
+        || context.authority_revision != revision
+        || context.menu_instance != menu.instance_id
+        || context.operation_id != operation
+        || !controls_differ_only_in_selection(canonical, &owner.return_control)
+    {
+        return Err(GameKernelV7Error::Invalid);
+    }
+    if control.kind == GameControlKindV2::BattleCommand {
+        return if *control == owner.return_control { Ok(()) } else { Err(GameKernelV7Error::Invalid) };
+    }
+    let leaf_menu = control.menu.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+    if leaf_menu.instance_id <= menu.instance_id {
+        return Err(GameKernelV7Error::Invalid);
+    }
+    // Regenerate only to validate the supplied leaf's legal actor/actions; the
+    // canonical root and return selection always come from retained exact data.
+    let mut expected = match control.kind {
+        GameControlKindV2::BattleMove => move_select_control(state, owner.owner_seat, leaf_menu.instance_id, revision)?,
+        GameControlKindV2::BattleSwitch => switch_select_control(state, owner.owner_seat, leaf_menu.instance_id, revision)?,
+        _ => return Err(GameKernelV7Error::Invalid),
+    };
+    expected.action_context.as_mut().ok_or(GameKernelV7Error::Invalid)?.authority_seat = context.authority_seat;
+    if !controls_differ_only_in_selection(&expected, control) {
+        return Err(GameKernelV7Error::Invalid);
+    }
+    Ok(())
 }
 
 fn command_root_control(

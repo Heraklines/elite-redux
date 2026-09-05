@@ -1074,3 +1074,90 @@ patch omitted three files. Verified full115,628-byte patch SHA
 `e95455dc58f59eeea8f63d472466ad20b5f641d65d9a71da5b01dc467d91244a`
 and applied all six batch-owned Rust files. Both48,740-byte diagnostics and
 redundant laneB evidence remain remote. Baseline remains qualified d6fd1c4.
+
+### Current batch native lanes passed; platform pending
+
+Candidate `9a3e8db3fb17d4cc0223c4c0a82800125caeb3b7`, run `33954961024`,
+passed both native jobs: A65 plus B18, all83 selected tests executed, zero failures
+or skips. All six core batch, both actual native CLI batch and three protocol
+response-context tests passed, with required current/historical adapter targets,
+formatting, lint and106 harness preflight checks. Platform/aggregate remains
+pending; baseline stays fully qualified d6fd1c4 until the complete run passes.
+
+Native A ran08:19:54-08:40:39 UTC (20m45); B08:19:53-08:41:22 (21m29).
+Core batch50,953 ms; actual CLI batch482,440 ms; current CLI reload559,608 ms;
+CLI capsule299,232 ms; browser host297,466 ms. Build A121,329/B119,719 ms.
+These are test-profile phase timings, not throughput or a controlled speedup.
+The current two-lane split and all600-second target/35-minute job limits held.
+
+Native-A proof83cb05afb2a576bada6749221f6dcd90e0ce99601cef0f68a88cb5b9cb00d065;
+B9bb03147a1501d651b5a0a67f44c8693a3a42e0034511377b9db2728bf9955d4.
+Selected-ID file SHA d9225c4c088b843ee2f6596f0f7675544746923be27aee59e432c793773be6c6;
+plan a78e52f42b9ecbc5be6bb0cbdbcecbbdfc507dd4f4cf464fb686fec2cd362571.
+Both builds independently produced CLI SHA
+c73c0e99c92e4ec9364b03013f474f8647faef4f9dfe20a2043a3389f87beb97,
+85,869,144 bytes; worker SHA remains a8188f5c6f3688e438eb5381133e569ea524af2375246d4e40e3dac2d9a8e388.
+Only inspected native compact artifacts were downloaded (A2792/B2486 compressed
+bytes). Diagnostics A48,447/B41,227 bytes, proofs and85,869,270-byte CLI archive
+remain remote. Platform started08:40:42 UTC.
+
+The isolated private-control gate now preserves batch requirements and adds exact
+core batch6/CLI batch2/protocol3 to timer scope, along with existing capsule,
+co-op/private, snapshot/domain, process and both mutant requirements.109 source
+selftests remain; proposal22,843 bytes, not yet executed. The actual private
+product sources remain separate and unstaged; frozen parity digest is unchanged.
+
+Source-reviewed followups: browser response-cache payload bound (approved source
+review, no runtime/heap claim), current-entry map `.git/m9e-current-entry-cutover.md`,
+and batch usage `.git/m9e-current-batch-usage.md`. An isolated current validator
+proposal is in progress; default gameplay already selects V7, while historical
+validators and unsupported lab/developer-plane capabilities remain explicit work.
+### Current native batch fully qualified
+
+Candidate9a3e8db3fb17d4cc0223c4c0a82800125caeb3b7, run33954961024,
+passed all four jobs and exact aggregation:83 native,2 Wasm,2 Chromium and1 typed
+route test, zero failures/skips.106 harness preflight tests passed. Current batch
+scope selected no behavioral mutants; private kernel scope retains both mandatory
+mutants. This is focused batch qualification, not full M9 completion.
+
+The actual browser capsule replayed through the candidate CLI: base1417/final1433,
+16 attempts, full digest blake3-v1:f4e7ad23f09dd59e1e1e7bf678e052f754c334a04261bb1e44d187e1ccb9dc4b.
+Omitted applied time event was rejected at1428. CLI SHA c73c0e99c92e4ec9364b03013f474f8647faef4f9dfe20a2043a3389f87beb97.
+This remains in-page Wasm-host/byte-relay Chromium evidence, not real Worker/WebRTC.
+
+Aggregate full summary SHA d7f76130c42a5d84bad4127a32f5bd14f3acd50b3c4740cc10c136873e5c90ee;
+platform proof e9477df37b0855054747b74bf9579b821743dcc96a364f3860982e9958d0e6e8;
+global inventory24a901a3d00341b5f920c7abb4de489dbaf45780dc85691402a608702f25605f;
+normalized plan ee640b4f4f7398b8b14ed6445ab9f8feb9cd308abb05ce07acda6a06a3207b14
+(the earlier a78e52 entry identifies the raw plan.json file).
+Harness7b1f7bfa8d7e3e4c97a8476fa3ee888a10ffe79ac02319549e1d9a539356821d;
+lock47cc9677555a235e8e29a9ca9c6f0d24d06248f07d3b400c63f4a33401138073;
+selftests1d7c94179c15850b335c423b6bbb102af59de2655bab1acb4669506e6b36f7a9.
+Phase helper, workflow, pinned oracle/content and native/Wasm timer digest remain
+as recorded above. Browser asset manifest7445da775b72533e29baa659cf32401eb8647c2dc61f359e6ec6dd93e7b965d4;
+actual Wasm remains16,168,477 bytes and SHA edbf9ea386c9c1f9bae98f89a5105a4f33dc678cca5aefc893d664ae7a6dc716.
+
+Downloaded only inspected platform2069 and aggregate2625 compressed-byte summaries,
+in addition to native A2792/B2486. Platform15,256-byte diagnostics, proof and all
+large assets stay remote. Platform08:40:42-08:50:03 UTC (9m21), aggregate26 seconds;
+overall08:19:53-08:50:31 (30m38). Platform timings: Wasm check23,481 ms,
+eventwise68,726 ms, browser build294,500 ms, Chromium61,876 ms, typed route716 ms.
+No allocation, throughput or controlled performance claim.
+
+Advance baseline to exact qualified9a3/run33954961024. Submit the separately
+reviewed private-control source and109-selftest gate next. It retains exact
+canonical and return control from before local navigation; removes allocator-1
+parent guessing; restores canonical control only on staged material/action paths;
+and preserves complete private state on duplicate or rejected transitions.
+Repeated Fight/Party, genuine private snapshot continuation, bad ownership and
+late collision regressions are included. Old synthetic leaf-only states remain
+decodable as GameSaveV2 but cannot restore by guessing a missing parent. The fresh
+boosted Wasm fixture starts with a consistent ledger; its frozen parity digest is
+unchanged until an actual remote result supports a specific update.
+
+The source-only candidate is saved as .git/m9e-private-control-candidate.patch,
+base9a3, tree13c215bcdac7757556f3f42736f8bb48ee02e9a2 before baseline advancement.
+The live submission supersedes that saved candidate after the baseline changes.
+Cache, current validator and cost-probe proposals remain isolated/unqualified;
+long-session retention, lost-response/reconnect, actual browser topology,
+full source fidelity, native capture and remaining lab/developer-plane work remain.
