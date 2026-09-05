@@ -103,7 +103,11 @@ impl CurrentDispatcher {
         Ok(())
     }
 
-    fn create(&mut self, params: &Value, context: AgentResponseContextV1<'_>) -> Result<Value, AgentDispatchErrorV1> {
+    fn create(
+        &mut self,
+        params: &Value,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
         let request: CreateRequest =
             serde_json::from_value(params.clone()).map_err(invalid_error)?;
         self.reserve_id(&request.session)?;
@@ -119,41 +123,63 @@ impl CurrentDispatcher {
             let capture = NativeCapture::checkpoint(&session, request.capture_limits, 0)?;
             context.admit_inline_success(&response)?;
             Some(capture)
-        } else { None };
+        } else {
+            None
+        };
         let session = match &self.worker {
             Some(worker) => worker.adopt(&request.session, &session, owner_seat, role)?,
             None => CurrentBackend::Native(Box::new(session)),
         };
-        if let Some(capture) = capture { self.captures.insert(request.session.clone(), capture); }
+        if let Some(capture) = capture {
+            self.captures.insert(request.session.clone(), capture);
+        }
         self.sessions.insert(request.session, session);
         Ok(response)
     }
 
-    fn import_capsule(&mut self, params: &Value, context: AgentResponseContextV1<'_>) -> Result<Value, AgentDispatchErrorV1> {
+    fn import_capsule(
+        &mut self,
+        params: &Value,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
         let id = self.session_id(params)?.to_owned();
         self.reserve_id(&id)?;
         let capsule: er_repro::current::CurrentReproCapsuleV1 = required(params, "capsule")?;
-        let limits = params.get("capture_limits").map(|value| serde_json::from_value(value.clone()).map_err(invalid_error)).transpose()?.unwrap_or_default();
+        let limits = params
+            .get("capture_limits")
+            .map(|value| serde_json::from_value(value.clone()).map_err(invalid_error))
+            .transpose()?
+            .unwrap_or_default();
         let (capture, session) = if self.worker.is_none() {
-            let (capture, session) = NativeCapture::imported(capsule.clone(), Arc::clone(&self.content), limits)?;
+            let (capture, session) =
+                NativeCapture::imported(capsule.clone(), Arc::clone(&self.content), limits)?;
             (Some(capture), session)
-        } else { (None, er_repro::current::replay_current_capsule_v1(
-            &capsule,
-            Arc::clone(&self.content),
-            er_repro::current::CurrentReproLimitsV1::default(),
-        )
-        .map_err(backend)?) };
+        } else {
+            (
+                None,
+                er_repro::current::replay_current_capsule_v1(
+                    &capsule,
+                    Arc::clone(&self.content),
+                    er_repro::current::CurrentReproLimitsV1::default(),
+                )
+                .map_err(backend)?,
+            )
+        };
         let response = bounded(json!({
             "session": id, "kernel_version": 7, "processed_attempts": capsule.attempts.len(),
             "base_position": capsule.base_position, "final_position": capsule.final_position,
             "snapshot_digest": capsule.final_snapshot_digest, "observation": session.observe().map_err(backend)?
         }))?;
-        if capture.is_some() { context.admit_inline_success(&response)?; }
+        if capture.is_some() {
+            context.admit_inline_success(&response)?;
+        }
         let session = match &self.worker {
             Some(worker) => worker.adopt(&id, &session, capsule.local_seat, capsule.role)?,
             None => CurrentBackend::Native(Box::new(session)),
         };
-        if let Some(capture) = capture { self.captures.insert(id.clone(), capture); }
+        if let Some(capture) = capture {
+            self.captures.insert(id.clone(), capture);
+        }
         self.sessions.insert(id, session);
         Ok(response)
     }
@@ -166,22 +192,51 @@ impl CurrentDispatcher {
         context: AgentResponseContextV1<'_>,
     ) -> Result<Value, AgentDispatchErrorV1> {
         let id = self.session_id(params)?.to_owned();
-        match self.sessions.get_mut(&id).ok_or_else(|| backend("current session missing or closed"))? {
-            CurrentBackend::Native(session) => self.captures.get_mut(&id)
-                .ok_or_else(|| backend("native capture owner missing"))?.apply(session, event, origin, context),
+        match self
+            .sessions
+            .get_mut(&id)
+            .ok_or_else(|| backend("current session missing or closed"))?
+        {
+            CurrentBackend::Native(session) => self
+                .captures
+                .get_mut(&id)
+                .ok_or_else(|| backend("native capture owner missing"))?
+                .apply(session, event, origin, context),
             session @ CurrentBackend::Worker(_) => session.apply(event),
         }
     }
 
     fn ingress_gap(&mut self, method: Option<&str>, params: Option<&Value>, reason: &str) {
-        if method.is_some_and(|method| method.starts_with("batch.") || matches!(method,
-            "session.observe" | "session.invariants" | "session.snapshot" | "session.checkpoint" |
-            "session.capsule.export" | "session.capsule.status" | "protocol.hello" |
-            "content.inspect" | "lab.health" | "lab.resources")) { return; }
-        if let Some(id) = params.and_then(|params| params.get("session")).and_then(Value::as_str).filter(|id| !id.is_empty() && id.len() <= 128) {
-            if let Some(capture) = self.captures.get_mut(id) { capture.gap(reason); }
+        if method.is_some_and(|method| {
+            method.starts_with("batch.")
+                || matches!(
+                    method,
+                    "session.observe"
+                        | "session.invariants"
+                        | "session.snapshot"
+                        | "session.checkpoint"
+                        | "session.capsule.export"
+                        | "session.capsule.status"
+                        | "protocol.hello"
+                        | "content.inspect"
+                        | "lab.health"
+                        | "lab.resources"
+                )
+        }) {
+            return;
+        }
+        if let Some(id) = params
+            .and_then(|params| params.get("session"))
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty() && id.len() <= 128)
+        {
+            if let Some(capture) = self.captures.get_mut(id) {
+                capture.gap(reason);
+            }
         } else {
-            for capture in self.captures.values_mut() { capture.gap(reason); }
+            for capture in self.captures.values_mut() {
+                capture.gap(reason);
+            }
         }
     }
 }
@@ -242,29 +297,56 @@ impl AgentDispatcherV1 for CurrentDispatcher {
             );
         }
         let result = self.dispatch_current(method, params, context);
-        let typed_event_method = matches!(method, "session.raw_input" | "session.advance_time" |
-            "session.network_frame" | "session.transport_changed" | "session.presentation_settled" |
-            "session.storage_result" | "platform.event");
-        if result.as_ref().is_err_and(|error| !typed_event_method || error.code == AgentErrorCodeV1::InvalidRequest) {
-            self.ingress_gap(Some(method), Some(params), "native request parameters rejected");
+        let typed_event_method = matches!(
+            method,
+            "session.raw_input"
+                | "session.advance_time"
+                | "session.network_frame"
+                | "session.transport_changed"
+                | "session.presentation_settled"
+                | "session.storage_result"
+                | "platform.event"
+        );
+        if result.as_ref().is_err_and(|error| {
+            !typed_event_method || error.code == AgentErrorCodeV1::InvalidRequest
+        }) {
+            self.ingress_gap(
+                Some(method),
+                Some(params),
+                "native request parameters rejected",
+            );
         }
         result
     }
 
     fn rejected_ingress(&mut self, request: Option<&AgentRequestV1>, reason: &str) {
-        self.ingress_gap(request.map(|request| request.method.as_str()), request.map(|request| &request.params), reason);
+        self.ingress_gap(
+            request.map(|request| request.method.as_str()),
+            request.map(|request| &request.params),
+            reason,
+        );
     }
 
     fn dispatch(&mut self, method: &str, params: &Value) -> Result<Value, AgentDispatchErrorV1> {
-        self.dispatch_with_response_context(method, params, AgentResponseContextV1 {
-            request_id: "", maximum_inline_result_bytes: MAXIMUM_MESSAGE_BYTES,
-            maximum_response_jsonl_bytes: MAXIMUM_MESSAGE_BYTES,
-        })
+        self.dispatch_with_response_context(
+            method,
+            params,
+            AgentResponseContextV1 {
+                request_id: "",
+                maximum_inline_result_bytes: MAXIMUM_MESSAGE_BYTES,
+                maximum_response_jsonl_bytes: MAXIMUM_MESSAGE_BYTES,
+            },
+        )
     }
 }
 
 impl CurrentDispatcher {
-    fn dispatch_current(&mut self, method: &str, params: &Value, context: AgentResponseContextV1<'_>) -> Result<Value, AgentDispatchErrorV1> {
+    fn dispatch_current(
+        &mut self,
+        method: &str,
+        params: &Value,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
         match method {
             "protocol.hello" => Ok(json!({
                 "protocol_version": 1,
@@ -483,7 +565,11 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
             Arc::clone(&dispatcher.content),
         )?;
         if dispatcher.worker.is_none() {
-            dispatcher.captures.insert("current".to_owned(), NativeCapture::checkpoint(&session, CaptureLimits::default(), 0).map_err(|error| error.message)?);
+            dispatcher.captures.insert(
+                "current".to_owned(),
+                NativeCapture::checkpoint(&session, CaptureLimits::default(), 0)
+                    .map_err(|error| error.message)?,
+            );
         }
         let session = match &dispatcher.worker {
             Some(worker) => worker
@@ -512,7 +598,9 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
         let response =
             match read_bounded_jsonl_line_v1(&mut reader, &mut line, MAXIMUM_MESSAGE_BYTES)? {
                 BoundedLineStatusV1::Eof => break,
-                BoundedLineStatusV1::Oversized => server.process_oversized_line_with_diagnostics()?,
+                BoundedLineStatusV1::Oversized => {
+                    server.process_oversized_line_with_diagnostics()?
+                }
                 BoundedLineStatusV1::Line => server.process_line(&line)?,
             };
         writer.write_all(&response)?;

@@ -1857,3 +1857,14 @@ future required inventory includes the new capture/protocol identities. Existing
 mutant scope rules, full compile/discovery, early lint, platform/CLI bridge checks,
 byte caps and time limits remain unchanged. This source-reviewed combined cut
 has not yet executed remotely; its behavior and qualification remain pending.
+
+Native-capture b3e3b032f4f656934c0fa91fed5f955903410f43/run33979379043 passed
+133 harness selftests and stopped at remote formatting before native execution.
+The compact included only a truncated source-format patch, so the separately
+bounded68795-byte repair was retrieved from its inspected12868-byte compressed
+artifact. Its SHA25601c7097667ae48a4e6f4d880c3846cef5ca611d5e5b34c9e3373226d1a736806
+matches the compact. It formats only the four owned protocol/native-agent/capture/
+new-test Rust files. The reviewed exact patch was applied locally as text; no
+formatter ran on this PC. All behavior, test identities and limits are unchanged.
+The inspected native A compact was12581 compressed bytes; full logs stayed remote.
+Baseline remains fully qualified597. The formatted successor requires its own run.
