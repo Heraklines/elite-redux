@@ -905,8 +905,13 @@ impl GameKernelV7 {
         candidate.advance_replay_sequence()?;
         candidate.synchronize_menu_allocator()?;
         let mut step = GameKernelStepV7 {
-            effects: material.transition().presentation.iter().cloned()
-                .map(GameKernelEffectV7::Presentation).collect(),
+            effects: material
+                .transition()
+                .presentation
+                .iter()
+                .cloned()
+                .map(GameKernelEffectV7::Presentation)
+                .collect(),
             internal_events: Vec::new(),
         };
         // This slice delivers presentations and preserves no platform fan-out,
