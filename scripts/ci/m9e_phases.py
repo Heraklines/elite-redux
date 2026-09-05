@@ -1,8 +1,11 @@
 """Same-run native/platform handoff; only aggregate can qualify a candidate.
 
-The workflow uploads two single-file artifacts from bounded producer directories:
-native.json (<=64 KiB) and optionally er-cli (<=128 MiB). Consumers never receive
-worker/test binaries or a target tree. No archive supplied by a manifest is opened.
+The workflow uploads single-file artifacts from bounded producer directories:
+native-a.json/native-b.json (each <=64 KiB) and optionally er-cli (<=128 MiB).
+Native wire proofs index repeated required IDs and target pairs into their complete inventories;
+readers reconstruct the exact proof before its existing semantic validation.
+Consumers never receive worker/test binaries or a target tree. No archive
+supplied by a manifest is opened.
 """
 
 import hashlib
@@ -15,6 +18,7 @@ import sys
 
 
 MANIFEST_LIMIT = 64 * 1024
+NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
     "harness": "scripts/ci/m9e_feedback.py",
@@ -79,7 +83,7 @@ def file_hash(path):
 
 
 def write_bounded(path, value):
-    data = encoded(value)
+    data = encoded(pack_native_ids(value))
     if len(data) > MANIFEST_LIMIT:
         raise RuntimeError("phase manifest exceeds 64 KiB")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,9 +96,101 @@ def read_bounded(path, expected_hash):
             or path.is_symlink() or not path.is_file() or path.stat().st_size > MANIFEST_LIMIT):
         raise RuntimeError("phase manifest path, size or expected digest is invalid")
     data = path.read_bytes()
+    if len(data) > MANIFEST_LIMIT:
+        raise RuntimeError("phase manifest size changed while reading")
     if sha(data) != expected_hash:
         raise RuntimeError("phase manifest digest mismatch")
-    return json.loads(data)
+    return unpack_native_ids(json.loads(data))
+
+
+def pack_native_ids(value):
+    """Store repeated required IDs as permutations of the complete inventory.
+
+    The semantic proof, plan hash and inventory hash are unchanged. Invalid
+    proofs remain inline for the existing validators to reject, never repaired.
+    """
+    if not isinstance(value, dict) or value.get("phase") != "native":
+        return value
+    plan = value.get("plan", {})
+    if not isinstance(plan, dict):
+        return value
+    required = plan.get("required_native_test_ids")
+    if not isinstance(required, dict) or not required:
+        return value
+    inventory = value.get("inventory", [])
+    partition(inventory)
+    by_target = {f"{item['crate']}:{item['target']}": item["ids"] for item in inventory}
+    if len(by_target) != len(inventory):
+        raise RuntimeError("native encoding target identity is ambiguous")
+    indices = {}
+    for target, ids in required.items():
+        available = by_target.get(target)
+        if (not isinstance(ids, list) or not ids or available is None
+                or any(not isinstance(item, str) for item in ids)
+                or len(ids) != len(available) or set(ids) != set(available)):
+            return value
+        positions = {item: index for index, item in enumerate(available)}
+        indices[target] = [positions[item] for item in ids]
+    target_positions = {(item["crate"], item["target"]): index for index, item in enumerate(inventory)}
+    targets = {}
+    for field in ("assigned_targets", "completed_targets"):
+        pairs = value.get(field)
+        if (not isinstance(pairs, list)
+                or any(not isinstance(pair, list) or len(pair) != 2
+                       or any(not isinstance(part, str) for part in pair)
+                       or tuple(pair) not in target_positions for pair in pairs)
+                or len({tuple(pair) for pair in pairs}) != len(pairs)):
+            return value
+        targets[field] = [target_positions[tuple(pair)] for pair in pairs]
+    return {"encoding": NATIVE_ID_ENCODING,
+            "proof": {**value, **targets, "plan": {**plan, "required_native_test_ids": indices}}}
+
+
+def unpack_native_ids(value):
+    if not isinstance(value, dict) or "encoding" not in value:
+        return value
+    if set(value) != {"encoding", "proof"} or value["encoding"] != NATIVE_ID_ENCODING:
+        raise RuntimeError("native encoding fields or version are invalid")
+    proof = value["proof"]
+    if (not isinstance(proof, dict) or type(proof.get("version")) is not int or proof["version"] != 1
+            or proof.get("phase") != "native" or not isinstance(proof.get("plan"), dict)
+            or not isinstance(proof.get("inventory"), list)):
+        raise RuntimeError("native encoding proof is invalid")
+    inventory = proof["inventory"]
+    partition(inventory)
+    by_target = {f"{item['crate']}:{item['target']}": item["ids"] for item in inventory}
+    if len(by_target) != len(inventory):
+        raise RuntimeError("native encoding target identity is ambiguous")
+    required = proof["plan"].get("required_native_test_ids")
+    if not isinstance(required, dict) or not required:
+        raise RuntimeError("native encoding required targets are missing")
+    restored = {}
+    for target, indices in required.items():
+        ids = by_target.get(target)
+        if (ids is None or not isinstance(indices, list) or not indices
+                or len(indices) != len(ids)
+                or any(type(index) is not int or index < 0 or index >= len(ids) for index in indices)
+                or len(set(indices)) != len(indices)):
+            raise RuntimeError("native encoding indices are not an exact target permutation")
+        restored[target] = [ids[index] for index in indices]
+    targets = {}
+    for field in ("assigned_targets", "completed_targets"):
+        indices = proof.get(field)
+        if (not isinstance(indices, list) or len(indices) > len(inventory)
+                or any(type(index) is not int or index < 0 or index >= len(inventory) for index in indices)
+                or len(set(indices)) != len(indices)):
+            raise RuntimeError("native encoding target indices are invalid")
+        targets[field] = [[inventory[index]["crate"], inventory[index]["target"]] for index in indices]
+    expanded = {**proof, **targets, "plan": {**proof["plan"], "required_native_test_ids": restored}}
+    # Every target is referenced at most once and each index is a permutation:
+    # each target-pair list is also bounded by the inventory count. Cap the
+    # complete reconstructed evidence as well as the 64 KiB wire representation.
+    if len(encoded(expanded)) > 2 * MANIFEST_LIMIT:
+        raise RuntimeError("reconstructed native proof exceeds its bounded expansion")
+    if (expanded.get("plan_sha256") != sha(encoded(expanded["plan"]))
+            or expanded.get("inventory_sha256") != sha(encoded(inventory))):
+        raise RuntimeError("reconstructed native plan or inventory digest mismatch")
+    return expanded
 
 
 def output(name, value):

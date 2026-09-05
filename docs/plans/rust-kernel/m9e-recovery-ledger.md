@@ -1602,3 +1602,33 @@ are from the existing unoptimized test profile, and overlap total duration.
 The 12289 operations, real4096-record windows, independent effects/state/frontier
 assertions, restore/preview, historical hard stop and stale/conflict checks remain
 unchanged. The 600-second target and 35-minute job limits remain unchanged.
+
+### Native phase evidence encoding repair (execution pending)
+
+The native phase wire now uses a versioned native-inventory-indices-v1 wrapper.
+It keeps the complete test inventory once and indexes repeated required-test
+names plus assigned/completed target pairs. Reconstruction preserves every field
+and list order before the existing plan/inventory hashes, exact test identities,
+counts, lane ownership/union, mutants, and CLI/worker bindings are validated.
+Both platform and aggregate use that reader; inline proofs remain readable.
+Wire and compact limits remain65536 bytes. Indexed reconstruction additionally
+rejects expanded proof serialization above131072 bytes, invalid integer types,
+negative/out-of-range/duplicate references, incomplete permutations, missing
+or ambiguous targets, unknown wrapper fields/versions and semantic hash mismatch.
+No test identity, result, artifact, required target, workflow or timeout is removed.
+
+Three phase regressions raise harness selftest declarations122 to125. They cover
+an originally oversized proof roundtrip with reversed required-ID order and all
+values retained, correctly wire-hashed tampering, and both encoded/expanded
+bounds. All earlier assertions remain. Complete raw evidence stays remote.
+The actual producer and consumers have not yet executed this source repair.
+
+Source-size accounting used only the needed plan13772 bytes and inventory60215
+bytes from the inspected946 native-B diagnostics archive, extracted by bounded
+ZIP ranges (compressed members4013/13775 bytes), plus its existing compact metadata.
+Required-ID indexing saves6186 bytes of repeated strings. A conservative lane-A
+shape including all76 targets, inflated durations and extra artifact/policy fields
+is64935 bytes; this estimate is not a successful actual manifest or future-growth
+guarantee. Oversize evidence still fails closed. Independent source reviews passed.
+The fully qualified baseline remains3aa4a0c/run33963418110; the timing-only4145
+candidate remains bound to its separate remote run33970667797.

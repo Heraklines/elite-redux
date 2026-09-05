@@ -3114,6 +3114,98 @@ class PhaseTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "size"):
             self.phases.read_bounded(path, self.native_hash)
 
+    def native_with_repeated_required_ids(self):
+        proof = copy.deepcopy(self.native)
+        ids = [f"case_{index:04d}_" + "full_current_state_and_effect_ownership_" * 2 for index in range(600)]
+        proof["inventory"][1]["ids"] = ids
+        proof["plan"]["required_native_test_ids"] = {"er-repro:m9e_current_repro": list(reversed(ids))}
+        proof["required_native_target_counts"]["er-repro:m9e_current_repro"] = len(ids)
+        proof["tests"].update({"selected": len(ids) + 4, "executed": len(ids) + 2, "passed": len(ids) + 2})
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        return proof
+
+    def test_native_manifest_indices_preserve_complete_proof_and_required_order(self):
+        proof = self.native_with_repeated_required_ids()
+        before = copy.deepcopy(proof)
+        self.phases.validate_native(proof, self.identity)
+        self.assertGreater(len(self.phases.encoded(proof)), self.phases.MANIFEST_LIMIT)
+        path = self.root / "indexed.json"
+        digest = self.phases.write_bounded(path, proof)
+        self.assertLessEqual(path.stat().st_size, self.phases.MANIFEST_LIMIT)
+        self.assertEqual(digest, self.phases.file_hash(path))
+        wire = json.loads(path.read_bytes())
+        self.assertEqual(wire["encoding"], "native-inventory-indices-v1")
+        self.assertEqual(wire["proof"]["inventory"], proof["inventory"])
+        self.assertEqual(wire["proof"]["assigned_targets"], [1, 2])
+        self.assertEqual(wire["proof"]["completed_targets"], [1, 2])
+        self.assertEqual(wire["proof"]["plan"]["required_native_test_ids"]["er-repro:m9e_current_repro"],
+                         list(reversed(range(600))))
+        restored = self.phases.read_bounded(path, digest)
+        self.assertEqual(restored, before)
+        self.assertEqual(proof, before)
+        self.phases.validate_native(restored, self.identity)
+        # Reconstructing the wire representation does not waive count validation.
+        restored["tests"]["executed"] -= 1
+        with self.assertRaisesRegex(RuntimeError, "counts"):
+            self.phases.validate_native(restored, self.identity)
+
+    def test_native_manifest_indices_reject_tampering_and_missing_evidence(self):
+        packed = self.phases.pack_native_ids(self.native_with_repeated_required_ids())
+        target = "er-repro:m9e_current_repro"
+        for label in ("bool", "negative", "outside", "duplicate", "missing_index", "unknown_target",
+                      "missing_target", "reordered", "inventory", "version", "unknown_field", "missing_proof",
+                      "assigned_bool", "assigned_outside", "completed_duplicate", "missing_completed"):
+            with self.subTest(label=label):
+                wire = copy.deepcopy(packed)
+                required = wire["proof"]["plan"]["required_native_test_ids"]
+                if label in {"bool", "negative", "outside", "duplicate"}:
+                    required[target][0] = {"bool": True, "negative": -1, "outside": 600, "duplicate": 598}[label]
+                elif label == "missing_index":
+                    required[target].pop()
+                elif label == "unknown_target":
+                    required["er-repro:unknown"] = required.pop(target)
+                elif label == "missing_target":
+                    required.pop(target)
+                elif label == "reordered":
+                    required[target].reverse()
+                elif label == "inventory":
+                    wire["proof"]["inventory"][1]["ids"][0] += "_tampered"
+                elif label == "version":
+                    wire["encoding"] = "native-inventory-indices-v2"
+                elif label == "unknown_field":
+                    wire["extra"] = True
+                elif label == "missing_proof":
+                    wire.pop("proof")
+                elif label == "assigned_bool":
+                    wire["proof"]["assigned_targets"][0] = True
+                elif label == "assigned_outside":
+                    wire["proof"]["assigned_targets"][0] = 3
+                elif label == "completed_duplicate":
+                    wire["proof"]["completed_targets"][0] = 2
+                elif label == "missing_completed":
+                    wire["proof"].pop("completed_targets")
+                path = self.root / "tampered.json"
+                data = self.phases.encoded(wire)
+                self.assertLessEqual(len(data), self.phases.MANIFEST_LIMIT)
+                path.write_bytes(data)
+                # Supply the actual wire hash: rejection must inspect references
+                # and semantic hashes rather than merely detect a stale file hash.
+                with self.assertRaisesRegex(RuntimeError, "native"):
+                    self.phases.read_bounded(path, self.phases.sha(data))
+
+    def test_native_manifest_index_encoding_keeps_wire_and_expansion_bounded(self):
+        proof = self.native_with_repeated_required_ids()
+        proof["padding"] = "x" * self.phases.MANIFEST_LIMIT
+        with self.assertRaisesRegex(RuntimeError, "64 KiB"):
+            self.phases.write_bounded(self.root / "oversize-indexed.json", proof)
+        with self.assertRaisesRegex(RuntimeError, "bounded expansion"):
+            self.phases.unpack_native_ids(self.phases.pack_native_ids(proof))
+        packed = self.phases.pack_native_ids(self.native_with_repeated_required_ids())
+        packed["proof"]["plan"]["required_native_test_ids"]["er-repro:m9e_current_repro"] = [0] * 100_000
+        with self.assertRaisesRegex(RuntimeError, "permutation"):
+            self.phases.unpack_native_ids(packed)
+
     def phase_environment(self):
         return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",
                                       "M9E_NATIVE_B_RESULT": "success", "M9E_NATIVE_B_MANIFEST_SHA256": self.other_hash,
