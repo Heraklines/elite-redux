@@ -8,12 +8,14 @@ use er_game::m9e_content_v2::{
 use er_game::m9e_material_v6::{GameMaterialV6, GamePlatformEffectV2, GamePresentationEffectV2};
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7, GameKernelV7Error,
-    GameProposalEnvelopeV2,
+    GameProposalEnvelopeV2, KernelStorageResultV2,
 };
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
-use er_kernel::snapshot_v7::{PendingPlatformRequestV2, PendingPresentationV3};
+use er_kernel::snapshot_v7::{
+    PendingPlatformRequestV2, PendingPresentationV3, StorageFrontierSnapshotV1,
+};
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
 use er_protocol::recovery::RecoveryTransactionConfig;
@@ -897,6 +899,63 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         GameKernelStepV7::default()
     );
     assert_eq!(duplicate.snapshot()?, duplicate_snapshot);
+
+    // The actual Save owns both a write and a presentation. At an exhausted
+    // replay frontier, neither callback may retire ownership or publish a CAS
+    // frontier before reporting its late failure.
+    let mut callback_snapshot = authority_snapshot.clone();
+    callback_snapshot.replay_sequence = SafeU53::MAX;
+    let mut callbacks = GameKernelV7::from_snapshot(
+        callback_snapshot.clone(),
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        callbacks.apply_storage_result(*request, KernelStorageResultV2::Written),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(callbacks.snapshot()?, callback_snapshot);
+    assert_eq!(
+        callbacks.settle_presentation(expected_presentation.event_id),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(callbacks.snapshot()?, callback_snapshot);
+
+    let mut callback_retry_snapshot = callbacks.snapshot()?;
+    callback_retry_snapshot.replay_sequence = authority_snapshot.replay_sequence;
+    assert_eq!(callback_retry_snapshot, authority_snapshot);
+    let mut callback_retry = GameKernelV7::from_snapshot(
+        callback_retry_snapshot,
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        callback_retry.apply_storage_result(*request, KernelStorageResultV2::Written)?,
+        GameKernelStepV7::default()
+    );
+    let mut expected_callbacks = authority_snapshot.clone();
+    expected_callbacks.pending_platform.clear();
+    expected_callbacks.storage_frontiers = vec![StorageFrontierSnapshotV1 {
+        slot: slot.clone(),
+        generation: *generation,
+    }];
+    expected_callbacks.replay_sequence = safe(expected_callbacks.replay_sequence.get() + 1);
+    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
+    callback_retry.settle_presentation(expected_presentation.event_id)?;
+    expected_callbacks.pending_presentations.clear();
+    expected_callbacks.replay_sequence = safe(expected_callbacks.replay_sequence.get() + 1);
+    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
+    assert_eq!(
+        callback_retry.apply_storage_result(*request, KernelStorageResultV2::Written),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(
+        callback_retry.settle_presentation(expected_presentation.event_id),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
 
     // This is a valid pre-delivery snapshot. The collision is detected only
     // when presentation ownership is installed after common material apply.

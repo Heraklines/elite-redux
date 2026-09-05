@@ -1942,3 +1942,56 @@ failures, the existing bounded range reader retrieved only summary.json15086byte
 and format.patch9667bytes (4736/2150 compressed member bytes plus ZIP metadata).
 Full diagnostics stayed remote. Semantics, all test IDs, limits and qualified
 baseline930 are unchanged; the formatted successor requires exact remote proof.
+
+### Qualified causal transactions (9e05ec36)
+
+Exact 9e05ec36cd3308575587961b513e60edb4fc8408 passed run33982109674:
+133 harness checks, formatting, full reverse compilation and required Clippy;
+617 native tests (A597/B20), zero failed/skipped, all22 required inventories,
+2 Wasm parity tests,2 Chromium journeys,1 typed-effect witness, the exact native
+CLI capsule bridge and aggregate. Eleven timer tests took3022ms, four co-op
+4931ms, V7 retention189786ms and native capture35123ms. B reload563840ms,
+batch471294ms, repro295209ms and host289447ms retain the existing600s bound.
+These are exact passing timings, not a stable throughput claim.
+
+Both real timer and replica mutants were detected (exit101, one failure each),
+with kernel source restored to5029d4b7f190d888ee60ef65154ed7760afce8642ed8392a1eeb01b74da1b456.
+Ledger mutation remains retention-only. Held parity remains
+8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+CLI ca69e95e62ff1078695a07d0031ea0f3a6b0a016533cf2e0e4d282b23b610fd9
+(86439296bytes), both workers21f274401bd600cc1515d7fe5a58aada551985f7a5a157939f1e7c6cb6b1cb04
+(74001992bytes) bind this exact source. Native A proof
+32deae11233c1f2a81b27b1abe20716aaebd136a9e91e341bdcdf19ce554e114;
+B23c2b50ee7a83d0ac03806fe476ef998663a0566129c92da52783445bdbb19ec;
+platformf039838ca0a3366fe8bcc03d07a26246e3efb108c2bccefd442e29463ce2b1c2;
+aggregatee6ca5eda0ab46585545e8ed7ec42e09cea20168d1b77e5bd95e44776a6fb00b8.
+The bridge retains1417->1433/16attempts and omitted-time divergence1428.
+Browser scope remains in-page V7 Wasm, byte relay and typed router.
+
+Only inspected compact archives A2129/B3120/platform2065/aggregate3516bytes
+were accessed, plus the58197-byte A proof from its inspected16478-byte archive
+for exact inventory/timing and next-scope size accounting. The latter leaves
+7339bytes under the unchanged64KiB wire limit. Full diagnostics, binaries and
+assets remain remote. Comparison baseline advances now to qualified9e.
+
+### Atomic storage and presentation completion (execution pending)
+
+The public V7 presentation callback validates ownership/outcome then preflights
+its replay increment before retiring the pending presentation. The remaining
+tail is infallible, without cloning the whole kernel for each presentation.
+The public storage callback stages the complete kernel, executes its original
+branch logic, validates and publishes only on success. Pending ownership, CAS
+frontiers, loaded state, private/input/menu state and replay changes cannot leak
+from a late failure. Existing typed failed/conflict/uncertain-write rejection
+semantics remain; this does not implement ambiguous-write reconciliation.
+
+The existing real guest Save co-op witness now rejects both Written and Settled
+callbacks at a controlled valid exhausted replay frontier with full snapshot
+conservation. Correcting only that controlled frontier lets the same callbacks
+succeed with independently asserted exact ownership, CAS and replay changes;
+duplicate callbacks reject without mutation. It directly exercises Written and
+Settled branches, not every storage-result variant. Four co-op IDs and all
+existing assertions survive. Source review by two independent lanes found no
+blocker. The current strict causal scope already owns this kernel/test pair;
+no inventory, mutation control, timeout or byte cap changes are required.
+Remote qualification of this new callback candidate remains pending.

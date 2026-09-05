@@ -994,8 +994,11 @@ impl GameKernelV7 {
             }
             _ => return Err(GameKernelV7Error::Invalid),
         }
+        // Preflight the sole remaining fallible step before retiring ownership.
+        let next_replay_sequence = increment_safe(self.replay_sequence)?;
         self.pending_presentations.remove(&event_id);
-        self.advance_replay_sequence()
+        self.replay_sequence = next_replay_sequence;
+        Ok(())
     }
 
     pub fn settle_platform_request(
@@ -1009,6 +1012,18 @@ impl GameKernelV7 {
     }
 
     pub fn apply_storage_result(
+        &mut self,
+        request_id: PlatformRequestId,
+        result: KernelStorageResultV2,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let mut candidate = self.clone();
+        let step = candidate.apply_storage_result_transaction(request_id, result)?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(step)
+    }
+
+    fn apply_storage_result_transaction(
         &mut self,
         request_id: PlatformRequestId,
         result: KernelStorageResultV2,

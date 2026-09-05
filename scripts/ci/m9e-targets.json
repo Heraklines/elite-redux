@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "93071d27a19e1595d969f1adc0549cdf4b4678e8",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33979738009",
+  "baseline": "9e05ec36cd3308575587961b513e60edb4fc8408",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33982109674",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
