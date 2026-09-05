@@ -81,23 +81,26 @@ fn run_hashes_are_strict_blake3_v1_values() {
 
 #[test]
 fn modifier_tier_and_closed_surface_enums_reject_unknown_wire_values() {
-    assert_eq!(serde_json::to_string(&ModifierTier::Common).unwrap(), "0");
     assert_eq!(
-        serde_json::from_str::<ModifierTier>("4").unwrap(),
+        serde_json::to_string(&ModifierTier::Common).expect("serialize common tier"),
+        "0"
+    );
+    assert_eq!(
+        serde_json::from_str::<ModifierTier>("4").expect("deserialize master tier"),
         ModifierTier::Master
     );
     assert!(serde_json::from_str::<ModifierTier>("5").is_err());
     assert!(serde_json::from_str::<ModifierTier>("\"COMMON\"").is_err());
 
     assert_eq!(
-        serde_json::to_value(RunSurfaceKind::RewardShop).unwrap(),
+        serde_json::to_value(RunSurfaceKind::RewardShop).expect("serialize reward shop"),
         json!("REWARD_SHOP")
     );
     assert!(serde_json::from_str::<RunStage>("\"UNKNOWN\"").is_err());
     assert!(serde_json::from_str::<RunOutcome>("\"UNKNOWN\"").is_err());
     let action = RunSurfaceAction::Reward(RewardAction::Reroll);
     assert_eq!(
-        serde_json::to_value(action).unwrap(),
+        serde_json::to_value(action).expect("serialize reward action"),
         json!({"kind":"REWARD","payload":{"kind":"REROLL"}})
     );
     assert!(
@@ -126,9 +129,9 @@ fn logical_menu_rejects_duplicate_options_duplicate_edges_and_bad_selection() {
     assert_eq!(duplicate_option, Err(LogicalMenuError::DuplicateOption));
 
     let edge = MenuNavigationEdge::new(
-        MenuOptionId::new("a").unwrap(),
+        MenuOptionId::new("a").expect("option a"),
         NavigationDirection::Right,
-        MenuOptionId::new("b").unwrap(),
+        MenuOptionId::new("b").expect("option b"),
     );
     let duplicate_edge = menu(
         "a",
@@ -147,10 +150,10 @@ fn logical_menu_rejects_duplicate_options_duplicate_edges_and_bad_selection() {
     );
 
     let bad_layout = LogicalMenuOption::new(
-        MenuOptionId::new("a").unwrap(),
+        MenuOptionId::new("a").expect("option a"),
         true,
         Some(er_types::ui_menu::MenuOptionLayout::new(
-            MenuOptionId::new("b").unwrap(),
+            MenuOptionId::new("b").expect("option b"),
             0,
             0,
             0,
@@ -165,14 +168,14 @@ fn logical_menu_rejects_duplicate_options_duplicate_edges_and_bad_selection() {
 #[test]
 fn logical_menu_canonicalizes_option_and_edge_order_without_using_layout() {
     let right = MenuNavigationEdge::new(
-        MenuOptionId::new("b").unwrap(),
+        MenuOptionId::new("b").expect("option b"),
         NavigationDirection::Right,
-        MenuOptionId::new("a").unwrap(),
+        MenuOptionId::new("a").expect("option a"),
     );
     let up = MenuNavigationEdge::new(
-        MenuOptionId::new("a").unwrap(),
+        MenuOptionId::new("a").expect("option a"),
         NavigationDirection::Up,
-        MenuOptionId::new("b").unwrap(),
+        MenuOptionId::new("b").expect("option b"),
     );
     let value = menu(
         "a",
@@ -182,6 +185,6 @@ fn logical_menu_canonicalizes_option_and_edge_order_without_using_layout() {
     .expect("menu canonicalization");
     assert_eq!(value.options[0].option_id.as_str(), "a");
     assert_eq!(value.navigation[0].from.as_str(), "a");
-    assert!(!value.is_enabled(&MenuOptionId::new("a").unwrap()));
-    assert!(value.is_enabled(&MenuOptionId::new("b").unwrap()));
+    assert!(!value.is_enabled(&MenuOptionId::new("a").expect("option a")));
+    assert!(value.is_enabled(&MenuOptionId::new("b").expect("option b")));
 }

@@ -22,7 +22,7 @@
   },
   "menu_validation_focus": {
     "trigger_paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs"],
-    "paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs"],
+    "paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs", "rust/crates/er-types/tests/m4_types.rs"],
     "execute": {"er-types": ["*"], "er-kernel": ["*"], "er-state": ["*"], "er-protocol": ["*"], "er-agent-protocol": ["*"], "er-env": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
     "required_targets": {"er-types": ["m9e_menu_validation"], "er-cli": ["m9e_current_reload", "m9e_current_entry"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2"], "er-web": ["m9e_host_v2"], "er-wasm": ["m9e_parity"], "er-kernel": ["m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"]},
     "exact_test_ids": {

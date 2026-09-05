@@ -681,3 +681,25 @@ shared compile cone and Wasm/Chromium boundaries; B2 and capsules stay excluded.
 No menu performance improvement is claimed before remote measurement. Full M9
 remains incomplete; batch, retention, full failure replay and final qualification
 still require implementation and evidence.
+
+### Shared menu native witnesses pass; historical types lint repair
+
+Candidate `b2b32edb8cc13cb9960f653c78045e229a2913e6`, run `33942520353`,
+passed all 680 selected/executed native tests with zero failures/skips, including
+five menu tests and both actual CLI reload tests. Formatting and CLI Clippy
+passed. Types Clippy then found 14 existing unwrap calls in historical
+`er-types/tests/m4_types.rs`; later lint, Wasm and Chromium checks did not run.
+The small repair adds explicit expect messages while preserving all assertions
+and includes that exact test path in the menu gate. No lint suppression or
+reduced test inventory is introduced. Baseline remains fully green `5cbba49`.
+
+Inspected and downloaded compact artifact 4,501 compressed bytes; the 96,386-byte
+diagnostics artifact remains remote. Harness SHA-256
+`3c34e167119924029dfb028e68c6737039496206b35da77c2e3f2a82620e587b`;
+selected IDs SHA-256
+`bba162b11cac9471b30938b725f6772ac366c544fa8e3434c128e8d744369588`.
+Build 139,430 ms; actual CLI reload 584,096 ms; supervisor 231,659 ms;
+worker 98,639 ms; current browser host 246,806 ms. The menu test target took
+4 ms. The native timer parity digest remains unchanged. These runner timings
+do not demonstrate a speedup from the menu optimization; full qualification
+and any controlled performance comparison remain outstanding.
