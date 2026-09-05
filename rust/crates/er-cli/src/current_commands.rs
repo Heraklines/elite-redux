@@ -28,6 +28,10 @@ pub(crate) fn read_json<T: DeserializeOwned>(
     path: &Path,
     maximum: usize,
 ) -> Result<T, Box<dyn Error>> {
+    Ok(serde_json::from_slice(&read_bytes(path, maximum)?)?)
+}
+
+fn read_bytes(path: &Path, maximum: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = Vec::new();
     File::open(path)?
         .take((maximum + 1) as u64)
@@ -35,7 +39,25 @@ pub(crate) fn read_json<T: DeserializeOwned>(
     if bytes.len() > maximum {
         return Err("current command input exceeds its byte limit".into());
     }
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(bytes)
+}
+
+/// Validate canonical save bytes and their state against the selected current content.
+pub fn validate_save(options: &Options) -> Result<(), Box<dyn Error>> {
+    let content = content(options)?;
+    let path = crate::option_path(options, "save", "ER_M9_SAVE")?;
+    let save = er_save::m9e_save_v2::GameSaveV2::decode(&read_bytes(&path, 8 << 20)?)?;
+    if save.content_identity != *content.identity() {
+        return Err("current save content identity differs from prepared content".into());
+    }
+    save.state.validate_with(content.as_ref())?;
+    crate::write_line(&serde_json::to_string(&json!({
+        "kernel_version": 7, "save_schema_version": save.schema_version,
+        "validation": "CANONICAL_SAVE_AND_CURRENT_CONTENT_STATE",
+        "valid": true, "content_identity": content.identity(),
+        "generation": save.generation, "checksum": save.checksum,
+        "active_run": save.state.active_run.is_some()
+    }))?)
 }
 
 fn content(options: &Options) -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
@@ -191,6 +213,15 @@ fn play(mut session: CurrentGameSession) -> Result<(), Box<dyn Error>> {
 
 /// Replay the complete current event suffix with quarantined platform effects.
 pub fn replay(options: &Options) -> Result<(), Box<dyn Error>> {
+    replay_result(options, false)
+}
+
+/// Successful validation includes isolated replay, not just schema admission.
+pub fn validate_capsule(options: &Options) -> Result<(), Box<dyn Error>> {
+    replay_result(options, true)
+}
+
+fn replay_result(options: &Options, report_validation: bool) -> Result<(), Box<dyn Error>> {
     let content = content(options)?;
     let path = crate::option_path(options, "capsule", "ER_M9_REPRO")?;
     let capsule: er_repro::current::CurrentReproCapsuleV1 = read_json(&path, MAXIMUM_EVENT_BYTES)?;
@@ -199,12 +230,18 @@ pub fn replay(options: &Options) -> Result<(), Box<dyn Error>> {
         content,
         er_repro::current::CurrentReproLimitsV1::default(),
     )?;
-    let result = serde_json::to_string(&json!({
+    let mut result = json!({
         "kernel_version": 7, "processed_attempts": capsule.attempts.len(),
         "base_position": capsule.base_position, "final_position": capsule.final_position,
         "snapshot_digest": capsule.final_snapshot_digest,
         "observation": session.observe()?, "snapshot": session.snapshot()?
-    }))?;
+    });
+    if report_validation {
+        result["validation"] = json!("ISOLATED_CURRENT_CAPSULE_REPLAY");
+        result["schema_valid"] = json!(true);
+        result["replay_valid"] = json!(true);
+    }
+    let result = serde_json::to_string(&result)?;
     if result.len() > MAXIMUM_EVENT_BYTES {
         return Err("current replay result exceeds 4 MiB".into());
     }

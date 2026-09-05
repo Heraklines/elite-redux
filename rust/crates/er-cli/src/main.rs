@@ -40,14 +40,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         "resume-v6" => resume(&options),
         "replay" => current_commands::replay(&options),
         "replay-v6" => validate_replay(&options),
-        "validate-save" => validate_save(&options),
+        "validate-save" => current_commands::validate_save(&options),
+        "validate-save-v6" => validate_save(&options),
         "simulate" => current_commands::simulate(&options),
         "simulate-v6" => simulate(&options),
         "inspect-content" => current_commands::inspect_content(&options),
         "inspect-content-v6" => inspect_content(&options),
         "agent" => current_agent::run(&options),
         "agent-v6" => agent_jsonl(&options),
-        "capsule-validate" => validate_capsule(&options),
+        "capsule-validate" => current_commands::validate_capsule(&options),
+        "capsule-validate-v1" => validate_capsule(&options),
         _ => Err(format!("unknown er-cli command {command}").into()),
     }
 }

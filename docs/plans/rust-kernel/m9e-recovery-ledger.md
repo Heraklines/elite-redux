@@ -1313,3 +1313,61 @@ downloaded only nativeA7,869 compressed-byte summary; duplicateB/full10,970-byte
 diagnostics remainremote. Complete9,879-byte host_v2.rs formatterpatch, zero
 omissions, verified SHA256a581e89eb60780c06a17de82b13045b52d5daeaa10fee7958551538c4ef73e38,
 was applied. No qualification/baseline advance beyond977200b.
+
+Cache1b9567295b56cb2775ad5762713885c3e6275d80/run33961778505 passed both
+native lanes: A67/67, B18/18, total85, zero failures/skips;114 harness and
+required formatting/all-target lint passed. Exact five host unit IDs and14
+host integration IDs executed. Cache units5,433ms; host290,068ms; reload527,993ms;
+CLIbatch472,349ms; CLIcaps296,264ms. A10:51:55-11:11:31 UTC, B10:51:54-11:13:10.
+Only inspected A2,797/B2,507 compressed-byte summaries downloaded; diagnostics
+48,528/41,317, proof5,335/5,002 and86,023,574-byte CLI archive remain remote.
+CLI b1dd190f8c149bda89227fbab885505f5d89f85b843614c4023a76027def26f7
+(86,023,448bytes) and worker53516b5cc003b9bf3c6952339d0e1a9d34dc16136693777da70c3e0221e723a9
+(73,928,432bytes) match across lanes. Native timer parity remains8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+Amanifest7cfc83fbec6a46cc2ac0df2046099fac104674e3c2eef97be50a071a0709f7ff;
+Bmanifest1910e21f04f2686c9d13d3497aeeee5ca119f721a344f8cd36553e96e54eb5e1.
+Platform and aggregate still pending; baseline remains977200b/run33959991266.
+This scoped cache run selects no behavioral mutants; private-control mutant
+qualification remains separate evidence at977. No performance/heap claim.
+FULL FOCUSED QUALIFICATION PASSED for1b9567295b56cb2775ad5762713885c3e6275d80
+run33961778505:85native(A67+B18),2Wasm,2Chromium,1typed-effect check; zero
+failures/skips,114harness and requiredformat/lint. Platform11:11:34-11:21:10 UTC;
+aggregate11:21:12-11:21:40; overall29m46. Exact CLI bridge retained16attempts,
+base1417/final1433, fullsnapshot
+blake3-v1:3ebd6118c4d9500bbbde971eb9100eb199cd0496c94ec367200b7a24ddeb8690;
+omitted appliedtime rejected at1428. This is in-page Wasm-host/byte-relay evidence,
+not actual Worker/WebRTC/renderer qualification or complete M9 acceptance.
+Platformmanifest26eda37ea9e60c1f660e7baf7aced9fe29a9f6d889fff01f5bd1a1811382562a;
+aggregate74e42bbb8ef2628baee14a8f782435a5fc1e63e187e79fed0f76e1631e59ded8;
+normalizedinventoryd25e391aaaddc2e4c62dd3303cf5d292b30677e3d8b90f1f15b6ace46043f3b7;
+normalizedplan60b03ea187a8b49bd07305b369e230490e5df7c9155c01f60d58fd115c5df6f9;
+selectedIDs0e834481f33d62cf60378f24f8c5f0eb4ff15ba45223e4d930b32fed8c039cf5.
+Harnessf78c8c30a9b65b469b3ec08ba58173be03548d74dc95653b26258701f70ed6e2;
+selftestsc625d4321508444886d9bc274426557ef9dd51e2a7a5efa3caab15e1f40d668c;
+configa8c97a5b8ca45e603eab56b4d49abe1b8bdca29c358d1e4d767e124c7df6dd79.
+Content/lock/phasehelper/workflow/oracle identities are unchanged from977.
+Browserassetmanifest95c6abe1a8f999804b039c06d5c1286fca6185a20e9bd79e215d1f67870e4ad5;
+Wasm540982dece5a6791fc189095706ccf7ea4b0e670835788226e509af94f486d51
+(16,249,560bytes); contentJSON640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4.
+Only inspected platform2,069/aggregate2,637 compressed-byte summaries downloaded.
+Browserassets4,527,519, platformdiagnostics14,747, proof4,598 andaggregateevidence
+2,594 compressedbytes remainremote. Browserbuild308,575ms, Wasm71,381ms,
+Chromium73,552ms, typed816ms. These are run timings, not controlled speedup or
+allocation measurements. Focused baseline now advances to exact1b/run33961778505.
+
+### Next isolated cut: ordinary current save and capsule validators
+
+Integrated the previously reviewed CLI main/current_commands and two realprocess
+test proposal. Both preservedbase blobs exactly matched actualsource at1b. Normal
+validate-save now validates canonical/checksummed GameSaveV2/current-content state;
+normalcapsule-validate performs isolated current replay. Explicit historical
+validate-save-v6/capsule-validate-v1 routes remain. No dependency changes.
+The118-selftest gate was three-way refreshed onto actual114-cache CI, independently
+reviewed, and applied with all five actualhost unit IDs and two validator IDs.
+Exact validator target runs first, exact CLIreload second, remaining order stable;
+wrong-crate decoys verify priority is crate-bound and membership unchanged.
+Full reverse compile, early Clippy, mandatory parity/platform/exactCLI bridge and
+fail-closed mixed-product scope remain. New regression process witnesses exercise
+valid-checksum absent-species validation, exact causal divergence and byte-limit
+errors. They remain unformatted/uncompiled/unexecuted until the remote run.
+No local build, formatter, lint, test, dependency or browser workload ran.

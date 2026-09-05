@@ -328,6 +328,10 @@ def plan():
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
     cache_session = cache_changed and all(path in cache_paths for path in product_changes)
+    validation_focus = config.get("current_validation_focus", {})
+    validation_paths = validation_focus.get("paths", [])
+    validation_changed = any(path in validation_focus.get("trigger_paths", []) for path in product_changes)
+    validation_session = validation_changed and all(path in validation_paths for path in product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
     worker_focus = config.get("worker_session_focus", {})
@@ -473,6 +477,10 @@ def plan():
         execution_scope = cache_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in cache_paths]
+    if validation_session:
+        execution_scope = validation_focus["execute"]
+        browser_required = True
+        boundaries = [path for path in boundaries if path not in validation_paths]
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -486,7 +494,7 @@ def plan():
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
     if endpoint_execution:
         selected.add("er-kernel-worker")
-    cli_executable_required = browser_required and (cache_session or timer_session or repro_session or batch_session or (
+    cli_executable_required = browser_required and (cache_session or validation_session or timer_session or repro_session or batch_session or (
         ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
     if cli_executable_required:
         selected.add("er-cli")
@@ -505,7 +513,7 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
-              "requires_cli_clippy": cache_session or timer_session or repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
+              "requires_cli_clippy": cache_session or validation_session or timer_session or repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
@@ -517,15 +525,18 @@ def plan():
               "current_batch_focus": batch_session,
               "current_batch_dependency_guard": batch_guard,
               "browser_cache_focus": cache_session,
+              "current_validation_focus": validation_session,
               "requires_cli_executable": cli_executable_required,
               "required_native_test_ids": (cache_focus.get("exact_test_ids", {}) if cache_session
+                                           else validation_focus.get("exact_test_ids", {}) if validation_session
                                            else batch_focus.get("exact_test_ids", {}) if batch_session
                                            else repro_focus.get("exact_test_ids", {}) if repro_session
                                            else menu_focus.get("exact_test_ids", {}) if menu_session
                                            else timer_focus.get("exact_test_ids", {}) if timer_session else {}),
-              "requires_agent_protocol_clippy": cache_session or timer_session or cli_reload_session or menu_session or batch_session,
+              "requires_agent_protocol_clippy": cache_session or validation_session or timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
               "required_native_targets": (cache_focus.get("required_targets", {}) if cache_session
+                                          else validation_focus.get("required_targets", {}) if validation_session
                                           else batch_focus.get("required_targets", {}) if batch_session
                                           else repro_focus.get("required_targets", {}) if repro_session
                                           else menu_focus.get("required_targets", {}) if menu_session
@@ -542,7 +553,7 @@ def plan():
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
-    if unknown or boundaries or (cache_changed and not cache_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session):
+    if unknown or boundaries or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -949,6 +960,9 @@ def native_execution_order(selection, enumerated):
     if selection.get("browser_cache_focus"):
         priority = {("er-web", "er_web"): 0, ("er-web", "m9e_host_v2"): 1, ("er-cli", "m9e_current_reload"): 2}
         return sorted(enumerated, key=lambda item: priority.get((item[4].name, item[2]), len(priority)))
+    if selection.get("current_validation_focus"):
+        priority = {("er-cli", "m9e_current_validation"): 0, ("er-cli", "m9e_current_reload"): 1}
+        return sorted(enumerated, key=lambda item: priority.get((item[4].name, item[2]), len(priority)))
     if selection.get("cli_reload_focus") or selection.get("menu_validation_focus") or selection.get("current_batch_focus"):
         return sorted(enumerated, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_reload"))
     return enumerated
@@ -1077,7 +1091,7 @@ def main(preflight_failure=None):
             for package in ("er-batch", "er-env"):
                 write_progress(summary, "lint", package)
                 run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
-        if selection.get("browser_cache_focus"):
+        if selection.get("browser_cache_focus") or selection.get("current_validation_focus"):
             for package in ("er-batch", "er-env", "er-repro"):
                 write_progress(summary, "lint", package)
                 run(["cargo", "clippy", "--locked", "-p", package, "--all-targets", "--no-deps", "--", "-D", "warnings"], package + "-clippy")
