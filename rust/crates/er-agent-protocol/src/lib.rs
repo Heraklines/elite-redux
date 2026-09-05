@@ -352,7 +352,7 @@ fn classify_method(method: &str) -> MethodClassV1 {
     }) {
         return MethodClassV1::Forbidden;
     }
-    const ALLOWED: [&str; 42] = [
+    const ALLOWED: [&str; 43] = [
         "protocol.hello",
         "session.create",
         "session.from_snapshot",
@@ -371,6 +371,7 @@ fn classify_method(method: &str) -> MethodClassV1 {
         "session.snapshot",
         "session.checkpoint",
         "session.restore",
+        "session.reload",
         "session.seek",
         "session.fork",
         "session.diff",

@@ -1,6 +1,7 @@
 //! Current V7 terminal and agent entries, with explicit historical compatibility.
 
 mod current_agent;
+mod current_worker_agent;
 mod current_commands;
 mod m72;
 mod m72_lab;

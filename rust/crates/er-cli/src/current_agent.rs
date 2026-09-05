@@ -19,11 +19,12 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::m72::{BoundedLineStatusV1, read_bounded_jsonl_line_v1};
+use crate::current_worker_agent::{CurrentBackend, WorkerConfiguration};
 
 // A full current snapshot is larger than the historical 64 KiB inline threshold.
 // Keep all accepted responses inline; oversized results are rejected, never turned
 // into inaccessible artifact references by the historical server.
-const MAXIMUM_MESSAGE_BYTES: usize = 4 << 20;
+pub(crate) const MAXIMUM_MESSAGE_BYTES: usize = 4 << 20;
 const MAXIMUM_SESSIONS: usize = 256;
 
 #[derive(Debug, Deserialize)]
@@ -53,12 +54,14 @@ struct CreateRequest {
 #[derive(Debug)]
 struct CurrentDispatcher {
     content: Arc<PreparedGameContentV2>,
-    sessions: BTreeMap<String, CurrentGameSession>,
+    sessions: BTreeMap<String, CurrentBackend>,
+    worker: Option<WorkerConfiguration>,
     maximum_sessions: usize,
+    next_reload_ticket: u64,
 }
 
 #[derive(Debug)]
-struct CurrentCompletionError(AgentDispatchErrorV1);
+pub(crate) struct CurrentCompletionError(pub(crate) AgentDispatchErrorV1);
 
 impl From<CurrentSessionError> for CurrentCompletionError {
     fn from(error: CurrentSessionError) -> Self {
@@ -75,9 +78,10 @@ impl CurrentDispatcher {
             .ok_or_else(|| invalid("missing session"))
     }
 
-    fn session(&self, params: &Value) -> Result<&CurrentGameSession, AgentDispatchErrorV1> {
+    fn session(&mut self, params: &Value) -> Result<&mut CurrentBackend, AgentDispatchErrorV1> {
+        let id = self.session_id(params)?.to_owned();
         self.sessions
-            .get(self.session_id(params)?)
+            .get_mut(&id)
             .ok_or_else(|| backend("current session missing or closed"))
     }
 
@@ -97,6 +101,10 @@ impl CurrentDispatcher {
         let request: CreateRequest =
             serde_json::from_value(params.clone()).map_err(invalid_error)?;
         self.reserve_id(&request.session)?;
+        let (owner_seat, role) = match &request.start {
+            CurrentStart::Natural { owner_seat, .. } => (*owner_seat, GameKernelRoleV7::Authority),
+            CurrentStart::Snapshot { owner_seat, role, .. } => (*owner_seat, *role),
+        };
         let session = match request.start {
             CurrentStart::Natural {
                 profile,
@@ -127,6 +135,10 @@ impl CurrentDispatcher {
             .map_err(backend)?,
         };
         let response = json!({"session": request.session, "kernel_version": 7});
+        let session = match &self.worker {
+            Some(worker) => worker.adopt(&request.session, &session, owner_seat, role)?,
+            None => CurrentBackend::Native(Box::new(session)),
+        };
         self.sessions.insert(request.session, session);
         Ok(response)
     }
@@ -140,14 +152,7 @@ impl CurrentDispatcher {
         self.sessions
             .get_mut(&id)
             .ok_or_else(|| backend("current session missing or closed"))?
-            .apply_with(event, |candidate, step| {
-                bounded(json!({
-                    "step": step,
-                    "observation": candidate.observe()?
-                }))
-                .map_err(CurrentCompletionError)
-            })
-            .map_err(|error| error.0)
+            .apply(event)
     }
 }
 
@@ -161,7 +166,9 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                 "warm": true,
                 "start_modes": ["NATURAL", "SNAPSHOT"],
                 "input_boundary": "RAW_PHYSICAL_INPUT",
-                "maximum_message_bytes": MAXIMUM_MESSAGE_BYTES
+                "maximum_message_bytes": MAXIMUM_MESSAGE_BYTES,
+                "backend": if self.worker.is_some() { "WORKER_V2" } else { "IN_PROCESS_V7" },
+                "reload_actions": if self.worker.is_some() { vec!["begin", "activate"] } else { vec![] }
             })),
             "session.create" => self.create(params),
             "session.from_snapshot" => self.create(&json!({
@@ -173,15 +180,15 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                 }
             })),
             "session.observe" => bounded(
-                serde_json::to_value(self.session(params)?.observe().map_err(backend)?)
+                serde_json::to_value(self.session(params)?.observe()?)
                     .map_err(backend)?,
             ),
             "session.invariants" => {
-                self.session(params)?.validate().map_err(backend)?;
+                self.session(params)?.validate()?;
                 Ok(json!({"valid": true, "kernel_version": 7}))
             }
             "session.snapshot" | "session.checkpoint" => bounded(
-                serde_json::to_value(self.session(params)?.snapshot().map_err(backend)?)
+                serde_json::to_value(self.session(params)?.snapshot()?)
                     .map_err(backend)?,
             ),
             "session.raw_input" => self.apply(
@@ -230,18 +237,19 @@ impl AgentDispatcherV1 for CurrentDispatcher {
             ),
             "platform.event" => self.apply(params, required(params, "event")?),
             "session.restore" => {
-                let id = self.session_id(params)?.to_owned();
-                let mut candidate = self.session(params)?.fork().map_err(backend)?;
-                candidate
-                    .restore(required(params, "snapshot")?)
-                    .map_err(backend)?;
-                self.sessions.insert(id, candidate);
-                Ok(json!({"restored": true, "kernel_version": 7}))
+                self.session(params)?.restore(required(params, "snapshot")?)
+            }
+            "session.reload" => {
+                let ticket = self.next_reload_ticket;
+                let next = ticket.checked_add(1).ok_or_else(|| backend("reload ticket counter exhausted"))?;
+                let result = self.session(params)?.reload(params, ticket)?;
+                self.next_reload_ticket = next;
+                Ok(result)
             }
             "session.fork" => {
                 let id: String = required(params, "target_session")?;
                 self.reserve_id(&id)?;
-                let fork = self.session(params)?.fork().map_err(backend)?;
+                let fork = self.session(params)?.fork(&id)?;
                 let response = json!({"session": id, "kernel_version": 7});
                 self.sessions.insert(id, fork);
                 Ok(response)
@@ -252,8 +260,8 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                     .sessions
                     .remove(&id)
                     .ok_or_else(|| backend("current session missing or closed"))?;
-                session.dispose();
-                Ok(json!({"closed": id}))
+                let retirement_issue = session.dispose();
+                Ok(json!({"closed": id, "retirement_issue": retirement_issue}))
             }
             "content.inspect" => {
                 Ok(json!({"kernel_version": 7, "content_identity": self.content.identity()}))
@@ -274,12 +282,13 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
         return Err("agent requires --protocol jsonl".into());
     }
     let path = crate::option_path(options, "content", "ER_M9_CONTENT")?;
-    let bundle: GameContentBundleV2 = crate::decode_file(&path).map_err(|error| {
+    let bundle: GameContentBundleV2 = crate::current_commands::read_json(&path, 64 << 20).map_err(|error| {
         format!(
             "current agent requires V2 content; use agent-v6 for historical V1 content: {error}"
         )
     })?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
+    let worker = WorkerConfiguration::from_options(options, &content)?;
     let maximum_sessions = options
         .get("maximum-sessions")
         .map_or(Ok(MAXIMUM_SESSIONS), |value| value.parse::<usize>())?;
@@ -289,10 +298,12 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
     let mut dispatcher = CurrentDispatcher {
         content,
         sessions: BTreeMap::new(),
+        worker,
         maximum_sessions,
+        next_reload_ticket: 1,
     };
     if let Some(path) = options.get("snapshot") {
-        let snapshot: CoreGameKernelSnapshotV7 = crate::decode_file(std::path::Path::new(path))?;
+        let snapshot: CoreGameKernelSnapshotV7 = crate::current_commands::read_json(std::path::Path::new(path), 8 << 20)?;
         let owner = options
             .get("seat")
             .map_or(Ok(1), |value| value.parse::<u64>())?;
@@ -311,6 +322,11 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
             role,
             Arc::clone(&dispatcher.content),
         )?;
+        let session = match &dispatcher.worker {
+            Some(worker) => worker.adopt("current", &session, SeatId::new(SafeU53::new(owner)?), role)
+                .map_err(|error| error.message)?,
+            None => CurrentBackend::Native(Box::new(session)),
+        };
         dispatcher.sessions.insert("current".to_owned(), session);
     }
     let mut server = AgentJsonlServerV1::new(
@@ -342,7 +358,7 @@ pub fn run(options: &BTreeMap<String, String>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn bounded(value: Value) -> Result<Value, AgentDispatchErrorV1> {
+pub(crate) fn bounded(value: Value) -> Result<Value, AgentDispatchErrorV1> {
     if serde_json::to_vec(&value).map_err(backend)?.len() > MAXIMUM_MESSAGE_BYTES {
         return Err(backend(
             "current response exceeds the bounded inline protocol limit",
@@ -351,7 +367,7 @@ fn bounded(value: Value) -> Result<Value, AgentDispatchErrorV1> {
     Ok(value)
 }
 
-fn required<T: serde::de::DeserializeOwned>(
+pub(crate) fn required<T: serde::de::DeserializeOwned>(
     params: &Value,
     name: &str,
 ) -> Result<T, AgentDispatchErrorV1> {
@@ -362,7 +378,7 @@ fn required<T: serde::de::DeserializeOwned>(
     serde_json::from_value(value).map_err(invalid_error)
 }
 
-fn invalid(message: &str) -> AgentDispatchErrorV1 {
+pub(crate) fn invalid(message: &str) -> AgentDispatchErrorV1 {
     AgentDispatchErrorV1 {
         code: AgentErrorCodeV1::InvalidRequest,
         message: message.to_owned(),
@@ -373,7 +389,7 @@ fn invalid_error(error: impl ToString) -> AgentDispatchErrorV1 {
     invalid(&error.to_string())
 }
 
-fn backend(error: impl ToString) -> AgentDispatchErrorV1 {
+pub(crate) fn backend(error: impl ToString) -> AgentDispatchErrorV1 {
     AgentDispatchErrorV1 {
         code: AgentErrorCodeV1::BackendError,
         message: error.to_string(),

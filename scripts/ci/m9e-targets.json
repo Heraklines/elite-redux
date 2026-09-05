@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "f8f69832749cc389f8853f9fa1de04f1ae0fb237",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33936401079",
+  "baseline": "da73baacc6cfc57b0a7ce78b484d48d666851fb6",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33937641185",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -13,6 +13,12 @@
     "paths": ["rust/crates/er-env/src/current.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/src/m72_lab.rs", "rust/crates/er-cli/tests/m9e_current_entry.rs"],
     "execute": {"er-env": ["*"], "er-cli": ["*"], "er-wasm": ["m9e_parity"]},
     "reason": "CLI-only changes use current session/CLI and parity witnesses. Shared session changes additionally require the browser scope because BrowserKernelHostV2 consumes it. Compile the full reverse dependency cone."
+  },
+  "cli_reload_focus": {
+    "paths": ["rust/crates/er-cli/src/current_worker_agent.rs", "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/src/main.rs", "rust/crates/er-cli/Cargo.toml", "rust/crates/er-cli/tests/m9e_current_reload.rs", "rust/crates/er-agent-protocol/src/lib.rs", "rust/Cargo.lock"],
+    "execute": {"er-agent-protocol": ["*"], "er-cli": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
+    "required_targets": {"er-cli": ["m9e_current_reload", "m9e_current_entry"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"], "er-wasm": ["m9e_parity"]},
+    "reason": "Current JSONL agent process backend and exact reload. Compile the full reverse cone, bind the exact candidate worker executable to the CLI process witness, execute protocol/current/historical regressions and both existing native/Wasm parity witnesses. Accept only the paired er-cli manifest and lock addition of the already locked er-kernel-worker workspace dependency. Shared runtime/browser changes retain broader mapping."
   },
   "browser_session_focus": {
     "paths": ["rust/crates/er-web/src/host_v2.rs", "rust/crates/er-web/tests/m9e_host_v2.rs"],

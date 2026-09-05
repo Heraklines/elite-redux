@@ -73,6 +73,7 @@ class FeedbackTests(unittest.TestCase):
         self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
         self.head = CANDIDATE
         self.baseline_lock = None
+        self.baseline_cli_manifest = None
         self.capture_calls = []
         self.commands = []
         self.events = []
@@ -108,6 +109,8 @@ class FeedbackTests(unittest.TestCase):
             return self.head
         if args == ["git", "show", f"{BASE}:rust/Cargo.lock"] and self.baseline_lock is not None:
             return self.baseline_lock
+        if args == ["git", "show", f"{BASE}:rust/crates/er-cli/Cargo.toml"] and self.baseline_cli_manifest is not None:
+            return self.baseline_cli_manifest
         if args == ["rustc", "--version"]:
             return "rustc 1.97.1 (synthetic)"
         if args == ["rustc", "-vV"]:
@@ -642,6 +645,175 @@ class FeedbackTests(unittest.TestCase):
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
         self.package("er-lab", '[dependencies]\ner-kernel-worker = { path = "../er-kernel-worker" }\n')
         self.package("er-reverse", '[dependencies]\ner-lab = { path = "../er-lab" }\n')
+
+    @staticmethod
+    def cli_reload_lock_fixture(dependencies):
+        return ('version = 4\n\n[[package]]\nname = "er-cli"\nversion = "0.1.0"\n'
+                + "dependencies = " + json.dumps(dependencies) + '\n'
+                + '\n[[package]]\nname = "er-env"\nversion = "0.1.0"\n'
+                + '\n[[package]]\nname = "er-kernel-worker"\nversion = "0.1.0"\n')
+
+    def configure_cli_reload_scope(self):
+        self.configure_supervisor_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["cli_reload_focus"] = policy["cli_reload_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-agent-protocol")
+        self.package("er-cli", '[dependencies]\ner-agent-protocol = { path = "../er-agent-protocol" }\n'
+                     'er-kernel-worker = { path = "../er-kernel-worker" }\n')
+        self.package("er-reverse", '[dependencies]\ner-cli = { path = "../er-cli" }\n')
+        self.baseline_cli_manifest = (self.rust / "crates/er-cli/Cargo.toml").read_text().replace(
+            'er-kernel-worker = { path = "../er-kernel-worker" }\n', '')
+        self.baseline_lock = self.cli_reload_lock_fixture(["er-env"])
+        (self.rust / "Cargo.lock").write_text(self.cli_reload_lock_fixture(["er-env", "er-kernel-worker"]))
+
+    def test_cli_reload_scope_requires_exact_process_witnesses_and_wasm_without_browser(self):
+        self.configure_cli_reload_scope()
+        self.changed = self.config["cli_reload_focus"]["paths"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["cli_reload_focus"])
+        self.assertTrue(selection["requires_worker_executable"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertFalse(selection["requires_browser"])
+        self.assertTrue(selection["requires_agent_protocol_clippy"])
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(selection["execution_scope"]["er-wasm"], ["m9e_parity"])
+        self.assertEqual(selection["execution_scope"]["er-agent-protocol"], ["*"])
+        self.assertEqual(selection["required_native_targets"]["er-cli"], ["m9e_current_reload", "m9e_current_entry"])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        self.assertIsNone(selection["worker_lock_guard"])
+        self.assertEqual(selection["cli_reload_dependency_guard"], {
+            "status": "verified", "owner": "er-cli", "added_workspace_dependencies": ["er-kernel-worker"],
+            "baseline_sha": BASE})
+
+    def test_cli_reload_guard_rejects_every_other_lock_or_manifest_change(self):
+        self.configure_cli_reload_scope()
+        before = self.baseline_lock
+        after = (self.rust / "Cargo.lock").read_text()
+        manifest = (self.rust / "crates/er-cli/Cargo.toml").read_text()
+        invalid_locks = {
+            "unchanged": before,
+            "removed": self.cli_reload_lock_fixture(["er-kernel-worker"]),
+            "extra": self.cli_reload_lock_fixture(["er-env", "er-kernel-worker", "serde"]),
+            "duplicate": self.cli_reload_lock_fixture(["er-env", "er-kernel-worker", "er-kernel-worker"]),
+            "versioned_dependency": self.cli_reload_lock_fixture(["er-env", "er-kernel-worker 0.1.0"]),
+            "top_metadata": after.replace("version = 4", "version = 3"),
+            "owner_metadata": after.replace('name = "er-cli"\n', 'name = "er-cli"\nchecksum = "changed"\n'),
+            "other_record": after.replace('name = "er-env"\n', 'name = "er-env"\nchecksum = "changed"\n'),
+            "version": after.replace('name = "er-env"\nversion = "0.1.0"', 'name = "er-env"\nversion = "0.2.0"'),
+            "source": after.replace('name = "er-kernel-worker"\n', 'name = "er-kernel-worker"\nsource = "registry+invalid"\n'),
+            "inventory": after + '\n[[package]]\nname = "new"\nversion = "0.1.0"\n',
+            "duplicate_record": after + '\n[[package]]\nname = "er-env"\nversion = "0.1.0"\n',
+        }
+        for defect, lock in invalid_locks.items():
+            with self.subTest(defect=defect), self.assertRaisesRegex(RuntimeError, "CLI lock guard"):
+                self.feedback.verify_cli_reload_dependencies(before, lock, self.baseline_cli_manifest, manifest)
+        invalid_manifests = [manifest.replace('../er-kernel-worker', '../wrong'),
+                            manifest.replace('version = "0.1.0"', 'version = "0.2.0"'),
+                            manifest + '\n[features]\nextra = []\n',
+                            manifest.replace('{ path = "../er-kernel-worker" }', '{ path = "../er-kernel-worker", optional = true }')]
+        for changed in invalid_manifests:
+            with self.subTest(manifest=changed), self.assertRaisesRegex(RuntimeError, "CLI dependency guard"):
+                self.feedback.verify_cli_reload_dependencies(before, after, self.baseline_cli_manifest, changed)
+        with self.assertRaisesRegex(RuntimeError, "already present"):
+            self.feedback.verify_cli_reload_dependencies(before, after, manifest, manifest)
+        external = 'name = "er-kernel-worker"\nsource = "registry+invalid"\n'
+        with self.assertRaisesRegex(RuntimeError, "unambiguous existing workspace"):
+            self.feedback.verify_cli_reload_dependencies(
+                before.replace('name = "er-kernel-worker"\n', external),
+                after.replace('name = "er-kernel-worker"\n', external), self.baseline_cli_manifest, manifest)
+        ambiguous = '\n[[package]]\nname = "er-kernel-worker"\nversion = "0.2.0"\n'
+        with self.assertRaisesRegex(RuntimeError, "unambiguous existing workspace"):
+            self.feedback.verify_cli_reload_dependencies(before + ambiguous, after + ambiguous,
+                                                         self.baseline_cli_manifest, manifest)
+
+    def test_cli_reload_scope_rejects_unpaired_guards_and_preserves_broader_boundaries(self):
+        self.configure_cli_reload_scope()
+        source = "rust/crates/er-cli/src/current_worker_agent.rs"
+        for extra in ("rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml"):
+            self.changed = [source, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "must be paired"):
+                self.feedback.plan()
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-web/src/host_v2.rs", "unknown.json"):
+            self.changed = [source, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        self.changed = [source, "rust/crates/er-env/src/current.rs"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["cli_reload_focus"])
+        self.assertIsNone(selection["execution_scope"])
+        self.assertTrue(selection["requires_wasm"])
+        self.assertTrue(selection["requires_browser"])
+
+    def test_cli_reload_missing_ambiguous_empty_or_wrong_crate_witness_fails(self):
+        self.configure_cli_reload_scope()
+        self.changed = ["rust/crates/er-cli/src/current_worker_agent.rs"]
+        required = self.feedback.plan()["required_native_targets"]
+        valid = [(crate, target, ["real_test"]) for crate, names in required.items() for target in names]
+        self.assertEqual(self.feedback.required_native_target_counts(required, valid)["er-cli:m9e_current_reload"], 1)
+        without = [row for row in valid if row[:2] != ("er-cli", "m9e_current_reload")]
+        for rows in (without, without + [("er-cli", "m9e_current_reload", [])],
+                     without + [("er-lab", "m9e_current_reload", ["wrong_crate"])],
+                     valid + [("er-cli", "m9e_current_reload", ["duplicate"]) ]):
+            with self.assertRaisesRegex(RuntimeError, "er-cli:m9e_current_reload"):
+                self.feedback.required_native_target_counts(required, rows)
+
+    def test_cli_reload_bound_artifact_reaches_listing_execution_and_protocol_clippy(self):
+        self.configure_cli_reload_scope()
+        self.changed = ["rust/crates/er-cli/src/current_worker_agent.rs"]
+        selection = self.feedback.plan()
+        # This orchestration fixture isolates CLI binding. The full required
+        # target inventory and exact two parity tests have separate witnesses.
+        selection["execution_scope"] = {"er-cli": ["m9e_current_reload"]}
+        selection["required_native_targets"] = {"er-cli": ["m9e_current_reload"]}
+        self.binary_ids = {"m9e_current_reload": ["actual_cli_reload"]}
+        self.binary_crates = {"m9e_current_reload": "er-cli"}
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        self.assertIsNone(self.feedback.native_target_env("er-lab", "m9e_current_reload", None))
+        self.assertIsNone(self.feedback.native_target_env("er-cli", "current_kernel_endpoint_v2", None))
+        with self.assertRaisesRegex(RuntimeError, "no bound worker executable"):
+            self.feedback.native_target_env("er-cli", "m9e_current_reload", None)
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        self.assertEqual([(name, phase) for name, phase, _ in self.binary_envs],
+                         [("m9e_current_reload", "list"), ("m9e_current_reload", "execute")])
+        binding = summary["worker_executable"]
+        for _, _, env in self.binary_envs:
+            self.assertEqual({key: env[key] for key in env if key.startswith("ER_M9E_WORKER_")}, {
+                "ER_M9E_WORKER_EXECUTABLE": binding["path"], "ER_M9E_WORKER_EXECUTABLE_SHA256": binding["sha256"],
+                "ER_M9E_WORKER_SOURCE_SHA": CANDIDATE, "ER_M9E_WORKER_BUILD_TARGET": summary["target"],
+                "ER_M9E_WORKER_BUILD_PROFILE": summary["profile"]})
+        self.assertIn("agent-protocol-clippy", summary["timing_ms"])
+        wasm.assert_called_once()
+        browser.assert_not_called()
+        self.extra_artifacts = []
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("exactly one real worker executable", summary["first_failure"])
+
+    def test_broad_cli_scope_binds_present_reload_target_without_relaxing_narrow_requirements(self):
+        self.configure_browser_scope()
+        self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
+        self.assertFalse(self.feedback.plan()["requires_worker_executable"])
+        target = self.rust / "crates/er-cli/tests/m9e_current_reload.rs"
+        target.parent.mkdir()
+        target.write_text("// synthetic target presence; never compiled\n")
+        self.assertTrue(self.feedback.plan()["requires_worker_executable"])
+
+    def test_agent_protocol_clippy_failure_cannot_produce_green_feedback(self):
+        selection = self.feedback.plan()
+        selection["requires_agent_protocol_clippy"] = True
+        self.clippy_code = 1
+        with patch.object(self.feedback, "plan", return_value=selection):
+            code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(summary["tests"]["passed"], 2)
+        self.assertIn("agent-protocol-clippy exited 1", summary["first_failure"])
+        self.assertIn(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets",
+                       "--no-deps", "--", "-D", "warnings"], self.commands)
 
     def test_supervisor_scope_requires_real_process_targets_without_browser(self):
         self.configure_supervisor_scope()

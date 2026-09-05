@@ -510,3 +510,37 @@ full diagnostics (22,849 bytes) stayed remote. Build 42,945 ms; current CLI
 witnesses 28,489 ms; native parity 10,081 ms. Wasm was not reached after Clippy
 failed. Baseline remains fully green f8f6983; utilities are not yet qualified.
 Worker/reload and B2 edits remain excluded from this repair candidate.
+
+### Normal current utilities verified; actual CLI reload submitted
+
+Candidate `da73baacc6cfc57b0a7ce78b484d48d666851fb6`, run `33937641185`,
+passed all 13 selected/executed native tests, both Wasm parity tests, formatting,
+and CLI Clippy (zero failures/skips). Native and Wasm held-timer digest matches
+`9002fe7f032760abb343efebeb6b0a75a74c10578d3e38bdf21fc205cf4b650e`.
+Harness SHA-256 `d8f13301cef6ec685a69fb23e446ba619205667bbe693a4e4af758211f377a0e`;
+selected IDs SHA-256 `e1d4876c3c6ff3a53c20d0895044615ff4056b598bfc5eb3d1a5ff37d7b29a2e`.
+Build 42,197 ms, actual current CLI tests 29,333 ms, native parity 10,282 ms,
+Wasm execution 62,755 ms. Inspected compact artifact 2,541 compressed bytes;
+diagnostics 14,777 bytes remained remote. Baseline advances to this exact pass.
+
+The next candidate connects the normal JSONL current agent to the verified ABI2
+worker/supervisor with optional executable/root/identity configuration. It adds
+bounded begin/activate reload, failed-candidate preservation, monotonic ticket
+IDs, live timer-tail replay, fork, restore and bounded retirement reporting.
+Two actual CLI/worker executable tests assert full state and effect results,
+artifact/ticket rejection categories, continued held-timer behavior and restore
+invalidation. The unchanged default remains the in-process current V7 backend.
+
+The focused gate strictly accepts only the paired er-cli manifest/lock addition
+of the already locked workspace worker. It binds the exact non-test Cargo worker
+artifact during both test discovery and execution; requires nonempty current
+CLI/reload, worker, endpoint, supervisor and parity targets; preserves native
+and Wasm parity plus CLI/worker/lab/protocol Clippy. Seven added harness tests
+cover guards and failure handling. Independent source review found no blockers;
+remote validation remains pending. B2 replica effects stay outside this cut.
+
+Next after reload and B2: implement complete causal capsule export/replay and
+normal batch execution. Batch protocol names currently exist without normal
+agent handlers; the historical er-batch V1 library still owns DeveloperSession.
+Reuse CurrentGameSession with shared V2 content, staged all-or-nothing batch
+results and bounded aggregate responses. Full M9 remains incomplete.

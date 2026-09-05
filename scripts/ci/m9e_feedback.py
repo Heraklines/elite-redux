@@ -24,7 +24,9 @@ COMPACT = REPORT / "compact"
 FULL = REPORT / "full"
 RUST = ROOT / "rust"
 TIMINGS = {}
-WORKER_BOUND_TARGETS = {"current_kernel_endpoint_v2", "current_kernel_supervisor_v2"}
+WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
+                        ("er-lab", "current_kernel_supervisor_v2"),
+                        ("er-cli", "m9e_current_reload")}
 
 
 def digest(path):
@@ -102,6 +104,48 @@ def check_format(selection):
         raise
 
 
+def verify_cli_reload_dependencies(before_lock, after_lock, before_manifest, after_manifest):
+    """Allow the one existing workspace worker dependency, with no other drift."""
+    old_manifest, new_manifest = map(tomllib.loads, (before_manifest, after_manifest))
+    old_dependencies = old_manifest.get("dependencies", {})
+    if "er-kernel-worker" in old_dependencies:
+        raise RuntimeError("CLI dependency guard: worker dependency already present")
+    expected_manifest = {**old_manifest, "dependencies": {
+        **old_dependencies, "er-kernel-worker": {"path": "../er-kernel-worker"}}}
+    if new_manifest != expected_manifest:
+        raise RuntimeError("CLI dependency guard: only the exact worker path dependency may change")
+    before, after = map(tomllib.loads, (before_lock, after_lock))
+    def records(lock):
+        packages = lock.get("package", [])
+        result = {(item["name"], item["version"], item.get("source")): item for item in packages}
+        if len(result) != len(packages):
+            raise RuntimeError("CLI lock guard: duplicate package identity")
+        return result
+    old, new = records(before), records(after)
+    if old.keys() != new.keys() or {key: value for key, value in before.items() if key != "package"} != {
+        key: value for key, value in after.items() if key != "package"
+    }:
+        raise RuntimeError("CLI lock guard: lock metadata or package inventory changed")
+    for name in ("er-cli", "er-kernel-worker"):
+        keys = [key for key in old if key[0] == name]
+        if len(keys) != 1 or keys[0][2] is not None:
+            raise RuntimeError("CLI lock guard: one unambiguous existing workspace package required")
+    owner = next(key for key in old if key[0] == "er-cli")
+    for key in old:
+        if key != owner and old[key] != new[key]:
+            raise RuntimeError("CLI lock guard: another package record changed")
+    if {key: value for key, value in old[owner].items() if key != "dependencies"} != {
+        key: value for key, value in new[owner].items() if key != "dependencies"
+    }:
+        raise RuntimeError("CLI lock guard: owner metadata changed")
+    old_deps, new_deps = old[owner].get("dependencies", []), new[owner].get("dependencies", [])
+    if len(old_deps) != len(set(old_deps)) or len(new_deps) != len(set(new_deps)) or (
+        set(new_deps) - set(old_deps) != {"er-kernel-worker"} or set(old_deps) - set(new_deps)
+    ):
+        raise RuntimeError("CLI lock guard: only one exact worker dependency addition is allowed")
+    return {"status": "verified", "owner": "er-cli", "added_workspace_dependencies": ["er-kernel-worker"]}
+
+
 def verify_worker_lock_change(before_text, after_text):
     """Allow only the ABI2 worker's three existing workspace dependencies."""
     before = tomllib.loads(before_text)
@@ -177,6 +221,18 @@ def plan():
     supervisor_focus = config.get("supervisor_focus", {})
     supervisor_paths = supervisor_focus.get("paths", [])
     supervisor_session = bool(product_changes) and all(path in supervisor_paths for path in product_changes)
+    cli_reload_focus = config.get("cli_reload_focus", {})
+    cli_reload_paths = cli_reload_focus.get("paths", [])
+    cli_reload_session = bool(product_changes) and all(path in cli_reload_paths for path in product_changes)
+    cli_reload_guard = None
+    cli_manifest = "rust/crates/er-cli/Cargo.toml"
+    if cli_reload_session and any(path in changed for path in (cli_manifest, "rust/Cargo.lock")):
+        if not all(path in changed for path in (cli_manifest, "rust/Cargo.lock")):
+            raise RuntimeError("CLI dependency guard: manifest and lock changes must be paired")
+        cli_reload_guard = verify_cli_reload_dependencies(
+            capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text(),
+            capture(["git", "show", f"{base}:{cli_manifest}"]), (ROOT / cli_manifest).read_text())
+        cli_reload_guard["baseline_sha"] = base
     native_worker_delta = worker_session or endpoint_session or supervisor_session
     worker_lock_guard = None
     if native_worker_delta and "rust/Cargo.lock" in changed:
@@ -196,7 +252,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (timer_session and path in timer_focus["paths"]) or (native_worker_delta and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (timer_session and path in timer_focus["paths"]) or ((native_worker_delta or cli_reload_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -246,6 +302,8 @@ def plan():
         execution_scope = endpoint_focus["execute"]
     if supervisor_session:
         execution_scope = supervisor_focus["execute"]
+    if cli_reload_session:
+        execution_scope = cli_reload_focus["execute"]
     if timer_session:
         execution_scope = timer_focus["execute"]
         browser_required = True
@@ -254,9 +312,13 @@ def plan():
         selected.update(execution_scope)
         if not native_worker_delta:
             current_session = True
-    endpoint_execution = "er-lab" in selected and (
-        execution_scope is None or "*" in execution_scope.get("er-lab", [])
-        or bool(WORKER_BOUND_TARGETS.intersection(execution_scope.get("er-lab", []))))
+    # Older checkpoints can execute CLI suites before the reload target exists.
+    # The explicit reload scope requires it even when missing; broad scopes bind
+    # it whenever present, and exact required-target checks reject its removal.
+    endpoint_execution = any(crate in selected and (crate != "er-cli" or cli_reload_session
+        or (RUST / "crates/er-cli/tests/m9e_current_reload.rs").is_file()) and (
+        execution_scope is None or "*" in execution_scope.get(crate, [])
+        or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
     if endpoint_execution:
         selected.add("er-kernel-worker")
     result = {"base_sha": base, "changed_paths": changed, "packages": sorted(selected),
@@ -270,9 +332,13 @@ def plan():
               "worker_session_focus": worker_session,
               "endpoint_session_focus": endpoint_session,
               "supervisor_focus": supervisor_session,
+              "cli_reload_focus": cli_reload_session,
+              "cli_reload_dependency_guard": cli_reload_guard,
+              "requires_agent_protocol_clippy": cli_reload_session,
               "timer_focus": timer_session,
               "required_native_targets": (timer_focus.get("required_targets", {}) if timer_session
-                                          else supervisor_focus.get("required_targets", {}) if supervisor_session else {}),
+                                          else supervisor_focus.get("required_targets", {}) if supervisor_session
+                                          else cli_reload_focus.get("required_targets", {}) if cli_reload_session else {}),
               "timer_mutant": timer_focus.get("mutant") if timer_session else None,
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
@@ -319,7 +385,7 @@ def discover_worker_executable(artifacts, summary):
 
 
 def native_target_env(crate, target, worker_executable):
-    if crate != "er-lab" or target not in WORKER_BOUND_TARGETS:
+    if (crate, target) not in WORKER_BOUND_TARGETS:
         return None
     if worker_executable is None:
         raise RuntimeError("current endpoint target has no bound worker executable")
@@ -585,7 +651,7 @@ def main(preflight_failure=None):
             binaries = selected_binaries
         worker_executable = None
         if selection["requires_worker_executable"]:
-            if not any(name in WORKER_BOUND_TARGETS and cwd.name == "er-lab" for name, cwd in binaries.values()):
+            if not any((cwd.name, name) in WORKER_BOUND_TARGETS for name, cwd in binaries.values()):
                 raise RuntimeError("required current process test target is missing")
             worker_executable = discover_worker_executable(artifacts, summary)
             summary["worker_executable"] = worker_executable
@@ -647,6 +713,8 @@ def main(preflight_failure=None):
             raise RuntimeError("zero tests executed")
         if selection.get("requires_cli_clippy"):
             run(["cargo", "clippy", "--locked", "-p", "er-cli", "--all-targets", "--no-deps", "--", "-D", "warnings"], "cli-clippy")
+        if selection.get("requires_agent_protocol_clippy"):
+            run(["cargo", "clippy", "--locked", "-p", "er-agent-protocol", "--all-targets", "--no-deps", "--", "-D", "warnings"], "agent-protocol-clippy")
         if selection["worker_session_focus"] or selection["requires_worker_executable"]:
             run(["cargo", "clippy", "--locked", "-p", "er-kernel-worker", "--all-targets", "--no-deps", "--", "-D", "warnings"], "worker-clippy")
         if selection["requires_worker_executable"]:
