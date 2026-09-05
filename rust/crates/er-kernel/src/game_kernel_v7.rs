@@ -52,7 +52,7 @@ use thiserror::Error;
 use crate::snapshot::{
     HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRepeatSnapshotV2,
     InputRouterSnapshotV2, KernelSchedulerSnapshotV2, PhysicalInputSourceV2,
-    PressedPhysicalInputSnapshotV2, TimeClassPauseSnapshotV2,
+    PressedPhysicalInputSnapshotV2,
 };
 use crate::snapshot_v7::{
     CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7, CoreGameKernelSnapshotV7,
@@ -855,6 +855,18 @@ impl GameKernelV7 {
         generation: ConnectionGeneration,
         connected: bool,
     ) -> Result<(), GameKernelV7Error> {
+        let mut candidate = self.clone();
+        candidate.transport_changed_transaction(generation, connected)?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    fn transport_changed_transaction(
+        &mut self,
+        generation: ConnectionGeneration,
+        connected: bool,
+    ) -> Result<(), GameKernelV7Error> {
         let protocol = self.protocol.as_mut().ok_or(GameKernelV7Error::Invalid)?;
         let connection = protocol
             .connections
@@ -888,22 +900,19 @@ impl GameKernelV7 {
                 .sort_by_key(|staged| staged.peer_seat);
             connection.state = TransportState::Connecting;
         }
-        let reason = "transport-disconnected".to_owned();
-        self.scheduler.pauses.retain(|pause| {
-            !(pause.endpoint == self.local_seat
-                && pause.time_class == TimeClass::Connected
-                && pause.reasons.iter().any(|value| value == &reason))
-        });
-        if !connected {
-            self.scheduler.pauses.push(TimeClassPauseSnapshotV2 {
-                endpoint: self.local_seat,
-                time_class: TimeClass::Connected,
-                reasons: vec![reason],
-            });
-            self.scheduler
-                .pauses
-                .sort_by_key(|pause| (pause.endpoint, pause.time_class));
-        }
+        // A new generation is only staged above; Connecting cannot resume
+        // connected-time work. Remove only the pause reason owned by this API.
+        let effective_connected = connection.state == TransportState::Connected;
+        let mut scheduler = self.scheduler.clone().into_scheduler()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let reason = "transport-disconnected";
+        let _ = if effective_connected {
+            scheduler.resume_class(self.local_seat, TimeClass::Connected, reason)
+        } else {
+            scheduler.pause_class(self.local_seat, TimeClass::Connected, reason)
+        }.map_err(|_| GameKernelV7Error::Invalid)?;
+        self.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
         protocol
             .validate()
             .map_err(|_| GameKernelV7Error::Invalid)?;
@@ -1162,24 +1171,34 @@ impl GameKernelV7 {
         if admission.disposed || admission.fingerprints.len() >= capacity {
             return Err(GameKernelV7Error::Invalid);
         }
+        let mut staged = self.clone();
+        let step = staged.apply_admitted_game_proposal(envelope, protocol, fingerprint)?;
+        staged.validate()?;
+        *self = staged;
+        Ok(step)
+    }
+
+    fn apply_admitted_game_proposal(
+        &mut self,
+        envelope: GameProposalEnvelopeV2,
+        protocol: ProtocolRuntimeSnapshotV2,
+        fingerprint: String,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let action_context = envelope.proposal.context;
         let operation_id = action_context.operation_id.clone();
         let action = envelope.proposal.action;
         if matches!(action, GameActionV1::Battle { .. }) {
-            let mut staged = self.clone();
-            let step = staged.collect_battle_action(
+            let step = self.collect_battle_action(
                 action,
                 action_context,
                 envelope.sender_seat,
                 CommandAdmissionSource::AuthorityRemoteProposal,
             )?;
             remember_proposal_fingerprint(
-                staged.protocol.as_mut().ok_or(GameKernelV7Error::Invalid)?,
+                self.protocol.as_mut().ok_or(GameKernelV7Error::Invalid)?,
                 operation_id,
                 fingerprint,
             )?;
-            staged.validate()?;
-            *self = staged;
             return Ok(step);
         }
         let context = GameActionDispatchContextV1 {

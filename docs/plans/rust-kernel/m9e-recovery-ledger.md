@@ -1868,3 +1868,66 @@ new-test Rust files. The reviewed exact patch was applied locally as text; no
 formatter ran on this PC. All behavior, test identities and limits are unchanged.
 The inspected native A compact was12581 compressed bytes; full logs stayed remote.
 Baseline remains fully qualified597. The formatted successor requires its own run.
+
+### Qualified native capture (93071d27)
+
+Exact93071d27a19e1595d969f1adc0549cdf4b4678e8 passed run33979738009:
+133 harness tests, formatting, full compilation and required Clippy;93 native
+(A73/B20), zero failures/skips;2 Wasm,2 Chromium,1 typed-effect witness, exact
+current CLI capsule bridge and aggregate. All four real native-capture tests
+passed in36169ms, including257 retained attempts through both normal replay
+commands. Eighteen required target inventories were validated. This capture-only
+scope selected no timer, replica or ledger mutants; their policies remain intact.
+
+The run took32m28s (17:03:07-17:35:35UTC2026-09-05). A ended17:16:00,
+platform17:25:06, B17:35:08 and aggregate17:35:34. B reload589202ms is close to
+the unchanged600s target limit; batch499190ms, repro307879ms, host300306ms.
+This is passing bounded evidence, not stable throughput or an isolated speedup.
+
+CLI9b764b763939eab9b301834a2cf8252838adc7f5d5305b2fa9dd7f99d589372b,
+86368536bytes; both workers27dd6f1b1b15e59e64cb641e851b062fe20092bfe06cc373d0706e1ec9a834f7,
+73931064bytes, all source-bound930. A proof
+9b6712032cd9b75c6290b2891662cf6481d87b5cb8b7d5674ab11fae75be74d2;
+B930b4a9ca6652e14d90fd2d69995dd5465ca0060834558c38f01e7c39572b9e7;
+platform5dc2b7bc485a73783dd6ec928b562fe0c5dab7e13cdf9c65f179446a80af81a2;
+aggregate6fbe0c6b5aee24e1ab94111ae35a558702f8455876a7d1e050dad8038ab817e8.
+Held parity remains8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+Bridge1417->1433/16attempts retained its full snapshot digest and detected omitted
+time at1428. Chromium remains in-page V7 Wasm plus byte relay and typed router;
+actual Worker/RTC topology is still a separate pending capability.
+
+Only inspected compact A2827/B2537/platform2067/aggregate2664 compressed bytes
+were downloaded. All binaries, assets, full diagnostics and other proofs stayed
+remote. Comparison baseline advances only now to exact930/run33979738009.
+
+### Transport pause ownership and atomic proposal admission (execution pending)
+
+The next bounded source cut fixes two current V7 mutation paths. Transport changes
+stage the whole kernel, update only their owned transport-disconnected pause
+reason through the scheduler, validate and publish. Unrelated pause reasons
+survive reconnect, and a newly staged connection generation remains Connecting
+with connected-time work paused. This does not implement generation promotion
+or reconnect recovery. Invalid generations and late replay overflow retain the
+complete original snapshot.
+
+Proposal admission preserves role, canonical bytes, proposal, generation,
+fingerprint, duplicate, control-root and capacity preflight order. Exact duplicate
+admission still returns before mutation, including at the maximum replay position.
+Every admitted action now executes on a full kernel candidate and publishes only
+after final validation. The existing battle branch's staging is covered by this
+common transaction; late effect, allocator, protocol, replay or terminal failures
+cannot publish partial state. A real guest Save proposal witnesses a late replay
+overflow, exact full-snapshot rollback and successful same-proposal continuation
+after correcting only the controlled fixture's exhausted replay frontier.
+
+Two timer tests extend the inventory from9 to11. They exercise independent pause
+reasons, connected/human/absolute clocks, held navigation consequences, snapshot
+resume and rejected transitions. The four co-op test identities remain unchanged.
+The focused gate explicitly pins timer11, native capture4, normal validators2,
+V7 retention2 and host unit5/integration14, requiring22 targets while preserving
+the existing execution selection. Retention also pins the current timer inventory.
+All133 harness test declarations, full reverse compilation/discovery, early lint,
+B's four target pairs, exact executable bindings and platform/CLI bridge survive.
+Timer and replica mutation controls are required; the ledger control remains
+retention-only. Source paths, timeouts and evidence byte limits are unchanged.
+Source review is not execution evidence; remote qualification is pending.

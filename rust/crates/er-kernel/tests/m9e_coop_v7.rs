@@ -772,6 +772,25 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         })
         .ok_or("guest Save proposal missing")?;
     let before_delivery = replica.snapshot()?;
+    let before_admission = authority.snapshot()?;
+    let mut exhausted_snapshot = before_admission.clone();
+    exhausted_snapshot.replay_sequence = SafeU53::MAX;
+    let mut exhausted = GameKernelV7::from_snapshot(
+        exhausted_snapshot.clone(),
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        exhausted.admit_game_proposal(proposal),
+        Err(GameKernelV7Error::Invalid),
+        "valid Save admission reaches the exhausted replay sequence after preparing effects"
+    );
+    assert_eq!(
+        exhausted.snapshot()?,
+        exhausted_snapshot,
+        "late admission rejection must retain state, effects, private control and protocol"
+    );
     let authority_step = authority.admit_game_proposal(proposal)?;
     let material = authority_step
         .effects
@@ -847,6 +866,37 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         authority_snapshot.pending_presentations.as_slice(),
         std::slice::from_ref(&pending)
     );
+
+    // In this controlled fixture, correct only the exhausted replay frontier.
+    // The same real guest proposal must still be available for admission.
+    let mut corrected_snapshot = exhausted.snapshot()?;
+    corrected_snapshot.replay_sequence = before_admission.replay_sequence;
+    assert_eq!(corrected_snapshot, before_admission);
+    let mut corrected = GameKernelV7::from_snapshot(
+        corrected_snapshot,
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(corrected.admit_game_proposal(proposal)?, authority_step);
+    assert_eq!(corrected.snapshot()?, authority_snapshot);
+
+    // Exact duplicates remain preflight no-ops even when a new admission's
+    // replay increment would fail. They must not advance the replay sequence
+    // or reinstall effects.
+    let mut duplicate_snapshot = authority_snapshot.clone();
+    duplicate_snapshot.replay_sequence = SafeU53::MAX;
+    let mut duplicate = GameKernelV7::from_snapshot(
+        duplicate_snapshot.clone(),
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        duplicate.admit_game_proposal(proposal)?,
+        GameKernelStepV7::default()
+    );
+    assert_eq!(duplicate.snapshot()?, duplicate_snapshot);
 
     // This is a valid pre-delivery snapshot. The collision is detected only
     // when presentation ownership is installed after common material apply.

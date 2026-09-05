@@ -2019,6 +2019,11 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["execution_scope"][crate], targets)
         for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
             self.assertEqual(selection["required_native_test_ids"][identity], ids)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_timers_v7"]), 11)
+        self.assertIn("transport_resume_preserves_unrelated_pause_reasons_and_clock_classes",
+                      selection["required_native_test_ids"]["er-kernel:m9e_timers_v7"])
+        self.assertIn("staged_transport_generation_remains_paused_and_rejections_are_atomic",
+                      selection["required_native_test_ids"]["er-kernel:m9e_timers_v7"])
         self.assertEqual(set(selection["required_native_targets"]["er-game"]), {
             "m3_command_menus", "m3_internal_event_boundary", "m3_local_battle", "m3_party_menus", "m3_runtime",
             "m9e_content_v2", "m9e_material_v6", "m9e_new_run_v6", "m9e_runtime_v6", "m9e_material_retention"})
@@ -2164,6 +2169,7 @@ class FeedbackTests(unittest.TestCase):
         parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
         self.assertIn("--nocapture", parity_execution)
         self.assertEqual(len(summary["required_native_target_counts"]), 34)
+        self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_timers_v7"], 11)
         self.assertEqual(summary["required_native_target_counts"]["er-repro:m9e_current_repro"], 9)
         self.assertEqual(summary["required_native_target_counts"]["er-game:m9e_material_retention"], 3)
         self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_material_retention_v7"], 2)
@@ -2226,9 +2232,37 @@ class FeedbackTests(unittest.TestCase):
             self.assertIn(package, selection["packages"])
             self.assertEqual(selection["execution_scope"][package], ["*"])
         self.assertEqual(set(selection["required_native_targets"]["er-kernel"]), {
-            "m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"})
+            "m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7",
+            "m9e_material_retention_v7"})
+        self.assertEqual(sum(len(names) for names in selection["required_native_targets"].values()), 22)
+        self.assertEqual(set(selection["required_native_test_ids"]["er-kernel:m9e_timers_v7"]), {
+            "held_navigation_repeats_at_250ms_with_real_cursor_effects",
+            "snapshot_resume_and_time_chunking_preserve_ordered_consequences",
+            "release_blur_text_focus_and_duplicate_sources_cancel_or_suppress_repeats",
+            "menu_transition_retires_repeat_and_stale_snapshot_ownership_is_rejected",
+            "pause_reasons_preserve_remaining_delay_until_last_reason_is_removed",
+            "unequal_and_tied_deadlines_dispatch_in_chronological_timer_order",
+            "exhausted_allocator_and_consequence_budget_fail_atomically",
+            "invalid_directional_keyboard_and_gamepad_presses_preserve_full_snapshot",
+            "unsupported_later_timer_rolls_back_earlier_real_navigation",
+            "transport_resume_preserves_unrelated_pause_reasons_and_clock_classes",
+            "staged_transport_generation_remains_paused_and_rejections_are_atomic"})
         self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
         self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertIsNone(selection["ledger_mutant"])
+        causal_paths = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
+                        "rust/crates/er-kernel/tests/m9e_timers_v7.rs",
+                        "rust/crates/er-kernel/tests/m9e_coop_v7.rs"]
+        for changed in (causal_paths, causal_paths[:2], [causal_paths[0], causal_paths[2]]):
+            with self.subTest(changed=changed):
+                self.changed = changed
+                combined = self.feedback.plan()
+                for key in ("required_native_targets", "required_native_test_ids", "execution_scope",
+                            "timer_mutant", "replica_mutant"):
+                    self.assertEqual(combined[key], selection[key])
+                self.assertFalse(combined["material_retention_focus"])
+                self.assertIsNone(combined["ledger_mutant"])
+                self.assertTrue(combined["requires_cli_executable"])
 
     def test_timer_scope_rejects_unmapped_mixed_product_and_lock_changes(self):
         self.configure_timer_scope()
@@ -2236,6 +2270,8 @@ class FeedbackTests(unittest.TestCase):
         for extra in ("rust/crates/er-state/src/lib.rs", "rust/crates/er-protocol/src/lib.rs",
                       "rust/crates/er-kernel/src/snapshot.rs", "rust/crates/er-env/src/current.rs",
                       "rust/crates/er-web/src/lib.rs", "test/browser/rust-browser/other.spec.ts",
+                      "rust/crates/er-kernel/tests/m9e_timers_v7_extra.rs",
+                      "rust/crates/er-kernel/tests/m9e_coop_v7_extra.rs",
                       "rust/Cargo.lock", "unmapped.json"):
             with self.subTest(extra=extra):
                 self.changed = [core, extra]
@@ -2269,6 +2305,9 @@ class FeedbackTests(unittest.TestCase):
                                         ("er-kernel:m9e_domain_journeys_v7", 12),
                                         ("er-repro:m9e_current_repro", 9), ("er-cli:m9e_current_repro", 2),
                                         ("er-batch:m9e_current_batch", 6), ("er-cli:m9e_current_batch", 2),
+                                        ("er-kernel:m9e_timers_v7", 11), ("er-kernel:m9e_material_retention_v7", 2),
+                                        ("er-cli:m9e_current_native_capture", 4), ("er-cli:m9e_current_validation", 2),
+                                        ("er-web:er_web", 5), ("er-web:m9e_host_v2", 14),
                                         ("er-agent-protocol:er_agent_protocol", 5)):
                     self.assertEqual(len(exact[identity]), count)
                     package, target = identity.split(":")
@@ -2289,6 +2328,9 @@ class FeedbackTests(unittest.TestCase):
         for identity in ("er-kernel:m9e_coop_v7", "er-kernel:m9e_snapshot_v7",
                          "er-kernel:m9e_domain_journeys_v7", "er-repro:m9e_current_repro",
                          "er-cli:m9e_current_repro", "er-batch:m9e_current_batch", "er-cli:m9e_current_batch",
+                         "er-kernel:m9e_timers_v7", "er-kernel:m9e_material_retention_v7",
+                         "er-cli:m9e_current_native_capture", "er-cli:m9e_current_validation",
+                         "er-web:er_web", "er-web:m9e_host_v2",
                          "er-agent-protocol:er_agent_protocol"):
             for omit_target in (False, True):
                 with self.subTest(identity=identity, omit_target=omit_target):
@@ -2297,6 +2339,25 @@ class FeedbackTests(unittest.TestCase):
                                if not omit_target or f"{crate}:{target}" != identity]
                     with self.assertRaisesRegex(RuntimeError, "required native test identities"):
                         self.feedback.require_native_test_ids(required, missing)
+        timer_identity = "er-kernel:m9e_timers_v7"
+        for witness in required[timer_identity]:
+            for mutation in ("omit", "rename", "duplicate", "wrong-crate"):
+                with self.subTest(witness=witness, mutation=mutation):
+                    changed = []
+                    for crate, target, ids in inventory:
+                        actual_ids = list(ids)
+                        if f"{crate}:{target}" == timer_identity:
+                            if mutation == "omit":
+                                actual_ids.remove(witness)
+                            elif mutation == "rename":
+                                actual_ids[actual_ids.index(witness)] = witness + "_renamed"
+                            elif mutation == "duplicate":
+                                actual_ids.append(witness)
+                            else:
+                                crate = "er-other"
+                        changed.append((crate, target, actual_ids))
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(required, changed)
 
     def test_private_control_unmapped_kernel_or_later_capsule_product_change_fails_closed(self):
         self.configure_timer_scope()
@@ -2349,17 +2410,22 @@ class FeedbackTests(unittest.TestCase):
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
         self.binary_ids["m9e_parity"] = ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
         self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
-        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica, patch.object(self.feedback, "ledger_behavioral_mutant") as ledger:
             code, summary = self.invoke()
         self.assertEqual(code, 0)
         wasm.assert_called_once()
         browser.assert_called_once()
         mutant.assert_called_once()
         replica.assert_called_once()
+        ledger.assert_not_called()
         self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
         parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
         self.assertIn("--nocapture", parity_execution)
-        self.assertEqual(len(summary["required_native_target_counts"]), 18)
+        self.assertEqual(len(summary["required_native_target_counts"]), 22)
+        for identity, count in (("er-kernel:m9e_timers_v7", 11), ("er-kernel:m9e_material_retention_v7", 2),
+                                ("er-cli:m9e_current_native_capture", 4), ("er-cli:m9e_current_validation", 2),
+                                ("er-web:er_web", 5), ("er-web:m9e_host_v2", 14)):
+            self.assertEqual(summary["required_native_target_counts"][identity], count)
         self.assertEqual(summary["required_native_target_counts"]["er-repro:m9e_current_repro"], 9)
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_repro"], 2)
         self.assertEqual(summary["required_native_target_counts"]["er-batch:m9e_current_batch"], 6)
