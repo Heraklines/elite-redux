@@ -154,6 +154,7 @@ test("current V7 Worker executes natural input and presentation settlement", asy
     const presentationIds: number[] = [];
     let settlements = 0;
     let uiChanges = 0;
+    const materialRevisions = new Set<number>();
     const unexpected = () => { throw new Error("unexpected external adapter in bounded solo Worker witness"); };
     const router = new module.BrowserEffectRouterV2({
       renderUi: () => { uiChanges++; },
@@ -171,7 +172,27 @@ test("current V7 Worker executes natural input and presentation settlement", asy
           "settled presentation must release exactly its actual pending ID");
         settlements++;
       },
-      changePresentationScene: () => {}, sendNetworkFrame: unexpected, handleStorageRequest: unexpected,
+      changePresentationScene: () => {},
+      // Solo authority still emits its committed material through the host's
+      // network effect. Observe it without inventing a peer or delivery ACK.
+      sendNetworkFrame: async (generation: number, bytes: Uint8Array) => {
+        assert(generation === 1 && bytes.length > 0 && bytes.length <= (32 << 20),
+          "solo authority material must use the actual bounded generation");
+        const material = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+        assert(["NEW_RUN", "BATTLE_TURN", "BATTLE_REPLACEMENT", "GAME_ACTION", "TERMINAL"].includes(material.kind)
+          && material.value?.schema_version === 6 && material.value.authority_seat === 1,
+          "solo network effect must contain current authority material");
+        const revision = material.value.authority_revision;
+        assert(Number.isSafeInteger(revision) && revision >= 0 && !materialRevisions.has(revision)
+          && materialRevisions.size < 64, "authority material revisions must be bounded and unique");
+        const state = await snapshot();
+        const record = state.material_ledger.records.find((item: any) => item.authority_revision === revision);
+        assert(record != null && record.after_digest === material.value.after_digest
+          && text(record.operation_id) === text(material.value.operation_id),
+          "emitted material must match the actual committed kernel ledger");
+        materialRevisions.add(revision);
+      },
+      handleStorageRequest: unexpected,
       requestAsset: () => {}, playAudioCue: () => {}, showTerminal: unexpected, recordTelemetry: () => {},
       publishRepro: unexpected, publishCurrentRepro: unexpected, dispose: () => {},
     });
@@ -209,6 +230,7 @@ test("current V7 Worker executes natural input and presentation settlement", asy
       const active = await snapshot();
       assert(active.lifecycle.kind === "ACTIVE" && control(active).kind === "BATTLE_COMMAND", "natural BattleCommand");
       assert(presentationIds.length > 0 && settlements === presentationIds.length, "actual presentations must settle");
+      assert(materialRevisions.size > 0, "natural startup must emit committed authority material");
       assert(new Set(presentationIds).size === presentationIds.length, "presentation IDs must be routed once");
       const beforeRejected = await snapshot();
       const frontier = client.status.acceptedSequence;
@@ -244,7 +266,8 @@ test("current V7 Worker executes natural input and presentation settlement", asy
       return { initial_control: "TITLE", final_control: control(final).kind, presentation_count: presentationIds.length,
         settled_presentation_count: settlements, ui_change_count: uiChanges, held_cursor: held, released_cursor: released,
         final_snapshot_digest: await digest(final), accepted_sequence: accepted, disposed: true,
-        rejected_event_code: rejectedCode, rejection_preserved_snapshot: true };
+        rejected_event_code: rejectedCode, rejection_preserved_snapshot: true,
+        authority_material_count: materialRevisions.size };
     } finally { try { await router.dispose(); } finally { client.terminate(); } }
   }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(), initialization });
   expect(observed).toHaveLength(1);

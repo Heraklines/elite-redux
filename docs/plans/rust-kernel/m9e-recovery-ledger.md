@@ -2061,3 +2061,25 @@ This cut does not implement RTC, IndexedDB, reconnect, LIST controls, uncertain-
 write recovery, renderer/default rollout or deployment. See m9e-current-browser-
 worker.md for ownership and usage boundaries; those remaining capabilities need
 separate connected implementations and real platform evidence.
+
+## Worker harness correction after e1a8
+
+Run33986024336 for e1a8e1445e323d1ebe11aa8e6cfd04340a15fea4 did not
+qualify: nativeA597 and nativeB20 passed (617 selected,22 required targets),
+all142 harness tests passed, and the negative Worker ABI/termination witness
+passed. The positive Worker journey rejected an existing SEND_NETWORK_FRAME
+before completing; the host emits committed authority material even in solo
+play. The platform job therefore failed and aggregate correctly stayed failed.
+Only the compact summaries and4224-byte named Worker diagnostic were retrieved;
+full diagnostics, assets and binaries remain remote. Baseline stays qualified
+a19d337/run33983872608.
+
+The correction observes actual emitted authority material without a peer,
+requires generation1/schema6/authority-seat1, bounded unique revisions and
+matching operation/revision/after-digest in the actual kernel ledger, and reports
+a nonzero bounded count. Storage and other unexpected adapters still reject.
+The independently validated attachment now requires that count and rejects
+zero, boolean and oversized counts. Existing142 test identities, native/causal
+inventories, platform witnesses, mutants and all limits remain. No transport or
+Rust implementation change is made. This is a pending remote correction, not
+qualification or RTC delivery evidence.

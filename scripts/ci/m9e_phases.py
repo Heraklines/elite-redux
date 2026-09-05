@@ -461,7 +461,7 @@ def validate_browser_worker_tests(tests, evidence, binding):
               "glue_sha256", "wasm_sha256", "content_sha256", "browser_worker_protocol_version", "observed_worker_count"}
     positive_fields = {"initial_control", "final_control", "presentation_count", "settled_presentation_count", "ui_change_count",
                        "held_cursor", "released_cursor", "final_snapshot_digest", "accepted_sequence", "disposed",
-                       "rejected_event_code", "rejection_preserved_snapshot"}
+                       "rejected_event_code", "rejection_preserved_snapshot", "authority_material_count"}
     negative_fields = {"wrong_abi", "invalid_request_id", "pending_before_termination", "settled_after_termination", "rejected_after_termination",
                        "closed", "pending_after", "queued_bytes_after", "accepted_sequence", "post_termination_rejected"}
     for key, extra, worker_count in (("positive", positive_fields, 1), ("negative", negative_fields, 2)):
@@ -477,6 +477,8 @@ def validate_browser_worker_tests(tests, evidence, binding):
                 or any(item[field] != manifest["cohort"][field] for field in manifest["cohort"])):
             raise RuntimeError("current Worker measured identity disagrees")
     positive, negative = tests["positive"], tests["negative"]
+    if type(positive["authority_material_count"]) is not int or not 1 <= positive["authority_material_count"] <= 64:
+        raise RuntimeError("current Worker authority material evidence is missing or unbounded")
     for field in ("presentation_count", "settled_presentation_count", "ui_change_count", "accepted_sequence"):
         if type(positive[field]) is not int or not 1 <= positive[field] <= (1 << 53) - 1:
             raise RuntimeError("current Worker positive counters are unsafe or empty")

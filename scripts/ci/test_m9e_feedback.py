@@ -49,7 +49,7 @@ def browser_worker_fixture(phases):
                 "held_cursor": ["battle/command/party", "battle/command/party", "battle/command/fight"],
                 "released_cursor": "battle/command/fight", "final_snapshot_digest": "1" * 64,
                 "accepted_sequence": 12, "disposed": True, "rejected_event_code": "HOST_REJECTED",
-                "rejection_preserved_snapshot": True}
+                "rejection_preserved_snapshot": True, "authority_material_count": 1}
     negative = {**common, "observed_worker_count": 2,
                 "wrong_abi": {"code": "INVALID_ABI", "acceptance": "REJECTED", "request_id": 1, "sequence": 0, "accepted_sequence": None},
                 "invalid_request_id": {"code": "WORKER_FAILURE", "acceptance": "UNKNOWN", "request_id": None, "sequence": None, "accepted_sequence": None},
@@ -2140,6 +2140,8 @@ class FeedbackTests(unittest.TestCase):
                                   ("positive", "held_cursor", ["battle/command/party"] * 3),
                                   ("positive", "settled_presentation_count", 2), ("positive", "accepted_sequence", True),
                                   ("positive", "rejection_preserved_snapshot", False),
+                                  ("positive", "authority_material_count", 0), ("positive", "authority_material_count", True),
+                                  ("positive", "authority_material_count", 65),
                                   ("negative", "settled_after_termination", 1), ("negative", "pending_after", 1),
                                   ("negative", "accepted_sequence", 1), ("negative", "post_termination_rejected", False)):
             bad = copy.deepcopy(tests)

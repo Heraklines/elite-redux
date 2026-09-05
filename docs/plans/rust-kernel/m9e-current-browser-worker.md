@@ -47,6 +47,11 @@ actual presentation ownership/settlement, held-navigation timing, full snapshot
 conservation on kernel rejection, acknowledgement/disposal, wrong ABI/invalid
 correlation and external termination with two pending requests.
 
+The solo host also emits committed authority material as network effects. The
+Worker witness observes those bytes, validates their current schema, generation
+and unique revision against the actual kernel ledger, and requires a nonzero
+bounded count. It does not deliver them to a peer or acknowledge network delivery.
+
 This capability alone does not establish RTC co-op, IndexedDB persistence,
 reconnect, recovery after lost replies, a renderer, or production rollout.
 Those require their own connected implementations and platform evidence.
