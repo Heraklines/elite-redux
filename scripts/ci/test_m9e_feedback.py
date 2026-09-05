@@ -2403,6 +2403,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(self.feedback.plan()["packages"], ["er-canonical"])
 
     def test_ai_damage_query_lint_repairs_keep_full_execution_and_reverse_lint_scope(self):
+        self.configure_browser_worker_scope()
         self.configure_ai_damage_query_scope()
         policy = self.config["ai_damage_query_focus"]
         expected = ["rust/crates/er-state/src/" + path for path in (

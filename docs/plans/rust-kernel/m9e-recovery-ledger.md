@@ -2168,3 +2168,10 @@ scope and reject adjacent paths/policy drift; all154 prior test bodies remain.
 The full selected-package Clippy command,1,006-test execution scope,50 required
 targets, causal controls and every current platform witness remain mandatory.
 Remote formatting/lint/execution of this repair remains pending.
+## Lint mapping witness fixture repair
+
+7b17ba1b6a9ba0c2fa2d0129984f76e33b1fc0d0 / run33996047345 stopped in
+the156 harness selftests:155 passed, the new repair-scope test asserted Worker
+activation without creating its source fixture. Initialize the existing exact
+Worker source/lock fixture before the AI scope setup, retaining that assertion.
+Production mapping and all Rust repairs remain unchanged. No native execution.
