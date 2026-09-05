@@ -11,7 +11,10 @@ use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_state::m7_state::{DexState, ProfileStateV1, ProfileStatistics};
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
-use er_types::{ConnectionGeneration, GameButton, GameControlKindV2, SafeU53, SeatId, TimeClass, TimerId, TransportState};
+use er_types::{
+    ConnectionGeneration, GameButton, GameControlKindV2, SafeU53, SeatId, TimeClass, TimerId,
+    TransportState,
+};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -159,16 +162,28 @@ fn transport_fixture(suspended: bool) -> TestResult<GameKernelV7> {
             log: AuthorityLogConfig {
                 local_context: FrameContext {
                     session_id: SessionId::new("transport-pause-session")?,
-                    run_id: RunId::new("transport-pause-run")?, session_epoch: safe(1),
+                    run_id: RunId::new("transport-pause-run")?,
+                    session_epoch: safe(1),
                     seat_map_id: "transport-pause-map".to_owned(),
                     membership_revision: MembershipRevision::new(safe(1)),
-                    sender_seat_id: seat(), authority_seat_id: seat(),
+                    sender_seat_id: seat(),
+                    authority_seat_id: seat(),
                     connection_generation: generation,
                 },
-                peer_bindings: vec![PeerBinding { seat_id: SeatId::new(safe(2)), connection_generation: generation }],
-                owner_id: "transport-pause-authority".to_owned(), retain_capacity: safe(32),
-                delivery_backoff: BackoffPolicy { initial_ms: safe(1), maximum_ms: safe(64), factor_numerator: safe(2), factor_denominator: safe(1) },
-                delivery_time_class: TimeClass::Connected, max_delivery_attempts: Some(safe(8)),
+                peer_bindings: vec![PeerBinding {
+                    seat_id: SeatId::new(safe(2)),
+                    connection_generation: generation,
+                }],
+                owner_id: "transport-pause-authority".to_owned(),
+                retain_capacity: safe(32),
+                delivery_backoff: BackoffPolicy {
+                    initial_ms: safe(1),
+                    maximum_ms: safe(64),
+                    factor_numerator: safe(2),
+                    factor_denominator: safe(1),
+                },
+                delivery_time_class: TimeClass::Connected,
+                max_delivery_attempts: Some(safe(8)),
             },
             proposal_capacity: safe(64),
         },
@@ -183,7 +198,10 @@ fn transport_fixture(suspended: bool) -> TestResult<GameKernelV7> {
     snapshot.protocol = Some(protocol);
     // Controlled timer registrations test clock-class accounting below their
     // deadlines; this fixture does not invent dispatch for protocol timers.
-    let mut next_timer_id = snapshot.scheduler.next_timer_id.ok_or("timer allocator exhausted")?;
+    let mut next_timer_id = snapshot
+        .scheduler
+        .next_timer_id
+        .ok_or("timer allocator exhausted")?;
     for class in [TimeClass::Connected, TimeClass::Absolute] {
         let id = next_timer_id;
         next_timer_id = SafeU53::new(id.get().checked_add(1).ok_or("timer ID overflow")?)?;
@@ -200,7 +218,9 @@ fn transport_fixture(suspended: bool) -> TestResult<GameKernelV7> {
     snapshot.scheduler.next_timer_id = Some(next_timer_id);
     if suspended {
         snapshot.scheduler.pauses.push(TimeClassPauseSnapshotV2 {
-            endpoint: seat(), time_class: TimeClass::Connected, reasons: vec!["suspended".to_owned()],
+            endpoint: seat(),
+            time_class: TimeClass::Connected,
+            reasons: vec!["suspended".to_owned()],
         });
     }
     restore(snapshot)
@@ -217,9 +237,15 @@ fn assert_transport_time(kernel: &mut GameKernelV7, connected_paused: bool) -> T
     assert_eq!(kernel.advance_time(safe(100))?, GameKernelStepV7::default());
     assert_eq!(kernel.snapshot()?, expected);
     assert_eq!(selected(kernel), "battle/command/party");
-    assert_eq!(expected.scheduler.timers[0].registration.time_class, TimeClass::HumanInput);
+    assert_eq!(
+        expected.scheduler.timers[0].registration.time_class,
+        TimeClass::HumanInput
+    );
     assert_eq!(expected.scheduler.timers[0].remaining_active_ms, safe(50));
-    assert_eq!(expected.scheduler.timers[2].registration.time_class, TimeClass::Absolute);
+    assert_eq!(
+        expected.scheduler.timers[2].registration.time_class,
+        TimeClass::Absolute
+    );
     assert_eq!(expected.scheduler.timers[2].remaining_active_ms, safe(1900));
     Ok(())
 }
@@ -230,11 +256,16 @@ fn transport_resume_preserves_unrelated_pause_reasons_and_clock_classes() -> Tes
         let mut kernel = transport_fixture(suspended)?;
         let generation = ConnectionGeneration::new(safe(9));
         let mut expected = kernel.snapshot()?;
-        expected.protocol.as_mut().ok_or("protocol")?.connections[0].state = TransportState::Disconnected;
+        expected.protocol.as_mut().ok_or("protocol")?.connections[0].state =
+            TransportState::Disconnected;
         expected.scheduler.pauses = vec![TimeClassPauseSnapshotV2 {
-            endpoint: seat(), time_class: TimeClass::Connected,
-            reasons: if suspended { vec!["suspended".to_owned(), "transport-disconnected".to_owned()] }
-                else { vec!["transport-disconnected".to_owned()] },
+            endpoint: seat(),
+            time_class: TimeClass::Connected,
+            reasons: if suspended {
+                vec!["suspended".to_owned(), "transport-disconnected".to_owned()]
+            } else {
+                vec!["transport-disconnected".to_owned()]
+            },
         }];
         expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
         kernel.transport_changed(generation, false)?;
@@ -243,10 +274,17 @@ fn transport_resume_preserves_unrelated_pause_reasons_and_clock_classes() -> Tes
         expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
         kernel.transport_changed(generation, false)?;
         assert_eq!(kernel.snapshot()?, expected);
-        expected.protocol.as_mut().ok_or("protocol")?.connections[0].state = TransportState::Connected;
-        expected.scheduler.pauses = if suspended { vec![TimeClassPauseSnapshotV2 {
-            endpoint: seat(), time_class: TimeClass::Connected, reasons: vec!["suspended".to_owned()],
-        }] } else { Vec::new() };
+        expected.protocol.as_mut().ok_or("protocol")?.connections[0].state =
+            TransportState::Connected;
+        expected.scheduler.pauses = if suspended {
+            vec![TimeClassPauseSnapshotV2 {
+                endpoint: seat(),
+                time_class: TimeClass::Connected,
+                reasons: vec!["suspended".to_owned()],
+            }]
+        } else {
+            Vec::new()
+        };
         expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
         kernel.transport_changed(generation, true)?;
         assert_eq!(kernel.snapshot()?, expected);
@@ -264,22 +302,35 @@ fn staged_transport_generation_remains_paused_and_rejections_are_atomic() -> Tes
     let mut expected = kernel.snapshot()?;
     let protocol = expected.protocol.as_mut().ok_or("protocol")?;
     protocol.connections[0].state = TransportState::Connecting;
-    protocol.staged_rebinds.push(er_protocol::snapshot::StagedPeerRebindSnapshotV2 {
-        peer_seat: SeatId::new(safe(2)), generation: ConnectionGeneration::new(safe(10)),
-    });
+    protocol
+        .staged_rebinds
+        .push(er_protocol::snapshot::StagedPeerRebindSnapshotV2 {
+            peer_seat: SeatId::new(safe(2)),
+            generation: ConnectionGeneration::new(safe(10)),
+        });
     expected.scheduler.pauses.push(TimeClassPauseSnapshotV2 {
-        endpoint: seat(), time_class: TimeClass::Connected, reasons: vec!["transport-disconnected".to_owned()],
+        endpoint: seat(),
+        time_class: TimeClass::Connected,
+        reasons: vec!["transport-disconnected".to_owned()],
     });
     expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
     kernel.transport_changed(ConnectionGeneration::new(safe(10)), true)?;
     assert_eq!(kernel.snapshot()?, expected);
-    assert_eq!(expected.protocol.as_ref().ok_or("protocol")?.connections[0].generation, ConnectionGeneration::new(safe(9)));
+    assert_eq!(
+        expected.protocol.as_ref().ok_or("protocol")?.connections[0].generation,
+        ConnectionGeneration::new(safe(9))
+    );
     for generation in [8, 10, 11] {
-        assert_eq!(kernel.transport_changed(ConnectionGeneration::new(safe(generation)), true), Err(GameKernelV7Error::Invalid));
+        assert_eq!(
+            kernel.transport_changed(ConnectionGeneration::new(safe(generation)), true),
+            Err(GameKernelV7Error::Invalid)
+        );
         assert_eq!(kernel.snapshot()?, expected);
     }
     assert_transport_time(&mut kernel, true)?;
-    let mut resumed = restore(serde_json::from_slice(&serde_json::to_vec(&kernel.snapshot()?)?)?)?;
+    let mut resumed = restore(serde_json::from_slice(&serde_json::to_vec(
+        &kernel.snapshot()?,
+    )?)?)?;
     let step = kernel.advance_time(safe(50))?;
     assert_eq!(cursor_effects(&step), ["battle/command/fight"]);
     assert_eq!(step.internal_events, [GameInternalEventKindV2::TimerFired]);
@@ -290,7 +341,10 @@ fn staged_transport_generation_remains_paused_and_rejections_are_atomic() -> Tes
     let mut exhausted_kernel = restore(exhausted.clone())?;
     // Overflow occurs after protocol/pause preparation, so direct-kernel staging
     // must preserve all state, not just the sequence counter, on this late error.
-    assert_eq!(exhausted_kernel.transport_changed(ConnectionGeneration::new(safe(10)), true), Err(GameKernelV7Error::Invalid));
+    assert_eq!(
+        exhausted_kernel.transport_changed(ConnectionGeneration::new(safe(10)), true),
+        Err(GameKernelV7Error::Invalid)
+    );
     assert_eq!(exhausted_kernel.snapshot()?, exhausted);
     Ok(())
 }

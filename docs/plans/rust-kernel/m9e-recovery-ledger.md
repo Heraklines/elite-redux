@@ -1931,3 +1931,14 @@ B's four target pairs, exact executable bindings and platform/CLI bridge survive
 Timer and replica mutation controls are required; the ledger control remains
 retention-only. Source paths, timeouts and evidence byte limits are unchanged.
 Source review is not execution evidence; remote qualification is pending.
+
+Causal candidate7c8c82ccc080a206ee07f1acbf3a7bff3f1e5b30/run33981572011 passed
+133 harness checks and stopped at formatting, before compilation or gameplay.
+The complete remote9667-byte formatter patch touches only game_kernel_v7.rs and
+m9e_timers_v7.rs; SHA2563386fc7afe7955e8cb9ff8d721fb3cfa574ef9ffc266573f35b53f9ac23d7379.
+It was reviewed and applied as source text; no local formatter ran. The inspected
+compact artifact is9781 compressed bytes. After transient GitHub download/TLS
+failures, the existing bounded range reader retrieved only summary.json15086bytes
+and format.patch9667bytes (4736/2150 compressed member bytes plus ZIP metadata).
+Full diagnostics stayed remote. Semantics, all test IDs, limits and qualified
+baseline930 are unchanged; the formatted successor requires exact remote proof.

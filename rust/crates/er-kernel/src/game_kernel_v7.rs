@@ -903,14 +903,18 @@ impl GameKernelV7 {
         // A new generation is only staged above; Connecting cannot resume
         // connected-time work. Remove only the pause reason owned by this API.
         let effective_connected = connection.state == TransportState::Connected;
-        let mut scheduler = self.scheduler.clone().into_scheduler()
+        let mut scheduler = self
+            .scheduler
+            .clone()
+            .into_scheduler()
             .map_err(|_| GameKernelV7Error::Invalid)?;
         let reason = "transport-disconnected";
         let _ = if effective_connected {
             scheduler.resume_class(self.local_seat, TimeClass::Connected, reason)
         } else {
             scheduler.pause_class(self.local_seat, TimeClass::Connected, reason)
-        }.map_err(|_| GameKernelV7Error::Invalid)?;
+        }
+        .map_err(|_| GameKernelV7Error::Invalid)?;
         self.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)
             .map_err(|_| GameKernelV7Error::Invalid)?;
         protocol
