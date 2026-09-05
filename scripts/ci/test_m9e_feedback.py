@@ -714,7 +714,7 @@ class FeedbackTests(unittest.TestCase):
                 names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary] = crate
                 self.binary_targets[binary] = target
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
@@ -857,7 +857,7 @@ class FeedbackTests(unittest.TestCase):
                 names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary] = crate
                 self.binary_targets[binary] = target
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
@@ -1052,7 +1052,7 @@ class FeedbackTests(unittest.TestCase):
                 names = policy["required_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
-                self.binary_ids[binary] = exact.get(f"{crate}:{target}", ["behavior"])
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{crate}:{target}", ["behavior"])
                 self.binary_crates[binary] = crate
                 self.binary_targets[binary] = target
         self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]

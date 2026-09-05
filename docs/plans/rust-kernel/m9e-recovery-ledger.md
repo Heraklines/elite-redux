@@ -2251,3 +2251,14 @@ baseline remain unchanged. Three new CI selftests cover exact paired scope,
 mandatory inventory/partition and full execution;165 authored tests await remote
 validation. New native ID counts will come from real discovery, never the prior
 1,006 count. No local formatter, compiler, test or other runtime workload ran.
+
+## Companion harness lookup correction
+
+704d35ec89c9877e9b9bc597b3fd5ddf0f2a2a94 / run33998896069 stopped in the
+165 harness tests:162 passed, three errored in2.512 seconds. The final helper edit
+inadvertently replaced existing cache/validation/native-capture policy lookups with
+an undefined local variable. Restore those three exact original expressions;
+retain the new AI helper's conditional exact-ID lookup and all its assertions.
+The bounded compact was1358 bytes and failure excerpt12,125 bytes. No Rust format,
+compile or native execution occurred. Product repairs, coverage and baseline stay
+unchanged. The earlier source preservation claim applies after these restorations.
