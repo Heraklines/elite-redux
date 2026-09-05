@@ -13,8 +13,8 @@ use er_game::m9e_internal_event_v2::{
     GameInternalEventV2,
 };
 use er_game::m9e_material_v6::{
-    AppliedGameMaterialLedgerV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GamePlatformEffectV2,
-    GamePresentationEffectV2,
+    AppliedGameMaterialLedgerV1, AppliedMaterialRetentionV1, GameMaterialApplyOutcomeV6,
+    GameMaterialV6, GamePlatformEffectV2, GamePresentationEffectV2, MAX_APPLIED_MATERIAL_RECORDS_V1,
 };
 use er_game::m9e_new_run_v6::{construct_natural_run_v6, expand_cooperative_topology_v6};
 use er_game::m9e_runtime_v6::{
@@ -62,6 +62,12 @@ use crate::snapshot_v7::{
 pub(crate) const NAVIGATION_REPEAT_INTERVAL_MS_V7: SafeU53 = match SafeU53::new(250) {
     Ok(value) => value,
     Err(_) => SafeU53::ZERO,
+};
+
+// Current V7 owns this policy across construction and restore. Historical
+// GameRuntimeV6 callers retain their default hard-stop behavior and wire schema.
+const MATERIAL_RETENTION_V7: AppliedMaterialRetentionV1 = AppliedMaterialRetentionV1::BoundedSuffix {
+    maximum_records: MAX_APPLIED_MATERIAL_RECORDS_V1,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -236,7 +242,7 @@ impl GameKernelV7 {
         protocol: Option<ProtocolRuntimeSnapshotV2>,
     ) -> Result<Self, GameKernelV7Error> {
         let next_menu_instance_id = next_menu_from_state(&state)?;
-        let runtime = GameRuntimeV6::new(Some(state), content.clone(), next_authority_revision)
+        let runtime = GameRuntimeV6::new_with_retention(Some(state), content.clone(), next_authority_revision, MATERIAL_RETENTION_V7)
             .map_err(runtime_error)?;
         let authority_ai =
             (role == GameKernelRoleV7::Authority).then(|| AuthorityAiV2::new(content.ai.clone()));
@@ -284,12 +290,13 @@ impl GameKernelV7 {
                 GameKernelLifecycleV7::Bootstrap(bootstrap)
             }
             GameKernelLifecycleSnapshotV7::Active(state) => GameKernelLifecycleV7::Active(
-                GameRuntimeV6::from_snapshot(
+                GameRuntimeV6::from_snapshot_with_retention(
                     GameRuntimeSnapshotV6 {
                         state: Some(state),
                         material_ledger: material_ledger.clone(),
                     },
                     content.clone(),
+                    MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?,
             ),
@@ -298,12 +305,13 @@ impl GameKernelV7 {
                 control: _,
                 terminal,
             } => GameKernelLifecycleV7::Terminal {
-                runtime: GameRuntimeV6::from_snapshot(
+                runtime: GameRuntimeV6::from_snapshot_with_retention(
                     GameRuntimeSnapshotV6 {
                         state: Some(state),
                         material_ledger: material_ledger.clone(),
                     },
                     content.clone(),
+                    MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?,
                 terminal,
@@ -1032,7 +1040,7 @@ impl GameKernelV7 {
                     .unwrap_or(SafeU53::ZERO);
                 let next_revision = current_revision.max(increment_safe(control_revision)?);
                 let runtime =
-                    GameRuntimeV6::new(Some(save.state), self.content.clone(), next_revision)
+                    GameRuntimeV6::new_with_retention(Some(save.state), self.content.clone(), next_revision, MATERIAL_RETENTION_V7)
                         .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.private_battle_control = None;
@@ -1272,7 +1280,7 @@ impl GameKernelV7 {
             .ok_or(GameKernelV7Error::Invalid)?
             .control = command_control;
         let mut runtime =
-            GameRuntimeV6::new(None, self.content.clone(), safe_one()).map_err(runtime_error)?;
+            GameRuntimeV6::new_with_retention(None, self.content.clone(), safe_one(), MATERIAL_RETENTION_V7).map_err(runtime_error)?;
         let context = GameActionDispatchContextV1 {
             action: GameActionContextV1 {
                 operation_id: OperationId::new("bootstrap/new-run/1")
@@ -1862,12 +1870,13 @@ impl GameKernelV7 {
                 .control = owner.canonical_control.clone();
         }
         let runtime_snapshot = self.active_runtime()?.snapshot();
-        let mut staged = GameRuntimeV6::from_snapshot(
+        let mut staged = GameRuntimeV6::from_snapshot_with_retention(
             GameRuntimeSnapshotV6 {
                 state: Some(canonical_state),
                 material_ledger: runtime_snapshot.material_ledger,
             },
             self.content.clone(),
+            MATERIAL_RETENTION_V7,
         )
         .map_err(runtime_error)?;
         let context = GameActionDispatchContextV1 {

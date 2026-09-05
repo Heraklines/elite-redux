@@ -1378,3 +1378,75 @@ the inspected11,991 compressed-byte nativeA summary; duplicateB11,992 and18,370-
 diagnostics stayremote. Complete22,849-byte newvalidator-test formatterpatch had
 zeroomissions and verified SHA25673f64a121e37f6cb1b0f323685bf4fdb69cd243443750a3ccdad03aed7f40aa4;
 applied exactly that remote patch. Baseline remains qualified1b/run33961778505.
+
+Validator3aa4a0cd4488d82ef739cd9a204a45374e3eb98d/run33963418110 passed both
+native lanes: A69/69, B18/18, total87, zero failures/skips. New two actual validator
+process tests passed first in24,615ms, followed by current CLIreload583,994ms.
+Required formatting,118 harness and all-target Clippy passed. A11:28:25-11:50:05UTC;
+B11:28:25-11:46:07; platform started11:50:07 and remains required.
+CLIacacd84ec83cc323ac91a9cc2c7309096f0bdf222d73cfd42e374d692b69e397
+(86,042,440bytes), worker53516b5cc003b9bf3c6952339d0e1a9d34dc16136693777da70c3e0221e723a9
+(73,928,432bytes), exactA/B matches. Amanifest
+2b9f153f5a65bec292dfab42a1478b5a81dce7c0daef0671b86943750898288e;
+Bmanifest2665673332c3bc7b55a75ebf86ac855542aa5a4d620840311cfb90f7455012cf.
+Only inspected A2,814/B2,515 compressed-byte summaries downloaded. Diagnostics
+49,578/41,917, proofs5,444/5,086 and86,042,566-byte CLI archive stayremote.
+B CLIbatch385,065ms, CLIcaps241,988ms, host236,756ms; A supervisor232,941ms,
+worker98,652ms, corebatch51,796ms, entry24,788ms, corecaps10,888ms, parity9,684ms.
+Reload approached the unchanged600-second target bound; this successful run is
+not a speedup claim or a reason to raise limits. Platform/aggregate remainpending;
+baseline stays fullyqualified1b/run33961778505.
+
+FULL FOCUSED QUALIFICATION PASSED for3aa4a0cd4488d82ef739cd9a204a45374e3eb98d
+run33963418110:87native(A69+B18),2Wasm,2Chromium,1typed-effect check, zero
+failures/skips;118 harness and requiredformat/lint passed. Platform11:50:07-11:59:50UTC;
+aggregate11:59:53-12:00:21; overall31m56. Exact CLI bridge used the new
+acacd84ec83cc323ac91a9cc2c7309096f0bdf222d73cfd42e374d692b69e397 executable,
+retaining16attempts at1417->1433 and fullsnapshot
+blake3-v1:3ebd6118c4d9500bbbde971eb9100eb199cd0496c94ec367200b7a24ddeb8690;
+omitted appliedtime rejected at1428. Native/Wasm heldtimer digest remains
+8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+Aggregatecf98852ade2a62d187b3ae92d6dcfa029d42ec7e27d4dbd60779997aae5d7875;
+platform6137959e70dc2bab4217082e02d8ee961954703d28b716f6bb4c4e6330afc8d7;
+normalizedinventory7447366c567a2e4698b210baa1ecb0c45deb79dc42d2baf5423aa71bdadba8b1;
+normalizedplana5bdddc82824b1b7d6121ddf00f66bbc687695af241c3a7374849d904488f63d;
+selectedIDsba55ba39389a83d62677e49daf982156c912c68e0f03e20076d1014811d5e82b.
+Harnesse7900e6be1896d590c55f1ac3d17569bd765e48f1cac925059f7ac43dc097f24;
+selftestse2512ce71f3d071010f6d733c2036e7b88f99023b5522ed9a891423064956eb0;
+configc0d00bc30695c2a084fb6ec0bdab730ff40e4f31e7ced3abb4a24c289c18599c.
+Content/lock/phasehelper/workflow/oracle identities unchanged from1b. Browserasset
+manifest64e6e7ebb3668e509f1636bb595d8045734df51a1ede8db0af4abf734d8e5372;
+Wasm540982dece5a6791fc189095706ccf7ea4b0e670835788226e509af94f486d51
+(16,249,560bytes), contentJSON640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4.
+Only inspected platform2,070/aggregate2,647 compressed-byte summaries downloaded.
+Browserassets4,527,519, platformdiagnostics14,809, proof4,671 andaggregateevidence
+2,608 compressedbytes remainremote. Browserbuild313,541ms, Wasm72,335ms,
+Chromium74,909ms, typed816ms; no controlled performance claim. This remains
+in-page Wasm-host/byte-relay evidence, not shipping Worker/WebRTC/renderer or
+wholeM9 qualification. Advance focused baseline only to exact3aa/run33963418110.
+
+### Next isolated cut: current material suffix retention
+
+Integrated the separately reviewed three material/runtime/kernel source changes
+and five new regression tests. Their preserved base blobs exactly matched actual
+source at3aa: materialffe2d846513d2a65ad2bcd15558f14330f2ffddc,
+runtime63212628d9d89bbee4915d5c4b34702325c25c83,
+kernelbea79cbb9689308e09b47f4c6ca05c5f58f905dd.
+V7 explicitly selects a contiguous4096 suffix at all six construction/restore
+sites; historicalV6 defaults keep their hardstop and wire schema. Whole candidate
+validation and checked frontier advance precede retirement/publication. Retained
+exact retries are no-ops, conflicts reject, old admitted materials below the
+floor are StaleUnverifiable. No lifetime operation-string uniqueness claim.
+Three helper tests include12289 realSave/Delete dispatches+replicaapplications,
+three full4096 windows with explicitrestore, independently expected fullstate,
+small-window conflict/rollback and revision exhaustion. Two V7 tests include4098
+actual materials, pendingpresentation restore/settlement, latecollision rollback,
+retainedduplicates/staleoldbytes and oldgapped evidence rejection. These controlled
+fixtures do not prove natural authority rollover, proposal retirement, lostreply
+recovery, reconnect, externalstorage, throughput or allocation improvements.
+The standalone122-test/33-required-target retention gate preserves currentcache/
+validator checks and both realtimer/replica mutants. New exact helper/kernel
+retention targets receive early execution priority before the existing timer
+sequence; all discovery/lint/membership/phase/platform/artifact requirements stay.
+Remote formatting/compilation/execution remain required; no local workloads ran.
+The separate native-capture product and combined126 gate are still unintegrated.

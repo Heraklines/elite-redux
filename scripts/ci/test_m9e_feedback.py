@@ -1791,6 +1791,176 @@ class FeedbackTests(unittest.TestCase):
             self.package(package)
         self.package("er-reverse", '[dependencies]\ner-kernel = { path = "../er-kernel" }\n')
 
+    def configure_material_retention_scope(self):
+        self.configure_timer_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["material_retention_focus"]
+        self.config["material_retention_focus"] = policy
+        complete = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for scope in ("browser_cache_focus", "current_validation_focus"):
+            self.config[scope] = complete[scope]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-game")
+        self.package("er-reverse", '[dependencies]\ner-game = { path = "../er-game" }\n')
+
+    def test_material_retention_requires_full_game_cone_and_exact_new_witnesses(self):
+        self.configure_material_retention_scope()
+        self.changed = self.config["material_retention_focus"]["paths"]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["material_retention_focus"])
+        self.assertTrue(selection["timer_focus"])
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        for flag in ("requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable",
+                     "requires_cli_clippy", "requires_agent_protocol_clippy"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertIsNone(selection["worker_lock_guard"])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertNotIn("er-reverse", selection["execution_scope"])
+        self.assertEqual(selection["execution_scope"]["er-game"], ["*"])
+        for crate, targets in self.config["timer_focus"]["execute"].items():
+            self.assertEqual(selection["execution_scope"][crate], targets)
+        for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+            self.assertEqual(selection["required_native_test_ids"][identity], ids)
+        self.assertEqual(set(selection["required_native_targets"]["er-game"]), {
+            "m3_command_menus", "m3_internal_event_boundary", "m3_local_battle", "m3_party_menus", "m3_runtime",
+            "m9e_content_v2", "m9e_material_v6", "m9e_new_run_v6", "m9e_runtime_v6", "m9e_material_retention"})
+        self.assertEqual(set(selection["required_native_test_ids"]["er-game:m9e_material_retention"]), {
+            "bounded_material_suffix_crosses_three_full_4096_windows_through_dispatch_and_apply",
+            "small_suffix_retained_conflicts_late_invalid_and_stale_material_preserve_full_frontier",
+            "retention_policy_restore_and_revision_exhaustion_reject_without_retirement"})
+        self.assertEqual(set(selection["required_native_test_ids"]["er-kernel:m9e_material_retention_v7"]), {
+            "v7_material_rollover_restores_pending_effects_and_continues_exact_snapshots",
+            "v7_restore_rejects_historical_gapped_evidence_and_continues_a_valid_suffix"})
+
+        for identity, ids in self.config["current_validation_focus"]["exact_test_ids"].items():
+            self.assertEqual(selection["required_native_test_ids"][identity], ids)
+        prefix = "host_v2::transaction_tests::"
+        self.assertEqual(set(selection["required_native_test_ids"]["er-web:er_web"]), {prefix + name for name in (
+            "late_response_limit_rejection_preserves_state_cache_and_retry",
+            "read_only_response_limit_failure_preserves_capture",
+            "sequence_exhaustion_preflight_preserves_current_session_and_cached_response",
+            "retained_response_byte_boundary_evicts_by_acceptance_and_preserves_retry",
+            "single_response_cache_boundary_rejects_before_commit_and_disposal_clears_payloads")})
+        self.assertEqual(set(selection["required_native_test_ids"]["er-cli:m9e_current_validation"]), {
+            "ordinary_validate_save_accepts_v2_and_rejects_legacy_or_wrong_content",
+            "ordinary_capsule_validation_replays_current_and_rejects_tampered_or_legacy_input"})
+
+    def test_material_retention_rejects_mixed_changes_and_preserves_readiness(self):
+        self.configure_material_retention_scope()
+        paths = self.config["material_retention_focus"]["paths"]
+        for extra in ("rust/crates/er-game/src/lib.rs", "rust/crates/er-game/Cargo.toml", "rust/Cargo.lock",
+                      "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-web/src/host_v2.rs", "rust/crates/er-cli/src/current_commands.rs",
+                      "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "unmapped.json"):
+            with self.subTest(extra=extra):
+                self.changed = paths + [extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+        self.changed = ["rust/crates/er-kernel/src/game_kernel_v7.rs"]
+        ordinary = self.feedback.plan()
+        self.assertFalse(ordinary["material_retention_focus"])
+        self.assertTrue(ordinary["timer_focus"])
+        self.assertEqual(ordinary["execution_scope"], self.config["timer_focus"]["execute"])
+        self.changed = ["docs/plans/rust-kernel/m9e-retention-next.md", "scripts/ci/m9e_feedback.py"]
+        readiness = self.feedback.plan()
+        self.assertFalse(readiness["material_retention_focus"])
+        self.assertEqual(readiness["packages"], self.config["readiness_packages"])
+        self.assertIsNone(readiness["execution_scope"])
+        for flag in ("requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable"):
+            self.assertFalse(readiness[flag])
+
+    def test_material_retention_missing_retention_witness_or_consumer_cannot_qualify(self):
+        self.configure_material_retention_scope()
+        self.changed = ["rust/crates/er-game/tests/m9e_material_retention.rs"]
+        selection = self.feedback.plan()
+        required = selection["required_native_test_ids"]
+        inventory = [(identity.split(":")[0], identity.split(":")[1], ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, inventory)
+        for identity in required:
+            for omit_target in (True, False):
+                with self.subTest(identity=identity, omit_target=omit_target):
+                    reduced = [(crate, target, ids[:-1] if f"{crate}:{target}" == identity else ids)
+                               for crate, target, ids in inventory if not omit_target or f"{crate}:{target}" != identity]
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(required, reduced)
+        targets = selection["required_native_targets"]
+        rows = [(crate, target, ["witness"]) for crate, names in targets.items() for target in names]
+        self.feedback.required_native_target_counts(targets, rows)
+        for index in range(len(rows)):
+            with self.assertRaisesRegex(RuntimeError, "required native witness"):
+                self.feedback.required_native_target_counts(targets, rows[:index] + rows[index + 1:])
+
+    def test_material_retention_execution_keeps_full_inventory_lint_mutants_and_platforms(self):
+        self.configure_material_retention_scope()
+        self.changed = self.config["material_retention_focus"]["paths"]
+        policy = self.config["material_retention_focus"]
+        self.binary_ids = {}
+        for package, names in policy["execute"].items():
+            if names == ["*"]:
+                names = policy["required_targets"].get(package, [package.replace("-", "_")])
+            for name in names:
+                binary = name if name not in self.binary_ids else package + "--" + name
+                self.binary_ids[binary] = policy["exact_test_ids"].get(f"{package}:{name}", ["behavior"])
+                self.binary_crates[binary] = package
+                self.binary_targets[binary] = name
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.binary_ids["m9e_parity"] = ["native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, patch.object(self.feedback, "timer_behavioral_mutant") as mutant, patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        mutant.assert_called_once()
+        replica.assert_called_once()
+        self.assertEqual(summary["native_timer_parity_digest"], "d" * 64)
+        parity_execution = next(command for command in self.commands if Path(command[0]).name == "m9e_parity" and "--list" not in command)
+        self.assertIn("--nocapture", parity_execution)
+        self.assertEqual(len(summary["required_native_target_counts"]), 33)
+        self.assertEqual(summary["required_native_target_counts"]["er-repro:m9e_current_repro"], 9)
+        self.assertEqual(summary["required_native_target_counts"]["er-game:m9e_material_retention"], 3)
+        self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_material_retention_v7"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:er_web"], 5)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_validation"], 2)
+        for lint in ("er-game-clippy", "er-kernel-clippy", "er-batch-clippy", "er-repro-clippy", "er-env-clippy",
+                     "cli-clippy", "agent-protocol-clippy", "worker-clippy", "endpoint-clippy", "browser-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_repro"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-batch:m9e_current_batch"], 6)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_batch"], 2)
+        self.assertEqual(summary["required_native_target_counts"]["er-agent-protocol:er_agent_protocol"], 3)
+        first = [("er-kernel", target) for target in (
+            "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
+        first[:0] = [("er-game", "m9e_material_retention"), ("er-kernel", "m9e_material_retention_v7")]
+        first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
+        self.assertEqual([(self.binary_crates[name], self.binary_targets.get(name, name)) for name in self.executed[:10]], first)
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        first_execution = self.events.index("execute:" + self.executed[0])
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, first_execution)
+        expected_count = sum(len(ids) for ids in self.binary_ids.values())
+        self.assertEqual(summary["tests"], {"selected": expected_count, "executed": expected_count,
+                                           "passed": expected_count, "failed": 0, "skipped": 0})
+        self.assertIn("current_kernel_endpoint_v2", self.executed)
+        self.assertIn("current_kernel_endpoint_faults_v2", self.executed)
+        for name, phase, env in self.binary_envs:
+            with self.subTest(name=name, phase=phase):
+                if (self.binary_crates[name], self.binary_targets.get(name, name)) in self.feedback.WORKER_BOUND_TARGETS:
+                    self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+                else:
+                    self.assertIsNone(env)
+
+        self.binary_ids["m9e_material_retention"] = self.binary_ids["m9e_material_retention"][:-1]
+        self.executed.clear()
+        self.events.clear()
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertIn("required native test identities", summary["first_failure"])
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+
     def test_timer_scope_requires_shared_regressions_and_all_platforms(self):
         self.configure_timer_scope()
         self.changed = self.config["timer_focus"]["paths"] + ["docs/plans/rust-kernel/m9e-progress.md"]
@@ -2005,6 +2175,18 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(validation, [enumerated[15], enumerated[1], *enumerated[:1], *enumerated[2:15]])
         self.assertEqual(sorted(item[0] for item in validation), list(range(len(enumerated))))
         self.assertEqual(enumerated, original)
+        retention_items = [
+            (200, "wrong-material", "m9e_material_retention", ["decoy"], self.rust / "crates/er-other", set(), None),
+            (201, "wrong-kernel", "m9e_material_retention_v7", ["decoy"], self.rust / "crates/er-game", set(), None),
+            *enumerated,
+            (202, "material", "m9e_material_retention", ["material"], self.rust / "crates/er-game", set(), None),
+            (203, "kernel", "m9e_material_retention_v7", ["kernel"], self.rust / "crates/er-kernel", set(), None)]
+        retention_original = list(retention_items)
+        retention = self.feedback.native_execution_order({"timer_focus": True, "material_retention_focus": True}, retention_items)
+        self.assertEqual(retention, [retention_items[-2], retention_items[-1], *ordered[:8],
+                                     retention_items[0], retention_items[1], *ordered[8:]])
+        self.assertEqual(retention_items, retention_original)
+        self.assertEqual(sorted(item[0] for item in retention), sorted(item[0] for item in retention_items))
         self.assertEqual(self.feedback.native_execution_order({}, enumerated), enumerated)
 
     def invoke_synthetic_timer_mutant(self, mode, mutant="timer", expected_failure_phase=None):

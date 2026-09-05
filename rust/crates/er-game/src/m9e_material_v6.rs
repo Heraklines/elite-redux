@@ -27,6 +27,26 @@ pub const MAX_GAME_PLATFORM_EFFECTS_V6: usize = 256;
 pub const MAX_PLATFORM_PAYLOAD_BYTES_V6: usize = 8 * 1024 * 1024;
 pub const MAX_APPLIED_MATERIAL_RECORDS_V1: usize = 4_096;
 
+/// Adapter-selected evidence retention. Snapshot wire data does not select policy.
+/// The bounded mode retains a revision-contiguous suffix, not lifetime operation IDs.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AppliedMaterialRetentionV1 {
+    #[default]
+    HistoricalHardStop,
+    BoundedSuffix { maximum_records: usize },
+}
+
+impl AppliedMaterialRetentionV1 {
+    pub fn validate(self) -> Result<(), GameMaterialV6Error> {
+        if let Self::BoundedSuffix { maximum_records } = self
+            && !(1..=MAX_APPLIED_MATERIAL_RECORDS_V1).contains(&maximum_records)
+        {
+            return Err(GameMaterialV6Error::Ledger);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GameActionDomainV2 {
@@ -201,6 +221,8 @@ pub enum GameMaterialV6Error {
     Revision,
     #[error("material V6 duplicates an operation with different bytes")]
     ConflictingDuplicate,
+    #[error("material revision predates retained evidence and cannot be verified")]
+    StaleUnverifiable,
     #[error("material V6 applied-material ledger is full or invalid")]
     Ledger,
 }
@@ -327,6 +349,27 @@ impl AppliedGameMaterialLedgerV1 {
             .iter()
             .find(|record| &record.operation_id == operation_id)
     }
+
+    /// Opt-in snapshots must describe a contiguous suffix ending at the frontier.
+    /// Empty evidence fences every revision below next_authority_revision.
+    pub fn validate_with_retention(
+        &self,
+        retention: AppliedMaterialRetentionV1,
+    ) -> Result<(), GameMaterialV6Error> {
+        retention.validate()?;
+        self.validate()?;
+        if let AppliedMaterialRetentionV1::BoundedSuffix { maximum_records } = retention
+            && (self.records.len() > maximum_records
+                || self.records.first().is_some_and(|record| record.authority_revision == SafeU53::ZERO)
+                || self.records.windows(2).any(|pair| {
+                    pair[0].authority_revision.get().checked_add(1)
+                        != Some(pair[1].authority_revision.get())
+                }))
+        {
+            return Err(GameMaterialV6Error::Ledger);
+        }
+        Ok(())
+    }
 }
 
 pub fn apply_game_material_v6(
@@ -335,9 +378,27 @@ pub fn apply_game_material_v6(
     content: &PreparedGameContentV2,
     bytes: &[u8],
 ) -> Result<GameMaterialApplyOutcomeV6, GameMaterialV6Error> {
-    ledger.validate()?;
+    apply_game_material_v6_with_retention(
+        live, ledger, content, bytes, AppliedMaterialRetentionV1::HistoricalHardStop,
+    )
+}
+
+pub fn apply_game_material_v6_with_retention(
+    live: &mut Option<GameStateV6>,
+    ledger: &mut AppliedGameMaterialLedgerV1,
+    content: &PreparedGameContentV2,
+    bytes: &[u8],
+    retention: AppliedMaterialRetentionV1,
+) -> Result<GameMaterialApplyOutcomeV6, GameMaterialV6Error> {
+    ledger.validate_with_retention(retention)?;
     let material = GameMaterialV6::decode(bytes)?;
     let transition = material.transition();
+    if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
+        let floor = ledger.records.first().map_or(ledger.next_authority_revision, |record| record.authority_revision);
+        if transition.authority_revision < floor {
+            return Err(GameMaterialV6Error::StaleUnverifiable);
+        }
+    }
     let fingerprint = material_fingerprint(bytes)?;
     if let Some(record) = ledger.record(&transition.operation_id) {
         return if record.material_fingerprint == fingerprint
@@ -349,7 +410,9 @@ pub fn apply_game_material_v6(
             Err(GameMaterialV6Error::ConflictingDuplicate)
         };
     }
-    if ledger.records.len() == MAX_APPLIED_MATERIAL_RECORDS_V1 {
+    if retention == AppliedMaterialRetentionV1::HistoricalHardStop
+        && ledger.records.len() == MAX_APPLIED_MATERIAL_RECORDS_V1
+    {
         return Err(GameMaterialV6Error::Ledger);
     }
     if transition.authority_revision != ledger.next_authority_revision {
@@ -377,10 +440,20 @@ pub fn apply_game_material_v6(
         authority_revision: transition.authority_revision,
         after_digest: transition.after_digest.clone(),
     };
-    *live = Some(transition.after_state.clone());
-    ledger.records.push(record);
-    ledger.next_authority_revision = next_revision(transition.authority_revision)?;
-    ledger.validate()?;
+    // Complete all fallible checks before retiring evidence or publishing state.
+    let next = next_revision(transition.authority_revision)?;
+    let mut candidate_ledger = ledger.clone();
+    if let AppliedMaterialRetentionV1::BoundedSuffix { maximum_records } = retention
+        && candidate_ledger.records.len() == maximum_records
+    {
+        candidate_ledger.records.remove(0);
+    }
+    candidate_ledger.records.push(record);
+    candidate_ledger.next_authority_revision = next;
+    candidate_ledger.validate_with_retention(retention)?;
+    let candidate = transition.after_state.clone();
+    *live = Some(candidate);
+    *ledger = candidate_ledger;
     Ok(GameMaterialApplyOutcomeV6::Applied)
 }
 

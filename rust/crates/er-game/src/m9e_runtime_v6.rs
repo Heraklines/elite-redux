@@ -42,10 +42,10 @@ use crate::m9e_content_v2::{
     PreparedGameContentV2, PresentationCueFamilyV1, PresentationSemanticIdV1,
 };
 use crate::m9e_material_v6::{
-    AppliedGameMaterialLedgerV1, GameActionDomainV2, GameIdentityDomainV1,
+    AppliedGameMaterialLedgerV1, AppliedMaterialRetentionV1, GameActionDomainV2, GameIdentityDomainV1,
     GameMaterialApplyOutcomeV6, GameMaterialV6, GameMutationEvidenceV2, GameMutationKindV2,
     GamePlatformEffectV2, GamePresentationEffectV2, GameTransitionMaterialV6,
-    apply_game_material_v6, empty_game_state_digest, game_state_digest,
+    apply_game_material_v6_with_retention, empty_game_state_digest, game_state_digest,
 };
 use crate::m9e_new_run_v6::advance_to_next_encounter_v6;
 
@@ -115,6 +115,7 @@ pub struct GameRuntimeV6 {
     state: Option<GameStateV6>,
     content: Arc<PreparedGameContentV2>,
     material_ledger: AppliedGameMaterialLedgerV1,
+    material_retention: AppliedMaterialRetentionV1,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -149,6 +150,16 @@ impl GameRuntimeV6 {
         content: Arc<PreparedGameContentV2>,
         next_authority_revision: SafeU53,
     ) -> Result<Self, GameRuntimeV6Error> {
+        Self::new_with_retention(state, content, next_authority_revision, AppliedMaterialRetentionV1::HistoricalHardStop)
+    }
+
+    pub fn new_with_retention(
+        state: Option<GameStateV6>,
+        content: Arc<PreparedGameContentV2>,
+        next_authority_revision: SafeU53,
+        material_retention: AppliedMaterialRetentionV1,
+    ) -> Result<Self, GameRuntimeV6Error> {
+        material_retention.validate().map_err(material_error)?;
         if let Some(state) = &state {
             state
                 .validate_with(content.as_ref())
@@ -161,6 +172,7 @@ impl GameRuntimeV6 {
             state,
             content,
             material_ledger,
+            material_retention,
         })
     }
 
@@ -168,9 +180,18 @@ impl GameRuntimeV6 {
         snapshot: GameRuntimeSnapshotV6,
         content: Arc<PreparedGameContentV2>,
     ) -> Result<Self, GameRuntimeV6Error> {
+        Self::from_snapshot_with_retention(snapshot, content, AppliedMaterialRetentionV1::HistoricalHardStop)
+    }
+
+    /// Policy is supplied explicitly by the restoring adapter, never by wire data.
+    pub fn from_snapshot_with_retention(
+        snapshot: GameRuntimeSnapshotV6,
+        content: Arc<PreparedGameContentV2>,
+        material_retention: AppliedMaterialRetentionV1,
+    ) -> Result<Self, GameRuntimeV6Error> {
         snapshot
             .material_ledger
-            .validate()
+            .validate_with_retention(material_retention)
             .map_err(material_error)?;
         if let Some(state) = &snapshot.state {
             state
@@ -182,6 +203,7 @@ impl GameRuntimeV6 {
             state: snapshot.state,
             content,
             material_ledger: snapshot.material_ledger,
+            material_retention,
         })
     }
 
@@ -206,6 +228,10 @@ impl GameRuntimeV6 {
 
     pub fn next_authority_revision(&self) -> SafeU53 {
         self.material_ledger.next_authority_revision
+    }
+
+    pub fn material_retention(&self) -> AppliedMaterialRetentionV1 {
+        self.material_retention
     }
 
     pub fn install_control(
@@ -323,25 +349,31 @@ impl GameRuntimeV6 {
         action: GameActionV1,
         context: GameActionDispatchContextV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
-        let prepared = GameActionDispatcherV1::prepare(
+        let prepared = GameActionDispatcherV1::prepare_with_retention(
             self.state.as_ref(),
             self.content.as_ref(),
             &self.material_ledger,
             action,
             context,
+            self.material_retention,
         )?;
-        let outcome = apply_game_material_v6(
-            &mut self.state,
-            &mut self.material_ledger,
+        let mut candidate_state = self.state.clone();
+        let mut candidate_ledger = self.material_ledger.clone();
+        let outcome = apply_game_material_v6_with_retention(
+            &mut candidate_state,
+            &mut candidate_ledger,
             self.content.as_ref(),
             &prepared.material_bytes,
+            self.material_retention,
         )
         .map_err(material_error)?;
         if outcome != GameMaterialApplyOutcomeV6::Applied
-            || self.state.as_ref() != Some(&prepared.candidate)
+            || candidate_state.as_ref() != Some(&prepared.candidate)
         {
             return Err(GameRuntimeV6Error::CandidateMismatch);
         }
+        self.state = candidate_state;
+        self.material_ledger = candidate_ledger;
         Ok(prepared)
     }
 
@@ -349,11 +381,12 @@ impl GameRuntimeV6 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameMaterialApplyOutcomeV6, GameRuntimeV6Error> {
-        apply_game_material_v6(
+        apply_game_material_v6_with_retention(
             &mut self.state,
             &mut self.material_ledger,
             self.content.as_ref(),
             bytes,
+            self.material_retention,
         )
         .map_err(material_error)
     }
@@ -367,6 +400,20 @@ impl GameActionDispatcherV1 {
         action: GameActionV1,
         context: GameActionDispatchContextV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
+        Self::prepare_with_retention(before, content, ledger, action, context, AppliedMaterialRetentionV1::HistoricalHardStop)
+    }
+
+    pub fn prepare_with_retention(
+        before: Option<&GameStateV6>,
+        content: &PreparedGameContentV2,
+        ledger: &AppliedGameMaterialLedgerV1,
+        action: GameActionV1,
+        context: GameActionDispatchContextV1,
+        retention: AppliedMaterialRetentionV1,
+    ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
+        if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
+            ledger.validate_with_retention(retention).map_err(material_error)?;
+        }
         action.validate().map_err(|_| GameRuntimeV6Error::Action)?;
         if !context.authority
             || context.action.operation_id.as_str().is_empty()
@@ -456,11 +503,12 @@ impl GameActionDispatcherV1 {
         let material_bytes = material.canonical_bytes().map_err(material_error)?;
         let mut proof_state = before.cloned();
         let mut proof_ledger = ledger.clone();
-        let outcome = apply_game_material_v6(
+        let outcome = apply_game_material_v6_with_retention(
             &mut proof_state,
             &mut proof_ledger,
             content,
             &material_bytes,
+            retention,
         )
         .map_err(material_error)?;
         if outcome != GameMaterialApplyOutcomeV6::Applied
