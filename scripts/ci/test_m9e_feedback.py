@@ -1846,13 +1846,39 @@ class FeedbackTests(unittest.TestCase):
             "ordinary_validate_save_accepts_v2_and_rejects_legacy_or_wrong_content",
             "ordinary_capsule_validation_replays_current_and_rejects_tampered_or_legacy_input"})
 
+        lint_paths = {
+            "rust/crates/er-game/src/m6/coop_campaign.rs",
+            "rust/crates/er-game/src/m6/runtime_v4.rs",
+            "rust/crates/er-game/src/m6/solo_campaign.rs",
+            "rust/crates/er-game/src/m7_internal_event.rs",
+            "rust/crates/er-game/src/m7_material.rs",
+            "rust/crates/er-game/src/m7_run_executor.rs",
+            "rust/crates/er-game/src/m7_runtime.rs",
+            "rust/crates/er-game/src/m9e_internal_event_v2.rs"}
+        original_paths = {
+            "rust/crates/er-game/src/m9e_material_v6.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs",
+            "rust/crates/er-game/tests/m9e_material_retention.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs",
+            "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs"}
+        policy = self.config["material_retention_focus"]
+        self.assertEqual(set(policy["paths"]), original_paths | lint_paths)
+        self.assertEqual(set(policy["trigger_paths"]), original_paths - {"rust/crates/er-kernel/src/game_kernel_v7.rs"})
+        for lint_path in lint_paths:
+            with self.subTest(lint_path=lint_path):
+                self.changed = ["rust/crates/er-game/src/m9e_material_v6.rs", lint_path]
+                repair = self.feedback.plan()
+                self.assertTrue(repair["material_retention_focus"])
+                for key in ("execution_scope", "required_native_test_ids", "required_native_targets", "timer_mutant", "replica_mutant"):
+                    self.assertEqual(repair[key], selection[key])
+
     def test_material_retention_rejects_mixed_changes_and_preserves_readiness(self):
         self.configure_material_retention_scope()
         paths = self.config["material_retention_focus"]["paths"]
         for extra in ("rust/crates/er-game/src/lib.rs", "rust/crates/er-game/Cargo.toml", "rust/Cargo.lock",
                       "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-env/src/current.rs",
                       "rust/crates/er-web/src/host_v2.rs", "rust/crates/er-cli/src/current_commands.rs",
-                      "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "unmapped.json"):
+                      "test/browser/rust-browser/m9e-v7-corrective.spec.ts", "unmapped.json",
+                      "rust/crates/er-game/src/m6/unmapped.rs", "rust/crates/er-game/src/m7_internal_event_extra.rs",
+                      "rust/crates/er-game/src/m9e_internal_event.rs"):
             with self.subTest(extra=extra):
                 self.changed = paths + [extra]
                 with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):

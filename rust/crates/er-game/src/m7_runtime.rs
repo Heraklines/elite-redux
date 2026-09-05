@@ -383,10 +383,10 @@ impl GameRuntimeV5 {
         let material = GameMaterialV5::decode_canonical(bytes)
             .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;
         let operation_id = material.operation_id().clone();
-        if let Some(previous) = self.applied_materials.get(&operation_id) {
-            if previous != bytes {
-                return Err(GameRuntimeV5Error::OperationCollision);
-            }
+        if let Some(previous) = self.applied_materials.get(&operation_id)
+            && previous != bytes
+        {
+            return Err(GameRuntimeV5Error::OperationCollision);
         }
         let result = apply_game_material_v5(&mut self.state, &self.content, bytes)
             .map_err(|error| GameRuntimeV5Error::Material(error.to_string()))?;

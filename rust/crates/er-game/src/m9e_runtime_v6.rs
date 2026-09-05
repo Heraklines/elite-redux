@@ -57,6 +57,10 @@ pub enum InventoryUseEffectV1 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Preserve the public by-value bootstrap input; changing its ownership is a separate API change"
+)]
 pub enum GameDomainExecutionInputV1 {
     None,
     BootstrapCandidate(GameStateV6),

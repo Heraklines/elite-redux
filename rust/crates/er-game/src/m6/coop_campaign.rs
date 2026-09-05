@@ -284,10 +284,10 @@ pub fn verify_authority_receipt_order(
             // Exact redelivery of a known commit: idempotent by contract.
             continue;
         }
-        if let Some(highest) = highest_revision {
-            if entry.revision <= highest {
-                return Err(CoopCampaignError::RevisionOrderNotIncreasing);
-            }
+        if let Some(highest) = highest_revision
+            && entry.revision <= highest
+        {
+            return Err(CoopCampaignError::RevisionOrderNotIncreasing);
         }
         highest_revision = Some(entry.revision);
         seen_operations.insert(entry.operation_id.clone());

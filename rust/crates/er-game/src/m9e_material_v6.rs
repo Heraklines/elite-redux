@@ -501,7 +501,8 @@ fn variant_matches_transition(
 }
 
 fn action_matches_domain(action: Option<&GameActionV1>, domain: GameActionDomainV2) -> bool {
-    match (action, domain) {
+    matches!(
+        (action, domain),
         (Some(GameActionV1::Bootstrap { .. }), GameActionDomainV2::NewRun)
         | (Some(GameActionV1::ExecuteRunProgram { .. }), GameActionDomainV2::RunProgram)
         | (Some(GameActionV1::Battle { .. }), GameActionDomainV2::BattleTurn)
@@ -517,9 +518,8 @@ fn action_matches_domain(action: Option<&GameActionV1>, domain: GameActionDomain
         | (Some(GameActionV1::World { .. }), GameActionDomainV2::World)
         | (Some(GameActionV1::Scenario { .. }), GameActionDomainV2::Scenario)
         | (Some(GameActionV1::Save { .. }), GameActionDomainV2::SaveControl)
-        | (Some(GameActionV1::Terminal { .. }), GameActionDomainV2::Terminal) => true,
-        _ => false,
-    }
+        | (Some(GameActionV1::Terminal { .. }), GameActionDomainV2::Terminal)
+    )
 }
 
 fn invalid_mutations(mutations: &[GameMutationEvidenceV2]) -> bool {

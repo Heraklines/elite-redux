@@ -33,6 +33,10 @@ pub enum StorageResultV2 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Preserve the public by-value transition payload; changing its ownership is a separate API change"
+)]
 pub enum GameInternalEventV2 {
     ControlSelected {
         action: GameActionV1,
@@ -355,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn AI_budget_failure_retains_replayable_evidence() {
+    fn ai_budget_failure_retains_replayable_evidence() {
         let event = || GameInternalEventV2::AiCommandRequested {
             actor: PokemonId::new(safe(1)),
         };

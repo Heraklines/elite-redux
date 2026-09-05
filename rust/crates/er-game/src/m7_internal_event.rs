@@ -39,21 +39,11 @@ pub enum GameInternalEventQueueErrorV1 {
     NotQuiescent,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct GameInternalEventQueueV1 {
     pending: VecDeque<GameInternalEventV1>,
     processed: usize,
     processed_kinds: Vec<GameInternalEventKindV1>,
-}
-
-impl Default for GameInternalEventQueueV1 {
-    fn default() -> Self {
-        Self {
-            pending: VecDeque::new(),
-            processed: 0,
-            processed_kinds: Vec::new(),
-        }
-    }
 }
 
 impl GameInternalEventV1 {

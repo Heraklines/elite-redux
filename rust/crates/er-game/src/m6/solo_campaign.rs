@@ -78,6 +78,10 @@ pub struct SoloContentTable {
 
 impl SoloContentTable {
     /// Validates the closed content index table, failing closed.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Preserve the historical by-value SoloCampaignError teardown diagnostic"
+    )]
     pub fn validate(&self) -> Result<(), SoloCampaignError> {
         if self.content_identity.is_empty() {
             return Err(SoloCampaignError::Content(
@@ -111,6 +115,10 @@ pub struct SoloCampaignConfig {
 
 impl SoloCampaignConfig {
     /// Constructs a validated configuration with generous default budgets.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Preserve the historical by-value SoloCampaignError teardown diagnostic"
+    )]
     pub fn new(seed: impl Into<String>, battles: u32) -> Result<Self, SoloCampaignError> {
         let config = Self {
             schema_version: SOLO_CAMPAIGN_SCHEMA_VERSION,
@@ -124,6 +132,10 @@ impl SoloCampaignConfig {
     }
 
     /// Validates every budget and identity field.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Preserve the historical by-value SoloCampaignError teardown diagnostic"
+    )]
     pub fn validate(&self) -> Result<(), SoloCampaignError> {
         if self.schema_version != SOLO_CAMPAIGN_SCHEMA_VERSION {
             return Err(SoloCampaignError::Config(format!(
@@ -207,6 +219,10 @@ pub struct SoloCampaignPlan {
 impl SoloCampaignPlan {
     /// Canonical blake3 digest binding the plan (and thereby the content
     /// identity) into every trace.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Preserve the historical by-value SoloCampaignError teardown diagnostic"
+    )]
     pub fn digest(&self) -> Result<String, SoloCampaignError> {
         Ok(format!("blake3-v1:{}", content_digest(self)?))
     }
@@ -217,6 +233,10 @@ impl SoloCampaignPlan {
 /// Draw order is fixed: party size, favored side, then per-combatant species,
 /// move, and level draws.  Planning is pure, so identical configurations
 /// produce identical plans.
+#[expect(
+    clippy::result_large_err,
+    reason = "Preserve the historical by-value SoloCampaignError teardown diagnostic"
+)]
 pub fn plan_solo_campaign(
     config: &SoloCampaignConfig,
     table: &SoloContentTable,
@@ -226,7 +246,7 @@ pub fn plan_solo_campaign(
     let mut rng = PhaserRdg::from_seeds(&[config.seed.as_str(), "m6-solo-campaign-plan"]);
     let mut battles = Vec::with_capacity(usize::try_from(config.battles).unwrap_or(0));
     for battle_index in 0..config.battles {
-        let party_size = usize::try_from(rng.pick_index(PARTY_SIZE_CARDINALITY)?).unwrap_or(0) + 1;
+        let party_size = rng.pick_index(PARTY_SIZE_CARDINALITY)? + 1;
         let player_favored = rng.pick_index(2)? == 0;
         let mut player_party = Vec::with_capacity(party_size);
         for ordinal in 0..party_size {
@@ -259,6 +279,10 @@ pub fn plan_solo_campaign(
     })
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn combatant_plan(
     rng: &mut PhaserRdg,
     table: &SoloContentTable,
@@ -504,6 +528,10 @@ pub fn first_trace_divergence(
 }
 
 #[derive(Debug, Error)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Preserve the public by-value LiveResourceSnapshot in the historical TeardownLeak variant"
+)]
 pub enum SoloCampaignError {
     #[error("invalid solo campaign configuration: {0}")]
     Config(String),
@@ -558,6 +586,10 @@ impl BattleCounters {
 
 /// Runs the complete campaign against `host`, enforcing budgets, terminal
 /// outcomes, and zero-resource teardown after every battle.
+#[expect(
+    clippy::result_large_err,
+    reason = "Preserve the historical by-value SoloCampaignError teardown diagnostic"
+)]
 pub fn run_solo_campaign<H: SoloCampaignHost>(
     host: &mut H,
     config: &SoloCampaignConfig,
@@ -596,6 +628,10 @@ pub fn run_solo_campaign<H: SoloCampaignHost>(
     })
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn run_single_battle<H: SoloCampaignHost>(
     host: &mut H,
     config: &SoloCampaignConfig,
@@ -795,6 +831,10 @@ fn run_single_battle<H: SoloCampaignHost>(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn press_command_root<H: SoloCampaignHost>(
     host: &mut H,
     config: &SoloCampaignConfig,
@@ -823,6 +863,10 @@ fn press_command_root<H: SoloCampaignHost>(
     )
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn first_option(
     observation: &SoloObservation,
     battle_index: u32,
@@ -837,6 +881,10 @@ fn first_option(
         })
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn select_and_confirm<H: SoloCampaignHost>(
     host: &mut H,
     trace: &mut Vec<SoloTraceEntry>,
@@ -886,6 +934,10 @@ fn select_and_confirm<H: SoloCampaignHost>(
 }
 
 /// Delivers one physical press (down followed by up), recording both events.
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn press_key<H: SoloCampaignHost>(
     host: &mut H,
     trace: &mut Vec<SoloTraceEntry>,
@@ -922,6 +974,10 @@ fn press_key<H: SoloCampaignHost>(
     Ok(())
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn drain_presentations<H: SoloCampaignHost>(
     host: &mut H,
     trace: &mut Vec<SoloTraceEntry>,
@@ -953,6 +1009,10 @@ fn drain_presentations<H: SoloCampaignHost>(
     Ok(())
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Propagate the historical by-value SoloCampaignError without changing its payload"
+)]
 fn verify_turn_horizon(
     battle_index: u32,
     plan: &SoloBattlePlan,

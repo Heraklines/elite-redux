@@ -1459,3 +1459,35 @@ repair artifact instead. Complete47,016-byte format-repair.patch verified SHA256
 33481d5e15c4ede77537fb297cc7cd361344e5a1e7432995918b6abbeb22d647
 and applied to all five touchedRustfiles. DuplicateB/full30,033-byte diagnostics
 remainremote. Baseline remains qualified3aa/run33963418110; no productqualification.
+
+Retention formatter commit9ad64c5ea812e98e8e0f44ef197e34fb69e1a8c4,
+run33965432507, passed122 harness checks, formatting and full reverse compilation.
+Discovery selected662 tests;0 executed because new early er-game all-target Clippy
+reported27 warnings in existing m6/m7/current source. Earlier CLI no-deps lint did
+not lint this dependency. CLI/protocol/repro/env lint passed; kernel/batch lint,
+product tests, both mutants and platform were not reached. Build137,983ms.
+Inspected/downloaded only nativeA summary5,471 compressed bytes. The88,551-byte
+A diagnostic ZIP stayed remote: explicit HTTP byte ranges fetched its8,192-byte
+central-directory tail,30-byte member header and3,322-byte compressed member.
+Only the needed21,856-byte er-game-clippy.log was inflated locally as bounded text;
+no build/test/formatter ran locally. Duplicate B5,454-byte summary and88,505-byte
+B diagnostics stayed remote. No Desktop tokens were read or credentials logged.
+
+Bounded lint repair preserves public Rust payload/constructor shapes and behavior.
+Copy fields replace redundant clones; derived empty/zero queue Default, let-chain
+conditions, saturating arithmetic and matches! preserve the reported expressions.
+Fourteen exact historical SoloCampaign result functions and its diagnostic enum
+have item-scoped expected large-error/variant lints with reasons; two current
+public by-value input/event enums likewise retain their ownership shape. The
+historical8-argument material constructor has one item-scoped expected lint.
+These are explicit API-layout decisions, not allocation/performance improvements.
+The existing AI_budget_failure_retains_replayable_evidence unit is renamed to
+ai_budget_failure_retains_replayable_evidence; its assertions/body are unchanged,
+and full er-game:* inventory still discovers it. No obsolete-name waiver is added.
+The strict retention allowlist adds only the eight compiler-reported game paths,
+for13 product paths total. Existing122 selftests now independently pin those exact
+paths and reject adjacent unmapped names. All33 required targets, five exact
+retention IDs, full reverse compilation, all-target lint, both real mutants and
+mandatory platform checks remain required. Qualified baseline stays3aa/run33963418110.
+This repair is awaiting remote formatting/lint/test evidence; retention remains
+unqualified and proposal/reconnect/native-capture work remains outstanding.

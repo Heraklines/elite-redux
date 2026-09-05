@@ -286,6 +286,10 @@ pub enum GameMaterialV5 {
 }
 
 impl GameActionMaterialV1 {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Preserve the historical V5 material constructor's public argument shape"
+    )]
     pub fn new(
         context: GameActionContextV1,
         content: &PreparedGameContentV1,

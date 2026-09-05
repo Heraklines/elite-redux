@@ -332,7 +332,7 @@ fn project_pokemon(pokemon: &PokemonStateV2) -> PokemonState {
         max_hp: pokemon.max_hp,
         status: pokemon.status,
         stat_stages: pokemon.stat_stages,
-        moves: pokemon.moves.clone(),
+        moves: pokemon.moves,
         abilities: pokemon.abilities,
         fainted: pokemon.fainted,
     }
@@ -389,7 +389,7 @@ fn merge_pokemon(target: &mut PokemonStateV2, source: &PokemonState) -> Result<(
     target.max_hp = source.max_hp;
     target.status = source.status;
     target.stat_stages = source.stat_stages;
-    target.moves = source.moves.clone();
+    target.moves = source.moves;
     target.abilities = source.abilities;
     target.fainted = source.fainted;
     target

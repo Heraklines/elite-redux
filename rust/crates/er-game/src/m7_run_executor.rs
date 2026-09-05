@@ -378,7 +378,7 @@ fn dispatch_operation<C: RunExecutionContentV1>(
                     .iter()
                     .map(|entry| entry.slot.get().get())
                     .max()
-                    .map_or(0, |value| value.checked_add(1).unwrap_or(u64::MAX));
+                    .map_or(0, |value| value.saturating_add(1));
                 let slot = StorageSlotId::new(
                     SafeU53::new(next_slot).map_err(|_| RunExecutionError::Overflow)?,
                 );

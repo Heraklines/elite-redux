@@ -254,7 +254,15 @@
     "rust/crates/er-game/src/m9e_runtime_v6.rs",
     "rust/crates/er-game/tests/m9e_material_retention.rs",
     "rust/crates/er-kernel/src/game_kernel_v7.rs",
-    "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs"
+    "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs",
+    "rust/crates/er-game/src/m6/coop_campaign.rs",
+    "rust/crates/er-game/src/m6/runtime_v4.rs",
+    "rust/crates/er-game/src/m6/solo_campaign.rs",
+    "rust/crates/er-game/src/m7_internal_event.rs",
+    "rust/crates/er-game/src/m7_material.rs",
+    "rust/crates/er-game/src/m7_run_executor.rs",
+    "rust/crates/er-game/src/m7_runtime.rs",
+    "rust/crates/er-game/src/m9e_internal_event_v2.rs"
   ],
   "execute": {
     "er-batch": [
@@ -487,7 +495,7 @@
       "ordinary_capsule_validation_replays_current_and_rejects_tampered_or_legacy_input"
     ]
   },
-  "reason": "Isolated five-path material suffix retention cut. Compile the full er-game reverse cone, execute all game targets including nine existing historical/material/runtime witnesses and all current timer-scope consumers. Require exact three new game and two new V7 IDs, both existing kernel mutants, early game/kernel/current Clippy and all native/Wasm/Chromium/typed/CLI bridge evidence. Unique material source/new test paths trigger the scope; mixed other product or dependency changes fail closed. Existing limits and phase partition remain unchanged."
+  "reason": "Material suffix retention plus eight exact compiler-reported er-game lint-repair paths. Compile the full er-game reverse cone, execute all game targets including nine existing historical/material/runtime witnesses and all current timer-scope consumers. Require exact three new game and two new V7 IDs, both existing kernel mutants, early game/kernel/current Clippy and all native/Wasm/Chromium/typed/CLI bridge evidence. Unique material source/new test paths trigger the scope; mixed other product or dependency changes fail closed. Existing limits and phase partition remain unchanged."
 },
   "menu_validation_focus": {
     "trigger_paths": ["rust/crates/er-types/src/m7_menu.rs", "rust/crates/er-types/tests/m9e_menu_validation.rs"],
