@@ -172,18 +172,33 @@ impl CoreGameKernelSnapshotV7 {
                     self.material_ledger.next_authority_revision,
                 )
                 .map_err(|_| SnapshotV7Error::Invalid)?;
-                let canonical_control = self.private_battle_control.as_ref()
+                let canonical_control = self
+                    .private_battle_control
+                    .as_ref()
                     .map(|owner| &owner.canonical_control)
-                    .or_else(|| state.active_run.as_ref()
-                        .filter(|run| run.control.kind == GameControlKindV2::BattleCommand)
-                        .map(|run| &run.control));
+                    .or_else(|| {
+                        state
+                            .active_run
+                            .as_ref()
+                            .filter(|run| run.control.kind == GameControlKindV2::BattleCommand)
+                            .map(|run| &run.control)
+                    });
                 if let Some(control) = canonical_control
-                    && let Some(record) = self.material_ledger.records.iter().max_by_key(|record| record.authority_revision)
+                    && let Some(record) = self
+                        .material_ledger
+                        .records
+                        .iter()
+                        .max_by_key(|record| record.authority_revision)
                 {
                     let mut canonical_state = state.clone();
-                    canonical_state.active_run.as_mut().ok_or(SnapshotV7Error::Invalid)?.control = control.clone();
+                    canonical_state
+                        .active_run
+                        .as_mut()
+                        .ok_or(SnapshotV7Error::Invalid)?
+                        .control = control.clone();
                     if er_game::m9e_material_v6::game_state_digest(&canonical_state)
-                        .map_err(|_| SnapshotV7Error::Invalid)? != record.after_digest
+                        .map_err(|_| SnapshotV7Error::Invalid)?
+                        != record.after_digest
                     {
                         return Err(SnapshotV7Error::Invalid);
                     }

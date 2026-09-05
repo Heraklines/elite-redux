@@ -1161,3 +1161,10 @@ The live submission supersedes that saved candidate after the baseline changes.
 Cache, current validator and cost-probe proposals remain isolated/unqualified;
 long-session retention, lost-response/reconnect, actual browser topology,
 full source fidelity, native capture and remaining lab/developer-plane work remain.
+Private candidate936c9b954aafde3969849879b5772652f7f7f2a8/run33956480191
+passed109 harness preflight tests and stopped at formatting before selecting or
+executing product tests. Downloaded only inspected native-A compact10,857 bytes;
+redundant B evidence and both16,251-byte diagnostics remain remote. Its complete
+24,194-byte four-file formatting patch had zero omissions and verified SHA
+eff01661a78a009928dbce185e377ab14b0cb763a2a33f81cee5a4595cd4721e.
+Applied that remote-generated patch; baseline remains fully qualified9a3e8db3.
