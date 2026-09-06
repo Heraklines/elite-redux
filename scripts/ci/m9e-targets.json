@@ -42,8 +42,18 @@
       "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic"
     ]
   },
-  "baseline": "791ae5b53333eaaf8edd8e91dcdba1de006e106d",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34011232052",
+  "current_read_rebind_focus": {
+    "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs", "rust/crates/er-web/tests/m9e_host_v2.rs"],
+    "exact_test_ids": [
+      "read_rebind_preserves_saved_semantics_and_executes_write_after_restore",
+      "read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root",
+      "read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion",
+      "read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior",
+      "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work"
+    ]
+  },
+  "baseline": "46496094719a2f739cdc76df6d2a9779fb28bc04",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34034142653",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],

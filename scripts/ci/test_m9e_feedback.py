@@ -4889,6 +4889,136 @@ class FeedbackTests(unittest.TestCase):
                 self.assertIn("browser-worker-results" if name == "browser-worker-journey" else "browser-results",
                               env["PLAYWRIGHT_JSON_OUTPUT_FILE"])
 
+    def configure_read_rebind_scope(self):
+        self.configure_owner_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["current_read_rebind_focus"]
+        self.config["current_read_rebind_focus"] = policy
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(policy["paths"])
+
+    def test_read_rebind_scope_keeps_original_kernel_ids_owner_and_all_platforms(self):
+        self.configure_read_rebind_scope()
+        before = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        for flag in ("current_read_rebind_focus", "requires_read_rebind", "requires_current_proposal", "timer_focus",
+                     "requires_browser_rtc", "requires_browser_worker", "requires_browser", "requires_wasm",
+                     "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[flag], flag)
+        target = "er-kernel:m9e_game_kernel_v7"
+        inherited = self.config["timer_focus"]["exact_test_ids"][target]
+        self.assertEqual(selection["required_native_test_ids"][target], inherited + self.feedback.READ_REBIND_IDS)
+        self.assertEqual(len(inherited), 7)
+        self.assertEqual(len(selection["required_native_test_ids"][target]), 12)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+        for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+            if identity != target:
+                self.assertEqual(selection["required_native_test_ids"][identity], ids)
+
+    def test_read_rebind_installed_witnesses_survive_later_scopes_without_duplication(self):
+        self.configure_read_rebind_scope()
+        target = "er-kernel:m9e_game_kernel_v7"
+        for paths in (["rust/crates/er-kernel/tests/m9e_timers_v7.rs"],
+                      self.config["current_proposal_focus"]["paths"]):
+            with self.subTest(paths=paths):
+                self.changed = list(paths)
+                selection = self.feedback.plan()
+                self.assertFalse(selection["current_read_rebind_focus"])
+                self.assertTrue(selection["requires_read_rebind"])
+                self.assertEqual(len(selection["required_native_test_ids"][target]), 12)
+                for name in self.feedback.READ_REBIND_IDS:
+                    self.assertEqual(selection["required_native_test_ids"][target].count(name), 1)
+        self.configure_ai_snapshot_validation_scope()
+        selection = self.feedback.plan()
+        self.assertTrue(selection["ai_snapshot_validation_focus"])
+        self.assertTrue(selection["requires_read_rebind"])
+        self.assertEqual(selection["required_native_test_ids"]["er-ai:er_ai"], self.feedback.AI_SNAPSHOT_VALIDATION_IDS)
+        self.assertEqual(len(selection["required_native_test_ids"][target]), 12)
+        self.changed = ["docs/plans/rust-kernel/m9e-note.md"]
+        self.assertFalse(self.feedback.plan()["requires_read_rebind"])
+
+    def test_read_rebind_policy_and_mixed_product_changes_fail_closed(self):
+        self.configure_read_rebind_scope()
+        original = copy.deepcopy(self.config["current_read_rebind_focus"])
+        for mutation in ("path", "id", "extra", "type"):
+            with self.subTest(mutation=mutation):
+                policy = copy.deepcopy(original)
+                if mutation == "path":
+                    policy["paths"].append("rust/crates/er-kernel/src/snapshot.rs")
+                elif mutation == "id":
+                    policy["exact_test_ids"].pop()
+                elif mutation == "extra":
+                    policy["skip"] = True
+                else:
+                    policy = True
+                self.config["current_read_rebind_focus"] = policy
+                (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+                with self.assertRaisesRegex(RuntimeError, "READ rebind policy"):
+                    self.feedback.plan()
+        self.config["current_read_rebind_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for extra in ("rust/Cargo.lock", "rust/crates/er-ai/src/authority_v2.rs", "rust/crates/er-kernel/src/snapshot.rs",
+                      "src/rust-browser/routes/rust-current-rtc-entry.ts"):
+            with self.subTest(extra=extra):
+                self.changed = [*original["paths"], extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+
+    def test_read_rebind_rejects_omitted_renamed_or_duplicate_added_kernel_witness(self):
+        self.configure_read_rebind_scope()
+        selection = self.feedback.plan()
+        exact = selection["required_native_test_ids"]
+        rows = [(*identity.split(":"), ids) for identity, ids in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        index = next(index for index, row in enumerate(rows) if row[:2] == ("er-kernel", "m9e_game_kernel_v7"))
+        crate, target, ids = rows[index]
+        for name in self.feedback.READ_REBIND_IDS:
+            for replacement in ([item for item in ids if item != name],
+                                [item if item != name else item + "_renamed" for item in ids], [*ids, name]):
+                with self.subTest(name=name, replacement=replacement):
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+
+    def test_read_rebind_execution_requires_all_twelve_kernel_witnesses_before_lint(self):
+        self.configure_read_rebind_scope()
+        selection = self.feedback.plan()
+        self.binary_ids = {}
+        for crate, names in selection["execution_scope"].items():
+            if "*" in names:
+                names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for name in names:
+                binary = name if name not in self.binary_ids else crate + "--" + name
+                self.binary_ids[binary] = list(selection["required_native_test_ids"].get(f"{crate}:{name}", ["behavior"]))
+                self.binary_crates[binary], self.binary_targets[binary] = crate, name
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary)
+        if (self.full / "full-summary.json").is_file():
+            summary = json.loads((self.full / "full-summary.json").read_text())
+        self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_game_kernel_v7"], 12)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:m9e_host_v2"], 14)
+        self.assertEqual(len(summary["required_native_target_counts"]), 23)
+        lint = [command for command in self.commands if command[:2] == ["cargo", "clippy"]]
+        self.assertEqual(len(lint), 1)
+        self.assertEqual([lint[0][index + 1] for index, part in enumerate(lint[0]) if part == "-p"], selection["packages"])
+        self.assertLess(self.events.index("clippy"), self.events.index("execute:" + self.executed[0]))
+        for control in (wasm, browser, timer, replica):
+            control.assert_called_once()
+        self.binary_ids["m9e_game_kernel_v7"].pop()
+        self.executed.clear()
+        self.events.clear()
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+        self.assertIn("required native test identities", summary["first_failure"])
+
     def configure_owner_scope(self):
         self.configure_browser_rtc_scope()
         import m9e_current_proposal as owner
