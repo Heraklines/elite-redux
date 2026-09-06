@@ -2692,7 +2692,7 @@ class FeedbackTests(unittest.TestCase):
             for target in targets:
                 self.assertIn([crate, target], assignments["a"])
                 self.assertNotIn([crate, target], assignments["b"])
-        self.assertEqual(len(assignments["a"]) + len(assignments["b"]), 77)
+        self.assertEqual(sum(len(targets) for targets in assignments.values()), 77)
 
     def test_ai_damage_query_lint_companions_execute_with_full_clippy_and_platform(self):
         self.configure_ai_damage_query_scope()
@@ -6238,7 +6238,7 @@ class FeedbackTests(unittest.TestCase):
     def control_query_mock_inventory(self, selection):
         self.binary_ids = {}
         for crate, names in selection["execution_scope"].items():
-            if names == ["*"]:
+            if "*" in names:
                 names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
@@ -6321,7 +6321,7 @@ class FeedbackTests(unittest.TestCase):
         inventory = [{"crate": "er-cli", "target": "m9e_current_control_query",
                       "ids": list(phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []}]
         phases.validate_control_query_inventory(selection, inventory)
-        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": []})
+        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": []})
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded", "duplicate", "missing_target"):
             bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
             if mode == "missing_flag":
@@ -6699,6 +6699,131 @@ class FeedbackTests(unittest.TestCase):
                 with self.subTest(mode=mode), self.assertRaises(RuntimeError):
                     phases.validate_state_query_inventory(bad_plan, rows)
 
+    def configure_cost_scope(self):
+        self.configure_state_query_scope()
+        self.configure_title_retirement_scope()
+        import m9e_current_cost as cost
+        import m9e_phases as phases
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for key in ("current_ai_max_pp_focus", "current_cost_probe_focus"):
+            self.config[key] = policy[key]
+        for name in (cost.SOURCE, phases.CONTROL_QUERY_PATHS[1], *phases.STATE_QUERY_PATHS[2:]):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("installed exact witness\n")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = [cost.SOURCE]
+        binding = {"source_sha": CANDIDATE, "source_hashes": {cost.SOURCE: "f" * 64},
+                   "cargo_manifests": {"count": 35, "sha256": "e" * 64}}
+        mocked = patch.object(cost, "build_source_binding", return_value=binding)
+        mocked.start()
+        self.addCleanup(mocked.stop)
+        return cost, phases, binding
+
+    def test_cost_scope_adds_one_release_witness_and_preserves_installed_current_obligations(self):
+        cost, phases, binding = self.configure_cost_scope()
+        previous = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        for key in ("current_cost_probe_focus", "requires_current_cost_probe", "timer_focus", "requires_current_state_query",
+                    "requires_current_control_query", "requires_ai_max_pp", "requires_title_storage", "requires_title_retirement",
+                    "requires_read_rebind", "requires_current_proposal", "requires_worker_storage", "requires_current_storage",
+                    "requires_browser_rtc", "requires_browser_worker", "requires_wasm", "requires_browser",
+                    "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[key], key)
+        self.assertEqual(selection["current_cost_source_binding"], binding)
+        self.assertEqual(selection["required_native_targets"][cost.TARGET[0]].count(cost.TARGET[1]), 1)
+        self.assertEqual(selection["required_native_test_ids"][":".join(cost.TARGET)], [cost.TEST_ID])
+        self.assertEqual(selection["timer_mutant"], previous["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], previous["timer_focus"]["replica_mutant"])
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 14)
+        for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
+            self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
+        self.assertEqual(self.config, previous)
+        self.assertEqual(self.executed, [])
+
+    def test_cost_scope_rejects_mixed_products_missing_source_and_mutated_policy(self):
+        cost, _, _ = self.configure_cost_scope()
+        for path in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock",
+                     "rust/crates/er-repro/tests/neighbor.rs", "rust/crates/er-cli/src/current_agent.rs",
+                     "src/rust-browser/routes/rust-current-storage-entry.ts"):
+            self.changed = [cost.SOURCE, path]
+            with self.subTest(path=path), self.assertRaises(RuntimeError):
+                self.feedback.plan()
+        self.changed = [cost.SOURCE]
+        original = copy.deepcopy(self.config)
+        for policy in (None, {"paths": [cost.SOURCE], "test_ids": []},
+                       {"paths": [cost.SOURCE, "neighbor"], "test_ids": [cost.TEST_ID]}):
+            self.config = copy.deepcopy(original)
+            self.config["current_cost_probe_focus"] = policy
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaises(RuntimeError):
+                self.feedback.plan()
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(original))
+        (self.root / cost.SOURCE).unlink()
+        with self.assertRaises(RuntimeError):
+            self.feedback.plan()
+
+    def test_cost_installed_requirement_follows_selected_target_without_expanding_readiness(self):
+        cost, phases, _ = self.configure_cost_scope()
+        self.changed = phases.CONTROL_QUERY_PATHS
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_cost_probe_focus"])
+        self.assertTrue(selection["requires_current_cost_probe"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["requires_current_cost_probe"])
+        self.assertIsNone(selection["current_cost_source_binding"])
+        self.assertNotIn(cost.TARGET[1], selection["required_native_targets"].get(cost.TARGET[0], []))
+
+    def test_cost_native_orchestration_overrides_only_A_once_after_discovery_and_lint(self):
+        cost, phases, binding = self.configure_cost_scope()
+        import sys
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        captured = {}
+        def release(repository, temporary, diagnostics, **kwargs):
+            self.assertEqual(self.executed, [], "release target must execute first")
+            self.assertEqual(kwargs["source_binding"], binding)
+            self.assertEqual(kwargs["discovered_ids"], [cost.TEST_ID])
+            self.assertIn("clippy", self.events)
+            output = diagnostics / "current-cost-execute.log"
+            output.write_text(self.result_line(passed=1))
+            return output, {"fixture": "release evidence, validator tested independently"}
+        def export(feedback, summary):
+            captured.update(copy.deepcopy(summary))
+        with patch.dict(os.environ, {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "a"}), \
+                patch.dict(sys.modules, {self.feedback.__name__: self.feedback}), \
+                patch.object(phases, "identity", return_value={"product_sha": CANDIDATE}), \
+                patch.object(phases, "export_native", side_effect=export), \
+                patch.object(cost, "execute_release", side_effect=release) as execute, \
+                patch.object(self.feedback, "timer_behavioral_mutant"), patch.object(self.feedback, "replica_behavioral_mutant"):
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        execute.assert_called_once()
+        self.assertNotIn(cost.TARGET[1], self.executed, "ordinary debug cost binary must never execute")
+        self.assertEqual(captured["completed_targets"].count(list(cost.TARGET)), 1)
+        self.assertEqual(captured["tests"]["executed"], sum(len(row["ids"]) for row in captured["native_inventory"]
+                                                         if [row["crate"], row["target"]] in captured["assigned_targets"]))
+        self.assertEqual(captured["tests"]["failed"], 0)
+        self.assertIn("current_cost_probe", captured)
+
+    def test_cost_native_B_never_builds_or_executes_release_override(self):
+        cost, phases, _ = self.configure_cost_scope()
+        import sys
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        captured = {}
+        with patch.dict(os.environ, {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "b"}), \
+                patch.dict(sys.modules, {self.feedback.__name__: self.feedback}), \
+                patch.object(phases, "identity", return_value={"product_sha": CANDIDATE}), \
+                patch.object(phases, "export_native", side_effect=lambda _, value: captured.update(copy.deepcopy(value))), \
+                patch.object(cost, "execute_release") as execute:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        execute.assert_not_called()
+        self.assertNotIn("current_cost_probe", captured)
+        self.assertNotIn(list(cost.TARGET), captured["completed_targets"])
+        self.assertNotIn(cost.TARGET[1], self.executed)
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-phase-test-")
@@ -7100,7 +7225,7 @@ class PhaseTransferTests(unittest.TestCase):
             with self.subTest(lane="b", mutant=key):
                 proof = copy.deepcopy(self.other)
                 proof[key] = {"status": "detected"}
-                with self.assertRaisesRegex(RuntimeError, "lane B cannot claim lane A mutant"):
+                with self.assertRaisesRegex(RuntimeError, "non-A lane cannot claim lane A mutant"):
                     self.phases.validate_native(proof, self.identity)
 
     def test_ai_damage_query_proof_keeps_full_required_ids_both_mutants_and_platform_bridge(self):
@@ -7137,7 +7262,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
             ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
             ("er-cli", "m9e_current_reload")})
-        self.assertIn(["er-cli", "m9e_current_batch"], assignment["a"])
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         for key in policies:
             for damage in ("missing", "restoration", "wrong_test"):
                 with self.subTest(key=key, damage=damage):
@@ -7165,7 +7290,8 @@ class PhaseTransferTests(unittest.TestCase):
         other["lane"] = "b"
         other["assigned_targets"] = assignment["b"]
         other["completed_targets"] = assignment["b"]
-        other["tests"].update({"executed": selected - passed, "passed": selected - passed})
+        other_count = sum(len(row["ids"]) for row in other["inventory"] if [row["crate"], row["target"]] in assignment["b"] )
+        other["tests"].update({"executed": other_count, "passed": other_count})
         other["native_timer_parity_digest"] = None
         for key in policies:
             other.pop(key)
@@ -7174,7 +7300,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": proof["plan_sha256"]})
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity):
             aggregate = self.phases.aggregate(None)
         self.assertEqual(aggregate["tests"]["passed"], selected)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
@@ -7182,7 +7308,7 @@ class PhaseTransferTests(unittest.TestCase):
             self.assertEqual(aggregate[key], proof[key])
         self.platform["browser_current_repro_bridge"]["time_omission_rejected"] = False
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity), \
                 self.assertRaisesRegex(RuntimeError, "bridge"):
             self.phases.aggregate(None)
 
@@ -7239,7 +7365,7 @@ class PhaseTransferTests(unittest.TestCase):
             other.pop(key)
         self.phases.validate_native(other, self.identity)
         other["ledger_mutant"] = proof["ledger_mutant"]
-        with self.assertRaisesRegex(RuntimeError, "lane B"):
+        with self.assertRaisesRegex(RuntimeError, "non-A lane"):
             self.phases.validate_native(other, self.identity)
         other.pop("ledger_mutant")
         self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", proof)
@@ -7247,7 +7373,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.platform["native_manifest_sha256"] = self.native_hash
         self.platform["plan_sha256"] = proof["plan_sha256"]
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity):
             result = self.phases.aggregate(None)
         for key in policies:
             self.assertEqual(result[key], proof[key])
@@ -7255,7 +7381,7 @@ class PhaseTransferTests(unittest.TestCase):
         missing = copy.deepcopy(proof)
         missing.pop("ledger_mutant")
         self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", missing)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity), \
                 self.assertRaisesRegex(RuntimeError, "mutant"):
             self.phases.aggregate(None)
 
@@ -7494,14 +7620,14 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(legacy_path.read_bytes(), self.phases.encoded(self.phases.pack_native_ids(legacy)))
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": proof["plan_sha256"]})
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity):
             result = self.phases.aggregate(None)
         self.assertEqual(result["tests"], {"selected": 913, "executed": 913, "passed": 913, "failed": 0, "skipped": 0})
         self.assertEqual(result["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         self.assertEqual(result["inventory_sha256"], proof["inventory_sha256"])
         candidate["completed_targets"] = []
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", candidate)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity), \
                 self.assertRaisesRegex(RuntimeError, "completed targets"):
             self.phases.aggregate(None)
 
@@ -7644,12 +7770,107 @@ class PhaseTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "64 KiB"):
             self.phases.write_bounded(self.root / "compressed-still-oversized.json", proof)
 
-    def phase_environment(self):
+    def phase_environment(self, native=None):
+        third = copy.deepcopy(self.native if native is None else native)
+        third["lane"] = "c"
+        third["assigned_targets"] = self.phases.partition(third["inventory"])["c"]
+        third["completed_targets"] = list(third["assigned_targets"])
+        count = sum(len(row["ids"]) for row in third["inventory"] if [row["crate"], row["target"]] in third["assigned_targets"])
+        third["tests"].update(executed=count, passed=count, failed=0, skipped=0)
+        third["native_timer_parity_digest"] = None
+        for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe"):
+            third.pop(key, None)
+        self.third_hash = self.phases.write_bounded(self.root / "proof/native-c.json", third)
         return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",
                                       "M9E_NATIVE_B_RESULT": "success", "M9E_NATIVE_B_MANIFEST_SHA256": self.other_hash,
+                                      "M9E_NATIVE_C_RESULT": "success", "M9E_NATIVE_C_MANIFEST_SHA256": self.third_hash,
                                       "M9E_PLATFORM_RESULT": "success", "M9E_NATIVE_MANIFEST_SHA256": self.native_hash,
                                       "M9E_PLATFORM_MANIFEST_SHA256": self.platform_hash})
 
+    def install_third_lane_fixture(self):
+        for proof in (self.native, self.other):
+            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS)):
+                ids = ["complete_c_witness_" + str(index)]
+                proof["inventory"].append({"crate": crate, "target": target, "ids": ids, "historical_excluded_ids": []})
+                proof["plan"]["required_native_targets"].setdefault(crate, []).append(target)
+                proof["plan"].setdefault("required_native_test_ids", {})[crate + ":" + target] = ids
+                proof["required_native_target_counts"][crate + ":" + target] = 1
+            proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+            proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+            proof["tests"]["selected"] += 3
+            proof["assigned_targets"] = self.phases.partition(proof["inventory"])[proof["lane"]]
+            proof["completed_targets"] = list(proof["assigned_targets"])
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform["native_manifest_sha256"] = self.native_hash
+        self.platform["plan_sha256"] = self.native["plan_sha256"]
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+
+    def test_third_lane_moves_whole_targets_and_preserves_exact_disjoint_global_union(self):
+        self.install_third_lane_fixture()
+        inventory = self.native["inventory"]
+        assignment = self.phases.partition(inventory)
+        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS)
+        self.assertFalse(self.phases.LANE_B_TARGETS & self.phases.LANE_C_TARGETS)
+        flat = [tuple(pair) for targets in assignment.values() for pair in targets]
+        self.assertEqual(len(flat), len(set(flat)))
+        self.assertEqual(set(flat), {(row["crate"], row["target"]) for row in inventory})
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+        self.assertEqual(result["tests"], {"selected": 16, "executed": 16, "passed": 16, "failed": 0, "skipped": 0})
+        self.assertEqual(result["native_c_manifest_sha256"], self.third_hash)
+        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c"})
+
+    def test_third_lane_is_mandatory_even_for_an_empty_assigned_partition(self):
+        for state in ("", "failure", "skipped", "cancelled"):
+            with self.phase_environment(), patch.dict(os.environ, {"M9E_NATIVE_C_RESULT": state}), self.assertRaisesRegex(RuntimeError, "absent"):
+                self.phases.aggregate(None)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            (self.root / "proof/native-c.json").unlink()
+            with self.assertRaisesRegex(RuntimeError, "manifest"):
+                self.phases.aggregate(None)
+
+    def test_third_lane_rejects_rehashed_omission_overlap_wrong_run_and_non_A_claims(self):
+        self.install_third_lane_fixture()
+        for mode in ("omitted", "overlap", "wrong_run", "wrong_lane", "mutant", "cost", "inventory", "plan"):
+            with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+                bad = self.phases.read_bounded(self.root / "proof/native-c.json", self.third_hash)
+                if mode == "omitted":
+                    bad["completed_targets"].pop()
+                elif mode == "overlap":
+                    bad["assigned_targets"].append(self.native["assigned_targets"][0])
+                    bad["completed_targets"].append(self.native["assigned_targets"][0])
+                elif mode == "wrong_run":
+                    bad["identity"]["run_attempt"] = "2"
+                elif mode == "wrong_lane":
+                    bad["lane"] = "a"
+                elif mode == "mutant":
+                    bad["timer_mutant"] = {"status": "detected"}
+                elif mode == "cost":
+                    bad["current_cost_probe"] = {"status": "passed"}
+                elif mode == "inventory":
+                    bad["inventory"][0]["ids"].append("unrelated")
+                    bad["inventory_sha256"] = self.phases.sha(self.phases.encoded(bad["inventory"]))
+                else:
+                    bad["plan"]["different_plan"] = True
+                    bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+                digest = self.phases.write_bounded(self.root / "proof/native-c.json", bad)
+                with self.subTest(mode=mode), patch.dict(os.environ, {"M9E_NATIVE_C_MANIFEST_SHA256": digest}), self.assertRaises(RuntimeError):
+                    self.phases.aggregate(None)
+
+    def test_third_lane_partition_keeps_unrelated_same_name_targets_and_zero_test_harnesses(self):
+        inventory = [{"crate": crate, "target": target, "ids": [], "historical_excluded_ids": []}
+                     for crate, target in sorted(self.phases.LANE_C_TARGETS)]
+        inventory.append({"crate": "er-other", "target": "m9e_current_batch", "ids": [], "historical_excluded_ids": []})
+        assignment = self.phases.partition(inventory)
+        self.assertEqual(len(assignment["c"]), 3)
+        self.assertEqual(assignment["a"], [["er-other", "m9e_current_batch"]])
+        self.assertEqual(assignment["b"], [])
+        enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
+                      for index, row in enumerate(inventory)]
+        actual, owned = self.phases.inventory_and_assignment(enumerated, "c")
+        self.assertEqual(owned, self.phases.partition(actual)["c"])
+        self.assertEqual(len(actual), 4)
     def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
         for status in ("", "failure", "skipped", "cancelled"):
             with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):
@@ -7712,7 +7933,7 @@ class PhaseTransferTests(unittest.TestCase):
         ])
         assignment = self.phases.partition(inventory)
         self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
-        self.assertIn(["er-cli", "m9e_current_batch"], assignment["a"])
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         self.assertNotIn(["er-cli", "m9e_current_batch"], assignment["b"])
         self.assertIn(["er-cli", "m9e_current_reload"], assignment["b"])
         self.assertNotIn(["er-cli", "m9e_current_reload"], assignment["a"])
@@ -7721,9 +7942,9 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
         self.assertEqual(len(assignment["b"]), 3)
-        self.assertEqual(len(assignment["a"]) + len(assignment["b"]), len(inventory))
+        self.assertEqual(sum(len(targets) for targets in assignment.values()), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
-        self.assertEqual(sorted(assignment["a"] + assignment["b"]),
+        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"]),
                          sorted([[item["crate"], item["target"]] for item in inventory]))
         inventory.append(copy.deepcopy(inventory[0]))
         with self.assertRaisesRegex(RuntimeError, "duplicated"):
@@ -8841,5 +9062,985 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "changed source/lock"):
                 title.checks(self.root, self.full, remote, summary, env, "1.97.1")
             rebuilt.assert_not_called()
+
+class CurrentCostRecordTests(unittest.TestCase):
+    # Exact bounded record produced by release6e2bb145/run34043250096. This is
+    # parser evidence only; mutations never substitute for the real Rust probe.
+    PRODUCED = r'''{"architecture":"x86_64","bundle_bytes":15810979,"checkpoints":[{"checkpoint":"title","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":1,"observation_json_bytes":1567,"phases":[{"median_ns":1593,"min_ns":1543,"phase":"fork"},{"median_ns":2424,"min_ns":2394,"phase":"snapshot"},{"median_ns":2555,"min_ns":2444,"phase":"validate"},{"median_ns":461,"min_ns":430,"phase":"observe"},{"median_ns":629464,"min_ns":613204,"phase":"canonical_encode_snapshot"},{"median_ns":640375,"min_ns":629364,"phase":"canonical_digest_snapshot"},{"median_ns":17563,"min_ns":17512,"phase":"blake3_preencoded_snapshot"},{"median_ns":37420,"min_ns":37129,"phase":"apply_effectful_raw_input"},{"median_ns":2136496,"min_ns":2124153,"phase":"recorder_append"}],"recorder_capsule_bytes":77605,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":68327,"snapshot_digest":"9e7b9834bb4b1ea0e9d078b1d3e2ddb1352aba2de831aae9b7da7adf83b61996"},{"checkpoint":"mode","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":9,"observation_json_bytes":4379,"phases":[{"median_ns":4178,"min_ns":4117,"phase":"fork"},{"median_ns":9518,"min_ns":9447,"phase":"snapshot"},{"median_ns":10129,"min_ns":10108,"phase":"validate"},{"median_ns":1793,"min_ns":1763,"phase":"observe"},{"median_ns":648540,"min_ns":647548,"phase":"canonical_encode_snapshot"},{"median_ns":681191,"min_ns":680079,"phase":"canonical_digest_snapshot"},{"median_ns":18644,"min_ns":18595,"phase":"blake3_preencoded_snapshot"},{"median_ns":4101171,"min_ns":4038494,"phase":"apply_effectful_raw_input"},{"median_ns":10380876,"min_ns":10321375,"phase":"recorder_append"}],"recorder_capsule_bytes":738869,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":71145,"snapshot_digest":"c9e4373e6ff335ae0485ee2a6d9f823f6e24219a38f1770ba04fd7974eee9bb0"},{"checkpoint":"starter","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":707,"observation_json_bytes":333602,"phases":[{"median_ns":98714,"min_ns":98363,"phase":"fork"},{"median_ns":981792,"min_ns":938079,"phase":"snapshot"},{"median_ns":1054968,"min_ns":1053105,"phase":"validate"},{"median_ns":96961,"min_ns":96170,"phase":"observe"},{"median_ns":3761558,"min_ns":3741881,"phase":"canonical_encode_snapshot"},{"median_ns":3877534,"min_ns":3814936,"phase":"canonical_digest_snapshot"},{"median_ns":95258,"min_ns":95158,"phase":"blake3_preencoded_snapshot"},{"median_ns":4272500,"min_ns":4255138,"phase":"apply_effectful_raw_input"},{"median_ns":16411907,"min_ns":16250916,"phase":"recorder_append"}],"recorder_capsule_bytes":1067916,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":400368,"snapshot_digest":"9dd00a7668a85f1311a873259c2b919e3bb9936dd93a2029d9a8eb196b2a0f56"},{"checkpoint":"active","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"ARROW_DOWN"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":2,"observation_json_bytes":2050,"phases":[{"median_ns":3186,"min_ns":3076,"phase":"fork"},{"median_ns":113512,"min_ns":111398,"phase":"snapshot"},{"median_ns":121517,"min_ns":121396,"phase":"validate"},{"median_ns":92323,"min_ns":88545,"phase":"observe"},{"median_ns":90378,"min_ns":89917,"phase":"canonical_encode_snapshot"},{"median_ns":91381,"min_ns":91170,"phase":"canonical_digest_snapshot"},{"median_ns":2525,"min_ns":2525,"phase":"blake3_preencoded_snapshot"},{"median_ns":273330,"min_ns":268771,"phase":"apply_effectful_raw_input"},{"median_ns":1547377,"min_ns":1532760,"phase":"recorder_append"}],"recorder_capsule_bytes":12969,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":8416,"snapshot_digest":"884799cb819b8a0a502a484715b136e214003b7d59aec6cd7a978770be3199ef"}],"content_identity":{"ai_hash":"3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9","battle_hash":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","bootstrap_hash":"e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a","bundle_hash":"blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429","oracle_sha":"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7","presentation_hash":"6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0","progression_hash":"751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695","run_hash":"879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428","scenario_hash":"e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8","semantic_catalog_hash":"a878c7487924a10f8508787ec560829efd72c5c5f101f022ad93c5358ec1ced0","world_hash":"c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"},"content_phases":[{"median_ns":52567776,"min_ns":50231488,"phase":"content_decode"},{"median_ns":206343510,"min_ns":205525914,"phase":"content_prepare_and_arc"}],"debug_assertions":false,"limitations":"Wall time includes optimizer barriers, scheduling, internal validation/allocation and internal destruction. Setup, verification and final input/output teardown excluded. Warm-process fixed-order samples; no allocator or live-memory claims. API costs overlap and are not additive components. Digest includes canonical encoding; preencoded BLAKE3 isolates hashing. Recorder append excludes event apply and recorder construction; measures one accepted event on an empty tail, not rotation or accumulated history. Not transport or whole-run latency.","os":"linux","probe":"current_native_phase_costs_preserve_semantics","samples_per_phase":3,"schema_version":1,"warmups_per_phase":1}'''
+
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        self.value = json.loads(self.PRODUCED)
+        self.binding = {"architecture": "x86_64", "operating_system": "linux",
+                        "bundle_bytes": 15_810_979, "content_identity": copy.deepcopy(self.value["content_identity"])}
+
+    def raw(self, value=None):
+        value = self.value if value is None else value
+        return self.cost.PREFIX + json.dumps(value, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+
+    def rejected(self, value):
+        with self.assertRaises(RuntimeError):
+            self.cost.parse_line(self.raw(value), **self.binding)
+
+    def test_actual_release_cost_record_reconstructs_bound_bytes_and_hash(self):
+        raw = self.raw()
+        self.assertEqual(len(raw), 6009)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), "5c8eb3c10b702ec14d68a2428279834041e10d8d957d4035033f3accbc0749d8")
+        parsed = self.cost.parse_line(raw, **self.binding)
+        self.assertEqual(parsed, self.value)
+        self.assertEqual(parsed["checkpoints"][2]["menu_options"], 707)
+        proof = {"line": raw.decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        self.assertEqual(self.cost.validate_record(proof, **self.binding), self.value)
+
+    def test_cost_record_rejects_incomplete_repeated_and_oversized_framing(self):
+        raw = self.raw()
+        for malformed in (raw[:-1], raw + raw, b"progress " + raw, raw + b"\n", raw.replace(b"\n", b"\r\n"),
+                          raw + b"trailing", b"M9E_CURRENT_COST_PROBE\n", raw.decode(), None,
+                          self.cost.PREFIX + b" " * (8192 - len(self.cost.PREFIX) - 1) + b"\n"):
+            with self.subTest(kind=type(malformed).__name__), self.assertRaises(RuntimeError):
+                self.cost.parse_line(malformed, **self.binding)
+
+    def test_cost_record_rejects_duplicate_json_keys_nonfinite_values_and_trailing_json(self):
+        raw = self.raw()
+        for malformed in (raw.replace(b'"schema_version":1', b'"schema_version":1,"schema_version":1'),
+                          raw.replace(b'"min_ns":1543', b'"min_ns":1543,"min_ns":1543'),
+                          raw.replace(b'"schema_version":1', b'"schema_version":NaN'),
+                          raw.replace(b'"schema_version":1', b'"schema_version":Infinity'),
+                          raw.replace(b'"schema_version":1', b'"schema_version":-Infinity'),
+                          raw[:-1] + b" {}\n", self.cost.PREFIX + b"\xff\n",
+                          self.cost.PREFIX + b"[]\n", self.cost.PREFIX + b"{" + b"\n"):
+            self.assertNotEqual(malformed, raw)
+            with self.assertRaises(RuntimeError):
+                self.cost.parse_line(malformed, **self.binding)
+
+    def test_cost_record_rejects_missing_unknown_and_wrong_typed_object_fields(self):
+        paths = [(), ("content_identity",), ("content_phases", 0), ("checkpoints", 0),
+                 ("checkpoints", 0, "phases", 0), ("checkpoints", 0, "event"),
+                 ("checkpoints", 0, "event", "input"), ("checkpoints", 0, "event", "input", "data"),
+                 ("checkpoints", 0, "event", "input", "data", "code")]
+        for path in paths:
+            original = self.value
+            for key in path:
+                original = original[key]
+            for mode in ("missing", "unknown"):
+                bad = copy.deepcopy(self.value)
+                row = bad
+                for key in path:
+                    row = row[key]
+                if mode == "missing":
+                    row.pop(next(iter(original)))
+                else:
+                    row["unrecognized"] = False
+                with self.subTest(path=path, mode=mode):
+                    self.rejected(bad)
+        bad = copy.deepcopy(self.value)
+        bad["checkpoints"][0]["event"]["input"]["data"] = []
+        self.rejected(bad)
+
+    def test_cost_record_rejects_boolean_counters_and_wrong_host_or_profile(self):
+        for key in ("schema_version", "warmups_per_phase", "samples_per_phase", "bundle_bytes"):
+            for replacement in (True, False, None, "1", 1.0, -1, self.cost.U64_MAX + 1):
+                bad = copy.deepcopy(self.value)
+                bad[key] = replacement
+                with self.subTest(key=key, replacement=replacement):
+                    self.rejected(bad)
+        for key, replacement in (("probe", "renamed"), ("architecture", "aarch64"), ("os", "windows"),
+                                 ("debug_assertions", True), ("debug_assertions", 0), ("limitations", "fast enough")):
+            bad = copy.deepcopy(self.value)
+            bad[key] = replacement
+            self.rejected(bad)
+
+    def test_cost_record_binds_all_actual_content_fields_and_typed_digest_prefixes(self):
+        for key in self.cost.IDENTITY_FIELDS:
+            for replacement in ("0" * 64, "bad", True):
+                bad = copy.deepcopy(self.value)
+                bad["content_identity"][key] = replacement
+                self.rejected(bad)
+            binding = copy.deepcopy(self.binding)
+            binding["content_identity"][key] = "0" * (40 if key == "oracle_sha" else 64)
+            with self.assertRaises(RuntimeError):
+                self.cost.parse_line(self.raw(), **binding)
+        for key, replacement in (("bundle_bytes", 1), ("bundle_bytes", True), ("architecture", "mips"),
+                                 ("operating_system", "darwin")):
+            binding = {**self.binding, key: replacement}
+            with self.assertRaises(RuntimeError):
+                self.cost.parse_line(self.raw(), **binding)
+
+    def test_cost_record_requires_every_phase_once_in_the_recorded_order(self):
+        for path in [("content_phases",), *[("checkpoints", i, "phases") for i in range(4)]]:
+            for mode in ("missing", "duplicate", "reorder", "renamed"):
+                bad = copy.deepcopy(self.value)
+                rows = bad
+                for key in path:
+                    rows = rows[key]
+                if mode == "missing":
+                    rows.pop()
+                elif mode == "duplicate":
+                    rows[-1] = copy.deepcopy(rows[0])
+                elif mode == "reorder":
+                    rows.reverse()
+                else:
+                    rows[0]["phase"] = "external_approximation"
+                self.rejected(bad)
+
+    def test_cost_record_accepts_zero_resolution_but_rejects_invalid_duration_order_and_types(self):
+        bad = copy.deepcopy(self.value)
+        for row in [*bad["content_phases"], *[phase for cp in bad["checkpoints"] for phase in cp["phases"]]]:
+            row["min_ns"] = row["median_ns"] = 0
+        self.assertEqual(self.cost.parse_line(self.raw(bad), **self.binding), bad)
+        for minimum, median in ((True, 1), (0, False), (1.0, 2), (2, 1), (-1, 0), (0, self.cost.U64_MAX + 1)):
+            bad = copy.deepcopy(self.value)
+            bad["checkpoints"][0]["phases"][0].update(min_ns=minimum, median_ns=median)
+            self.rejected(bad)
+
+    def test_cost_record_requires_four_actual_checkpoint_identities_and_snapshot_digests(self):
+        for mode in ("missing", "duplicate", "reorder", "extra", "digest", "kind"):
+            bad = copy.deepcopy(self.value)
+            rows = bad["checkpoints"]
+            if mode == "missing":
+                rows.pop()
+            elif mode == "duplicate":
+                rows[-1] = copy.deepcopy(rows[0])
+            elif mode == "reorder":
+                rows.reverse()
+            elif mode == "extra":
+                rows.append(copy.deepcopy(rows[0]))
+            elif mode == "digest":
+                rows[0]["snapshot_digest"] = "A" * 64
+            else:
+                rows[0]["checkpoint"] = "controlled_fixture"
+            self.rejected(bad)
+
+    def test_cost_record_rejects_changed_raw_event_or_coerced_boolean_controls(self):
+        for index in range(4):
+            for key, value in (("printable", True), ("printable", 0), ("browser_repeat", True),
+                               ("browser_repeat", 0), ("focus", "TEXT"), ("code", {"kind": "ESCAPE"})):
+                bad = copy.deepcopy(self.value)
+                bad["checkpoints"][index]["event"]["input"]["data"][key] = value
+                self.rejected(bad)
+            for path, replacement in ((["kind"], "TIMER"), (["input", "kind"], "KEY_UP")):
+                bad = copy.deepcopy(self.value)
+                event = bad["checkpoints"][index]["event"]
+                for part in path[:-1]:
+                    event = event[part]
+                event[path[-1]] = replacement
+                self.rejected(bad)
+
+    def test_cost_record_keeps_existing_recorder_caps_and_positive_measured_sizes(self):
+        for key in ("snapshot_canonical_bytes", "observation_json_bytes", "menu_options", "event_effects",
+                    "recorder_capsule_bytes", "recorder_maximum_bytes", "recorder_maximum_events"):
+            for value in (True, 0, -1, 1.0, self.cost.U64_MAX + 1):
+                bad = copy.deepcopy(self.value)
+                bad["checkpoints"][0][key] = value
+                self.rejected(bad)
+        for key, value in (("recorder_capsule_bytes", 16_777_217), ("recorder_maximum_bytes", 33_554_432),
+                           ("recorder_maximum_events", 8192)):
+            bad = copy.deepcopy(self.value)
+            bad["checkpoints"][0][key] = value
+            self.rejected(bad)
+
+    def test_cost_wire_record_rejects_tampering_missing_fields_and_invalid_unicode(self):
+        raw = self.raw()
+        proof = {"line": raw.decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        for key in proof:
+            bad = dict(proof)
+            bad.pop(key)
+            with self.assertRaises(RuntimeError):
+                self.cost.validate_record(bad, **self.binding)
+        for key, value in (("line", proof["line"] + " "), ("line", "\ud800"), ("line", raw),
+                           ("bytes", True), ("bytes", len(raw) - 1), ("sha256", "0" * 64), ("extra", "ignored")):
+            with self.assertRaises(RuntimeError):
+                self.cost.validate_record({**proof, key: value}, **self.binding)
+
+class CurrentCostArtifactTests(unittest.TestCase):
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-release-artifact-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.repository = self.root / "candidate"
+        self.manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
+        self.manifest.parent.mkdir(parents=True)
+        self.manifest.write_text('[package]\nname="er-repro"\nversion.workspace=true\n')
+        (self.repository / "rust/Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
+        self.source = self.repository / cost.SOURCE
+        self.source.parent.mkdir(parents=True)
+        self.source.write_text("// exact test source\n")
+        self.directory = self.root / "owned-release"
+        self.binary = self.directory / "release/deps/m9e_current_cost_probe-0123456789abcdef"
+        self.binary.parent.mkdir(parents=True)
+        self.binary.write_bytes(b"candidate executable fixture, never executed")
+        self.binary.chmod(0o700)
+        self.artifact = {"reason": "compiler-artifact", "manifest_path": str(self.manifest), "features": [],
+                         "package_id": "path+" + self.manifest.parent.as_uri() + "#0.1.0",
+                         "target": {"name": cost.TARGET[1], "kind": ["test"], "crate_types": ["bin"], "src_path": str(self.source)},
+                         "profile": {"opt_level": "3", "debug_assertions": False, "debuginfo": 0,
+                                     "overflow_checks": False, "test": True}, "executable": str(self.binary)}
+        self.finished = {"reason": "build-finished", "success": True}
+        self.records = [self.artifact, self.finished]
+
+    def discover(self, records=None, directory=None):
+        return self.cost.discover_release(self.records if records is None else records,
+                                         repository=self.repository,
+                                         target_directory=self.directory if directory is None else directory)
+
+    def test_cost_release_discovery_binds_exact_source_profile_and_executable_bytes(self):
+        executable, binding = self.discover()
+        self.assertEqual(executable, self.binary)
+        self.assertEqual(binding["sha256"], hashlib.sha256(self.binary.read_bytes()).hexdigest())
+        self.assertEqual(binding["bytes"], self.binary.stat().st_size)
+        self.assertEqual(binding["manifest_sha256"], hashlib.sha256(self.manifest.read_bytes()).hexdigest())
+        self.assertEqual(binding["source_sha256"], hashlib.sha256(self.source.read_bytes()).hexdigest())
+        self.assertEqual(binding["relative_path"], "release/deps/" + self.binary.name)
+        self.cost.check_executable(executable, binding)
+        self.artifact["profile"]["opt_level"] = "0"
+        self.assertEqual(binding["cargo_profile"]["opt_level"], "3")
+
+    def test_cost_release_discovery_rejects_missing_ambiguous_or_unfinished_builds(self):
+        for records in ([], [self.artifact], [self.finished], [self.artifact, self.artifact, self.finished],
+                        [self.artifact, self.finished, self.finished], [self.artifact, {**self.finished, "success": False}],
+                        [self.artifact, {**self.finished, "success": 1}], [None], self.artifact):
+            with self.assertRaises(RuntimeError):
+                self.discover(records)
+
+    def test_cost_release_discovery_rejects_wrong_package_target_source_features_and_profile(self):
+        mutations = [(["manifest_path"], str(self.source)), (["package_id"], "registry+unrelated#er-repro@0.1.0"),
+                     (["features"], ["alternate"]), (["target", "kind"], ["bench"]),
+                     (["target", "name"], "neighbor"), (["target", "crate_types"], ["lib"]),
+                     (["target", "src_path"], str(self.manifest)), (["profile", "opt_level"], "0"),
+                     (["profile", "debug_assertions"], True), (["profile", "debug_assertions"], 0),
+                     (["profile", "overflow_checks"], True), (["profile", "debuginfo"], False),
+                     (["profile", "test"], False), (["profile", "test"], 1), (["profile", "unknown"], False)]
+        for path, value in mutations:
+            bad = copy.deepcopy(self.records)
+            row = bad[0]
+            for key in path[:-1]:
+                row = row[key]
+            row[path[-1]] = value
+            with self.subTest(path=path), self.assertRaises(RuntimeError):
+                self.discover(bad)
+
+    def test_cost_release_discovery_confines_executable_to_owned_native_release_tree(self):
+        escaped = self.root / self.binary.name
+        escaped.write_bytes(self.binary.read_bytes())
+        escaped.chmod(0o700)
+        linked = self.binary.parent / "m9e_current_cost_probe-fedcba9876543210"
+        linked.symlink_to(escaped)
+        wrong_name = self.binary.parent / "not-the-cost-target"
+        wrong_name.write_bytes(self.binary.read_bytes())
+        wrong_name.chmod(0o700)
+        for path in (str(escaped), str(linked), str(wrong_name), "relative/release/deps/test", None,
+                     str(self.directory / "debug/deps" / self.binary.name)):
+            with self.assertRaises(RuntimeError):
+                self.discover([{**self.artifact, "executable": path}, self.finished])
+        alias = self.root / "alias"
+        alias.symlink_to(self.directory, target_is_directory=True)
+        with self.assertRaises(RuntimeError):
+            self.discover(directory=alias)
+        self.binary.chmod(0o600)
+        with self.assertRaises(RuntimeError):
+            self.discover()
+
+    def test_cost_release_executable_conservation_rejects_bytes_permissions_and_symlink_changes(self):
+        executable, binding = self.discover()
+        original = self.binary.read_bytes()
+        self.binary.write_bytes(b"X" * len(original))
+        with self.assertRaises(RuntimeError):
+            self.cost.check_executable(executable, binding)
+        self.binary.write_bytes(original)
+        self.binary.chmod(0o600)
+        with self.assertRaises(RuntimeError):
+            self.cost.check_executable(executable, binding)
+        self.binary.chmod(0o700)
+        self.cost.check_executable(executable, binding)
+        self.binary.unlink()
+        with self.assertRaises(RuntimeError):
+            self.cost.check_executable(executable, binding)
+
+    def test_cost_release_listing_matches_the_actual_sole_global_test_identity(self):
+        raw = (self.cost.TEST_ID + ": test\n").encode()
+        self.assertEqual(len(raw), 52)
+        self.cost.validate_listing(raw, [self.cost.TEST_ID])
+        for listing, identities in ((raw, []), (raw, [self.cost.TEST_ID] * 2), (raw, ["renamed"]),
+                                    (raw + raw, [self.cost.TEST_ID]), (raw[:-1], [self.cost.TEST_ID]),
+                                    (b"", [self.cost.TEST_ID]), (raw.replace(b": test", b": benchmark"), [self.cost.TEST_ID]),
+                                    (raw + b"ignored: test\n", [self.cost.TEST_ID]), (b"\xff", [self.cost.TEST_ID]),
+                                    (b"x" * 16385, [self.cost.TEST_ID])):
+            with self.assertRaises(RuntimeError):
+                self.cost.validate_listing(listing, identities)
+
+class CurrentCostContentBindingTests(unittest.TestCase):
+    MANIFEST = r'''{"components":{"ai":"3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9","battle":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","bootstrap":"e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a","meta":"4b6fdf238af42d40441175d2436c03e5dcec40117863a9e5600ba8127009be64","presentation":"6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0","progression":"751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695","run":"879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428","scenario":"e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8","world":"c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"},"content_hash":"blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429","counts":{"ai_behaviors":2586,"battle_species":1962,"bootstrap_starters":706,"meta_behaviors":6870,"presentation_mappings":55,"progression_species_forms":3384,"run_programs":3,"scenarios":91,"world_biomes":35},"oracle_sha":"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7","pending_bespoke_behaviors":0,"reachable_unsupported_behaviors":0,"schema_version":2,"unresolved_cross_references":0,"v1_production_fallbacks":0}'''
+
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-cost-content-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.manifest = json.loads(self.MANIFEST)
+        self.identity = json.loads(CurrentCostRecordTests.PRODUCED)["content_identity"]
+        # Minimal source-shape fixture for binding checks, not prepared game content.
+        self.bundle = {"schema_version": 2, "oracle_sha": self.identity["oracle_sha"],
+                       "content_hash": self.identity["bundle_hash"]}
+        for name, digest in self.manifest["components"].items():
+            self.bundle["scenarios" if name == "scenario" else name] = {"content_hash": digest}
+        self.bundle["battle"]["semantic_catalog_hash"] = self.identity["semantic_catalog_hash"]
+        self.bundle_path = self.root / cost.BUNDLE
+        self.manifest_path = self.root / cost.CONTENT_MANIFEST
+        self.bundle_path.parent.mkdir(parents=True)
+        self.write()
+
+    def write(self):
+        self.bundle_path.write_text(json.dumps(self.bundle, sort_keys=True))
+        self.manifest_path.write_text(json.dumps(self.manifest, sort_keys=True))
+
+    def test_cost_content_binding_projects_actual_v2_component_names_and_original_bytes(self):
+        binding = self.cost.read_content(self.root)
+        self.assertEqual(binding["identity"], self.identity)
+        for name, path in (("bundle", self.bundle_path), ("manifest", self.manifest_path)):
+            self.assertEqual(binding[name]["bytes"], path.stat().st_size)
+            self.assertEqual(binding[name]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+        self.assertEqual(self.manifest["counts"]["bootstrap_starters"], 706)
+        before = binding["bundle"]["sha256"]
+        self.bundle_path.write_bytes(self.bundle_path.read_bytes() + b"\n")
+        changed = self.cost.read_content(self.root)
+        self.assertEqual(changed["identity"], binding["identity"])
+        self.assertNotEqual(changed["bundle"]["sha256"], before)
+
+    def test_cost_content_binding_rejects_each_source_component_and_manifest_identity_drift(self):
+        initial_bundle, initial_manifest = copy.deepcopy(self.bundle), copy.deepcopy(self.manifest)
+        for name in self.manifest["components"]:
+            self.bundle = copy.deepcopy(initial_bundle)
+            self.bundle["scenarios" if name == "scenario" else name]["content_hash"] = "0" * 64
+            self.write()
+            with self.subTest(component=name), self.assertRaises(RuntimeError):
+                self.cost.read_content(self.root)
+        for key, replacement in (("oracle_sha", "0" * 40), ("content_hash", "blake3-v1:" + "0" * 64),
+                                 ("schema_version", True), ("unresolved_cross_references", 1),
+                                 ("pending_bespoke_behaviors", False), ("v1_production_fallbacks", 1), ("extra", "ignored")):
+            self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
+            self.manifest[key] = replacement
+            self.write()
+            with self.assertRaises(RuntimeError):
+                self.cost.read_content(self.root)
+        self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
+        self.manifest["counts"]["bootstrap_starters"] = True
+        self.write()
+        with self.assertRaises(RuntimeError):
+            self.cost.read_content(self.root)
+        self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
+        self.bundle["meta"]["content_hash"] = self.manifest["components"]["meta"] = "bad"
+        self.write()
+        with self.assertRaises(RuntimeError):
+            self.cost.read_content(self.root)
+
+    def test_cost_content_reader_rejects_duplicate_invalid_oversized_or_redirected_files(self):
+        original = self.manifest_path.read_bytes()
+        for raw in (b"", b"\xff", b"[]", b"{}" + b" " * 16383,
+                    original.replace(b'"schema_version": 2', b'"schema_version": 2, "schema_version": 2')):
+            self.assertNotEqual(raw, original)
+            self.manifest_path.write_bytes(raw)
+            with self.assertRaises(RuntimeError):
+                self.cost.read_content(self.root)
+        self.manifest_path.write_bytes(original)
+        relocated = self.root / "elsewhere.json"
+        relocated.write_bytes(original)
+        self.manifest_path.unlink()
+        self.manifest_path.symlink_to(relocated)
+        with self.assertRaises(RuntimeError):
+            self.cost.read_content(self.root)
+
+class CurrentCostBoundedProcessTests(unittest.TestCase):
+    # These tiny Python processes run only on the remote Linux harness runner;
+    # they prove actual pipe/deadline/process-group behavior, not game execution.
+    def setUp(self):
+        import m9e_current_cost as cost
+        import sys
+        self.cost = cost
+        self.python = sys.executable
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-cost-process-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.output = self.root / "output.log"
+        self.children = []
+        self.real_popen = subprocess.Popen
+
+    def spawn(self, *args, **kwargs):
+        self.assertIs(kwargs.get("start_new_session"), True)
+        self.assertNotIn("shell", kwargs)
+        child = self.real_popen(*args, **kwargs)
+        self.children.append(child)
+        return child
+
+    def tearDown(self):
+        import signal
+        # Failsafe for regressions in the helper itself; no owned test group
+        # may survive a failed assertion in this process integration fixture.
+        for child in self.children:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.wait(timeout=1)
+
+    def run_code(self, code, **overrides):
+        options = {"cwd": self.root, "environment": dict(os.environ), "output": self.output,
+                   "seconds": 3, "byte_limit": 1024, **overrides}
+        with patch.object(self.cost.subprocess, "Popen", side_effect=self.spawn):
+            return self.cost.run_bounded([self.python, "-c", code], **options)
+
+    def test_cost_runner_streams_combined_output_from_a_real_owned_session(self):
+        result = self.run_code("import os; os.write(1, str(os.getsid(0) == os.getpid()).encode()); os.write(2, b' stderr')")
+        self.assertEqual(self.output.read_bytes(), b"True stderr")
+        self.assertEqual(result["bytes"], 11)
+        self.assertEqual(result["sha256"], hashlib.sha256(b"True stderr").hexdigest())
+        self.assertEqual(result["path"], self.output)
+        self.assertLess(result["elapsed_seconds"], 3)
+        self.assertEqual(self.children[0].poll(), 0)
+        self.assertTrue(self.children[0].stdout.closed)
+
+    def test_cost_runner_nonzero_completion_cannot_supply_success_evidence(self):
+        with self.assertRaisesRegex(RuntimeError, "command exited 7"):
+            self.run_code("import os; os.write(1, b'expected failure'); raise SystemExit(7)")
+        self.assertEqual(self.output.read_bytes(), b"expected failure")
+        self.assertEqual(self.children[0].poll(), 7)
+        self.assertTrue(self.children[0].stdout.closed)
+
+    def test_cost_runner_stops_streaming_at_the_exact_output_bound(self):
+        with self.assertRaisesRegex(RuntimeError, "output exceeded"):
+            self.run_code("import os,time; os.write(1, b'x' * 1048576); time.sleep(10)", byte_limit=128)
+        self.assertEqual(self.output.read_bytes(), b"x" * 128)
+        self.assertIsNotNone(self.children[0].poll())
+        self.assertTrue(self.children[0].stdout.closed)
+
+    def test_cost_runner_deadline_kills_term_ignoring_parent_and_descendant(self):
+        import signal
+        import time
+        code = ("import signal,subprocess,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+                "child=subprocess.Popen([sys.executable,'-c','import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(10)']); "
+                "print(child.pid,flush=True); time.sleep(10)")
+        original = os.killpg
+        signals = []
+        def tracked(pid, sig):
+            signals.append((pid, sig))
+            return original(pid, sig)
+        with patch.object(self.cost.os, "killpg", side_effect=tracked), self.assertRaisesRegex(RuntimeError, "wall deadline"):
+            self.run_code(code, seconds=2)
+        child = self.children[0]
+        self.assertEqual(child.poll(), -signal.SIGKILL)
+        self.assertIn((child.pid, signal.SIGTERM), signals)
+        self.assertIn((child.pid, signal.SIGKILL), signals)
+        descendant = int(self.output.read_text().strip())
+        status = Path(f"/proc/{descendant}/stat")
+        running = True
+        for _ in range(20):
+            try:
+                running = status.read_text().split(") ", 1)[1].split()[0] != "Z"
+            except FileNotFoundError:
+                running = False
+            if not running:
+                break
+            time.sleep(0.01)
+        self.assertFalse(running, "owned descendant survived the group deadline")
+
+    def test_cost_runner_rejects_expired_budget_and_invalid_caps_before_spawn(self):
+        import time
+        for overrides in ({"seconds": True}, {"seconds": 901}, {"seconds": float("nan")},
+                          {"byte_limit": True}, {"byte_limit": 0}, {"byte_limit": (16 << 20) + 1},
+                          {"global_deadline": time.monotonic() - 1}, {"global_deadline": float("inf")}):
+            with self.assertRaises(RuntimeError):
+                self.run_code("pass", **overrides)
+            self.assertFalse(self.output.exists())
+            self.assertEqual(self.children, [])
+
+    def test_cost_runner_never_overwrites_an_existing_diagnostic(self):
+        self.output.write_bytes(b"retain prior diagnostic")
+        with self.assertRaises(FileExistsError):
+            self.run_code("pass")
+        self.assertEqual(self.output.read_bytes(), b"retain prior diagnostic")
+        self.assertEqual(self.children, [])
+
+    def test_cost_runner_attempts_kill_and_reap_after_term_cleanup_failure(self):
+        import signal
+        original = os.killpg
+        signals = []
+        def failed_term(pid, sig):
+            signals.append((pid, sig))
+            if sig == signal.SIGTERM:
+                raise PermissionError("simulated termination failure")
+            return original(pid, sig)
+        with patch.object(self.cost.os, "killpg", side_effect=failed_term), self.assertRaisesRegex(RuntimeError, "cleanup failed"):
+            self.run_code("pass")
+        child = self.children[0]
+        self.assertIn((child.pid, signal.SIGKILL), signals)
+        self.assertIsNotNone(child.poll())
+        self.assertTrue(child.stdout.closed)
+
+class CurrentCostBuildIdentityTests(unittest.TestCase):
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-cost-build-identity-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.repository = self.root / "candidate"
+        self.target = self.root / "owned-release"
+        self.inherited = {"HOME": str(self.root / "home"), "CARGO_HOME": str(self.root / "cargo-home"),
+                          "PATH": "/synthetic/bin", "DUMMY_SECRET": "unreported-value",
+                          "CARGO_TARGET_DIR": str(self.root / "ordinary-cache")}
+        for name in cost.BUILD_SOURCE_PATHS:
+            path = self.repository / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("source fixture " + name + "\n")
+        dependency = self.repository / "rust/crates/er-extra/Cargo.toml"
+        dependency.parent.mkdir(parents=True)
+        dependency.write_text('[package]\nname="er-extra"\n')
+
+    def test_cost_build_binding_tracks_exact_sources_and_every_workspace_manifest(self):
+        first = self.cost.build_source_binding(self.repository, CANDIDATE)
+        self.assertEqual(first["source_sha"], CANDIDATE)
+        self.assertEqual(set(first["source_hashes"]), set(self.cost.BUILD_SOURCE_PATHS))
+        self.assertEqual(first["cargo_manifests"]["count"], 2)
+        dependency = self.repository / "rust/crates/er-extra/Cargo.toml"
+        dependency.write_text('[package]\nname="er-extra"\nversion="0.2.0"\n')
+        second = self.cost.build_source_binding(self.repository, CANDIDATE)
+        self.assertEqual(first["source_hashes"], second["source_hashes"])
+        self.assertNotEqual(first["cargo_manifests"]["sha256"], second["cargo_manifests"]["sha256"])
+        new = self.repository / "rust/crates/er-another/Cargo.toml"
+        new.parent.mkdir()
+        new.write_text('[package]\nname="er-another"\n')
+        third = self.cost.build_source_binding(self.repository, CANDIDATE)
+        self.assertEqual(third["cargo_manifests"]["count"], 3)
+        self.assertNotEqual(third["cargo_manifests"]["sha256"], second["cargo_manifests"]["sha256"])
+
+    def test_cost_build_binding_detects_missing_empty_oversized_and_redirected_source(self):
+        source = self.repository / self.cost.SOURCE
+        original = source.read_bytes()
+        for bad in (None, b"", b"x" * ((4 << 20) + 1), "symlink"):
+            source.unlink()
+            if bad == "symlink":
+                other = self.root / "unowned.rs"
+                other.write_bytes(original)
+                source.symlink_to(other)
+            elif bad is not None:
+                source.write_bytes(bad)
+            with self.assertRaises(RuntimeError):
+                self.cost.build_source_binding(self.repository, CANDIDATE)
+            if source.exists() or source.is_symlink():
+                source.unlink()
+            source.write_bytes(original)
+        for sha in ("", "z" * 40, CANDIDATE.upper(), True):
+            with self.assertRaises(RuntimeError):
+                self.cost.build_source_binding(self.repository, sha)
+
+    def test_cost_release_environment_preserves_credentials_without_reporting_and_owns_target(self):
+        original = copy.deepcopy(self.inherited)
+        environment, facts = self.cost.release_environment(self.repository, self.target, self.inherited)
+        self.assertEqual(self.inherited, original)
+        self.assertEqual(environment["DUMMY_SECRET"], "unreported-value")
+        self.assertNotIn("unreported-value", json.dumps(facts))
+        self.assertNotIn("DUMMY_SECRET", json.dumps(facts))
+        self.assertEqual(environment["CARGO_TARGET_DIR"], str(self.target))
+        self.assertEqual(environment["RUSTUP_TOOLCHAIN"], "1.97.1")
+        self.assertEqual(environment["CARGO_INCREMENTAL"], "0")
+        self.assertEqual(facts["profile"], "release")
+        self.assertEqual(facts["target"], "native-host")
+        self.assertFalse(self.target.exists(), "configuration helper must not create or overwrite a target")
+
+    def test_cost_release_environment_rejects_flags_wrappers_cross_target_and_profile_overrides(self):
+        keys = ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC", "RUSTDOC", "RUSTC_BOOTSTRAP", "RUSTC_WRAPPER",
+                "RUSTC_WORKSPACE_WRAPPER", "CARGO_WORKSPACE_WRAPPER", "CARGO_ENCODED_RUSTDOCFLAGS",
+                "CARGO_BUILD_TARGET", "CARGO_BUILD_RUSTFLAGS", "CARGO_PROFILE_RELEASE_OPT_LEVEL",
+                "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS", "CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_OPT_LEVEL",
+                "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS"]
+        for key in keys:
+            for value in ("", "unreviewed"):
+                with self.subTest(key=key, value=value), self.assertRaises(RuntimeError):
+                    self.cost.release_environment(self.repository, self.target, {**self.inherited, key: value})
+        for key, value in (("CARGO_INCREMENTAL", "1"), ("CARGO_PROFILE_DEV_DEBUG", "2"),
+                           ("CARGO_PROFILE_TEST_DEBUG", "1"), ("RUSTUP_TOOLCHAIN", "nightly")):
+            with self.assertRaises(RuntimeError):
+                self.cost.release_environment(self.repository, self.target, {**self.inherited, key: value})
+
+    def test_cost_release_environment_rejects_candidate_ancestor_and_cargo_home_configuration(self):
+        for path in (self.repository / "rust/.cargo/config.toml", self.repository / ".cargo/config",
+                     self.root / ".cargo/config.toml", self.root / "cargo-home/config.toml"):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('[build]\nrustflags=["--cfg", "different"]\n')
+            with self.assertRaises(RuntimeError):
+                self.cost.release_environment(self.repository, self.target, self.inherited)
+            path.unlink()
+        missing = self.root / "cargo-home/config"
+        missing.symlink_to(self.root / "absent-config")
+        with self.assertRaises(RuntimeError):
+            self.cost.release_environment(self.repository, self.target, self.inherited)
+
+    def test_cost_release_environment_rejects_invalid_or_redirected_target_without_side_effects(self):
+        self.target.symlink_to(self.repository, target_is_directory=True)
+        for target, environment in ((self.target, self.inherited), (Path("relative"), self.inherited),
+                                    (self.root / "new", {"PATH": False}), (self.root / "new", None)):
+            with self.assertRaises(RuntimeError):
+                self.cost.release_environment(self.repository, target, environment)
+        self.assertFalse((self.root / "new").exists())
+
+
+class CurrentCostReleaseExecutionTests(unittest.TestCase):
+    def setUp(self):
+        import m9e_current_cost as cost
+        import time
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-release-execution-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.repository = self.root / "candidate"
+        for name in cost.BUILD_SOURCE_PATHS:
+            path = self.repository / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("bound fixture " + name + "\n")
+        (self.repository / "rust/Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
+        self.binding = cost.build_source_binding(self.repository, CANDIDATE)
+        self.identity = {"product_sha": CANDIDATE, "workflow_sha": CANDIDATE, "run_id": "42", "run_attempt": "1",
+                         "profile": "test", "features": "default", "target": "x86_64-unknown-linux-gnu"}
+        self.record = json.loads(CurrentCostRecordTests.PRODUCED)
+        self.line = cost.PREFIX + json.dumps(self.record, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+        self.content = {"bundle": {"bytes": self.record["bundle_bytes"], "sha256": "1" * 64},
+                        "manifest": {"bytes": 1219, "sha256": "2" * 64},
+                        "identity": self.record["content_identity"]}
+        self.environment = {"HOME": str(self.root / "home"), "CARGO_HOME": str(self.root / "cargo-home")}
+        self.deadline = time.monotonic() + 30
+        self.calls, self.targets = [], []
+        self.defect = None
+        self.serial = 0
+
+    def command(self, command, *, cwd, environment, output, seconds, byte_limit, global_deadline):
+        self.calls.append((command, str(cwd), dict(environment), seconds, byte_limit, global_deadline))
+        if command[0] == "cargo":
+            target = Path(environment["CARGO_TARGET_DIR"])
+            self.assertTrue(target.is_dir())
+            self.assertEqual(list(target.iterdir()), [])
+            self.targets.append(target)
+            binary = target / "release/deps/m9e_current_cost_probe-0123456789abcdef"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"source-bound fake executable; not run")
+            binary.chmod(0o700)
+            manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
+            artifact = {"reason": "compiler-artifact", "manifest_path": str(manifest), "features": [],
+                        "package_id": "path+" + manifest.parent.as_uri() + "#0.1.0",
+                        "target": {"name": self.cost.TARGET[1], "kind": ["test"], "crate_types": ["bin"],
+                                   "src_path": str(self.repository / self.cost.SOURCE)},
+                        "profile": {"opt_level": "3", "debug_assertions": False, "debuginfo": 0,
+                                    "overflow_checks": False, "test": True}, "executable": str(binary)}
+            raw = (json.dumps(artifact) + '\n' + json.dumps({"reason": "build-finished", "success": True}) + '\n').encode()
+        elif "--list" in command:
+            raw = (self.cost.TEST_ID + ": test\n").encode()
+            if self.defect == "binary":
+                Path(command[0]).write_bytes(b"changed after listing")
+        else:
+            self.assertIn("--exact", command)
+            if self.defect == "exit":
+                raise RuntimeError("simulated actual nonzero execution")
+            suffix = b"test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\n"
+            raw = b"running 1 test\n" + self.line + suffix
+            if self.defect == "duplicate-result":
+                raw += suffix
+            elif self.defect == "duplicate-record":
+                raw += self.line
+            elif self.defect == "zero-tests":
+                raw = raw.replace(b"1 passed", b"0 passed")
+            elif self.defect == "source":
+                (self.repository / self.cost.SOURCE).write_text("changed after execution\n")
+        output.write_bytes(raw)
+        return {"path": output, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(), "elapsed_seconds": 0.01}
+
+    def execute(self, **overrides):
+        self.serial += 1
+        diagnostics = self.root / ("diagnostics-" + str(self.serial))
+        diagnostics.mkdir()
+        kwargs = {"identity": self.identity, "source_binding": self.binding,
+                  "discovered_ids": [self.cost.TEST_ID], "global_deadline": self.deadline, **overrides}
+        with patch.object(self.cost, "run_bounded", side_effect=self.command), \
+                patch.object(self.cost, "read_content", return_value=self.content), \
+                patch.dict(os.environ, self.environment, clear=True):
+            return self.cost.execute_release(self.repository, self.root, diagnostics, **kwargs)
+
+    def test_cost_release_executes_one_owned_release_artifact_in_global_inventory_once(self):
+        output, proof = self.execute()
+        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(self.calls[0][0], ["cargo", "test", "--locked", "--release", "-p", "er-repro", "--test",
+                                          self.cost.TARGET[1], "--no-run", "--message-format=json"])
+        self.assertEqual(self.calls[1][0][1:], ["--list", "--format", "terse"])
+        self.assertEqual(self.calls[2][0][1:], [self.cost.TEST_ID, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"])
+        self.assertEqual([(call[3], call[4]) for call in self.calls], [(900, 16 << 20), (30, 16384), (600, 16384)])
+        self.assertTrue(all(call[5] == self.deadline for call in self.calls))
+        self.assertTrue(all(call[2]["CARGO_TARGET_DIR"] == str(self.targets[0]) for call in self.calls))
+        self.assertTrue(output.is_file())
+        self.assertFalse(self.targets[0].parent.exists())
+        self.assertEqual(proof["execution_profile"], "release")
+        self.assertEqual(proof["record"]["line"].encode(), self.line)
+        self.assertEqual(proof["tests"], {"executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+        self.assertEqual(proof["phase_identity_sha256"], hashlib.sha256(self.cost.encoded(self.identity)).hexdigest())
+        self.assertEqual(proof["source_binding_sha256"], hashlib.sha256(self.cost.encoded(self.binding)).hexdigest())
+        self.assertLessEqual(len(self.cost.encoded(proof)), 16384)
+
+    def test_cost_release_refuses_unbound_inventory_profile_host_and_deadline_before_build(self):
+        for overrides in ({"discovered_ids": []}, {"discovered_ids": [self.cost.TEST_ID] * 2},
+                          {"identity": {**self.identity, "profile": "release"}},
+                          {"identity": {**self.identity, "features": "extra"}},
+                          {"identity": {**self.identity, "target": "wasm32-unknown-unknown"}},
+                          {"source_binding": {}}, {"global_deadline": 0}, {"global_deadline": True}):
+            with self.assertRaises(RuntimeError):
+                self.execute(**overrides)
+            self.assertEqual(self.calls, [])
+            self.assertEqual(self.targets, [])
+
+    def test_cost_release_rejects_binary_and_source_changes_and_always_removes_owned_build(self):
+        for defect in ("binary", "source"):
+            self.defect = defect
+            with self.assertRaises(RuntimeError):
+                self.execute()
+            self.assertTrue(all(not target.parent.exists() for target in self.targets))
+        self.assertEqual(len(self.calls), 5, "changed listed binary must never execute")
+
+    def test_cost_release_rejects_nonzero_duplicate_results_records_and_zero_execution(self):
+        for defect in ("exit", "duplicate-result", "duplicate-record", "zero-tests"):
+            self.defect = defect
+            with self.assertRaises(RuntimeError):
+                self.execute()
+            self.assertFalse(self.targets[-1].parent.exists())
+
+    def validate(self, proof, **overrides):
+        kwargs = {"repository": self.repository, "identity": self.identity,
+                  "source_binding": self.binding, "content": self.content, **overrides}
+        with patch.object(self.cost, "read_content", return_value=self.content):
+            return self.cost.validate_execution(proof, **kwargs)
+
+    def test_cost_transferred_proof_roundtrips_after_owned_binary_cleanup(self):
+        _, proof = self.execute()
+        restored = json.loads(self.cost.encoded(proof))
+        self.validate(restored)
+        self.assertFalse(self.targets[0].exists())
+        self.assertEqual(len(self.calls), 3)
+        for name in ("artifact", "record", "logs"):
+            self.assertEqual(restored[name], proof[name])
+
+    def test_cost_transferred_proof_rejects_other_run_candidate_scope_and_counts(self):
+        _, proof = self.execute()
+        mutations = [("schema_version", True), ("status", "pending"), ("execution_profile", "test"),
+                     ("target", ["er-cli", self.cost.TARGET[1]]), ("test_id", "unrelated"),
+                     ("phase_identity_sha256", "0" * 64), ("source_binding_sha256", "0" * 64),
+                     ("tests", {"executed": True, "passed": 1, "failed": 0, "skipped": 0}),
+                     ("tests", {"executed": 2, "passed": 2, "failed": 0, "skipped": 0})]
+        for key, value in mutations:
+            with self.subTest(key=key, value=value), self.assertRaises(RuntimeError):
+                self.validate({**proof, key: value})
+        for key in ("run_id", "run_attempt", "product_sha", "workflow_sha", "profile", "features", "target"):
+            with self.subTest(identity=key), self.assertRaises(RuntimeError):
+                self.validate(proof, identity={**self.identity, key: "different"})
+        with self.assertRaises(RuntimeError):
+            self.validate({**proof, "unreviewed": "x" * 17000})
+        for key in proof:
+            with self.subTest(missing=key), self.assertRaises(RuntimeError):
+                self.validate({name: value for name, value in proof.items() if name != key})
+
+    def test_cost_transferred_proof_rejects_debug_or_unbound_artifact_and_environment(self):
+        _, proof = self.execute()
+        changes = [("bytes", True), ("bytes", (128 << 20) + 1), ("sha256", "bad"),
+                   ("relative_path", "../release/deps/escape"), ("cargo_package_id", "registry+unrelated"),
+                   ("manifest_sha256", "0" * 64), ("source_sha256", "0" * 64)]
+        for key, value in changes:
+            with self.subTest(artifact=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "artifact": {**proof["artifact"], key: value}})
+        for key, value in (("opt_level", "0"), ("debug_assertions", True), ("overflow_checks", True),
+                           ("debuginfo", False), ("test", 1), ("extra", False)):
+            artifact = copy.deepcopy(proof["artifact"])
+            artifact["cargo_profile"][key] = value
+            with self.subTest(profile=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "artifact": artifact})
+        for key, value in (("cargo_config_files", False), ("compiler_overrides", 1),
+                           ("features", "other"), ("profile", "test"), ("secret", "must not transfer")):
+            with self.subTest(environment=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "environment": {**proof["environment"], key: value}})
+
+    def test_cost_transferred_proof_rejects_rehashed_invalid_record_and_bad_log_bounds(self):
+        _, proof = self.execute()
+        for key, value in (("line", self.line.decode()[:-1]), ("line", self.line.decode() * 2),
+                           ("bytes", True), ("bytes", len(self.line) + 1), ("sha256", "0" * 64)):
+            with self.subTest(record=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "record": {**proof["record"], key: value}})
+        bad = copy.deepcopy(self.record)
+        bad["debug_assertions"] = True
+        raw = self.cost.PREFIX + json.dumps(bad).encode() + b"\n"
+        with self.assertRaises(RuntimeError):
+            self.validate({**proof, "record": {"line": raw.decode(), "bytes": len(raw),
+                                               "sha256": hashlib.sha256(raw).hexdigest()}})
+        for name in ("build", "list", "execute"):
+            for key, value in (("bytes", 0), ("bytes", (16 << 20) + 1), ("sha256", "bad"),
+                               ("elapsed_seconds", True), ("elapsed_seconds", float("nan")),
+                               ("elapsed_seconds", 901), ("unexpected", 1)):
+                logs = copy.deepcopy(proof["logs"])
+                logs[name][key] = value
+                with self.subTest(log=name, field=key), self.assertRaises(RuntimeError):
+                    self.validate({**proof, "logs": logs})
+        logs = copy.deepcopy(proof["logs"])
+        logs["list"]["sha256"] = "0" * 64
+        with self.assertRaises(RuntimeError):
+            self.validate({**proof, "logs": logs})
+
+    def test_cost_transferred_proof_rejects_candidate_content_and_manifest_drift(self):
+        _, proof = self.execute()
+        for key in ("bundle", "manifest", "identity"):
+            changed = copy.deepcopy(self.content)
+            if key == "identity":
+                changed[key]["oracle_sha"] = "0" * 40
+            else:
+                changed[key]["sha256"] = "0" * 64
+            with self.subTest(content=key), self.assertRaises(RuntimeError):
+                self.validate(proof, content=changed)
+        manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
+        manifest.write_text("changed Cargo manifest\n")
+        with self.assertRaises(RuntimeError):
+            self.validate(proof)
+    def lane_proofs(self):
+        import m9e_phases as phases
+        self.identity["files"] = {"content": "f" * 64}
+        _, release = self.execute()
+        inventory = [{"crate": self.cost.TARGET[0], "target": self.cost.TARGET[1],
+                      "ids": [self.cost.TEST_ID], "historical_excluded_ids": []}]
+        plan = {"requires_wasm": False, "requires_browser": False, "requires_cli_executable": False,
+                "requires_current_cost_probe": True, "current_cost_source_binding": self.binding,
+                "required_native_targets": {self.cost.TARGET[0]: [self.cost.TARGET[1]]},
+                "required_native_test_ids": {":".join(self.cost.TARGET): [self.cost.TEST_ID]}}
+        first = {"version": 1, "phase": "native", "status": "passed", "qualification": "pending",
+                 "identity": self.identity, "plan": plan, "plan_sha256": phases.sha(phases.encoded(plan)),
+                 "inventory": inventory, "inventory_sha256": phases.sha(phases.encoded(inventory)),
+                 "lane": "a", "assigned_targets": [list(self.cost.TARGET)], "completed_targets": [list(self.cost.TARGET)],
+                 "tests": {"selected": 1, "executed": 1, "passed": 1, "failed": 0, "skipped": 0},
+                 "selected_inventory_validated": True, "selected_test_ids_sha256": "c" * 64,
+                 "required_native_target_counts": {":".join(self.cost.TARGET): 1},
+                 "native_timer_parity_digest": None, "cli": None, "worker": None, "current_cost_probe": release}
+        second = copy.deepcopy(first)
+        second.update(lane="b", assigned_targets=[], completed_targets=[])
+        second["tests"].update(executed=0, passed=0)
+        second.pop("current_cost_probe")
+        return phases, first, second
+
+    def validate_native_cost(self, phases, proof):
+        proof["plan_sha256"] = phases.sha(phases.encoded(proof["plan"]))
+        with patch.object(phases, "ROOT", self.repository), patch.object(self.cost, "read_content", return_value=self.content):
+            phases.validate_native(proof, self.identity)
+
+    def test_cost_native_proofs_roundtrip_exact_A_execution_and_B_global_inventory(self):
+        phases, first, second = self.lane_proofs()
+        for lane, proof in (("a", first), ("b", second)):
+            path = self.root / ("native-" + lane + ".json")
+            digest = phases.write_bounded(path, proof)
+            restored = phases.read_bounded(path, digest)
+            self.validate_native_cost(phases, restored)
+            self.assertEqual(restored, proof)
+        self.assertEqual(first["tests"]["executed"] + second["tests"]["executed"], 1)
+        self.assertFalse(self.targets[0].exists())
+
+    def test_cost_native_proof_rejects_missing_A_extra_B_and_unrequested_release_evidence(self):
+        phases, first, second = self.lane_proofs()
+        mutations = []
+        bad = copy.deepcopy(first)
+        bad.pop("current_cost_probe")
+        mutations.append(bad)
+        bad = copy.deepcopy(second)
+        bad["current_cost_probe"] = first["current_cost_probe"]
+        mutations.append(bad)
+        bad = copy.deepcopy(first)
+        bad["plan"]["requires_current_cost_probe"] = False
+        mutations.append(bad)
+        bad = copy.deepcopy(first)
+        bad["plan"]["requires_current_cost_probe"] = 1
+        mutations.append(bad)
+        for proof in mutations:
+            with self.assertRaises(RuntimeError):
+                self.validate_native_cost(phases, proof)
+
+    def test_cost_native_proof_rejects_discovery_count_map_and_completion_changes(self):
+        phases, first, _ = self.lane_proofs()
+        for mode in ("ids", "excluded", "map", "required", "count", "completion", "assigned", "source"):
+            bad = copy.deepcopy(first)
+            if mode == "ids":
+                bad["inventory"][0]["ids"] = ["replacement"]
+            elif mode == "excluded":
+                bad["inventory"][0]["historical_excluded_ids"] = [self.cost.TEST_ID]
+            elif mode == "map":
+                bad["plan"]["required_native_test_ids"] = {}
+            elif mode == "required":
+                bad["plan"]["required_native_targets"][self.cost.TARGET[0]] *= 2
+            elif mode == "count":
+                bad["required_native_target_counts"][":".join(self.cost.TARGET)] = True
+            elif mode == "completion":
+                bad["completed_targets"] *= 2
+            elif mode == "assigned":
+                bad["assigned_targets"] = []
+            else:
+                bad["plan"]["current_cost_source_binding"]["cargo_manifests"]["sha256"] = "0" * 64
+            bad["inventory_sha256"] = phases.sha(phases.encoded(bad["inventory"]))
+            with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                self.validate_native_cost(phases, bad)
+
+    def test_cost_native_proof_cannot_hide_debug_profile_behind_valid_outer_hashes(self):
+        phases, first, _ = self.lane_proofs()
+        bad = copy.deepcopy(first)
+        bad["current_cost_probe"]["artifact"]["cargo_profile"]["opt_level"] = "0"
+        path = self.root / "rehash.json"
+        digest = phases.write_bounded(path, bad)
+        restored = phases.read_bounded(path, digest)
+        with self.assertRaises(RuntimeError):
+            self.validate_native_cost(phases, restored)
+
+    def test_cost_aggregate_preserves_validated_release_record_without_reexecution(self):
+        phases, first, second = self.lane_proofs()
+        first_hash = phases.write_bounded(self.root / "proof/native-a.json", first)
+        second_hash = phases.write_bounded(self.root / "proof/native-b.json", second)
+        third = copy.deepcopy(second)
+        third["lane"] = "c"
+        third_hash = phases.write_bounded(self.root / "proof/native-c.json", third)
+        platform = {"version": 1, "phase": "platform", "status": "passed", "qualification": "pending",
+                    "identity": self.identity, "native_manifest_sha256": first_hash, "plan_sha256": first["plan_sha256"]}
+        platform_hash = phases.write_bounded(self.root / "platform/platform.json", platform)
+        environment = {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_MANIFEST_SHA256": first_hash,
+                       "M9E_NATIVE_B_MANIFEST_SHA256": second_hash, "M9E_PLATFORM_MANIFEST_SHA256": platform_hash,
+                       "M9E_NATIVE_C_RESULT": "success", "M9E_NATIVE_C_MANIFEST_SHA256": third_hash,
+                       "M9E_NATIVE_A_RESULT": "success", "M9E_NATIVE_B_RESULT": "success", "M9E_PLATFORM_RESULT": "success"}
+        with patch.dict(os.environ, environment), patch.object(phases, "identity", return_value=self.identity), \
+                patch.object(phases, "ROOT", self.repository), patch.object(self.cost, "read_content", return_value=self.content), \
+                patch.object(self.cost, "execute_release") as execute:
+            aggregate = phases.aggregate(SimpleNamespace())
+        execute.assert_not_called()
+        self.assertEqual(aggregate["qualification"], "passed")
+        self.assertEqual(aggregate["current_cost_probe"], first["current_cost_probe"])
+        self.assertEqual(aggregate["tests"]["executed"], 1)
+        self.assertEqual(aggregate["native_manifest_sha256"], first_hash)
+
+    def test_cost_compact_pointer_preserves_other_fields_and_exact_full_summary_hash(self):
+        phases, first, _ = self.lane_proofs()
+        compact = {"status": "passed", "tests": first["tests"], "current_cost_probe": first["current_cost_probe"]}
+        unchanged = copy.deepcopy(compact)
+        self.cost.compact(compact, "d" * 64, phases.encoded)
+        self.assertEqual(compact, unchanged)
+        compact["other_required_evidence"] = "x" * 9000
+        self.assertGreater(len(phases.encoded(compact)), 16000)
+        preserved = {key: value for key, value in compact.items() if key != "current_cost_probe"}
+        self.cost.compact(compact, "d" * 64, phases.encoded)
+        self.assertEqual(compact["current_cost_probe"], {"file": "phase-summary.json", "sha256": "d" * 64,
+                                                       "field": "current_cost_probe"})
+        self.assertEqual({key: value for key, value in compact.items() if key != "current_cost_probe"}, preserved)
+        self.assertLessEqual(len(phases.encoded(compact)), 16000)
+
+    def test_cost_proof_transport_retains_existing_raw_and_expanded_byte_limits(self):
+        phases, first, _ = self.lane_proofs()
+        self.assertEqual(phases.MANIFEST_LIMIT, 65536)
+        self.assertEqual(phases.NATIVE_PROOF_LIMIT, 196608)
+        first["unbounded_extra"] = "x" * 65536
+        with self.assertRaises(RuntimeError):
+            phases.write_bounded(self.root / "oversized.json", first)
 if __name__ == "__main__":
     unittest.main()

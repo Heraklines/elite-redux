@@ -770,6 +770,8 @@ def plan():
                                       focus_policy, merge_targets, selected_owner, source_binding)
     product_changes = [path for path in changed if path not in (HELPER_PATH, "scripts/ci/m9e_title_storage.py") and path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
+    import m9e_current_cost as cost
+    cost_session = cost.select_scope(config, product_changes, ROOT)
     from m9e_phases import STATE_QUERY_PATHS, STATE_QUERY_TARGET, STATE_QUERY_TEST_IDS, STATE_QUERY_IDENTITIES
     state_query_focus = config.get("current_state_query_focus", {})
     if state_query_focus and (state_query_focus.get("paths") != STATE_QUERY_PATHS
@@ -904,7 +906,7 @@ def plan():
     max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session or cost_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -1090,6 +1092,8 @@ def plan():
         ai_snapshot_targets = {**timer_focus["required_targets"], "er-ai": ["er_ai"]}
         ai_snapshot_ids = {**timer_focus["exact_test_ids"], "er-ai:er_ai": list(AI_SNAPSHOT_VALIDATION_IDS)}
         boundaries = [path for path in boundaries if path not in AI_SNAPSHOT_VALIDATION_PATHS]
+    if cost_session:
+        boundaries = [path for path in boundaries if path != cost.SOURCE]
     if max_pp_session:
         boundaries = [path for path in boundaries if path not in AI_MAX_PP_PATHS]
     if read_session:
@@ -1138,6 +1142,11 @@ def plan():
     query_required = query_required or state_query_required
     if query_required and not query_focus:
         raise RuntimeError("selected current control query target requires its exact policy")
+    cost_selected = cost.TARGET[0] in selected and (execution_scope is None
+        or "*" in execution_scope.get(cost.TARGET[0], []) or cost.TARGET[1] in execution_scope.get(cost.TARGET[0], []))
+    cost_required = cost_selected and (cost_session or (ROOT / cost.SOURCE).is_file())
+    if cost_required and config.get("current_cost_probe_focus") is None:
+        raise RuntimeError("selected current cost probe requires its exact policy")
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
@@ -1215,6 +1224,9 @@ def plan():
               "current_read_rebind_focus": read_session,
               "current_title_storage_focus": title_session,
               "requires_title_storage": title_required,
+              "current_cost_probe_focus": cost_session,
+              "requires_current_cost_probe": cost_required,
+              "current_cost_source_binding": cost.build_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if cost_required else None,
               "current_state_query_focus": state_query_session,
               "requires_current_state_query": state_query_required,
               "current_control_query_focus": query_session,
@@ -1306,6 +1318,9 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
             identity: [*inherited, *[name for name in AI_MAX_PP_IDS if name not in inherited]]}
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
+    if cost_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {cost.TARGET[0]: [cost.TARGET[1]]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], ":".join(cost.TARGET): [cost.TEST_ID]}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
     # to broad native success or bypass the timer and replica mutant gate.
@@ -2009,6 +2024,10 @@ def write_progress(summary, phase, target=None):
 def native_execution_order(selection, enumerated):
     # Discovery and lint already covered every selected target. Exercise current
     # kernel changes before long process witnesses without changing membership.
+    if selection.get("requires_current_cost_probe"):
+        import m9e_current_cost as cost
+        ordered = native_execution_order({**selection, "requires_current_cost_probe": False}, enumerated)
+        return sorted(ordered, key=lambda item: (item[4].name, item[2]) != cost.TARGET)
     if selection.get("current_state_query_focus"):
         ordered = native_execution_order({**selection, "current_state_query_focus": False}, enumerated)
         return sorted(ordered, key=lambda item: (item[4].name, item[2]) not in {
@@ -2045,6 +2064,7 @@ def native_execution_order(selection, enumerated):
 
 
 def main(preflight_failure=None):
+    native_deadline = time.monotonic() + 1800
     COMPACT.mkdir(parents=True, exist_ok=True)
     FULL.mkdir(parents=True, exist_ok=True)
     (COMPACT / "clippy-diagnostics.json").unlink(missing_ok=True)
@@ -2219,6 +2239,9 @@ def main(preflight_failure=None):
                             "assigned_targets": assigned, "completed_targets": [],
                             "phase": "native", "qualification": "pending"})
             enumerated = [item for item in enumerated if [item[4].name, item[2]] in assigned]
+        from m9e_phases import identity as phase_identity
+        import m9e_current_cost as cost
+        release_identity = phase_identity(sys.modules[__name__]) if selection.get("requires_current_cost_probe") else None
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             # Run even zero-test harnesses and fail if reported counts disagree.
             write_progress(summary, "native", f"{cwd.name}:{name}")
@@ -2234,9 +2257,20 @@ def main(preflight_failure=None):
             for test_id in sorted(excluded_ids):
                 command.extend(["--skip", test_id])
             try:
-                with output.open("w") as stream:
-                    code = subprocess.run(command, cwd=cwd,
-                                          env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
+                if (cwd.name, name) == cost.TARGET:
+                    if (not selection.get("requires_current_cost_probe") or os.environ.get("M9E_PHASE") != "native"
+                            or os.environ.get("M9E_NATIVE_LANE") != "a" or excluded_ids
+                            or "current_cost_probe" in summary):
+                        raise RuntimeError("cost release override is outside its exactly-once native A scope")
+                    output, summary["current_cost_probe"] = cost.execute_release(
+                        ROOT, REPORT, FULL, identity=release_identity,
+                        source_binding=selection["current_cost_source_binding"], discovered_ids=ids,
+                        global_deadline=native_deadline)
+                    code = 0
+                else:
+                    with output.open("w") as stream:
+                        code = subprocess.run(command, cwd=cwd,
+                                              env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
             except subprocess.TimeoutExpired as error:
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
@@ -2348,7 +2382,7 @@ def main(preflight_failure=None):
             summary["plan"] = {"file": "plan.json", "sha256": digest(FULL / "plan.json")}
             encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
         if len(encoded_summary) > 16000:
-            for key in ("native_target_timing_ms", "required_native_target_counts", "build_only_targets", "timing_ms"):
+            for key in ("native_target_timing_ms", "required_native_target_counts", "build_only_targets", "timing_ms", "current_cost_probe"):
                 if key in summary:
                     summary[key] = {"file": "full-summary.json", "sha256": digest(FULL / "full-summary.json")}
             encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
