@@ -2431,3 +2431,28 @@ selected record JSON SHA256
 Prepared Stench and selected move programs have no query bindings; bespoke
 classifications remain and are not claimed mechanic-free. All prior41 assertion
 sites remain plus six Harden metadata guards; complete runtime proof is pending.
+
+## Preserve forbidden-command rejection tests outside public API source
+
+2466a2dc374d4cf4f7ae3b7d3a4c256181151109 / run34002882835 completed
+1,158 native A tests: 1,157 passed and one failed in m71_foundation. The four
+current damage-query tests now passed, including effective Harden metadata,
+independent46/13 values, PP bounds, state conservation and actual turn RNG.
+The whole cut remains unqualified; f140/33990371692 remains the baseline.
+Retrieved only5914-byte summary and795-byte failure from inspected2462-byte
+compact9980124337. Full diagnostics186944 bytes remain remote.
+
+The old architecture guard includes the entire agent-protocol library source.
+Its forbidden choose_move substring occurs only in an intentional cfg(test)
+request that verifies rejection, not a public API. Move that complete module into
+src/ingress_diagnostic_tests.rs and retain its original module name, both exact
+qualified test IDs, all10 assertions and the exact forbidden command. The guard,
+production request classification and dispatch behavior remain unchanged.
+Source note1bdf62e0c43da560956565596a69a5e994556d8ab5d32e41f89929860ddef819
+records the diagnosis. This is a test-source relocation, not a guard exemption.
+
+Add only that sibling path to the existing exact repair-companion registry and
+its strict mirrored fixture (58 paths). All165 harness declarations,77 mandatory
+nonempty targets, exact native IDs, selected reverse compilation, Clippy,
+Worker/Wasm/browser controls, proof caps and mutation obligations remain.
+No local compilation, formatting, test, browser or installation was run.

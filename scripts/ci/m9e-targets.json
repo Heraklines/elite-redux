@@ -1074,7 +1074,8 @@
       "rust/crates/er-testkit/tests/m6_item_parity.rs",
       "rust/crates/er-testkit/tests/m6_move_parity.rs",
       "rust/crates/er-testkit/tests/m6_species_form_parity.rs",
-      "rust/crates/er-testkit/tests/m6_properties.rs"
+      "rust/crates/er-testkit/tests/m6_properties.rs",
+      "rust/crates/er-agent-protocol/src/ingress_diagnostic_tests.rs"
     ],
     "execute": {
       "er-batch": [

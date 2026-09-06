@@ -90,6 +90,7 @@ AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-testkit/tests/m6_move_parity.rs",
     "rust/crates/er-testkit/tests/m6_species_form_parity.rs",
     "rust/crates/er-testkit/tests/m6_properties.rs",
+    "rust/crates/er-agent-protocol/src/ingress_diagnostic_tests.rs",
 ]
 
 
