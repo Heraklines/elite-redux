@@ -5298,7 +5298,7 @@ class FeedbackTests(unittest.TestCase):
             self.events.clear()
             self.binary_envs.clear()
             self.extra_artifacts = original_artifacts[1:] if failure == "worker" else original_artifacts
-            self.binary_ids["m9e_current_state_query"] = [] if failure == "witness" else original_ids
+            self.binary_ids["m9e_current_state_query"] = ["renamed"] if failure == "witness" else original_ids
             self.clippy_codes = {"er-cli": 1} if failure == "lint" else {}
             code, summary = self.invoke()
             self.assertEqual(code, 1)
@@ -6432,7 +6432,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
-        self.assertEqual(len(assignment["b"]), 4)
+        self.assertEqual(len(assignment["b"]), 3)
         self.assertEqual(len(assignment["a"]) + len(assignment["b"]), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
         self.assertEqual(sorted(assignment["a"] + assignment["b"]),
