@@ -2950,3 +2950,25 @@ Remote preflight89c547860b567c1a5ac6b24ff3b307835e331474/run34042046105 passed t
 remains outside main. Actual remote rustfmt changed only this Title witness1075
 bytes; namedcompact9991967131ZIP1902/sourcehashes checked before applying. Exact
 Title native/platform qualification remains pending, comparisonstillqualified5b.
+Title 748728a333433ee24acd83080b9006d378e286f0 / run34042137836 is now fully
+qualified: native A1080/B18 =1098, all111 inventory targets,64 mandatory targets,
+27 exact identity maps,232 harness cases, platform and aggregate passed. Bounded
+metadata audit matched56 cached source bindings, complete/disjoint partitions,
+cross-phase source/plan/artifact hashes, retained owner/READ/storage/RTC evidence,
+and both detected/restored mutants. Aggregate37431 bytes SHA256
+c3b5b530cec9fa457300f792c30462c2023440285ab824fbad1aab0fe1152e36.
+Only platform52245 and aggregate37431 named proof members were downloaded from
+archives9992599973(13858) and9992613141(9931); generated assets/logs remain remote.
+
+Integrate prepared Title storage retirement onto this verified ancestor. Six
+product files retain read-only owners in CANCELLING until backend work and queued
+callbacks drain, suppress stale delivery, preserve uncertain ownership and write
+semantics, and retire more than sixteen actual LIST/READ owners before real load
+and generation-two Write. Keep both real Workers, full Rust snapshot oracle,
+all previous storage callbacks and the corrected keydown/keyup replay accounting.
+Five CI files preserve Title/lint/owner/READ/Worker/RTC/CLI/Wasm obligations and add
+strict source-bound retirement evidence. Remote preflight7e84b068/run34041724939
+passed257 harness cases; all5 changed CI hashes matched before copying. Product
+Rust fixture remains remotely formatted e6fa69d6105b9437b7bc3869d483ebe72b0ac06e2425a088c6303522cfbca98f.
+Comparison advances only to qualified748; full retirement runtime still pending.
+This is an integration checkpoint, not completion of M9.
