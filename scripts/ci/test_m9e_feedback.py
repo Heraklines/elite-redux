@@ -13,7 +13,10 @@ import io
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -2622,7 +2625,8 @@ class FeedbackTests(unittest.TestCase):
                     self.assertIn(reverse, selection["packages"])
                     self.assertNotIn(reverse, selection["execution_scope"])
                 self.assertNotIn("m9e_current_rulechange_reload", selection["required_native_targets"]["er-cli"])
-                self.assertNotIn(("er-cli", "m9e_current_rulechange_reload"), self.feedback.WORKER_BOUND_TARGETS)
+                self.assertIn(("er-cli", "m9e_current_rulechange_reload"), self.feedback.WORKER_BOUND_TARGETS)
+                self.assertIsNone(selection["rule_worker"])
 
     def test_ai_damage_query_mixed_and_dependency_paths_fail_closed_without_changing_old_scopes(self):
         self.configure_ai_damage_query_scope()
