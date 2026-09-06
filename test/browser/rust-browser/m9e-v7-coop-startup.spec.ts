@@ -146,12 +146,20 @@ async function pair(browser: Browser): Promise<Pair> {
       if (initial.lifecycle.kind !== "BOOTSTRAP" || initial.lifecycle.value.stage !== "TITLE"
         || initial.lifecycle.value.seed !== seed || initial.lifecycle.value.selections.starters.length !== 0
         || initial.current_coop_setup == null) throw new Error("actual Worker did not start its owned empty Title setup");
+      let control = structuredClone(initial.lifecycle.value.control);
+      let rawInputs = 0;
       const press = async (kind = "SPACE") => {
-        await peer.dispatch({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN", data: {
-          code: { kind }, printable: false, browser_repeat: false, focus: "GAME" } } });
-        await peer.dispatch({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind } } } });
+        for (const event of [{ kind: "KEY_DOWN", data: { code: { kind }, printable: false, browser_repeat: false, focus: "GAME" } },
+          { kind: "KEY_UP", data: { code: { kind } } }]) {
+          const response = await peer.dispatch({ kind: "RAW_INPUT", event });
+          if (response.response.kind !== "EFFECTS") throw new Error("actual raw Worker effects required");
+          for (const effect of response.response.batch.effects) {
+            if (effect.kind === "UI_CHANGED") control = structuredClone(effect.control);
+          }
+          rawInputs++;
+        }
       };
-      (globalThis as any).__naturalCoop = { peer, evidence, press,
+      (globalThis as any).__naturalCoop = { peer, evidence, press, control: () => structuredClone(control), rawInputs: () => rawInputs,
         snapshot: async () => (await peer.dispatch({ kind: "SNAPSHOT" })).response.snapshot,
         retry: async () => { await peer.dispatch({ kind: "RETRY_COOP_SETUP" }); } };
     }, { entry: `${address}/assets/${manifest.entry}`,
@@ -173,17 +181,22 @@ const press = (page: Page, kind = "SPACE"): Promise<void> => page.evaluate(kind 
 const retry = (page: Page): Promise<void> => page.evaluate(() => (globalThis as any).__naturalCoop.retry());
 const frames = (page: Page): Promise<any[]> => page.evaluate(() => (globalThis as any).__naturalCoop.evidence.frames);
 async function navigate(page: Page, target: string): Promise<void> {
-  const initial = (await snapshot(page)).lifecycle.value.control.menu;
-  const bound = initial.options.length + 1;
-  for (let index = 0; index < bound; index++) {
-    const menu = (await snapshot(page)).lifecycle.value.control.menu;
-    if (menu.selected_option_id === target) return;
-    const current = menu.options.findIndex((option: any) => option.option_id === menu.selected_option_id);
-    const wanted = menu.options.findIndex((option: any) => option.option_id === target);
-    if (current < 0 || wanted < 0) throw new Error(`actual bootstrap option missing: ${target}`);
-    await press(page, wanted < current ? "ARROW_UP" : "ARROW_DOWN");
-  }
-  throw new Error(`bounded raw navigation could not reach ${target}`);
+  await page.evaluate(async target => {
+    const current = (globalThis as any).__naturalCoop;
+    // UI_CHANGED is the actual Rust control returned by each Worker response.
+    // Keep every raw key event while avoiding full snapshots and browser-driver
+    // crossings between arrows. The observation never predicts or edits a menu.
+    const bound = current.control().menu.options.length + 1;
+    for (let index = 0; index < bound; index++) {
+      const menu = current.control().menu;
+      if (menu.selected_option_id === target) return;
+      const selected = menu.options.findIndex((option: any) => option.option_id === menu.selected_option_id);
+      const wanted = menu.options.findIndex((option: any) => option.option_id === target);
+      if (selected < 0 || wanted < 0) throw new Error(`actual bootstrap option missing: ${target}`);
+      await current.press(wanted < selected ? "ARROW_UP" : "ARROW_DOWN");
+    }
+    throw new Error(`bounded raw navigation could not reach ${target}`);
+  }, target);
 }
 async function choices(page: Page, host: boolean): Promise<any[]> {
   const before = (await snapshot(page)).lifecycle.value;
@@ -276,6 +289,7 @@ for (const hostFirst of [true, false]) {
       expect((await frames(peers.left)).filter(frame => frame.direction === "sent").map(frame => frame.bytes)).toEqual([sentHost, sentHost, sentHost]);
       expect(await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.evidence.presentations)))).toEqual(presentations);
       expect(peers.workers).toHaveLength(2);
+      const rawInputs = await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.rawInputs())));
       for (const url of peers.workers) { expect(new URL(url).origin).toBe(address); expect(new URL(url).pathname).toBe(`/assets/${manifest.worker}`); }
       await info.attach("m9e-natural-coop-startup", { contentType: "application/json", body: Buffer.from(JSON.stringify({
         source_sha: manifest.source_sha, order: hostFirst ? "host" : "guest", actual_workers: peers.workers.length,
@@ -284,7 +298,7 @@ for (const hostFirst of [true, false]) {
         guest_choices: guestChoices.map(choice => choice.species_id), choices_sha256: digest(Buffer.from(sentGuest)),
         started_sha256: digest(Buffer.from(sentHost)), choices_bytes: sentGuest.length, started_bytes: sentHost.length,
         party_owners: party.map((pokemon: any) => pokemon.owner_seat), presentations: presentations[0].length,
-        received: [hostFirst ? 2 : 3, 3], retry_preserved_snapshots: true,
+        received: [hostFirst ? 2 : 3, 3], raw_inputs: rawInputs, retry_preserved_snapshots: true,
       })) });
     } finally {
       try { await Promise.allSettled([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.dispose()))); }
