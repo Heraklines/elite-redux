@@ -5451,6 +5451,158 @@ class FeedbackTests(unittest.TestCase):
             owner.legacy_rtc_view(bad, context["binding"], context["helper_hash"])
         with self.assertRaises(RuntimeError):
             owner.legacy_rtc_view(tests, context["binding"], "0" * 64)
+    def configure_title_storage_core_scope(self):
+        self.configure_composition_after_read_and_owner()
+        actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["current_title_storage_focus"] = actual["current_title_storage_focus"]
+        self.package("er-testkit")
+        self.package("er-title-reverse", '[dependencies]\nkit = { package = "er-testkit", path = "../er-testkit" }\n')
+        for name in self.feedback.TITLE_STORAGE_PATHS:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("current Title source fixture: " + name)
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(self.feedback.TITLE_STORAGE_PATHS)
+
+    def test_title_storage_core_requires_all_new_ingress_and_historical_bootstrap_witnesses(self):
+        self.configure_title_storage_core_scope()
+        before = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        self.assertEqual(len(self.feedback.TITLE_STORAGE_PATHS), 15)
+        self.assertEqual(len(self.feedback.TITLE_STORAGE_TRIGGERS), 4)
+        for flag in ("current_title_storage_focus", "requires_title_storage", "requires_current_proposal", "requires_read_rebind",
+                     "requires_worker_storage", "requires_current_storage", "requires_browser_worker", "requires_browser_rtc",
+                     "requires_wasm", "requires_browser", "requires_cli_executable", "requires_worker_executable", "timer_focus"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
+        for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
+            self.assertEqual(selection["required_native_test_ids"][identity], ids)
+            self.assertIn(identity.split(":")[1], selection["required_native_targets"][identity.split(":")[0]])
+        self.assertEqual([len(ids) for ids in self.feedback.TITLE_STORAGE_IDS.values()], [6, 2, 2, 8])
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-web:m9e_host_v2"]), 14)
+        self.assertIn("quiescent_v6_snapshot_migrates_without_gameplay_side_effects", selection["required_native_test_ids"]["er-kernel:m9e_snapshot_v7"])
+        self.assertIn("game_save_v2_restores_every_control_kind", selection["required_native_test_ids"]["er-kernel:m9e_domain_journeys_v7"])
+        self.assertIn("er-title-reverse", selection["packages"])
+        self.assertNotIn("er-title-reverse", selection["execution_scope"])
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+
+    def test_title_storage_core_policy_missing_mapping_and_mixed_changes_fail_closed(self):
+        self.configure_title_storage_core_scope()
+        original = copy.deepcopy(self.config["current_title_storage_focus"])
+        for mutation in ("paths", "trigger_paths", "exact_test_ids", "extra", "type", "absent"):
+            with self.subTest(mutation=mutation):
+                policy = copy.deepcopy(original)
+                if mutation in ("paths", "trigger_paths"):
+                    policy[mutation].pop()
+                elif mutation == "exact_test_ids":
+                    policy[mutation]["er-kernel:m9e_title_storage"].pop()
+                elif mutation == "extra":
+                    policy["skip"] = True
+                elif mutation == "type":
+                    policy = True
+                else:
+                    policy = {}
+                self.config["current_title_storage_focus"] = policy
+                (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+                with self.assertRaisesRegex(RuntimeError, "policy identities|additional mapping"):
+                    self.feedback.plan()
+        self.config["current_title_storage_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for extra in ("rust/Cargo.lock", "rust/crates/er-game/src/current_bootstrap_other.rs",
+                      "rust/crates/er-ai/src/authority_v2.rs", "src/rust-browser/routes/rust-current-storage-entry.ts",
+                      "src/rust-browser/routes/rust-current-rtc-entry.ts", "package.json"):
+            self.changed = [*self.feedback.TITLE_STORAGE_PATHS, extra]
+            with self.assertRaisesRegex(RuntimeError, "additional mapping|mixed source scope"):
+                self.feedback.plan()
+        for trigger in self.feedback.TITLE_STORAGE_TRIGGERS:
+            self.changed = [trigger]
+            self.assertTrue(self.feedback.plan()["current_title_storage_focus"])
+        self.assertEqual(self.executed, [])
+
+    def test_title_storage_core_exact_test_inventory_rejects_every_omission_rename_and_duplicate(self):
+        self.configure_title_storage_core_scope()
+        selection = self.feedback.plan()
+        exact = selection["required_native_test_ids"]
+        rows = [(*identity.split(":"), ids) for identity, ids in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        for identity, names in self.feedback.TITLE_STORAGE_IDS.items():
+            index = next(index for index, row in enumerate(rows) if ":".join(row[:2]) == identity)
+            crate, target, ids = rows[index]
+            for name in names:
+                for replacement in ([item for item in ids if item != name],
+                                    [item if item != name else item + "_renamed" for item in ids], [*ids, name]):
+                    with self.subTest(identity=identity, name=name, replacement=replacement):
+                        with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                            self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+
+    def test_title_storage_core_remains_required_for_later_snapshot_owner_read_and_composition(self):
+        self.configure_title_storage_core_scope()
+        self.configure_ai_snapshot_validation_scope()
+        snapshots = list(self.config["ai_snapshot_validation_focus"]["paths"])
+        for paths, count in ((snapshots, 28), (self.config["current_proposal_focus"]["paths"], 29),
+                             (self.config["current_read_rebind_focus"]["paths"], 27),
+                             (self.config["current_worker_storage_focus"]["paths"], 55)):
+            self.changed = list(paths)
+            selection = self.feedback.plan()
+            self.assertTrue(selection["requires_title_storage"])
+            self.assertFalse(selection["current_title_storage_focus"])
+            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), count)
+            for target, ids in self.feedback.TITLE_STORAGE_IDS.items():
+                self.assertEqual(selection["required_native_test_ids"][target], ids)
+            self.assertTrue(selection["requires_current_proposal"])
+            self.assertTrue(selection["requires_read_rebind"])
+            self.assertTrue(selection["requires_worker_storage"])
+        self.changed = ["docs/plans/rust-kernel/m9e-readiness.md"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["requires_title_storage"])
+        self.assertEqual(selection["packages"], ["er-canonical"])
+
+    def test_title_storage_core_full_clippy_and_execution_preserve_required_counts_and_controls(self):
+        self.configure_title_storage_core_scope()
+        selection = self.feedback.plan()
+        self.binary_ids = {}
+        for crate, targets in selection["execution_scope"].items():
+            if "*" in targets:
+                targets = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for target in targets:
+                binary = target if target not in self.binary_ids else crate + "--" + target
+                self.binary_ids[binary] = selection["required_native_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_crates[binary], self.binary_targets[binary] = crate, target
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        for fail in (True, False):
+            self.clippy_codes["er-testkit"] = 1 if fail else 0
+            self.executed.clear()
+            self.events.clear()
+            self.commands.clear()
+            with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                    patch.object(self.feedback, "timer_behavioral_mutant") as timer, patch.object(self.feedback, "replica_behavioral_mutant") as replica, \
+                    patch.object(self.feedback, "collect_clippy_failure_diagnostics") as diagnostics:
+                code, summary = self.invoke()
+            if (self.full / "full-summary.json").is_file():
+                summary = json.loads((self.full / "full-summary.json").read_text())
+            self.assertEqual(code, 1 if fail else 0)
+            lint = [args for args in self.commands if args[:2] == ["cargo", "clippy"]]
+            self.assertEqual(len(lint), 1)
+            self.assertEqual([lint[0][index + 1] for index, word in enumerate(lint[0]) if word == "-p"], selection["packages"])
+            if fail:
+                self.assertEqual(self.executed, [])
+                diagnostics.assert_called_once()
+                for check in (wasm, browser, timer, replica):
+                    check.assert_not_called()
+            else:
+                self.assertEqual(len(summary["required_native_target_counts"]), 55)
+                for target, ids in self.feedback.TITLE_STORAGE_IDS.items():
+                    self.assertEqual(summary["required_native_target_counts"][target], len(ids))
+                self.assertEqual([(self.binary_crates[name], self.binary_targets[name]) for name in self.executed[:4]],
+                                 [(crate, target) for crate, targets in self.feedback.TITLE_STORAGE_TARGETS.items() for target in targets])
+                diagnostics.assert_not_called()
+                for check in (wasm, browser, timer, replica):
+                    check.assert_called_once()
+
     def configure_composition_after_read_and_owner(self):
         self.configure_worker_storage_composition_scope()
         self.configure_read_rebind_scope()

@@ -186,6 +186,7 @@ fn natural_host() -> Result<(BrowserKernelHostV2, u64), Box<dyn Error>> {
                 seed: "browser-v2-natural".to_owned(),
                 save_slots: vec!["preview-slot".to_owned()],
                 local_is_host: true,
+                existing_saves: false,
             }),
         },
     )
@@ -1653,6 +1654,7 @@ fn current_session_and_browser_match_natural_input_and_external_outcomes()
                 seed: "browser-session-parity".to_owned(),
                 save_slots: vec!["preview-slot".to_owned()],
                 local_is_host: true,
+                existing_saves: false,
             }),
         },
     )?;

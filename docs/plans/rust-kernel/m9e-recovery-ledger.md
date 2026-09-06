@@ -2841,3 +2841,31 @@ This non-ancestor is not the main comparison. State query may now qualify separa
 as its descendant; eventual main integration must retain newer owner/storage gates.
 Broad M9 remains unfinished, including natural Title storage, reconnect/expiry,
 source AI/content gaps, further tooling and final frozen engineering qualification.
+
+READ checkpoint0fcde2f871faed85560926e1f78b0726d3c4c1c0/run34035988852 qualified:
+all four jobs passed,624 native A604/B20,zero skipped/failed,67 inventory targets,
+23 mandatory/18 exact maps. Current kernel12 including all5 READ regressions;
+host14 and owner2 retained. Wasm/in-page/typed/Worker/codec/CLI bridge/RTC passed,
+both mutants detected/restored. Metadata audit verified28 source hashes, restored
+plan and complete disjoint inventory, all cross-phase hashes, receipt binding and
+unchanged RTC material semantics. Aggregate22913 bytes SHA
+542edc273f12460f57d91bd7217c3aa96cc5c3680f2fdd603085697ffde5a074.
+Only bounded proof metadata downloaded: A63318/B59572/platform32852/aggregate22913;
+all runtime binaries, browser assets and full logs remained remote.
+
+Use this qualified READ ancestor for complete Worker storage integration: the four
+independently qualified adapter1b4cb519 product paths plus four Worker composition
+paths, with the actual READ rebind/generation-two-write revision. The same I gate
+requires adapter Node5/Chromium3, actual two-Worker composition2, all installed
+owner/READ/AI/RTC/CLI/Worker/Wasm/causal checks and both mutants. Scope permits only
+these exact eight related paths; unknown neighboring files and missing adapter
+sources reject. Remote harness preflight82009b14/run34037420185 passed225 cases;
+ce5f84d7/run34037517720 repeated225 and formatted the exact Rust fixture. Verified
+all CI hashes plus source before/after; format patch23454 bytes SHA
+96631c3a4a213d48719a96a42ce83cc8d02cd7feeb9950de334114b31c280c72.
+Composition uses actual GameSaveV2 bytes through two Workers, independent pending
+presentations, committed-write reconciliation, and a fresh raw generation-two Write
+after Load. It is explicitly a controlled Active save/load checkpoint. Natural
+Title discovery/cancellation, reconnect, AI fidelity and whole-M9 Q remain pending.
+This integration needs actual native/platform qualification; preflight alone is
+not a game result. No deployment, default activation or real player-save access.
