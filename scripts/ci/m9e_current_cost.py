@@ -12,6 +12,7 @@ import re
 import selectors
 import signal
 import subprocess
+import tempfile
 import time
 import tomllib
 
@@ -446,3 +447,157 @@ def release_environment(repository, target_directory, inherited):
     environment["CARGO_TARGET_DIR"] = str(target_directory)
     return environment, {"settings": settings, "cargo_config_files": 0, "compiler_overrides": 0,
                          "target": "native-host", "features": "default", "profile": "release"}
+
+
+def encoded(value):
+    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def execute_release(repository, temporary, diagnostics, *, identity, source_binding, discovered_ids, global_deadline):
+    """Execute the sole globally discovered target once using a fresh release build.
+
+    The caller owns ordinary inventory/count accounting. This returns only after
+    exact one-test success, final executable/source/content verification and owned
+    temporary target cleanup. No binary is transferred to another phase.
+    """
+    repository = Path(repository).resolve()
+    temporary, diagnostics = Path(temporary).resolve(), Path(diagnostics).resolve()
+    if (identity.get("profile") != "test" or identity.get("features") != "default"
+            or identity.get("target") != "x86_64-unknown-linux-gnu"
+            or discovered_ids != [TEST_ID] or type(global_deadline) not in (int, float)
+            or not math.isfinite(global_deadline) or global_deadline <= time.monotonic()
+            or build_source_binding(repository, identity["product_sha"]) != source_binding):
+        fail("release execution candidate/global inventory binding")
+    content = read_content(repository)
+    logs = {}
+    with tempfile.TemporaryDirectory(prefix="m9e-current-release-", dir=temporary) as owned:
+        target = Path(owned).resolve() / "target"
+        target.mkdir(exist_ok=False)
+        environment, environment_binding = release_environment(repository, target, dict(os.environ))
+        def run(command, name, seconds, limit, cwd):
+            result = run_bounded(command, cwd=cwd, environment=environment,
+                                 output=diagnostics / ("current-cost-" + name + ".log"),
+                                 seconds=seconds, byte_limit=limit, global_deadline=global_deadline)
+            logs[name] = {key: result[key] for key in ("bytes", "sha256", "elapsed_seconds")}
+            return result["path"]
+        build = run(["cargo", "test", "--locked", "--release", "-p", TARGET[0], "--test", TARGET[1],
+                     "--no-run", "--message-format=json"], "build", 900, 16 << 20, repository / "rust")
+        records = [json.loads(line) for line in build.read_text().splitlines() if line.startswith("{")]
+        executable, artifact = discover_release(records, repository=repository, target_directory=target)
+        check_executable(executable, artifact)
+        listing = run([str(executable), "--list", "--format", "terse"], "list", 30, 16384, repository / "rust")
+        validate_listing(listing.read_bytes(), discovered_ids)
+        check_executable(executable, artifact)
+        output = run([str(executable), TEST_ID, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"],
+                     "execute", 600, 16384, repository / "rust/crates/er-repro")
+        raw = output.read_bytes()
+        if re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", raw) != [
+                (b"1", b"0", b"0", b"0", b"0")]:
+            fail("release target exact-one completion")
+        lines = [line for line in raw.splitlines(keepends=True) if line.startswith(PREFIX)]
+        if len(lines) != 1:
+            fail("release target sole measurement record")
+        parse_line(lines[0], architecture="x86_64", operating_system="linux",
+                   bundle_bytes=content["bundle"]["bytes"], content_identity=content["identity"])
+        check_executable(executable, artifact)
+        if (read_content(repository) != content
+                or build_source_binding(repository, identity["product_sha"]) != source_binding):
+            fail("release execution source/content conservation")
+        proof = {"schema_version": 1, "status": "passed", "execution_profile": "release",
+                 "target": list(TARGET), "test_id": TEST_ID,
+                 "phase_identity_sha256": hashlib.sha256(encoded(identity)).hexdigest(),
+                 "source_binding_sha256": hashlib.sha256(encoded(source_binding)).hexdigest(),
+                 "content": content, "artifact": artifact, "environment": environment_binding,
+                 "record": {"line": lines[0].decode("utf-8"), "bytes": len(lines[0]),
+                            "sha256": hashlib.sha256(lines[0]).hexdigest()},
+                 "logs": logs, "tests": {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}}
+        if len(encoded(proof)) > 16384:
+            fail("release execution proof exceeds 16 KiB")
+    validate_execution(proof, repository=repository, identity=identity,
+                       source_binding=source_binding, content=content)
+    if time.monotonic() > global_deadline:
+        fail("release evidence/cleanup completed after the native deadline")
+    return output, proof
+
+def validate_execution(proof, *, repository, identity, source_binding, content):
+    """Revalidate transferred release metadata against this exact candidate.
+
+    This does not reconstruct or execute a deleted binary. The producer owns its
+    actual execution and conservation; hashed cross-phase evidence binds that
+    execution to the same source, content, workflow run and native inventory.
+    """
+    repository = Path(repository).resolve()
+    if (identity.get("profile") != "test" or identity.get("features") != "default"
+            or identity.get("target") != "x86_64-unknown-linux-gnu"
+            or identity.get("workflow_sha") != identity.get("product_sha")):
+        fail("transferred phase profile or candidate identity")
+    exact_fields(source_binding, ["source_sha", "source_hashes", "cargo_manifests"], "source binding")
+    if build_source_binding(repository, identity["product_sha"]) != source_binding:
+        fail("transferred build source binding differs from candidate")
+    exact_fields(proof, ["schema_version", "status", "execution_profile", "target", "test_id",
+                         "phase_identity_sha256", "source_binding_sha256", "content", "artifact",
+                         "environment", "record", "logs", "tests"], "release proof")
+    integer(proof["schema_version"], 1, 1, "release proof schema")
+    if (len(encoded(proof)) > 16384 or proof["status"] != "passed" or proof["execution_profile"] != "release"
+            or proof["target"] != list(TARGET) or proof["test_id"] != TEST_ID
+            or proof["phase_identity_sha256"] != hashlib.sha256(encoded(identity)).hexdigest()
+            or proof["source_binding_sha256"] != hashlib.sha256(encoded(source_binding)).hexdigest()):
+        fail("transferred release identity or proof byte bound")
+    exact_fields(content, ["bundle", "manifest", "identity"], "content binding")
+    for name, limit in (("bundle", 32 << 20), ("manifest", 16 << 10)):
+        exact_fields(content[name], ["bytes", "sha256"], name + " binding")
+        integer(content[name]["bytes"], 1, limit, name + " bytes")
+        lower_hex(content[name]["sha256"], 64, name + " digest")
+    content_binding(content["identity"])
+    if proof["content"] != content or read_content(repository) != content:
+        fail("transferred content differs from candidate")
+    artifact = proof["artifact"]
+    exact_fields(artifact, ["sha256", "bytes", "relative_path", "cargo_profile", "cargo_package_id",
+                            "manifest_sha256", "source_sha256"], "release artifact")
+    lower_hex(artifact["sha256"], 64, "release executable digest")
+    integer(artifact["bytes"], 1, 128 << 20, "release executable bytes")
+    if (type(artifact["relative_path"]) is not str or re.fullmatch(
+            "release/deps/" + TARGET[1] + "-[0-9a-f]{16}", artifact["relative_path"]) is None
+            or artifact["manifest_sha256"] != source_binding["source_hashes"]["rust/crates/er-repro/Cargo.toml"]
+            or artifact["source_sha256"] != source_binding["source_hashes"][SOURCE]):
+        fail("transferred release artifact source or owned path")
+    version = tomllib.loads((repository / "rust/Cargo.toml").read_text())["workspace"]["package"]["version"]
+    package = (repository / "rust/crates/er-repro").as_uri()
+    if artifact["cargo_package_id"] not in {"path+" + package + "#" + suffix
+                                            for suffix in (version, "er-repro@" + version)}:
+        fail("transferred release Cargo package")
+    expected_profile = {"opt_level": "3", "debuginfo": 0, "debug_assertions": False,
+                        "overflow_checks": False, "test": True}
+    if encoded(artifact["cargo_profile"]) != encoded(expected_profile):
+        fail("transferred release Cargo profile")
+    expected_environment = {"settings": {"CARGO_INCREMENTAL": "0", "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0", "RUSTUP_TOOLCHAIN": "1.97.1"}, "cargo_config_files": 0,
+        "compiler_overrides": 0, "target": "native-host", "features": "default", "profile": "release"}
+    if encoded(proof["environment"]) != encoded(expected_environment):
+        fail("transferred release build environment")
+    if encoded(proof["tests"]) != encoded({"executed": 1, "passed": 1, "failed": 0, "skipped": 0}):
+        fail("transferred release exact-one counts")
+    record = proof["record"]
+    exact_fields(record, ["line", "bytes", "sha256"], "release record")
+    if type(record["line"]) is not str:
+        fail("transferred release line type")
+    raw = record["line"].encode("utf-8", errors="strict")
+    integer(record["bytes"], 1, LINE_LIMIT - 1, "release record bytes")
+    if record["bytes"] != len(raw) or record["sha256"] != hashlib.sha256(raw).hexdigest():
+        fail("transferred release line digest or length")
+    parse_line(raw, architecture="x86_64", operating_system="linux",
+               bundle_bytes=content["bundle"]["bytes"], content_identity=content["identity"])
+    exact_fields(proof["logs"], ["build", "list", "execute"], "release logs")
+    for name, seconds, limit in (("build", 900, 16 << 20), ("list", 30, 16384), ("execute", 600, 16384)):
+        log = proof["logs"][name]
+        exact_fields(log, ["bytes", "sha256", "elapsed_seconds"], "release log")
+        integer(log["bytes"], 1, limit, "release log bytes")
+        lower_hex(log["sha256"], 64, "release log digest")
+        if (type(log["elapsed_seconds"]) not in (int, float) or not math.isfinite(log["elapsed_seconds"])
+                or not 0 <= log["elapsed_seconds"] <= seconds):
+            fail("transferred release log execution bound")
+    listing = (TEST_ID + ": test\n").encode()
+    if (proof["logs"]["list"]["bytes"] != len(listing)
+            or proof["logs"]["list"]["sha256"] != hashlib.sha256(listing).hexdigest()
+            or proof["logs"]["execute"]["bytes"] <= len(raw)):
+        fail("transferred release discovery or execution framing")
