@@ -1,8 +1,13 @@
 """Fail-closed selection policy for complete AI command ownership regressions."""
 import copy
+import os
+from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
-import m9e_feedback as feedback
+with patch.dict(os.environ, {"M9E_REPORT_DIR": str(Path(tempfile.gettempdir()) / "m9e-ai-command-policy")}):
+    import m9e_feedback as feedback
 
 
 class AiCommandPolicyTests(unittest.TestCase):
