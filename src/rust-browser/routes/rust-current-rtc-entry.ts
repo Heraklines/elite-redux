@@ -163,10 +163,14 @@ export class CurrentDevelopmentRtcPeerV1 {
 
   async offer(): Promise<string> {
     this.#startSignaling();
-    this.#attach(this.#pc.createDataChannel("er-current-development-v2", { ordered: true, protocol: "er-current-v2" }));
+    const channel = this.#pc.createDataChannel("er-current-development-v2", { ordered: true, protocol: "er-current-v2" });
     try {
       await boundedOperation(this.#pc.setLocalDescription(await boundedOperation(this.#pc.createOffer(), this.#abort.signal)), this.#abort.signal);
       await this.#waitIce();
+      // Local offer preparation has its own bounded signaling operations. No
+      // peer can open this channel before the returned SDP is answered. Attach
+      // now so its unchanged handshake deadline covers the peer exchange.
+      this.#attach(channel);
       return boundedSdp(this.#pc.localDescription?.sdp);
     } catch (error) { this.#fail(error); throw error; }
   }

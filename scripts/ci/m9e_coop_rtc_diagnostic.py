@@ -155,6 +155,7 @@ def main(summary):
                 or value.get("setup_manifest_sha256") != summary["setup_manifest_sha256"]
                 or any(value.get(key) != expected for key, expected in rtc["cohort"].items())
                 or value.get("party_owners") != [1, 2, 2] or value.get("received") != ([2, 3], [3, 3])[index]
+                or value.get("delayed_offer_ms") != (12000, 0)[index]
                 or value.get("retry_preserved_snapshots") is not True or value.get("presentations", 0) <= 0):
             raise RuntimeError("browser evidence differs from actual bound assets and journey")
         evidence.append(value)

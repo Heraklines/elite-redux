@@ -93,7 +93,7 @@ for (const [path, asset] of Object.entries(setup.assets) as [string, Asset][]) {
 }
 
 interface Pair { contexts: BrowserContext[]; left: Page; right: Page; workers: string[] }
-async function pair(browser: Browser): Promise<Pair> {
+async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
   const contexts: BrowserContext[] = [];
   try {
     contexts.push(await browser.newContext(), await browser.newContext());
@@ -168,7 +168,18 @@ async function pair(browser: Browser): Promise<Pair> {
         glue_url: `${address}/assets/er_web.js`, glue_sha256: manifest.cohort.glue_sha256,
         content_url: `${address}/assets/game-content-bundle-v2.json`, content_sha256: manifest.cohort.content_sha256 },
       source: manifest.source_sha, workerHash: manifest.assets[manifest.worker].sha256 })));
-    const offer = await left.evaluate(() => (globalThis as any).__naturalCoop.peer.offer());
+    const offer = await left.evaluate(async delayMs => {
+      const original = RTCPeerConnection.prototype.createOffer;
+      try {
+        if (delayMs > 0) {
+          (RTCPeerConnection.prototype as any).createOffer = async function(this: RTCPeerConnection, options?: RTCOfferOptions) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            return original.call(this, options);
+          };
+        }
+        return await (globalThis as any).__naturalCoop.peer.offer();
+      } finally { RTCPeerConnection.prototype.createOffer = original; }
+    }, delayOffer ? 12_000 : 0);
     const answer = await right.evaluate(offer => (globalThis as any).__naturalCoop.peer.answer(offer), offer);
     await left.evaluate(answer => (globalThis as any).__naturalCoop.peer.accept(answer), answer);
     await Promise.all([left, right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.ready())));
@@ -234,7 +245,7 @@ async function delivered(page: Page, count: number): Promise<void> {
 }
 for (const hostFirst of [true, false]) {
   test(`natural cooperative Title through two Workers and RTC ${hostFirst ? "host" : "guest"} ready first`, async ({ browser }, info) => {
-    const peers = await pair(browser);
+    const peers = await pair(browser, hostFirst);
     try {
       let hostChoices: any[]; let guestChoices: any[];
       if (hostFirst) {
@@ -298,7 +309,7 @@ for (const hostFirst of [true, false]) {
         guest_choices: guestChoices.map(choice => choice.species_id), choices_sha256: digest(Buffer.from(sentGuest)),
         started_sha256: digest(Buffer.from(sentHost)), choices_bytes: sentGuest.length, started_bytes: sentHost.length,
         party_owners: party.map((pokemon: any) => pokemon.owner_seat), presentations: presentations[0].length,
-        received: [hostFirst ? 2 : 3, 3], raw_inputs: rawInputs, retry_preserved_snapshots: true,
+        received: [hostFirst ? 2 : 3, 3], raw_inputs: rawInputs, delayed_offer_ms: hostFirst ? 12_000 : 0, retry_preserved_snapshots: true,
       })) });
     } finally {
       try { await Promise.allSettled([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.dispose()))); }
