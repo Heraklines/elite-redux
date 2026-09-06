@@ -1,23 +1,56 @@
 {
-  "current_title_retirement_focus": {
-    "paths": ["src/rust-browser/adapters/current-storage-owner.ts", "src/rust-browser/routes/rust-current-storage-entry.ts", "test/node/rust-browser/engineering/current-storage-owner.test.ts", "rust/crates/er-web/examples/m9e_v7_title_storage_fixtures.rs", "scripts/build-kernel-m9e-title-storage-web.mjs", "test/browser/rust-browser/m9e-v7-worker-title-storage.spec.ts"],
-    "trigger_paths": ["rust/crates/er-web/examples/m9e_v7_title_storage_fixtures.rs", "scripts/build-kernel-m9e-title-storage-web.mjs", "test/browser/rust-browser/m9e-v7-worker-title-storage.spec.ts"],
-    "test_ids": ["natural Title retires more than sixteen actual LIST/READ owners before loading and raw generation-two Write"],
-    "node_ids": [
-      "current storage owner freezes requests and separates durable callback acknowledgement",
-      "current storage owner bounds admission and rejects unsupported or malformed images before IO",
-      "current storage owner drains nested enqueue without rerunning durable writes",
-      "current storage owner fences unknown callback acceptance and late disposed work",
-      "current storage owner reconciles exact uncertain images and rejects changed receipts",
-      "Title cancellation drains queued read-only ownership without IO and never reuses evicted IDs",
-      "Title CANCELLING retains the sixteen-owner admission bound until running and queued work drains",
-      "Title retirement suppresses a queued delivery guard and releases its retained result once",
-      "Title retirement admits real abort classification but never reclaims an unclassified backend rejection",
-      "Title cancellation rejects writes, unknown acceptance, invalid evidence and impossible accepted callback races",
-      "Title backend deadlines and disposal never convert uncertain work into cancellation"
-    ]
-  },
   "current_title_storage_focus": {
+    "lint_paths": [
+      "rust/crates/er-content/src/m5_pack.rs",
+      "rust/crates/er-content/src/m6_catalog.rs",
+      "rust/crates/er-content/src/moves.rs",
+      "rust/crates/er-content/tests/m6_catalog.rs",
+      "rust/crates/er-dev-types/src/observation.rs",
+      "rust/crates/er-mechanics/src/m6.rs",
+      "rust/crates/er-mechanics/src/v2.rs"
+    ],
+    "lint_targets": {
+      "er-content": [
+        "m3_moves_abilities",
+        "m3_species_pack",
+        "m4_pack",
+        "m5_pack",
+        "m6_catalog",
+        "m6_pack"
+      ],
+      "er-dev-types": [
+        "er_dev_types"
+      ],
+      "er-mechanics": [
+        "er_mechanics",
+        "program_validation"
+      ]
+    },
+    "lint_ids": {
+      "er-content:m3_moves_abilities": [
+        "selected_moves_match_the_manifest_and_are_canonically_ordered",
+        "selected_abilities_match_the_manifest_and_are_canonically_ordered",
+        "lookups_are_deterministic_and_reject_outside_content",
+        "move_validation_rejects_bad_ranges_effects_flags_and_capability",
+        "ability_validation_rejects_unknown_ids_and_unsupported_capability",
+        "move_serialization_round_trips_and_rejects_unknown_fields",
+        "ability_serialization_round_trips_and_rejects_unknown_fields"
+      ],
+      "er-content:m5_pack": [
+        "valid_pack_round_trips_through_loader",
+        "tampered_content_hash_is_rejected",
+        "program_slot_mismatch_is_rejected",
+        "generated_bootstrap_pack_closes_the_complete_catalog"
+      ],
+      "er-content:m6_catalog": [
+        "frozen_semantic_catalog_loads_and_validates",
+        "unknown_fields_fail_closed",
+        "wrong_schema_version_fails_closed"
+      ],
+      "er-dev-types:er_dev_types": [
+        "observation::tests::forensic_indirection_preserves_tagged_canonical_wire"
+      ]
+    },
   "paths": [
     "rust/crates/er-cli/src/current_agent.rs",
     "rust/crates/er-cli/tests/m9e_current_repro.rs",
@@ -126,7 +159,7 @@
   "baseline": "5b2c068883db862f21e30a06480aeb5bda57cb4a",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34037758849",
   "readiness_packages": ["er-canonical"],
-  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_title_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
+  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
   "shared_packages": ["er-kernel", "er-game", "er-state", "er-protocol", "er-types"],
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],

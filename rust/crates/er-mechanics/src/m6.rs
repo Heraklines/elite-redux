@@ -231,17 +231,17 @@ mod tests {
 
     fn program() -> MechanicsProgramV2Contract {
         let source = BehaviorSourceId::Move {
-            numeric_id: SafeU53::new(1).unwrap(),
+            numeric_id: SafeU53::new(1).expect("fixture ID fits SafeU53"),
         };
         MechanicsProgramV2Contract {
             schema_version: M6_MECHANICS_PROGRAM_VERSION,
-            id: MechanicsProgramId::try_from_u64(1).unwrap(),
+            id: MechanicsProgramId::try_from_u64(1).expect("fixture program ID is valid"),
             source: source.clone(),
             behavior_units: vec![BehaviorUnitId {
                 source,
                 unit_kind: BehaviorUnitKind::IntrinsicMoveRule,
                 ordinal: BehaviorUnitOrdinal::ZERO,
-                provenance_hash: ProvenanceHash::parse("0".repeat(64)).unwrap(),
+                provenance_hash: ProvenanceHash::parse("0".repeat(64)).expect("fixture hash is valid"),
             }],
             rng_sites: Vec::new(),
             budget: ProgramBudgetV2 {
@@ -283,12 +283,12 @@ mod tests {
             site: RngSiteDefinitionV1 {
                 id: RngSiteId {
                     ordinal: RngSiteOrdinal::ZERO,
-                    provenance_hash: ProvenanceHash::parse("1".repeat(64)).unwrap(),
+                    provenance_hash: ProvenanceHash::parse("1".repeat(64)).expect("fixture hash is valid"),
                 },
                 owner: program.behavior_units[0].clone(),
                 domain: RngDomainV1::BattleMechanical,
                 reason: RngReasonV2::Accuracy,
-                requested_range: SafeU53::new(100).unwrap(),
+                requested_range: SafeU53::new(100).expect("fixture range fits SafeU53"),
                 draw_for_singleton: false,
             },
             execution_ordinal: 0,
@@ -312,12 +312,12 @@ mod tests {
             site: RngSiteDefinitionV1 {
                 id: RngSiteId {
                     ordinal: RngSiteOrdinal::ZERO,
-                    provenance_hash: ProvenanceHash::parse("2".repeat(64)).unwrap(),
+                    provenance_hash: ProvenanceHash::parse("2".repeat(64)).expect("fixture hash is valid"),
                 },
                 owner: program.behavior_units[0].clone(),
                 domain: RngDomainV1::ForbiddenNondeterministic,
                 reason: RngReasonV2::SourceIdentifiedBespoke,
-                requested_range: SafeU53::new(100).unwrap(),
+                requested_range: SafeU53::new(100).expect("fixture range fits SafeU53"),
                 draw_for_singleton: false,
             },
             execution_ordinal: 0,
