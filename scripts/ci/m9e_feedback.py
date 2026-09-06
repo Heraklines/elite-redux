@@ -172,6 +172,25 @@ AI_MAX_PP_PATHS = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
                    "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"]
 AI_MAX_PP_IDS = ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
 
+AI_COMMAND_TARGET = "m9e_ai_command_transaction_v7"
+AI_COMMAND_PATHS = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
+                    "rust/crates/er-kernel/tests/" + AI_COMMAND_TARGET + ".rs"]
+AI_COMMAND_IDS = ["command_cursor_rejection_preserves_ai_sequence_and_all_other_owners",
+                  "complete_two_actor_preparation_commits_once_and_replays_identical_commands",
+                  "later_actor_rejection_preserves_the_complete_ai_command_owner"]
+AI_COMMAND_POLICY = {"paths": AI_COMMAND_PATHS, "exact_test_ids": AI_COMMAND_IDS}
+
+
+def select_ai_command_scope(config, changed):
+    policy = config.get("current_ai_command_transaction_focus")
+    if policy is not None and policy != AI_COMMAND_POLICY:
+        raise RuntimeError("AI command transaction policy identities disagree")
+    scoped = policy is not None and bool(changed) and all(path in AI_COMMAND_PATHS for path in changed)
+    if AI_COMMAND_PATHS[1] in changed and not scoped:
+        raise RuntimeError("AI command transaction product delta is unmapped")
+    return scoped, policy is not None
+
+
 # Exact source repairs required by the first full selected-package Clippy run.
 AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-state/src/bespoke_v2/forms.rs",
@@ -926,9 +945,10 @@ def plan():
                        or max_pp_focus["paths"] != AI_MAX_PP_PATHS or max_pp_focus["exact_test_ids"] != AI_MAX_PP_IDS):
         raise RuntimeError("current AI max-PP policy identities disagree")
     max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
+    ai_commands_session, ai_commands_installed = select_ai_command_scope(config, product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session or cost_session or rule_session or coop_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session or cost_session or rule_session or coop_session or ai_commands_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -1002,7 +1022,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -1130,6 +1150,10 @@ def plan():
         boundaries = [path for path in boundaries if path not in (retirement.PRODUCT_PATHS if retirement_session else title_allowed)]
         if retirement_session and not all((ROOT / path).is_file() for path in TITLE_STORAGE_TRIGGERS):
             raise RuntimeError("Title retirement requires installed current Title native ingress")
+    if ai_commands_session:
+        execution_scope = merge_targets(timer_focus["execute"], capture_focus["execute"],
+                                        {"er-kernel": ["*", AI_COMMAND_TARGET], "er-game": ["m9e_new_run_v6"]})
+        boundaries = [path for path in boundaries if path not in AI_COMMAND_PATHS]
     if coop_session:
         execution_scope = merge_targets(timer_focus["execute"], capture_focus["execute"], coop.NATIVE_TARGETS,
                                         {"er-game": ["m9e_new_run_v6"]})
@@ -1263,6 +1287,7 @@ def plan():
               "ai_damage_query_lint_repair_focus": damage_lint_session,
               "ai_snapshot_validation_focus": ai_snapshot_session,
               "current_ai_max_pp_focus": max_pp_session,
+              "current_ai_command_transaction_focus": ai_commands_session,
               "current_read_rebind_focus": read_session,
               "current_title_storage_focus": title_session,
               "requires_title_storage": title_required,
@@ -1355,6 +1380,17 @@ def plan():
     # Once installed, every selected current game-kernel suite must keep all
     # two max-PP witnesses, including later owner/AI/storage changes. Do not
     # replace or shorten the pre-existing game-kernel identity list.
+    ai_commands_required = ai_commands_installed and "er-kernel" in selected and (
+        execution_scope is None or "*" in execution_scope.get("er-kernel", [])
+        or any(target in execution_scope.get("er-kernel", []) for target in ("m9e_game_kernel_v7", AI_COMMAND_TARGET)))
+    result["requires_ai_command_transaction"] = ai_commands_required
+    if ai_commands_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": [AI_COMMAND_TARGET]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + AI_COMMAND_TARGET: list(AI_COMMAND_IDS)}
+        if result["execution_scope"] is not None:
+            result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [AI_COMMAND_TARGET]})
+    if ai_commands_session:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-game": ["m9e_new_run_v6"]})
     max_pp_required = bool(max_pp_focus) and "er-kernel" in selected and (
         execution_scope is None or "*" in execution_scope.get("er-kernel", [])
         or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))
@@ -1392,7 +1428,7 @@ def plan():
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session and not coop_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session or coop_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session and not coop_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session or coop_session or ai_commands_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 

@@ -29,6 +29,8 @@ NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "ai_commands_test": "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs",
+    "ai_commands_selftests": "scripts/ci/test_m9e_ai_commands.py",
     "coop_helper": "scripts/ci/m9e_coop_startup.py",
     "coop_selftests": "scripts/ci/test_m9e_coop_startup.py",
     "harness": "scripts/ci/m9e_feedback.py",
