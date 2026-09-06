@@ -5371,6 +5371,67 @@ class FeedbackTests(unittest.TestCase):
             owner.legacy_rtc_view(bad, context["binding"], context["helper_hash"])
         with self.assertRaises(RuntimeError):
             owner.legacy_rtc_view(tests, context["binding"], "0" * 64)
+    def configure_title_retirement_scope(self):
+        import m9e_title_storage as title
+        self.configure_title_storage_core_scope()
+        self.config["current_title_retirement_focus"] = title.policy()
+        for name in title.SOURCE_PATHS:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("retirement source: " + name)
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(title.PRODUCT_PATHS)
+        return title
+
+    def test_title_retirement_plan_keeps_all_native_and_prior_platform_requirements(self):
+        title = self.configure_title_retirement_scope()
+        selection = self.feedback.plan()
+        for flag in ("current_title_retirement_focus", "requires_title_retirement", "requires_title_storage",
+                     "requires_current_proposal", "requires_read_rebind", "requires_worker_storage", "requires_current_storage",
+                     "requires_browser_worker", "requires_browser_rtc", "requires_wasm", "requires_browser", "requires_cli_executable",
+                     "requires_worker_executable", "timer_focus"):
+            self.assertTrue(selection[flag], flag)
+        self.assertFalse(selection["boundary_paths"])
+        self.assertFalse(selection["unknown_paths"])
+        self.assertEqual(selection["title_storage_binding"], title.source_binding(self.root, CANDIDATE))
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
+        for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
+            self.assertEqual(selection["required_native_test_ids"][identity], ids)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-web:m9e_host_v2"]), 14)
+        self.assertIsNotNone(selection["timer_mutant"])
+        self.assertIsNotNone(selection["replica_mutant"])
+
+    def test_title_retirement_plan_rejects_removed_policy_and_incomplete_installed_product(self):
+        title = self.configure_title_retirement_scope()
+        original = copy.deepcopy(self.config)
+        for replacement in ({}, {**title.policy(), "node_ids": title.NODE_IDS[:5]}, {**title.policy(), "paths": title.PRODUCT_PATHS[:-1]}):
+            self.config["current_title_retirement_focus"] = replacement
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "Title retirement"):
+                self.feedback.plan()
+        self.config = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        missing = self.root / title.PRODUCT_PATHS[3]
+        missing.unlink()
+        with self.assertRaisesRegex(RuntimeError, "bounded regular"):
+            self.feedback.plan()
+
+    def test_title_retirement_installed_plan_persists_after_owner_change_and_does_not_hide_unknown_paths(self):
+        title = self.configure_title_retirement_scope()
+        self.changed = [title.PRODUCT_PATHS[0]]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["current_title_retirement_focus"])
+        self.assertTrue(selection["requires_title_retirement"])
+        self.changed = ["rust/crates/er-kernel/src/snapshot_v7.rs"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_title_retirement_focus"])
+        self.assertTrue(selection["requires_title_retirement"])
+        self.changed = [*title.PRODUCT_PATHS, "src/unmapped-title-path.ts"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_title_retirement_focus"])
+        self.assertIn("src/unmapped-title-path.ts", selection["unknown_paths"])
+        self.assertTrue(selection["requires_title_retirement"])
     def configure_title_storage_core_scope(self):
         self.configure_composition_after_read_and_owner()
         actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
@@ -7527,5 +7588,125 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
                 if mutation == "duplicate_json": item["body"] = base64.b64encode(b'{"schema_version":1,"schema_version":1}').decode()
                 with self.assertRaisesRegex(RuntimeError, "Title retirement"):
                     title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
+
+    def test_title_node_parser_requires_eleven_exact_passes_and_preserves_legacy_five(self):
+        import m9e_title_storage as title
+        report = {"success": True, "numTotalTests": 11, "numPassedTests": 11, "numFailedTests": 0, "numPendingTests": 0,
+                  "testResults": [{"name": title.PRODUCT_PATHS[2], "assertionResults": [
+                      {"fullName": name, "status": "passed", "failureMessages": []} for name in title.NODE_IDS]}]}
+        evidence = title.node_evidence(report)
+        self.phases.validate_storage_node(evidence, title_retirement=True)
+        with self.assertRaisesRegex(RuntimeError, "current storage Node"):
+            self.phases.validate_storage_node(evidence)
+        old = {"expected": 5, "passed": 5, "failed": 0, "skipped": 0, "selected_test_ids": title.NODE_IDS[:5]}
+        self.phases.validate_storage_node(old)
+        with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
+            self.phases.validate_storage_node(old, title_retirement=True)
+        for field, value in (("numTotalTests", 5), ("numPassedTests", True), ("numPendingTests", 1), ("success", False)):
+            with self.assertRaisesRegex(RuntimeError, "Node source identities"):
+                title.node_evidence({**report, field: value})
+        for mutation in ("duplicate", "skip", "name", "file"):
+            bad = copy.deepcopy(report)
+            rows = bad["testResults"][0]["assertionResults"]
+            if mutation == "duplicate": rows[-1] = copy.deepcopy(rows[0])
+            if mutation == "skip": rows[-1]["status"] = "pending"
+            if mutation == "name": rows[-1]["fullName"] += " renamed"
+            if mutation == "file": bad["testResults"][0]["name"] = "wrong.test.ts"
+            with self.assertRaisesRegex(RuntimeError, "Node source identities"):
+                title.node_evidence(bad)
+
+    def title_platform_proof_fixture(self):
+        title, binding, cohort, assets, oracle, tests, _ = self.title_browser_proof_fixture()
+        flags = ("requires_title_retirement", "requires_title_storage", "requires_read_rebind", "requires_current_proposal",
+                 "requires_browser", "requires_browser_worker", "requires_browser_rtc", "requires_current_storage",
+                 "requires_worker_storage", "requires_wasm", "requires_cli_executable")
+        plan = {flag: True for flag in flags}
+        plan["title_storage_binding"] = binding
+        for key in ("browser_worker_binding", "browser_rtc_binding", "current_storage_binding", "worker_storage_binding"):
+            plan[key] = copy.deepcopy(binding)
+        native = {"plan": plan, "identity": {"product_sha": CANDIDATE, "files": {"title_storage": "f" * 64},
+                                            "toolchain": "rustc 1.97.1 (fixture)"}}
+        proof = {"title_storage_assets": assets, "title_storage_oracle": oracle, "title_storage_tests": tests,
+                 "browser_assets": {"assets": cohort}, "current_storage_node": {"expected": 11, "passed": 11,
+                     "failed": 0, "skipped": 0, "selected_test_ids": list(title.NODE_IDS)}}
+        for index, key in enumerate(("browser_worker_assets", "browser_rtc_assets", "worker_storage_assets")):
+            proof[key] = {"manifest": {"assets": {f"prior-bundle-{index}.js": {}}}}
+        return title, native, proof
+
+    def test_title_platform_validator_binds_prerequisites_sources_toolchain_and_owner_inventory(self):
+        title, native, proof = self.title_platform_proof_fixture()
+        title.validate_platform(proof, native)
+        for flag, value in native["plan"].items():
+            if value is not True:
+                continue
+            bad = copy.deepcopy(native)
+            bad["plan"][flag] = False
+            with self.assertRaisesRegex(RuntimeError, "Title retirement"):
+                title.validate_platform(proof, bad)
+        for key in ("browser_worker_binding", "browser_rtc_binding", "current_storage_binding", "worker_storage_binding"):
+            bad = copy.deepcopy(native)
+            bad["plan"][key]["source_hashes"][title.SOURCE_PATHS[0]] = "b" * 64
+            with self.assertRaisesRegex(RuntimeError, "dependency source binding"):
+                title.validate_platform(proof, bad)
+        bad = copy.deepcopy(native)
+        del bad["identity"]["files"]["title_storage"]
+        with self.assertRaisesRegex(RuntimeError, "proof validator"):
+            title.validate_platform(proof, bad)
+        bad = copy.deepcopy(native)
+        bad["identity"]["toolchain"] = "rustc 1.96.0 (other)"
+        with self.assertRaisesRegex(RuntimeError, "manifest source/cohort/hash"):
+            title.validate_platform(proof, bad)
+        bad = copy.deepcopy(proof)
+        bad["current_storage_node"]["selected_test_ids"] = title.NODE_IDS[:5]
+        with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
+            title.validate_platform(bad, native)
+        bad = copy.deepcopy(proof)
+        bad["browser_rtc_assets"]["manifest"]["assets"]["current-title-storage-entry.js"] = {}
+        with self.assertRaisesRegex(RuntimeError, "namespace overlaps"):
+            title.validate_platform(bad, native)
+
+    def test_title_compaction_keeps_full_evidence_address_without_trimming_prior_proof(self):
+        title, _, proof = self.title_platform_proof_fixture()
+        small = copy.deepcopy(proof)
+        title.compact(small, "e" * 64, self.phases.encoded)
+        self.assertEqual(small, proof)
+        large = {**copy.deepcopy(proof), "prior": "x" * 16000}
+        title.compact(large, "e" * 64, self.phases.encoded)
+        for key in title.PROOF_KEYS:
+            self.assertEqual(large[key], {"file": "phase-summary.json", "sha256": "e" * 64})
+        self.assertEqual(large["prior"], "x" * 16000)
+        self.assertGreater(len(self.phases.encoded(large)), 16000)
+        self.assertIsInstance(proof["title_storage_tests"]["retirement"]["evidence"], dict)
+
+    @patch("subprocess.run", side_effect=AssertionError("source metadata build checks cannot run a subprocess"))
+    def test_title_build_evidence_uses_actual_asset_binding_and_fixture_oracle(self, subprocess_run):
+        title, binding, cohort, assets = self.title_retirement_assets_fixture()
+        for name in [*title.SOURCE_PATHS, "pnpm-lock.yaml"]:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Title integration source: " + name)
+        binding = title.source_binding(self.root, CANDIDATE)
+        manifest = assets["manifest"]
+        manifest.update(binding)
+        self.output.joinpath("current-title-storage-entry.js").write_bytes(b"entry")
+        self.output.joinpath(manifest["worker"]).write_bytes(b"worker")
+        self.output.joinpath(manifest["fixture"]["path"]).write_bytes(b"{}")
+        self.output.joinpath("m9e-v7-title-storage-assets.json").write_bytes(title.js_bytes(manifest) + b"\n")
+        vite = self.root / "node_modules/vite/package.json"
+        vite.parent.mkdir(parents=True)
+        vite.write_text('{"version":"8.0.10"}')
+        _, _, _, _, oracle, _, _ = self.title_browser_proof_fixture()
+        summary = {"product_sha": CANDIDATE, "plan": {"title_storage_binding": binding}, "browser_assets": {"assets": cohort}}
+        with patch.object(title, "fixture_oracle", return_value=oracle) as fixture_check:
+            title.build_evidence(self.output, summary, self.root, self.full, "1.97.1")
+            fixture_check.assert_called_once_with({}, "e" * 64)
+        self.assertEqual(summary["title_storage_oracle"], oracle)
+        self.assertEqual(summary["title_storage_assets"]["manifest"], manifest)
+        self.assertTrue((self.full / "m9e-v7-title-storage-assets.json").is_file())
+        self.output.joinpath(manifest["fixture"]["path"]).write_bytes(b"[]")
+        with patch.object(title, "fixture_oracle", side_effect=AssertionError("must fail before semantic interpretation")):
+            with self.assertRaisesRegex(RuntimeError, "fixture bytes differ"):
+                title.build_evidence(self.output, summary, self.root, self.full, "1.97.1")
+        subprocess_run.assert_not_called()
 if __name__ == "__main__":
     unittest.main()

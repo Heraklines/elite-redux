@@ -612,3 +612,69 @@ def checks(root, full, run, summary, env, toolchain):
     build_evidence(Path(env["M9E_V7_WEB_DIR"]), repeated, root, full, toolchain)
     if any(repeated[key] != summary[key] for key in PROOF_KEYS[:2]):
         raise RuntimeError("Title retirement witness changed emitted cohort/fixture")
+
+def select_scope(config, changes, root):
+    configured = config.get("current_title_retirement_focus", {})
+    installed = any((root / path).is_file() for path in TRIGGER_PATHS)
+    changed = any(path in PRODUCT_PATHS for path in changes)
+    if configured:
+        validate_policy(configured)
+    elif installed or any(path in TRIGGER_PATHS for path in changes):
+        raise RuntimeError("Title retirement installed product requires its exact policy")
+    session = bool(configured) and changed and all(path in PRODUCT_PATHS for path in changes)
+    return session, installed
+
+
+def node_evidence(report):
+    suites = report.get("testResults", [])
+    assertions = [item for suite in suites for item in suite.get("assertionResults", [])]
+    path = str(suites[0].get("name", "")).replace("\\", "/") if len(suites) == 1 else ""
+    if (report.get("success") is not True or len(suites) != 1
+            or any(not integer(report.get(key), count, count) for key, count in
+                   (("numTotalTests", 11), ("numPassedTests", 11), ("numFailedTests", 0), ("numPendingTests", 0)))
+            or (path != PRODUCT_PATHS[2] and not path.endswith("/" + PRODUCT_PATHS[2]))
+            or len(assertions) != 11 or {item.get("fullName") for item in assertions} != set(NODE_IDS)
+            or any(item.get("status") != "passed" or item.get("failureMessages") for item in assertions)):
+        raise RuntimeError("Title retirement Node source identities/counts differ")
+    result = {"expected": 11, "passed": 11, "failed": 0, "skipped": 0, "selected_test_ids": list(NODE_IDS)}
+    validate_node(result)
+    return result
+
+
+def validate_platform(proof, native):
+    plan = native["plan"]
+    if not plan.get("requires_title_retirement"):
+        if any(key in proof for key in PROOF_KEYS):
+            raise RuntimeError("platform cannot claim unrequested Title retirement")
+        return
+    if not all(plan.get(key) for key in ("requires_title_storage", "requires_read_rebind", "requires_current_proposal",
+            "requires_browser", "requires_browser_worker", "requires_browser_rtc", "requires_current_storage",
+            "requires_worker_storage", "requires_wasm", "requires_cli_executable")):
+        raise RuntimeError("Title retirement omitted prior native/platform prerequisites")
+    binding = plan.get("title_storage_binding")
+    validate_binding(binding, native["identity"]["product_sha"])
+    if not digest(native["identity"]["files"].get("title_storage")):
+        raise RuntimeError("Title retirement omitted its source-bound proof validator")
+    for other_name in ("browser_worker_binding", "browser_rtc_binding", "current_storage_binding", "worker_storage_binding"):
+        other = plan[other_name]
+        if (other["pnpm_lock_sha256"] != binding["pnpm_lock_sha256"]
+                or any(binding["source_hashes"][name] != value for name, value in other["source_hashes"].items() if name in SOURCE_PATHS)):
+            raise RuntimeError("Title retirement prior dependency source binding differs")
+    toolchain = re.match(r"rustc (1\.[0-9]+\.[0-9]+) ", native["identity"].get("toolchain", ""))
+    if toolchain is None:
+        raise RuntimeError("Title retirement native toolchain identity differs")
+    validate_tests(proof.get("title_storage_tests"), proof.get("title_storage_assets"), proof.get("title_storage_oracle"),
+                   binding, proof["browser_assets"]["assets"], toolchain[1])
+    validate_node(proof.get("current_storage_node"))
+    names = set(proof["title_storage_assets"]["manifest"]["assets"])
+    for key in ("browser_worker_assets", "browser_rtc_assets", "worker_storage_assets"):
+        if names & set(proof[key]["manifest"]["assets"]):
+            raise RuntimeError("Title retirement emitted namespace overlaps prior bundle")
+
+
+def compact(value, full_hash, encoded):
+    for key in PROOF_KEYS:
+        if len(encoded(value)) <= 16000:
+            break
+        if key in value:
+            value[key] = {"file": "phase-summary.json", "sha256": full_hash}
