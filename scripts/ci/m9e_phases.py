@@ -875,6 +875,8 @@ def validate_platform(proof, native, native_hash):
             or proof.get("plan_sha256") != native["plan_sha256"]):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
+    if "plan" in proof and proof["plan"] != plan:
+        raise RuntimeError("platform duplicated plan differs from its bound native plan")
     from m9e_current_proposal import validate_obligations
     validate_obligations(plan, native["inventory"], native["identity"]["product_sha"])
     if plan.get("requires_browser_worker"):
@@ -957,6 +959,21 @@ def validate_platform(proof, native, native_hash):
                 raise RuntimeError("platform current repro bridge causal evidence is inconsistent")
 
 
+def reference_platform_plan(proof, native, native_hash):
+    """Keep the exact same-run native plan by hash, without a second full copy.
+
+    validate_platform consumes the already verified native plan for every
+    obligation. Both artifact and plan hashes remain in the platform proof;
+    no test, asset, identity, timing or size bound is discarded.
+    """
+    if proof.get("plan") != native["plan"]:
+        raise RuntimeError("platform producer must bind its complete native plan before publication")
+    validate_platform(proof, native, native_hash)
+    result = {key: value for key, value in proof.items() if key != "plan"}
+    validate_platform(result, native, native_hash)
+    return result
+
+
 def platform(feedback):
     source = Path(os.environ["M9E_PHASE_DIR"])
     native_hash = os.environ["M9E_NATIVE_MANIFEST_SHA256"]
@@ -981,7 +998,7 @@ def platform(feedback):
         # browser_checks rehashes this exact relocated binding before the bridge.
         feedback.browser_checks(summary)
     summary["status"] = "passed"
-    validate_platform(summary, native, native_hash)
+    summary = reference_platform_plan(summary, native, native_hash)
     proof_hash = write_bounded(source / "platform/platform.json", summary)
     output("platform_manifest_sha256", proof_hash)
     return summary

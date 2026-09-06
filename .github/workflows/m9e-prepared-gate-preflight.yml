@@ -1,0 +1,123 @@
+name: M9E Prepared Gate Preflight
+on:
+  push:
+    branches: [codex/m9e-platform-proof-focused-20260907]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-prepared-gate-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  harness:
+    name: Prepared gate harness only - no game qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      M9E_EXPECTED_TESTS: '358'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/ci/
+            /.github/workflows/m9e-focused-feedback.yml
+      - name: Verify candidate and execute only harness selftests
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/m9e-preflight/compact" "$RUNNER_TEMP/m9e-preflight/diagnostics"
+          set +e
+          ruby -ryaml - <<'RUBY' > "$RUNNER_TEMP/m9e-preflight/diagnostics/workflow-validation.log" 2>&1
+          workflow = YAML.safe_load(File.read('.github/workflows/m9e-focused-feedback.yml'), aliases: false)
+          raise 'workflow permissions' unless workflow['permissions'] == {'contents' => 'read'}
+          jobs = workflow.fetch('jobs')
+          raise 'job inventory' unless jobs.keys.sort == %w[focused native_a native_b native_c platform]
+          jobs.each_value do |job|
+            raise 'existing runner or time cap changed' unless job['runs-on'] == 'ubuntu-24.04' && job['timeout-minutes'] == 35
+          end
+          %w[a b c].each do |lane|
+            job = jobs.fetch('native_' + lane)
+            raise 'conditional native job' if job.key?('if')
+            raise 'wrong native lane' unless job.fetch('env')['M9E_NATIVE_LANE'] == lane
+            run = job.fetch('steps').find {|step| step['id'] == 'native'}
+            raise 'native execution differs' unless run['run'] == 'python3 scripts/ci/m9e_feedback.py'
+            proof = job.fetch('steps').find {|step| step['id'] == 'native-proof'}
+            raise 'wrong proof target' unless proof.fetch('with')['path'].end_with?('/proof/native-' + lane + '.json')
+          end
+          aggregate = jobs.fetch('focused')
+          raise 'missing aggregate dependency' unless aggregate.fetch('needs').sort == %w[native_a native_b native_c platform]
+          raise 'third result binding' unless aggregate.fetch('env')['M9E_NATIVE_C_RESULT'] == '$' + '{{ needs.native_c.result }}'
+          raise 'third manifest binding' unless aggregate.fetch('env')['M9E_NATIVE_C_MANIFEST_SHA256'] == '$' + '{{ needs.native_c.outputs.manifest_sha256 }}'
+          third = aggregate.fetch('steps').select {|step| step.fetch('with', {})['artifact-ids'] == '$' + '{{ needs.native_c.outputs.proof_artifact_id }}'}
+          raise 'third same-run download' unless third.length == 1 && third[0]['if'] == "needs.native_c.result == 'success'" && third[0]['with']['merge-multiple'] == true
+          puts 'Passed: parsed existing-runner graph, three mandatory native jobs and exact third proof transfer.'
+          RUBY
+          workflow_result=$?
+          python3 -m unittest discover -s scripts/ci -p test_m9e_feedback.py -v > "$RUNNER_TEMP/m9e-preflight/diagnostics/harness-tests.log" 2>&1
+          result=$?
+          set -e
+          export M9E_PREFLIGHT_EXIT="$result"
+          export M9E_WORKFLOW_EXIT="$workflow_result"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'm9e-preflight'
+          log_path = root / 'diagnostics/harness-tests.log'
+          raw = log_path.read_bytes()
+          if len(raw) > 1048576:
+              raise RuntimeError('harness log exceeds 1 MiB; no complete harness result')
+          text = raw.decode('utf-8', errors='strict')
+          finished = re.findall(r'^Ran (\d+) tests? in ([0-9.]+)s$', text, re.M)
+          failures = re.findall(r'^(?:FAIL|ERROR): (.+)$', text, re.M)
+          expected = int(os.environ['M9E_EXPECTED_TESTS'])
+          passed = (os.environ['M9E_PREFLIGHT_EXIT'] == '0' and os.environ['M9E_WORKFLOW_EXIT'] == '0' and len(finished) == 1
+                    and int(finished[0][0]) == expected and not failures and text.rstrip().endswith('OK'))
+          details = text[text.find('\n======================================================================\n'):] if failures else text[-1024:]
+          if os.environ['M9E_WORKFLOW_EXIT'] != '0':
+              failures.append('workflow graph validation')
+              details += (root / 'diagnostics/workflow-validation.log').read_text()[-8192:]
+          diagnostic = details.encode()
+          truncated = len(diagnostic) > 245760
+          if truncated:
+              diagnostic = b'TRUNCATED: full harness-tests.log remains in remote diagnostics.\n' + diagnostic[-245680:]
+          (root / 'diagnostics/failure.txt').write_bytes(diagnostic)
+          files = {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                   for path in sorted(pathlib.Path('scripts/ci').glob('m9e*.py'))}
+          files['scripts/ci/test_m9e_feedback.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_feedback.py').read_bytes()).hexdigest()
+          files['scripts/ci/m9e-targets.json'] = hashlib.sha256(pathlib.Path('scripts/ci/m9e-targets.json').read_bytes()).hexdigest()
+          files['.github/workflows/m9e-focused-feedback.yml'] = hashlib.sha256(pathlib.Path('.github/workflows/m9e-focused-feedback.yml').read_bytes()).hexdigest()
+          summary = {'status': 'passed' if passed else 'failed', 'qualification': 'harness only; no native or platform game qualification',
+                     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
+                     'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'expected': expected,
+                     'actual': int(finished[0][0]) if len(finished) == 1 else None,
+                     'seconds': finished[0][1] if len(finished) == 1 else None, 'failures': failures,
+                     'exit_code': int(os.environ['M9E_PREFLIGHT_EXIT']), 'workflow_exit_code': int(os.environ['M9E_WORKFLOW_EXIT']), 'source_hashes': files,
+                     'log_bytes': len(raw), 'log_sha256': hashlib.sha256(raw).hexdigest(), 'diagnostic_truncated': truncated}
+          encoded = (json.dumps(summary, sort_keys=True, indent=2) + '\n').encode()
+          if len(encoded) > 16384:
+              raise RuntimeError('preflight compact summary exceeds bound')
+          (root / 'compact/summary.json').write_bytes(encoded)
+          print(encoded.decode())
+          raise SystemExit(0 if passed else 1)
+          PY
+      - name: Compact harness result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-prepared-gate-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-preflight/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remote harness diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-prepared-gate-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-preflight/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
