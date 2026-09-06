@@ -30,7 +30,7 @@ pub enum CurrentCoopFrameV1 {
     },
     CurrentCoopStarted {
         authority: FrameContext,
-        choices: CurrentCoopChoicesV1,
+        choices: Box<CurrentCoopChoicesV1>,
         host: RunBootstrapSelectionsV1,
         material_hex: String,
     },
@@ -456,7 +456,9 @@ impl GameKernelV7 {
                     }
                     let frame = CurrentCoopFrameV1::CurrentCoopStarted {
                         authority: owner.local.clone(),
-                        choices: owner.choices.clone().ok_or(GameKernelV7Error::Invalid)?,
+                        choices: Box::new(
+                            owner.choices.clone().ok_or(GameKernelV7Error::Invalid)?,
+                        ),
                         host: host.clone(),
                         material_hex: current_bytes_hex_v1(bytes),
                     };
