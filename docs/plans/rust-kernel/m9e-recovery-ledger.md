@@ -2709,3 +2709,12 @@ remote build: DecodedCurrentReceiptV1 lacked Debug, required by the workspace's
 all fields already support Debug. No behavioral contract or witness changes.
 Retrieve only3533-byte named failure from1913-byte compact artifact9983134442.
 Runtime remains unqualified; comparison stays791 and the full focused run repeats.
+Owner3f07ac9c/run34013476181 compiled the production receipt helper and reached
+integration-test compilation. Five calls used crate-private snapshot scheduler
+conversions, unavailable from an external integration test. Replace only that
+fixture plumbing with explicit public import/export scheduler-state bridges;
+preserve and validate every timer/pause/allocator/disposal field, and assert the
+full snapshot round trip before exercising real lease arm/retirement or pauses.
+Do not expose the production private methods or remove ownership assertions.
+Named compact failure7330bytes fromartifact9983210181ZIP2228. Tests and actual
+platform qualification remain pending; comparison staysqualified791.

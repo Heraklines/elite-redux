@@ -461,6 +461,68 @@ fn reject_ingress(kernel: &mut GameKernelV7, bytes: &[u8]) -> Result<(), Box<dyn
     Ok(())
 }
 
+// Test-only public scheduler state bridges preserve every owned field. The
+// production snapshot conversion methods intentionally remain crate-private.
+fn live_scheduler(
+    snapshot: &KernelSchedulerSnapshotV2,
+) -> Result<er_protocol::KernelScheduler, Box<dyn Error>> {
+    snapshot.validate()?;
+    let state = er_protocol::KernelSchedulerRestorableState {
+        next_timer_id: snapshot.next_timer_id,
+        timers: snapshot
+            .timers
+            .iter()
+            .map(|timer| er_protocol::KernelSchedulerTimerState {
+                registration: timer.registration.clone(),
+                original_delay_ms: timer.original_delay_ms,
+                remaining_active_ms: timer.remaining_active_ms,
+            })
+            .collect(),
+        pauses: snapshot
+            .pauses
+            .iter()
+            .map(|pause| er_protocol::KernelSchedulerPauseState {
+                endpoint: pause.endpoint,
+                time_class: pause.time_class,
+                reasons: pause.reasons.clone(),
+            })
+            .collect(),
+        disposed: snapshot.disposed,
+    };
+    let scheduler = er_protocol::KernelScheduler::import_restorable_state(state)?;
+    assert_eq!(scheduler_snapshot(&scheduler)?, *snapshot);
+    Ok(scheduler)
+}
+
+fn scheduler_snapshot(
+    scheduler: &er_protocol::KernelScheduler,
+) -> Result<KernelSchedulerSnapshotV2, Box<dyn Error>> {
+    let state = scheduler.export_restorable_state();
+    let snapshot = KernelSchedulerSnapshotV2 {
+        next_timer_id: state.next_timer_id,
+        timers: state
+            .timers
+            .into_iter()
+            .map(|timer| er_kernel::snapshot::RestorableTimerSnapshotV2 {
+                registration: timer.registration,
+                original_delay_ms: timer.original_delay_ms,
+                remaining_active_ms: timer.remaining_active_ms,
+            })
+            .collect(),
+        pauses: state
+            .pauses
+            .into_iter()
+            .map(|pause| er_kernel::snapshot::TimeClassPauseSnapshotV2 {
+                endpoint: pause.endpoint,
+                time_class: pause.time_class,
+                reasons: pause.reasons,
+            })
+            .collect(),
+        disposed: state.disposed,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
+}
 fn historical_owner_rejection(
     pending: &CoreGameKernelSnapshotV7,
     content: Arc<PreparedGameContentV2>,
@@ -468,7 +530,7 @@ fn historical_owner_rejection(
     use er_protocol::proposal::{ProposalLeaseManager, ProposalLeaseSpec};
     use er_protocol::snapshot::ProposalLeaseSnapshotBridge;
     let guest = SeatId::new(safe(2));
-    let mut scheduler = pending.scheduler.clone().into_scheduler()?;
+    let mut scheduler = live_scheduler(&pending.scheduler)?;
     let mut protocol = pending.protocol.clone().ok_or("protocol missing")?;
     let config = protocol
         .proposal_leases
@@ -494,7 +556,7 @@ fn historical_owner_rejection(
     )?;
     protocol.proposal_leases = Some(leases.snapshot_v2()?);
     protocol.validate()?;
-    let historical_scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)?;
+    let historical_scheduler = scheduler_snapshot(&scheduler)?;
     historical_scheduler.validate()?;
     assert_eq!(
         protocol
@@ -552,7 +614,7 @@ fn historical_owner_rejection(
         .as_mut()
         .ok_or("protocol missing")?
         .proposal_leases = Some(leases.snapshot_v2()?);
-    quiescent.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)?;
+    quiescent.scheduler = scheduler_snapshot(&scheduler)?;
     quiescent.validate()?;
     let migrated = CoreGameKernelSnapshotV7::migrate_from_v6(quiescent.clone(), &content)?;
     assert!(migrated.current_proposal.is_none());
@@ -1031,10 +1093,10 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
     // Raw terminal compatibility delivery during a real disconnect has no exact
     // acceptance authority. The original proposal is conserved as abandoned.
     let mut paused = replica.snapshot()?;
-    let mut unrelated_scheduler = paused.scheduler.clone().into_scheduler()?;
+    let mut unrelated_scheduler = live_scheduler(&paused.scheduler)?;
     let _pause =
         unrelated_scheduler.pause_class(guest, TimeClass::HumanInput, "current-owner-unrelated")?;
-    paused.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&unrelated_scheduler)?;
+    paused.scheduler = scheduler_snapshot(&unrelated_scheduler)?;
     paused
         .protocol
         .as_mut()
