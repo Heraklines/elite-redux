@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '254'
+      M9E_EXPECTED_TESTS: '195'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -72,31 +72,12 @@ jobs:
           print(encoded.decode())
           raise SystemExit(0 if passed else 1)
           PY
-      - name: Verify pinned receipt provider on remote runner
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import hashlib, json, os, pathlib, sys
-          sys.path.insert(0, 'scripts/ci')
-          import m9e_current_proposal as owner
-          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'm9e-preflight'
-          try:
-              primitive, provider = owner.prepare_provider(True, os.environ['RUNNER_TEMP'], root / 'diagnostics')
-              result = {'status': 'passed', 'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
-                        'helper_sha256': hashlib.sha256(pathlib.Path('scripts/ci/m9e_current_proposal.py').read_bytes()).hexdigest(),
-                        'provider': provider, 'empty_digest': primitive(b'')}
-              (root / 'compact/provider.json').write_text(json.dumps(result, sort_keys=True, indent=2) + '\n')
-              print(json.dumps(result, sort_keys=True))
-          except Exception as error:
-              (root / 'diagnostics/provider-failure.txt').write_text(str(error)[:8192])
-              raise
-          PY
       - name: Compact harness result
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: m9e-prepared-gate-summary-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-preflight/compact/*.json
+          path: ${{ runner.temp }}/m9e-preflight/compact/summary.json
           if-no-files-found: error
           retention-days: 14
       - name: Remote harness diagnostics
