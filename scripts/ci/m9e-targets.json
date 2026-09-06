@@ -1,4 +1,23 @@
 {
+  "current_proposal_focus": {
+    "paths": [
+      "rust/crates/er-kernel/src/current_proposal_v7.rs",
+      "rust/crates/er-kernel/src/game_kernel_v7.rs",
+      "rust/crates/er-kernel/src/lib.rs",
+      "rust/crates/er-kernel/src/snapshot_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_coop_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs",
+      "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"
+    ],
+    "trigger_paths": ["rust/crates/er-kernel/src/current_proposal_v7.rs", "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs"],
+    "exact_test_ids": {
+      "er-kernel:m9e_current_proposal_v7": [
+        "current_proposal_publication_receipt_and_snapshot_conserve_ownership",
+        "current_proposal_rejection_duplicate_and_terminal_are_transactional"
+      ]
+    }
+  },
   "version": 1,
   "ai_snapshot_validation_focus": {
     "paths": [

@@ -645,10 +645,15 @@ def plan():
     changed = capture(["git", "diff", "--name-only", base, "HEAD"]).splitlines()
     rust_changes = [path for path in changed if path.startswith("rust/")]
     timer_focus = config.get("timer_focus", {})
-    product_changes = [path for path in changed if path not in config["infrastructure_paths"]
+    from m9e_current_proposal import (HELPER_PATH, OWNER_PATHS, OWNER_TRIGGERS, TARGET, NATIVE_IDS,
+                                      focus_policy, merge_targets, selected_owner, source_binding)
+    product_changes = [path for path in changed if path != HELPER_PATH and path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
     from m9e_phases import (WORKER_SOURCE_PATHS, WORKER_TEST_IDS, WORKER_CODEC_IDS, browser_worker_source_binding,
                             RTC_PATHS, RTC_TEST_IDS, browser_rtc_source_binding)
+    owner_session = focus_policy(config, product_changes)
+    owner_installed = any((ROOT / path).is_file() for path in OWNER_TRIGGERS)
+    owner_changed = owner_installed and any(path in OWNER_PATHS for path in product_changes)
     browser_worker_focus = config.get("current_browser_worker_focus", {})
     browser_worker_paths = browser_worker_focus.get("paths", [])
     if browser_worker_focus and (browser_worker_paths != WORKER_SOURCE_PATHS
@@ -716,7 +721,7 @@ def plan():
                            and set(product_changes) == set(AI_SNAPSHOT_VALIDATION_PATHS))
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -790,7 +795,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -898,6 +903,17 @@ def plan():
         ai_snapshot_targets = {**timer_focus["required_targets"], "er-ai": ["er_ai"]}
         ai_snapshot_ids = {**timer_focus["exact_test_ids"], "er-ai:er_ai": list(AI_SNAPSHOT_VALIDATION_IDS)}
         boundaries = [path for path in boundaries if path not in AI_SNAPSHOT_VALIDATION_PATHS]
+    if owner_session:
+        execution_scope = merge_targets(timer_focus["execute"], capture_focus["execute"], {"er-kernel": ["*"]})
+        boundaries = [path for path in boundaries if path not in OWNER_PATHS]
+    owner_required = owner_changed or (owner_installed and selected_owner(selected | set(execution_scope or {}), execution_scope))
+    if owner_required:
+        # Additional witnesses preserve the old focus and all its required IDs.
+        if execution_scope is not None:
+            execution_scope = merge_targets(execution_scope, {"er-kernel": ["m9e_current_proposal_v7"]})
+        selected.add("er-kernel")
+        browser_required = True
+        current_session = True
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -911,7 +927,7 @@ def plan():
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
     if endpoint_execution:
         selected.add("er-kernel-worker")
-    cli_executable_required = browser_required and (retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
+    cli_executable_required = browser_required and (owner_required or retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
         ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
     if cli_executable_required:
         selected.add("er-cli")
@@ -924,7 +940,7 @@ def plan():
                 break
             selected = widened
     storage_required = storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
-    rtc_required = rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
+    rtc_required = owner_required or rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
     browser_worker_required = storage_required or rtc_required or browser_worker_session or (browser_required and any(
         (ROOT / path).is_file() for path in (
             "src/rust-browser/routes/rust-current-worker-entry.ts",
@@ -940,6 +956,9 @@ def plan():
               "current_storage_binding": storage_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if storage_required else None,
               "requires_browser_worker": browser_worker_required,
               "current_browser_rtc_focus": rtc_session,
+              "current_proposal_focus": owner_session,
+              "requires_current_proposal": owner_required,
+              "owner_source_binding": source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if owner_required else None,
               "requires_browser_rtc": rtc_required,
               "browser_rtc_binding": (browser_rtc_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"]))
                                       if rtc_required else None),
@@ -994,6 +1013,12 @@ def plan():
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
+    if owner_session:
+        result["required_native_targets"] = merge_targets(timer_focus["required_targets"], capture_focus["required_targets"])
+        result["required_native_test_ids"] = {**timer_focus.get("exact_test_ids", {}), **capture_focus.get("exact_test_ids", {})}
+    if owner_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_current_proposal_v7"]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], TARGET: NATIVE_IDS}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
     # to broad native success or bypass the timer and replica mutant gate.
@@ -1001,7 +1026,7 @@ def plan():
                         for path in product_changes)
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (storage_changed and not storage_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
+    if unknown or boundaries or (not owner_session and ((storage_changed and not storage_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -1255,7 +1280,7 @@ def verify_browser_worker_build(output, summary, *, rtc=False):
     summary[key + "_assets"] = evidence
 
 
-def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort_assets=None):
+def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort_assets=None, owner_context=None):
     from m9e_phases import WORKER_TEST_IDS, RTC_TEST_IDS, validate_browser_worker_tests, validate_browser_rtc_tests
     selected_ids = RTC_TEST_IDS if rtc else WORKER_TEST_IDS
     expected_file = "m9e-v7-worker-rtc.spec.ts" if rtc else "m9e-v7-worker.spec.ts"
@@ -1286,7 +1311,14 @@ def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort
             raise RuntimeError("current Worker witness failed, skipped, retried or flaky")
         key = "positive" if spec["title"] == selected_ids[0] else "negative"
         attachments = [item for item in runs[0].get("attachments", [])
-                       if str(item.get("name", "")).startswith(prefix)]
+                       if owner_context is not None or str(item.get("name", "")).startswith(prefix)]
+        receipt_bytes = None
+        if owner_context is not None:
+            from m9e_current_proposal import receipt_attachment
+            if not rtc:
+                raise RuntimeError("owner receipt evidence requires actual RTC witnesses")
+            compact, receipt_bytes = receipt_attachment(attachments, ROOT, key == "positive")
+            attachments = [compact]
         if (len(attachments) != 1 or attachments[0].get("name") != prefix + key
                 or attachments[0].get("contentType") != "application/json"):
             raise RuntimeError("current Worker attachment missing, ambiguous or misplaced")
@@ -1307,9 +1339,17 @@ def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort
             raise RuntimeError("current Worker attachment requires one bounded body or file")
         if len(payload) > 4096:
             raise RuntimeError("current Worker attachment exceeds bound")
-        result[key] = json.loads(payload)
+        if owner_context is not None:
+            from m9e_current_proposal import parse, receipt_oracle
+            result[key] = parse(payload, 4096, canonical_required=False)
+            if key == "positive":
+                result["receipt_oracle"] = receipt_oracle(receipt_bytes, result[key], **owner_context)
+        else:
+            result[key] = json.loads(payload)
     if rtc:
-        validate_browser_rtc_tests(result, assets, binding, cohort_assets or {})
+        validate_browser_rtc_tests(result, assets, binding, cohort_assets or {},
+                                   owner_binding=owner_context["binding"] if owner_context else None,
+                                   owner_helper_hash=owner_context["helper_hash"] if owner_context else None)
     else:
         validate_browser_worker_tests(result, assets, binding)
     return result
@@ -1476,12 +1516,30 @@ def browser_checks(summary):
             json.loads((FULL / "browser-worker-results.json").read_text()), summary["browser_worker_assets"],
             summary["plan"]["browser_worker_binding"])
     if summary.get("plan", {}).get("requires_browser_rtc"):
+        owner_context = None
+        if summary["plan"].get("requires_current_proposal"):
+            from m9e_current_proposal import prepare_provider, fixture_identity, revalidate_cohort, source_binding, HELPER_PATH
+            revalidate_cohort(output, summary["browser_assets"]["assets"])
+            primitive, provider = prepare_provider(True, os.environ["RUNNER_TEMP"], FULL)
+            owner_context = {"expected": fixture_identity(output, summary["browser_assets"]["assets"]),
+                             "primitive": primitive, "provider": provider,
+                             "binding": summary["plan"]["owner_source_binding"], "helper_hash": digest(ROOT / HELPER_PATH)}
+            if source_binding(ROOT, summary["product_sha"]) != owner_context["binding"]:
+                raise RuntimeError("owner source changed before browser receipt production")
         env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-rtc-results.json")
         run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
              "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts", "--workers=1", "--reporter=line,json"], "browser-rtc-journey", ROOT, env)
         summary["browser_rtc_tests"] = browser_worker_result_evidence(
             json.loads((FULL / "browser-rtc-results.json").read_text()), summary["browser_rtc_assets"],
-            summary["plan"]["browser_rtc_binding"], rtc=True, cohort_assets=summary["browser_assets"]["assets"])
+            summary["plan"]["browser_rtc_binding"], rtc=True, cohort_assets=summary["browser_assets"]["assets"], owner_context=owner_context)
+        if owner_context is not None:
+            revalidate_cohort(output, summary["browser_assets"]["assets"])
+            if (fixture_identity(output, summary["browser_assets"]["assets"]) != owner_context["expected"]
+                    or source_binding(ROOT, summary["product_sha"]) != owner_context["binding"]
+                    or digest(ROOT / HELPER_PATH) != owner_context["helper_hash"]):
+                raise RuntimeError("owner source or fixture changed during browser receipt production")
+            verify_browser_worker_build(output, summary, rtc=True)
+            verify_browser_worker_build(output, summary)
 
     if summary.get("plan", {}).get("requires_current_storage"):
         current_storage_checks(summary, env)
@@ -1752,6 +1810,9 @@ def main(preflight_failure=None):
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
             enumerated.append((index, binary, name, ids, cwd, excluded_ids, env))
+        from m9e_current_proposal import validate_obligations
+        validate_obligations(selection, [{"crate": cwd.name, "target": name, "ids": ids}
+                                        for _, _, name, ids, cwd, _, _ in enumerated], summary["product_sha"])
         summary["required_native_target_counts"] = required_native_target_counts(
             selection.get("required_native_targets", {}),
             [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
@@ -1766,7 +1827,8 @@ def main(preflight_failure=None):
         summary["selected_inventory_validated"] = True
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
-        if selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus"):
+        if (selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus")
+                or selection.get("requires_current_proposal")):
             write_progress(summary, "lint", "selected-packages")
             try:
                 run(["cargo", "clippy", "--locked",
