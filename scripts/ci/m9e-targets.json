@@ -42,8 +42,12 @@
       "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic"
     ]
   },
-  "baseline": "791ae5b53333eaaf8edd8e91dcdba1de006e106d",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34011232052",
+  "current_ai_max_pp_focus": {
+    "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"],
+    "exact_test_ids": ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
+  },
+  "baseline": "46496094719a2f739cdc76df6d2a9779fb28bc04",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34034142653",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
