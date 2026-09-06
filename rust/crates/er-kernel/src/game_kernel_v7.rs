@@ -2558,7 +2558,8 @@ impl GameKernelV7 {
         let runtime = runtime.clone();
         if let Some(owner) = &self.current_coop_setup
             && (owner.local.sender_seat_id != self.local_seat
-                || (owner.local.authority_seat_id == self.local_seat) != (self.role == GameKernelRoleV7::Authority))
+                || (owner.local.authority_seat_id == self.local_seat)
+                    != (self.role == GameKernelRoleV7::Authority))
         {
             return Err(GameKernelV7Error::Invalid);
         }

@@ -3,8 +3,8 @@
 use super::*;
 use crate::current_proposal_v7::{MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1, decode_current_hex_v1};
 use er_game::m72_bootstrap::RunBootstrapSelectionsV1;
-use er_types::{FrameContext, GameContentIdentityV2};
 use er_types::battle_ids::GameModeId;
+use er_types::{FrameContext, GameContentIdentityV2};
 
 const MAX_CHOICES_BYTES: usize = 16_384;
 const MAX_OWNER_BYTES: usize = 1_048_576;
@@ -386,7 +386,12 @@ impl GameKernelV7 {
     }
 
     pub(super) fn advance_coop_bootstrap(&mut self) -> Result<GameKernelStepV7> {
-        let generation = self.current_coop_setup.as_ref().ok_or(GameKernelV7Error::Invalid)?.local.connection_generation;
+        let generation = self
+            .current_coop_setup
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?
+            .local
+            .connection_generation;
         self.validate_current_network_pair(generation)?;
         let GameKernelLifecycleV7::Bootstrap(bootstrap) = &self.lifecycle else {
             return Err(GameKernelV7Error::Invalid);
@@ -396,8 +401,17 @@ impl GameKernelV7 {
             .as_mut()
             .ok_or(GameKernelV7Error::Invalid)?;
         if bootstrap.selections.mode.is_some_and(|selected| {
-            !self.content.bundle().bootstrap.modes.iter().any(|mode| mode.mode == selected && mode.cooperative && mode.supported)
-                || owner.choices.as_ref().is_some_and(|choices| choices.mode != selected)
+            !self
+                .content
+                .bundle()
+                .bootstrap
+                .modes
+                .iter()
+                .any(|mode| mode.mode == selected && mode.cooperative && mode.supported)
+                || owner
+                    .choices
+                    .as_ref()
+                    .is_some_and(|choices| choices.mode != selected)
         }) {
             return Err(GameKernelV7Error::Invalid);
         }
