@@ -8828,5 +8828,195 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "changed source/lock"):
                 title.checks(self.root, self.full, remote, summary, env, "1.97.1")
             rebuilt.assert_not_called()
+
+class CurrentCostRecordTests(unittest.TestCase):
+    # Exact bounded record produced by release6e2bb145/run34043250096. This is
+    # parser evidence only; mutations never substitute for the real Rust probe.
+    PRODUCED = r'''{"architecture":"x86_64","bundle_bytes":15810979,"checkpoints":[{"checkpoint":"title","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":1,"observation_json_bytes":1567,"phases":[{"median_ns":1593,"min_ns":1543,"phase":"fork"},{"median_ns":2424,"min_ns":2394,"phase":"snapshot"},{"median_ns":2555,"min_ns":2444,"phase":"validate"},{"median_ns":461,"min_ns":430,"phase":"observe"},{"median_ns":629464,"min_ns":613204,"phase":"canonical_encode_snapshot"},{"median_ns":640375,"min_ns":629364,"phase":"canonical_digest_snapshot"},{"median_ns":17563,"min_ns":17512,"phase":"blake3_preencoded_snapshot"},{"median_ns":37420,"min_ns":37129,"phase":"apply_effectful_raw_input"},{"median_ns":2136496,"min_ns":2124153,"phase":"recorder_append"}],"recorder_capsule_bytes":77605,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":68327,"snapshot_digest":"9e7b9834bb4b1ea0e9d078b1d3e2ddb1352aba2de831aae9b7da7adf83b61996"},{"checkpoint":"mode","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":9,"observation_json_bytes":4379,"phases":[{"median_ns":4178,"min_ns":4117,"phase":"fork"},{"median_ns":9518,"min_ns":9447,"phase":"snapshot"},{"median_ns":10129,"min_ns":10108,"phase":"validate"},{"median_ns":1793,"min_ns":1763,"phase":"observe"},{"median_ns":648540,"min_ns":647548,"phase":"canonical_encode_snapshot"},{"median_ns":681191,"min_ns":680079,"phase":"canonical_digest_snapshot"},{"median_ns":18644,"min_ns":18595,"phase":"blake3_preencoded_snapshot"},{"median_ns":4101171,"min_ns":4038494,"phase":"apply_effectful_raw_input"},{"median_ns":10380876,"min_ns":10321375,"phase":"recorder_append"}],"recorder_capsule_bytes":738869,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":71145,"snapshot_digest":"c9e4373e6ff335ae0485ee2a6d9f823f6e24219a38f1770ba04fd7974eee9bb0"},{"checkpoint":"starter","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":707,"observation_json_bytes":333602,"phases":[{"median_ns":98714,"min_ns":98363,"phase":"fork"},{"median_ns":981792,"min_ns":938079,"phase":"snapshot"},{"median_ns":1054968,"min_ns":1053105,"phase":"validate"},{"median_ns":96961,"min_ns":96170,"phase":"observe"},{"median_ns":3761558,"min_ns":3741881,"phase":"canonical_encode_snapshot"},{"median_ns":3877534,"min_ns":3814936,"phase":"canonical_digest_snapshot"},{"median_ns":95258,"min_ns":95158,"phase":"blake3_preencoded_snapshot"},{"median_ns":4272500,"min_ns":4255138,"phase":"apply_effectful_raw_input"},{"median_ns":16411907,"min_ns":16250916,"phase":"recorder_append"}],"recorder_capsule_bytes":1067916,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":400368,"snapshot_digest":"9dd00a7668a85f1311a873259c2b919e3bb9936dd93a2029d9a8eb196b2a0f56"},{"checkpoint":"active","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"ARROW_DOWN"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":2,"observation_json_bytes":2050,"phases":[{"median_ns":3186,"min_ns":3076,"phase":"fork"},{"median_ns":113512,"min_ns":111398,"phase":"snapshot"},{"median_ns":121517,"min_ns":121396,"phase":"validate"},{"median_ns":92323,"min_ns":88545,"phase":"observe"},{"median_ns":90378,"min_ns":89917,"phase":"canonical_encode_snapshot"},{"median_ns":91381,"min_ns":91170,"phase":"canonical_digest_snapshot"},{"median_ns":2525,"min_ns":2525,"phase":"blake3_preencoded_snapshot"},{"median_ns":273330,"min_ns":268771,"phase":"apply_effectful_raw_input"},{"median_ns":1547377,"min_ns":1532760,"phase":"recorder_append"}],"recorder_capsule_bytes":12969,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":8416,"snapshot_digest":"884799cb819b8a0a502a484715b136e214003b7d59aec6cd7a978770be3199ef"}],"content_identity":{"ai_hash":"3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9","battle_hash":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","bootstrap_hash":"e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a","bundle_hash":"blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429","oracle_sha":"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7","presentation_hash":"6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0","progression_hash":"751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695","run_hash":"879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428","scenario_hash":"e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8","semantic_catalog_hash":"a878c7487924a10f8508787ec560829efd72c5c5f101f022ad93c5358ec1ced0","world_hash":"c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"},"content_phases":[{"median_ns":52567776,"min_ns":50231488,"phase":"content_decode"},{"median_ns":206343510,"min_ns":205525914,"phase":"content_prepare_and_arc"}],"debug_assertions":false,"limitations":"Wall time includes optimizer barriers, scheduling, internal validation/allocation and internal destruction. Setup, verification and final input/output teardown excluded. Warm-process fixed-order samples; no allocator or live-memory claims. API costs overlap and are not additive components. Digest includes canonical encoding; preencoded BLAKE3 isolates hashing. Recorder append excludes event apply and recorder construction; measures one accepted event on an empty tail, not rotation or accumulated history. Not transport or whole-run latency.","os":"linux","probe":"current_native_phase_costs_preserve_semantics","samples_per_phase":3,"schema_version":1,"warmups_per_phase":1}'''
+
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        self.value = json.loads(self.PRODUCED)
+        self.binding = {"architecture": "x86_64", "operating_system": "linux",
+                        "bundle_bytes": 15_810_979, "content_identity": copy.deepcopy(self.value["content_identity"])}
+
+    def raw(self, value=None):
+        value = self.value if value is None else value
+        return self.cost.PREFIX + json.dumps(value, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+
+    def rejected(self, value):
+        with self.assertRaises(RuntimeError):
+            self.cost.parse_line(self.raw(value), **self.binding)
+
+    def test_actual_release_cost_record_reconstructs_bound_bytes_and_hash(self):
+        raw = self.raw()
+        self.assertEqual(len(raw), 6009)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), "5c8eb3c10b702ec14d68a2428279834041e10d8d957d4035033f3accbc0749d8")
+        parsed = self.cost.parse_line(raw, **self.binding)
+        self.assertEqual(parsed, self.value)
+        self.assertEqual(parsed["checkpoints"][2]["menu_options"], 707)
+        proof = {"line": raw.decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        self.assertEqual(self.cost.validate_record(proof, **self.binding), self.value)
+
+    def test_cost_record_rejects_incomplete_repeated_and_oversized_framing(self):
+        raw = self.raw()
+        for malformed in (raw[:-1], raw + raw, b"progress " + raw, raw + b"\n", raw.replace(b"\n", b"\r\n"),
+                          raw + b"trailing", b"M9E_CURRENT_COST_PROBE\n", raw.decode(), None,
+                          self.cost.PREFIX + b" " * (8192 - len(self.cost.PREFIX) - 1) + b"\n"):
+            with self.subTest(kind=type(malformed).__name__), self.assertRaises(RuntimeError):
+                self.cost.parse_line(malformed, **self.binding)
+
+    def test_cost_record_rejects_duplicate_json_keys_nonfinite_values_and_trailing_json(self):
+        raw = self.raw()
+        for malformed in (raw.replace(b'"schema_version":1', b'"schema_version":1,"schema_version":1'),
+                          raw.replace(b'"min_ns":1543', b'"min_ns":1543,"min_ns":1543'),
+                          raw.replace(b'"schema_version":1', b'"schema_version":NaN'),
+                          raw.replace(b'"schema_version":1', b'"schema_version":Infinity'),
+                          raw.replace(b'"schema_version":1', b'"schema_version":-Infinity'),
+                          raw[:-1] + b" {}\n", self.cost.PREFIX + b"\xff\n",
+                          self.cost.PREFIX + b"[]\n", self.cost.PREFIX + b"{" + b"\n"):
+            self.assertNotEqual(malformed, raw)
+            with self.assertRaises(RuntimeError):
+                self.cost.parse_line(malformed, **self.binding)
+
+    def test_cost_record_rejects_missing_unknown_and_wrong_typed_object_fields(self):
+        paths = [(), ("content_identity",), ("content_phases", 0), ("checkpoints", 0),
+                 ("checkpoints", 0, "phases", 0), ("checkpoints", 0, "event"),
+                 ("checkpoints", 0, "event", "input"), ("checkpoints", 0, "event", "input", "data"),
+                 ("checkpoints", 0, "event", "input", "data", "code")]
+        for path in paths:
+            original = self.value
+            for key in path:
+                original = original[key]
+            for mode in ("missing", "unknown"):
+                bad = copy.deepcopy(self.value)
+                row = bad
+                for key in path:
+                    row = row[key]
+                if mode == "missing":
+                    row.pop(next(iter(original)))
+                else:
+                    row["unrecognized"] = False
+                with self.subTest(path=path, mode=mode):
+                    self.rejected(bad)
+        bad = copy.deepcopy(self.value)
+        bad["checkpoints"][0]["event"]["input"]["data"] = []
+        self.rejected(bad)
+
+    def test_cost_record_rejects_boolean_counters_and_wrong_host_or_profile(self):
+        for key in ("schema_version", "warmups_per_phase", "samples_per_phase", "bundle_bytes"):
+            for replacement in (True, False, None, "1", 1.0, -1, self.cost.U64_MAX + 1):
+                bad = copy.deepcopy(self.value)
+                bad[key] = replacement
+                with self.subTest(key=key, replacement=replacement):
+                    self.rejected(bad)
+        for key, replacement in (("probe", "renamed"), ("architecture", "aarch64"), ("os", "windows"),
+                                 ("debug_assertions", True), ("debug_assertions", 0), ("limitations", "fast enough")):
+            bad = copy.deepcopy(self.value)
+            bad[key] = replacement
+            self.rejected(bad)
+
+    def test_cost_record_binds_all_actual_content_fields_and_typed_digest_prefixes(self):
+        for key in self.cost.IDENTITY_FIELDS:
+            for replacement in ("0" * 64, "bad", True):
+                bad = copy.deepcopy(self.value)
+                bad["content_identity"][key] = replacement
+                self.rejected(bad)
+            binding = copy.deepcopy(self.binding)
+            binding["content_identity"][key] = "0" * (40 if key == "oracle_sha" else 64)
+            with self.assertRaises(RuntimeError):
+                self.cost.parse_line(self.raw(), **binding)
+        for key, replacement in (("bundle_bytes", 1), ("bundle_bytes", True), ("architecture", "mips"),
+                                 ("operating_system", "darwin")):
+            binding = {**self.binding, key: replacement}
+            with self.assertRaises(RuntimeError):
+                self.cost.parse_line(self.raw(), **binding)
+
+    def test_cost_record_requires_every_phase_once_in_the_recorded_order(self):
+        for path in [("content_phases",), *[("checkpoints", i, "phases") for i in range(4)]]:
+            for mode in ("missing", "duplicate", "reorder", "renamed"):
+                bad = copy.deepcopy(self.value)
+                rows = bad
+                for key in path:
+                    rows = rows[key]
+                if mode == "missing":
+                    rows.pop()
+                elif mode == "duplicate":
+                    rows[-1] = copy.deepcopy(rows[0])
+                elif mode == "reorder":
+                    rows.reverse()
+                else:
+                    rows[0]["phase"] = "external_approximation"
+                self.rejected(bad)
+
+    def test_cost_record_accepts_zero_resolution_but_rejects_invalid_duration_order_and_types(self):
+        bad = copy.deepcopy(self.value)
+        for row in [*bad["content_phases"], *[phase for cp in bad["checkpoints"] for phase in cp["phases"]]]:
+            row["min_ns"] = row["median_ns"] = 0
+        self.assertEqual(self.cost.parse_line(self.raw(bad), **self.binding), bad)
+        for minimum, median in ((True, 1), (0, False), (1.0, 2), (2, 1), (-1, 0), (0, self.cost.U64_MAX + 1)):
+            bad = copy.deepcopy(self.value)
+            bad["checkpoints"][0]["phases"][0].update(min_ns=minimum, median_ns=median)
+            self.rejected(bad)
+
+    def test_cost_record_requires_four_actual_checkpoint_identities_and_snapshot_digests(self):
+        for mode in ("missing", "duplicate", "reorder", "extra", "digest", "kind"):
+            bad = copy.deepcopy(self.value)
+            rows = bad["checkpoints"]
+            if mode == "missing":
+                rows.pop()
+            elif mode == "duplicate":
+                rows[-1] = copy.deepcopy(rows[0])
+            elif mode == "reorder":
+                rows.reverse()
+            elif mode == "extra":
+                rows.append(copy.deepcopy(rows[0]))
+            elif mode == "digest":
+                rows[0]["snapshot_digest"] = "A" * 64
+            else:
+                rows[0]["checkpoint"] = "controlled_fixture"
+            self.rejected(bad)
+
+    def test_cost_record_rejects_changed_raw_event_or_coerced_boolean_controls(self):
+        for index in range(4):
+            for key, value in (("printable", True), ("printable", 0), ("browser_repeat", True),
+                               ("browser_repeat", 0), ("focus", "TEXT"), ("code", {"kind": "ESCAPE"})):
+                bad = copy.deepcopy(self.value)
+                bad["checkpoints"][index]["event"]["input"]["data"][key] = value
+                self.rejected(bad)
+            for path, replacement in ((["kind"], "TIMER"), (["input", "kind"], "KEY_UP")):
+                bad = copy.deepcopy(self.value)
+                event = bad["checkpoints"][index]["event"]
+                for part in path[:-1]:
+                    event = event[part]
+                event[path[-1]] = replacement
+                self.rejected(bad)
+
+    def test_cost_record_keeps_existing_recorder_caps_and_positive_measured_sizes(self):
+        for key in ("snapshot_canonical_bytes", "observation_json_bytes", "menu_options", "event_effects",
+                    "recorder_capsule_bytes", "recorder_maximum_bytes", "recorder_maximum_events"):
+            for value in (True, 0, -1, 1.0, self.cost.U64_MAX + 1):
+                bad = copy.deepcopy(self.value)
+                bad["checkpoints"][0][key] = value
+                self.rejected(bad)
+        for key, value in (("recorder_capsule_bytes", 16_777_217), ("recorder_maximum_bytes", 33_554_432),
+                           ("recorder_maximum_events", 8192)):
+            bad = copy.deepcopy(self.value)
+            bad["checkpoints"][0][key] = value
+            self.rejected(bad)
+
+    def test_cost_wire_record_rejects_tampering_missing_fields_and_invalid_unicode(self):
+        raw = self.raw()
+        proof = {"line": raw.decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        for key in proof:
+            bad = dict(proof)
+            bad.pop(key)
+            with self.assertRaises(RuntimeError):
+                self.cost.validate_record(bad, **self.binding)
+        for key, value in (("line", proof["line"] + " "), ("line", "\ud800"), ("line", raw),
+                           ("bytes", True), ("bytes", len(raw) - 1), ("sha256", "0" * 64), ("extra", "ignored")):
+            with self.assertRaises(RuntimeError):
+                self.cost.validate_record({**proof, key: value}, **self.binding)
 if __name__ == "__main__":
     unittest.main()
