@@ -9590,5 +9590,97 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
                 self.execute()
             self.assertFalse(self.targets[-1].parent.exists())
 
+    def validate(self, proof, **overrides):
+        kwargs = {"repository": self.repository, "identity": self.identity,
+                  "source_binding": self.binding, "content": self.content, **overrides}
+        with patch.object(self.cost, "read_content", return_value=self.content):
+            return self.cost.validate_execution(proof, **kwargs)
+
+    def test_cost_transferred_proof_roundtrips_after_owned_binary_cleanup(self):
+        _, proof = self.execute()
+        restored = json.loads(self.cost.encoded(proof))
+        self.validate(restored)
+        self.assertFalse(self.targets[0].exists())
+        self.assertEqual(len(self.calls), 3)
+        for name in ("artifact", "record", "logs"):
+            self.assertEqual(restored[name], proof[name])
+
+    def test_cost_transferred_proof_rejects_other_run_candidate_scope_and_counts(self):
+        _, proof = self.execute()
+        mutations = [("schema_version", True), ("status", "pending"), ("execution_profile", "test"),
+                     ("target", ["er-cli", self.cost.TARGET[1]]), ("test_id", "unrelated"),
+                     ("phase_identity_sha256", "0" * 64), ("source_binding_sha256", "0" * 64),
+                     ("tests", {"executed": True, "passed": 1, "failed": 0, "skipped": 0}),
+                     ("tests", {"executed": 2, "passed": 2, "failed": 0, "skipped": 0})]
+        for key, value in mutations:
+            with self.subTest(key=key, value=value), self.assertRaises(RuntimeError):
+                self.validate({**proof, key: value})
+        for key in ("run_id", "run_attempt", "product_sha", "workflow_sha", "profile", "features", "target"):
+            with self.subTest(identity=key), self.assertRaises(RuntimeError):
+                self.validate(proof, identity={**self.identity, key: "different"})
+        with self.assertRaises(RuntimeError):
+            self.validate({**proof, "unreviewed": "x" * 17000})
+        for key in proof:
+            with self.subTest(missing=key), self.assertRaises(RuntimeError):
+                self.validate({name: value for name, value in proof.items() if name != key})
+
+    def test_cost_transferred_proof_rejects_debug_or_unbound_artifact_and_environment(self):
+        _, proof = self.execute()
+        changes = [("bytes", True), ("bytes", (128 << 20) + 1), ("sha256", "bad"),
+                   ("relative_path", "../release/deps/escape"), ("cargo_package_id", "registry+unrelated"),
+                   ("manifest_sha256", "0" * 64), ("source_sha256", "0" * 64)]
+        for key, value in changes:
+            with self.subTest(artifact=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "artifact": {**proof["artifact"], key: value}})
+        for key, value in (("opt_level", "0"), ("debug_assertions", True), ("overflow_checks", True),
+                           ("debuginfo", False), ("test", 1), ("extra", False)):
+            artifact = copy.deepcopy(proof["artifact"])
+            artifact["cargo_profile"][key] = value
+            with self.subTest(profile=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "artifact": artifact})
+        for key, value in (("cargo_config_files", False), ("compiler_overrides", 1),
+                           ("features", "other"), ("profile", "test"), ("secret", "must not transfer")):
+            with self.subTest(environment=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "environment": {**proof["environment"], key: value}})
+
+    def test_cost_transferred_proof_rejects_rehashed_invalid_record_and_bad_log_bounds(self):
+        _, proof = self.execute()
+        for key, value in (("line", self.line.decode()[:-1]), ("line", self.line.decode() * 2),
+                           ("bytes", True), ("bytes", len(self.line) + 1), ("sha256", "0" * 64)):
+            with self.subTest(record=key), self.assertRaises(RuntimeError):
+                self.validate({**proof, "record": {**proof["record"], key: value}})
+        bad = copy.deepcopy(self.record)
+        bad["debug_assertions"] = True
+        raw = self.cost.PREFIX + json.dumps(bad).encode() + b"\n"
+        with self.assertRaises(RuntimeError):
+            self.validate({**proof, "record": {"line": raw.decode(), "bytes": len(raw),
+                                               "sha256": hashlib.sha256(raw).hexdigest()}})
+        for name in ("build", "list", "execute"):
+            for key, value in (("bytes", 0), ("bytes", (16 << 20) + 1), ("sha256", "bad"),
+                               ("elapsed_seconds", True), ("elapsed_seconds", float("nan")),
+                               ("elapsed_seconds", 901), ("unexpected", 1)):
+                logs = copy.deepcopy(proof["logs"])
+                logs[name][key] = value
+                with self.subTest(log=name, field=key), self.assertRaises(RuntimeError):
+                    self.validate({**proof, "logs": logs})
+        logs = copy.deepcopy(proof["logs"])
+        logs["list"]["sha256"] = "0" * 64
+        with self.assertRaises(RuntimeError):
+            self.validate({**proof, "logs": logs})
+
+    def test_cost_transferred_proof_rejects_candidate_content_and_manifest_drift(self):
+        _, proof = self.execute()
+        for key in ("bundle", "manifest", "identity"):
+            changed = copy.deepcopy(self.content)
+            if key == "identity":
+                changed[key]["oracle_sha"] = "0" * 40
+            else:
+                changed[key]["sha256"] = "0" * 64
+            with self.subTest(content=key), self.assertRaises(RuntimeError):
+                self.validate(proof, content=changed)
+        manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
+        manifest.write_text("changed Cargo manifest\n")
+        with self.assertRaises(RuntimeError):
+            self.validate(proof)
 if __name__ == "__main__":
     unittest.main()
