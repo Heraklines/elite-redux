@@ -174,10 +174,13 @@ async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
         if (delayMs > 0) {
           (RTCPeerConnection.prototype as any).createOffer = async function(this: RTCPeerConnection, options?: RTCOfferOptions) {
             await new Promise(resolve => setTimeout(resolve, delayMs));
-            return original.call(this, options);
+            return Reflect.apply(original, this, [options]);
           };
         }
-        return await (globalThis as any).__naturalCoop.peer.offer();
+        const started = performance.now();
+        const offer = await (globalThis as any).__naturalCoop.peer.offer();
+        if (performance.now() - started < delayMs) throw new Error("actual delayed offer preparation was bypassed");
+        return offer;
       } finally { RTCPeerConnection.prototype.createOffer = original; }
     }, delayOffer ? 12_000 : 0);
     const answer = await right.evaluate(offer => (globalThis as any).__naturalCoop.peer.answer(offer), offer);
