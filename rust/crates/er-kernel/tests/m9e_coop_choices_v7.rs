@@ -7,21 +7,23 @@ use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_new_run_v6::{expand_cooperative_choices_v7, expand_cooperative_topology_v6};
 use er_game::m72_bootstrap::RunBootstrapStageV1;
 use er_kernel::game_kernel_v7::GameKernelV7;
-use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::game_kernel_v7::current_coop_setup_v7::CurrentCoopFrameV1;
+use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
+use er_kernel::snapshot::KernelSchedulerSnapshotV2;
+use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
 use er_protocol::recovery::RecoveryTransactionConfig;
 use er_protocol::replica::AuthorityReplicaConfig;
-use er_types::{ConnectionGeneration, FrameContext, MembershipRevision, RunId, SessionId, TimeClass};
-use er_kernel::snapshot::KernelSchedulerSnapshotV2;
-use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
 use er_types::battle_ids::WaveIndex;
+use er_types::{
+    ConnectionGeneration, FrameContext, MembershipRevision, RunId, SessionId, TimeClass,
+};
 use er_types::{InputFocus, PhysicalKey, RawInputEvent, SafeU53, SeatId, StarterSelectionV1};
 
 const BUNDLE: &[u8] =
@@ -357,31 +359,64 @@ fn replica_protocol(
     })
 }
 
-
-fn owned_title(content: Arc<PreparedGameContentV2>, host: bool) -> Result<GameKernelV7, Box<dyn Error>> {
+fn owned_title(
+    content: Arc<PreparedGameContentV2>,
+    host: bool,
+) -> Result<GameKernelV7, Box<dyn Error>> {
     let authority = SeatId::new(safe(1));
     let replica = SeatId::new(safe(2));
     let seat = if host { authority } else { replica };
     let generation = ConnectionGeneration::new(safe(1));
-    let config = if host { authority_protocol(authority, replica, generation)? } else { replica_protocol(authority, replica, generation)? };
+    let config = if host {
+        authority_protocol(authority, replica, generation)?
+    } else {
+        replica_protocol(authority, replica, generation)?
+    };
     let protocol = initial_battle_protocol_snapshot_v2(&config, seat)?;
-    let mut kernel = GameKernelV7::natural_start(profile()?, "owned-startup".to_owned(), seat,
-        vec!["owned-save".to_owned()], host, content, KernelSchedulerSnapshotV2 {
-            next_timer_id: Some(SafeU53::ZERO), timers: Vec::new(), pauses: Vec::new(), disposed: false,
-        }, Some(protocol))?;
+    let mut kernel = GameKernelV7::natural_start(
+        profile()?,
+        "owned-startup".to_owned(),
+        seat,
+        vec!["owned-save".to_owned()],
+        host,
+        content,
+        KernelSchedulerSnapshotV2 {
+            next_timer_id: Some(SafeU53::ZERO),
+            timers: Vec::new(),
+            pauses: Vec::new(),
+            disposed: false,
+        },
+        Some(protocol),
+    )?;
     let before = kernel.snapshot()?;
-    assert!(before.current_coop_setup.is_none(), "capability must not activate by default");
+    assert!(
+        before.current_coop_setup.is_none(),
+        "capability must not activate by default"
+    );
     kernel.enable_current_coop_setup()?;
     assert!(kernel.current_control().is_some());
     Ok(kernel)
 }
 
-fn capture_press(kernel: &mut GameKernelV7, frames: &mut Vec<Vec<u8>>) -> Result<(), Box<dyn Error>> {
-    for input in [RawInputEvent::KeyDown { code: PhysicalKey::Space, printable: false, browser_repeat: false, focus: InputFocus::Game },
-                  RawInputEvent::KeyUp { code: PhysicalKey::Space }] {
+fn capture_press(
+    kernel: &mut GameKernelV7,
+    frames: &mut Vec<Vec<u8>>,
+) -> Result<(), Box<dyn Error>> {
+    for input in [
+        RawInputEvent::KeyDown {
+            code: PhysicalKey::Space,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+        RawInputEvent::KeyUp {
+            code: PhysicalKey::Space,
+        },
+    ] {
         for effect in kernel.raw_input(input)?.effects {
             match effect {
-                GameKernelEffectV7::ProposalReady { bytes, .. } | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => frames.push(bytes),
+                GameKernelEffectV7::ProposalReady { bytes, .. }
+                | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => frames.push(bytes),
                 _ => {}
             }
         }
@@ -389,8 +424,18 @@ fn capture_press(kernel: &mut GameKernelV7, frames: &mut Vec<Vec<u8>>) -> Result
     Ok(())
 }
 
-fn choose_owned(kernel: &mut GameKernelV7, content: &PreparedGameContentV2, host: bool) -> Result<(Vec<StarterSelectionV1>, Vec<Vec<u8>>), Box<dyn Error>> {
-    let mode = content.bundle().bootstrap.modes.iter().find(|mode| mode.cooperative && mode.supported).ok_or("co-op mode missing")?;
+fn choose_owned(
+    kernel: &mut GameKernelV7,
+    content: &PreparedGameContentV2,
+    host: bool,
+) -> Result<(Vec<StarterSelectionV1>, Vec<Vec<u8>>), Box<dyn Error>> {
+    let mode = content
+        .bundle()
+        .bootstrap
+        .modes
+        .iter()
+        .find(|mode| mode.cooperative && mode.supported)
+        .ok_or("co-op mode missing")?;
     let mut frames = Vec::new();
     capture_press(kernel, &mut frames)?;
     navigate(kernel, &format!("bootstrap/mode/{}", mode.mode.get()))?;
@@ -399,21 +444,33 @@ fn choose_owned(kernel: &mut GameKernelV7, content: &PreparedGameContentV2, host
         navigate(kernel, "bootstrap/challenge/done")?;
         capture_press(kernel, &mut frames)?;
     }
-    let GameKernelLifecycleSnapshotV7::Bootstrap(before) = kernel.snapshot()?.lifecycle else { return Err("raw setup bypassed".into()); };
+    let GameKernelLifecycleSnapshotV7::Bootstrap(before) = kernel.snapshot()?.lifecycle else {
+        return Err("raw setup bypassed".into());
+    };
     assert_eq!(before.stage, RunBootstrapStageV1::StarterSelect);
     let count = if host { 1 } else { 2 };
     let mut budget = before.catalog.maximum_starter_cost;
     let mut selected = Vec::new();
-    for starter in before.catalog.starters.iter().skip(if host { 0 } else { 2 }) {
+    for starter in before
+        .catalog
+        .starters
+        .iter()
+        .skip(if host { 0 } else { 2 })
+    {
         if starter.cost <= budget {
             budget -= starter.cost;
             selected.push(starter.clone());
-            if selected.len() == count { break; }
+            if selected.len() == count {
+                break;
+            }
         }
     }
     assert_eq!(selected.len(), count);
     for starter in &selected {
-        navigate(kernel, &format!("bootstrap/starter/{}", starter.pokemon_id.get()))?;
+        navigate(
+            kernel,
+            &format!("bootstrap/starter/{}", starter.pokemon_id.get()),
+        )?;
         capture_press(kernel, &mut frames)?;
     }
     navigate(kernel, "bootstrap/starter/confirm")?;
@@ -421,35 +478,64 @@ fn choose_owned(kernel: &mut GameKernelV7, content: &PreparedGameContentV2, host
     capture_press(kernel, &mut frames)?;
     if host {
         for _ in 0..4 {
-            if kernel.state().is_some() || matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete) { break; }
+            if kernel.state().is_some()
+                || matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete)
+            {
+                break;
+            }
             capture_press(kernel, &mut frames)?;
         }
     } else {
-        assert!(matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::WaitingForPartner));
-        assert_eq!(frames.len(), 1, "confirmation itself publishes exactly one peer selection");
+        assert!(
+            matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::WaitingForPartner)
+        );
+        assert_eq!(
+            frames.len(),
+            1,
+            "confirmation itself publishes exactly one peer selection"
+        );
     }
     Ok((selected, frames))
 }
 
 fn wire(step: &GameKernelStepV7) -> Result<Vec<u8>, Box<dyn Error>> {
-    let bytes = step.effects.iter().filter_map(|effect| match effect {
-        GameKernelEffectV7::ProposalReady { bytes, .. } | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes.clone()), _ => None,
-    }).collect::<Vec<_>>();
+    let bytes = step
+        .effects
+        .iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::ProposalReady { bytes, .. }
+            | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
     assert_eq!(bytes.len(), 1);
     Ok(bytes[0].clone())
 }
 
-fn restored(kernel: &GameKernelV7, content: Arc<PreparedGameContentV2>, host: bool) -> Result<GameKernelV7, Box<dyn Error>> {
+fn restored(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+    host: bool,
+) -> Result<GameKernelV7, Box<dyn Error>> {
     let snapshot = kernel.snapshot()?;
     let encoded = er_canonical::canonical_bytes(&snapshot)?;
-    let restored = GameKernelV7::from_snapshot(serde_json::from_slice(&encoded)?, SeatId::new(safe(if host { 1 } else { 2 })),
-        if host { GameKernelRoleV7::Authority } else { GameKernelRoleV7::Replica }, content)?;
+    let restored = GameKernelV7::from_snapshot(
+        serde_json::from_slice(&encoded)?,
+        SeatId::new(safe(if host { 1 } else { 2 })),
+        if host {
+            GameKernelRoleV7::Authority
+        } else {
+            GameKernelRoleV7::Replica
+        },
+        content,
+    )?;
     assert_eq!(snapshot, restored.snapshot()?);
     Ok(restored)
 }
 
 #[test]
-fn natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution() -> Result<(), Box<dyn Error>> {
+fn natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution()
+-> Result<(), Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
     let generation = ConnectionGeneration::new(safe(1));
@@ -462,7 +548,12 @@ fn natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reex
         assert_eq!(wire(&guest.retry_current_coop_setup()?)?, choices);
         let (host_choices, started) = if guest_first {
             let early = host.ingest_network_frame(generation, &choices)?;
-            assert!(early.effects.iter().all(|effect| matches!(effect, GameKernelEffectV7::UiChanged(_))));
+            assert!(
+                early
+                    .effects
+                    .iter()
+                    .all(|effect| matches!(effect, GameKernelEffectV7::UiChanged(_)))
+            );
             assert!(host.state().is_none());
             host = restored(&host, content.clone(), true)?;
             let (selected, frames) = choose_owned(&mut host, content.as_ref(), true)?;
@@ -473,30 +564,59 @@ fn natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reex
             assert!(frames.is_empty());
             assert!(host.state().is_none(), "host may not invent a guest party");
             host = restored(&host, content.clone(), true)?;
-            (selected, wire(&host.ingest_network_frame(generation, &choices)?)?)
+            (
+                selected,
+                wire(&host.ingest_network_frame(generation, &choices)?)?,
+            )
         };
         host = restored(&host, content.clone(), true)?;
         let before = host.snapshot()?;
         let duplicate = host.ingest_network_frame(generation, &choices)?;
-        assert_eq!(wire(&duplicate)?, started, "lost startup reply must be byte-identical");
-        assert_eq!(duplicate.effects.len(), 1, "retry must not repeat presentation or storage");
+        assert_eq!(
+            wire(&duplicate)?,
+            started,
+            "lost startup reply must be byte-identical"
+        );
+        assert_eq!(
+            duplicate.effects.len(),
+            1,
+            "retry must not repeat presentation or storage"
+        );
         assert_eq!(before, host.snapshot()?);
         assert_eq!(wire(&host.retry_current_coop_setup()?)?, started);
         let applied = guest.ingest_network_frame(generation, &started)?;
-        assert!(applied.effects.iter().all(|effect| !matches!(effect, GameKernelEffectV7::Platform(_) | GameKernelEffectV7::AuthorityMaterial { .. })));
+        assert!(applied.effects.iter().all(|effect| !matches!(
+            effect,
+            GameKernelEffectV7::Platform(_) | GameKernelEffectV7::AuthorityMaterial { .. }
+        )));
         assert_eq!(host.state(), guest.state());
-        assert_eq!(host.snapshot()?.pending_presentations, guest.snapshot()?.pending_presentations);
+        assert_eq!(
+            host.snapshot()?.pending_presentations,
+            guest.snapshot()?.pending_presentations
+        );
         assert!(guest.snapshot()?.pending_platform.is_empty());
-        let run = host.state().and_then(|state| state.active_run.as_ref()).ok_or("owned run missing")?;
+        let run = host
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("owned run missing")?;
         assert_eq!(run.party.len(), host_choices.len() + guest_choices.len());
-        for (pokemon, selected) in run.party.iter().zip(host_choices.iter().chain(&guest_choices)) {
+        for (pokemon, selected) in run
+            .party
+            .iter()
+            .zip(host_choices.iter().chain(&guest_choices))
+        {
             assert_eq!(pokemon.owner_seat, Some(selected.owner_seat));
             assert_eq!(pokemon.species_id.get(), selected.species_id);
             assert_eq!(pokemon.form_index, selected.form_index);
         }
         guest = restored(&guest, content.clone(), false)?;
         let before = guest.snapshot()?;
-        assert!(guest.ingest_network_frame(generation, &started)?.effects.is_empty());
+        assert!(
+            guest
+                .ingest_network_frame(generation, &started)?
+                .effects
+                .is_empty()
+        );
         assert_eq!(guest.snapshot()?, before);
         assert!(guest.retry_current_coop_setup()?.effects.is_empty());
     }
@@ -513,7 +633,9 @@ fn owned_startup_rejects_forged_frames_and_snapshots_atomically() -> Result<(), 
     let (_, publications) = choose_owned(&mut guest, content.as_ref(), false)?;
     let choices = &publications[0];
     let frame: CurrentCoopFrameV1 = serde_json::from_slice(choices)?;
-    let CurrentCoopFrameV1::CurrentCoopChoices { choices: original } = frame else { return Err("wrong raw publication".into()); };
+    let CurrentCoopFrameV1::CurrentCoopChoices { choices: original } = frame else {
+        return Err("wrong raw publication".into());
+    };
     for index in 0..14 {
         let mut forged = original.clone();
         match index {
@@ -532,9 +654,14 @@ fn owned_startup_rejects_forged_frames_and_snapshots_atomically() -> Result<(), 
             12 => forged.starters = Vec::new(),
             _ => forged.starters.push(forged.starters[0].clone()),
         }
-        let bytes = er_canonical::canonical_bytes(&CurrentCoopFrameV1::CurrentCoopChoices { choices: forged })?;
+        let bytes = er_canonical::canonical_bytes(&CurrentCoopFrameV1::CurrentCoopChoices {
+            choices: forged,
+        })?;
         let before = host.snapshot()?;
-        assert!(host.ingest_network_frame(generation, &bytes).is_err(), "forgery {index} accepted");
+        assert!(
+            host.ingest_network_frame(generation, &bytes).is_err(),
+            "forgery {index} accepted"
+        );
         assert_eq!(before, host.snapshot()?);
     }
     let mut unknown: serde_json::Value = serde_json::from_slice(choices)?;
@@ -542,23 +669,59 @@ fn owned_startup_rejects_forged_frames_and_snapshots_atomically() -> Result<(), 
     let unknown = er_canonical::canonical_bytes(&unknown)?;
     let before = host.snapshot()?;
     assert!(host.ingest_network_frame(generation, &unknown).is_err());
-    assert!(host.ingest_network_frame(ConnectionGeneration::new(safe(2)), choices).is_err());
-    assert!(host.ingest_network_frame(generation, &vec![b' '; 1_048_577]).is_err());
+    assert!(
+        host.ingest_network_frame(ConnectionGeneration::new(safe(2)), choices)
+            .is_err()
+    );
+    assert!(
+        host.ingest_network_frame(generation, &vec![b' '; 1_048_577])
+            .is_err()
+    );
     assert_eq!(before, host.snapshot()?);
     choose_owned(&mut host, content.as_ref(), true)?;
     let started = wire(&host.ingest_network_frame(generation, choices)?)?;
     let mut forged: CurrentCoopFrameV1 = serde_json::from_slice(&started)?;
-    let CurrentCoopFrameV1::CurrentCoopStarted { choices: peer, .. } = &mut forged else { return Err("wrong startup receipt".into()); };
+    let CurrentCoopFrameV1::CurrentCoopStarted { choices: peer, .. } = &mut forged else {
+        return Err("wrong startup receipt".into());
+    };
     peer.starters.reverse();
     let before = guest.snapshot()?;
-    assert!(guest.ingest_network_frame(generation, &er_canonical::canonical_bytes(&forged)?).is_err());
+    assert!(
+        guest
+            .ingest_network_frame(generation, &er_canonical::canonical_bytes(&forged)?)
+            .is_err()
+    );
     assert_eq!(before, guest.snapshot()?);
     let mut corrupt = before.clone();
-    corrupt.current_coop_setup.as_mut().ok_or("owner missing")?.choices = None;
-    assert!(GameKernelV7::from_snapshot(corrupt, SeatId::new(safe(2)), GameKernelRoleV7::Replica, content.clone()).is_err());
+    corrupt
+        .current_coop_setup
+        .as_mut()
+        .ok_or("owner missing")?
+        .choices = None;
+    assert!(
+        GameKernelV7::from_snapshot(
+            corrupt,
+            SeatId::new(safe(2)),
+            GameKernelRoleV7::Replica,
+            content.clone()
+        )
+        .is_err()
+    );
     guest.ingest_network_frame(generation, &started)?;
     let mut corrupt = guest.snapshot()?;
-    corrupt.current_coop_setup.as_mut().ok_or("owner missing")?.started = None;
-    assert!(GameKernelV7::from_snapshot(corrupt, SeatId::new(safe(2)), GameKernelRoleV7::Replica, content).is_err());
+    corrupt
+        .current_coop_setup
+        .as_mut()
+        .ok_or("owner missing")?
+        .started = None;
+    assert!(
+        GameKernelV7::from_snapshot(
+            corrupt,
+            SeatId::new(safe(2)),
+            GameKernelRoleV7::Replica,
+            content
+        )
+        .is_err()
+    );
     Ok(())
 }

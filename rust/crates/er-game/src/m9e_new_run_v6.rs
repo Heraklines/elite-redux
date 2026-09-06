@@ -832,7 +832,11 @@ fn increment(value: SafeU53) -> Result<SafeU53, NaturalRunV6Error> {
 }
 
 /// Check explicit starter records against the prepared source catalog before retention.
-pub fn validate_cooperative_choices_v7(content: &PreparedGameContentV2, partner_seat: SeatId, starters: &[er_types::StarterSelectionV1]) -> Result<(), NaturalRunV6Error> {
+pub fn validate_cooperative_choices_v7(
+    content: &PreparedGameContentV2,
+    partner_seat: SeatId,
+    starters: &[er_types::StarterSelectionV1],
+) -> Result<(), NaturalRunV6Error> {
     if starters.is_empty()
         || starters.len() > content.bundle().bootstrap.maximum_starters
         || starters

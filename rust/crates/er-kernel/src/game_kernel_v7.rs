@@ -1414,10 +1414,10 @@ impl GameKernelV7 {
                     .accept_current_slots(request_id, slots)
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
                 self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
-        if self.current_coop_setup.is_some() {
-            self.advance_replay_sequence()?;
-            return self.advance_coop_bootstrap();
-        }
+                if self.current_coop_setup.is_some() {
+                    self.advance_replay_sequence()?;
+                    return self.advance_coop_bootstrap();
+                }
             }
             (
                 GamePlatformEffectV2::StorageRead { .. },
@@ -1430,10 +1430,10 @@ impl GameKernelV7 {
                     .accept_current_missing(request_id)
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
                 self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
-        if self.current_coop_setup.is_some() {
-            self.advance_replay_sequence()?;
-            return self.advance_coop_bootstrap();
-        }
+                if self.current_coop_setup.is_some() {
+                    self.advance_replay_sequence()?;
+                    return self.advance_coop_bootstrap();
+                }
             }
             (
                 GamePlatformEffectV2::StorageRead { slot, .. },
@@ -1736,7 +1736,10 @@ impl GameKernelV7 {
         self.complete_bootstrap_run(bootstrap)
     }
 
-    fn complete_bootstrap_run(&mut self, bootstrap: RunBootstrapMachineV1) -> Result<GameKernelStepV7, GameKernelV7Error> {
+    fn complete_bootstrap_run(
+        &mut self,
+        bootstrap: RunBootstrapMachineV1,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
         if let Some(storage) = &bootstrap.current_storage {
@@ -1759,9 +1762,16 @@ impl GameKernelV7 {
         {
             if let Some(owner) = &self.current_coop_setup {
                 let choices = owner.choices.as_ref().ok_or(GameKernelV7Error::Invalid)?;
-                if bootstrap.selections.mode != Some(choices.mode) { return Err(GameKernelV7Error::Invalid); }
-                er_game::m9e_new_run_v6::expand_cooperative_choices_v7(&mut candidate, self.content.as_ref(), partner, &choices.starters)
-                    .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+                if bootstrap.selections.mode != Some(choices.mode) {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                er_game::m9e_new_run_v6::expand_cooperative_choices_v7(
+                    &mut candidate,
+                    self.content.as_ref(),
+                    partner,
+                    &choices.starters,
+                )
+                .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
             } else {
                 expand_cooperative_topology_v6(&mut candidate, self.content.as_ref(), partner)
                     .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
