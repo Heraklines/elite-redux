@@ -6660,7 +6660,7 @@ class FeedbackTests(unittest.TestCase):
                      for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
                                          *phases.STATE_QUERY_IDENTITIES.items())]
         phases.validate_state_query_inventory(selection, inventory)
-        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["a"])
+        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["c"])
         self.assertIn(list(phases.STATE_QUERY_WORKER_TARGET), phases.partition(inventory)["b"])
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
                      "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
