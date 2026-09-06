@@ -2696,3 +2696,10 @@ advance that baseline to791/run34011232052. The gate retains all prior native,
 CLI, Wasm, Worker, RTC and both mutation controls. The pinned receipt-hash wheel
 is downloaded and installed only on the remote runner. Runtime remains unqualified
 until this exact candidate completes its focused checks. Broad M9 remains incomplete.
+Owner candidatec1ae46dff/run34012900744 stopped at remote Rust formatting before
+native test execution or platform qualification. Apply exact remote rustfmt repair
+74116 bytes SHA df4eb4ea03d00e01d46da368c0f5e86c7373df348dc27ac1e889051bda61dca2
+from artifact9983027548ZIP12952. Four paths only: current proposal module, game kernel,
+co-op test and new proposal test. The compact excerpt omitted the larger test portion;
+the bounded complete repair includes it. No local formatter/compiler/test was run.
+Baseline remains fully qualified791. This formatting correction needs a new exact run.

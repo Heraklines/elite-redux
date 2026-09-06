@@ -655,21 +655,43 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     let exact_pending = replica.snapshot()?;
     let mut exhausted_press = private_move_menu.clone();
     exhausted_press.replay_sequence = safe(9_007_199_254_740_991);
-    let mut exhausted_press = GameKernelV7::from_snapshot(exhausted_press, guest,
-        GameKernelRoleV7::Replica, content.clone())?;
+    let mut exhausted_press = GameKernelV7::from_snapshot(
+        exhausted_press,
+        guest,
+        GameKernelRoleV7::Replica,
+        content.clone(),
+    )?;
     let before_exhausted_press = exhausted_press.snapshot()?;
     assert!(press(&mut exhausted_press, PhysicalKey::Space).is_err());
     assert_eq!(exhausted_press.snapshot()?, before_exhausted_press);
-    let previous_option = replica.current_control().and_then(|control| control.menu.as_ref())
-        .ok_or("pending move menu missing")?.selected_option_id.clone();
+    let previous_option = replica
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .ok_or("pending move menu missing")?
+        .selected_option_id
+        .clone();
     press(&mut replica, PhysicalKey::ArrowDown)?;
     let distinct_pending = replica.snapshot()?;
-    assert_ne!(replica.current_control().and_then(|control| control.menu.as_ref())
-        .ok_or("distinct move menu missing")?.selected_option_id, previous_option);
+    assert_ne!(
+        replica
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .ok_or("distinct move menu missing")?
+            .selected_option_id,
+        previous_option
+    );
     assert!(press(&mut replica, PhysicalKey::Space).is_err());
     assert_eq!(replica.snapshot()?, distinct_pending);
-    assert_eq!(distinct_pending.current_proposal, exact_pending.current_proposal);
-    replica = GameKernelV7::from_snapshot(exact_pending, guest, GameKernelRoleV7::Replica, content.clone())?;
+    assert_eq!(
+        distinct_pending.current_proposal,
+        exact_pending.current_proposal
+    );
+    replica = GameKernelV7::from_snapshot(
+        exact_pending,
+        guest,
+        GameKernelRoleV7::Replica,
+        content.clone(),
+    )?;
     let resolved = authority
         .ingest_network_frame(generation, &proposal)
         .map_err(|error| format!("guest command admission failed: {error}"))?;
@@ -724,7 +746,12 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     assert!(replica.snapshot()?.current_proposal.is_none());
     assert_eq!(replica.state(), authority.state());
     assert_eq!(replica.current_control(), authority.current_control());
-    assert!(authority.ingest_network_frame(generation, &proposal)?.effects.is_empty());
+    assert!(
+        authority
+            .ingest_network_frame(generation, &proposal)?
+            .effects
+            .is_empty()
+    );
     Ok(())
 }
 

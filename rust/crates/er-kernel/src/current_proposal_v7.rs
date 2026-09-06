@@ -7,8 +7,7 @@ use er_game::m9e_material_v6::{GameMaterialV6, game_state_digest};
 use er_protocol::{EndpointRole, ProtocolRuntimeSnapshotV2};
 use er_types::battle_ids::MenuInstanceId;
 use er_types::{
-    FrameContext, GameContentIdentityV2, GameRunId, OperationId,
-    SafeU53, SeatId, TransportState,
+    FrameContext, GameContentIdentityV2, GameRunId, OperationId, SafeU53, SeatId, TransportState,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -63,8 +62,12 @@ pub struct TerminalAbandonedCurrentProposalV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum CurrentProposalOwnerSnapshotV1 {
-    Pending { retained: Box<RetainedCurrentProposalV1> },
-    TerminalAbandoned { audit: Box<TerminalAbandonedCurrentProposalV1> },
+    Pending {
+        retained: Box<RetainedCurrentProposalV1>,
+    },
+    TerminalAbandoned {
+        audit: Box<TerminalAbandonedCurrentProposalV1>,
+    },
 }
 
 impl CurrentProposalOwnerSnapshotV1 {
@@ -96,7 +99,9 @@ pub struct CurrentProposalMaterialReceiptV1 {
     pub material_fingerprint: String,
 }
 
-fn deserialize_current_frame_context<'de, D>(deserializer: D) -> std::result::Result<FrameContext, D::Error>
+fn deserialize_current_frame_context<'de, D>(
+    deserializer: D,
+) -> std::result::Result<FrameContext, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -114,10 +119,13 @@ where
     }
     let value = StrictContext::deserialize(deserializer)?;
     Ok(FrameContext {
-        session_id: value.session_id, run_id: value.run_id,
-        session_epoch: value.session_epoch, seat_map_id: value.seat_map_id,
+        session_id: value.session_id,
+        run_id: value.run_id,
+        session_epoch: value.session_epoch,
+        seat_map_id: value.seat_map_id,
         membership_revision: value.membership_revision,
-        sender_seat_id: value.sender_seat_id, authority_seat_id: value.authority_seat_id,
+        sender_seat_id: value.sender_seat_id,
+        authority_seat_id: value.authority_seat_id,
         connection_generation: value.connection_generation,
     })
 }
@@ -161,7 +169,9 @@ pub fn decode_current_hex_v1(value: &str, maximum: usize) -> Result<Vec<u8>> {
             _ => Err(CurrentProposalErrorV1),
         }
     }
-    value.as_bytes().chunks_exact(2)
+    value
+        .as_bytes()
+        .chunks_exact(2)
         .map(|pair| Ok(nibble(pair[0])? * 16 + nibble(pair[1])?))
         .collect()
 }
@@ -177,7 +187,10 @@ pub fn decode_current_proposal_v1(bytes: &[u8]) -> Result<GameProposalEnvelopeV2
     {
         return Err(CurrentProposalErrorV1);
     }
-    proposal.proposal.validate().map_err(|_| CurrentProposalErrorV1)?;
+    proposal
+        .proposal
+        .validate()
+        .map_err(|_| CurrentProposalErrorV1)?;
     Ok(proposal)
 }
 
@@ -229,12 +242,13 @@ impl CurrentProposalMaterialReceiptV1 {
     }
 
     pub fn evidence(&self) -> Result<DecodedCurrentReceiptV1> {
-        let proposal_bytes = decode_current_hex_v1(&self.proposal_hex, MAX_CURRENT_PROPOSAL_BYTES_V1)?;
-        let material_bytes = decode_current_hex_v1(
-            &self.material_hex, MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1,
-        )?;
+        let proposal_bytes =
+            decode_current_hex_v1(&self.proposal_hex, MAX_CURRENT_PROPOSAL_BYTES_V1)?;
+        let material_bytes =
+            decode_current_hex_v1(&self.material_hex, MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1)?;
         let proposal = decode_current_proposal_v1(&proposal_bytes)?;
-        let material = GameMaterialV6::decode(&material_bytes).map_err(|_| CurrentProposalErrorV1)?;
+        let material =
+            GameMaterialV6::decode(&material_bytes).map_err(|_| CurrentProposalErrorV1)?;
         let transition = material.transition();
         let context = &proposal.proposal.context;
         if self.schema_version != 1
@@ -248,12 +262,18 @@ impl CurrentProposalMaterialReceiptV1 {
             || self.authority_context.sender_seat_id != context.authority_seat
             || self.authority_context.authority_seat_id != context.authority_seat
             || self.authority_context.connection_generation != proposal.connection_generation
-            || proposal.connection_generation.get() != SafeU53::new(1).map_err(|_| CurrentProposalErrorV1)?
+            || proposal.connection_generation.get()
+                != SafeU53::new(1).map_err(|_| CurrentProposalErrorV1)?
             || proposal.sender_seat == context.authority_seat
         {
             return Err(CurrentProposalErrorV1);
         }
-        Ok(DecodedCurrentReceiptV1 { proposal, proposal_bytes, material, material_bytes })
+        Ok(DecodedCurrentReceiptV1 {
+            proposal,
+            proposal_bytes,
+            material,
+            material_bytes,
+        })
     }
 }
 
@@ -267,19 +287,28 @@ pub fn validate_current_pair_v1(
 ) -> Result<()> {
     protocol.validate().map_err(|_| CurrentProposalErrorV1)?;
     let local = &protocol.frame_context.context;
-    let peer = protocol.peer_identity.peer.as_ref().ok_or(CurrentProposalErrorV1)?;
+    let peer = protocol
+        .peer_identity
+        .peer
+        .as_ref()
+        .ok_or(CurrentProposalErrorV1)?;
     let [connection] = protocol.connections.as_slice() else {
         return Err(CurrentProposalErrorV1);
     };
     let one = SafeU53::new(1).map_err(|_| CurrentProposalErrorV1)?;
     let mut expected_peer = local.clone();
     expected_peer.sender_seat_id = peer.sender_seat_id;
-    if protocol.disposed || protocol.role != role
-        || local != &protocol.peer_identity.local || local.sender_seat_id != local_seat
-        || peer != &expected_peer || peer.sender_seat_id == local_seat
+    if protocol.disposed
+        || protocol.role != role
+        || local != &protocol.peer_identity.local
+        || local.sender_seat_id != local_seat
+        || peer != &expected_peer
+        || peer.sender_seat_id == local_seat
         || connection.peer_seat != peer.sender_seat_id
-        || local.connection_generation.get() != one || connection.generation.get() != one
-        || !protocol.staged_rebinds.is_empty() || protocol.authority_rebind_pending
+        || local.connection_generation.get() != one
+        || connection.generation.get() != one
+        || !protocol.staged_rebinds.is_empty()
+        || protocol.authority_rebind_pending
         || (require_connected && connection.state != TransportState::Connected)
         || match role {
             EndpointRole::Authority => local.authority_seat_id != local_seat,
@@ -296,16 +325,24 @@ pub fn validate_current_proposal_quiescence_v1(
     scheduler: &KernelSchedulerSnapshotV2,
 ) -> Result<()> {
     if let Some(leases) = protocol.and_then(|value| value.proposal_leases.as_ref())
-        && (leases.disposed || !leases.leases.is_empty() || !leases.timer_targets.is_empty()
+        && (leases.disposed
+            || !leases.leases.is_empty()
+            || !leases.timer_targets.is_empty()
             || scheduler.timers.iter().any(|timer| {
-                timer.registration.owner.owner_id.starts_with(&leases.config.owner_prefix)
+                timer
+                    .registration
+                    .owner
+                    .owner_id
+                    .starts_with(&leases.config.owner_prefix)
             }))
     {
         return Err(CurrentProposalErrorV1);
     }
     if scheduler.timers.iter().any(|timer| {
-        matches!(timer.registration.owner.reason.as_str(),
-            "v2 proposal retry" | "v2 proposal absolute ceiling")
+        matches!(
+            timer.registration.owner.reason.as_str(),
+            "v2 proposal retry" | "v2 proposal absolute ceiling"
+        )
     }) {
         return Err(CurrentProposalErrorV1);
     }
@@ -314,7 +351,10 @@ pub fn validate_current_proposal_quiescence_v1(
 
 fn valid_state_digest(value: &str) -> bool {
     value.strip_prefix("blake3-v1:").is_some_and(|digest| {
-        digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     })
 }
 
@@ -322,46 +362,76 @@ pub fn validate_current_owner_snapshot_v1(
     snapshot: &CoreGameKernelSnapshotV7,
     content: &PreparedGameContentV2,
 ) -> Result<()> {
-    let Some(owner) = &snapshot.current_proposal else { return Ok(()); };
-    if canonical_bytes(owner).map_err(|_| CurrentProposalErrorV1)?.len()
+    let Some(owner) = &snapshot.current_proposal else {
+        return Ok(());
+    };
+    if canonical_bytes(owner)
+        .map_err(|_| CurrentProposalErrorV1)?
+        .len()
         > MAX_CURRENT_PROPOSAL_OWNER_BYTES_V1
-    { return Err(CurrentProposalErrorV1); }
+    {
+        return Err(CurrentProposalErrorV1);
+    }
     let retained = owner.retained();
     let protocol = snapshot.protocol.as_ref().ok_or(CurrentProposalErrorV1)?;
-    validate_current_pair_v1(protocol, retained.publication_context.sender_seat_id, EndpointRole::Replica, false)?;
+    validate_current_pair_v1(
+        protocol,
+        retained.publication_context.sender_seat_id,
+        EndpointRole::Replica,
+        false,
+    )?;
     validate_current_proposal_quiescence_v1(Some(protocol), &snapshot.scheduler)?;
     let bytes = decode_current_hex_v1(&retained.proposal_hex, MAX_CURRENT_PROPOSAL_BYTES_V1)?;
     let envelope = decode_current_proposal_v1(&bytes)?;
     let state = match (&snapshot.lifecycle, owner) {
-        (GameKernelLifecycleSnapshotV7::Active(state), CurrentProposalOwnerSnapshotV1::Pending { .. }) => state,
-        (GameKernelLifecycleSnapshotV7::Terminal { state, terminal, .. },
-            CurrentProposalOwnerSnapshotV1::TerminalAbandoned { audit }) => {
-            if audit.terminal_id != terminal.terminal_id || audit.terminal_reason != terminal.reason
+        (
+            GameKernelLifecycleSnapshotV7::Active(state),
+            CurrentProposalOwnerSnapshotV1::Pending { .. },
+        ) => state,
+        (
+            GameKernelLifecycleSnapshotV7::Terminal {
+                state, terminal, ..
+            },
+            CurrentProposalOwnerSnapshotV1::TerminalAbandoned { audit },
+        ) => {
+            if audit.terminal_id != terminal.terminal_id
+                || audit.terminal_reason != terminal.reason
                 || audit.abandonment_replay_sequence < retained.publication_replay_sequence
                 || audit.abandonment_replay_sequence > snapshot.replay_sequence
-                || !snapshot.material_ledger.records.last().is_some_and(|record| {
-                    record.operation_id == audit.terminal_operation_id
-                        && record.material_fingerprint == audit.terminal_material_fingerprint
-                        && record.authority_revision == audit.terminal_authority_revision
-                        && record.after_digest == audit.terminal_after_digest
-                        && record.authority_revision.get().checked_add(1)
-                            == Some(snapshot.material_ledger.next_authority_revision.get())
-                        && game_state_digest(state).is_ok_and(|digest| digest == record.after_digest)
-                })
-            { return Err(CurrentProposalErrorV1); }
+                || !snapshot
+                    .material_ledger
+                    .records
+                    .last()
+                    .is_some_and(|record| {
+                        record.operation_id == audit.terminal_operation_id
+                            && record.material_fingerprint == audit.terminal_material_fingerprint
+                            && record.authority_revision == audit.terminal_authority_revision
+                            && record.after_digest == audit.terminal_after_digest
+                            && record.authority_revision.get().checked_add(1)
+                                == Some(snapshot.material_ledger.next_authority_revision.get())
+                            && game_state_digest(state)
+                                .is_ok_and(|digest| digest == record.after_digest)
+                    })
+            {
+                return Err(CurrentProposalErrorV1);
+            }
             state
         }
         _ => return Err(CurrentProposalErrorV1),
     };
     let run = state.active_run.as_ref().ok_or(CurrentProposalErrorV1)?;
     if retained.schema_version != 1
-        || canonical_bytes(retained).map_err(|_| CurrentProposalErrorV1)?.len() > MAX_RETAINED_CURRENT_PROPOSAL_BYTES_V1
+        || canonical_bytes(retained)
+            .map_err(|_| CurrentProposalErrorV1)?
+            .len()
+            > MAX_RETAINED_CURRENT_PROPOSAL_BYTES_V1
         || retained.proposal_digest != json_bytes_sha256_v1(&bytes)?
         || retained.publication_context != protocol.frame_context.context
         || Some(&retained.authority_peer_context) != protocol.peer_identity.peer.as_ref()
         || envelope.sender_seat != retained.publication_context.sender_seat_id
         || envelope.connection_generation != retained.publication_context.connection_generation
-        || envelope.proposal.context.authority_seat != retained.authority_peer_context.sender_seat_id
+        || envelope.proposal.context.authority_seat
+            != retained.authority_peer_context.sender_seat_id
         || &retained.publication_content_identity != content.identity()
         || retained.publication_game_run_id != run.run_id
         || !valid_state_digest(&retained.publication_before_digest)
@@ -369,23 +439,39 @@ pub fn validate_current_owner_snapshot_v1(
         || retained.publication_menu_highwater > snapshot.next_menu_instance_id
         || retained.publication_replay_sequence == SafeU53::ZERO
         || retained.publication_replay_sequence > snapshot.replay_sequence
-        || retained.publication_next_authority_revision != envelope.proposal.context.authority_revision
-        || retained.publication_next_authority_revision > snapshot.material_ledger.next_authority_revision
+        || retained.publication_next_authority_revision
+            != envelope.proposal.context.authority_revision
+        || retained.publication_next_authority_revision
+            > snapshot.material_ledger.next_authority_revision
         || protocol.proposal_leases.as_ref().is_some_and(|leases| {
-            leases.committed_tombstones.contains(&envelope.proposal.context.operation_id)
+            leases
+                .committed_tombstones
+                .contains(&envelope.proposal.context.operation_id)
         })
-    { return Err(CurrentProposalErrorV1); }
-    if retained.publication_next_authority_revision == snapshot.material_ledger.next_authority_revision {
+    {
+        return Err(CurrentProposalErrorV1);
+    }
+    if retained.publication_next_authority_revision
+        == snapshot.material_ledger.next_authority_revision
+    {
         let mut canonical_state = state.clone();
         if let Some(private) = &snapshot.private_battle_control {
-            canonical_state.active_run.as_mut().ok_or(CurrentProposalErrorV1)?.control = private.canonical_control.clone();
+            canonical_state
+                .active_run
+                .as_mut()
+                .ok_or(CurrentProposalErrorV1)?
+                .control = private.canonical_control.clone();
         }
-        if game_state_digest(&canonical_state).map_err(|_| CurrentProposalErrorV1)? != retained.publication_before_digest {
+        if game_state_digest(&canonical_state).map_err(|_| CurrentProposalErrorV1)?
+            != retained.publication_before_digest
+        {
             return Err(CurrentProposalErrorV1);
         }
     } else if let Some(anchor) = snapshot.material_ledger.records.iter().find(|record| {
-        record.authority_revision.get().checked_add(1) == Some(retained.publication_next_authority_revision.get())
-    }) && anchor.after_digest != retained.publication_before_digest {
+        record.authority_revision.get().checked_add(1)
+            == Some(retained.publication_next_authority_revision.get())
+    }) && anchor.after_digest != retained.publication_before_digest
+    {
         return Err(CurrentProposalErrorV1);
     }
     Ok(())
