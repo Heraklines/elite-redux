@@ -2375,3 +2375,34 @@ Retrieved only the1779-byte summary,11727-byte failure excerpt,35890-byte harnes
 log and named patch from inspected artifacts. Required inventory remains57
 repair paths/77 targets; baseline remains f140. No local formatter or runtime
 workload, and no qualification advancement.
+## Damage query fixture uses published effective move definitions
+
+4c8175665df6daee842fe544442ee9e4b8b59f41 / run34001547205 passed remote
+formatting3.474s, build149.145s and full selected-package Clippy56.612s.
+Discovery selected1,235 actual native IDs with77 required targets. Native A then
+executed the four query witnesses first; all four failed the same fixture power
+assertion before the numeric query checks: published Cut15 has power60, while
+the fixture incorrectly expected vanilla power50. This is not qualification.
+Retrieved only the13155-byte summary and2180-byte failure excerpt from inspected
+4194-byte compact artifact9979680797; no full logs or content bundle download.
+
+The original source review inspected vanilla definitions but missed Elite Redux's
+effective retunes and Cut's Steel/forced-critical changes. Correct the fixture
+using published effective Force Palm395 and Confusion93: both power50, accuracy100,
+PP20, NearOther target and priority0; Force Palm is Fighting/Physical with Contact,
+Confusion Psychic/Special with no flags. The already-cached exact complete-battle-
+definitions blob ed96bde45255693557e77d94c2605fd294beeaf1 was read as source text
+with lazy fetching disabled; only relevant records were extracted. The compact
+source-record extract has SHA256
+e99179ba552cfceaaadc629c4ffcc073f60c7333df53152e9d9d91b20c5a9047.
+No fixture or
+content assets were downloaded or changed. These moves have no forced/high-
+critical flags in the pinned original source. The actual turn uses Confusion;
+Force Palm is used by the numeric queries only.
+
+Keep the independent ordinary46/13 calculations, defense inversion, all four IDs,
+full state/turn/RNG and PP/invalid-input assertions unchanged. Add exact effective
+flag/target/priority guards and correct the guide. The physical move's secondary
+behavior is not executed or claimed. This repairs the unqualified fixture only;
+production arithmetic, AI activation, required inventory, controls and f140
+qualification baseline remain unchanged. No local workload was run.

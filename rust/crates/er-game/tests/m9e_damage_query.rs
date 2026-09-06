@@ -13,8 +13,8 @@ use er_types::battle_command::{
 };
 use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, MoveSlotIndex};
 use er_types::battle_model::{
-    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState, PokemonType,
-    PokemonTyping,
+    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MoveFlag, MovePower, MoveSlotState,
+    MoveTarget, PokemonType, PokemonTyping,
 };
 
 use std::error::Error;
@@ -144,8 +144,9 @@ fn ordinary_move(
     move_type: PokemonType,
     accuracy: MoveAccuracy,
     base_pp: u16,
+    flags: &[MoveFlag],
 ) -> TestResult<MoveId> {
-    // Pinned oracle move definitions: Cut=15, Confusion=93. Never rewrite the pack.
+    // Published effective definitions: Force Palm=395, Confusion=93. Never rewrite the pack.
     let id = MoveId::new(safe(numeric_id));
     let definition = content.battle.move_definition(id)?;
     assert_eq!(definition.power, MovePower::Value(50));
@@ -153,6 +154,9 @@ fn ordinary_move(
     assert_eq!(definition.move_type, move_type);
     assert_eq!(definition.accuracy, accuracy);
     assert_eq!(definition.base_pp, base_pp);
+    assert_eq!(definition.flags.as_slice(), flags);
+    assert_eq!(definition.target, MoveTarget::NearOther);
+    assert_eq!(definition.priority, 0);
     Ok(id)
 }
 fn controlled_state(
@@ -161,11 +165,12 @@ fn controlled_state(
 ) -> TestResult<GameStateV5> {
     let physical = ordinary_move(
         content,
-        15,
+        395,
         MoveCategory::Physical,
-        PokemonType::Normal,
-        MoveAccuracy::Percent(95),
-        30,
+        PokemonType::Fighting,
+        MoveAccuracy::Percent(100),
+        20,
+        &[MoveFlag::Contact],
     )?;
     let special = ordinary_move(
         content,
@@ -173,7 +178,8 @@ fn controlled_state(
         MoveCategory::Special,
         PokemonType::Psychic,
         MoveAccuracy::Percent(100),
-        25,
+        20,
+        &[],
     )?;
     let splash = MoveId::new(safe(150));
     let splash_definition = content.battle.move_definition(splash)?;
