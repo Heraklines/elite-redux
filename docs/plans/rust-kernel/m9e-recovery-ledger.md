@@ -2363,3 +2363,15 @@ Full selected-package Clippy, reverse compilation, causal controls, Worker,
 platform and CLI proof requirements and existing size/time bounds remain. The
 sole qualified baseline is still f140b7687d44559e38e775147ad91835f62de8e8.
 No local formatter, compiler, test, benchmark or browser workload was run.
+## Remaining parity repair remote formatting
+
+3353fb49560eb688659b94730a4fe4e55871006e / run34001348201 passed all165
+harness tests in2.936 seconds, then stopped on Rust formatting before compilation
+or native execution. Apply the exact9299-byte remote formatting patch, SHA256
+ab169e6f449ad1b834802884d5ecc90fda8c9108e86cd5559216c4cf55ac2b8f,
+for m6_item_parity, m6_properties and m6_species_form_parity. Reviewed changes
+are line wrapping and equivalent braces around two existing return-error arms.
+Retrieved only the1779-byte summary,11727-byte failure excerpt,35890-byte harness
+log and named patch from inspected artifacts. Required inventory remains57
+repair paths/77 targets; baseline remains f140. No local formatter or runtime
+workload, and no qualification advancement.

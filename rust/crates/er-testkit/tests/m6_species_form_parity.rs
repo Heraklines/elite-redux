@@ -73,12 +73,14 @@ fn resolve_fixture(name: &str) -> Result<PathBuf, Box<dyn Error>> {
     Err(format!(
         "frozen m6 fixture `{name}` not found above {}",
         env!("CARGO_MANIFEST_DIR")
-    ).into())
+    )
+    .into())
 }
 
 fn load_fixture(name: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let path = resolve_fixture(name)?;
-    let bytes = std::fs::read(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let bytes =
+        std::fs::read(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
     Ok(serde_json::from_slice(&bytes)
         .map_err(|error| format!("parse {}: {error}", path.display()))?)
 }
@@ -186,7 +188,9 @@ fn species_and_form_closure_is_exact_with_zero_residual() -> Result<(), Box<dyn 
                     // the copy rule is behavioral, not declarative.
                     let record = species_gap::resolve(metadata.id).expect("pinned record");
                     let ErGapSpeciesSource::ContentOf(source_species) = record.source else {
-                        return Err(format!("class/source coherence broke for {}", metadata.id).into());
+                        return Err(
+                            format!("class/source coherence broke for {}", metadata.id).into()
+                        );
                     };
                     let source_content = closure
                         .species_content(source_species)

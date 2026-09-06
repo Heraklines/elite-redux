@@ -688,7 +688,8 @@ fn m6d_turn_resolution_is_pure_and_deterministic_across_the_corpus() -> TestResu
 
         // Terminal consistency: the derived outcome matches the recorded one
         // and a decided battle always completes its next decision.
-        let after_battle = first.after_state
+        let after_battle = first
+            .after_state
             .battle
             .as_ref()
             .expect("property battle fixture retains its battle");
@@ -794,7 +795,8 @@ fn m6d_pairwise_factor_matrix_keeps_all_invariants_after_resolution() -> TestRes
                 )?;
                 let case = format!("pairwise/status={status:?}/speed={speed}/hp_full={hp_full}");
                 check_state_invariants(0, &case, &[], &transition.after_state)?;
-                let after_battle = transition.after_state
+                let after_battle = transition
+                    .after_state
                     .battle
                     .as_ref()
                     .expect("property battle fixture retains its battle");
@@ -845,7 +847,8 @@ fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consiste
                 ),
             ));
             check_state_invariants(seed, &case, &trace, &transition.after_state)?;
-            let after_battle = transition.after_state
+            let after_battle = transition
+                .after_state
                 .battle
                 .as_ref()
                 .expect("property battle fixture retains its battle");
@@ -998,7 +1001,8 @@ fn resolve_campaign_replacement(
         .battle
         .as_ref()
         .expect("property battle fixture retains its battle");
-    let after_battle = transition.after_state
+    let after_battle = transition
+        .after_state
         .battle
         .as_ref()
         .expect("property battle fixture retains its battle");
