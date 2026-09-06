@@ -360,8 +360,9 @@ def write_case_reference(case, generation, content_identity):
             or save["state"].get("content_identity") != content_identity
             or save["content_identity"] != content_identity or save["state"] != state
             or before["pending_platform"] or before["pending_presentations"]
-            or len(pending["pending_platform"]) != 1
-            or pending["pending_platform"][0]["request_id"] != request["request_id"]
+            or pending["pending_platform"] != [{"request_id": request["request_id"], "effect": {
+                "kind": "STORAGE_WRITE", "request": request["request_id"], "slot": "controlled-slot",
+                "generation": generation, "bytes": request["bytes"]}}]
             or pending["pending_presentations"] != [case["presentation"]]
             or case["presentation"]["semantic"] != {"kind": "CUE", "value": "SAVE"}
             or case["presentation"]["event_id"] != before["material_ledger"]["next_authority_revision"]):
@@ -392,11 +393,17 @@ def fixture_oracle(fixture, content_hash):
             or fixture["natural_reached"]["lifecycle"]["value"]["active_run"]["control"]["kind"] != "BATTLE_COMMAND"
             or len(fixture["cycles"]) != 21 or len(fixture["read_cancels"]) != 2):
         raise RuntimeError("Title fixture identity/topology differs")
+    import copy
+    natural_state = copy.deepcopy(fixture["natural_reached"]["lifecycle"]["value"])
+    producer_state = fixture["write"]["before"]["lifecycle"]["value"]
+    natural_state["active_run"]["control"] = producer_state["active_run"]["control"]
+    if producer_state != natural_state:
+        raise RuntimeError("Title controlled producer changed natural gameplay outside its declared Save control")
     payload, save = write_case_reference(fixture["write"], 1, fixture["content_identity"])
     rewrite_payload, _ = write_case_reference(fixture["rewrite"], 2, fixture["content_identity"])
     initial = fixture["initial"]
     owner = initial["lifecycle"]["value"]
-    if (owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 1)
+    if (initial["lifecycle"]["kind"] != "BOOTSTRAP" or owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 1)
             or owner["current_storage"] != {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}
             or owner["catalog"]["save_slots"] != ["new-run-destination"]
             or initial["pending_platform"] or initial["pending_presentations"]):

@@ -7431,7 +7431,8 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         payload = canonical(saved)
         presentation = {"event_id": 3, "semantic": {"kind": "CUE", "value": "SAVE"}, "blocking": "NON_BLOCKING", "skip": "ALLOWED"}
         pending = copy.deepcopy(before)
-        pending.update({"pending_platform": [{"request_id": 1}], "pending_presentations": [presentation], "replay_sequence": 11})
+        pending.update({"pending_platform": [{"request_id": 1, "effect": {"kind": "STORAGE_WRITE", "request": 1,
+            "slot": "controlled-slot", "generation": 1, "bytes": list(payload)}}], "pending_presentations": [presentation], "replay_sequence": 11})
         callback = copy.deepcopy(pending)
         callback.update({"pending_platform": [], "storage_frontiers": [{"slot": "controlled-slot", "generation": 1}], "replay_sequence": 12})
         settled = copy.deepcopy(callback)
@@ -7441,6 +7442,11 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         case = {"before": before, "pending": pending, "callback": callback, "settled": settled, "continued": continued,
                 "presentation": presentation, "request": {"kind": "WRITE", "request_id": 1, "slot": "controlled-slot", "generation": 1, "bytes": list(payload)}}
         self.assertEqual(title.write_case_reference(case, 1, identity), (payload, saved))
+        for key, value in (("kind", "STORAGE_READ"), ("request", 2), ("slot", "other-slot"), ("generation", 2), ("bytes", [0])):
+            bad = copy.deepcopy(case)
+            bad["pending"]["pending_platform"][0]["effect"][key] = value
+            with self.assertRaisesRegex(RuntimeError, "effect ownership"):
+                title.write_case_reference(bad, 1, identity)
         for field in ("callback", "settled", "continued"):
             bad = copy.deepcopy(case)
             bad[field]["replay_sequence"] += 1
@@ -7710,5 +7716,40 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "fixture bytes differ"):
                 title.build_evidence(self.output, summary, self.root, self.full, "1.97.1")
         subprocess_run.assert_not_called()
+
+    def test_title_browser_checks_revalidate_cohort_after_exact_remote_command(self):
+        title, binding, cohort, assets, oracle, tests, report = self.title_browser_proof_fixture()
+        summary = {"product_sha": CANDIDATE, "plan": {"title_storage_binding": binding}, "browser_assets": {"assets": cohort},
+                   "title_storage_assets": assets, "title_storage_oracle": oracle}
+        env = {"M9E_V7_WEB_DIR": str(self.output), "preserved": "runner-owned"}
+        commands = []
+        def remote(command, label, root, run_env):
+            commands.append((command, label, root, run_env))
+            self.assertEqual(command, ["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts",
+                                      "--project=chromium", title.PRODUCT_PATHS[5], "--workers=1", "--reporter=line,json"])
+            self.assertEqual(label, "title-storage-journey")
+            self.assertEqual(root, self.root)
+            self.assertEqual(run_env["preserved"], "runner-owned")
+            self.assertEqual(run_env["M9E_V7_WEB_DIR"], str(self.output))
+            self.assertEqual(run_env["PLAYWRIGHT_JSON_OUTPUT_FILE"], str(self.full / "title-storage-results.json"))
+            Path(run_env["PLAYWRIGHT_JSON_OUTPUT_FILE"]).write_text(json.dumps(report))
+        with patch.object(title, "source_binding", return_value=binding) as source, patch.object(title, "build_evidence") as rebuilt:
+            title.checks(self.root, self.full, remote, summary, env, "1.97.1")
+            self.assertEqual(source.call_count, 2)
+            rebuilt.assert_called_once()
+            self.assertEqual(rebuilt.call_args.args[0], self.output)
+            self.assertEqual(rebuilt.call_args.args[-1], "1.97.1")
+        self.assertEqual(summary["title_storage_tests"], tests)
+        self.assertEqual(len(commands), 1)
+        self.assertNotIn("PLAYWRIGHT_JSON_OUTPUT_FILE", env)
+        def drift(output, repeated, root, full, toolchain):
+            repeated["title_storage_assets"] = {**repeated["title_storage_assets"], "manifest_sha256": "0" * 64}
+        with patch.object(title, "source_binding", return_value=binding), patch.object(title, "build_evidence", side_effect=drift):
+            with self.assertRaisesRegex(RuntimeError, "changed emitted cohort/fixture"):
+                title.checks(self.root, self.full, remote, summary, env, "1.97.1")
+        with patch.object(title, "source_binding", side_effect=[binding, {**binding, "pnpm_lock_sha256": "0" * 64}]), patch.object(title, "build_evidence") as rebuilt:
+            with self.assertRaisesRegex(RuntimeError, "changed source/lock"):
+                title.checks(self.root, self.full, remote, summary, env, "1.97.1")
+            rebuilt.assert_not_called()
 if __name__ == "__main__":
     unittest.main()
