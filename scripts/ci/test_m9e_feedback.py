@@ -6238,7 +6238,7 @@ class FeedbackTests(unittest.TestCase):
     def control_query_mock_inventory(self, selection):
         self.binary_ids = {}
         for crate, names in selection["execution_scope"].items():
-            if names == ["*"]:
+            if "*" in names:
                 names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
             for target in names:
                 binary = target if target not in self.binary_ids else crate + "--" + target
