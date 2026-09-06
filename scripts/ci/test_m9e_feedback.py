@@ -9018,5 +9018,123 @@ class CurrentCostRecordTests(unittest.TestCase):
                            ("bytes", True), ("bytes", len(raw) - 1), ("sha256", "0" * 64), ("extra", "ignored")):
             with self.assertRaises(RuntimeError):
                 self.cost.validate_record({**proof, key: value}, **self.binding)
+
+class CurrentCostArtifactTests(unittest.TestCase):
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-release-artifact-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.repository = self.root / "candidate"
+        self.manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
+        self.manifest.parent.mkdir(parents=True)
+        self.manifest.write_text('[package]\nname="er-repro"\nversion.workspace=true\n')
+        (self.repository / "rust/Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
+        self.source = self.repository / cost.SOURCE
+        self.source.parent.mkdir(parents=True)
+        self.source.write_text("// exact test source\n")
+        self.directory = self.root / "owned-release"
+        self.binary = self.directory / "release/deps/m9e_current_cost_probe-0123456789abcdef"
+        self.binary.parent.mkdir(parents=True)
+        self.binary.write_bytes(b"candidate executable fixture, never executed")
+        self.binary.chmod(0o700)
+        self.artifact = {"reason": "compiler-artifact", "manifest_path": str(self.manifest), "features": [],
+                         "package_id": "path+" + self.manifest.parent.as_uri() + "#0.1.0",
+                         "target": {"name": cost.TARGET[1], "kind": ["test"], "crate_types": ["bin"], "src_path": str(self.source)},
+                         "profile": {"opt_level": "3", "debug_assertions": False, "debuginfo": 0,
+                                     "overflow_checks": False, "test": True}, "executable": str(self.binary)}
+        self.finished = {"reason": "build-finished", "success": True}
+        self.records = [self.artifact, self.finished]
+
+    def discover(self, records=None, directory=None):
+        return self.cost.discover_release(self.records if records is None else records,
+                                         repository=self.repository,
+                                         target_directory=self.directory if directory is None else directory)
+
+    def test_cost_release_discovery_binds_exact_source_profile_and_executable_bytes(self):
+        executable, binding = self.discover()
+        self.assertEqual(executable, self.binary)
+        self.assertEqual(binding["sha256"], hashlib.sha256(self.binary.read_bytes()).hexdigest())
+        self.assertEqual(binding["bytes"], self.binary.stat().st_size)
+        self.assertEqual(binding["manifest_sha256"], hashlib.sha256(self.manifest.read_bytes()).hexdigest())
+        self.assertEqual(binding["source_sha256"], hashlib.sha256(self.source.read_bytes()).hexdigest())
+        self.assertEqual(binding["relative_path"], "release/deps/" + self.binary.name)
+        self.cost.check_executable(executable, binding)
+        self.artifact["profile"]["opt_level"] = "0"
+        self.assertEqual(binding["cargo_profile"]["opt_level"], "3")
+
+    def test_cost_release_discovery_rejects_missing_ambiguous_or_unfinished_builds(self):
+        for records in ([], [self.artifact], [self.finished], [self.artifact, self.artifact, self.finished],
+                        [self.artifact, self.finished, self.finished], [self.artifact, {**self.finished, "success": False}],
+                        [self.artifact, {**self.finished, "success": 1}], [None], self.artifact):
+            with self.assertRaises(RuntimeError):
+                self.discover(records)
+
+    def test_cost_release_discovery_rejects_wrong_package_target_source_features_and_profile(self):
+        mutations = [(["manifest_path"], str(self.source)), (["package_id"], "registry+unrelated#er-repro@0.1.0"),
+                     (["features"], ["alternate"]), (["target", "kind"], ["bench"]),
+                     (["target", "name"], "neighbor"), (["target", "crate_types"], ["lib"]),
+                     (["target", "src_path"], str(self.manifest)), (["profile", "opt_level"], "0"),
+                     (["profile", "debug_assertions"], True), (["profile", "debug_assertions"], 0),
+                     (["profile", "overflow_checks"], True), (["profile", "debuginfo"], False),
+                     (["profile", "test"], False), (["profile", "test"], 1), (["profile", "unknown"], False)]
+        for path, value in mutations:
+            bad = copy.deepcopy(self.records)
+            row = bad[0]
+            for key in path[:-1]:
+                row = row[key]
+            row[path[-1]] = value
+            with self.subTest(path=path), self.assertRaises(RuntimeError):
+                self.discover(bad)
+
+    def test_cost_release_discovery_confines_executable_to_owned_native_release_tree(self):
+        escaped = self.root / self.binary.name
+        escaped.write_bytes(self.binary.read_bytes())
+        escaped.chmod(0o700)
+        linked = self.binary.parent / "m9e_current_cost_probe-fedcba9876543210"
+        linked.symlink_to(escaped)
+        wrong_name = self.binary.parent / "not-the-cost-target"
+        wrong_name.write_bytes(self.binary.read_bytes())
+        wrong_name.chmod(0o700)
+        for path in (str(escaped), str(linked), str(wrong_name), "relative/release/deps/test", None,
+                     str(self.directory / "debug/deps" / self.binary.name)):
+            with self.assertRaises(RuntimeError):
+                self.discover([{**self.artifact, "executable": path}, self.finished])
+        alias = self.root / "alias"
+        alias.symlink_to(self.directory, target_is_directory=True)
+        with self.assertRaises(RuntimeError):
+            self.discover(directory=alias)
+        self.binary.chmod(0o600)
+        with self.assertRaises(RuntimeError):
+            self.discover()
+
+    def test_cost_release_executable_conservation_rejects_bytes_permissions_and_symlink_changes(self):
+        executable, binding = self.discover()
+        original = self.binary.read_bytes()
+        self.binary.write_bytes(b"X" * len(original))
+        with self.assertRaises(RuntimeError):
+            self.cost.check_executable(executable, binding)
+        self.binary.write_bytes(original)
+        self.binary.chmod(0o600)
+        with self.assertRaises(RuntimeError):
+            self.cost.check_executable(executable, binding)
+        self.binary.chmod(0o700)
+        self.cost.check_executable(executable, binding)
+        self.binary.unlink()
+        with self.assertRaises(RuntimeError):
+            self.cost.check_executable(executable, binding)
+
+    def test_cost_release_listing_matches_the_actual_sole_global_test_identity(self):
+        raw = (self.cost.TEST_ID + ": test\n").encode()
+        self.assertEqual(len(raw), 52)
+        self.cost.validate_listing(raw, [self.cost.TEST_ID])
+        for listing, identities in ((raw, []), (raw, [self.cost.TEST_ID] * 2), (raw, ["renamed"]),
+                                    (raw + raw, [self.cost.TEST_ID]), (raw[:-1], [self.cost.TEST_ID]),
+                                    (b"", [self.cost.TEST_ID]), (raw.replace(b": test", b": benchmark"), [self.cost.TEST_ID]),
+                                    (raw + b"ignored: test\n", [self.cost.TEST_ID]), (b"\xff", [self.cost.TEST_ID]),
+                                    (b"x" * 16385, [self.cost.TEST_ID])):
+            with self.assertRaises(RuntimeError):
+                self.cost.validate_listing(listing, identities)
 if __name__ == "__main__":
     unittest.main()

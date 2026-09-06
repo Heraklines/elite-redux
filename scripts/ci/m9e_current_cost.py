@@ -5,7 +5,10 @@ fixture. Parsing a record alone does not qualify an executable or game semantics
 """
 import hashlib
 import json
+import os
+from pathlib import Path
 import re
+import tomllib
 
 SOURCE = "rust/crates/er-repro/tests/m9e_current_cost_probe.rs"
 TARGET = ("er-repro", "m9e_current_cost_probe")
@@ -154,3 +157,75 @@ def validate_record(proof, **binding):
     if hashlib.sha256(raw).hexdigest() != proof["sha256"]:
         fail("wire record hash mismatch")
     return parse_line(raw, **binding)
+
+
+def file_hash(path):
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def discover_release(records, *, repository, target_directory):
+    """Read only exact completed Cargo output; return the executable and its binding."""
+    repository = Path(repository).resolve()
+    target_directory = Path(target_directory)
+    if (not target_directory.is_absolute() or target_directory.resolve() != target_directory
+            or not target_directory.is_dir()):
+        fail("release target directory is not the owned absolute directory")
+    if type(records) is not list or not 1 <= len(records) <= 20_000 or any(type(row) is not dict for row in records):
+        fail("Cargo build record inventory")
+    finished = [row for row in records if row.get("reason") == "build-finished"]
+    if len(finished) != 1 or finished[0].get("success") is not True:
+        fail("Cargo did not finish successfully exactly once")
+    matches = [row for row in records if row.get("reason") == "compiler-artifact"
+               and type(row.get("target")) is dict and row["target"].get("name") == TARGET[1]]
+    if len(matches) != 1:
+        fail("release target is missing or ambiguous")
+    artifact = matches[0]
+    manifest = repository / "rust/crates/er-repro/Cargo.toml"
+    source = repository / SOURCE
+    with (repository / "rust/Cargo.toml").open("rb") as stream:
+        version = tomllib.load(stream)["workspace"]["package"]["version"]
+    package_ids = {"path+" + manifest.parent.as_uri() + "#" + suffix
+                   for suffix in (version, "er-repro@" + version)}
+    target = artifact["target"]
+    profile = artifact.get("profile")
+    exact_fields(profile, ["opt_level", "debuginfo", "debug_assertions", "overflow_checks", "test"], "Cargo profile")
+    if (artifact.get("manifest_path") != str(manifest) or target.get("src_path") != str(source)
+            or artifact.get("package_id") not in package_ids or artifact.get("features") != []
+            or target.get("kind") != ["test"] or target.get("crate_types") != ["bin"]
+            or profile["opt_level"] != "3" or profile["debug_assertions"] is not False
+            or profile["test"] is not True or profile["overflow_checks"] is not False
+            or type(profile["debuginfo"]) is not int or profile["debuginfo"] != 0):
+        fail("Cargo source/package/features/profile identity differs")
+    name = artifact.get("executable")
+    if type(name) is not str:
+        fail("Cargo executable path type")
+    executable = Path(name)
+    if (not executable.is_absolute() or executable.resolve() != executable or executable.is_symlink()
+            or executable.parent != target_directory / "release/deps" or not executable.is_file()
+            or re.fullmatch(TARGET[1] + "-[0-9a-f]{16}", executable.name) is None
+            or not os.access(executable, os.X_OK)):
+        fail("Cargo executable escaped native release/deps or is not executable")
+    integer(executable.stat().st_size, 1, 128 << 20, "executable bytes")
+    return executable, {"sha256": file_hash(executable), "bytes": executable.stat().st_size,
+                        "relative_path": str(executable.relative_to(target_directory)),
+                        "cargo_profile": dict(profile), "cargo_package_id": artifact["package_id"],
+                        "manifest_sha256": file_hash(manifest), "source_sha256": file_hash(source)}
+
+
+def check_executable(executable, binding):
+    if (not executable.is_file() or executable.is_symlink() or executable.resolve() != executable
+            or not os.access(executable, os.X_OK)
+            or executable.stat().st_size != binding["bytes"] or file_hash(executable) != binding["sha256"]):
+        fail("release executable changed after discovery")
+
+
+def validate_listing(raw, discovered_ids):
+    if type(raw) is not bytes or not 0 < len(raw) <= 16_384:
+        fail("release listing byte bound")
+    try:
+        text = raw.decode("utf-8", errors="strict")
+    except UnicodeError as error:
+        raise RuntimeError("current cost evidence: invalid release listing Unicode") from error
+    if text != TEST_ID + ": test\n" or discovered_ids != [TEST_ID]:
+        fail("release listing differs from the sole globally discovered test")
