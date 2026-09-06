@@ -520,30 +520,18 @@ impl GameKernelV7 {
                 .moves
                 .iter()
                 .enumerate()
-                .map(|(index, slot)| {
-                    let Some(slot) = slot.as_ref() else {
-                        return Ok(None);
-                    };
-                    let definition = self
-                        .content
-                        .battle
-                        .move_definition(slot.move_id)
-                        .map_err(|_| GameKernelV7Error::Invalid)?;
-                    let max_pp = er_state::pokemon::calculate_max_pp(
-                        definition.base_pp,
-                        slot.pp_ups,
-                        slot.max_pp_override,
-                    )
-                    .map_err(|_| GameKernelV7Error::Invalid)?;
-                    if slot.pp_used >= max_pp {
-                        return Ok(None);
+                .filter_map(|(index, slot)| {
+                    let slot = slot.as_ref()?;
+                    let definition = self.content.battle.move_definition(slot.move_id).ok()?;
+                    if slot.pp_used >= definition.base_pp {
+                        return None;
                     }
-                    let move_slot = u8::try_from(index).map_err(|_| GameKernelV7Error::Invalid)?;
+                    let move_slot = u8::try_from(index).ok()?;
                     let power = match definition.power {
                         er_types::battle_model::MovePower::None => 0,
                         er_types::battle_model::MovePower::Value(power) => power,
                     };
-                    Ok(Some((
+                    Some((
                         slot.move_id,
                         move_slot,
                         power,
@@ -552,11 +540,8 @@ impl GameKernelV7 {
                             .iter()
                             .map(|target| target.position)
                             .collect::<Vec<_>>(),
-                    )))
+                    ))
                 })
-                .collect::<Result<Vec<_>, GameKernelV7Error>>()?
-                .into_iter()
-                .flatten()
                 .collect::<Vec<_>>();
             let actor_view = AiActorViewV1 {
                 pokemon: actor.id,

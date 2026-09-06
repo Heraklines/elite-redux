@@ -174,10 +174,6 @@
       "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work"
     ]
   },
-  "current_ai_max_pp_focus": {
-    "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"],
-    "exact_test_ids": ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
-  },
   "baseline": "748728a333433ee24acd83080b9006d378e286f0",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34042137836",
   "readiness_packages": ["er-canonical"],
@@ -936,18 +932,6 @@
     "paths": ["src/rust-browser/adapters/current-rtc-transport.ts", "src/rust-browser/routes/rust-current-rtc-entry.ts", "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"],
     "test_ids": ["two current Workers exchange real RTC proposals and converge one natural checkpoint turn", "current RTC identity mismatch and stalled presentation teardown settle owned work"],
     "reason": "Exactly three additive fixed-generation RTC checkpoint paths. Reuse the full causal22 native scope and controls; retain both lanes, Worker2/codec3, Wasm2, inpage2, typed1 and source-bound CLI bridge. Require two separate actual RTC witnesses and complete artifact/causal/teardown proof. No lock, dependency, reconnect, fragmentation or production-route exemption."
-  },
-  "current_state_query_focus": {
-    "paths": ["rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-lab/src/query.rs", "rust/crates/er-cli/tests/m9e_current_state_query.rs",
-      "rust/crates/er-cli/tests/m9e_current_state_query_worker.rs",
-      "rust/crates/er-cli/tests/support/m9e_current_state_query.rs"],
-    "test_ids": ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture", "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"],
-    "reason": "Exact current snapshot selector scope; borrowed shared selector parity is exercised inside the two actual CLI state witnesses. Retain causal22, control-query2, all existing er-lab current integration witnesses, reverse compilation/lint, Worker bindings on any actual selection, both controls and every current platform witness. No state.delta, broad historical lab execution or cap change."
-  },
-  "current_control_query_focus": {
-    "paths": ["rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/tests/m9e_current_control_query.rs"],
-    "test_ids": ["current_control_queries_are_read_only_and_plans_drive_natural_raw_input", "worker_control_queries_bind_current_control_and_preserve_rejections"],
-    "reason": "Exact current native V7 and actual Worker V2 read-only control queries. Reuse the complete causal timer scope, reverse compilation, selected CLI targets, four native capture witnesses, both behavioral mutants and all browser/Wasm/CLI bridge gates. The new target is A-owned and requires exact two-ID and real Worker binding whenever any future scope actually selects it. The unique test path rejects mixed product deltas; dispatcher overlap retains earlier explicit capture/repro/batch scopes. No product dependency or byte/time limit change."
   },
   "current_browser_worker_focus": {
   "paths": [

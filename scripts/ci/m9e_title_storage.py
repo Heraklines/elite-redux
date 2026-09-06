@@ -253,6 +253,11 @@ def bootstrap_control(stage, owner, revision, instance):
     for left, right in zip(rows, rows[1:]):
         edges.extend([{"from": left[0], "direction": "DOWN", "to": right[0]},
                       {"from": right[0], "direction": "UP", "to": left[0]}])
+    # GameMenuV2::new stores canonical ID/direction order, independently of
+    # rendered row order and the explicitly selected New Game option.
+    options.sort(key=lambda option: option["option_id"])
+    directions = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+    edges.sort(key=lambda edge: (edge["from"], directions[edge["direction"]], edge["to"]))
     return {"schema_version": 2, "revision": revision, "kind": kind, "owner_seat": owner, "actionable": True,
             "action_context": {"operation_id": identity, "authority_seat": owner,
                                "authority_revision": revision, "menu_instance": instance},
