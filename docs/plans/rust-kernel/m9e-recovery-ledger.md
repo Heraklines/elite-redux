@@ -2607,3 +2607,50 @@ Only compact platform summary579/failure4233 bytes were retrieved from inspected
 artifact9981919051 (ZIP1545). The qualified comparison baseline remains
 1eead4142a16700bc087f34b2fad1dc9f69d4be9 /34006023505 until the corrected
 candidate passes the complete focused remote gate. No local runtime execution.
+
+## Qualified current Worker/WebRTC checkpoint
+
+f3a00d7eae83169d8d5b49256c456a86bac834db / run34009767895 passed every
+focused job. Native A597/B20 gives617 selected/executed/passed, zero failures or
+skips;66 inventory targets,22 mandatory targets, disjoint62/4 complete assignments.
+All182 harness tests passed3.064s. Formatting, full selected build and Clippy,
+and both exact behavioral mutants passed; each mutant was detected and restored.
+
+Wasm2, in-page Chromium2, typed effects1, actual Worker2, codec3, actual CLI replay
+bridge and actual RTC2 passed. The RTC positive used two real Workers, generation1,
+314-byte proposal and29923-byte material; turn1 advanced to2, with one new replica
+presentation delivered and settled. Duplicate proposal/material preserved state
+and emitted no repeated effects. Actual disconnect reached each core once; both
+Workers disposed with acknowledgement and empty queues. Imported checkpoint owners
+were conserved exactly. Negative identity mismatch rejected both readiness promises
+and16 queued sends with no core changes; a stalled accepted presentation aborted
+its callback, rejected queued work and closed without a false disposal acknowledgement.
+
+Native/CLI parity and complete causal replay remain unchanged:16 attempts1417..1433,
+omitted-time rejection1428, held-timer digest
+8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942.
+Source identity, required-ID permutations, assignments, cohort manifests and all
+cross-phase proof hashes were audited from bounded artifacts:
+A proof61285 SHA8fe0974c5ddb125976d97312dbfc490bf8ebd371c96bdf7497c08c2aff90ee9b;
+B proof57585 SHA65c4ab6aae400abd5be9cbaa4a43283f83f3182f9e9f9ae643e105b50522ae43;
+platform27689 SHAe920d0c21e9f3d1f17712ed4e586e85127d8078e79b959d629ca982dd61f4686;
+aggregate19780 SHA6505594df8bc34e5c56d3a3023536a83fae75f81f67b39188cd3cc43cadbf7fb.
+Large diagnostic archives, binaries and browser assets stayed remote. This qualifies
+the fixed-generation RTC cut; it does not claim reconnect, durable saves, imported
+presentation rehydration, full co-op recovery or complete M9 acceptance.
+
+## Borrowed snapshot AI validation candidate
+
+Advance the comparison baseline only to the audited f3a00d7 checkpoint above.
+Apply prepared snapshot a4b23d9c (original product8d8e7780): expose the existing
+AI snapshot validator by shared borrow, and call it directly during core snapshot
+validation. This removes discarded owned AI/content copies while retaining the
+same validator and mapped error. No measured speed improvement is claimed yet.
+
+Require the exact two production paths, all prior causal/RTC/Worker/CLI checks,
+full selected reverse Clippy and both mutants. Add five gate tests (187 total),
+including missing/renamed/duplicate AI and causal witness rejection. Explicitly
+list the seven existing game-kernel test names in timer/retention/AI policy maps;
+their targets and complete execution were already mandatory. The separate remote
+snapshot harness dfdea1ef/run34010125357 passed187 tests, but this runtime candidate
+must pass its own complete focused qualification before owner integration.

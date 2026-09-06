@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use er_ai::authority_v2::{AuthorityAiSnapshotV2, AuthorityAiV2};
+use er_ai::authority_v2::AuthorityAiSnapshotV2;
 use er_game::m9e_content_v2::{PreparedGameContentV2, PresentationSemanticIdV1};
 use er_game::m9e_material_v6::{AppliedGameMaterialLedgerV1, GamePlatformEffectV2};
 use er_game::m72_bootstrap::RunBootstrapMachineV1;
@@ -152,8 +152,7 @@ impl CoreGameKernelSnapshotV7 {
             .validate()
             .map_err(|_| SnapshotV7Error::Invalid)?;
         if let Some(snapshot) = &self.authority_ai {
-            AuthorityAiV2::from_snapshot(content.ai.clone(), snapshot.clone())
-                .map_err(|_| SnapshotV7Error::Invalid)?;
+            snapshot.validate().map_err(|_| SnapshotV7Error::Invalid)?;
         }
         match &self.lifecycle {
             GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {

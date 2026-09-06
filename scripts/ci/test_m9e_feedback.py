@@ -2944,6 +2944,134 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual({item[0] for item in ordered}, {item[0] for item in items})
         self.assertEqual(self.feedback.native_execution_order({}, items), items)
 
+    def configure_ai_snapshot_validation_scope(self):
+        self.configure_browser_rtc_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["ai_snapshot_validation_focus"]
+        self.config["ai_snapshot_validation_focus"] = policy
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-ai")
+        self.package("er-ai-reverse", '[dependencies]\ner-ai = { path = "../er-ai" }\n')
+        self.changed = list(policy["paths"])
+
+    def test_ai_snapshot_validation_requires_full_causal_and_ai_inventory_with_rtc(self):
+        self.configure_ai_snapshot_validation_scope()
+        before = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        for flag in ("ai_snapshot_validation_focus", "timer_focus", "requires_wasm", "requires_browser",
+                     "requires_browser_worker", "requires_browser_rtc", "requires_cli_executable",
+                     "requires_worker_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+            self.assertTrue(selection[flag], flag)
+        self.assertFalse(selection["ai_damage_query_focus"])
+        self.assertFalse(selection["current_browser_rtc_focus"])
+        causal = self.config["timer_focus"]
+        self.assertEqual(selection["execution_scope"], {**causal["execute"], "er-ai": ["*"]})
+        self.assertEqual(selection["required_native_targets"], {**causal["required_targets"], "er-ai": ["er_ai"]})
+        self.assertEqual(selection["required_native_test_ids"], {
+            **causal["exact_test_ids"], "er-ai:er_ai": self.config["ai_snapshot_validation_focus"]["exact_test_ids"]})
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-ai:er_ai"]), 14)
+        self.assertIn("er-ai-reverse", selection["packages"])
+        self.assertIn("er-reverse", selection["packages"])
+        self.assertEqual(selection["timer_mutant"], causal["mutant"])
+        self.assertEqual(selection["replica_mutant"], causal["replica_mutant"])
+        self.assertEqual(self.config, before)
+
+    def test_ai_snapshot_validation_rejects_unpaired_and_mixed_product_changes(self):
+        self.configure_ai_snapshot_validation_scope()
+        paths = list(self.changed)
+        for extra in (None, "rust/Cargo.lock", "rust/crates/er-ai/src/content_v2.rs",
+                      "rust/crates/er-ai/src/authority_v2_extra.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs",
+                      "rust/crates/er-repro/src/current.rs", "src/rust-browser/routes/rust-current-rtc-entry.ts"):
+            with self.subTest(extra=extra):
+                self.changed = paths[:1] if extra is None else [*paths, extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+        # Existing snapshot-only ownership keeps the established timer scope.
+        self.changed = paths[1:]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["ai_snapshot_validation_focus"])
+        self.assertEqual(selection["required_native_targets"], self.config["timer_focus"]["required_targets"])
+        self.changed = ["docs/plans/rust-kernel/m9e-note.md"]
+        self.assertFalse(self.feedback.plan()["ai_snapshot_validation_focus"])
+
+    def test_ai_snapshot_validation_policy_cannot_expand_paths_or_drop_ids(self):
+        self.configure_ai_snapshot_validation_scope()
+        original = copy.deepcopy(self.config["ai_snapshot_validation_focus"])
+        for mutation in ("path", "missing_id", "duplicate_id", "extra_field", "missing_paths", "missing_policy"):
+            with self.subTest(mutation=mutation):
+                policy = copy.deepcopy(original)
+                if mutation == "path":
+                    policy["paths"].append("rust/crates/er-ai/src/lib.rs")
+                elif mutation == "missing_id":
+                    policy["exact_test_ids"].pop()
+                elif mutation == "duplicate_id":
+                    policy["exact_test_ids"][0] = policy["exact_test_ids"][1]
+                elif mutation == "extra_field":
+                    policy["execute"] = {}
+                elif mutation == "missing_paths":
+                    del policy["paths"]
+                else:
+                    policy = {}
+                self.config["ai_snapshot_validation_focus"] = policy
+                (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+                with self.assertRaisesRegex(RuntimeError, "policy identities|additional mapping"):
+                    self.feedback.plan()
+
+    def test_ai_snapshot_validation_rejects_missing_or_changed_ai_and_causal_witnesses(self):
+        self.configure_ai_snapshot_validation_scope()
+        selection = self.feedback.plan()
+        exact = selection["required_native_test_ids"]
+        rows = [(*identity.split(":"), ids) for identity, ids in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        for identity in ("er-ai:er_ai", "er-kernel:m9e_snapshot_v7", "er-kernel:m9e_game_kernel_v7",
+                         "er-cli:m9e_current_reload", "er-repro:m9e_current_repro", "er-wasm:m9e_parity"):
+            index = next(index for index, row in enumerate(rows) if f"{row[0]}:{row[1]}" == identity)
+            crate, target, ids = rows[index]
+            for replacement in ([], [(crate, target, [])], [(crate, target, ids[:-1])],
+                                [(crate, target, ids + [ids[0]])], [(crate, target + "_renamed", ids)]):
+                with self.subTest(identity=identity, replacement=replacement):
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(exact, rows[:index] + replacement + rows[index + 1:])
+
+    def test_ai_snapshot_validation_execution_keeps_reverse_clippy_and_both_mutants(self):
+        self.configure_ai_snapshot_validation_scope()
+        selection = self.feedback.plan()
+        self.binary_ids = {}
+        for crate, names in selection["execution_scope"].items():
+            if names == ["*"]:
+                names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for name in names:
+                binary = name if name not in self.binary_ids else crate + "--" + name
+                self.binary_ids[binary] = selection["required_native_test_ids"].get(f"{crate}:{name}", ["behavior"])
+                self.binary_crates[binary], self.binary_targets[binary] = crate, name
+        self.binary_ids["reverse_compiled_only"] = ["reverse"]
+        self.binary_crates["reverse_compiled_only"] = "er-ai-reverse"
+        self.binary_targets["reverse_compiled_only"] = "reverse_compiled_only"
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0)
+        if (self.full / "full-summary.json").is_file():
+            summary = json.loads((self.full / "full-summary.json").read_text())
+        self.assertEqual(len(summary["required_native_target_counts"]), 23)
+        self.assertEqual(summary["required_native_target_counts"]["er-ai:er_ai"], 14)
+        self.assertIn("er_ai", self.executed)
+        self.assertNotIn("reverse_compiled_only", self.executed)
+        for command in [command for command in self.commands if command[:2] in (["cargo", "test"], ["cargo", "clippy"])]:
+            self.assertEqual([command[index + 1] for index, part in enumerate(command) if part == "-p"], selection["packages"])
+        self.assertLess(self.events.index("clippy"), self.events.index("execute:" + self.executed[0]))
+        count = sum(len(self.binary_ids[name]) for name in self.executed)
+        self.assertEqual(summary["tests"], {"selected": count, "executed": count, "passed": count, "failed": 0, "skipped": 0})
+        self.assertEqual(summary["worker_executable"]["source_sha"], CANDIDATE)
+        self.assertEqual(summary["cli_executable"]["source_sha"], CANDIDATE)
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        timer.assert_called_once()
+        replica.assert_called_once()
+
     def configure_browser_rtc_scope(self):
         self.configure_browser_worker_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["current_browser_rtc_focus"]

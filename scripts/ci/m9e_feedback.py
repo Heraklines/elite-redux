@@ -31,6 +31,25 @@ WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-cli", "m9e_current_reload"),
                         ("er-cli", "m9e_current_repro")}
 
+AI_SNAPSHOT_VALIDATION_PATHS = ["rust/crates/er-ai/src/authority_v2.rs",
+                                "rust/crates/er-kernel/src/snapshot_v7.rs"]
+AI_SNAPSHOT_VALIDATION_IDS = [
+    "full_surface::tests::ai_rng_and_recovery_are_audited_and_idempotent",
+    "full_surface::tests::doubles_and_triples_joint_actions_reject_duplicate_switches",
+    "full_surface::tests::legal_basic_and_scoring_policies_are_deterministic",
+    "full_surface::tests::trainer_boss_and_modes_validate_topology",
+    "mode_profiles::tests::ghost_profile_sanitizes_lines_tokens_and_effects",
+    "mode_profiles::tests::moody_sessions_sort_validate_reset_and_round_trip",
+    "party_snapshots::tests::active_party_compaction_and_challenge_mutations_are_stable",
+    "party_snapshots::tests::mode_party_snapshots_clone_and_capture_once",
+    "showdown_session::tests::pending_and_profile_set_state_is_idempotent",
+    "showdown_session::tests::showdown_negotiation_rejects_protocol_format_and_hash_drift",
+    "tests::empty_legal_set_fails_closed",
+    "tests::first_legal_policy_is_deterministic_without_rng",
+    "trainer_party::tests::rival_traits_and_post_processing_are_stable",
+    "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic",
+]
+
 # Exact source repairs required by the first full selected-package Clippy run.
 AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-state/src/bespoke_v2/forms.rs",
@@ -687,9 +706,17 @@ def plan():
     damage_session = damage_changed and damage_docs_paired and all(
         path in damage_paths or path in damage_lint_paths or path in damage_doc_paths for path in product_changes)
     damage_lint_session = damage_session and any(path in damage_lint_paths for path in product_changes)
+    ai_snapshot_focus = config.get("ai_snapshot_validation_focus", {})
+    if ai_snapshot_focus and (set(ai_snapshot_focus) != {"paths", "exact_test_ids"}
+                              or ai_snapshot_focus["paths"] != AI_SNAPSHOT_VALIDATION_PATHS
+                              or ai_snapshot_focus["exact_test_ids"] != AI_SNAPSHOT_VALIDATION_IDS):
+        raise RuntimeError("AI snapshot validation policy identities disagree")
+    ai_snapshot_changed = AI_SNAPSHOT_VALIDATION_PATHS[0] in product_changes
+    ai_snapshot_session = (bool(ai_snapshot_focus) and ai_snapshot_changed
+                           and set(product_changes) == set(AI_SNAPSHOT_VALIDATION_PATHS))
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -866,6 +893,11 @@ def plan():
         browser_required = True
         boundaries = [path for path in boundaries if path not in damage_paths and path not in damage_lint_paths
                       and path not in damage_doc_paths]
+    if ai_snapshot_session:
+        execution_scope = {**timer_focus["execute"], "er-ai": ["*"]}
+        ai_snapshot_targets = {**timer_focus["required_targets"], "er-ai": ["er_ai"]}
+        ai_snapshot_ids = {**timer_focus["exact_test_ids"], "er-ai:er_ai": list(AI_SNAPSHOT_VALIDATION_IDS)}
+        boundaries = [path for path in boundaries if path not in AI_SNAPSHOT_VALIDATION_PATHS]
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
@@ -930,8 +962,10 @@ def plan():
               "native_capture_focus": capture_session,
               "ai_damage_query_focus": damage_session,
               "ai_damage_query_lint_repair_focus": damage_lint_session,
+              "ai_snapshot_validation_focus": ai_snapshot_session,
               "requires_cli_executable": cli_executable_required,
-              "required_native_test_ids": (damage_exact_test_ids if damage_session
+              "required_native_test_ids": (ai_snapshot_ids if ai_snapshot_session
+                                           else damage_exact_test_ids if damage_session
                                            else cache_focus.get("exact_test_ids", {}) if cache_session
                                            else validation_focus.get("exact_test_ids", {}) if validation_session
                                            else retention_focus.get("exact_test_ids", {}) if retention_session
@@ -942,7 +976,8 @@ def plan():
                                            else timer_focus.get("exact_test_ids", {}) if timer_session else {}),
               "requires_agent_protocol_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
-              "required_native_targets": (damage_required_targets if damage_session
+              "required_native_targets": (ai_snapshot_targets if ai_snapshot_session
+                                          else damage_required_targets if damage_session
                                           else cache_focus.get("required_targets", {}) if cache_session
                                           else validation_focus.get("required_targets", {}) if validation_session
                                           else retention_focus.get("required_targets", {}) if retention_session
@@ -964,6 +999,8 @@ def plan():
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
+    if ai_snapshot_changed and not ai_snapshot_session:
+        raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if unknown or boundaries or (storage_changed and not storage_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
@@ -1729,7 +1766,7 @@ def main(preflight_failure=None):
         summary["selected_inventory_validated"] = True
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
-        if selection.get("ai_damage_query_focus"):
+        if selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus"):
             write_progress(summary, "lint", "selected-packages")
             try:
                 run(["cargo", "clippy", "--locked",
