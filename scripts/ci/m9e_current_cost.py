@@ -601,3 +601,57 @@ def validate_execution(proof, *, repository, identity, source_binding, content):
             or proof["logs"]["list"]["sha256"] != hashlib.sha256(listing).hexdigest()
             or proof["logs"]["execute"]["bytes"] <= len(raw)):
         fail("transferred release discovery or execution framing")
+
+def select_scope(config, changes, repository):
+    policy = config.get("current_cost_probe_focus")
+    expected = {"paths": [SOURCE], "test_ids": [TEST_ID]}
+    if policy is not None and policy != expected:
+        fail("cost policy exact source and test identities")
+    changed = SOURCE in changes
+    focused = bool(policy) and changes == [SOURCE]
+    if changed and not focused:
+        fail("cost source change needs its isolated one-path mapping")
+    if focused and not (Path(repository) / SOURCE).is_file():
+        fail("required cost product is missing")
+    return focused
+
+
+def validate_lane(proof, repository, partition):
+    """One selected cost target, one A execution, no B or out-of-scope claim."""
+    plan, inventory = proof["plan"], proof["inventory"]
+    required = plan.get("requires_current_cost_probe", False)
+    if type(required) is not bool:
+        fail("cost requirement must be boolean")
+    rows = [row for row in inventory if (row["crate"], row["target"]) == TARGET]
+    if rows and not required:
+        fail("selected cost inventory lacks its mandatory release execution")
+    if not required:
+        if "current_cost_probe" in proof or plan.get("current_cost_source_binding") is not None:
+            fail("cost evidence or binding outside selected scope")
+        return
+    if (len(rows) != 1 or rows[0]["ids"] != [TEST_ID] or rows[0]["historical_excluded_ids"]
+            or plan.get("required_native_targets", {}).get(TARGET[0], []).count(TARGET[1]) != 1
+            or plan.get("required_native_test_ids", {}).get(":".join(TARGET)) != [TEST_ID]
+            or proof.get("required_native_target_counts", {}).get(":".join(TARGET)) != 1
+            or list(TARGET) not in partition(inventory)["a"]
+            or list(TARGET) in partition(inventory)["b"]):
+        fail("cost global inventory, exact ID, count or A ownership")
+    binding = plan.get("current_cost_source_binding")
+    if build_source_binding(repository, proof["identity"]["product_sha"]) != binding:
+        fail("cost selected source binding differs from candidate")
+    if proof["lane"] == "b":
+        if "current_cost_probe" in proof or list(TARGET) in proof["completed_targets"]:
+            fail("lane B cannot claim release cost execution")
+        return
+    if (proof["lane"] != "a" or proof["completed_targets"].count(list(TARGET)) != 1
+            or proof["assigned_targets"].count(list(TARGET)) != 1
+            or "current_cost_probe" not in proof):
+        fail("lane A lacks its exactly-once cost completion")
+    validate_execution(proof["current_cost_probe"], repository=repository, identity=proof["identity"],
+                       source_binding=binding, content=read_content(repository))
+
+
+def compact(compact, full_hash, encoder):
+    if "current_cost_probe" in compact and len(encoder(compact)) > 16000:
+        compact["current_cost_probe"] = {"file": "phase-summary.json", "sha256": full_hash,
+                                         "field": "current_cost_probe"}

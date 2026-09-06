@@ -20,6 +20,7 @@ import sys
 import zlib
 
 
+ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_LIMIT = 64 * 1024
 # Wire bytes and decompressed ID bytes retain their independent 64/128 KiB caps.
 # The complete proof also repeats required IDs, target pairs and plan metadata.
@@ -494,6 +495,10 @@ def validate_native(proof, expected_identity):
         raise RuntimeError("native worker artifact evidence is invalid")
 
 
+    import m9e_current_cost as cost
+    cost.validate_lane(proof, ROOT, partition)
+
+
 def export_native(feedback, summary):
     """Called after full discovery/lint and this lane's complete execution."""
     expected = identity(feedback)
@@ -517,6 +522,8 @@ def export_native(feedback, summary):
              "completed_targets": summary["completed_targets"],
              "native_target_timing_ms": summary.get("native_target_timing_ms", {}),
              "native_timer_parity_digest": summary.get("native_timer_parity_digest"), "cli": None}
+    if "current_cost_probe" in summary:
+        proof["current_cost_probe"] = summary["current_cost_probe"]
     worker = summary.get("worker_executable")
     proof["worker"] = None
     if worker is not None:
@@ -992,7 +999,7 @@ def aggregate(feedback):
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
-            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
+            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native}}
 
 
 def compact_rtc_evidence(compact, full_hash):
@@ -1051,7 +1058,7 @@ def main():
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
             "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
-            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
+            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
             compact["first_failure"] = summary["first_failure"]
@@ -1065,6 +1072,8 @@ def main():
         composition.compact(compact, full_hash, encoded)
         import m9e_title_storage as retirement
         retirement.compact(compact, full_hash, encoded)
+        import m9e_current_cost as cost
+        cost.compact(compact, full_hash, encoded)
         if len(encoded(compact)) > 16000:
             raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
         write_bounded(feedback.COMPACT / "summary.json", compact)

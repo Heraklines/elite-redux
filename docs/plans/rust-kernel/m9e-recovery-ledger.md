@@ -2999,3 +2999,64 @@ run34044952978 nowall4passed621native(A602/B19),69 inventory25mandatory20maps,
 journeys preserve all1412rawinputs and original test IDs in separateA/Btargets.
 Aggregate20019bytesSHAae5c723219d82d20c3d515d6f150d30bf593b0605bc1e9a2083a8f488d37dd2e.
 Queryproduct remains prepared for main integration after its storage/PP prerequisites.
+
+Title retirement d31411fad6cc0367ff28b8eedb2f717fb8a1b419/run34047497578 is now
+fully qualified:1031 native(A1013/B18),101inventory55mandatory23exactmaps,
+258harness, all actual platform and aggregate checks. The metadata audit matched
+60 cached sources, complete disjoint partitions, exact plan/proof/cohort hashes,
+23cancel/READ/rewritten-generation2 browser-oracle evidence, and prior RTC/mutants.
+Bounded platform61208 and aggregate44929 bytes came from named proof members only.
+Aggregate SHA256 eb8f1be4d763b2d8db7fb1abb50782aecadd209b55675c39d2697c01de1896ff.
+Browser assets, test binaries and complete logs remain remote.
+
+Integrate the independently qualified AI max-PP correction (4220f1ed/run34036531932)
+onto that ancestor: use the shared max-PP calculation for actual candidate admission,
+retain original move indices, order, scores and RNG, and keep last-PP choice plus
+full exhausted-party rollback witnesses. This is not whole source-AI or Elite/Hell
+fidelity. All Title/storage/READ/owner/Worker/RTC/CLI/Wasm and mutant prerequisites
+remain mandatory. Refreshed preflight1be158e29b53747a39f03641b560095dce80b7f5/
+run34047625489 passed264harness/6.053s. All3CI and2pinned-formattedRust hashes
+verified before integration; preserve the corrected Title oracle. Advance comparison
+only to auditedd314; this exact integrated runtime still requires all phases.
+
+Independent focused cost measurement5d805ed53a55ee749a1c4bcaa97713c49a19c934/
+run34048638706 passed with streamed output caps and bounded process-group cleanup.
+13rawcachedsources, actualreleaseartifact, unchangedcontent and6017-byte record hash
+were audited. This remains focused cost evidence, not integrated performance/Q.
+
+PP integration 75a5ce1bf823d734da0dbb0f972ee2ac46179b62/run34049405293 is fully
+qualified: 644 native (A626/B18), 71 inventory targets, 27 required targets,
+22 exact identity maps, 264 harness cases, all platform and aggregate checks.
+The metadata audit matched 60 cached sources, the complete disjoint partitions,
+plan and cross-phase proof hashes, retained Title/storage/owner/RTC and mutants.
+Aggregate 43181 bytes SHA256
+065eca86bb85180d0064e5a4def39090964476d9c8a8698915db18c2be36c684.
+Only named bounded platform and aggregate proof members were downloaded.
+
+Integrate the independently qualified current control/state queries from
+ e2493b3eae91485a5a99d8c2684cde06e00fb301/run34044952978, refreshed by
+08fa4dc9e25483eb4905dd499c3a7dc85960644b/run34047863524 (284 harness cases).
+All 4 CI and 8 pinned-formatted Rust proposal hashes matched before copying;
+the two PP Rust files are unchanged. The actual delta is six query Rust paths.
+Preserve all 1412 natural navigation events and full step/snapshot comparisons
+in the separate native and real Worker state journeys, current raw control
+queries, nine borrowed selectors and historical query behavior. State delta
+remains explicitly unsupported. Advance comparison only to audited 75a5ce1b.
+This combined candidate still requires its own complete integration run.
+
+Actual rule-change focused diagnostic 03a59251451220eee883a0164638d2dbd7fa5256/
+run34050243405 passed the real base/derived Worker journey: 1427 raw prefix
+events, 2857 requests, preserved prefix, changed future timer consequences,
+rejected divergent rollback candidate with preserved ticket, and accepted
+matching replacement. Source/derived-tree/executable/owned-pool metadata audit
+passed (15 cached source bindings and the exact 818-byte transformation).
+The test took 579358ms under its unchanged 600s limit. This is focused evidence;
+integrated rule coverage and the complete M9 qualification remain pending.
+
+Actual release-cost focused diagnostic 20c5e0cd1eeefb722ce729e1874c630982413317/
+run34050312422 passed; audit matched 18 cached source bindings, all 35 workspace
+Cargo manifests, actual compiler/environment/profile/artifact/content and exact
+5995-byte measurement record. The prepared release-execution wrapper's remote
+preflight 30217340b4b9b8959de6decd667b7053a42c93ca/run34050956250 passed 322
+harness cases, retaining bounded-process and build-identity regressions.
+Neither constitutes the integrated cost gate or final performance qualification.

@@ -6699,6 +6699,131 @@ class FeedbackTests(unittest.TestCase):
                 with self.subTest(mode=mode), self.assertRaises(RuntimeError):
                     phases.validate_state_query_inventory(bad_plan, rows)
 
+    def configure_cost_scope(self):
+        self.configure_state_query_scope()
+        self.configure_title_retirement_scope()
+        import m9e_current_cost as cost
+        import m9e_phases as phases
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for key in ("current_ai_max_pp_focus", "current_cost_probe_focus"):
+            self.config[key] = policy[key]
+        for name in (cost.SOURCE, phases.CONTROL_QUERY_PATHS[1], *phases.STATE_QUERY_PATHS[2:]):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("installed exact witness\n")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = [cost.SOURCE]
+        binding = {"source_sha": CANDIDATE, "source_hashes": {cost.SOURCE: "f" * 64},
+                   "cargo_manifests": {"count": 35, "sha256": "e" * 64}}
+        mocked = patch.object(cost, "build_source_binding", return_value=binding)
+        mocked.start()
+        self.addCleanup(mocked.stop)
+        return cost, phases, binding
+
+    def test_cost_scope_adds_one_release_witness_and_preserves_installed_current_obligations(self):
+        cost, phases, binding = self.configure_cost_scope()
+        previous = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        for key in ("current_cost_probe_focus", "requires_current_cost_probe", "timer_focus", "requires_current_state_query",
+                    "requires_current_control_query", "requires_ai_max_pp", "requires_title_storage", "requires_title_retirement",
+                    "requires_read_rebind", "requires_current_proposal", "requires_worker_storage", "requires_current_storage",
+                    "requires_browser_rtc", "requires_browser_worker", "requires_wasm", "requires_browser",
+                    "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[key], key)
+        self.assertEqual(selection["current_cost_source_binding"], binding)
+        self.assertEqual(selection["required_native_targets"][cost.TARGET[0]].count(cost.TARGET[1]), 1)
+        self.assertEqual(selection["required_native_test_ids"][":".join(cost.TARGET)], [cost.TEST_ID])
+        self.assertEqual(selection["timer_mutant"], previous["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], previous["timer_focus"]["replica_mutant"])
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 14)
+        for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
+            self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
+        self.assertEqual(self.config, previous)
+        self.assertEqual(self.executed, [])
+
+    def test_cost_scope_rejects_mixed_products_missing_source_and_mutated_policy(self):
+        cost, _, _ = self.configure_cost_scope()
+        for path in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock",
+                     "rust/crates/er-repro/tests/neighbor.rs", "rust/crates/er-cli/src/current_agent.rs",
+                     "src/rust-browser/routes/rust-current-storage-entry.ts"):
+            self.changed = [cost.SOURCE, path]
+            with self.subTest(path=path), self.assertRaises(RuntimeError):
+                self.feedback.plan()
+        self.changed = [cost.SOURCE]
+        original = copy.deepcopy(self.config)
+        for policy in (None, {"paths": [cost.SOURCE], "test_ids": []},
+                       {"paths": [cost.SOURCE, "neighbor"], "test_ids": [cost.TEST_ID]}):
+            self.config = copy.deepcopy(original)
+            self.config["current_cost_probe_focus"] = policy
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaises(RuntimeError):
+                self.feedback.plan()
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(original))
+        (self.root / cost.SOURCE).unlink()
+        with self.assertRaises(RuntimeError):
+            self.feedback.plan()
+
+    def test_cost_installed_requirement_follows_selected_target_without_expanding_readiness(self):
+        cost, phases, _ = self.configure_cost_scope()
+        self.changed = phases.CONTROL_QUERY_PATHS
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_cost_probe_focus"])
+        self.assertTrue(selection["requires_current_cost_probe"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["requires_current_cost_probe"])
+        self.assertIsNone(selection["current_cost_source_binding"])
+        self.assertNotIn(cost.TARGET[1], selection["required_native_targets"].get(cost.TARGET[0], []))
+
+    def test_cost_native_orchestration_overrides_only_A_once_after_discovery_and_lint(self):
+        cost, phases, binding = self.configure_cost_scope()
+        import sys
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        captured = {}
+        def release(repository, temporary, diagnostics, **kwargs):
+            self.assertEqual(self.executed, [], "release target must execute first")
+            self.assertEqual(kwargs["source_binding"], binding)
+            self.assertEqual(kwargs["discovered_ids"], [cost.TEST_ID])
+            self.assertIn("clippy", self.events)
+            output = diagnostics / "current-cost-execute.log"
+            output.write_text(self.result_line(passed=1))
+            return output, {"fixture": "release evidence, validator tested independently"}
+        def export(feedback, summary):
+            captured.update(copy.deepcopy(summary))
+        with patch.dict(os.environ, {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "a"}), \
+                patch.dict(sys.modules, {self.feedback.__name__: self.feedback}), \
+                patch.object(phases, "identity", return_value={"product_sha": CANDIDATE}), \
+                patch.object(phases, "export_native", side_effect=export), \
+                patch.object(cost, "execute_release", side_effect=release) as execute, \
+                patch.object(self.feedback, "timer_behavioral_mutant"), patch.object(self.feedback, "replica_behavioral_mutant"):
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        execute.assert_called_once()
+        self.assertNotIn(cost.TARGET[1], self.executed, "ordinary debug cost binary must never execute")
+        self.assertEqual(captured["completed_targets"].count(list(cost.TARGET)), 1)
+        self.assertEqual(captured["tests"]["executed"], sum(len(row["ids"]) for row in captured["native_inventory"]
+                                                         if [row["crate"], row["target"]] in captured["assigned_targets"]))
+        self.assertEqual(captured["tests"]["failed"], 0)
+        self.assertIn("current_cost_probe", captured)
+
+    def test_cost_native_B_never_builds_or_executes_release_override(self):
+        cost, phases, _ = self.configure_cost_scope()
+        import sys
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        captured = {}
+        with patch.dict(os.environ, {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "b"}), \
+                patch.dict(sys.modules, {self.feedback.__name__: self.feedback}), \
+                patch.object(phases, "identity", return_value={"product_sha": CANDIDATE}), \
+                patch.object(phases, "export_native", side_effect=lambda _, value: captured.update(copy.deepcopy(value))), \
+                patch.object(cost, "execute_release") as execute:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        execute.assert_not_called()
+        self.assertNotIn("current_cost_probe", captured)
+        self.assertNotIn(list(cost.TARGET), captured["completed_targets"])
+        self.assertNotIn(cost.TARGET[1], self.executed)
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-phase-test-")
@@ -9682,5 +9807,140 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         manifest.write_text("changed Cargo manifest\n")
         with self.assertRaises(RuntimeError):
             self.validate(proof)
+    def lane_proofs(self):
+        import m9e_phases as phases
+        self.identity["files"] = {"content": "f" * 64}
+        _, release = self.execute()
+        inventory = [{"crate": self.cost.TARGET[0], "target": self.cost.TARGET[1],
+                      "ids": [self.cost.TEST_ID], "historical_excluded_ids": []}]
+        plan = {"requires_wasm": False, "requires_browser": False, "requires_cli_executable": False,
+                "requires_current_cost_probe": True, "current_cost_source_binding": self.binding,
+                "required_native_targets": {self.cost.TARGET[0]: [self.cost.TARGET[1]]},
+                "required_native_test_ids": {":".join(self.cost.TARGET): [self.cost.TEST_ID]}}
+        first = {"version": 1, "phase": "native", "status": "passed", "qualification": "pending",
+                 "identity": self.identity, "plan": plan, "plan_sha256": phases.sha(phases.encoded(plan)),
+                 "inventory": inventory, "inventory_sha256": phases.sha(phases.encoded(inventory)),
+                 "lane": "a", "assigned_targets": [list(self.cost.TARGET)], "completed_targets": [list(self.cost.TARGET)],
+                 "tests": {"selected": 1, "executed": 1, "passed": 1, "failed": 0, "skipped": 0},
+                 "selected_inventory_validated": True, "selected_test_ids_sha256": "c" * 64,
+                 "required_native_target_counts": {":".join(self.cost.TARGET): 1},
+                 "native_timer_parity_digest": None, "cli": None, "worker": None, "current_cost_probe": release}
+        second = copy.deepcopy(first)
+        second.update(lane="b", assigned_targets=[], completed_targets=[])
+        second["tests"].update(executed=0, passed=0)
+        second.pop("current_cost_probe")
+        return phases, first, second
+
+    def validate_native_cost(self, phases, proof):
+        proof["plan_sha256"] = phases.sha(phases.encoded(proof["plan"]))
+        with patch.object(phases, "ROOT", self.repository), patch.object(self.cost, "read_content", return_value=self.content):
+            phases.validate_native(proof, self.identity)
+
+    def test_cost_native_proofs_roundtrip_exact_A_execution_and_B_global_inventory(self):
+        phases, first, second = self.lane_proofs()
+        for lane, proof in (("a", first), ("b", second)):
+            path = self.root / ("native-" + lane + ".json")
+            digest = phases.write_bounded(path, proof)
+            restored = phases.read_bounded(path, digest)
+            self.validate_native_cost(phases, restored)
+            self.assertEqual(restored, proof)
+        self.assertEqual(first["tests"]["executed"] + second["tests"]["executed"], 1)
+        self.assertFalse(self.targets[0].exists())
+
+    def test_cost_native_proof_rejects_missing_A_extra_B_and_unrequested_release_evidence(self):
+        phases, first, second = self.lane_proofs()
+        mutations = []
+        bad = copy.deepcopy(first)
+        bad.pop("current_cost_probe")
+        mutations.append(bad)
+        bad = copy.deepcopy(second)
+        bad["current_cost_probe"] = first["current_cost_probe"]
+        mutations.append(bad)
+        bad = copy.deepcopy(first)
+        bad["plan"]["requires_current_cost_probe"] = False
+        mutations.append(bad)
+        bad = copy.deepcopy(first)
+        bad["plan"]["requires_current_cost_probe"] = 1
+        mutations.append(bad)
+        for proof in mutations:
+            with self.assertRaises(RuntimeError):
+                self.validate_native_cost(phases, proof)
+
+    def test_cost_native_proof_rejects_discovery_count_map_and_completion_changes(self):
+        phases, first, _ = self.lane_proofs()
+        for mode in ("ids", "excluded", "map", "required", "count", "completion", "assigned", "source"):
+            bad = copy.deepcopy(first)
+            if mode == "ids":
+                bad["inventory"][0]["ids"] = ["replacement"]
+            elif mode == "excluded":
+                bad["inventory"][0]["historical_excluded_ids"] = [self.cost.TEST_ID]
+            elif mode == "map":
+                bad["plan"]["required_native_test_ids"] = {}
+            elif mode == "required":
+                bad["plan"]["required_native_targets"][self.cost.TARGET[0]] *= 2
+            elif mode == "count":
+                bad["required_native_target_counts"][":".join(self.cost.TARGET)] = True
+            elif mode == "completion":
+                bad["completed_targets"] *= 2
+            elif mode == "assigned":
+                bad["assigned_targets"] = []
+            else:
+                bad["plan"]["current_cost_source_binding"]["cargo_manifests"]["sha256"] = "0" * 64
+            bad["inventory_sha256"] = phases.sha(phases.encoded(bad["inventory"]))
+            with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                self.validate_native_cost(phases, bad)
+
+    def test_cost_native_proof_cannot_hide_debug_profile_behind_valid_outer_hashes(self):
+        phases, first, _ = self.lane_proofs()
+        bad = copy.deepcopy(first)
+        bad["current_cost_probe"]["artifact"]["cargo_profile"]["opt_level"] = "0"
+        path = self.root / "rehash.json"
+        digest = phases.write_bounded(path, bad)
+        restored = phases.read_bounded(path, digest)
+        with self.assertRaises(RuntimeError):
+            self.validate_native_cost(phases, restored)
+
+    def test_cost_aggregate_preserves_validated_release_record_without_reexecution(self):
+        phases, first, second = self.lane_proofs()
+        first_hash = phases.write_bounded(self.root / "proof/native-a.json", first)
+        second_hash = phases.write_bounded(self.root / "proof/native-b.json", second)
+        platform = {"version": 1, "phase": "platform", "status": "passed", "qualification": "pending",
+                    "identity": self.identity, "native_manifest_sha256": first_hash, "plan_sha256": first["plan_sha256"]}
+        platform_hash = phases.write_bounded(self.root / "platform/platform.json", platform)
+        environment = {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_MANIFEST_SHA256": first_hash,
+                       "M9E_NATIVE_B_MANIFEST_SHA256": second_hash, "M9E_PLATFORM_MANIFEST_SHA256": platform_hash,
+                       "M9E_NATIVE_A_RESULT": "success", "M9E_NATIVE_B_RESULT": "success", "M9E_PLATFORM_RESULT": "success"}
+        with patch.dict(os.environ, environment), patch.object(phases, "identity", return_value=self.identity), \
+                patch.object(phases, "ROOT", self.repository), patch.object(self.cost, "read_content", return_value=self.content), \
+                patch.object(self.cost, "execute_release") as execute:
+            aggregate = phases.aggregate(SimpleNamespace())
+        execute.assert_not_called()
+        self.assertEqual(aggregate["qualification"], "passed")
+        self.assertEqual(aggregate["current_cost_probe"], first["current_cost_probe"])
+        self.assertEqual(aggregate["tests"]["executed"], 1)
+        self.assertEqual(aggregate["native_manifest_sha256"], first_hash)
+
+    def test_cost_compact_pointer_preserves_other_fields_and_exact_full_summary_hash(self):
+        phases, first, _ = self.lane_proofs()
+        compact = {"status": "passed", "tests": first["tests"], "current_cost_probe": first["current_cost_probe"]}
+        unchanged = copy.deepcopy(compact)
+        self.cost.compact(compact, "d" * 64, phases.encoded)
+        self.assertEqual(compact, unchanged)
+        compact["other_required_evidence"] = "x" * 9000
+        self.assertGreater(len(phases.encoded(compact)), 16000)
+        preserved = {key: value for key, value in compact.items() if key != "current_cost_probe"}
+        self.cost.compact(compact, "d" * 64, phases.encoded)
+        self.assertEqual(compact["current_cost_probe"], {"file": "phase-summary.json", "sha256": "d" * 64,
+                                                       "field": "current_cost_probe"})
+        self.assertEqual({key: value for key, value in compact.items() if key != "current_cost_probe"}, preserved)
+        self.assertLessEqual(len(phases.encoded(compact)), 16000)
+
+    def test_cost_proof_transport_retains_existing_raw_and_expanded_byte_limits(self):
+        phases, first, _ = self.lane_proofs()
+        self.assertEqual(phases.MANIFEST_LIMIT, 65536)
+        self.assertEqual(phases.NATIVE_PROOF_LIMIT, 196608)
+        first["unbounded_extra"] = "x" * 65536
+        with self.assertRaises(RuntimeError):
+            phases.write_bounded(self.root / "oversized.json", first)
 if __name__ == "__main__":
     unittest.main()
