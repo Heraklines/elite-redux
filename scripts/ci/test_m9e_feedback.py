@@ -6660,7 +6660,7 @@ class FeedbackTests(unittest.TestCase):
                      for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
                                          *phases.STATE_QUERY_IDENTITIES.items())]
         phases.validate_state_query_inventory(selection, inventory)
-        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["a"])
+        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["c"])
         self.assertIn(list(phases.STATE_QUERY_WORKER_TARGET), phases.partition(inventory)["b"])
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
                      "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
@@ -7443,7 +7443,7 @@ class PhaseTransferTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.phases.aggregate(None)
 
-    def test_state_query_aggregate_requires_both_lanes_exact_inventory_and_real_worker_binding(self):
+    def test_state_query_aggregate_requires_all_lanes_exact_inventory_and_real_worker_binding(self):
         binding, assets, tests, cohort = browser_worker_fixture(self.phases)
         for proof in (self.native, self.other):
             proof["plan"].update({"requires_current_state_query": True, "requires_worker_executable": True,
@@ -7466,7 +7466,7 @@ class PhaseTransferTests(unittest.TestCase):
             proof["assigned_targets"] = self.phases.partition(proof["inventory"])[proof["lane"]]
             proof["completed_targets"] = list(proof["assigned_targets"])
             proof["tests"]["selected"] += 4
-            addition = 3 if proof["lane"] == "a" else 1
+            addition = 2 if proof["lane"] == "a" else 1
             proof["tests"]["executed"] += addition
             proof["tests"]["passed"] += addition
             proof["worker"] = {"source_sha": CANDIDATE, "target": self.identity["target"], "profile": "test",
@@ -7492,8 +7492,14 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
-        for lane in ("a", "b"):
-            original = self.native if lane == "a" else self.other
+        third = copy.deepcopy(self.native)
+        third["lane"] = "c"
+        third["assigned_targets"] = self.phases.partition(third["inventory"])["c"]
+        third["completed_targets"] = list(third["assigned_targets"])
+        third["tests"].update(executed=1, passed=1)
+        third["native_timer_parity_digest"] = None
+        self.phases.validate_native(third, self.identity)
+        for lane, original in (("a", self.native), ("b", self.other), ("c", third)):
             for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b", "worker_missing", "worker_renamed"):
                 proof = copy.deepcopy(original)
                 if mode == "missing":
@@ -8351,7 +8357,7 @@ class PhaseTransferTests(unittest.TestCase):
 
     def install_third_lane_fixture(self):
         for proof in (self.native, self.other):
-            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload")})):
+            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload"), self.phases.STATE_QUERY_TARGET})):
                 ids = ["complete_c_witness_" + str(index)]
                 proof["inventory"].append({"crate": crate, "target": target, "ids": ids, "historical_excluded_ids": []})
                 proof["plan"]["required_native_targets"].setdefault(crate, []).append(target)
@@ -8372,7 +8378,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.install_third_lane_fixture()
         inventory = self.native["inventory"]
         assignment = self.phases.partition(inventory)
-        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload")})
+        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload"), self.phases.STATE_QUERY_TARGET})
         self.assertFalse(self.phases.LANE_B_TARGETS & self.phases.LANE_C_TARGETS)
         flat = [tuple(pair) for targets in assignment.values() for pair in targets]
         self.assertEqual(len(flat), len(set(flat)))
@@ -8425,14 +8431,14 @@ class PhaseTransferTests(unittest.TestCase):
                      for crate, target in sorted(self.phases.LANE_C_TARGETS)]
         inventory.append({"crate": "er-other", "target": "m9e_current_batch", "ids": [], "historical_excluded_ids": []})
         assignment = self.phases.partition(inventory)
-        self.assertEqual(len(assignment["c"]), 4)
+        self.assertEqual(len(assignment["c"]), 5)
         self.assertEqual(assignment["a"], [["er-other", "m9e_current_batch"]])
         self.assertEqual(assignment["b"], [])
         enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
                       for index, row in enumerate(inventory)]
         actual, owned = self.phases.inventory_and_assignment(enumerated, "c")
         self.assertEqual(owned, self.phases.partition(actual)["c"])
-        self.assertEqual(len(actual), 5)
+        self.assertEqual(len(actual), 6)
     def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
         for status in ("", "failure", "skipped", "cancelled"):
             with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):
