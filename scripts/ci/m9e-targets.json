@@ -141,7 +141,6 @@
       ]
     }
   },
-  "rulechange_focus": {"paths": ["rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs"], "reason": "One actual current CLI future-rule reload witness. Reuse the complete causal timer scope, then require its one-file derived worker whenever this target is selected on any later cut; A owns the target and the B4 partition is unchanged."},
   "version": 1,
   "ai_snapshot_validation_focus": {
     "paths": [
@@ -182,7 +181,7 @@
   "baseline": "748728a333433ee24acd83080b9006d378e286f0",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34042137836",
   "readiness_packages": ["er-canonical"],
-  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_rulechange.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_title_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
+  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_title_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
   "shared_packages": ["er-kernel", "er-game", "er-state", "er-protocol", "er-types"],
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],

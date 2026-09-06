@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '292'
+      M9E_EXPECTED_TESTS: '318'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -26,7 +26,6 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /scripts/ci/
-            /rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs
       - name: Verify candidate and execute only harness selftests
         shell: bash
         run: |
@@ -73,32 +72,6 @@ jobs:
           (root / 'compact/summary.json').write_bytes(encoded)
           print(encoded.decode())
           raise SystemExit(0 if passed else 1)
-          PY
-      - name: Format only prepared current rulechange fixture with pinned remote rustfmt
-        shell: bash
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal --component rustfmt > "$RUNNER_TEMP/m9e-preflight/diagnostics/rustfmt-install.log" 2>&1
-          python3 - <<'PY'
-          import hashlib, json, os, pathlib, subprocess
-          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'm9e-preflight'
-          paths = ["rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs"]
-          def hashes():
-              return {name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in paths}
-          before = hashes()
-          with (root / 'diagnostics/rustfmt.log').open('wb') as log:
-              subprocess.run(['rustfmt', '+1.97.1', '--edition', '2024', '--config', 'skip_children=true', *paths],
-                             stdout=log, stderr=subprocess.STDOUT, timeout=60, check=True)
-          after = hashes()
-          patch = subprocess.check_output(['git', 'diff', '--unified=1', '--', *paths])
-          if len(patch) > 65536:
-              raise RuntimeError('prepared source format patch exceeds 64 KiB')
-          (root / 'compact/format.patch').write_bytes(patch)
-          result = {'status': 'passed', 'qualification': 'source formatting only; no compile or runtime evidence',
-                    'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
-                    'rustfmt': subprocess.check_output(['rustfmt', '+1.97.1', '--version'], text=True).strip(),
-                    'before': before, 'after': after, 'patch_bytes': len(patch), 'patch_sha256': hashlib.sha256(patch).hexdigest()}
-          (root / 'compact/format-summary.json').write_text(json.dumps(result, sort_keys=True, indent=2) + '\n')
-          print(json.dumps(result, sort_keys=True))
           PY
       - name: Compact harness result
         if: always()
