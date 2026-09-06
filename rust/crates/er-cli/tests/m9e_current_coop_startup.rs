@@ -178,7 +178,9 @@ impl Endpoint {
         if let Some(control) = &self.observed_control {
             return Ok(control.clone());
         }
-        let value = self.cli.result("session.observe", json!({"session":SESSION}))?;
+        let value = self
+            .cli
+            .result("session.observe", json!({"session":SESSION}))?;
         let control: GameControlPlanV2 = serde_json::from_value(value["control"].clone())?;
         self.observed_control = Some(control.clone());
         Ok(control)
@@ -296,10 +298,18 @@ impl Endpoint {
                 .position(|option| option.option_id.as_str() == target)
                 .ok_or("target absent")?;
             // The actual bootstrap graph is a non-wrapping ordered list.
-            let key = if wanted < current { PhysicalKey::ArrowUp } else { PhysicalKey::ArrowDown };
+            let key = if wanted < current {
+                PhysicalKey::ArrowUp
+            } else {
+                PhysicalKey::ArrowDown
+            };
             assert!(self.press(key)?.is_empty());
         }
-        Err(format!("raw target {target} unreachable from {:?}", self.control()?.menu.map(|menu| menu.selected_option_id)).into())
+        Err(format!(
+            "raw target {target} unreachable from {:?}",
+            self.control()?.menu.map(|menu| menu.selected_option_id)
+        )
+        .into())
     }
     fn choose(&mut self, content: &PreparedGameContentV2) -> TestResult<ChoicePublication> {
         let mode = content
