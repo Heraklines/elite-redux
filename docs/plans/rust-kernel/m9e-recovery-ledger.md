@@ -3060,3 +3060,40 @@ Cargo manifests, actual compiler/environment/profile/artifact/content and exact
 preflight 30217340b4b9b8959de6decd667b7053a42c93ca/run34050956250 passed 322
 harness cases, retaining bounded-process and build-identity regressions.
 Neither constitutes the integrated cost gate or final performance qualification.
+
+Query candidate0ad2760ed19df84ddffa0280044ea793b45d7d78/run34051642880 did not
+qualify: native A hit the unchanged 35-minute job deadline. Its last bounded
+progress records623passed/0failed/0skipped, active material retention; B completed
+19/19. Global discovery was648tests,74inventory,30requiredtargets,25exactmaps.
+Platform skipped and aggregate rejected incomplete work. Baseline remains75a.
+Retain A diagnostic9995256608ZIP96341 remotely; downloaded only its3621-byte
+progress and B39380-byte proof. The current native query itself took578029ms,
+under its600s target limit; the complete cumulative lane could not finish.
+
+Distribute complete existing targets across three jobs on the same authorized
+GitHub Actions ubuntu-24.04 configuration. C owns CLI batch2, kernel material
+retention2 and current supervisor9; B retains its four actual process targets;
+A retains queries, controls and the sole future release-cost override. Expected
+query partition is A616/B19/C13, still648 total. Preserve full global discovery,
+reverse compilation, lint, all test IDs, zero-test harnesses, existing mutants,
+profile/time/byte caps and all platform requirements. Aggregate requires all
+three same-run manifests, exact plans and complete disjoint target/count union.
+No infrastructure service, self-hosted runner, provider or paid plan provisioned.
+
+Remote preflightcd637c02af876a2ef41474103068f622107b1f01/run34053918829 passed343
+harness cases plus parsed workflow graph/permissions/runner/dependency/proof checks.
+All6 changed CI hashes matched before integration. Initial594ecd4a/run34053768977
+exposed stale two-lane synthetic counts, fixture proof selection, renamed error
+expectations and premature GitHub expression evaluation inside the Ruby checker.
+Fix those fixture/checker assumptions while retaining rejection assertions.
+This cut installs the prepared cost gate infrastructure but not the Rust cost
+product: it remains unselected and carries no release qualification claim.
+
+Actual focused release-wrapper30fea30a64af43def411e36f735e52210f80d347/
+run34052745788 passed and metadata audit matched18cachedsources,35Cargo manifests,
+same-run identity, actual ordinary test-profile listing with zero executions,
+once-only release execution, unchanged content/checkpoint semantics and6010-byte
+recordSHAfd5b7b7f1ce246a30b81d79e450cbc09e027240a46e3e0577c48d68b01fdcb0e.
+Fresh release build246.943s and probe4.132s. Both owned build directories were
+cleaned before success. This is F producer evidence, not integrated cost or Q.
+The repaired current query candidate still needs all five complete phases.

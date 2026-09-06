@@ -13,7 +13,10 @@ import io
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -142,6 +145,49 @@ def current_storage_fixture(phases, binding=None):
                    "testResults": [{"name": phases.STORAGE_SOURCE_PATHS[2], "assertionResults": [
                        {"fullName": name, "status": "passed", "failureMessages": []} for name in phases.STORAGE_NODE_IDS]}]}
     return binding, tests, {"suites": [{"specs": specs}], "errors": []}, node, node_report
+
+def rule_fixture(root):
+    import m9e_rulechange as rule
+    for key, path in rule.RULE_INPUTS.items():
+        source = root / path
+        source.parent.mkdir(parents=True, exist_ok=True)
+        if not source.exists():
+            source.write_text("synthetic " + key + "\n")
+    source = root / rule.RULE_SOURCE
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("fn timer() {\n" + rule.RULE_ORIGINAL + "}\n")
+    test = root / rule.RULE_TEST_SOURCE
+    test.parent.mkdir(parents=True, exist_ok=True)
+    test.write_text("// exact synthetic rule witness\n")
+    policy = rule.make_rule_policy(root, CANDIDATE)
+    worker = root / "rust/target/er-kernel-worker"
+    worker.parent.mkdir(parents=True, exist_ok=True)
+    worker.write_bytes(b"clean candidate worker")
+    worker.chmod(0o755)
+    clean = {"path": str(worker), "bytes": worker.stat().st_size,
+             "sha256": hashlib.sha256(worker.read_bytes()).hexdigest(), "source_sha": CANDIDATE,
+             "target": "x86_64-unknown-linux-gnu", "profile": "test",
+             "cargo_profile": {"test": False}, "cargo_package_id": "path+file:///clean#er-kernel-worker@0.1.0",
+             "manifest_path": rule.RULE_INPUTS["manifest"]}
+    identity = {"product_sha": CANDIDATE, "target": clean["target"], "toolchain": "rustc pinned",
+                "files": {"lock": policy["inputs"]["lock"], "rule_workspace": policy["inputs"]["workspace"],
+                          "rule_worker_manifest": policy["inputs"]["manifest"], "rule_toolchain": policy["inputs"]["toolchain"],
+                          "rule_source": policy["original_sha256"], "rule_test": policy["test_sha256"]}}
+    evidence = {"schema_version": 1, "status": "passed", "policy_sha256": hashlib.sha256(rule.encoded(policy)).hexdigest(),
+                **{key: policy[key] for key in ("source", "rule", "candidate_source_sha", "original_sha256", "derived_sha256", "inputs")},
+                "test": rule.RULE_TEST, "target": rule.RULE_TARGET,
+                "tests": {"executed": 1, "passed": 1, "failed": 0, "skipped": 0},
+                "derived_source_sha": "e" * 40, "parent_sha": CANDIDATE, "tree_sha": "3" * 40,
+                "parent_tree_sha": "4" * 40, "original_blob": "1" * 40, "derived_blob": "2" * 40,
+                "changed_paths": [rule.RULE_SOURCE], "source_mode": "100644", "patch_bytes": 700,
+                "patch_sha256": "9" * 64, "toolchain": identity["toolchain"], "cargo_version": "cargo 1.97.1",
+                "candidate_preserved_sha256": policy["original_sha256"], "pool_verified_after_test": True,
+                "clean_worker_sha256": clean["sha256"], "pool_files": ["base-worker", "rule-worker"],
+                "worker": {"source_sha": "e" * 40, "target": clean["target"], "profile": "test",
+                           "cargo_profile": clean["cargo_profile"], "package_identity": "er-kernel-worker@0.1.0",
+                           "manifest_path": clean["manifest_path"], "sha256": "8" * 64, "bytes": 200}}
+    return rule, policy, clean, identity, evidence
+
 
 class FeedbackTests(unittest.TestCase):
     def setUp(self):
@@ -2579,7 +2625,8 @@ class FeedbackTests(unittest.TestCase):
                     self.assertIn(reverse, selection["packages"])
                     self.assertNotIn(reverse, selection["execution_scope"])
                 self.assertNotIn("m9e_current_rulechange_reload", selection["required_native_targets"]["er-cli"])
-                self.assertNotIn(("er-cli", "m9e_current_rulechange_reload"), self.feedback.WORKER_BOUND_TARGETS)
+                self.assertIn(("er-cli", "m9e_current_rulechange_reload"), self.feedback.WORKER_BOUND_TARGETS)
+                self.assertIsNone(selection["rule_worker"])
 
     def test_ai_damage_query_mixed_and_dependency_paths_fail_closed_without_changing_old_scopes(self):
         self.configure_ai_damage_query_scope()
@@ -6824,6 +6871,378 @@ class FeedbackTests(unittest.TestCase):
         self.assertNotIn("current_cost_probe", captured)
         self.assertNotIn(list(cost.TARGET), captured["completed_targets"])
         self.assertNotIn(cost.TARGET[1], self.executed)
+
+    def test_rule_target_requirement_survives_later_cli_and_kernel_cuts_but_not_readiness(self):
+        self.configure_timer_scope()
+        rule, policy, _, _, _ = rule_fixture(self.root)
+        for changed in ([rule.RULE_TEST_SOURCE], ["rust/crates/er-kernel/src/game_kernel_v7.rs"]):
+            with self.subTest(changed=changed):
+                self.changed = changed
+                selection = self.feedback.plan()
+                self.assertEqual(selection["rule_worker"], policy)
+                self.assertTrue(selection["requires_worker_executable"])
+                self.assertTrue(selection["requires_browser"])
+                self.assertTrue(selection["requires_wasm"])
+                self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+                self.assertEqual(selection["required_native_test_ids"]["er-cli:" + rule.RULE_TARGET], [rule.RULE_TEST])
+                for key, ids in self.config["timer_focus"]["exact_test_ids"].items():
+                    self.assertEqual(selection["required_native_test_ids"][key], ids)
+        self.changed = ["rust/crates/er-cli/src/ordinary.rs"]
+        ordinary = self.feedback.plan()
+        self.assertEqual(ordinary["rule_worker"], policy)
+        self.assertIn(rule.RULE_TARGET, ordinary["required_native_targets"]["er-cli"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        with patch.object(rule, "make_rule_policy", side_effect=AssertionError("readiness must not derive workers")):
+            readiness = self.feedback.plan()
+        self.assertIsNone(readiness["rule_worker"])
+        self.assertEqual(readiness["packages"], ["er-canonical"])
+
+
+
+    def test_rule_scope_and_exact_target_reject_mixed_missing_renamed_or_extra_evidence(self):
+        self.configure_timer_scope()
+        rule, _, _, _, _ = rule_fixture(self.root)
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock",
+                      "rust/crates/er-cli/Cargo.toml", "src/other.ts", "unmapped.json"):
+            self.changed = [rule.RULE_TEST_SOURCE, extra]
+            with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        self.changed = [rule.RULE_TEST_SOURCE]
+        selection = self.feedback.plan()
+        required = {"er-cli:" + rule.RULE_TARGET: [rule.RULE_TEST]}
+        for ids in ([], ["renamed"], [rule.RULE_TEST, "extra"], [rule.RULE_TEST, rule.RULE_TEST]):
+            with self.assertRaises(RuntimeError):
+                self.feedback.require_native_test_ids(required, [("er-cli", rule.RULE_TARGET, ids)])
+        (self.root / rule.RULE_TEST_SOURCE).unlink()
+        with self.assertRaisesRegex(RuntimeError, "absent"):
+            self.feedback.plan()
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+
+
+
+    def test_rule_publication_follows_lint_exact_one_execution_and_context_verification(self):
+        import time
+        import m9e_current_cost as cost
+        import m9e_phases as phases
+        self.configure_timer_scope()
+        rule, _, _, _, _ = rule_fixture(self.root)
+        self.changed = [rule.RULE_TEST_SOURCE]
+        selection = self.feedback.plan()
+        selection.update({"packages": ["er-cli", "er-kernel-worker"], "execution_scope": {"er-cli": [rule.RULE_TARGET]},
+                          "required_native_targets": {"er-cli": [rule.RULE_TARGET]},
+                          "required_native_test_ids": {"er-cli:" + rule.RULE_TARGET: [rule.RULE_TEST]},
+                          "requires_cli_executable": False, "requires_wasm": False, "requires_browser": False,
+                          "timer_mutant": None, "replica_mutant": None, "ledger_mutant": None})
+        self.binary_ids = {"rule_binary": [rule.RULE_TEST]}
+        self.binary_crates = {"rule_binary": "er-cli"}
+        self.binary_targets = {"rule_binary": rule.RULE_TARGET}
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        finished = []
+        cleanup_failure = False
+        @contextlib.contextmanager
+        def prepared(_feedback, _summary, _worker):
+            self.assertIn("clippy:er-cli", self.events)
+            self.assertIn("list:rule_binary", self.events)
+            yield {"BOUND_VARIANT": "yes"}, {"status": "prepared"}
+            if cleanup_failure:
+                raise RuntimeError("rule cleanup verification failed")
+            finished.append(True)
+        def bounded(command, **kwargs):
+            self.assertEqual(command[1:], [rule.RULE_TEST, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"])
+            self.assertEqual(kwargs["seconds"], 600)
+            self.assertEqual(kwargs["byte_limit"], 16384)
+            self.assertEqual(kwargs["environment"], {"BOUND_VARIANT": "yes"})
+            self.assertGreater(kwargs["global_deadline"], time.monotonic())
+            with kwargs["output"].open("w") as output:
+                result = self.process(command, cwd=kwargs["cwd"], stdout=output, env=kwargs["environment"])
+            if result.returncode:
+                raise RuntimeError("rule witness failed")
+            return {"path": kwargs["output"], "elapsed_seconds": 0.1}
+        for code, result in ((0, self.result_line(1)), (1, self.result_line(0, 1)),
+                             (0, self.result_line(1) + self.result_line(1)), (0, self.result_line(0))):
+            with self.subTest(code=code, result=result):
+                self.results = {"rule_binary": (code, result)}
+                with patch.object(self.feedback, "plan", return_value=selection), patch.object(rule, "current_rule_worker", prepared), \
+                        patch.dict(sys.modules, {self.feedback.__name__: self.feedback}), \
+                        patch.dict(os.environ, {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "c"}), \
+                        patch.object(phases, "identity", return_value={"product_sha": CANDIDATE}), \
+                        patch.object(phases, "export_native"), patch.object(cost, "run_bounded", side_effect=bounded) as execute:
+                    status, summary = self.invoke()
+                execute.assert_called_once()
+                if code == 0 and result == self.result_line(1):
+                    self.assertEqual(status, 0)
+                    self.assertTrue(finished)
+                    self.assertEqual(summary["rule_worker"]["tests"], {"executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+                    self.assertEqual(self.binary_envs[-1][2], {"BOUND_VARIANT": "yes"})
+                else:
+                    self.assertNotEqual(status, 0)
+                    self.assertNotIn("rule_worker", summary)
+        cleanup_failure = True
+        self.results = {"rule_binary": (0, self.result_line(1))}
+        with patch.object(self.feedback, "plan", return_value=selection), patch.object(rule, "current_rule_worker", prepared), \
+                patch.dict(sys.modules, {self.feedback.__name__: self.feedback}), \
+                patch.dict(os.environ, {"M9E_PHASE": "native", "M9E_NATIVE_LANE": "c"}), \
+                patch.object(phases, "identity", return_value={"product_sha": CANDIDATE}), \
+                patch.object(phases, "export_native"), patch.object(cost, "run_bounded", side_effect=bounded):
+            status, summary = self.invoke()
+        self.assertNotEqual(status, 0)
+        self.assertIn("cleanup verification", summary["first_failure"])
+        self.assertNotIn("rule_worker", summary)
+        selection["rule_worker"] = None
+        with patch.object(self.feedback, "plan", return_value=selection):
+            status, summary = self.invoke()
+        self.assertNotEqual(status, 0)
+        self.assertIn("derived-worker requirement", summary["first_failure"])
+
+
+
+class RuleDerivationTests(unittest.TestCase):
+    def test_rule_adapter_shares_budget_preserves_each_log_and_propagates_failure(self):
+        import time
+        import m9e_current_cost as cost
+        self.feedback.FULL = self.report
+        self.feedback.TIMINGS = {}
+        deadline = time.monotonic() + 1000
+        adapter = self.rule.bounded_rule_feedback(self.feedback, deadline)
+        calls = []
+        def run(command, **kwargs):
+            calls.append((command, kwargs))
+            kwargs["output"].write_text("retained metadata")
+            return {"path": kwargs["output"], "elapsed_seconds": 0.25}
+        with patch.object(cost, "run_bounded", side_effect=run):
+            first = adapter.run(["git", "rev-parse", "HEAD"], "rule-meta-same", self.root)
+            second = adapter.run(["git", "rev-parse", "HEAD"], "rule-meta-same", self.root)
+            adapter.run(["cargo", "build"], "rule-worker-build", env={"ONLY": "explicit"})
+        self.assertNotEqual(first, second)
+        self.assertEqual(first.read_text(), "retained metadata")
+        self.assertEqual(second.read_text(), "retained metadata")
+        self.assertEqual([(item[1]["seconds"], item[1]["byte_limit"]) for item in calls],
+                         [(60, 16384), (60, 16384), (900, 16 << 20)])
+        self.assertTrue(all(item[1]["global_deadline"] == deadline for item in calls))
+        self.assertEqual(calls[-1][1]["environment"], {"ONLY": "explicit"})
+        self.assertEqual(calls[-1][1]["cwd"], self.feedback.RUST)
+        self.assertEqual(list(self.feedback.TIMINGS.values()), [250, 250, 250])
+        with patch.object(cost, "run_bounded", side_effect=RuntimeError("deadline exhausted")), self.assertRaisesRegex(RuntimeError, "deadline exhausted"):
+            adapter.run(["git", "status"], "rule-meta-failure", self.root)
+        self.assertEqual(len(self.feedback.TIMINGS), 3)
+
+    def test_rule_adapter_rejects_invalid_budget_names_and_command_overflow_before_spawn(self):
+        import time
+        import m9e_current_cost as cost
+        for deadline in (True, None, "100", float("inf"), float("nan"), time.monotonic() - 1):
+            with self.subTest(deadline=deadline), self.assertRaises(RuntimeError):
+                self.rule.bounded_rule_feedback(self.feedback, deadline)
+        adapter = self.rule.bounded_rule_feedback(self.feedback, time.monotonic() + 1000)
+        with patch.object(cost, "run_bounded") as spawn:
+            for name in (None, "../outside", "rule-" + "a" * 65, "rule-UPPER"):
+                with self.subTest(name=name), self.assertRaises(RuntimeError):
+                    adapter.run(["git", "status"], name)
+            adapter.counter = 64
+            with self.assertRaisesRegex(RuntimeError, "count"):
+                adapter.run(["git", "status"], "rule-meta-overflow")
+            spawn.assert_not_called()
+
+    def test_rule_compaction_retains_exact_full_proof_pointer_without_changing_small_evidence(self):
+        small = {"rule_worker": copy.deepcopy(self.evidence)}
+        original = copy.deepcopy(small)
+        self.rule.compact(small, "a" * 64, self.rule.encoded)
+        self.assertEqual(small, original)
+        large = {"rule_worker": copy.deepcopy(self.evidence), "other": "x" * 14000}
+        self.assertGreater(len(self.rule.encoded(large)), 16000)
+        self.rule.compact(large, "b" * 64, self.rule.encoded)
+        self.assertEqual(large["rule_worker"], {"file": "phase-summary.json", "sha256": "b" * 64, "field": "rule_worker"})
+        self.assertLessEqual(len(self.rule.encoded(large)), 16000)
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-rule-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.rule, self.policy, self.clean, self.identity, self.evidence = rule_fixture(self.root)
+        self.report = self.root / "report"
+        self.report.mkdir()
+        self.calls, self.committed, self.defect = [], False, None
+        self.checkout = None
+        self.feedback = SimpleNamespace(ROOT=self.root, RUST=self.root / "rust", REPORT=self.report,
+                                        re=re, json=json, hashlib=hashlib, Path=Path, os=os,
+                                        tempfile=tempfile, shutil=shutil, run=self.command,
+                                        digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest())
+        self.summary = {"product_sha": CANDIDATE, "target": self.clean["target"], "profile": "test",
+                        "toolchain": self.identity["toolchain"], "plan": {"rule_worker": self.policy}}
+        # Native runner cache variables must not redirect these synthetic files.
+        self.environment = patch.dict(os.environ, {"CARGO_TARGET_DIR": str(self.root / "rust/target")})
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+
+    def metadata(self, feedback, args, cwd=None):
+        self.assertIs(feedback, self.feedback)
+        cwd = self.root if cwd is None else cwd
+        if args == ["git", "rev-parse", "HEAD"]:
+            return CANDIDATE if cwd == self.root or not self.committed else "e" * 40
+        if args == ["git", "diff", "--name-only", "HEAD", "--"]:
+            return "" if cwd == self.root or self.committed else self.rule.RULE_SOURCE
+        if args[:3] == ["git", "status", "--porcelain"]:
+            return ""
+        if args == ["git", "rev-parse", "HEAD^"]:
+            return "d" * 40 if self.defect == "parent" else CANDIDATE
+        if args[:3] == ["git", "rev-list", "--parents"]:
+            return " ".join(["e" * 40, CANDIDATE] + (["f" * 40] if self.defect == "merge" else []))
+        if args[:3] == ["git", "diff-tree", "--no-commit-id"]:
+            if "--name-only" in args:
+                return self.rule.RULE_SOURCE + ("\nother.rs" if self.defect == "extra-source" else "")
+            mode = "100755" if self.defect == "mode" else "100644"
+            return f":100644 {mode} {'1' * 40} {'2' * 40} M\t{self.rule.RULE_SOURCE}"
+        if args[:2] == ["git", "rev-parse"]:
+            value = args[2]
+            if value.startswith("HEAD^:"):
+                return "1" * 40
+            if value.startswith("HEAD:"):
+                return "2" * 40
+            if value == "HEAD^{tree}":
+                return "3" * 40
+            if value == CANDIDATE + "^{tree}":
+                return "4" * 40
+        if args == ["rustc", "--version"]:
+            return "rustc other" if self.defect == "compiler" else self.identity["toolchain"]
+        if args == ["rustc", "-vV"]:
+            return "host: " + self.identity["target"]
+        if args == ["cargo", "--version"]:
+            return "cargo 1.97.1"
+        raise AssertionError((args, cwd))
+
+    def command(self, args, name, cwd, env=None):
+        self.calls.append((args, name, cwd, env))
+        log = self.report / (name + ".log")
+        log.write_text("ok\n")
+        if name == "rule-worktree-create":
+            self.checkout = Path(args[-2])
+            self.checkout.mkdir()
+            for path in (*self.rule.RULE_INPUTS.values(), self.rule.RULE_SOURCE, self.rule.RULE_TEST_SOURCE):
+                destination = self.checkout / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(self.root / path, destination)
+        elif name == "rule-derive-commit":
+            self.committed = True
+            if self.defect == "cargo-input":
+                (self.checkout / "rust/Cargo.lock").write_text("changed lock")
+        elif name == "rule-source-patch":
+            log.write_text("declared one-file patch\n" * (1000 if self.defect == "patch-bound" else 1))
+        elif name == "rule-worker-build":
+            self.assertIn("--locked", args)
+            self.assertIn("--offline", args)
+            self.assertEqual(args[args.index("--profile") + 1], "test")
+            self.assertEqual(args[args.index("--target") + 1], self.clean["target"])
+            self.assertEqual(cwd, self.checkout / "rust")
+            build_root = Path(env["CARGO_TARGET_DIR"])
+            self.assertNotEqual(build_root, self.root / "rust/target")
+            binary = build_root / "debug/er-kernel-worker"
+            if self.defect == "outside":
+                binary = self.root / "outside/er-kernel-worker"
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            binary.write_bytes(b"clean candidate worker" if self.defect == "same-binary" else b"derived worker")
+            binary.chmod(0o755)
+            artifact = {"reason": "compiler-artifact", "target": {"name": "er-kernel-worker", "kind": ["bin"]},
+                        "profile": {"test": False}, "manifest_path": str(self.checkout / self.rule.RULE_INPUTS["manifest"]),
+                        "package_id": "path+file:///derived#er-kernel-worker@0.1.0", "executable": str(binary)}
+            if self.defect == "profile":
+                artifact["profile"]["test"] = True
+            elif self.defect == "manifest":
+                artifact["manifest_path"] = str(self.root / self.rule.RULE_INPUTS["manifest"])
+            elif self.defect == "package":
+                artifact["package_id"] = "path+file:///derived#other@0.1.0"
+            artifacts = [artifact]
+            if self.defect == "ambiguous":
+                second = build_root / "other/er-kernel-worker"
+                second.parent.mkdir()
+                second.write_bytes(binary.read_bytes())
+                second.chmod(0o755)
+                artifacts.append({**artifact, "executable": str(second)})
+            log.write_text("\n".join(json.dumps(item) for item in artifacts) + "\n")
+            if self.defect == "build":
+                raise RuntimeError("synthetic build failed")
+        return log
+
+    def test_rule_policy_and_proof_bind_exact_derivation_and_success(self):
+        self.rule.validate_rule_evidence(self.evidence, self.policy, self.identity, self.clean)
+        for key, value in (("schema_version", True), ("status", "prepared"), ("parent_sha", "d" * 40),
+                           ("changed_paths", [self.rule.RULE_SOURCE, "other.rs"]), ("source_mode", "100755"),
+                           ("derived_source_sha", CANDIDATE), ("tree_sha", "4" * 40), ("derived_blob", "1" * 40),
+                           ("test", "renamed"), ("target", "wrong"), ("patch_bytes", 16_385),
+                           ("patch_sha256", "bad"), ("candidate_preserved_sha256", "0" * 64),
+                           ("pool_verified_after_test", False), ("pool_files", ["base-worker", "rule-worker", "extra"]),
+                           ("tests", {"executed": 1, "passed": 0, "failed": 1, "skipped": 0})):
+            with self.subTest(key=key):
+                bad = {**self.evidence, key: value}
+                with self.assertRaises(RuntimeError):
+                    self.rule.validate_rule_evidence(bad, self.policy, self.identity, self.clean)
+        for key, value in (("bytes", 0), ("bytes", 128 * 1024 * 1024 + 1), ("sha256", self.clean["sha256"]),
+                           ("source_sha", CANDIDATE), ("cargo_profile", {"test": True}), ("package_identity", "other"),
+                           ("manifest_path", "../Cargo.toml")):
+            with self.subTest(worker=key):
+                bad = copy.deepcopy(self.evidence)
+                bad["worker"][key] = value
+                with self.assertRaises(RuntimeError):
+                    self.rule.validate_rule_evidence(bad, self.policy, self.identity, self.clean)
+        bad_identity = copy.deepcopy(self.identity)
+        bad_identity["files"]["rule_test"] = "0" * 64
+        with self.assertRaises(RuntimeError):
+            self.rule.validate_rule_evidence(self.evidence, self.policy, bad_identity, self.clean)
+        source = self.root / self.rule.RULE_SOURCE
+        source.write_text(self.rule.RULE_ORIGINAL * 2)
+        with self.assertRaisesRegex(RuntimeError, "exactly one"):
+            self.rule.make_rule_policy(self.root, CANDIDATE)
+
+    def test_rule_context_derives_once_and_cleans_before_publish(self):
+        with patch.object(self.rule, "bounded_capture", side_effect=self.metadata):
+            with self.rule.current_rule_worker(self.feedback, self.summary, self.clean) as (env, evidence):
+                base, variant = Path(env["ER_M9E_WORKER_EXECUTABLE"]), Path(env["ER_M9E_RULE_WORKER_EXECUTABLE"])
+                self.assertEqual(base.parent, variant.parent)
+                self.assertEqual(sorted(path.name for path in base.parent.iterdir()), ["base-worker", "rule-worker"])
+                self.assertEqual(env["ER_M9E_RULE_WORKER_PARENT_SHA"], CANDIDATE)
+                self.assertEqual(env["ER_M9E_RULE_WORKER_SOURCE_SHA"], "e" * 40)
+                self.assertEqual(evidence["status"], "prepared")
+                self.assertNotIn("candidate_preserved_sha256", evidence)
+            self.assertFalse(base.exists())
+            self.assertTrue(evidence["pool_verified_after_test"])
+            self.assertEqual(evidence["candidate_preserved_sha256"], self.policy["original_sha256"])
+            self.assertEqual(evidence["status"], "prepared")
+        names = [call[1] for call in self.calls]
+        self.assertLess(names.index("rule-materialize-source"), names.index("rule-derive-commit"))
+        self.assertLess(names.index("rule-derive-commit"), names.index("rule-worker-build"))
+        self.assertEqual(names[-1], "rule-worktree-remove")
+        evidence.update(status="passed", test=self.rule.RULE_TEST, target=self.rule.RULE_TARGET,
+                        tests={"executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+        self.rule.validate_rule_evidence(evidence, self.policy, self.identity, self.clean)
+
+    def test_rule_derivation_artifact_and_build_failures_never_yield_or_escape_cleanup(self):
+        for defect in ("parent", "merge", "extra-source", "mode", "cargo-input", "compiler", "patch-bound",
+                       "manifest", "profile", "package", "outside", "ambiguous", "same-binary", "build"):
+            with self.subTest(defect=defect):
+                self.defect, self.committed, self.calls = defect, False, []
+                with patch.object(self.rule, "bounded_capture", side_effect=self.metadata), self.assertRaises(RuntimeError):
+                    with self.rule.current_rule_worker(self.feedback, self.summary, self.clean):
+                        self.fail("invalid derived source/artifact reached ordinary test")
+                self.assertEqual(self.calls[-1][1], "rule-worktree-remove")
+                self.assertEqual(self.feedback.digest(self.root / self.rule.RULE_SOURCE), self.policy["original_sha256"])
+                self.assertEqual(self.feedback.digest(Path(self.clean["path"])), self.clean["sha256"])
+
+    def test_rule_test_failure_or_pool_tamper_still_cleans_and_metadata_is_bounded(self):
+        for tamper in (False, True):
+            with self.subTest(tamper=tamper):
+                self.committed, self.calls = False, []
+                with patch.object(self.rule, "bounded_capture", side_effect=self.metadata), self.assertRaises(RuntimeError):
+                    with self.rule.current_rule_worker(self.feedback, self.summary, self.clean) as (env, evidence):
+                        if tamper:
+                            Path(env["ER_M9E_RULE_WORKER_EXECUTABLE"]).write_bytes(b"tampered")
+                        else:
+                            raise RuntimeError("ordinary witness failed")
+                self.assertEqual(self.calls[-1][1], "rule-worktree-remove")
+                self.assertEqual(evidence["status"], "prepared")
+                self.assertEqual(evidence["candidate_preserved_sha256"], self.policy["original_sha256"])
+        log = self.report / "metadata.log"
+        log.write_bytes(b"x" * 16_385)
+        with patch.object(self.feedback, "run", return_value=log), self.assertRaisesRegex(RuntimeError, "metadata exceeds"):
+            self.rule.bounded_capture(self.feedback, ["git", "rev-parse", "HEAD"])
+
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-phase-test-")
@@ -7036,6 +7455,77 @@ class PhaseTransferTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.phases.aggregate(None)
 
+    def test_rule_variant_is_required_by_actual_inventory_and_aggregate_only_accepts_c_owned_success(self):
+        rule, policy, clean, rule_identity, evidence = rule_fixture(self.root)
+        self.identity["files"].update(rule_identity["files"])
+        key = "er-cli:" + rule.RULE_TARGET
+        self.native["plan"].update(rule_worker=policy, requires_worker_executable=True)
+        self.native["plan"]["required_native_targets"]["er-cli"] = [rule.RULE_TARGET]
+        self.native["plan"]["required_native_test_ids"] = {key: [rule.RULE_TEST]}
+        self.native["inventory"].append({"crate": "er-cli", "target": rule.RULE_TARGET,
+                                         "ids": [rule.RULE_TEST], "historical_excluded_ids": []})
+        self.native["required_native_target_counts"][key] = 1
+        self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
+        self.native["inventory_sha256"] = self.phases.sha(self.phases.encoded(self.native["inventory"]))
+        self.native["assigned_targets"] = self.phases.partition(self.native["inventory"])["a"]
+        self.native["completed_targets"] = self.native["assigned_targets"]
+        self.native["tests"].update(selected=14, executed=11, passed=11)
+        self.native["worker"] = {name: value for name, value in clean.items() if name != "path"}
+        self.other = copy.deepcopy(self.native)
+        self.other["lane"] = "b"
+        self.other["assigned_targets"] = self.phases.partition(self.native["inventory"])["b"]
+        self.other["completed_targets"] = self.other["assigned_targets"]
+        self.other["tests"].update(executed=2, passed=2)
+        self.other["native_timer_parity_digest"] = None
+        with self.phase_environment(rule_evidence=evidence):
+            third = self.phases.read_bounded(self.root / "proof/native-c.json", self.third_hash)
+        self.assertIn(["er-cli", rule.RULE_TARGET], third["assigned_targets"])
+        self.assertNotIn(["er-cli", rule.RULE_TARGET], self.native["assigned_targets"])
+        self.assertNotIn(["er-cli", rule.RULE_TARGET], self.other["assigned_targets"])
+        self.phases.validate_native(self.native, self.identity)
+        self.phases.validate_native(self.other, self.identity)
+        self.phases.validate_native(third, self.identity)
+        for defect in ("missing", "wrong-test", "failed", "unselected-policy", "missing-required", "wrong-parent", "unrestored"):
+            with self.subTest(defect=defect):
+                bad = copy.deepcopy(third)
+                if defect == "missing":
+                    bad.pop("rule_worker")
+                elif defect == "wrong-test":
+                    bad["rule_worker"]["test"] = "renamed"
+                elif defect == "failed":
+                    bad["rule_worker"]["tests"].update(passed=0, failed=1)
+                elif defect == "unselected-policy":
+                    bad["plan"]["rule_worker"] = None
+                elif defect == "missing-required":
+                    bad["plan"]["required_native_targets"].pop("er-cli")
+                    bad["required_native_target_counts"].pop(key)
+                elif defect == "wrong-parent":
+                    bad["rule_worker"]["parent_sha"] = "d" * 40
+                else:
+                    bad["rule_worker"]["candidate_preserved_sha256"] = "0" * 64
+                bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+                with self.assertRaises(RuntimeError):
+                    self.phases.validate_native(bad, self.identity)
+        for owner in (self.native, self.other):
+            bad = copy.deepcopy(owner)
+            bad["rule_worker"] = evidence
+            with self.assertRaisesRegex(RuntimeError, "C-owned"):
+                self.phases.validate_native(bad, self.identity)
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform["native_manifest_sha256"] = self.native_hash
+        self.platform["plan_sha256"] = self.native["plan_sha256"]
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(rule_evidence=evidence), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+        self.assertEqual(result["qualification"], "passed")
+        self.assertEqual(result["tests"]["executed"], 14)
+        self.assertEqual(result["rule_worker"], evidence)
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.platform["native_manifest_sha256"] = self.native_hash
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), self.assertRaises(RuntimeError):
+            self.phases.aggregate(None)
     def test_phase_identity_rejects_source_build_and_run_mismatches(self):
         for key in ("product_sha", "workflow_sha", "run_id", "run_attempt", "profile", "target", "toolchain"):
             with self.subTest(key=key):
@@ -7770,7 +8260,7 @@ class PhaseTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "64 KiB"):
             self.phases.write_bounded(self.root / "compressed-still-oversized.json", proof)
 
-    def phase_environment(self, native=None):
+    def phase_environment(self, native=None, rule_evidence=None):
         third = copy.deepcopy(self.native if native is None else native)
         third["lane"] = "c"
         third["assigned_targets"] = self.phases.partition(third["inventory"])["c"]
@@ -7780,6 +8270,8 @@ class PhaseTransferTests(unittest.TestCase):
         third["native_timer_parity_digest"] = None
         for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe"):
             third.pop(key, None)
+        if rule_evidence is not None:
+            third["rule_worker"] = copy.deepcopy(rule_evidence)
         self.third_hash = self.phases.write_bounded(self.root / "proof/native-c.json", third)
         return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",
                                       "M9E_NATIVE_B_RESULT": "success", "M9E_NATIVE_B_MANIFEST_SHA256": self.other_hash,
@@ -7789,7 +8281,7 @@ class PhaseTransferTests(unittest.TestCase):
 
     def install_third_lane_fixture(self):
         for proof in (self.native, self.other):
-            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS)):
+            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload")})):
                 ids = ["complete_c_witness_" + str(index)]
                 proof["inventory"].append({"crate": crate, "target": target, "ids": ids, "historical_excluded_ids": []})
                 proof["plan"]["required_native_targets"].setdefault(crate, []).append(target)
@@ -7810,7 +8302,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.install_third_lane_fixture()
         inventory = self.native["inventory"]
         assignment = self.phases.partition(inventory)
-        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS)
+        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload")})
         self.assertFalse(self.phases.LANE_B_TARGETS & self.phases.LANE_C_TARGETS)
         flat = [tuple(pair) for targets in assignment.values() for pair in targets]
         self.assertEqual(len(flat), len(set(flat)))
@@ -7863,14 +8355,14 @@ class PhaseTransferTests(unittest.TestCase):
                      for crate, target in sorted(self.phases.LANE_C_TARGETS)]
         inventory.append({"crate": "er-other", "target": "m9e_current_batch", "ids": [], "historical_excluded_ids": []})
         assignment = self.phases.partition(inventory)
-        self.assertEqual(len(assignment["c"]), 3)
+        self.assertEqual(len(assignment["c"]), 4)
         self.assertEqual(assignment["a"], [["er-other", "m9e_current_batch"]])
         self.assertEqual(assignment["b"], [])
         enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
                       for index, row in enumerate(inventory)]
         actual, owned = self.phases.inventory_and_assignment(enumerated, "c")
         self.assertEqual(owned, self.phases.partition(actual)["c"])
-        self.assertEqual(len(actual), 4)
+        self.assertEqual(len(actual), 5)
     def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
         for status in ("", "failure", "skipped", "cancelled"):
             with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):
