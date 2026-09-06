@@ -9465,5 +9465,130 @@ class CurrentCostBuildIdentityTests(unittest.TestCase):
                 self.cost.release_environment(self.repository, target, environment)
         self.assertFalse((self.root / "new").exists())
 
+
+class CurrentCostReleaseExecutionTests(unittest.TestCase):
+    def setUp(self):
+        import m9e_current_cost as cost
+        import time
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-release-execution-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.repository = self.root / "candidate"
+        for name in cost.BUILD_SOURCE_PATHS:
+            path = self.repository / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("bound fixture " + name + "\n")
+        (self.repository / "rust/Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
+        self.binding = cost.build_source_binding(self.repository, CANDIDATE)
+        self.identity = {"product_sha": CANDIDATE, "workflow_sha": CANDIDATE, "run_id": "42", "run_attempt": "1",
+                         "profile": "test", "features": "default", "target": "x86_64-unknown-linux-gnu"}
+        self.record = json.loads(CurrentCostRecordTests.PRODUCED)
+        self.line = cost.PREFIX + json.dumps(self.record, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+        self.content = {"bundle": {"bytes": self.record["bundle_bytes"], "sha256": "1" * 64},
+                        "manifest": {"bytes": 1219, "sha256": "2" * 64},
+                        "identity": self.record["content_identity"]}
+        self.environment = {"HOME": str(self.root / "home"), "CARGO_HOME": str(self.root / "cargo-home")}
+        self.deadline = time.monotonic() + 30
+        self.calls, self.targets = [], []
+        self.defect = None
+        self.serial = 0
+
+    def command(self, command, *, cwd, environment, output, seconds, byte_limit, global_deadline):
+        self.calls.append((command, str(cwd), dict(environment), seconds, byte_limit, global_deadline))
+        if command[0] == "cargo":
+            target = Path(environment["CARGO_TARGET_DIR"])
+            self.assertTrue(target.is_dir())
+            self.assertEqual(list(target.iterdir()), [])
+            self.targets.append(target)
+            binary = target / "release/deps/m9e_current_cost_probe-0123456789abcdef"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"source-bound fake executable; not run")
+            binary.chmod(0o700)
+            manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
+            artifact = {"reason": "compiler-artifact", "manifest_path": str(manifest), "features": [],
+                        "package_id": "path+" + manifest.parent.as_uri() + "#0.1.0",
+                        "target": {"name": self.cost.TARGET[1], "kind": ["test"], "crate_types": ["bin"],
+                                   "src_path": str(self.repository / self.cost.SOURCE)},
+                        "profile": {"opt_level": "3", "debug_assertions": False, "debuginfo": 0,
+                                    "overflow_checks": False, "test": True}, "executable": str(binary)}
+            raw = (json.dumps(artifact) + '\n' + json.dumps({"reason": "build-finished", "success": True}) + '\n').encode()
+        elif "--list" in command:
+            raw = (self.cost.TEST_ID + ": test\n").encode()
+            if self.defect == "binary":
+                Path(command[0]).write_bytes(b"changed after listing")
+        else:
+            self.assertIn("--exact", command)
+            if self.defect == "exit":
+                raise RuntimeError("simulated actual nonzero execution")
+            suffix = b"test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\n"
+            raw = b"running 1 test\n" + self.line + suffix
+            if self.defect == "duplicate-result":
+                raw += suffix
+            elif self.defect == "duplicate-record":
+                raw += self.line
+            elif self.defect == "zero-tests":
+                raw = raw.replace(b"1 passed", b"0 passed")
+            elif self.defect == "source":
+                (self.repository / self.cost.SOURCE).write_text("changed after execution\n")
+        output.write_bytes(raw)
+        return {"path": output, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(), "elapsed_seconds": 0.01}
+
+    def execute(self, **overrides):
+        self.serial += 1
+        diagnostics = self.root / ("diagnostics-" + str(self.serial))
+        diagnostics.mkdir()
+        kwargs = {"identity": self.identity, "source_binding": self.binding,
+                  "discovered_ids": [self.cost.TEST_ID], "global_deadline": self.deadline, **overrides}
+        with patch.object(self.cost, "run_bounded", side_effect=self.command), \
+                patch.object(self.cost, "read_content", return_value=self.content), \
+                patch.dict(os.environ, self.environment, clear=True):
+            return self.cost.execute_release(self.repository, self.root, diagnostics, **kwargs)
+
+    def test_cost_release_executes_one_owned_release_artifact_in_global_inventory_once(self):
+        output, proof = self.execute()
+        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(self.calls[0][0], ["cargo", "test", "--locked", "--release", "-p", "er-repro", "--test",
+                                          self.cost.TARGET[1], "--no-run", "--message-format=json"])
+        self.assertEqual(self.calls[1][0][1:], ["--list", "--format", "terse"])
+        self.assertEqual(self.calls[2][0][1:], [self.cost.TEST_ID, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"])
+        self.assertEqual([(call[3], call[4]) for call in self.calls], [(900, 16 << 20), (30, 16384), (600, 16384)])
+        self.assertTrue(all(call[5] == self.deadline for call in self.calls))
+        self.assertTrue(all(call[2]["CARGO_TARGET_DIR"] == str(self.targets[0]) for call in self.calls))
+        self.assertTrue(output.is_file())
+        self.assertFalse(self.targets[0].parent.exists())
+        self.assertEqual(proof["execution_profile"], "release")
+        self.assertEqual(proof["record"]["line"].encode(), self.line)
+        self.assertEqual(proof["tests"], {"executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+        self.assertEqual(proof["phase_identity_sha256"], hashlib.sha256(self.cost.encoded(self.identity)).hexdigest())
+        self.assertEqual(proof["source_binding_sha256"], hashlib.sha256(self.cost.encoded(self.binding)).hexdigest())
+        self.assertLessEqual(len(self.cost.encoded(proof)), 16384)
+
+    def test_cost_release_refuses_unbound_inventory_profile_host_and_deadline_before_build(self):
+        for overrides in ({"discovered_ids": []}, {"discovered_ids": [self.cost.TEST_ID] * 2},
+                          {"identity": {**self.identity, "profile": "release"}},
+                          {"identity": {**self.identity, "features": "extra"}},
+                          {"identity": {**self.identity, "target": "wasm32-unknown-unknown"}},
+                          {"source_binding": {}}, {"global_deadline": 0}, {"global_deadline": True}):
+            with self.assertRaises(RuntimeError):
+                self.execute(**overrides)
+            self.assertEqual(self.calls, [])
+            self.assertEqual(self.targets, [])
+
+    def test_cost_release_rejects_binary_and_source_changes_and_always_removes_owned_build(self):
+        for defect in ("binary", "source"):
+            self.defect = defect
+            with self.assertRaises(RuntimeError):
+                self.execute()
+            self.assertTrue(all(not target.parent.exists() for target in self.targets))
+        self.assertEqual(len(self.calls), 5, "changed listed binary must never execute")
+
+    def test_cost_release_rejects_nonzero_duplicate_results_records_and_zero_execution(self):
+        for defect in ("exit", "duplicate-result", "duplicate-record", "zero-tests"):
+            self.defect = defect
+            with self.assertRaises(RuntimeError):
+                self.execute()
+            self.assertFalse(self.targets[-1].parent.exists())
+
 if __name__ == "__main__":
     unittest.main()

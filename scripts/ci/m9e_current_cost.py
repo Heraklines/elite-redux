@@ -12,6 +12,7 @@ import re
 import selectors
 import signal
 import subprocess
+import tempfile
 import time
 import tomllib
 
@@ -446,3 +447,72 @@ def release_environment(repository, target_directory, inherited):
     environment["CARGO_TARGET_DIR"] = str(target_directory)
     return environment, {"settings": settings, "cargo_config_files": 0, "compiler_overrides": 0,
                          "target": "native-host", "features": "default", "profile": "release"}
+
+
+def encoded(value):
+    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def execute_release(repository, temporary, diagnostics, *, identity, source_binding, discovered_ids, global_deadline):
+    """Execute the sole globally discovered target once using a fresh release build.
+
+    The caller owns ordinary inventory/count accounting. This returns only after
+    exact one-test success, final executable/source/content verification and owned
+    temporary target cleanup. No binary is transferred to another phase.
+    """
+    repository = Path(repository).resolve()
+    temporary, diagnostics = Path(temporary).resolve(), Path(diagnostics).resolve()
+    if (identity.get("profile") != "test" or identity.get("features") != "default"
+            or identity.get("target") != "x86_64-unknown-linux-gnu"
+            or discovered_ids != [TEST_ID] or type(global_deadline) not in (int, float)
+            or not math.isfinite(global_deadline) or global_deadline <= time.monotonic()
+            or build_source_binding(repository, identity["product_sha"]) != source_binding):
+        fail("release execution candidate/global inventory binding")
+    content = read_content(repository)
+    logs = {}
+    with tempfile.TemporaryDirectory(prefix="m9e-current-release-", dir=temporary) as owned:
+        target = Path(owned).resolve() / "target"
+        target.mkdir(exist_ok=False)
+        environment, environment_binding = release_environment(repository, target, dict(os.environ))
+        def run(command, name, seconds, limit, cwd):
+            result = run_bounded(command, cwd=cwd, environment=environment,
+                                 output=diagnostics / ("current-cost-" + name + ".log"),
+                                 seconds=seconds, byte_limit=limit, global_deadline=global_deadline)
+            logs[name] = {key: result[key] for key in ("bytes", "sha256", "elapsed_seconds")}
+            return result["path"]
+        build = run(["cargo", "test", "--locked", "--release", "-p", TARGET[0], "--test", TARGET[1],
+                     "--no-run", "--message-format=json"], "build", 900, 16 << 20, repository / "rust")
+        records = [json.loads(line) for line in build.read_text().splitlines() if line.startswith("{")]
+        executable, artifact = discover_release(records, repository=repository, target_directory=target)
+        check_executable(executable, artifact)
+        listing = run([str(executable), "--list", "--format", "terse"], "list", 30, 16384, repository / "rust")
+        validate_listing(listing.read_bytes(), discovered_ids)
+        check_executable(executable, artifact)
+        output = run([str(executable), TEST_ID, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"],
+                     "execute", 600, 16384, repository / "rust/crates/er-repro")
+        raw = output.read_bytes()
+        if re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", raw) != [
+                (b"1", b"0", b"0", b"0", b"0")]:
+            fail("release target exact-one completion")
+        lines = [line for line in raw.splitlines(keepends=True) if line.startswith(PREFIX)]
+        if len(lines) != 1:
+            fail("release target sole measurement record")
+        parse_line(lines[0], architecture="x86_64", operating_system="linux",
+                   bundle_bytes=content["bundle"]["bytes"], content_identity=content["identity"])
+        check_executable(executable, artifact)
+        if (read_content(repository) != content
+                or build_source_binding(repository, identity["product_sha"]) != source_binding):
+            fail("release execution source/content conservation")
+        proof = {"schema_version": 1, "status": "passed", "execution_profile": "release",
+                 "target": list(TARGET), "test_id": TEST_ID,
+                 "phase_identity_sha256": hashlib.sha256(encoded(identity)).hexdigest(),
+                 "source_binding_sha256": hashlib.sha256(encoded(source_binding)).hexdigest(),
+                 "content": content, "artifact": artifact, "environment": environment_binding,
+                 "record": {"line": lines[0].decode("utf-8"), "bytes": len(lines[0]),
+                            "sha256": hashlib.sha256(lines[0]).hexdigest()},
+                 "logs": logs, "tests": {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}}
+        if len(encoded(proof)) > 16384:
+            fail("release execution proof exceeds 16 KiB")
+    if time.monotonic() > global_deadline:
+        fail("release evidence/cleanup completed after the native deadline")
+    return output, proof
