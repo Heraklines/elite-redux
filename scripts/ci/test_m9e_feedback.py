@@ -7198,5 +7198,104 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             title.bind_asset_files(output, binding, cohort, "1.97.1")
         subprocess_run.assert_not_called()
 
+
+    def title_normalization_fixture(self):
+        control = {"kind": "TITLE", "revision": 1, "owner_seat": 1,
+                   "action_context": {"authority_revision": 1, "menu_instance": 1, "operation_id": "bootstrap/title/1"},
+                   "menu": {"instance_id": 1, "control_id": "bootstrap/title/1", "selected_option_id": "bootstrap/title/new-game",
+                            "options": [{"option_id": "bootstrap/title/new-game"}, {"option_id": "bootstrap/title/existing-saves"}]}}
+        initial = {"lifecycle": {"kind": "BOOTSTRAP", "value": {"stage": "TITLE", "control": control,
+                    "pressed_keys": [], "menu_instance_high_water": 1, "seed": "owned seed", "catalog": {"save_slots": ["new-destination"]},
+                    "current_storage": {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}}},
+                   "replay_sequence": 0, "next_menu_instance_id": 2, "pending_platform": [], "pending_presentations": [],
+                   "storage_frontiers": [], "material_ledger": {"schema_version": 1, "next_authority_revision": 1, "records": []},
+                   "unrelated_core_evidence": {"sentinel": [1, 2, 3]}}
+        pending = copy.deepcopy(initial)
+        owner = pending["lifecycle"]["value"]
+        owner["stage"] = "EXISTING_SAVE_LOADING"
+        owner["control"].update({"kind": "SAVE", "revision": 40})
+        owner["menu_instance_high_water"] = 20
+        owner["current_storage"].update({"next_platform_request_id": 26, "slots": ["controlled-slot"],
+            "pending": {"request_id": 25, "kind": {"kind": "READ", "value": {"slot": "controlled-slot"}}}})
+        pending.update({"replay_sequence": 99, "next_menu_instance_id": 21, "pending_platform": [{"request_id": 25}]})
+        saved = {"schema_version": 2, "generation": 1, "state": {
+            "identities": {"next_platform_request_id": 5, "other_id": 91},
+            "active_run": {"party": ["opaque saved party"], "control": {"kind": "SAVE", "revision": 7,
+                "menu": {"instance_id": 3, "selected_option_id": "saved/write", "options": ["saved option"]},
+                "action_context": {"authority_revision": 7, "menu_instance": 3, "operation_id": "saved operation"}}},
+            "opaque_saved_rng": [17, 29]}}
+        return initial, pending, saved
+
+    def test_title_read_normalization_conserves_every_other_saved_and_live_field(self):
+        import m9e_title_storage as title
+        _, pending, saved = self.title_normalization_fixture()
+        before = copy.deepcopy((pending, saved))
+        expected = copy.deepcopy(pending)
+        state = copy.deepcopy(saved["state"])
+        state["identities"]["next_platform_request_id"] = 26
+        control = state["active_run"]["control"]
+        control["revision"] = 41
+        control["menu"]["instance_id"] = 21
+        control["action_context"].update({"authority_revision": 41, "menu_instance": 21})
+        expected.update({"lifecycle": {"kind": "ACTIVE", "value": state}, "replay_sequence": 100,
+                         "next_menu_instance_id": 22, "pending_platform": [],
+                         "storage_frontiers": [{"slot": "controlled-slot", "generation": 1}],
+                         "material_ledger": {"schema_version": 1, "next_authority_revision": 41, "records": []}})
+        self.assertEqual(title.normalized_title_read(pending, saved), expected)
+        self.assertEqual((pending, saved), before)
+        saved["state"]["active_run"]["control"]["revision"] = 80
+        saved["state"]["active_run"]["control"]["menu"]["instance_id"] = 90
+        saved["state"]["identities"]["next_platform_request_id"] = 100
+        loaded = title.normalized_title_read(pending, saved)
+        self.assertEqual(loaded["lifecycle"]["value"]["active_run"]["control"]["revision"], 81)
+        self.assertEqual(loaded["next_menu_instance_id"], 92)
+        self.assertEqual(loaded["lifecycle"]["value"]["identities"]["next_platform_request_id"], 100)
+
+    def test_title_cancel_normalization_accounts_for_both_physical_replay_steps(self):
+        import m9e_title_storage as title
+        initial, pending, _ = self.title_normalization_fixture()
+        before = copy.deepcopy((initial, pending))
+        expected = copy.deepcopy(pending)
+        owner = copy.deepcopy(initial["lifecycle"]["value"])
+        owner["current_storage"]["next_platform_request_id"] = 26
+        owner["menu_instance_high_water"] = 21
+        owner["control"]["revision"] = 41
+        owner["control"]["menu"].update({"instance_id": 21, "control_id": "bootstrap/title/41"})
+        owner["control"]["action_context"].update({"authority_revision": 41, "menu_instance": 21, "operation_id": "bootstrap/title/41"})
+        expected.update({"lifecycle": {"kind": "BOOTSTRAP", "value": owner}, "replay_sequence": 101,
+                         "next_menu_instance_id": 22, "pending_platform": []})
+        result = title.normalized_title_cancel(pending, initial)
+        self.assertEqual(result, expected)
+        self.assertEqual((initial, pending), before)
+        self.assertEqual(result["replay_sequence"] - pending["replay_sequence"], 2)
+        self.assertEqual(result["lifecycle"]["value"]["current_storage"]["pending"], None)
+        self.assertEqual(result["unrelated_core_evidence"], pending["unrelated_core_evidence"])
+
+    def test_title_normalization_rejects_overflow_wrong_owner_and_unreleased_input(self):
+        import m9e_title_storage as title
+        initial, pending, saved = self.title_normalization_fixture()
+        for target in ("revision", "menu", "replay"):
+            with self.subTest(target=target):
+                bad = copy.deepcopy(pending)
+                if target == "revision": bad["lifecycle"]["value"]["control"]["revision"] = (1 << 53) - 1
+                if target == "menu":
+                    bad["next_menu_instance_id"] = (1 << 53) - 1
+                    bad["lifecycle"]["value"]["menu_instance_high_water"] = (1 << 53) - 1
+                if target == "replay": bad["replay_sequence"] = (1 << 53) - 1
+                with self.assertRaisesRegex(RuntimeError, "allocator overflows"):
+                    title.normalized_title_read(bad, saved)
+                with self.assertRaisesRegex(RuntimeError, "allocator overflows"):
+                    title.normalized_title_cancel(bad, initial)
+        bad = copy.deepcopy(pending)
+        bad["pending_platform"][0]["request_id"] = 24
+        with self.assertRaisesRegex(RuntimeError, "exact live owner"):
+            title.normalized_title_read(bad, saved)
+        with self.assertRaisesRegex(RuntimeError, "released owner/template"):
+            title.normalized_title_cancel(bad, initial)
+        bad = copy.deepcopy(pending)
+        bad["lifecycle"]["value"]["pressed_keys"] = [{"kind": "ESCAPE"}]
+        with self.assertRaisesRegex(RuntimeError, "released owner/template"):
+            title.normalized_title_cancel(bad, initial)
+
 if __name__ == "__main__":
     unittest.main()

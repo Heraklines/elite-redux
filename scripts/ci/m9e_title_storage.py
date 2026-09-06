@@ -151,3 +151,79 @@ def bind_asset_files(output, binding, cohort, toolchain):
         if len(emitted) != item["bytes"] or sha(emitted) != item["sha256"]:
             raise RuntimeError("Title retirement emitted asset bytes differ")
     return evidence, fixture_raw
+
+
+def normalized_title_read(pending, save):
+    """Independent exact saved-state normalization at the Title -> Active edge."""
+    import copy
+    if (pending["lifecycle"]["kind"] != "BOOTSTRAP" or save["schema_version"] != 2
+            or save["generation"] != 1):
+        raise RuntimeError("Title READ requires its current saved-state boundary")
+    owner = pending["lifecycle"]["value"]
+    storage = owner["current_storage"]
+    owned = storage["pending"]
+    if (owned is None or owned["kind"] != {"kind": "READ", "value": {"slot": "controlled-slot"}}
+            or len(pending["pending_platform"]) != 1
+            or pending["pending_platform"][0]["request_id"] != owned["request_id"]):
+        raise RuntimeError("Title READ lacks its exact live owner")
+    expected = copy.deepcopy(pending)
+    state = copy.deepcopy(save["state"])
+    control = state["active_run"]["control"]
+    revision = max(owner["control"]["revision"], control["revision"]) + 1
+    instance = max(pending["next_menu_instance_id"], control["menu"]["instance_id"] + 1)
+    platform = max(state["identities"]["next_platform_request_id"], storage["next_platform_request_id"])
+    replay = pending["replay_sequence"] + 1
+    if not all(integer(value, 1) for value in (revision, instance, instance + 1, platform, replay)):
+        raise RuntimeError("Title READ normalization allocator overflows")
+    state["identities"]["next_platform_request_id"] = platform
+    control["revision"] = revision
+    control["menu"]["instance_id"] = instance
+    control["action_context"]["authority_revision"] = revision
+    control["action_context"]["menu_instance"] = instance
+    expected["lifecycle"] = {"kind": "ACTIVE", "value": state}
+    expected["material_ledger"] = {"schema_version": 1, "next_authority_revision": revision, "records": []}
+    expected["next_menu_instance_id"] = instance + 1
+    expected["pending_platform"] = []
+    expected["storage_frontiers"] = [{"slot": "controlled-slot", "generation": 1}]
+    expected["replay_sequence"] = replay
+    return expected
+
+
+def normalized_title_cancel(pending, initial):
+    """Full released Cancel reference: one accepted KeyDown, then one KeyUp."""
+    import copy
+    if pending["lifecycle"]["kind"] != "BOOTSTRAP" or initial["lifecycle"]["kind"] != "BOOTSTRAP":
+        raise RuntimeError("Title Cancel is not a bootstrap boundary")
+    before = pending["lifecycle"]["value"]
+    template = initial["lifecycle"]["value"]
+    owned = before["current_storage"]["pending"]
+    if (template["stage"] != "TITLE" or template["control"]["kind"] != "TITLE"
+            or template["pressed_keys"] or before["pressed_keys"] or owned is None
+            or owned["kind"]["kind"] not in ("LIST", "READ")
+            or len(pending["pending_platform"]) != 1
+            or pending["pending_platform"][0]["request_id"] != owned["request_id"]
+            or [row["option_id"] for row in template["control"]["menu"]["options"]]
+                != ["bootstrap/title/new-game", "bootstrap/title/existing-saves"]):
+        raise RuntimeError("Title Cancel has no exact released owner/template")
+    revision = before["control"]["revision"] + 1
+    instance = before["menu_instance_high_water"] + 1
+    replay = pending["replay_sequence"] + 2
+    if not all(integer(value, 1) for value in (revision, instance, instance + 1, replay)):
+        raise RuntimeError("Title Cancel normalization allocator overflows")
+    owner = copy.deepcopy(template)
+    owner["current_storage"].update({"pending": None, "slots": [], "missing_slot": None,
+        "next_platform_request_id": before["current_storage"]["next_platform_request_id"]})
+    owner["menu_instance_high_water"] = instance
+    control = owner["control"]
+    control["revision"] = revision
+    control["menu"]["instance_id"] = instance
+    control["menu"]["control_id"] = f"bootstrap/title/{revision}"
+    control["menu"]["selected_option_id"] = "bootstrap/title/new-game"
+    control["action_context"].update({"authority_revision": revision, "menu_instance": instance,
+                                    "operation_id": f"bootstrap/title/{revision}"})
+    expected = copy.deepcopy(pending)
+    expected["lifecycle"] = {"kind": "BOOTSTRAP", "value": owner}
+    expected["next_menu_instance_id"] = instance + 1
+    expected["pending_platform"] = []
+    expected["replay_sequence"] = replay
+    return expected
