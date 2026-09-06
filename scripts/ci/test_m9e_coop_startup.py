@@ -188,6 +188,20 @@ class CoopPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "bounded"):
             coop.validate_entry(retained, identity, binding, self.root)
 
+    def test_balanced_partition_preserves_whole_query_and_coop_targets(self):
+        import m9e_phases as phases
+        rows = [{"crate": crate, "target": target, "ids": list(ids), "historical_excluded_ids": []}
+                for (crate, target), ids in ((coop.ENTRY_TARGET, coop.ENTRY_IDS), (coop.KERNEL_TARGET, coop.KERNEL_IDS),
+                    *phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS))]
+        before = copy.deepcopy(rows)
+        assignment = phases.partition(rows)
+        self.assertEqual(rows, before)
+        self.assertEqual(assignment["c"], [list(phases.STATE_QUERY_TARGET)])
+        self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
+        self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(coop.KERNEL_TARGET), list(phases.CONTROL_QUERY_TARGET)])
+        self.assertEqual(len({tuple(pair) for targets in assignment.values() for pair in targets}), len(rows))
+        self.assertEqual(sum(len(row["ids"]) for row in rows), 10)
+
     def test_platform_rejects_foreign_assets_incomplete_journeys_and_changed_material(self):
         proof, native = self.platform_fixture()
         coop.validate_platform(proof, native, self.root)
