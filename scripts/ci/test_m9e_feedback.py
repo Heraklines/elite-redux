@@ -4528,7 +4528,10 @@ class FeedbackTests(unittest.TestCase):
         source.unlink()
         with self.assertRaisesRegex(RuntimeError, "storage source binding path"):
             self.feedback.plan()
-        self.assertEqual(self.commands, [])
+        # Each rejected plan checks its comparison object before path/policy
+        # validation. No fetch, formatter, build, lint or test may run.
+        self.assertEqual(self.commands, [["git", "cat-file", "-e", BASE]] * 14)
+        self.assertEqual(self.events, [])
         self.assertEqual(self.executed, [])
 
     def test_current_storage_node_requires_all_five_exact_nonpending_source_identities(self):

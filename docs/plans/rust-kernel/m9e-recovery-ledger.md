@@ -2569,3 +2569,19 @@ This RTC cut is unqualified until its own full remote run passes. It does not
 claim reconnect, proposal retries/expiry, storage composition, full co-op recovery
 or M9 completion. Prepared snapshot optimization, proposal ownership, READ/IDB and
 Title work remain separate successors and require actual source/evidence refresh.
+
+## RTC preflight correction
+
+78cfa6a3efc05d880c59142db8f0223fe397cc86 / run34007571678 failed before
+native execution:182 harness tests ran,181 passed and one dormant storage planner
+negative test failed. The planner correctly rejected all10 mixed path cases,
+three policy identity changes and one missing source; the final assertion wrongly
+expected no subprocess calls, although each plan first checks its comparison Git
+object. Require exactly14 read-only git cat-file -e BASE calls, zero orchestration
+events and zero executed binaries. This still rejects fetch, format, build, lint
+or runtime commands. Production, policy, test identities and proof caps are unchanged.
+
+Native selected/executed counts are zero; platform was skipped and aggregate
+failed. RTC remains unqualified and1eead414/run34006023505 remains the comparison
+baseline. A compact9981444398 (inspected ZIP3203) provided summary1358 and bounded
+failure12125 bytes. All validation for the correction runs remotely.
