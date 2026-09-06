@@ -252,10 +252,10 @@ impl BattleContentPackV2 {
         let mut previous_subject: Option<&er_types::mechanics::MechanicSourceId> = None;
         for entry in &self.classifications.0 {
             entry.validate_shape()?;
-            if let Some(previous) = previous_subject
-                && entry.subject <= *previous
-            {
-                return Err(BattlePackLoadError::DuplicateClassification);
+            if let Some(previous) = previous_subject {
+                if entry.subject <= *previous {
+                    return Err(BattlePackLoadError::DuplicateClassification);
+                }
             }
             previous_subject = Some(&entry.subject);
             if entry.kind == ClassificationKind::Compiled {
@@ -314,14 +314,14 @@ impl BattleContentPackV2 {
             let Some(id) = id else {
                 continue;
             };
-            if let Some(previous) = previous
-                && id <= previous
-            {
-                return Err(BattlePackLoadError::DefinitionsOutOfOrder {
-                    kind,
-                    after: previous,
-                    found: id,
-                });
+            if let Some(previous) = previous {
+                if id <= previous {
+                    return Err(BattlePackLoadError::DefinitionsOutOfOrder {
+                        kind,
+                        after: previous,
+                        found: id,
+                    });
+                }
             }
             previous = Some(id);
         }
