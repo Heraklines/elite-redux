@@ -2456,3 +2456,14 @@ its strict mirrored fixture (58 paths). All165 harness declarations,77 mandatory
 nonempty targets, exact native IDs, selected reverse compilation, Clippy,
 Worker/Wasm/browser controls, proof caps and mutation obligations remain.
 No local compilation, formatting, test, browser or installation was run.
+
+### Include both module-relocation source paths in cumulative feedback
+
+e2d902e6404b8578d6397f2043f2756c674423cf / run34004243886 failed planning
+before compilation or execution. The relocation registered the new sibling file
+but omitted its changed existing lib.rs from the exact companion list. Add that
+one existing source path to all three strict registry mirrors:59 companions;
+all165 harness declarations,77 required targets and existing exact IDs remain.
+No classifier relaxation, product change, test omission or baseline advance.
+Only6058-byte summary and4097-byte failure were retrieved from inspected3060-byte
+compact9980447478. Native A diagnostics7685 bytes remain remote. No local workload.

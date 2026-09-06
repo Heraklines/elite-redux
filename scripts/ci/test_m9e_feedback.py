@@ -2712,6 +2712,7 @@ class FeedbackTests(unittest.TestCase):
             "rust/crates/er-testkit/tests/m6_move_parity.rs",
             "rust/crates/er-testkit/tests/m6_species_form_parity.rs",
             "rust/crates/er-testkit/tests/m6_properties.rs",
+            "rust/crates/er-agent-protocol/src/lib.rs",
             "rust/crates/er-agent-protocol/src/ingress_diagnostic_tests.rs",
         ]
         self.assertEqual(policy["lint_repair_paths"], expected)
