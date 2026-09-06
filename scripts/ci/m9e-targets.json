@@ -8,7 +8,8 @@
       "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs",
       "rust/crates/er-kernel/tests/m9e_coop_v7.rs",
       "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs",
-      "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"
+      "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts",
+      "test/browser/rust-browser/m9e-v7-corrective.spec.ts"
     ],
     "trigger_paths": ["rust/crates/er-kernel/src/current_proposal_v7.rs", "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs"],
     "exact_test_ids": {

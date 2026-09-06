@@ -4969,6 +4969,24 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
         self.assertNotIn(("er-kernel", "m9e_current_proposal_v7"), self.feedback.WORKER_BOUND_TARGETS)
 
+    def test_owner_in_page_receipt_companion_is_bound_and_cannot_expand_or_disappear(self):
+        owner = self.configure_owner_scope()
+        companion = "test/browser/rust-browser/m9e-v7-corrective.spec.ts"
+        self.assertIn(companion, owner.OWNER_PATHS)
+        self.changed = [owner.OWNER_TRIGGERS[0], companion]
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_current_proposal"])
+        self.assertIn(companion, selection["owner_source_binding"]["source_hashes"])
+        self.assertEqual(len(selection["owner_source_binding"]["source_hashes"]), 9)
+        self.changed.append("test/browser/rust-browser/m9e-v7-corrective-other.spec.ts")
+        with self.assertRaisesRegex(RuntimeError, "exclusive mixed"):
+            self.feedback.plan()
+        self.changed = [owner.OWNER_TRIGGERS[0], companion]
+        self.config["current_proposal_focus"]["paths"].remove(companion)
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        with self.assertRaisesRegex(RuntimeError, "policy identities"):
+            self.feedback.plan()
+
     def test_owner_installed_preserves_paired_ai_snapshot_scope_and_exact_obligations(self):
         owner = self.configure_owner_scope()
         self.configure_ai_snapshot_validation_scope()

@@ -2759,3 +2759,23 @@ native lane assignment, and all other targets retain their prior relative order.
 Add a harness regression covering same-name decoys, inherited AI priority, input
 conservation and complete unchanged target payloads. The expected harness total
 becomes202, subject to actual remote execution. No local Python was executed.
+
+Ownerdb1e339f/run34016135794 completed both native lanes: A599/B20,619 total,
+zero skipped/failed;67 inventory targets25 mandatory21 exact maps. Both mutants
+were detected and exact source restored. A63328 SHA
+bfff71634323f600949bf29a6e229d45edb6f9a34f8f6453e0d1f569dbd236fe;
+B59583 SHA43277912f703ab5ed7f11d0a099b568cebd3a4a6fc5a8047ead4f105c5610ae1.
+Native CLI SHA agrees across lanes:f6de8e466560503c455d1cec4f88496ec296f2ce44c06db187a6971bb430e5b1.
+Platform passed Wasm checks, then existing in-page browser tests had1pass/1fail:
+the cooperative fixture treated the new receipt as bare material and read an
+undefined value.presentation. Named3426byte failure fromcompact9984332539ZIP1185;
+large platform diagnostics2111950 and browser assets4654685 remain remote.
+Update only the in-page witness to require the bounded exact proposal receipt,
+decode its canonical lowercase material hex and preserve all existing actual
+presentation/convergence/duplicate assertions. Also observe actual pending owner
+and its retirement after delivery. Bind this exact companion in the owner source
+policy/helper (now9 paths), and add a harness check rejecting an omitted companion
+or an unrelated neighboring spec. Expected harness203; native/browser IDs unchanged.
+The separate solo Worker witness emits local authority raw material and needs no
+receipt adaptation. RTC already checks receipt bytes independently. Broad M9 and
+this exact owner checkpoint remain unqualified until all phases pass.
