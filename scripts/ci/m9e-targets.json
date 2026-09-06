@@ -670,6 +670,15 @@
     ]
   },
   "exact_test_ids": {
+      "er-kernel:m9e_game_kernel_v7": [
+        "raw_keys_complete_natural_start_and_install_serialized_v6_state",
+        "nonterminal_battle_progresses_to_next_wave",
+        "final_wave_victory_terminates_the_run",
+        "natural_solo_battle_reaches_terminal_using_only_physical_keys",
+        "authority_ai_can_choose_a_legal_enemy_switch",
+        "held_action_cannot_cross_bootstrap_menu_instance",
+        "gamepad_buttons_drive_bootstrap_and_active_controls"
+      ],
     "er-kernel:m9e_timers_v7": ["transport_resume_preserves_unrelated_pause_reasons_and_clock_classes","staged_transport_generation_remains_paused_and_rejections_are_atomic","held_navigation_repeats_at_250ms_with_real_cursor_effects","snapshot_resume_and_time_chunking_preserve_ordered_consequences","release_blur_text_focus_and_duplicate_sources_cancel_or_suppress_repeats","menu_transition_retires_repeat_and_stale_snapshot_ownership_is_rejected","pause_reasons_preserve_remaining_delay_until_last_reason_is_removed","unequal_and_tied_deadlines_dispatch_in_chronological_timer_order","exhausted_allocator_and_consequence_budget_fail_atomically","invalid_directional_keyboard_and_gamepad_presses_preserve_full_snapshot","unsupported_later_timer_rolls_back_earlier_real_navigation"],
     "er-batch:m9e_current_batch": [
       "current_batch_natural_controls_and_held_time_return_ordered_typed_results",
@@ -817,15 +826,6 @@
     "execute": {"er-types": ["*"], "er-kernel": ["*"], "er-state": ["*"], "er-protocol": ["*"], "er-agent-protocol": ["*"], "er-env": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
     "required_targets": {"er-types": ["m9e_menu_validation"], "er-cli": ["m9e_current_reload", "m9e_current_entry"], "er-kernel-worker": ["current_process_v2"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2"], "er-web": ["m9e_host_v2"], "er-wasm": ["m9e_parity"], "er-kernel": ["m9e_timers_v7", "m9e_domain_journeys_v7", "m9e_coop_v7", "m9e_game_kernel_v7", "m9e_snapshot_v7"]},
     "exact_test_ids": {
-      "er-kernel:m9e_game_kernel_v7": [
-        "raw_keys_complete_natural_start_and_install_serialized_v6_state",
-        "nonterminal_battle_progresses_to_next_wave",
-        "final_wave_victory_terminates_the_run",
-        "natural_solo_battle_reaches_terminal_using_only_physical_keys",
-        "authority_ai_can_choose_a_legal_enemy_switch",
-        "held_action_cannot_cross_bootstrap_menu_instance",
-        "gamepad_buttons_drive_bootstrap_and_active_controls"
-      ],
       "er-types:m9e_menu_validation": ["visible_graph_allows_disabled_nodes_unsorted_storage_and_hidden_duplicate_ids", "hidden_and_missing_selection_or_edge_endpoints_reject_before_cancel_and_duplicates", "option_action_and_layout_errors_precede_visibility_even_for_hidden_options", "cancel_requires_visible_enabled_option_before_logical_duplicate_validation", "visible_membership_does_not_hide_duplicate_navigation_keys"],
       "er-cli:m9e_current_reload": ["actual_worker_cli_reload_replays_held_timer_tail_and_preserves_failed_ticket", "actual_worker_cli_rejects_bad_artifacts_then_forks_and_restores"],
       "er-cli:m9e_current_entry": ["normal_new_run_resume_and_simulate_use_current_session_events", "normal_commands_report_v2_content_and_reject_historical_state_injection", "public_agent_natural_start_owns_v7_content_and_raw_controls", "public_agent_rejects_old_snapshot_schema_without_replacing_current_session", "public_agent_fork_time_restore_and_close_preserve_current_session_identity", "public_agent_rejected_external_results_do_not_commit_partial_state", "current_session_rolls_back_when_adapter_completion_rejects"],
