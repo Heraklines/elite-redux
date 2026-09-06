@@ -772,7 +772,12 @@ def plan():
     product_changes = [path for path in changed if path not in (HELPER_PATH, "scripts/ci/m9e_title_storage.py") and path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
     import m9e_current_cost as cost
-    cost_session = cost.select_scope(config, product_changes, ROOT)
+    from m9e_rulechange import RULE_TEST_SOURCE
+    # These two independently established witnesses have separate owning jobs.
+    # Map their exact pair explicitly; additional product paths still fail the
+    # existing isolated-scope admission rules and neither obligation is removed.
+    cost_rule_session = len(product_changes) == 2 and set(product_changes) == {cost.SOURCE, RULE_TEST_SOURCE}
+    cost_session = cost.select_scope(config, [cost.SOURCE] if cost_rule_session else product_changes, ROOT)
     from m9e_phases import STATE_QUERY_PATHS, STATE_QUERY_TARGET, STATE_QUERY_TEST_IDS, STATE_QUERY_IDENTITIES
     state_query_focus = config.get("current_state_query_focus", {})
     if state_query_focus and (state_query_focus.get("paths") != STATE_QUERY_PATHS
@@ -858,7 +863,7 @@ def plan():
     if rule_focus and rule_focus.get("paths") != [RULE_TEST_SOURCE]:
         raise RuntimeError("rulechange source policy must contain the single exact test path")
     rule_changed = RULE_TEST_SOURCE in product_changes
-    rule_session = rule_changed and all(path == RULE_TEST_SOURCE for path in product_changes)
+    rule_session = rule_changed and (cost_rule_session or all(path == RULE_TEST_SOURCE for path in product_changes))
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)

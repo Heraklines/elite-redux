@@ -6424,6 +6424,10 @@ class FeedbackTests(unittest.TestCase):
                               *phases.STATE_QUERY_IDENTITIES.items()):
             self.assertEqual(selection["required_native_test_ids"][":".join(target)], names)
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 14)
+        for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
+            self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
+        self.assertEqual(self.config, previous)
+        self.assertEqual(self.executed, [])
         self.assertEqual(selection["title_storage_binding"], title.source_binding(self.root, CANDIDATE))
         for identity, names in self.feedback.TITLE_STORAGE_IDS.items():
             self.assertEqual(selection["required_native_test_ids"][identity], names)
@@ -6783,10 +6787,33 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["timer_mutant"], previous["timer_focus"]["mutant"])
         self.assertEqual(selection["replica_mutant"], previous["timer_focus"]["replica_mutant"])
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 14)
-        for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
-            self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
-        self.assertEqual(self.config, previous)
-        self.assertEqual(self.executed, [])
+
+    def test_exact_cost_and_rule_pair_preserves_both_owners_and_every_existing_obligation(self):
+        cost, phases, binding = self.configure_cost_scope()
+        cost_only = self.feedback.plan()
+        rule, policy, _, _, _ = rule_fixture(self.root)
+        for changed in ([cost.SOURCE, rule.RULE_TEST_SOURCE], [rule.RULE_TEST_SOURCE, cost.SOURCE]):
+            self.changed = changed
+            selection = self.feedback.plan()
+            self.assertTrue(selection["current_cost_probe_focus"])
+            self.assertTrue(selection["requires_current_cost_probe"])
+            self.assertEqual(selection["current_cost_source_binding"], binding)
+            self.assertEqual(selection["rule_worker"], policy)
+            self.assertEqual(selection["required_native_test_ids"],
+                             {**cost_only["required_native_test_ids"], "er-cli:" + rule.RULE_TARGET: [rule.RULE_TEST]})
+            for key, value in cost_only.items():
+                if key.startswith("requires_") or key in ("timer_mutant", "replica_mutant", "ledger_mutant"):
+                    self.assertEqual(selection[key], value, key)
+            for crate, targets in cost_only["required_native_targets"].items():
+                expected = targets + ([rule.RULE_TARGET] if crate == "er-cli" else [])
+                self.assertEqual(selection["required_native_targets"][crate], expected)
+            assignment = phases.partition([{"crate": crate, "target": target, "ids": [test], "historical_excluded_ids": []}
+                                          for crate, target, test in ((*cost.TARGET, cost.TEST_ID), ("er-cli", rule.RULE_TARGET, rule.RULE_TEST))])
+            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]]})
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml", "unmapped.json"):
+            self.changed = [cost.SOURCE, rule.RULE_TEST_SOURCE, extra]
+            with self.subTest(extra=extra), self.assertRaises(RuntimeError):
+                self.feedback.plan()
 
     def test_cost_scope_rejects_mixed_products_missing_source_and_mutated_policy(self):
         cost, _, _ = self.configure_cost_scope()
