@@ -36,6 +36,7 @@ OWNER_PATHS = [
     "rust/crates/er-kernel/tests/m9e_coop_v7.rs",
     "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs",
     "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts",
+    "test/browser/rust-browser/m9e-v7-corrective.spec.ts",
 ]
 OWNER_TRIGGERS = [OWNER_PATHS[0], OWNER_PATHS[4]]
 TARGET = "er-kernel:m9e_current_proposal_v7"
