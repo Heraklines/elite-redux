@@ -18,7 +18,7 @@ fn frozen_semantic_catalog_loads_and_validates() {
     // RNG-site behavior units are included in the unit list.
     assert_eq!(catalog.rng_sites.len(), 273);
     assert_eq!(
-        u64::try_from(catalog.behavior_units.len()).expect("catalog unit count fits u64"),
+        u64::try_from(catalog.behavior_units.len()).unwrap(),
         catalog.declared_behavior_unit_total()
     );
     assert_eq!(
@@ -54,9 +54,8 @@ fn wrong_schema_version_fails_closed() {
     let mut value: serde_json::Value =
         serde_json::from_slice(&frozen_catalog_bytes()).expect("fixture is valid JSON");
     value["schema_version"] = serde_json::json!(99);
-    let error =
-        SemanticCatalogV1::from_bytes(&serde_json::to_vec(&value).expect("fixture encodes"))
-            .expect_err("schema version mismatch must fail");
+    let error = SemanticCatalogV1::from_bytes(&serde_json::to_vec(&value).unwrap())
+        .expect_err("schema version mismatch must fail");
     assert_eq!(
         error,
         CatalogLoadError::SemanticSchemaVersion {

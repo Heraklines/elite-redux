@@ -15,10 +15,6 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::current_proposal_v7::{
-    CurrentProposalOwnerSnapshotV1, validate_current_owner_snapshot_v1,
-    validate_current_proposal_quiescence_v1,
-};
 use crate::game_kernel_v7::{NAVIGATION_REPEAT_INTERVAL_MS_V7, navigation_button_v7};
 use crate::snapshot::{
     InputRouterSnapshotV2, KernelSchedulerSnapshotV2, PhysicalInputSourceV2,
@@ -86,8 +82,6 @@ pub struct CoreGameKernelSnapshotV7 {
     pub lifecycle: GameKernelLifecycleSnapshotV7,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub private_battle_control: Option<PrivateBattleControlSnapshotV7>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
     pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
@@ -168,40 +162,9 @@ impl CoreGameKernelSnapshotV7 {
                     || !self.input_router.held_buttons.is_empty()
                     || !self.input_router.locks.is_empty()
                     || !self.input_router.repeats.is_empty()
-                    || (bootstrap.current_storage.is_none() && !self.pending_platform.is_empty())
+                    || !self.pending_platform.is_empty()
                 {
                     return Err(SnapshotV7Error::Invalid);
-                }
-                if let Some(storage) = &bootstrap.current_storage {
-                    if self.protocol.is_some()
-                        || self.authority_ai.is_none()
-                        || self.scheduler.disposed
-                        || !self.storage_frontiers.is_empty()
-                        || self.material_ledger
-                            != AppliedGameMaterialLedgerV1::new(safe_one())
-                                .map_err(|_| SnapshotV7Error::Invalid)?
-                        || !self.scheduler.timers.is_empty()
-                        || !self.scheduler.pauses.is_empty()
-                        || !self.pending_presentations.is_empty()
-                        || !self.input_router.suppressed_printable_keys.is_empty()
-                        || self.next_menu_instance_id.get().get()
-                            != bootstrap
-                                .menu_instance_high_water
-                                .get()
-                                .get()
-                                .checked_add(1)
-                                .ok_or(SnapshotV7Error::Invalid)?
-                    {
-                        return Err(SnapshotV7Error::Invalid);
-                    }
-                    match (&storage.pending, bootstrap.current_storage_effect()) {
-                        (None, None) if self.pending_platform.is_empty() => {}
-                        (Some(owner), Some(effect))
-                            if self.pending_platform.len() == 1
-                                && self.pending_platform[0].request_id == owner.request_id
-                                && self.pending_platform[0].effect == effect => {}
-                        _ => return Err(SnapshotV7Error::Invalid),
-                    }
                 }
             }
             GameKernelLifecycleSnapshotV7::Active(state) => {
@@ -260,7 +223,6 @@ impl CoreGameKernelSnapshotV7 {
                 }
             }
         }
-        validate_current_owner_snapshot_v1(self, content).map_err(|_| SnapshotV7Error::Invalid)?;
         if current_menu_instance(&self.lifecycle)
             .is_some_and(|instance| instance >= self.next_menu_instance_id)
         {
@@ -338,8 +300,6 @@ impl CoreGameKernelSnapshotV7 {
         {
             return Err(SnapshotV7Error::Migration);
         }
-        validate_current_proposal_quiescence_v1(source.protocol.as_ref(), &source.scheduler)
-            .map_err(|_| SnapshotV7Error::Migration)?;
         let next_menu_instance_id = next_menu_instance_from_v6(&source)?;
         let state = GameStateV6::migrate_from_v5(source.game_state, content.identity().clone())
             .map_err(|_| SnapshotV7Error::Migration)?;
@@ -368,7 +328,6 @@ impl CoreGameKernelSnapshotV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
             private_battle_control: None,
-            current_proposal: None,
             input_router: source.input_router,
             scheduler: source.scheduler,
             protocol: source.protocol,
