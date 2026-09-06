@@ -5201,6 +5201,48 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(timer.call_args_list[-1].args, (owner.signal.ITIMER_REAL, 0))
             self.assertEqual(handler.call_args_list[-1].args, (owner.signal.SIGALRM, "previous"))
 
+    def test_owner_verified_wheel_empty_marker_keeps_exact_byte_checks(self):
+        import m9e_current_proposal as owner
+        import zipfile
+        members = {"blake3/__init__.py": b"# synthetic installer fixture\n", "blake3/py.typed": b""}
+        record = "".join(name + ",sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+                         + "," + str(len(data)) + "\n" for name, data in members.items())
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w") as archive:
+            for name, data in members.items():
+                archive.writestr(name, data)
+            archive.writestr("blake3-1.0.8.dist-info/RECORD", record + "blake3-1.0.8.dist-info/RECORD,,\n")
+        raw = payload.getvalue()
+        wheel = {**owner.WHEEL, "bytes": len(raw), "sha256": owner.sha(raw)}
+        class Response(io.BytesIO):
+            status = 200
+            def geturl(self):
+                return wheel["url"]
+        for mutation in (None, "empty-module", "nonempty-marker"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(dir=self.root) as temporary:
+                work = Path(temporary)
+                def install(args, **kwargs):
+                    target = Path(args[args.index("--target") + 1])
+                    for name, data in members.items():
+                        path = target / name
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(b"" if mutation == "empty-module" and name.endswith(".py") else
+                                         b"changed" if mutation == "nonempty-marker" and name.endswith("py.typed") else data)
+                    return SimpleNamespace(returncode=0)
+                with patch.object(owner, "WHEEL", wheel), patch.object(owner.urllib.request, "build_opener") as opener, \
+                        patch.object(owner.subprocess, "run", side_effect=install), \
+                        patch.object(owner.importlib, "import_module", side_effect=RuntimeError("verified files reached import")) as imported:
+                    opener.return_value.open.return_value = Response(raw)
+                    expected = "verified files reached import" if mutation is None else (
+                        "regular file byte bound" if mutation == "empty-module" else "installed provider differs")
+                    with self.assertRaisesRegex(RuntimeError, expected):
+                        owner.install_provider(work, self.full)
+                    self.assertEqual(imported.call_count, 1 if mutation is None else 0)
+                marker = work / "site/blake3/py.typed"
+                marker.write_bytes(b"")
+                with self.assertRaisesRegex(RuntimeError, "regular file byte bound"):
+                    owner.bounded_file(marker, work, 16 << 20)
+
     def test_owner_dependency_is_platform_required_only(self):
         import m9e_current_proposal as owner
         with patch.object(owner.urllib.request, "build_opener") as network, patch.object(owner.subprocess, "run") as install:

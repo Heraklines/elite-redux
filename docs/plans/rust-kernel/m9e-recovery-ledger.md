@@ -2779,3 +2779,26 @@ or an unrelated neighboring spec. Expected harness203; native/browser IDs unchan
 The separate solo Worker witness emits local authority raw material and needs no
 receipt adaptation. RTC already checks receipt bytes independently. Broad M9 and
 this exact owner checkpoint remain unqualified until all phases pass.
+
+Owner3edda186/run34017743908 passed both native lanes but platform rejected a
+regular file byte bound while preparing the independent receipt provider. Compact
+platform9984871581ZIP626: failure39 bytes; summary532 bytes. Existing in-page,
+Worker, codec and Wasm steps completed before the provider failure; no RTC proof.
+Correct provider verification to permit empty installed package members only when
+the hash-pinned wheel and verified RECORD contain exactly empty bytes. Keep normal
+source/receipt reads nonempty; exact installed byte equality, bounds and containment
+remain mandatory. Add regression: verified empty marker reaches import; truncated
+module and mutated marker reject before import; default empty read rejects.
+Remote side preflightd278a918/run34033976406 passed254 harness tests but actual
+provider installation then rejected the official vector. Upstream BLAKE3 1.8.2
+vectors reveal two copied outputs held33 bytes, not32. Use exact first32 bytes and
+explicitly validate digest width. Source URL:
+https://github.com/BLAKE3-team/BLAKE3/blob/1.8.2/test_vectors/test_vectors.json
+Sidebd9973e35cafefba38a089fa3ded3446797938ed now tests actual pinned wheel/provider
+plus254 combined harness cases. Main expected204 after this regression; no product
+or native selection changes. Full owner qualification remains required.
+
+Remote preflightbd9973e3/run34034083008 PASSED254 harness tests and actual pinned
+BLAKE3 provider installation/import/all3 official32byte vectors. Compact artifact
+9989576783ZIP1443; helper hash verified against exact local edited source. No game
+qualification implied. Start exact main qualification after this scoped repair.
