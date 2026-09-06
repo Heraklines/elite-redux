@@ -456,9 +456,7 @@ impl GameKernelV7 {
                     }
                     let frame = CurrentCoopFrameV1::CurrentCoopStarted {
                         authority: owner.local.clone(),
-                        choices: Box::new(
-                            owner.choices.clone().ok_or(GameKernelV7Error::Invalid)?,
-                        ),
+                        choices: Box::new(owner.choices.clone().ok_or(GameKernelV7Error::Invalid)?),
                         host: host.clone(),
                         material_hex: current_bytes_hex_v1(bytes),
                     };
