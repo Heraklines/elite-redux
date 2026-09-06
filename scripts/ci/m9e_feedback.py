@@ -1700,6 +1700,8 @@ def native_execution_order(selection, enumerated):
             first[:0] = [("er-game", "m9e_material_retention"), ("er-kernel", "m9e_material_retention_v7")]
         if selection.get("ai_damage_query_focus"):
             first[:0] = [("er-game", "m9e_damage_query")]
+        if selection.get("requires_current_proposal"):
+            first[:0] = [("er-kernel", "m9e_current_proposal_v7")]
         first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
         priority = {identity: index for index, identity in enumerate(first)}
         return sorted(enumerated, key=lambda item: priority.get((item[4].name, item[2]), len(priority)))

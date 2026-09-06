@@ -2751,3 +2751,11 @@ presentation through the public API, assert proposal ownership remains exact,
 then open the private menu and retain every duplicate/overflow/eviction/full-
 snapshot assertion. No product change, bypass, or test deletion. NativeB and the
 whole checkpoint are not yet qualified; full focused acceptance must run again.
+
+Improve the existing focused edit loop by prioritizing the exact er-kernel:
+m9e_current_proposal_v7 target whenever current proposal coverage is required.
+This happens after full discovery and lint; it neither changes selected IDs nor
+native lane assignment, and all other targets retain their prior relative order.
+Add a harness regression covering same-name decoys, inherited AI priority, input
+conservation and complete unchanged target payloads. The expected harness total
+becomes202, subject to actual remote execution. No local Python was executed.

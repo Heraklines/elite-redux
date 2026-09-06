@@ -2944,6 +2944,26 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual({item[0] for item in ordered}, {item[0] for item in items})
         self.assertEqual(self.feedback.native_execution_order({}, items), items)
 
+    def test_current_owner_executes_first_without_changing_inventory_or_prior_order(self):
+        items = [(index, f"bin{index}", name, [f"case{index}"], Path(crate), set(), None)
+                 for index, (crate, name) in enumerate([
+                     ("er-other", "m9e_current_proposal_v7"), ("er-cli", "m9e_current_reload"),
+                     ("er-kernel", "m9e_coop_v7"), ("er-game", "m9e_damage_query"),
+                     ("er-kernel", "m9e_current_proposal_v7"), ("er-kernel", "m9e_game_kernel_v7"),
+                     ("er-other", "last")])]
+        original = list(items)
+        for damage in (False, True):
+            selection = {"timer_focus": True, "ai_damage_query_focus": damage}
+            prior = self.feedback.native_execution_order(selection, items)
+            ordered = self.feedback.native_execution_order(
+                {**selection, "requires_current_proposal": True}, items)
+            self.assertEqual(ordered, [items[4], *[item for item in prior if item != items[4]]])
+            self.assertEqual(sorted(ordered, key=lambda item: item[0]), items)
+            self.assertEqual(self.feedback.native_execution_order(
+                {**selection, "requires_current_proposal": False}, items), prior)
+            self.assertEqual(items, original)
+        self.assertEqual(self.feedback.native_execution_order({}, items), items)
+
     def configure_ai_snapshot_validation_scope(self):
         self.configure_browser_rtc_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["ai_snapshot_validation_focus"]
