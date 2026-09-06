@@ -203,7 +203,7 @@ def normalized_title_cancel(pending, initial):
             or len(pending["pending_platform"]) != 1
             or pending["pending_platform"][0]["request_id"] != owned["request_id"]
             or [row["option_id"] for row in template["control"]["menu"]["options"]]
-                != ["bootstrap/title/new-game", "bootstrap/title/existing-saves"]):
+                != ["bootstrap/title/existing-saves", "bootstrap/title/new-game"]):
         raise RuntimeError("Title Cancel has no exact released owner/template")
     revision = before["control"]["revision"] + 1
     instance = before["menu_instance_high_water"] + 1

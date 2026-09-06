@@ -7435,7 +7435,7 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         control = {"kind": "TITLE", "revision": 1, "owner_seat": 1,
                    "action_context": {"authority_revision": 1, "menu_instance": 1, "operation_id": "bootstrap/title/1"},
                    "menu": {"instance_id": 1, "control_id": "bootstrap/title/1", "selected_option_id": "bootstrap/title/new-game",
-                            "options": [{"option_id": "bootstrap/title/new-game"}, {"option_id": "bootstrap/title/existing-saves"}]}}
+                            "options": [{"option_id": "bootstrap/title/existing-saves"}, {"option_id": "bootstrap/title/new-game"}]}}
         initial = {"lifecycle": {"kind": "BOOTSTRAP", "value": {"stage": "TITLE", "control": control,
                     "pressed_keys": [], "menu_instance_high_water": 1, "seed": "owned seed", "catalog": {"save_slots": ["new-destination"]},
                     "current_storage": {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}}},
