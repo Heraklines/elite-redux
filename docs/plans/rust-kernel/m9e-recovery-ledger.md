@@ -2406,3 +2406,28 @@ flag/target/priority guards and correct the guide. The physical move's secondary
 behavior is not executed or claimed. This repairs the unqualified fixture only;
 production arithmetic, AI activation, required inventory, controls and f140
 qualification baseline remain unchanged. No local workload was run.
+## Effective status-move fixture correction
+
+847730a2ca6df08edaa3d6bd7df3efade5668979 / run34002300787 passed remote
+formatting3.422s, build146.378s and full selected-package Clippy56.375s, with
+1,235 native IDs discovered. The four query tests passed the new attack metadata
+checks, then all failed the remaining vanilla Splash expectation: effective
+Splash150 is Physical/Water/power1, not a no-power status move. No query semantics
+have qualified yet. Retrieved only the13155-byte summary and2164-byte failure
+excerpt from inspected4188-byte compact9979901195; no complete diagnostics.
+
+Use cached published Harden106 for the status witness: Normal/Status, no power,
+AlwaysHits, PP20, User target, priority0, IgnoreProtect. Add exact metadata guards
+and retain the original source-to-source zero query, inactive/fainted rejection,
+full state equality and all four IDs. Published Growl is also damaging, so neither
+vanilla naming nor base-game knowledge substitutes for the effective definitions.
+The content pack, resolver, numerical attack expectations, CI scope and f140
+qualification baseline remain unchanged. No local workload or asset download.
+
+The additive cached-source audit note SHA256 is
+cbd726955c0d74c74b9d707b23521541e7bd8e0c6c5d566ae70b318d80de9db9;
+selected record JSON SHA256
+6d68cef8941bf9b30fed014428f761fcc7ca519b2b811754080e12b2bafd3de5.
+Prepared Stench and selected move programs have no query bindings; bespoke
+classifications remain and are not claimed mechanic-free. All prior41 assertion
+sites remain plus six Harden metadata guards; complete runtime proof is pending.

@@ -181,10 +181,16 @@ fn controlled_state(
         20,
         &[],
     )?;
-    let splash = MoveId::new(safe(150));
-    let splash_definition = content.battle.move_definition(splash)?;
-    assert_eq!(splash_definition.category, MoveCategory::Status);
-    assert_eq!(splash_definition.power, MovePower::None);
+    let status_move = MoveId::new(safe(106));
+    let status_definition = content.battle.move_definition(status_move)?;
+    assert_eq!(status_definition.category, MoveCategory::Status);
+    assert_eq!(status_definition.power, MovePower::None);
+    assert_eq!(status_definition.move_type, PokemonType::Normal);
+    assert_eq!(status_definition.accuracy, MoveAccuracy::AlwaysHits);
+    assert_eq!(status_definition.base_pp, 20);
+    assert_eq!(status_definition.target, MoveTarget::User);
+    assert_eq!(status_definition.priority, 0);
+    assert_eq!(status_definition.flags, vec![MoveFlag::IgnoreProtect]);
     let run = state.active_run.as_mut().ok_or("fixture run missing")?;
     let battle = run.battle.as_mut().ok_or("fixture battle missing")?;
     for pokemon in run.party.iter_mut().chain(battle.enemy_party.iter_mut()) {
@@ -225,7 +231,7 @@ fn controlled_state(
                 max_pp_override: None,
             }),
             Some(MoveSlotState {
-                move_id: splash,
+                move_id: status_move,
                 pp_used: 0,
                 pp_ups: 0,
                 max_pp_override: None,
@@ -508,7 +514,7 @@ fn current_damage_query_zero_and_inactive_inputs_leave_state_unchanged() -> Test
             source,
         )?,
         0,
-        "published Splash is a no-power status move"
+        "published Harden is a no-power status move"
     );
     assert_eq!(state, before);
 
