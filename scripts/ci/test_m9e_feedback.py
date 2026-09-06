@@ -7530,6 +7530,16 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             title.normalized_title_cancel(bad, initial)
 
 
+    def test_title_reference_matches_actual_opt_in_menu_reallocation(self):
+        import m9e_title_storage as title
+        # Exact small control from Rust51f/run34044688649. Enabling storage
+        # rebuilds the initial menu at instance2 while keeping revision1.
+        produced = json.loads(r'''{"action_context":{"authority_revision":1,"authority_seat":1,"menu_instance":2,"operation_id":"bootstrap/title/1"},"actionable":true,"kind":"TITLE","menu":{"cancel":{"kind":"DISABLED"},"control_id":"bootstrap/title/1","instance_id":2,"navigation":[{"direction":"UP","from":"bootstrap/title/existing-saves","to":"bootstrap/title/new-game"},{"direction":"DOWN","from":"bootstrap/title/new-game","to":"bootstrap/title/existing-saves"}],"options":[{"action":{"action":{"kind":"OPEN_EXISTING_SAVES"},"kind":"BOOTSTRAP"},"enabled":true,"layout":{"column":0,"option_id":"bootstrap/title/existing-saves","page":0,"row":1},"option_id":"bootstrap/title/existing-saves","visible":true},{"action":{"action":{"kind":"OPEN_NEW_GAME"},"kind":"BOOTSTRAP"},"enabled":true,"layout":{"column":0,"option_id":"bootstrap/title/new-game","page":0,"row":0},"option_id":"bootstrap/title/new-game","visible":true}],"owner_seat":1,"selected_option_id":"bootstrap/title/new-game"},"owner_seat":1,"revision":1,"schema_version":2}''')
+        self.assertEqual(title.bootstrap_control("TITLE", 1, 1, 2), produced)
+        self.assertNotEqual(title.bootstrap_control("TITLE", 1, 1, 1), produced)
+        self.assertEqual(produced["menu"]["selected_option_id"], "bootstrap/title/new-game")
+        self.assertEqual([row["layout"]["row"] for row in produced["menu"]["options"]], [1, 0])
+
     def test_title_reference_menus_pin_order_actions_and_allocator(self):
         import m9e_title_storage as title
         initial = title.bootstrap_control("TITLE", 1, 1, 1)

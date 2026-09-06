@@ -73,7 +73,7 @@ def main(result):
                   initial_control=owner["control"], initial_storage=owner["current_storage"],
                   initial_stage=owner["stage"], initial_pressed=owner["pressed_keys"],
                   initial_save_slots=owner["catalog"]["save_slots"],
-                  menu_matches_reference=owner["control"] == title.bootstrap_control("TITLE", 1, 1, 1))
+                  menu_matches_reference=owner["control"] == title.bootstrap_control("TITLE", 1, 1, 2))
     result["oracle"] = title.fixture_oracle(fixture, manifest["cohort"]["content_sha256"])
     result["status"] = "passed"
 

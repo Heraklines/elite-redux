@@ -408,7 +408,7 @@ def fixture_oracle(fixture, content_hash):
     rewrite_payload, _ = write_case_reference(fixture["rewrite"], 2, fixture["content_identity"])
     initial = fixture["initial"]
     owner = initial["lifecycle"]["value"]
-    if (initial["lifecycle"]["kind"] != "BOOTSTRAP" or owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 1)
+    if (initial["lifecycle"]["kind"] != "BOOTSTRAP" or owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 2)
             or owner["current_storage"] != {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}
             or owner["catalog"]["save_slots"] != ["new-run-destination"]
             or initial["pending_platform"] or initial["pending_presentations"]):
