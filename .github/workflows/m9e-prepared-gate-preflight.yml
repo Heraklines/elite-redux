@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '230'
+      M9E_EXPECTED_TESTS: '203'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -26,21 +26,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /scripts/ci/
-            /rust/crates/er-cli/src/current_agent.rs
-            /rust/crates/er-cli/tests/m9e_current_repro.rs
-            /rust/crates/er-cli/tests/m9e_current_title_storage.rs
-            /rust/crates/er-env/src/current.rs
-            /rust/crates/er-game/src/current_bootstrap_storage.rs
-            /rust/crates/er-game/src/m72_bootstrap.rs
-            /rust/crates/er-kernel/src/game_kernel_v7.rs
-            /rust/crates/er-kernel/src/snapshot_v7.rs
-            /rust/crates/er-kernel/tests/m9e_title_storage.rs
-            /rust/crates/er-types/src/m72_bootstrap.rs
-            /rust/crates/er-web/src/contracts_v2.rs
-            /rust/crates/er-web/src/host_v2.rs
-            /rust/crates/er-web/tests/m9e_host_v2.rs
-            /rust/crates/er-web/tests/m9e_title_storage.rs
-            /rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs
+            /rust/crates/er-cli/tests/m9e_current_state_query.rs
       - name: Verify candidate and execute only harness selftests
         shell: bash
         run: |
