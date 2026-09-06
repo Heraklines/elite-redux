@@ -9136,5 +9136,87 @@ class CurrentCostArtifactTests(unittest.TestCase):
                                     (b"x" * 16385, [self.cost.TEST_ID])):
             with self.assertRaises(RuntimeError):
                 self.cost.validate_listing(listing, identities)
+
+class CurrentCostContentBindingTests(unittest.TestCase):
+    MANIFEST = r'''{"components":{"ai":"3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9","battle":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","bootstrap":"e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a","meta":"4b6fdf238af42d40441175d2436c03e5dcec40117863a9e5600ba8127009be64","presentation":"6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0","progression":"751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695","run":"879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428","scenario":"e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8","world":"c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"},"content_hash":"blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429","counts":{"ai_behaviors":2586,"battle_species":1962,"bootstrap_starters":706,"meta_behaviors":6870,"presentation_mappings":55,"progression_species_forms":3384,"run_programs":3,"scenarios":91,"world_biomes":35},"oracle_sha":"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7","pending_bespoke_behaviors":0,"reachable_unsupported_behaviors":0,"schema_version":2,"unresolved_cross_references":0,"v1_production_fallbacks":0}'''
+
+    def setUp(self):
+        import m9e_current_cost as cost
+        self.cost = cost
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-cost-content-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.manifest = json.loads(self.MANIFEST)
+        self.identity = json.loads(CurrentCostRecordTests.PRODUCED)["content_identity"]
+        # Minimal source-shape fixture for binding checks, not prepared game content.
+        self.bundle = {"schema_version": 2, "oracle_sha": self.identity["oracle_sha"],
+                       "content_hash": self.identity["bundle_hash"]}
+        for name, digest in self.manifest["components"].items():
+            self.bundle["scenarios" if name == "scenario" else name] = {"content_hash": digest}
+        self.bundle["battle"]["semantic_catalog_hash"] = self.identity["semantic_catalog_hash"]
+        self.bundle_path = self.root / cost.BUNDLE
+        self.manifest_path = self.root / cost.CONTENT_MANIFEST
+        self.bundle_path.parent.mkdir(parents=True)
+        self.write()
+
+    def write(self):
+        self.bundle_path.write_text(json.dumps(self.bundle, sort_keys=True))
+        self.manifest_path.write_text(json.dumps(self.manifest, sort_keys=True))
+
+    def test_cost_content_binding_projects_actual_v2_component_names_and_original_bytes(self):
+        binding = self.cost.read_content(self.root)
+        self.assertEqual(binding["identity"], self.identity)
+        for name, path in (("bundle", self.bundle_path), ("manifest", self.manifest_path)):
+            self.assertEqual(binding[name]["bytes"], path.stat().st_size)
+            self.assertEqual(binding[name]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+        self.assertEqual(self.manifest["counts"]["bootstrap_starters"], 706)
+        before = binding["bundle"]["sha256"]
+        self.bundle_path.write_bytes(self.bundle_path.read_bytes() + b"\n")
+        changed = self.cost.read_content(self.root)
+        self.assertEqual(changed["identity"], binding["identity"])
+        self.assertNotEqual(changed["bundle"]["sha256"], before)
+
+    def test_cost_content_binding_rejects_each_source_component_and_manifest_identity_drift(self):
+        initial_bundle, initial_manifest = copy.deepcopy(self.bundle), copy.deepcopy(self.manifest)
+        for name in self.manifest["components"]:
+            self.bundle = copy.deepcopy(initial_bundle)
+            self.bundle["scenarios" if name == "scenario" else name]["content_hash"] = "0" * 64
+            self.write()
+            with self.subTest(component=name), self.assertRaises(RuntimeError):
+                self.cost.read_content(self.root)
+        for key, replacement in (("oracle_sha", "0" * 40), ("content_hash", "blake3-v1:" + "0" * 64),
+                                 ("schema_version", True), ("unresolved_cross_references", 1),
+                                 ("pending_bespoke_behaviors", False), ("v1_production_fallbacks", 1), ("extra", "ignored")):
+            self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
+            self.manifest[key] = replacement
+            self.write()
+            with self.assertRaises(RuntimeError):
+                self.cost.read_content(self.root)
+        self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
+        self.manifest["counts"]["bootstrap_starters"] = True
+        self.write()
+        with self.assertRaises(RuntimeError):
+            self.cost.read_content(self.root)
+        self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
+        self.bundle["meta"]["content_hash"] = self.manifest["components"]["meta"] = "bad"
+        self.write()
+        with self.assertRaises(RuntimeError):
+            self.cost.read_content(self.root)
+
+    def test_cost_content_reader_rejects_duplicate_invalid_oversized_or_redirected_files(self):
+        original = self.manifest_path.read_bytes()
+        for raw in (b"", b"\xff", b"[]", b"{}" + b" " * 16383,
+                    original.replace(b'"schema_version": 2', b'"schema_version": 2, "schema_version": 2')):
+            self.assertNotEqual(raw, original)
+            self.manifest_path.write_bytes(raw)
+            with self.assertRaises(RuntimeError):
+                self.cost.read_content(self.root)
+        self.manifest_path.write_bytes(original)
+        relocated = self.root / "elsewhere.json"
+        relocated.write_bytes(original)
+        self.manifest_path.unlink()
+        self.manifest_path.symlink_to(relocated)
+        with self.assertRaises(RuntimeError):
+            self.cost.read_content(self.root)
 if __name__ == "__main__":
     unittest.main()

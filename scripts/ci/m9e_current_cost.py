@@ -15,6 +15,8 @@ TARGET = ("er-repro", "m9e_current_cost_probe")
 TEST_ID = "current_native_phase_costs_preserve_semantics"
 PREFIX = b"M9E_CURRENT_COST_PROBE "
 LINE_LIMIT = 8192
+BUNDLE = "rust/fixtures/m9/engineering/game-content-bundle-v2.json"
+CONTENT_MANIFEST = "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"
 U64_MAX = (1 << 64) - 1
 PHASES = ["fork", "snapshot", "validate", "observe", "canonical_encode_snapshot",
           "canonical_digest_snapshot", "blake3_preencoded_snapshot", "apply_effectful_raw_input",
@@ -229,3 +231,59 @@ def validate_listing(raw, discovered_ids):
         raise RuntimeError("current cost evidence: invalid release listing Unicode") from error
     if text != TEST_ID + ": test\n" or discovered_ids != [TEST_ID]:
         fail("release listing differs from the sole globally discovered test")
+
+
+def read_json_file(path, limit):
+    if not path.is_file() or path.is_symlink() or path.resolve() != path or path.stat().st_size > limit:
+        fail("candidate content path or byte bound")
+    with path.open("rb") as stream:
+        raw = stream.read(limit + 1)
+    if not 0 < len(raw) <= limit:
+        fail("candidate content byte bound")
+    try:
+        value = json.loads(raw.decode("utf-8", errors="strict"), object_pairs_hook=strict_object,
+                           parse_constant=lambda token: fail("non-finite candidate JSON " + token))
+    except (UnicodeError, ValueError, RecursionError) as error:
+        raise RuntimeError("current cost evidence: invalid candidate content JSON") from error
+    if type(value) is not dict:
+        fail("candidate content root is not an object")
+    return value, {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def read_content(repository):
+    """Project actual V2 fields exactly as PreparedGameContentV2::prepare does.
+
+    This binds the original bytes and named hashes outside measured intervals;
+    the actual Rust preparation still owns canonical/domain validation.
+    """
+    repository = Path(repository).resolve()
+    bundle, bundle_file = read_json_file(repository / BUNDLE, 32 << 20)
+    manifest, manifest_file = read_json_file(repository / CONTENT_MANIFEST, 16 << 10)
+    exact_fields(manifest, ["components", "content_hash", "counts", "oracle_sha", "schema_version",
+                            "pending_bespoke_behaviors", "reachable_unsupported_behaviors",
+                            "unresolved_cross_references", "v1_production_fallbacks"], "content manifest")
+    integer(bundle.get("schema_version"), 2, 2, "bundle schema")
+    integer(manifest["schema_version"], 2, 2, "manifest schema")
+    components = ["ai", "battle", "bootstrap", "meta", "presentation", "progression", "run", "scenario", "world"]
+    exact_fields(manifest["components"], components, "manifest components")
+    lower_hex(manifest["components"]["meta"], 64, "meta content")
+    exact_fields(manifest["counts"], ["ai_behaviors", "battle_species", "bootstrap_starters", "meta_behaviors",
+                                      "presentation_mappings", "progression_species_forms", "run_programs",
+                                      "scenarios", "world_biomes"], "manifest counts")
+    for value in manifest["counts"].values():
+        integer(value, 1, U64_MAX, "content count")
+    for key in ("pending_bespoke_behaviors", "reachable_unsupported_behaviors",
+                "unresolved_cross_references", "v1_production_fallbacks"):
+        integer(manifest[key], 0, 0, key)
+    identity = {"oracle_sha": bundle.get("oracle_sha"), "bundle_hash": bundle.get("content_hash")}
+    for name in components:
+        section = bundle.get("scenarios" if name == "scenario" else name)
+        if type(section) is not dict or section.get("content_hash") != manifest["components"][name]:
+            fail("actual content component differs from manifest: " + name)
+        if name != "meta":
+            identity[name + "_hash"] = section["content_hash"]
+    identity["semantic_catalog_hash"] = bundle["battle"].get("semantic_catalog_hash")
+    content_binding(identity)
+    if identity["oracle_sha"] != manifest["oracle_sha"] or identity["bundle_hash"] != manifest["content_hash"]:
+        fail("actual bundle and manifest identities differ")
+    return {"bundle": bundle_file, "manifest": manifest_file, "identity": identity}
