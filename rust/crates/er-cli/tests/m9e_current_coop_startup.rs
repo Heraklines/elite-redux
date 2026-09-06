@@ -282,6 +282,9 @@ impl Endpoint {
         let initial = self.control()?;
         let bound = initial.menu.as_ref().ok_or("menu absent")?.options.len() + 1;
         for _ in 0..bound {
+            if self.browser_sequence % 128 == 0 {
+                eprintln!("raw navigation host={} sequence={} target={target}", self.host, self.browser_sequence);
+            }
             let control = self.control()?;
             let menu = control.menu.as_ref().ok_or("menu disappeared")?;
             if menu.selected_option_id.as_str() == target {
@@ -443,16 +446,20 @@ fn network_frames(step: &GameKernelStepV7) -> Vec<Vec<u8>> {
         .collect()
 }
 fn exercise(worker: bool) -> TestResult {
+    let started = Instant::now();
     let bundle: GameContentBundleV2 = serde_json::from_slice(&std::fs::read(content_path())?)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
     let mut host = Endpoint::new(content.clone(), worker, true)?;
     let mut guest = Endpoint::new(content.clone(), worker, false)?;
+    eprintln!("worker={worker} initialized {:?}", started.elapsed());
     let (host_choices, frames) = host.choose(content.as_ref())?;
+    eprintln!("worker={worker} host chose {:?}", started.elapsed());
     assert!(frames.is_empty());
     assert!(
         matches!(host.checkpoint()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref setup) if setup.stage == RunBootstrapStageV1::Complete)
     );
     let (guest_choices, frames) = guest.choose(content.as_ref())?;
+    eprintln!("worker={worker} guest chose {:?}", started.elapsed());
     assert_eq!(frames.len(), 1);
     let choices = &frames[0];
     let retried = guest.event(CurrentExternalEvent::RetryCoopSetup)?;
@@ -512,7 +519,9 @@ fn exercise(worker: bool) -> TestResult {
     );
     assert_eq!(guest.checkpoint()?, guest_before);
     host.replay_capture(content.clone(), !worker)?;
+    eprintln!("worker={worker} host replayed {:?}", started.elapsed());
     guest.replay_capture(content, !worker)?;
+    eprintln!("worker={worker} guest replayed {:?}", started.elapsed());
     host.finish()?;
     guest.finish()
 }
