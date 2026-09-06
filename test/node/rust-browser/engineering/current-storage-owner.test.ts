@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { CurrentIndexedDbStorage, CurrentStorageError, type CurrentStorageBackend, type CurrentStoredValue,
   type CurrentWriteImage } from "../../../../src/rust-browser/adapters/current-storage-backend";
-import { CurrentStorageRequestOwner, type CurrentStorageAcceptance } from
+import { CurrentStorageRequestOwner, type CurrentStorageAcceptance, type CurrentTitleCancellationEvidence } from
   "../../../../src/rust-browser/adapters/current-storage-owner";
 
 function fixture() {
@@ -244,4 +244,171 @@ it("current storage owner reconciles exact uncertain images and rejects changed 
     deliver: async () => "ACCEPTED" });
   readback.enqueue(write());
   expect((await readback.drain())[0]).toMatchObject({ phase: "UNCERTAIN", writeOutcome: "UNKNOWN", durable: false });
+});
+
+// Owner-only state witnesses. These hand-authored correlated facts are not a
+// substitute for the separate actual Worker pre/input/post proof witness.
+function titleCancellation(requestId: number, kind: "LIST" | "READ" = "LIST", slot: string | null = null): CurrentTitleCancellationEvidence {
+  return { requestId, kind, slot, preSequence: requestId * 3, cancelSequence: requestId * 3 + 1,
+    postSequence: requestId * 3 + 2, waitingMenu: requestId * 2 + 10, waitingRevision: requestId * 2 + 20,
+    postMenu: requestId * 2 + 11, postRevision: requestId * 2 + 21,
+    nextPlatformRequestId: requestId + 1, beforeReplay: requestId * 4, postReplay: requestId * 4 + 1 };
+}
+function latch() {
+  let release: () => void = () => undefined;
+  const promise = new Promise<void>(resolve => { release = resolve; });
+  return { promise, release };
+}
+const listRequest = (request_id: number) => ({ request_id, kind: "LIST" as const, slot: null, generation: null, bytes: [] });
+
+it("Title cancellation drains queued read-only ownership without IO and never reuses evicted IDs", async () => {
+  const { backend } = fixture();
+  let calls = 0;
+  backend.list = async () => { calls++; return []; };
+  const owner = new CurrentStorageRequestOwner({ backend, sessionIdentity: "cancel-queued", allowTitleCancellation: true,
+    deliver: async () => { throw new Error("cancelled queued request reached delivery"); } });
+  for (let id = 1; id <= 40; id++) {
+    owner.enqueue(listRequest(id));
+    const proof = titleCancellation(id);
+    owner.beginTitleReadOnlyRetirement(proof);
+    expect(owner.progress().find(entry => entry.requestId === id)?.phase).toBe("CANCELLING");
+    expect(owner.retirementStatus.pending).toBe(1);
+    proof.cancelSequence = 0; // Caller mutation cannot change the owned proof.
+    owner.beginTitleReadOnlyRetirement(titleCancellation(id));
+    await owner.drain();
+    expect(owner.progress().find(entry => entry.requestId === id)).toMatchObject({ phase: "CANCELLED", durable: false,
+      cancellation: { cancelSequence: id * 3 + 1, terminal: "NOT_STARTED" } });
+    expect(owner.retirementStatus).toMatchObject({ pending: 0, retainedBytes: 0, highestId: id, fenced: false });
+    owner.enqueue(listRequest(id)); // Exact router replay is no IO, including after retirement.
+    expect(() => owner.retry(id)).toThrow(/not retryable/u);
+    expect(() => owner.beginTitleReadOnlyRetirement({ ...titleCancellation(id), preSequence: id * 3 + 3,
+      cancelSequence: id * 3 + 4, postSequence: id * 3 + 5 })).toThrow(/evidence changed/u);
+  }
+  expect(calls).toBe(0);
+  expect(owner.retirementStatus.retained).toBeLessThanOrEqual(32);
+  expect(() => owner.enqueue(listRequest(1))).toThrow(/older than retained/u);
+  const ordinary = new CurrentStorageRequestOwner({ backend: fixture().backend, sessionIdentity: "default-off", deliver: async () => "ACCEPTED" });
+  ordinary.enqueue(listRequest(1));
+  expect(() => ordinary.beginTitleReadOnlyRetirement(titleCancellation(1))).toThrow(/not enabled/u);
+  expect((await ordinary.drain())[0].phase).toBe("ACKNOWLEDGED");
+});
+
+it("Title CANCELLING retains the sixteen-owner admission bound until running and queued work drains", async () => {
+  const { backend } = fixture();
+  const entered = latch(); const finish = latch();
+  let operations = 0; let deliveries = 0;
+  backend.list = async () => { operations++; entered.release(); await finish.promise; return []; };
+  const owner = new CurrentStorageRequestOwner({ backend, sessionIdentity: "cancel-capacity", allowTitleCancellation: true,
+    deliver: async () => { deliveries++; return "ACCEPTED"; } });
+  owner.enqueue(listRequest(1)); await entered.promise;
+  for (let id = 2; id <= 16; id++) owner.enqueue(listRequest(id));
+  for (let id = 1; id <= 16; id++) owner.beginTitleReadOnlyRetirement(titleCancellation(id));
+  expect(owner.retirementStatus).toMatchObject({ pending: 16, cancelling: 16, cancelled: 0, highestId: 16 });
+  expect(() => owner.enqueue(listRequest(17))).toThrow(/pending/u);
+  finish.release(); await owner.drain();
+  expect(owner.retirementStatus).toMatchObject({ pending: 0, cancelling: 0, cancelled: 16, retainedBytes: 0 });
+  expect(operations).toBe(1); expect(deliveries).toBe(0);
+  owner.enqueue(listRequest(17)); owner.beginTitleReadOnlyRetirement(titleCancellation(17)); await owner.drain();
+  expect(owner.retirementStatus).toMatchObject({ highestId: 17, pending: 0, retainedBytes: 0 });
+});
+
+it("Title retirement suppresses a queued delivery guard and releases its retained result once", async () => {
+  const { backend } = fixture();
+  backend.read = async () => ({ generation: 1, operation: "a".repeat(64), bytes: Uint8Array.of(1, 2, 3) });
+  const entered = latch(); const wire = latch();
+  let published = 0;
+  const owner = new CurrentStorageRequestOwner({ backend, sessionIdentity: "cancel-wire", allowTitleCancellation: true,
+    deliver: async (_id, _result, guard) => {
+      entered.release(); await wire.promise;
+      if (guard.cancelled()) return "SUPPRESSED_BY_CANCEL";
+      published++; return "ACCEPTED";
+    } });
+  owner.enqueue({ request_id: 1, kind: "READ", slot: "slot-a", generation: null, bytes: [] });
+  await entered.promise;
+  const retained = owner.retirementStatus.retainedBytes;
+  expect(retained).toBeGreaterThan(0);
+  owner.beginTitleReadOnlyRetirement(titleCancellation(1, "READ", "slot-a"));
+  expect(owner.retirementStatus).toMatchObject({ pending: 1, cancelling: 1, retainedBytes: retained });
+  wire.release(); await owner.drain();
+  expect(published).toBe(0);
+  expect(owner.progress()[0]).toMatchObject({ phase: "CANCELLED", durable: false, writeOutcome: "NOT_ATTEMPTED",
+    cancellation: { terminal: "COMPLETED" } });
+  expect(owner.retirementStatus.retainedBytes).toBe(0);
+  owner.beginTitleReadOnlyRetirement(titleCancellation(1, "READ", "slot-a"));
+  expect(owner.retirementStatus.retainedBytes).toBe(0);
+});
+
+it("Title retirement admits real abort classification but never reclaims an unclassified backend rejection", async () => {
+  for (const terminal of [true, false]) {
+    const { backend } = fixture(); const entered = latch(); const finish = latch();
+    backend.list = async () => {
+      entered.release(); await finish.promise;
+      throw new CurrentStorageError("UNAVAILABLE", terminal ? "actual transaction abort" : "blocked open", terminal ? "ABORTED" : "NOT_ATTEMPTED");
+    };
+    const owner = new CurrentStorageRequestOwner({ backend, sessionIdentity: `cancel-abort-${terminal}`, allowTitleCancellation: true,
+      deliver: async () => { throw new Error("failed read-only operation delivered"); } });
+    owner.enqueue(listRequest(1)); await entered.promise;
+    owner.beginTitleReadOnlyRetirement(titleCancellation(1)); finish.release(); await owner.drain();
+    expect(owner.progress()[0]).toMatchObject({ phase: terminal ? "CANCELLED" : "FENCED",
+      cancellation: { terminal: terminal ? "ABORTED" : "PENDING" } });
+    expect(owner.retirementStatus.pending).toBe(terminal ? 0 : 1);
+    if (!terminal) expect(() => owner.retry(1)).toThrow(/external session reconciliation/u);
+  }
+});
+
+it("Title cancellation rejects writes, unknown acceptance, invalid evidence and impossible accepted callback races", async () => {
+  const { backend } = fixture();
+  const written = new CurrentStorageRequestOwner({ backend, sessionIdentity: "write-excluded", allowTitleCancellation: true,
+    deliver: async () => "REJECTED" });
+  written.enqueue(write()); await written.drain();
+  expect(() => written.beginTitleReadOnlyRetirement(titleCancellation(1))).toThrow(/read-only/u);
+  expect(written.progress()[0]).toMatchObject({ phase: "CALLBACK_REJECTED", durable: true });
+  const unknown = new CurrentStorageRequestOwner({ backend: fixture().backend, sessionIdentity: "unknown-excluded", allowTitleCancellation: true,
+    deliver: async () => "UNKNOWN" });
+  unknown.enqueue(listRequest(1)); await unknown.drain();
+  expect(() => unknown.beginTitleReadOnlyRetirement(titleCancellation(1))).toThrow(/external session reconciliation/u);
+  const queued = new CurrentStorageRequestOwner({ backend: fixture().backend, sessionIdentity: "bad-proof", allowTitleCancellation: true,
+    deliver: async () => "ACCEPTED" });
+  queued.enqueue(listRequest(1));
+  for (const proof of [{ ...titleCancellation(1), postSequence: 99 }, { ...titleCancellation(1), nextPlatformRequestId: 1 },
+    { ...titleCancellation(1), postReplay: 0 }, titleCancellation(1, "READ", "other-slot")]) {
+    expect(() => queued.beginTitleReadOnlyRetirement(proof)).toThrow();
+    expect(queued.retirementStatus.cancelling).toBe(0);
+  }
+  await queued.drain();
+  expect(() => queued.beginTitleReadOnlyRetirement(titleCancellation(1))).toThrow(/cannot become cancelled/u);
+  const entered = latch(); const finish = latch();
+  const raced = new CurrentStorageRequestOwner({ backend: fixture().backend, sessionIdentity: "accepted-race", allowTitleCancellation: true,
+    deliver: async () => { entered.release(); await finish.promise; return "ACCEPTED"; } });
+  raced.enqueue(listRequest(1)); await entered.promise;
+  raced.beginTitleReadOnlyRetirement(titleCancellation(1)); finish.release(); await raced.drain();
+  expect(raced.progress()[0].phase).toBe("FENCED");
+  expect(raced.retirementStatus.pending).toBe(1);
+});
+
+it("Title backend deadlines and disposal never convert uncertain work into cancellation", async () => {
+  vi.useFakeTimers();
+  try {
+    const { backend } = fixture(); const entered = latch(); const finish = latch();
+    backend.list = async () => { entered.release(); await finish.promise; return []; };
+    const owner = new CurrentStorageRequestOwner({ backend, sessionIdentity: "cancel-timeout", allowTitleCancellation: true,
+      deliver: async () => { throw new Error("timed out work delivered"); } });
+    owner.enqueue(listRequest(1)); await entered.promise;
+    owner.beginTitleReadOnlyRetirement(titleCancellation(1));
+    await vi.advanceTimersByTimeAsync(10_001); await owner.drain();
+    expect(owner.progress()[0].phase).toBe("FENCED");
+    expect(owner.retirementStatus.pending).toBe(1);
+    finish.release(); await Promise.resolve(); await Promise.resolve();
+    expect(owner.progress()[0].phase).toBe("FENCED");
+    expect(owner.retirementStatus.pending).toBe(1);
+    expect(() => owner.beginTitleReadOnlyRetirement(titleCancellation(1))).toThrow(/external session reconciliation/u);
+  } finally { vi.useRealTimers(); }
+  const { backend } = fixture(); const entered = latch(); const finish = latch();
+  backend.list = async () => { entered.release(); await finish.promise; return []; };
+  const owner = new CurrentStorageRequestOwner({ backend, sessionIdentity: "cancel-close", allowTitleCancellation: true,
+    deliver: async () => { throw new Error("disposed work delivered"); } });
+  owner.enqueue(listRequest(1)); await entered.promise;
+  owner.beginTitleReadOnlyRetirement(titleCancellation(1)); await owner.close(); finish.release(); await owner.drain();
+  expect(owner.progress()[0].phase).toBe("FENCED");
+  expect(owner.retirementStatus.pending).toBe(1);
 });
