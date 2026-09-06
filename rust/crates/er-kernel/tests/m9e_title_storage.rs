@@ -604,15 +604,22 @@ fn title_default_bytes_strict_extension_and_overflow_are_atomic() -> Result<(), 
     unknown["lifecycle"]["value"]["current_storage"]["unrecognized"] = serde_json::json!(true);
     assert!(serde_json::from_value::<CoreGameKernelSnapshotV7>(unknown).is_err());
     let mut forged = initial.clone();
-    bootstrap_mut(&mut forged)?
+    let new_game = bootstrap_mut(&mut forged)?
         .control
         .menu
         .as_mut()
         .ok_or("menu absent")?
-        .options[0]
-        .action = GameActionV1::Bootstrap {
+        .options
+        .iter_mut()
+        .find(|option| option.option_id.as_str() == "bootstrap/title/new-game")
+        .ok_or("New Game option absent")?;
+    assert_eq!(new_game.action, GameActionV1::Bootstrap {
+        action: BootstrapActionV1::OpenNewGame,
+    });
+    new_game.action = GameActionV1::Bootstrap {
         action: BootstrapActionV1::OpenExistingSaves,
     };
+    assert_ne!(forged, initial, "negative witness must change the actual snapshot");
     assert!(restore(forged, content.clone()).is_err());
     navigate_down_to(&mut reader, "bootstrap/title/existing-saves")?;
     for field in ["platform", "replay"] {

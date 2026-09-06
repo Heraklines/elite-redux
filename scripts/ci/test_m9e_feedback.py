@@ -3198,7 +3198,7 @@ class FeedbackTests(unittest.TestCase):
             (output / name).write_bytes(b"entry" if name == manifest["entry"] else b"worker")
         (output / "m9e-v7-rtc-assets.json").write_bytes(phases.encoded(manifest))
         vite = self.root / "node_modules/vite/package.json"
-        vite.parent.mkdir(parents=True, exist_ok=True)
+        vite.parent.mkdir(parents=True)
         vite.write_text(json.dumps({"version": manifest["vite_version"]}))
         summary = {"product_sha": CANDIDATE, "plan": selection, "browser_assets": {"assets": cohort}}
         self.feedback.verify_browser_worker_build(output, summary, rtc=True)
@@ -5019,6 +5019,165 @@ class FeedbackTests(unittest.TestCase):
         self.assertNotIn("clippy", self.events)
         self.assertIn("required native test identities", summary["first_failure"])
 
+    def configure_ai_max_pp_scope(self):
+        self.configure_owner_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["current_ai_max_pp_focus"]
+        self.config["current_ai_max_pp_focus"] = policy
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(policy["paths"])
+
+    def test_ai_max_pp_combined_title_read_storage_owner_keeps_all_fourteen_kernel_ids(self):
+        self.configure_title_storage_core_scope()
+        actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["current_ai_max_pp_focus"] = actual["current_ai_max_pp_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        target = "er-kernel:m9e_game_kernel_v7"
+        expected = (self.config["timer_focus"]["exact_test_ids"][target]
+                    + self.feedback.READ_REBIND_IDS + self.feedback.AI_MAX_PP_IDS)
+        self.assertEqual(len(expected), 14)
+        before = copy.deepcopy(self.config)
+        for paths in (self.feedback.AI_MAX_PP_PATHS, self.feedback.TITLE_STORAGE_PATHS,
+                      self.config["current_worker_storage_focus"]["paths"],
+                      self.config["current_proposal_focus"]["paths"]):
+            with self.subTest(paths=paths):
+                self.changed = list(paths)
+                selection = self.feedback.plan()
+                self.assertEqual(selection["required_native_test_ids"][target], expected)
+                for flag in ("requires_ai_max_pp", "requires_read_rebind", "requires_title_storage",
+                             "requires_current_proposal", "requires_worker_storage", "requires_current_storage",
+                             "requires_browser_worker", "requires_browser_rtc", "requires_cli_executable",
+                             "requires_worker_executable", "requires_browser", "requires_wasm"):
+                    self.assertTrue(selection[flag], flag)
+                for identity, names in self.feedback.TITLE_STORAGE_IDS.items():
+                    self.assertEqual(selection["required_native_test_ids"][identity], names)
+                self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+                self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+        self.assertEqual(self.executed, [])
+
+    def test_ai_max_pp_scope_keeps_original_kernel_ids_owner_and_all_platforms(self):
+        self.configure_ai_max_pp_scope()
+        before = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        for flag in ("current_ai_max_pp_focus", "requires_ai_max_pp", "requires_current_proposal", "timer_focus",
+                     "requires_browser_rtc", "requires_browser_worker", "requires_browser", "requires_wasm",
+                     "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[flag], flag)
+        target = "er-kernel:m9e_game_kernel_v7"
+        inherited = self.config["timer_focus"]["exact_test_ids"][target]
+        self.assertEqual(selection["required_native_test_ids"][target], inherited + self.feedback.AI_MAX_PP_IDS)
+        self.assertEqual(len(inherited), 7)
+        self.assertEqual(len(selection["required_native_test_ids"][target]), 9)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+        for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+            if identity != target:
+                self.assertEqual(selection["required_native_test_ids"][identity], ids)
+
+    def test_ai_max_pp_installed_witnesses_survive_later_scopes_without_duplication(self):
+        self.configure_ai_max_pp_scope()
+        target = "er-kernel:m9e_game_kernel_v7"
+        for paths in (["rust/crates/er-kernel/tests/m9e_timers_v7.rs"],
+                      self.config["current_proposal_focus"]["paths"]):
+            with self.subTest(paths=paths):
+                self.changed = list(paths)
+                selection = self.feedback.plan()
+                self.assertFalse(selection["current_ai_max_pp_focus"])
+                self.assertTrue(selection["requires_ai_max_pp"])
+                self.assertEqual(len(selection["required_native_test_ids"][target]), 9)
+                for name in self.feedback.AI_MAX_PP_IDS:
+                    self.assertEqual(selection["required_native_test_ids"][target].count(name), 1)
+        self.configure_ai_snapshot_validation_scope()
+        selection = self.feedback.plan()
+        self.assertTrue(selection["ai_snapshot_validation_focus"])
+        self.assertTrue(selection["requires_ai_max_pp"])
+        self.assertEqual(selection["required_native_test_ids"]["er-ai:er_ai"], self.feedback.AI_SNAPSHOT_VALIDATION_IDS)
+        self.assertEqual(len(selection["required_native_test_ids"][target]), 9)
+        self.changed = ["docs/plans/rust-kernel/m9e-note.md"]
+        self.assertFalse(self.feedback.plan()["requires_ai_max_pp"])
+
+    def test_ai_max_pp_policy_and_mixed_product_changes_fail_closed(self):
+        self.configure_ai_max_pp_scope()
+        original = copy.deepcopy(self.config["current_ai_max_pp_focus"])
+        for mutation in ("path", "id", "extra", "type"):
+            with self.subTest(mutation=mutation):
+                policy = copy.deepcopy(original)
+                if mutation == "path":
+                    policy["paths"].append("rust/crates/er-kernel/src/snapshot.rs")
+                elif mutation == "id":
+                    policy["exact_test_ids"].pop()
+                elif mutation == "extra":
+                    policy["skip"] = True
+                else:
+                    policy = True
+                self.config["current_ai_max_pp_focus"] = policy
+                (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+                with self.assertRaisesRegex(RuntimeError, "AI max-PP policy"):
+                    self.feedback.plan()
+        self.config["current_ai_max_pp_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for extra in ("rust/Cargo.lock", "rust/crates/er-ai/src/authority_v2.rs", "rust/crates/er-kernel/src/snapshot.rs",
+                      "src/rust-browser/routes/rust-current-rtc-entry.ts"):
+            with self.subTest(extra=extra):
+                self.changed = [*original["paths"], extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+
+    def test_ai_max_pp_rejects_omitted_renamed_or_duplicate_added_kernel_witness(self):
+        self.configure_ai_max_pp_scope()
+        selection = self.feedback.plan()
+        exact = selection["required_native_test_ids"]
+        rows = [(*identity.split(":"), ids) for identity, ids in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        index = next(index for index, row in enumerate(rows) if row[:2] == ("er-kernel", "m9e_game_kernel_v7"))
+        crate, target, ids = rows[index]
+        for name in self.feedback.AI_MAX_PP_IDS:
+            for replacement in ([item for item in ids if item != name],
+                                [item if item != name else item + "_renamed" for item in ids], [*ids, name]):
+                with self.subTest(name=name, replacement=replacement):
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+
+    def test_ai_max_pp_execution_requires_all_nine_kernel_witnesses_before_lint(self):
+        self.configure_ai_max_pp_scope()
+        selection = self.feedback.plan()
+        self.binary_ids = {}
+        for crate, names in selection["execution_scope"].items():
+            if "*" in names:
+                names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for name in names:
+                binary = name if name not in self.binary_ids else crate + "--" + name
+                self.binary_ids[binary] = list(selection["required_native_test_ids"].get(f"{crate}:{name}", ["behavior"]))
+                self.binary_crates[binary], self.binary_targets[binary] = crate, name
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary)
+        if (self.full / "full-summary.json").is_file():
+            summary = json.loads((self.full / "full-summary.json").read_text())
+        self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_game_kernel_v7"], 9)
+        self.assertEqual(summary["required_native_target_counts"]["er-web:m9e_host_v2"], 14)
+        self.assertEqual(len(summary["required_native_target_counts"]), 23)
+        lint = [command for command in self.commands if command[:2] == ["cargo", "clippy"]]
+        self.assertEqual(len(lint), 1)
+        self.assertEqual([lint[0][index + 1] for index, part in enumerate(lint[0]) if part == "-p"], selection["packages"])
+        self.assertLess(self.events.index("clippy"), self.events.index("execute:" + self.executed[0]))
+        for control in (wasm, browser, timer, replica):
+            control.assert_called_once()
+        self.binary_ids["m9e_game_kernel_v7"].pop()
+        self.executed.clear()
+        self.events.clear()
+        code, summary = self.invoke()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.executed, [])
+        self.assertNotIn("clippy", self.events)
+        self.assertIn("required native test identities", summary["first_failure"])
+
     def configure_owner_scope(self):
         self.configure_browser_rtc_scope()
         import m9e_current_proposal as owner
@@ -5451,69 +5610,6 @@ class FeedbackTests(unittest.TestCase):
             owner.legacy_rtc_view(bad, context["binding"], context["helper_hash"])
         with self.assertRaises(RuntimeError):
             owner.legacy_rtc_view(tests, context["binding"], "0" * 64)
-    def configure_title_retirement_scope(self):
-        import m9e_title_storage as title
-        self.configure_title_storage_core_scope()
-        self.config["current_title_retirement_focus"] = title.policy()
-        for name in title.SOURCE_PATHS:
-            path = self.root / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("retirement source: " + name)
-        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
-        self.changed = list(title.PRODUCT_PATHS)
-        return title
-
-    def test_title_retirement_plan_keeps_all_native_and_prior_platform_requirements(self):
-        title = self.configure_title_retirement_scope()
-        selection = self.feedback.plan()
-        for flag in ("current_title_retirement_focus", "requires_title_retirement", "requires_title_storage",
-                     "requires_current_proposal", "requires_read_rebind", "requires_worker_storage", "requires_current_storage",
-                     "requires_browser_worker", "requires_browser_rtc", "requires_wasm", "requires_browser", "requires_cli_executable",
-                     "requires_worker_executable", "timer_focus"):
-            self.assertTrue(selection[flag], flag)
-        self.assertFalse(selection["boundary_paths"])
-        self.assertFalse(selection["unknown_paths"])
-        self.assertEqual(selection["title_storage_binding"], title.source_binding(self.root, CANDIDATE))
-        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
-        for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
-            self.assertEqual(selection["required_native_test_ids"][identity], ids)
-        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
-        self.assertEqual(len(selection["required_native_test_ids"]["er-web:m9e_host_v2"]), 14)
-        self.assertIsNotNone(selection["timer_mutant"])
-        self.assertIsNotNone(selection["replica_mutant"])
-
-    def test_title_retirement_plan_rejects_removed_policy_and_incomplete_installed_product(self):
-        title = self.configure_title_retirement_scope()
-        original = copy.deepcopy(self.config)
-        for replacement in ({}, {**title.policy(), "node_ids": title.NODE_IDS[:5]}, {**title.policy(), "paths": title.PRODUCT_PATHS[:-1]}):
-            self.config["current_title_retirement_focus"] = replacement
-            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
-            with self.assertRaisesRegex(RuntimeError, "Title retirement"):
-                self.feedback.plan()
-        self.config = original
-        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
-        missing = self.root / title.PRODUCT_PATHS[3]
-        missing.unlink()
-        with self.assertRaisesRegex(RuntimeError, "bounded regular"):
-            self.feedback.plan()
-
-    def test_title_retirement_installed_plan_persists_after_owner_change_and_does_not_hide_unknown_paths(self):
-        title = self.configure_title_retirement_scope()
-        self.changed = [title.PRODUCT_PATHS[0]]
-        selection = self.feedback.plan()
-        self.assertTrue(selection["current_title_retirement_focus"])
-        self.assertTrue(selection["requires_title_retirement"])
-        self.changed = ["rust/crates/er-kernel/src/snapshot_v7.rs"]
-        selection = self.feedback.plan()
-        self.assertFalse(selection["current_title_retirement_focus"])
-        self.assertTrue(selection["requires_title_retirement"])
-        self.changed = [*title.PRODUCT_PATHS, "src/unmapped-title-path.ts"]
-        with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping") as failure:
-            self.feedback.plan()
-        selection = json.loads(str(failure.exception).split(": ", 1)[1])
-        self.assertFalse(selection["current_title_retirement_focus"])
-        self.assertIn("src/unmapped-title-path.ts", selection["unknown_paths"])
-        self.assertTrue(selection["requires_title_retirement"])
     def configure_title_storage_core_scope(self):
         self.configure_composition_after_read_and_owner()
         actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
@@ -7280,645 +7376,5 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
 
 
 
-
-    def title_retirement_assets_fixture(self):
-        import m9e_title_storage as title
-        binding = {"source_sha": CANDIDATE, "source_hashes": {name: "a" * 64 for name in title.SOURCE_PATHS},
-                   "pnpm_lock_sha256": "b" * 64}
-        cohort = {name: {"sha256": value * 64} for name, value in
-                  (("er_web.js", "c"), ("er_web_bg.wasm", "d"), ("game-content-bundle-v2.json", "e"))}
-        assets = {"current-title-storage-entry.js": {"bytes": 5, "sha256": title.sha(b"entry"), "role": "entry"},
-                  "current-title-storage-kernel-worker-fixture.js": {"bytes": 6, "sha256": title.sha(b"worker"), "role": "worker"}}
-        manifest = {"schema_version": 1, "capability": title.CAPABILITY, "fixture_kind": title.FIXTURE_KIND,
-                    **binding, "entry": "current-title-storage-entry.js", "worker": "current-title-storage-kernel-worker-fixture.js",
-                    "assets": assets, "fixture": {"path": "m9e-v7-title-storage-fixtures.json", "bytes": 2,
-                                                  "sha256": title.sha(b"{}")},
-                    "cohort": {"glue_sha256": "c" * 64, "wasm_sha256": "d" * 64, "content_sha256": "e" * 64},
-                    "rustup_toolchain": "1.97.1", "vite_version": "8.0.10"}
-        evidence = {"manifest": manifest, "manifest_sha256": title.sha(title.js_bytes(manifest) + b"\n")}
-        return title, binding, cohort, evidence
-
-    def test_title_retirement_policy_has_exact_six_products_and_copied_identities(self):
-        import m9e_title_storage as title
-        original = title.policy()
-        title.validate_policy(original)
-        self.assertEqual(len(original["paths"]), 6)
-        self.assertEqual(len(title.SOURCE_PATHS), 21)
-        self.assertEqual(len(original["trigger_paths"]), 3)
-        self.assertEqual(len(original["node_ids"]), 11)
-        self.assertEqual(len(original["test_ids"]), 1)
-        for key in original:
-            for mutation in (original[key][:-1], original[key] + [original[key][0]], ["renamed"]):
-                with self.subTest(key=key, mutation=mutation):
-                    bad = copy.deepcopy(original)
-                    bad[key] = mutation
-                    with self.assertRaisesRegex(RuntimeError, "policy identities"):
-                        title.validate_policy(bad)
-        changed = title.policy()
-        changed["paths"].clear()
-        self.assertEqual(title.policy(), original)
-        with self.assertRaisesRegex(RuntimeError, "policy identities"):
-            title.validate_policy({**original, "unknown": True})
-
-    @patch("subprocess.run", side_effect=AssertionError("asset/source checks must not execute subprocesses"))
-    def test_title_retirement_source_binding_requires_every_current_source_and_lock(self, subprocess_run):
-        import m9e_title_storage as title
-        for name in [*title.SOURCE_PATHS, "pnpm-lock.yaml"]:
-            path = self.root / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("Title source: " + name)
-        binding = title.source_binding(self.root, CANDIDATE)
-        title.validate_binding(binding, CANDIDATE)
-        for name in title.SOURCE_PATHS:
-            with self.subTest(name=name):
-                bad = copy.deepcopy(binding)
-                del bad["source_hashes"][name]
-                with self.assertRaisesRegex(RuntimeError, "source binding"):
-                    title.validate_binding(bad, CANDIDATE)
-        for field, value in (("source_sha", BASE), ("pnpm_lock_sha256", "invalid")):
-            with self.assertRaisesRegex(RuntimeError, "source binding"):
-                title.validate_binding({**binding, field: value}, CANDIDATE)
-        path = self.root / title.PRODUCT_PATHS[0]
-        path.write_text("changed actual owner source")
-        self.assertNotEqual(title.source_binding(self.root, CANDIDATE), binding)
-        path.unlink()
-        with self.assertRaisesRegex(RuntimeError, "bounded regular"):
-            title.source_binding(self.root, CANDIDATE)
-        subprocess_run.assert_not_called()
-
-    def test_title_retirement_owner_inventory_rejects_old_five_and_every_missing_identity(self):
-        import m9e_title_storage as title
-        good = {"expected": 11, "passed": 11, "failed": 0, "skipped": 0, "selected_test_ids": list(title.NODE_IDS)}
-        title.validate_node(good)
-        for index in range(11):
-            for ids in (title.NODE_IDS[:index] + title.NODE_IDS[index + 1:],
-                        title.NODE_IDS[:index] + ["renamed"] + title.NODE_IDS[index + 1:],
-                        title.NODE_IDS + [title.NODE_IDS[index]]):
-                with self.subTest(index=index, ids=ids):
-                    with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
-                        title.validate_node({**good, "selected_test_ids": ids})
-        for field, value in (("expected", 5), ("passed", 5), ("failed", 1), ("skipped", 1), ("failed", False)):
-            with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
-                title.validate_node({**good, field: value})
-        with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
-            title.validate_node({**good, "expected": 5, "passed": 5, "selected_test_ids": title.NODE_IDS[:5]})
-
-    def test_title_retirement_manifest_binds_toolchain_source_cohort_and_declared_capability(self):
-        title, binding, cohort, good = self.title_retirement_assets_fixture()
-        title.validate_assets(good, binding, cohort, "1.97.1")
-        for field, value in (("schema_version", True), ("schema_version", 2), ("capability", "INDEXEDDB_ADAPTER_ONLY"),
-                             ("fixture_kind", "CONTROLLED_SAVE_CHECKPOINT"), ("source_sha", BASE),
-                             ("pnpm_lock_sha256", "f" * 64), ("rustup_toolchain", "1.97.0"), ("vite_version", "latest")):
-            with self.subTest(field=field, value=value):
-                bad = copy.deepcopy(good)
-                bad["manifest"][field] = value
-                bad["manifest_sha256"] = title.sha(title.js_bytes(bad["manifest"]) + b"\n")
-                with self.assertRaisesRegex(RuntimeError, "manifest source/cohort/hash"):
-                    title.validate_assets(bad, binding, cohort, "1.97.1")
-        with self.assertRaisesRegex(RuntimeError, "manifest source/cohort/hash"):
-            title.validate_assets({**good, "manifest_sha256": "f" * 64}, binding, cohort, "1.97.1")
-        bad = copy.deepcopy(good)
-        bad["manifest"]["cohort"]["content_sha256"] = "f" * 64
-        bad["manifest_sha256"] = title.sha(title.js_bytes(bad["manifest"]) + b"\n")
-        with self.assertRaisesRegex(RuntimeError, "manifest source/cohort/hash"):
-            title.validate_assets(bad, binding, cohort, "1.97.1")
-
-    def test_title_retirement_assets_reject_escape_role_counts_and_existing_byte_bound_overflow(self):
-        title, binding, cohort, good = self.title_retirement_assets_fixture()
-        for mode in ("entry", "worker", "role", "file_bound", "aggregate", "fixture_bound", "fixture_path", "count"):
-            with self.subTest(mode=mode):
-                bad = copy.deepcopy(good)
-                manifest = bad["manifest"]
-                if mode == "entry": manifest["entry"] = "../entry.js"
-                if mode == "worker": manifest["worker"] = "current-storage-kernel-worker-old.js"
-                if mode == "role": manifest["assets"][manifest["worker"]]["role"] = "entry"
-                if mode == "file_bound": manifest["assets"][manifest["entry"]]["bytes"] = (4 << 20) + 1
-                if mode == "aggregate": manifest["assets"][manifest["entry"]]["bytes"] = 4 << 20
-                if mode == "fixture_bound": manifest["fixture"]["bytes"] = (32 << 20) + 1
-                if mode == "fixture_path": manifest["fixture"]["path"] = "../fixture.json"
-                if mode == "count":
-                    for index in range(7):
-                        manifest["assets"][f"current-title-storage-extra-{index}.js"] = {"bytes": 1, "sha256": "f" * 64, "role": "chunk"}
-                bad["manifest_sha256"] = title.sha(title.js_bytes(manifest) + b"\n")
-                with self.assertRaisesRegex(RuntimeError, "Title retirement"):
-                    title.validate_assets(bad, binding, cohort, "1.97.1")
-
-    @patch("subprocess.run", side_effect=AssertionError("asset/source checks must not execute subprocesses"))
-    def test_title_retirement_actual_asset_files_reject_tamper_and_unlisted_output(self, subprocess_run):
-        title, binding, cohort, good = self.title_retirement_assets_fixture()
-        output = self.root / "title-assets"
-        output.mkdir()
-        manifest = good["manifest"]
-        (output / "m9e-v7-title-storage-assets.json").write_bytes(title.js_bytes(manifest) + b"\n")
-        (output / "m9e-v7-title-storage-fixtures.json").write_bytes(b"{}")
-        (output / manifest["entry"]).write_bytes(b"entry")
-        (output / manifest["worker"]).write_bytes(b"worker")
-        evidence, raw = title.bind_asset_files(output, binding, cohort, "1.97.1")
-        self.assertEqual(evidence, good)
-        self.assertEqual(raw, b"{}")  # Asset bytes only; no gameplay proof is inferred.
-        (output / manifest["entry"]).write_bytes(b"wrong")
-        with self.assertRaisesRegex(RuntimeError, "emitted asset bytes"):
-            title.bind_asset_files(output, binding, cohort, "1.97.1")
-        (output / manifest["entry"]).write_bytes(b"entry")
-        extra = output / "current-title-storage-unlisted.js"
-        extra.write_bytes(b"extra")
-        with self.assertRaisesRegex(RuntimeError, "unlisted or missing"):
-            title.bind_asset_files(output, binding, cohort, "1.97.1")
-        extra.unlink()
-        (output / "m9e-v7-title-storage-fixtures.json").write_bytes(b"[]")
-        with self.assertRaisesRegex(RuntimeError, "fixture bytes"):
-            title.bind_asset_files(output, binding, cohort, "1.97.1")
-        subprocess_run.assert_not_called()
-
-
-    def title_normalization_fixture(self):
-        control = {"kind": "TITLE", "revision": 1, "owner_seat": 1,
-                   "action_context": {"authority_revision": 1, "menu_instance": 1, "operation_id": "bootstrap/title/1"},
-                   "menu": {"instance_id": 1, "control_id": "bootstrap/title/1", "selected_option_id": "bootstrap/title/new-game",
-                            "options": [{"option_id": "bootstrap/title/new-game"}, {"option_id": "bootstrap/title/existing-saves"}]}}
-        initial = {"lifecycle": {"kind": "BOOTSTRAP", "value": {"stage": "TITLE", "control": control,
-                    "pressed_keys": [], "menu_instance_high_water": 1, "seed": "owned seed", "catalog": {"save_slots": ["new-destination"]},
-                    "current_storage": {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}}},
-                   "replay_sequence": 0, "next_menu_instance_id": 2, "pending_platform": [], "pending_presentations": [],
-                   "storage_frontiers": [], "material_ledger": {"schema_version": 1, "next_authority_revision": 1, "records": []},
-                   "unrelated_core_evidence": {"sentinel": [1, 2, 3]}}
-        pending = copy.deepcopy(initial)
-        owner = pending["lifecycle"]["value"]
-        owner["stage"] = "EXISTING_SAVE_LOADING"
-        owner["control"].update({"kind": "SAVE", "revision": 40})
-        owner["menu_instance_high_water"] = 20
-        owner["current_storage"].update({"next_platform_request_id": 26, "slots": ["controlled-slot"],
-            "pending": {"request_id": 25, "kind": {"kind": "READ", "value": {"slot": "controlled-slot"}}}})
-        pending.update({"replay_sequence": 99, "next_menu_instance_id": 21, "pending_platform": [{"request_id": 25}]})
-        saved = {"schema_version": 2, "generation": 1, "state": {
-            "identities": {"next_platform_request_id": 5, "other_id": 91},
-            "active_run": {"party": ["opaque saved party"], "control": {"kind": "SAVE", "revision": 7,
-                "menu": {"instance_id": 3, "selected_option_id": "saved/write", "options": ["saved option"]},
-                "action_context": {"authority_revision": 7, "menu_instance": 3, "operation_id": "saved operation"}}},
-            "opaque_saved_rng": [17, 29]}}
-        return initial, pending, saved
-
-    def test_title_read_normalization_conserves_every_other_saved_and_live_field(self):
-        import m9e_title_storage as title
-        _, pending, saved = self.title_normalization_fixture()
-        before = copy.deepcopy((pending, saved))
-        expected = copy.deepcopy(pending)
-        state = copy.deepcopy(saved["state"])
-        state["identities"]["next_platform_request_id"] = 26
-        control = state["active_run"]["control"]
-        control["revision"] = 41
-        control["menu"]["instance_id"] = 21
-        control["action_context"].update({"authority_revision": 41, "menu_instance": 21})
-        expected.update({"lifecycle": {"kind": "ACTIVE", "value": state}, "replay_sequence": 100,
-                         "next_menu_instance_id": 22, "pending_platform": [],
-                         "storage_frontiers": [{"slot": "controlled-slot", "generation": 1}],
-                         "material_ledger": {"schema_version": 1, "next_authority_revision": 41, "records": []}})
-        self.assertEqual(title.normalized_title_read(pending, saved), expected)
-        self.assertEqual((pending, saved), before)
-        saved["state"]["active_run"]["control"]["revision"] = 80
-        saved["state"]["active_run"]["control"]["menu"]["instance_id"] = 90
-        saved["state"]["identities"]["next_platform_request_id"] = 100
-        loaded = title.normalized_title_read(pending, saved)
-        self.assertEqual(loaded["lifecycle"]["value"]["active_run"]["control"]["revision"], 81)
-        self.assertEqual(loaded["next_menu_instance_id"], 92)
-        self.assertEqual(loaded["lifecycle"]["value"]["identities"]["next_platform_request_id"], 100)
-
-    def test_title_cancel_normalization_accounts_for_both_physical_replay_steps(self):
-        import m9e_title_storage as title
-        initial, pending, _ = self.title_normalization_fixture()
-        before = copy.deepcopy((initial, pending))
-        expected = copy.deepcopy(pending)
-        owner = copy.deepcopy(initial["lifecycle"]["value"])
-        owner["current_storage"]["next_platform_request_id"] = 26
-        owner["menu_instance_high_water"] = 21
-        owner["control"]["revision"] = 41
-        owner["control"]["menu"].update({"instance_id": 21, "control_id": "bootstrap/title/41"})
-        owner["control"]["action_context"].update({"authority_revision": 41, "menu_instance": 21, "operation_id": "bootstrap/title/41"})
-        expected.update({"lifecycle": {"kind": "BOOTSTRAP", "value": owner}, "replay_sequence": 101,
-                         "next_menu_instance_id": 22, "pending_platform": []})
-        result = title.normalized_title_cancel(pending, initial)
-        self.assertEqual(result, expected)
-        self.assertEqual((initial, pending), before)
-        self.assertEqual(result["replay_sequence"] - pending["replay_sequence"], 2)
-        self.assertEqual(result["lifecycle"]["value"]["current_storage"]["pending"], None)
-        self.assertEqual(result["unrelated_core_evidence"], pending["unrelated_core_evidence"])
-
-    def test_title_normalization_rejects_overflow_wrong_owner_and_unreleased_input(self):
-        import m9e_title_storage as title
-        initial, pending, saved = self.title_normalization_fixture()
-        for target in ("revision", "menu", "replay"):
-            with self.subTest(target=target):
-                bad = copy.deepcopy(pending)
-                if target == "revision": bad["lifecycle"]["value"]["control"]["revision"] = (1 << 53) - 1
-                if target == "menu":
-                    bad["next_menu_instance_id"] = (1 << 53) - 1
-                    bad["lifecycle"]["value"]["menu_instance_high_water"] = (1 << 53) - 1
-                if target == "replay": bad["replay_sequence"] = (1 << 53) - 1
-                with self.assertRaisesRegex(RuntimeError, "allocator overflows"):
-                    title.normalized_title_read(bad, saved)
-                with self.assertRaisesRegex(RuntimeError, "allocator overflows"):
-                    title.normalized_title_cancel(bad, initial)
-        bad = copy.deepcopy(pending)
-        bad["pending_platform"][0]["request_id"] = 24
-        with self.assertRaisesRegex(RuntimeError, "exact live owner"):
-            title.normalized_title_read(bad, saved)
-        with self.assertRaisesRegex(RuntimeError, "released owner/template"):
-            title.normalized_title_cancel(bad, initial)
-        bad = copy.deepcopy(pending)
-        bad["lifecycle"]["value"]["pressed_keys"] = [{"kind": "ESCAPE"}]
-        with self.assertRaisesRegex(RuntimeError, "released owner/template"):
-            title.normalized_title_cancel(bad, initial)
-
-
-    def test_title_reference_menus_pin_order_actions_and_allocator(self):
-        import m9e_title_storage as title
-        initial = title.bootstrap_control("TITLE", 1, 1, 1)
-        self.assertEqual(initial["schema_version"], 2)
-        self.assertEqual(initial["menu"]["selected_option_id"], "bootstrap/title/new-game")
-        self.assertEqual([option["action"] for option in initial["menu"]["options"]], [
-            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_NEW_GAME"}},
-            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_EXISTING_SAVES"}}])
-        self.assertEqual(initial["menu"]["navigation"], [
-            {"from": "bootstrap/title/new-game", "direction": "DOWN", "to": "bootstrap/title/existing-saves"},
-            {"from": "bootstrap/title/existing-saves", "direction": "UP", "to": "bootstrap/title/new-game"}])
-        selected = title.bootstrap_control("EXISTING_SAVE_SELECT", 1, 8, 9)
-        self.assertEqual(selected["action_context"], {"authority_seat": 1, "authority_revision": 8, "menu_instance": 9,
-                                                    "operation_id": "bootstrap/existingsaveselect/8"})
-        self.assertEqual(selected["menu"]["options"][0]["action"],
-                         {"kind": "BOOTSTRAP", "action": {"kind": "SELECT_EXISTING_SAVE", "value": "controlled-slot"}})
-        for stage in ("EXISTING_SAVE_LISTING", "EXISTING_SAVE_LOADING"):
-            control = title.bootstrap_control(stage, 1, 10, 11)
-            self.assertEqual([row["option_id"] for row in control["menu"]["options"]], ["bootstrap/existing/cancel"])
-            self.assertEqual(control["menu"]["cancel"], {"kind": "BACK", "action": {"kind": "BOOTSTRAP", "action": {"kind": "CANCEL"}}})
-        for args in (("ACTIVE", 1, 1, 1), ("TITLE", True, 1, 1), ("TITLE", 1, 0, 1), ("TITLE", 1, 1, 1 << 53)):
-            with self.assertRaisesRegex(RuntimeError, "Title reference control"):
-                title.bootstrap_control(*args)
-
-    def test_title_request_references_keep_exact_effects_and_unrelated_core_fields(self):
-        import m9e_title_storage as title
-        initial, _, _ = self.title_normalization_fixture()
-        initial["lifecycle"]["value"]["control"] = title.bootstrap_control("TITLE", 1, 1, 1)
-        initial["lifecycle"]["value"]["control"]["menu"]["selected_option_id"] = "bootstrap/title/existing-saves"
-        before = copy.deepcopy(initial)
-        listed = title.title_request_reference(initial, "LIST")
-        self.assertEqual(listed["pending_platform"], [{"request_id": 1, "effect": {"kind": "STORAGE_LIST", "request": 1}}])
-        self.assertEqual(listed["replay_sequence"], 2)
-        self.assertEqual(listed["next_menu_instance_id"], 3)
-        owned = listed["lifecycle"]["value"]["current_storage"]["pending"]
-        self.assertEqual(owned, {"request_id": 1, "kind": {"kind": "LIST"}, "source_menu": 1,
-                                 "source_revision": 1, "waiting_menu": 2, "waiting_revision": 2})
-        self.assertEqual(listed["unrelated_core_evidence"], initial["unrelated_core_evidence"])
-        self.assertEqual(initial, before)
-        selected = title.title_slots_reference(listed)
-        self.assertEqual(selected["pending_platform"], [])
-        self.assertEqual(selected["replay_sequence"], 3)
-        self.assertEqual(selected["lifecycle"]["value"]["current_storage"]["slots"], ["controlled-slot"])
-        loaded = title.title_request_reference(selected, "READ")
-        self.assertEqual(loaded["replay_sequence"], 5)
-        self.assertEqual(loaded["pending_platform"], [{"request_id": 2, "effect": {"kind": "STORAGE_READ", "request": 2, "slot": "controlled-slot"}}])
-        self.assertEqual(loaded["lifecycle"]["value"]["current_storage"]["next_platform_request_id"], 3)
-        for value in (listed, loaded):
-            with self.assertRaisesRegex(RuntimeError, "released control"):
-                title.title_request_reference(value, "READ")
-        bad = copy.deepcopy(initial)
-        bad["lifecycle"]["value"]["current_storage"]["next_platform_request_id"] = (1 << 53) - 1
-        with self.assertRaisesRegex(RuntimeError, "allocator overflows"):
-            title.title_request_reference(bad, "LIST")
-
-    def test_title_write_reference_rejects_checksum_payload_and_causal_owner_drift(self):
-        import m9e_title_storage as title
-        from m9e_current_proposal import canonical
-        identity = {"fixture": "independent synthetic save metadata"}
-        state = {"content_identity": identity, "identities": {"next_platform_request_id": 1}, "active_run": {"control": {"kind": "SAVE"}}, "kept": [4, 9]}
-        before = {"lifecycle": {"kind": "ACTIVE", "value": copy.deepcopy(state)}, "pending_platform": [],
-                  "pending_presentations": [], "replay_sequence": 10, "scheduler": {"timers": []},
-                  "material_ledger": {"schema_version": 1, "next_authority_revision": 3, "records": []}}
-        saved_state = copy.deepcopy(state)
-        saved_state["identities"]["next_platform_request_id"] = 2
-        saved = {"schema_version": 2, "content_identity": identity, "generation": 1, "state": saved_state}
-        saved["checksum"] = "sha256-v1:" + title.sha(canonical(saved))
-        payload = canonical(saved)
-        presentation = {"event_id": 3, "semantic": {"kind": "CUE", "value": "SAVE"}, "blocking": "NON_BLOCKING", "skip": "ALLOWED"}
-        pending = copy.deepcopy(before)
-        pending.update({"pending_platform": [{"request_id": 1, "effect": {"kind": "STORAGE_WRITE", "request": 1,
-            "slot": "controlled-slot", "generation": 1, "bytes": list(payload)}}], "pending_presentations": [presentation], "replay_sequence": 11})
-        callback = copy.deepcopy(pending)
-        callback.update({"pending_platform": [], "storage_frontiers": [{"slot": "controlled-slot", "generation": 1}], "replay_sequence": 12})
-        settled = copy.deepcopy(callback)
-        settled.update({"pending_presentations": [], "replay_sequence": 13})
-        continued = copy.deepcopy(settled)
-        continued["replay_sequence"] = 14
-        case = {"before": before, "pending": pending, "callback": callback, "settled": settled, "continued": continued,
-                "presentation": presentation, "request": {"kind": "WRITE", "request_id": 1, "slot": "controlled-slot", "generation": 1, "bytes": list(payload)}}
-        self.assertEqual(title.write_case_reference(case, 1, identity), (payload, saved))
-        for key, value in (("kind", "STORAGE_READ"), ("request", 2), ("slot", "other-slot"), ("generation", 2), ("bytes", [0])):
-            bad = copy.deepcopy(case)
-            bad["pending"]["pending_platform"][0]["effect"][key] = value
-            with self.assertRaisesRegex(RuntimeError, "effect ownership"):
-                title.write_case_reference(bad, 1, identity)
-        for field in ("callback", "settled", "continued"):
-            bad = copy.deepcopy(case)
-            bad[field]["replay_sequence"] += 1
-            with self.assertRaisesRegex(RuntimeError, "Title"):
-                title.write_case_reference(bad, 1, identity)
-        bad = copy.deepcopy(case)
-        wrong = copy.deepcopy(saved)
-        wrong["checksum"] = "sha256-v1:" + "0" * 64
-        bad["request"]["bytes"] = list(canonical(wrong))
-        with self.assertRaisesRegex(RuntimeError, "checksum differs"):
-            title.write_case_reference(bad, 1, identity)
-        bad = copy.deepcopy(case)
-        bad["request"]["bytes"] += [32]
-        with self.assertRaisesRegex(RuntimeError, "noncanonical JSON"):
-            title.write_case_reference(bad, 1, identity)
-        bad = copy.deepcopy(case)
-        bad["before"]["lifecycle"]["value"]["kept"].append(10)
-        with self.assertRaisesRegex(RuntimeError, "changed saved gameplay"):
-            title.write_case_reference(bad, 1, identity)
-
-
-    def title_browser_proof_fixture(self):
-        import base64
-        title, binding, cohort, assets = self.title_retirement_assets_fixture()
-        oracle = {"cancelled_requests": [*range(1, 22), 23, 25], "queued_not_started_request_id": 2,
-                  "highest_retired_id": 25, "rewrite_request_id": 28, "rewrite_generation": 2,
-                  "rewrite_payload_bytes": 1234, "presentation_id": 75,
-                  **{key: "a" * 64 for key in ("cancelled_snapshot_digest", "producer_receipt", "producer_payload_sha256",
-                      "load_snapshot_sha256", "rewrite_receipt", "rewrite_payload_sha256", "rewrite_callback_sha256", "rewrite_continued_sha256")}}
-        measured = {key: value for key, value in oracle.items() if key != "cancelled_requests"}
-        measured.update({"cancelled": 23, "list_cancels": 21, "read_cancels": 2, "queued_not_started_cancels": 1,
-            "list_emissions": 24, "native_transaction_cancels": 21, "native_gets": 210,
-            "native_get_limit_per_transaction": 20000, "native_deadline_ms": 8000,
-            "all_native_completions_after_cancel": True, "callback_queued_before_retirement": True,
-            "lists": 23, "reads": 3, "writes": 2, "reader_callbacks": 5, "presentation_settlements": 1,
-            "stale_callbacks_conserve_snapshot": True, "stale_rendered_cancel_not_sent": True,
-            "disposed": True, "queue_empty": True,
-            "correlated_sequences": [[request, 10 + index * 12, 11 + index * 12] for index, request in enumerate(oracle["cancelled_requests"])]})
-        manifest = assets["manifest"]
-        item = {"schema_version": 1, "capability": title.CAPABILITY, "fixture_kind": title.FIXTURE_KIND,
-                "source_sha": CANDIDATE, "manifest_sha256": assets["manifest_sha256"], "fixture_sha256": manifest["fixture"]["sha256"],
-                "worker_sha256": manifest["assets"][manifest["worker"]]["sha256"], "observed_worker_count": 2,
-                "cohort": manifest["cohort"], "evidence": measured}
-        tests = {"expected": 1, "passed": 1, "failed": 0, "skipped": 0, "selected_test_ids": list(title.TEST_IDS), "retirement": item}
-        attachment = {"name": title.ATTACHMENT, "contentType": "application/json", "body": base64.b64encode(title.js_bytes(item)).decode()}
-        report = {"errors": [], "suites": [{"suites": [{"specs": [{"title": title.TEST_IDS[0], "file": title.PRODUCT_PATHS[5],
-            "ok": True, "tests": [{"projectName": "chromium", "expectedStatus": "passed", "status": "expected",
-            "results": [{"status": "passed", "retry": 0, "errors": [], "attachments": [attachment]}]}]}]}]}]}
-        return title, binding, cohort, assets, oracle, tests, report
-
-    def test_title_browser_proof_accepts_exact_inline_and_contained_file_evidence(self):
-        title, binding, cohort, assets, oracle, tests, report = self.title_browser_proof_fixture()
-        title.validate_tests(tests, assets, oracle, binding, cohort, "1.97.1")
-        self.assertEqual(title.test_evidence(report, assets, oracle, binding, cohort, "1.97.1", self.root), tests)
-        attachment = report["suites"][0]["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"][0]
-        target = self.root / "test-results/rust-browser/title.json"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(title.js_bytes(tests["retirement"]))
-        del attachment["body"]
-        attachment["path"] = "test-results/rust-browser/title.json"
-        self.assertEqual(title.test_evidence(report, assets, oracle, binding, cohort, "1.97.1", self.root), tests)
-        attachment["path"] = str(self.root / "outside.json")
-        (self.root / "outside.json").write_bytes(title.js_bytes(tests["retirement"]))
-        with self.assertRaisesRegex(RuntimeError, "bounded regular"):
-            title.test_evidence(report, assets, oracle, binding, cohort, "1.97.1", self.root)
-
-    def test_title_browser_proof_rejects_every_missing_or_changed_causal_fact(self):
-        title, binding, cohort, assets, oracle, tests, _ = self.title_browser_proof_fixture()
-        for key, value in tests["retirement"]["evidence"].items():
-            if key in ("native_gets", "correlated_sequences"):
-                continue
-            with self.subTest(key=key):
-                bad = copy.deepcopy(tests)
-                bad["retirement"]["evidence"][key] = (not value) if isinstance(value, bool) else value + 1 if isinstance(value, int) else "b" * 64
-                with self.assertRaisesRegex(RuntimeError, "measured facts"):
-                    title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
-                del bad["retirement"]["evidence"][key]
-                with self.assertRaisesRegex(RuntimeError, "measured facts"):
-                    title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
-        for key in ("queue_empty", "disposed", "all_native_completions_after_cancel"):
-            bad = copy.deepcopy(tests)
-            bad["retirement"]["evidence"][key] = 1
-            with self.assertRaisesRegex(RuntimeError, "measured facts"):
-                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
-        for gets in (True, 20, 420001):
-            bad = copy.deepcopy(tests)
-            bad["retirement"]["evidence"]["native_gets"] = gets
-            with self.assertRaisesRegex(RuntimeError, "measured facts"):
-                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
-
-    def test_title_browser_proof_rejects_reordered_reused_and_uncorrelated_cancel_sequences(self):
-        title, binding, cohort, assets, oracle, tests, _ = self.title_browser_proof_fixture()
-        sequence = tests["retirement"]["evidence"]["correlated_sequences"]
-        for replacement in (sequence[:-1], list(reversed(sequence)), [sequence[0]] * 23,
-                            [[True, *sequence[0][1:]], *sequence[1:]],
-                            [[sequence[0][0], sequence[0][1], sequence[0][2] + 1], *sequence[1:]]):
-            bad = copy.deepcopy(tests)
-            bad["retirement"]["evidence"]["correlated_sequences"] = replacement
-            with self.assertRaisesRegex(RuntimeError, "sequence inventory|correlation"):
-                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
-        for key, value in (("cancelled_requests", list(range(1, 24))), ("highest_retired_id", 24),
-                           ("rewrite_request_id", 27), ("rewrite_generation", True), ("producer_receipt", "invalid")):
-            with self.assertRaisesRegex(RuntimeError, "reduced fixture oracle"):
-                title.validate_tests(tests, assets, {**oracle, key: value}, binding, cohort, "1.97.1")
-
-    def test_title_browser_report_rejects_wrong_source_retry_project_and_attempt_inventory(self):
-        title, binding, cohort, assets, oracle, _, report = self.title_browser_proof_fixture()
-        for target, key, value in (("spec", "title", "adapter-only"), ("spec", "file", "wrong.spec.ts"), ("spec", "ok", False),
-                ("test", "projectName", "firefox"), ("test", "expectedStatus", "failed"), ("test", "status", "flaky"),
-                ("run", "retry", 1), ("run", "retry", False), ("run", "status", "skipped"), ("run", "errors", ["failure"])):
-            with self.subTest(target=target, key=key):
-                bad = copy.deepcopy(report)
-                spec = bad["suites"][0]["suites"][0]["specs"][0]
-                item = spec if target == "spec" else spec["tests"][0] if target == "test" else spec["tests"][0]["results"][0]
-                item[key] = value
-                with self.assertRaisesRegex(RuntimeError, "Title retirement Chromium"):
-                    title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
-        for target in ("specs", "tests", "results"):
-            bad = copy.deepcopy(report)
-            suite = bad["suites"][0]["suites"][0]
-            owner = suite if target == "specs" else suite["specs"][0] if target == "tests" else suite["specs"][0]["tests"][0]
-            owner[target] *= 2
-            with self.assertRaisesRegex(RuntimeError, "Title retirement Chromium"):
-                title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
-
-    def test_title_browser_attachment_rejects_duplicate_fields_sources_and_oversized_encodings(self):
-        import base64
-        title, binding, cohort, assets, oracle, tests, report = self.title_browser_proof_fixture()
-        for key, value in (("observed_worker_count", 1), ("schema_version", True), ("source_sha", BASE),
-                           ("fixture_kind", "CONTROLLED_ONLY"), ("worker_sha256", "f" * 64)):
-            bad = copy.deepcopy(tests)
-            bad["retirement"][key] = value
-            with self.assertRaisesRegex(RuntimeError, "attachment source/topology"):
-                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
-        for mutation in ("duplicate", "body_and_file", "neither", "name", "mime", "oversize", "bad_base64", "duplicate_json"):
-            with self.subTest(mutation=mutation):
-                bad = copy.deepcopy(report)
-                attachments = bad["suites"][0]["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"]
-                item = attachments[0]
-                if mutation == "duplicate": attachments.append(copy.deepcopy(item))
-                if mutation == "body_and_file": item["path"] = "test-results/rust-browser/title.json"
-                if mutation == "neither": del item["body"]
-                if mutation == "name": item["name"] += "-renamed"
-                if mutation == "mime": item["contentType"] = "text/plain"
-                if mutation == "oversize": item["body"] = "A" * 5468
-                if mutation == "bad_base64": item["body"] = "!invalid!"
-                if mutation == "duplicate_json": item["body"] = base64.b64encode(b'{"schema_version":1,"schema_version":1}').decode()
-                with self.assertRaisesRegex(RuntimeError, "Title retirement"):
-                    title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
-
-    def test_title_node_parser_requires_eleven_exact_passes_and_preserves_legacy_five(self):
-        import m9e_title_storage as title
-        report = {"success": True, "numTotalTests": 11, "numPassedTests": 11, "numFailedTests": 0, "numPendingTests": 0,
-                  "testResults": [{"name": title.PRODUCT_PATHS[2], "assertionResults": [
-                      {"fullName": name, "status": "passed", "failureMessages": []} for name in title.NODE_IDS]}]}
-        evidence = title.node_evidence(report)
-        self.phases.validate_storage_node(evidence, title_retirement=True)
-        with self.assertRaisesRegex(RuntimeError, "current storage Node"):
-            self.phases.validate_storage_node(evidence)
-        old = {"expected": 5, "passed": 5, "failed": 0, "skipped": 0, "selected_test_ids": title.NODE_IDS[:5]}
-        self.phases.validate_storage_node(old)
-        with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
-            self.phases.validate_storage_node(old, title_retirement=True)
-        for field, value in (("numTotalTests", 5), ("numPassedTests", True), ("numPendingTests", 1), ("success", False)):
-            with self.assertRaisesRegex(RuntimeError, "Node source identities"):
-                title.node_evidence({**report, field: value})
-        for mutation in ("duplicate", "skip", "name", "file"):
-            bad = copy.deepcopy(report)
-            rows = bad["testResults"][0]["assertionResults"]
-            if mutation == "duplicate": rows[-1] = copy.deepcopy(rows[0])
-            if mutation == "skip": rows[-1]["status"] = "pending"
-            if mutation == "name": rows[-1]["fullName"] += " renamed"
-            if mutation == "file": bad["testResults"][0]["name"] = "wrong.test.ts"
-            with self.assertRaisesRegex(RuntimeError, "Node source identities"):
-                title.node_evidence(bad)
-
-    def title_platform_proof_fixture(self):
-        title, binding, cohort, assets, oracle, tests, _ = self.title_browser_proof_fixture()
-        flags = ("requires_title_retirement", "requires_title_storage", "requires_read_rebind", "requires_current_proposal",
-                 "requires_browser", "requires_browser_worker", "requires_browser_rtc", "requires_current_storage",
-                 "requires_worker_storage", "requires_wasm", "requires_cli_executable")
-        plan = {flag: True for flag in flags}
-        plan["title_storage_binding"] = binding
-        for key in ("browser_worker_binding", "browser_rtc_binding", "current_storage_binding", "worker_storage_binding"):
-            plan[key] = copy.deepcopy(binding)
-        native = {"plan": plan, "identity": {"product_sha": CANDIDATE, "files": {"title_storage": "f" * 64},
-                                            "toolchain": "rustc 1.97.1 (fixture)"}}
-        proof = {"title_storage_assets": assets, "title_storage_oracle": oracle, "title_storage_tests": tests,
-                 "browser_assets": {"assets": cohort}, "current_storage_node": {"expected": 11, "passed": 11,
-                     "failed": 0, "skipped": 0, "selected_test_ids": list(title.NODE_IDS)}}
-        for index, key in enumerate(("browser_worker_assets", "browser_rtc_assets", "worker_storage_assets")):
-            proof[key] = {"manifest": {"assets": {f"prior-bundle-{index}.js": {}}}}
-        return title, native, proof
-
-    def test_title_platform_validator_binds_prerequisites_sources_toolchain_and_owner_inventory(self):
-        title, native, proof = self.title_platform_proof_fixture()
-        title.validate_platform(proof, native)
-        for flag, value in native["plan"].items():
-            if value is not True:
-                continue
-            bad = copy.deepcopy(native)
-            bad["plan"][flag] = False
-            with self.assertRaisesRegex(RuntimeError, "Title retirement"):
-                title.validate_platform(proof, bad)
-        for key in ("browser_worker_binding", "browser_rtc_binding", "current_storage_binding", "worker_storage_binding"):
-            bad = copy.deepcopy(native)
-            bad["plan"][key]["source_hashes"][title.SOURCE_PATHS[0]] = "b" * 64
-            with self.assertRaisesRegex(RuntimeError, "dependency source binding"):
-                title.validate_platform(proof, bad)
-        bad = copy.deepcopy(native)
-        del bad["identity"]["files"]["title_storage"]
-        with self.assertRaisesRegex(RuntimeError, "proof validator"):
-            title.validate_platform(proof, bad)
-        bad = copy.deepcopy(native)
-        bad["identity"]["toolchain"] = "rustc 1.96.0 (other)"
-        with self.assertRaisesRegex(RuntimeError, "manifest source/cohort/hash"):
-            title.validate_platform(proof, bad)
-        bad = copy.deepcopy(proof)
-        bad["current_storage_node"]["selected_test_ids"] = title.NODE_IDS[:5]
-        with self.assertRaisesRegex(RuntimeError, "eleven owner tests"):
-            title.validate_platform(bad, native)
-        bad = copy.deepcopy(proof)
-        bad["browser_rtc_assets"]["manifest"]["assets"]["current-title-storage-entry.js"] = {}
-        with self.assertRaisesRegex(RuntimeError, "namespace overlaps"):
-            title.validate_platform(bad, native)
-
-    def test_title_compaction_keeps_full_evidence_address_without_trimming_prior_proof(self):
-        title, _, proof = self.title_platform_proof_fixture()
-        small = copy.deepcopy(proof)
-        title.compact(small, "e" * 64, self.phases.encoded)
-        self.assertEqual(small, proof)
-        large = {**copy.deepcopy(proof), "prior": "x" * 16000}
-        title.compact(large, "e" * 64, self.phases.encoded)
-        for key in title.PROOF_KEYS:
-            self.assertEqual(large[key], {"file": "phase-summary.json", "sha256": "e" * 64})
-        self.assertEqual(large["prior"], "x" * 16000)
-        self.assertGreater(len(self.phases.encoded(large)), 16000)
-        self.assertIsInstance(proof["title_storage_tests"]["retirement"]["evidence"], dict)
-
-    @patch("subprocess.run", side_effect=AssertionError("source metadata build checks cannot run a subprocess"))
-    def test_title_build_evidence_uses_actual_asset_binding_and_fixture_oracle(self, subprocess_run):
-        title, binding, cohort, assets = self.title_retirement_assets_fixture()
-        for name in [*title.SOURCE_PATHS, "pnpm-lock.yaml"]:
-            path = self.root / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("Title integration source: " + name)
-        binding = title.source_binding(self.root, CANDIDATE)
-        manifest = assets["manifest"]
-        manifest.update(binding)
-        self.output.joinpath("current-title-storage-entry.js").write_bytes(b"entry")
-        self.output.joinpath(manifest["worker"]).write_bytes(b"worker")
-        self.output.joinpath(manifest["fixture"]["path"]).write_bytes(b"{}")
-        self.output.joinpath("m9e-v7-title-storage-assets.json").write_bytes(title.js_bytes(manifest) + b"\n")
-        vite = self.root / "node_modules/vite/package.json"
-        vite.parent.mkdir(parents=True, exist_ok=True)
-        vite.write_text('{"version":"8.0.10"}')
-        _, _, _, _, oracle, _, _ = self.title_browser_proof_fixture()
-        summary = {"product_sha": CANDIDATE, "plan": {"title_storage_binding": binding}, "browser_assets": {"assets": cohort}}
-        with patch.object(title, "fixture_oracle", return_value=oracle) as fixture_check:
-            title.build_evidence(self.output, summary, self.root, self.full, "1.97.1")
-            fixture_check.assert_called_once_with({}, "e" * 64)
-        self.assertEqual(summary["title_storage_oracle"], oracle)
-        self.assertEqual(summary["title_storage_assets"]["manifest"], manifest)
-        self.assertTrue((self.full / "m9e-v7-title-storage-assets.json").is_file())
-        self.output.joinpath(manifest["fixture"]["path"]).write_bytes(b"[]")
-        with patch.object(title, "fixture_oracle", side_effect=AssertionError("must fail before semantic interpretation")):
-            with self.assertRaisesRegex(RuntimeError, "fixture bytes differ"):
-                title.build_evidence(self.output, summary, self.root, self.full, "1.97.1")
-        subprocess_run.assert_not_called()
-
-    def test_title_browser_checks_revalidate_cohort_after_exact_remote_command(self):
-        title, binding, cohort, assets, oracle, tests, report = self.title_browser_proof_fixture()
-        summary = {"product_sha": CANDIDATE, "plan": {"title_storage_binding": binding}, "browser_assets": {"assets": cohort},
-                   "title_storage_assets": assets, "title_storage_oracle": oracle}
-        env = {"M9E_V7_WEB_DIR": str(self.output), "preserved": "runner-owned"}
-        commands = []
-        def remote(command, label, root, run_env):
-            commands.append((command, label, root, run_env))
-            self.assertEqual(command, ["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts",
-                                      "--project=chromium", title.PRODUCT_PATHS[5], "--workers=1", "--reporter=line,json"])
-            self.assertEqual(label, "title-storage-journey")
-            self.assertEqual(root, self.root)
-            self.assertEqual(run_env["preserved"], "runner-owned")
-            self.assertEqual(run_env["M9E_V7_WEB_DIR"], str(self.output))
-            self.assertEqual(run_env["PLAYWRIGHT_JSON_OUTPUT_FILE"], str(self.full / "title-storage-results.json"))
-            Path(run_env["PLAYWRIGHT_JSON_OUTPUT_FILE"]).write_text(json.dumps(report))
-        with patch.object(title, "source_binding", return_value=binding) as source, patch.object(title, "build_evidence") as rebuilt:
-            title.checks(self.root, self.full, remote, summary, env, "1.97.1")
-            self.assertEqual(source.call_count, 2)
-            rebuilt.assert_called_once()
-            self.assertEqual(rebuilt.call_args.args[0], self.output)
-            self.assertEqual(rebuilt.call_args.args[-1], "1.97.1")
-        self.assertEqual(summary["title_storage_tests"], tests)
-        self.assertEqual(len(commands), 1)
-        self.assertNotIn("PLAYWRIGHT_JSON_OUTPUT_FILE", env)
-        def drift(output, repeated, root, full, toolchain):
-            repeated["title_storage_assets"] = {**repeated["title_storage_assets"], "manifest_sha256": "0" * 64}
-        with patch.object(title, "source_binding", return_value=binding), patch.object(title, "build_evidence", side_effect=drift):
-            with self.assertRaisesRegex(RuntimeError, "changed emitted cohort/fixture"):
-                title.checks(self.root, self.full, remote, summary, env, "1.97.1")
-        with patch.object(title, "source_binding", side_effect=[binding, {**binding, "pnpm_lock_sha256": "0" * 64}]), patch.object(title, "build_evidence") as rebuilt:
-            with self.assertRaisesRegex(RuntimeError, "changed source/lock"):
-                title.checks(self.root, self.full, remote, summary, env, "1.97.1")
-            rebuilt.assert_not_called()
 if __name__ == "__main__":
     unittest.main()
