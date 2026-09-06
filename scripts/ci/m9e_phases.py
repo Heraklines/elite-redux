@@ -86,12 +86,17 @@ CONTROL_QUERY_TARGET = ("er-cli", "m9e_current_control_query")
 CONTROL_QUERY_TEST_IDS = ["current_control_queries_are_read_only_and_plans_drive_natural_raw_input",
                           "worker_control_queries_bind_current_control_and_preserve_rejections"]
 STATE_QUERY_PATHS = ["rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-lab/src/query.rs",
-                     "rust/crates/er-cli/tests/m9e_current_state_query.rs"]
+                     "rust/crates/er-cli/tests/m9e_current_state_query.rs",
+                     "rust/crates/er-cli/tests/m9e_current_state_query_worker.rs",
+                     "rust/crates/er-cli/tests/support/m9e_current_state_query.rs"]
 STATE_QUERY_TARGET = ("er-cli", "m9e_current_state_query")
+STATE_QUERY_WORKER_TARGET = ("er-cli", "m9e_current_state_query_worker")
 STATE_QUERY_TEST_IDS = ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture",
                         "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"]
 LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-                  ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")}
+                  ("er-cli", "m9e_current_reload"), STATE_QUERY_WORKER_TARGET}
+STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
+                          STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 
 
 def inventory_and_assignment(enumerated, lane):
@@ -368,7 +373,7 @@ def validate_control_query_inventory(plan, inventory):
 
 def validate_state_query_inventory(plan, inventory):
     """Any selected current query target requires its exact process witness."""
-    selected = [item for item in inventory if (item["crate"], item["target"]) == STATE_QUERY_TARGET]
+    selected = [item for item in inventory if (item["crate"], item["target"]) in STATE_QUERY_IDENTITIES]
     required = plan.get("requires_current_state_query", False)
     if type(required) is not bool or (selected and not required):
         raise RuntimeError("current state query requirement is absent or not boolean")
@@ -377,14 +382,16 @@ def validate_state_query_inventory(plan, inventory):
     if plan.get("requires_current_control_query") is not True:
         raise RuntimeError("current state query requires the exact control-query prerequisite")
     validate_control_query_inventory(plan, inventory)
-    identity = ":".join(STATE_QUERY_TARGET)
-    if (len(selected) != 1 or sorted(selected[0]["ids"]) != sorted(STATE_QUERY_TEST_IDS)
-            or selected[0]["historical_excluded_ids"]
-            or plan.get("requires_worker_executable") is not True
-            or plan.get("required_native_test_ids", {}).get(identity) != STATE_QUERY_TEST_IDS
-            or plan.get("required_native_targets", {}).get("er-cli", []).count(STATE_QUERY_TARGET[1]) != 1
-            or list(STATE_QUERY_TARGET) not in partition(inventory)["a"]):
+    if len(selected) != 2 or plan.get("requires_worker_executable") is not True:
         raise RuntimeError("current state query process inventory, binding or lane ownership disagrees")
+    for target, ids in STATE_QUERY_IDENTITIES.items():
+        rows = [item for item in selected if (item["crate"], item["target"]) == target]
+        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "a"
+        if (len(rows) != 1 or rows[0]["ids"] != ids or rows[0]["historical_excluded_ids"]
+                or plan.get("required_native_test_ids", {}).get(":".join(target)) != ids
+                or plan.get("required_native_targets", {}).get("er-cli", []).count(target[1]) != 1
+                or list(target) not in partition(inventory)[lane]):
+            raise RuntimeError("current state query process inventory, binding or lane ownership disagrees")
 
 
 def validate_native(proof, expected_identity):

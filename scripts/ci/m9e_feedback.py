@@ -31,7 +31,8 @@ WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-cli", "m9e_current_reload"),
                         ("er-cli", "m9e_current_repro"),
                         ("er-cli", "m9e_current_control_query"),
-                        ("er-cli", "m9e_current_state_query")}
+                        ("er-cli", "m9e_current_state_query"),
+                        ("er-cli", "m9e_current_state_query_worker")}
 
 AI_SNAPSHOT_VALIDATION_PATHS = ["rust/crates/er-ai/src/authority_v2.rs",
                                 "rust/crates/er-kernel/src/snapshot_v7.rs"]
@@ -649,14 +650,14 @@ def plan():
     timer_focus = config.get("timer_focus", {})
     product_changes = [path for path in changed if path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
-    from m9e_phases import STATE_QUERY_PATHS, STATE_QUERY_TARGET, STATE_QUERY_TEST_IDS
+    from m9e_phases import STATE_QUERY_PATHS, STATE_QUERY_TARGET, STATE_QUERY_TEST_IDS, STATE_QUERY_IDENTITIES
     state_query_focus = config.get("current_state_query_focus", {})
     if state_query_focus and (state_query_focus.get("paths") != STATE_QUERY_PATHS
                               or state_query_focus.get("test_ids") != STATE_QUERY_TEST_IDS):
         raise RuntimeError("current state query policy identities disagree")
     # The unique state witness cannot be smuggled into an older dispatcher scope.
     # Shared current_agent.rs still belongs to explicit control/capture/repro cuts.
-    state_query_changed = STATE_QUERY_PATHS[2] in product_changes
+    state_query_changed = any(path in STATE_QUERY_PATHS[2:] for path in product_changes)
     state_query_session = bool(state_query_focus) and any(path in STATE_QUERY_PATHS for path in product_changes) and all(
         path in STATE_QUERY_PATHS for path in product_changes)
     from m9e_phases import CONTROL_QUERY_PATHS, CONTROL_QUERY_TARGET, CONTROL_QUERY_TEST_IDS
@@ -930,9 +931,9 @@ def plan():
     query_required = query_selected_scope and (query_session or (ROOT / CONTROL_QUERY_PATHS[1]).is_file()
         or (execution_scope is not None and CONTROL_QUERY_TARGET[1] in execution_scope.get("er-cli", [])))
     state_query_selected_scope = "er-cli" in selected and (execution_scope is None
-        or "*" in execution_scope.get("er-cli", []) or STATE_QUERY_TARGET[1] in execution_scope.get("er-cli", []))
+        or "*" in execution_scope.get("er-cli", []) or any(target[1] in execution_scope.get("er-cli", []) for target in STATE_QUERY_IDENTITIES))
     state_query_required = state_query_selected_scope and (state_query_session or (ROOT / STATE_QUERY_PATHS[2]).is_file()
-        or (execution_scope is not None and STATE_QUERY_TARGET[1] in execution_scope.get("er-cli", [])))
+        or (execution_scope is not None and any(target[1] in execution_scope.get("er-cli", []) for target in STATE_QUERY_IDENTITIES)))
     if state_query_required and not state_query_focus:
         raise RuntimeError("selected current state query target requires its exact policy")
     query_required = query_required or state_query_required
@@ -1046,10 +1047,10 @@ def plan():
     if state_query_required:
         # The preceding query-required block already detached policy-owned lists.
         targets = result["required_native_targets"].setdefault("er-cli", [])
-        if STATE_QUERY_TARGET[1] not in targets:
-            targets.append(STATE_QUERY_TARGET[1])
-        result["required_native_test_ids"] = {**result["required_native_test_ids"],
-                                               ":".join(STATE_QUERY_TARGET): list(STATE_QUERY_TEST_IDS)}
+        for target, ids in STATE_QUERY_IDENTITIES.items():
+            if target[1] not in targets:
+                targets.append(target[1])
+            result["required_native_test_ids"] = {**result["required_native_test_ids"], ":".join(target): list(ids)}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
     # to broad native success or bypass the timer and replica mutant gate.
@@ -1693,7 +1694,8 @@ def native_execution_order(selection, enumerated):
     # kernel changes before long process witnesses without changing membership.
     if selection.get("current_state_query_focus"):
         ordered = native_execution_order({**selection, "current_state_query_focus": False}, enumerated)
-        return sorted(ordered, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_state_query"))
+        return sorted(ordered, key=lambda item: (item[4].name, item[2]) not in {
+            ("er-cli", "m9e_current_state_query"), ("er-cli", "m9e_current_state_query_worker")})
     if selection.get("current_control_query_focus"):
         ordered = native_execution_order({**selection, "current_control_query_focus": False}, enumerated)
         return sorted(ordered, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_control_query"))
@@ -1900,7 +1902,9 @@ def main(preflight_failure=None):
             print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
             command = [binary, "--format", "terse"]
             native_timer_parity = (cwd.name, name) == ("er-wasm", "m9e_parity")
-            if native_timer_parity or (cwd.name, name) == ("er-cli", "m9e_current_state_query"):
+            if native_timer_parity or (cwd.name, name) in {
+                ("er-cli", "m9e_current_state_query"), ("er-cli", "m9e_current_state_query_worker")
+            }:
                 command.append("--nocapture")
             for test_id in sorted(excluded_ids):
                 command.extend(["--skip", test_id])

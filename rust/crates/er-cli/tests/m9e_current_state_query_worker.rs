@@ -3,7 +3,7 @@
 mod fixture;
 
 #[test]
-fn current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture()
+fn worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections()
 -> Result<(), Box<dyn std::error::Error>> {
-    fixture::exercise_queries(false)
+    fixture::exercise_queries(true)
 }

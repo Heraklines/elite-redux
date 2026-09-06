@@ -4909,7 +4909,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-                                                ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+                                                ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
 
@@ -5135,10 +5135,10 @@ class FeedbackTests(unittest.TestCase):
                          "requires_agent_protocol_clippy"):
                 self.assertTrue(selection[flag], flag)
             self.assertEqual(selection["execution_scope"], self.config["timer_focus"]["execute"])
-            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 24)
+            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 25)
             for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
                 self.assertEqual(selection["required_native_test_ids"][identity], ids)
-            for target, ids in ((phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS),
+            for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(),
                                 (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
                 self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
                 self.assertEqual(selection["required_native_targets"][target[0]].count(target[1]), 1)
@@ -5152,7 +5152,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-                                                ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+                                                ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
 
@@ -5198,7 +5198,8 @@ class FeedbackTests(unittest.TestCase):
             self.assertFalse(selection["current_state_query_focus"])
             self.assertTrue(selection["requires_current_state_query"])
             self.assertTrue(selection["requires_worker_executable"])
-            self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_state_query"], phases.STATE_QUERY_TEST_IDS)
+            self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_state_query"], phases.STATE_QUERY_TEST_IDS[:1])
+            self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_state_query_worker"], phases.STATE_QUERY_TEST_IDS[1:])
         self.changed = ["docs/plans/rust-kernel/m9e-control-query.md", "scripts/ci/m9e_feedback.py"]
         selection = self.feedback.plan()
         self.assertEqual(selection["packages"], self.config["readiness_packages"])
@@ -5255,8 +5256,9 @@ class FeedbackTests(unittest.TestCase):
                 patch.object(self.feedback, "replica_behavioral_mutant") as replica:
             code, summary = self.invoke()
         self.assertEqual(code, 0, summary.get("first_failure"))
-        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_state_query"], 2)
-        self.assertEqual(len(summary["required_native_target_counts"]), 24)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_state_query"], 1)
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_state_query_worker"], 1)
+        self.assertEqual(len(summary["required_native_target_counts"]), 25)
         self.assertEqual(self.executed[0], "m9e_current_state_query")
         query_command = next(args for args in self.commands
                              if Path(args[0]).name == "m9e_current_state_query" and "--list" not in args)
@@ -5275,7 +5277,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
             self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
             self.assertEqual(env["ER_M9E_WORKER_BUILD_PROFILE"], "test")
-        self.assertIn("m9e_current_state_query::worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections",
+        self.assertIn("m9e_current_state_query_worker::worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections",
                       timer.call_args.args[2])
         timer.assert_called_once()
         replica.assert_called_once()
@@ -5296,7 +5298,7 @@ class FeedbackTests(unittest.TestCase):
             self.events.clear()
             self.binary_envs.clear()
             self.extra_artifacts = original_artifacts[1:] if failure == "worker" else original_artifacts
-            self.binary_ids["m9e_current_state_query"] = original_ids[:1] if failure == "witness" else original_ids
+            self.binary_ids["m9e_current_state_query"] = ["renamed"] if failure == "witness" else original_ids
             self.clippy_codes = {"er-cli": 1} if failure == "lint" else {}
             code, summary = self.invoke()
             self.assertEqual(code, 1)
@@ -5313,17 +5315,20 @@ class FeedbackTests(unittest.TestCase):
         import m9e_phases as phases
         selection = self.feedback.plan()
         identities = [("er-other", "m9e_current_state_query"), ("er-kernel", "m9e_coop_v7"),
-                      phases.CONTROL_QUERY_TARGET, phases.STATE_QUERY_TARGET, ("er-kernel", "m9e_timers_v7")]
+                      phases.CONTROL_QUERY_TARGET, phases.STATE_QUERY_TARGET, ("er-kernel", "m9e_timers_v7"),
+                      phases.STATE_QUERY_WORKER_TARGET]
         rows = [(index, f"binary-{index}", target, ["synthetic"], self.rust / "crates" / crate, set(), None)
                 for index, (crate, target) in enumerate(identities)]
         prior_plan = {**selection, "current_state_query_focus": False}
         prior = self.feedback.native_execution_order(prior_plan, rows)
-        self.assertEqual(self.feedback.native_execution_order(selection, rows), [rows[3], *[row for row in prior if row != rows[3]]])
+        self.assertEqual(self.feedback.native_execution_order(selection, rows),
+                         [rows[3], rows[5], *[row for row in prior if row not in (rows[3], rows[5])]])
         inventory = [{"crate": target[0], "target": target[1], "ids": list(ids), "historical_excluded_ids": []}
                      for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
-                                         (phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS))]
+                                         *phases.STATE_QUERY_IDENTITIES.items())]
         phases.validate_state_query_inventory(selection, inventory)
         self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["a"])
+        self.assertIn(list(phases.STATE_QUERY_WORKER_TARGET), phases.partition(inventory)["b"])
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
                      "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
                      "state_ids", "plan_ids", "plan_target"):
@@ -5356,6 +5361,57 @@ class FeedbackTests(unittest.TestCase):
                 bad_plan["required_native_targets"]["er-cli"].remove(phases.STATE_QUERY_TARGET[1])
             with self.subTest(mode=mode), self.assertRaises(RuntimeError):
                 phases.validate_state_query_inventory(bad_plan, bad_inventory)
+
+    def test_split_state_query_worker_uses_bound_process_and_preserves_full_inventory(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        with patch.object(self.feedback, "wasm_checks"), patch.object(self.feedback, "browser_checks"), \
+                patch.object(self.feedback, "timer_behavioral_mutant"), patch.object(self.feedback, "replica_behavioral_mutant"):
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        self.assertEqual(self.executed[:2], [target[1] for target in phases.STATE_QUERY_IDENTITIES])
+        for target, ids in phases.STATE_QUERY_IDENTITIES.items():
+            self.assertEqual(self.binary_ids[target[1]], ids)
+            command = next(args for args in self.commands if Path(args[0]).name == target[1] and "--list" not in args)
+            self.assertEqual(command[1:], ["--format", "terse", "--nocapture"])
+            environments = [(phase, env) for name, phase, env in self.binary_envs if name == target[1]]
+            self.assertEqual([phase for phase, _ in environments], ["list", "execute"])
+            for _, env in environments:
+                self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+                self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+                self.assertEqual(env["ER_M9E_WORKER_BUILD_PROFILE"], "test")
+            with self.assertRaisesRegex(RuntimeError, "no bound worker"):
+                self.feedback.native_target_env(*target, None)
+
+    def test_split_state_query_rejects_swapped_or_collapsed_process_witnesses(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        selection = self.feedback.plan()
+        inventory = [{"crate": target[0], "target": target[1], "ids": list(ids), "historical_excluded_ids": []}
+                     for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
+                                         *phases.STATE_QUERY_IDENTITIES.items())]
+        phases.validate_state_query_inventory(selection, inventory)
+        for mode in ("swap", "collapse", "worker_plan", "worker_duplicate", "wrong_lane"):
+            bad_plan, rows = copy.deepcopy(selection), copy.deepcopy(inventory)
+            if mode == "swap":
+                rows[1]["ids"], rows[2]["ids"] = rows[2]["ids"], rows[1]["ids"]
+            elif mode == "collapse":
+                rows[1]["ids"] += rows.pop()["ids"]
+            elif mode == "worker_plan":
+                bad_plan["required_native_test_ids"].pop(":".join(phases.STATE_QUERY_WORKER_TARGET))
+            elif mode == "worker_duplicate":
+                rows[2]["ids"] *= 2
+            if mode == "wrong_lane":
+                assignment = phases.partition(rows)
+                assignment["b"].remove(list(phases.STATE_QUERY_WORKER_TARGET))
+                assignment["a"].append(list(phases.STATE_QUERY_WORKER_TARGET))
+                with patch.object(phases, "partition", return_value=assignment), self.assertRaises(RuntimeError):
+                    phases.validate_state_query_inventory(bad_plan, rows)
+            else:
+                with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                    phases.validate_state_query_inventory(bad_plan, rows)
 
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
@@ -5488,16 +5544,17 @@ class PhaseTransferTests(unittest.TestCase):
                 self.phases.aggregate(None)
 
     def test_state_query_aggregate_requires_both_lanes_exact_inventory_and_real_worker_binding(self):
-        identity = ":".join(self.phases.STATE_QUERY_TARGET)
         binding, assets, tests, cohort = browser_worker_fixture(self.phases)
         for proof in (self.native, self.other):
             proof["plan"].update({"requires_current_state_query": True, "requires_worker_executable": True,
                                   "requires_browser_worker": True, "browser_worker_binding": binding,
-                                  "required_native_test_ids": {identity: list(self.phases.STATE_QUERY_TEST_IDS)}})
-            proof["plan"]["required_native_targets"]["er-cli"] = ["m9e_current_state_query"]
-            proof["required_native_target_counts"][identity] = 2
-            proof["inventory"].append({"crate": "er-cli", "target": "m9e_current_state_query",
-                                       "ids": sorted(self.phases.STATE_QUERY_TEST_IDS), "historical_excluded_ids": []})
+                                  "required_native_test_ids": {":".join(target): list(ids)
+                                                               for target, ids in self.phases.STATE_QUERY_IDENTITIES.items()}})
+            proof["plan"]["required_native_targets"]["er-cli"] = [target[1] for target in self.phases.STATE_QUERY_IDENTITIES]
+            for target, ids in self.phases.STATE_QUERY_IDENTITIES.items():
+                proof["required_native_target_counts"][":".join(target)] = 1
+                proof["inventory"].append({"crate": target[0], "target": target[1],
+                                           "ids": list(ids), "historical_excluded_ids": []})
             control_identity = ":".join(self.phases.CONTROL_QUERY_TARGET)
             proof["plan"]["requires_current_control_query"] = True
             proof["plan"]["required_native_test_ids"][control_identity] = list(self.phases.CONTROL_QUERY_TEST_IDS)
@@ -5509,9 +5566,9 @@ class PhaseTransferTests(unittest.TestCase):
             proof["assigned_targets"] = self.phases.partition(proof["inventory"])[proof["lane"]]
             proof["completed_targets"] = list(proof["assigned_targets"])
             proof["tests"]["selected"] += 4
-            if proof["lane"] == "a":
-                proof["tests"]["executed"] += 4
-                proof["tests"]["passed"] += 4
+            addition = 3 if proof["lane"] == "a" else 1
+            proof["tests"]["executed"] += addition
+            proof["tests"]["passed"] += addition
             proof["worker"] = {"source_sha": CANDIDATE, "target": self.identity["target"], "profile": "test",
                                "manifest_path": "rust/crates/er-kernel-worker/Cargo.toml", "cargo_profile": {"test": False},
                                "bytes": 10, "sha256": "c" * 64}
@@ -5537,7 +5594,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         for lane in ("a", "b"):
             original = self.native if lane == "a" else self.other
-            for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b"):
+            for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b", "worker_missing", "worker_renamed"):
                 proof = copy.deepcopy(original)
                 if mode == "missing":
                     proof["inventory"] = [item for item in proof["inventory"] if item["target"] != "m9e_current_state_query"]
@@ -5547,6 +5604,10 @@ class PhaseTransferTests(unittest.TestCase):
                     proof["worker"] = None
                 elif mode == "flag":
                     proof["plan"]["requires_current_state_query"] = False
+                elif mode == "worker_missing":
+                    proof["inventory"] = [item for item in proof["inventory"] if item["target"] != "m9e_current_state_query_worker"]
+                elif mode == "worker_renamed":
+                    next(item for item in proof["inventory"] if item["target"] == "m9e_current_state_query_worker")["ids"][0] = "renamed"
                 else:
                     proof["assigned_targets"] = [["er-cli", "m9e_current_state_query"]] if lane == "b" else []
                 proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
@@ -5789,7 +5850,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-ai", "er_ai"], assignment["a"])
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
             ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-            ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+            ("er-cli", "m9e_current_reload")})
         for key in policies:
             for damage in ("missing", "restoration", "wrong_test"):
                 with self.subTest(key=key, damage=damage):
@@ -6364,14 +6425,14 @@ class PhaseTransferTests(unittest.TestCase):
         ])
         assignment = self.phases.partition(inventory)
         self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
-        self.assertIn(["er-cli", "m9e_current_batch"], assignment["b"])
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["a"])
         self.assertIn(["er-cli", "m9e_current_reload"], assignment["b"])
         self.assertNotIn(["er-cli", "m9e_current_reload"], assignment["a"])
         self.assertIn(["er-other", "m9e_current_reload"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
-        self.assertEqual(len(assignment["b"]), 4)
+        self.assertEqual(len(assignment["b"]), 3)
         self.assertEqual(len(assignment["a"]) + len(assignment["b"]), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
         self.assertEqual(sorted(assignment["a"] + assignment["b"]),

@@ -782,7 +782,9 @@
     "reason": "Exactly three additive fixed-generation RTC checkpoint paths. Reuse the full causal22 native scope and controls; retain both lanes, Worker2/codec3, Wasm2, inpage2, typed1 and source-bound CLI bridge. Require two separate actual RTC witnesses and complete artifact/causal/teardown proof. No lock, dependency, reconnect, fragmentation or production-route exemption."
   },
   "current_state_query_focus": {
-    "paths": ["rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-lab/src/query.rs", "rust/crates/er-cli/tests/m9e_current_state_query.rs"],
+    "paths": ["rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-lab/src/query.rs", "rust/crates/er-cli/tests/m9e_current_state_query.rs",
+      "rust/crates/er-cli/tests/m9e_current_state_query_worker.rs",
+      "rust/crates/er-cli/tests/support/m9e_current_state_query.rs"],
     "test_ids": ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture", "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"],
     "reason": "Exact current snapshot selector scope; borrowed shared selector parity is exercised inside the two actual CLI state witnesses. Retain causal22, control-query2, all existing er-lab current integration witnesses, reverse compilation/lint, Worker bindings on any actual selection, both controls and every current platform witness. No state.delta, broad historical lab execution or cap change."
   },
