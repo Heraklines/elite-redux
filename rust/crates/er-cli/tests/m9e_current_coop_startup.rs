@@ -283,7 +283,10 @@ impl Endpoint {
         let bound = initial.menu.as_ref().ok_or("menu absent")?.options.len() + 1;
         for _ in 0..bound {
             if self.browser_sequence % 128 == 0 {
-                eprintln!("raw navigation host={} sequence={} target={target}", self.host, self.browser_sequence);
+                eprintln!(
+                    "raw navigation host={} sequence={} target={target}",
+                    self.host, self.browser_sequence
+                );
             }
             let control = self.control()?;
             let menu = control.menu.as_ref().ok_or("menu disappeared")?;
