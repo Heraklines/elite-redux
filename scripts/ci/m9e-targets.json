@@ -174,6 +174,10 @@
       "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work"
     ]
   },
+  "current_ai_max_pp_focus": {
+    "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"],
+    "exact_test_ids": ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
+  },
   "baseline": "748728a333433ee24acd83080b9006d378e286f0",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34042137836",
   "readiness_packages": ["er-canonical"],
