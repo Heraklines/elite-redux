@@ -2936,3 +2936,17 @@ SHA30859010279acb6e64dcfa4c16160b7f4883029ee63cb70de1136360d8a82b57;
 all source before/after hashes verified. Full48768-byte harness log stays remote
 SHA97e59bca805ef3d51f0f949b8280730d0492535b35ca8df3961c10fb6d759490.
 Main comparison remains qualifiedstorage5b; actual Title qualification still pending.
+
+Title50da0bf5/run34041472828 passed build/fmt/fullselected Clippy and reached the
+actual kernel Title6. Five passed; the strict-extension negative failed because
+it mutated options[0] to OpenExistingSaves, already that sorted-ID option's action.
+GameMenuV2::new sorts option IDs; existing-saves sorts before new-game. The fixture
+had not forged anything. Select New Game by stable option ID, assert its original
+OpenNewGame action, alter it and assert fullsnapshot inequality before retaining
+restore rejection. No validator bypass, removed assertion or false product fix.
+
+Remote preflight89c547860b567c1a5ac6b24ff3b307835e331474/run34042046105 passed the
+232 current harness cases plus6 prepared PP integration cases=238 in5.904s. PP
+remains outside main. Actual remote rustfmt changed only this Title witness1075
+bytes; namedcompact9991967131ZIP1902/sourcehashes checked before applying. Exact
+Title native/platform qualification remains pending, comparisonstillqualified5b.
