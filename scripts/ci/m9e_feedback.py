@@ -29,7 +29,10 @@ TIMINGS = {}
 WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-lab", "current_kernel_supervisor_v2"),
                         ("er-cli", "m9e_current_reload"),
-                        ("er-cli", "m9e_current_repro")}
+                        ("er-cli", "m9e_current_repro"),
+                        ("er-cli", "m9e_current_control_query"),
+                        ("er-cli", "m9e_current_state_query"),
+                        ("er-cli", "m9e_current_state_query_worker")}
 
 TITLE_STORAGE_PATHS = [
   "rust/crates/er-cli/src/current_agent.rs",
@@ -767,6 +770,33 @@ def plan():
                                       focus_policy, merge_targets, selected_owner, source_binding)
     product_changes = [path for path in changed if path not in (HELPER_PATH, "scripts/ci/m9e_title_storage.py") and path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
+    from m9e_phases import STATE_QUERY_PATHS, STATE_QUERY_TARGET, STATE_QUERY_TEST_IDS, STATE_QUERY_IDENTITIES
+    state_query_focus = config.get("current_state_query_focus", {})
+    if state_query_focus and (state_query_focus.get("paths") != STATE_QUERY_PATHS
+                              or state_query_focus.get("test_ids") != STATE_QUERY_TEST_IDS):
+        raise RuntimeError("current state query policy identities disagree")
+    # The unique state witness cannot be smuggled into an older dispatcher scope.
+    # Shared current_agent.rs still belongs to explicit control/capture/repro cuts.
+    state_query_changed = any(path in STATE_QUERY_PATHS[2:] for path in product_changes)
+    state_query_session = bool(state_query_focus) and any(path in STATE_QUERY_PATHS for path in product_changes) and all(
+        path in STATE_QUERY_PATHS for path in product_changes)
+    from m9e_phases import CONTROL_QUERY_PATHS, CONTROL_QUERY_TARGET, CONTROL_QUERY_TEST_IDS
+    query_focus = config.get("current_control_query_focus", {})
+    if query_focus and (query_focus.get("paths") != CONTROL_QUERY_PATHS
+                        or query_focus.get("test_ids") != CONTROL_QUERY_TEST_IDS):
+        raise RuntimeError("current control query policy identities disagree")
+    # current_agent.rs belongs to earlier capture/repro/batch scopes as well.
+    # Only the unique new witness is an unconditional mixed-scope trigger;
+    # a dispatcher-only repair gets this full scope without stealing those cuts.
+    query_changed = bool(query_focus) and CONTROL_QUERY_PATHS[1] in product_changes
+    query_session = bool(query_focus) and any(path in CONTROL_QUERY_PATHS for path in product_changes) and all(
+        path in CONTROL_QUERY_PATHS for path in product_changes)
+    # This first main integration may include both exact, independently exercised
+    # query products. Their six-file union is explicit; no neighbor is absorbed.
+    query_pair = bool(query_focus) and bool(state_query_focus) and set(product_changes) == set(
+        [*CONTROL_QUERY_PATHS, *STATE_QUERY_PATHS])
+    query_session = query_session or query_pair
+    state_query_session = state_query_session or query_pair
     from m9e_phases import (WORKER_SOURCE_PATHS, WORKER_TEST_IDS, WORKER_CODEC_IDS, browser_worker_source_binding,
                             RTC_PATHS, RTC_TEST_IDS, browser_rtc_source_binding)
     title_focus = config.get("current_title_storage_focus", {})
@@ -874,7 +904,7 @@ def plan():
     max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or max_pp_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -1095,6 +1125,19 @@ def plan():
         selected.update(execution_scope)
         if not native_worker_delta:
             current_session = True
+    query_selected_scope = "er-cli" in selected and (execution_scope is None
+        or "*" in execution_scope.get("er-cli", []) or CONTROL_QUERY_TARGET[1] in execution_scope.get("er-cli", []))
+    query_required = query_selected_scope and (query_session or (ROOT / CONTROL_QUERY_PATHS[1]).is_file()
+        or (execution_scope is not None and CONTROL_QUERY_TARGET[1] in execution_scope.get("er-cli", [])))
+    state_query_selected_scope = "er-cli" in selected and (execution_scope is None
+        or "*" in execution_scope.get("er-cli", []) or any(target[1] in execution_scope.get("er-cli", []) for target in STATE_QUERY_IDENTITIES))
+    state_query_required = state_query_selected_scope and (state_query_session or (ROOT / STATE_QUERY_PATHS[2]).is_file()
+        or (execution_scope is not None and any(target[1] in execution_scope.get("er-cli", []) for target in STATE_QUERY_IDENTITIES)))
+    if state_query_required and not state_query_focus:
+        raise RuntimeError("selected current state query target requires its exact policy")
+    query_required = query_required or state_query_required
+    if query_required and not query_focus:
+        raise RuntimeError("selected current control query target requires its exact policy")
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
@@ -1102,6 +1145,7 @@ def plan():
         or (RUST / "crates/er-cli/tests" / (target + ".rs")).is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
+    endpoint_execution = endpoint_execution or query_required
     if endpoint_execution:
         selected.add("er-kernel-worker")
     cli_executable_required = browser_required and (owner_required or retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
@@ -1171,6 +1215,10 @@ def plan():
               "current_read_rebind_focus": read_session,
               "current_title_storage_focus": title_session,
               "requires_title_storage": title_required,
+              "current_state_query_focus": state_query_session,
+              "requires_current_state_query": state_query_required,
+              "current_control_query_focus": query_session,
+              "requires_current_control_query": query_required,
               "requires_cli_executable": cli_executable_required,
               "required_native_test_ids": (ai_snapshot_ids if ai_snapshot_session
                                            else damage_exact_test_ids if damage_session or composition_session
@@ -1230,6 +1278,21 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
             identity: [*inherited, *[name for name in READ_REBIND_IDS if name not in inherited]]}
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
+    if query_required:
+        result["required_native_targets"] = {crate: list(targets)
+                                              for crate, targets in result["required_native_targets"].items()}
+        targets = result["required_native_targets"].setdefault("er-cli", [])
+        if CONTROL_QUERY_TARGET[1] not in targets:
+            targets.append(CONTROL_QUERY_TARGET[1])
+        result["required_native_test_ids"] = {**result["required_native_test_ids"],
+                                               ":".join(CONTROL_QUERY_TARGET): list(CONTROL_QUERY_TEST_IDS)}
+    if state_query_required:
+        # The preceding query-required block already detached policy-owned lists.
+        targets = result["required_native_targets"].setdefault("er-cli", [])
+        for target, ids in STATE_QUERY_IDENTITIES.items():
+            if target[1] not in targets:
+                targets.append(target[1])
+            result["required_native_test_ids"] = {**result["required_native_test_ids"], ":".join(target): list(ids)}
     # Once installed, every selected current game-kernel suite must keep all
     # two max-PP witnesses, including later owner/AI/storage changes. Do not
     # replace or shorten the pre-existing game-kernel identity list.
@@ -1252,7 +1315,7 @@ def plan():
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -1946,6 +2009,13 @@ def write_progress(summary, phase, target=None):
 def native_execution_order(selection, enumerated):
     # Discovery and lint already covered every selected target. Exercise current
     # kernel changes before long process witnesses without changing membership.
+    if selection.get("current_state_query_focus"):
+        ordered = native_execution_order({**selection, "current_state_query_focus": False}, enumerated)
+        return sorted(ordered, key=lambda item: (item[4].name, item[2]) not in {
+            ("er-cli", "m9e_current_state_query"), ("er-cli", "m9e_current_state_query_worker")})
+    if selection.get("current_control_query_focus"):
+        ordered = native_execution_order({**selection, "current_control_query_focus": False}, enumerated)
+        return sorted(ordered, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_control_query"))
     if selection.get("timer_focus"):
         first = [("er-kernel", name) for name in (
             "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
@@ -2075,6 +2145,14 @@ def main(preflight_failure=None):
             [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
         require_native_test_ids(selection.get("required_native_test_ids", {}),
                                 [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
+        from m9e_phases import validate_control_query_inventory
+        validate_control_query_inventory(selection, [
+            {"crate": cwd.name, "target": name, "ids": ids, "historical_excluded_ids": sorted(excluded)}
+            for _, _, name, ids, cwd, excluded, _ in enumerated])
+        from m9e_phases import validate_state_query_inventory
+        validate_state_query_inventory(selection, [
+            {"crate": cwd.name, "target": name, "ids": ids, "historical_excluded_ids": sorted(excluded)}
+            for _, _, name, ids, cwd, excluded, _ in enumerated])
         for item in selection["historical_dispositions"]:
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
@@ -2149,7 +2227,9 @@ def main(preflight_failure=None):
             print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
             command = [binary, "--format", "terse"]
             native_timer_parity = (cwd.name, name) == ("er-wasm", "m9e_parity")
-            if native_timer_parity:
+            if native_timer_parity or (cwd.name, name) in {
+                ("er-cli", "m9e_current_state_query"), ("er-cli", "m9e_current_state_query_worker")
+            }:
                 command.append("--nocapture")
             for test_id in sorted(excluded_ids):
                 command.extend(["--skip", test_id])
