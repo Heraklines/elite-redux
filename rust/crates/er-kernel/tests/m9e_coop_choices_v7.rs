@@ -70,7 +70,11 @@ fn navigate(kernel: &mut GameKernelV7, id: &str) -> Result<(), Box<dyn Error>> {
         }
         press(kernel, PhysicalKey::ArrowDown)?;
     }
-    Err("raw option is unreachable".into())
+    let selected = kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .map_or("<no-menu>", |menu| menu.selected_option_id.as_str());
+    Err(format!("raw option {id} is unreachable from {selected}").into())
 }
 
 fn independent_setup(
