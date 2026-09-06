@@ -241,7 +241,8 @@ mod tests {
                 source,
                 unit_kind: BehaviorUnitKind::IntrinsicMoveRule,
                 ordinal: BehaviorUnitOrdinal::ZERO,
-                provenance_hash: ProvenanceHash::parse("0".repeat(64)).expect("fixture hash is valid"),
+                provenance_hash: ProvenanceHash::parse("0".repeat(64))
+                    .expect("fixture hash is valid"),
             }],
             rng_sites: Vec::new(),
             budget: ProgramBudgetV2 {
@@ -283,7 +284,8 @@ mod tests {
             site: RngSiteDefinitionV1 {
                 id: RngSiteId {
                     ordinal: RngSiteOrdinal::ZERO,
-                    provenance_hash: ProvenanceHash::parse("1".repeat(64)).expect("fixture hash is valid"),
+                    provenance_hash: ProvenanceHash::parse("1".repeat(64))
+                        .expect("fixture hash is valid"),
                 },
                 owner: program.behavior_units[0].clone(),
                 domain: RngDomainV1::BattleMechanical,
@@ -312,7 +314,8 @@ mod tests {
             site: RngSiteDefinitionV1 {
                 id: RngSiteId {
                     ordinal: RngSiteOrdinal::ZERO,
-                    provenance_hash: ProvenanceHash::parse("2".repeat(64)).expect("fixture hash is valid"),
+                    provenance_hash: ProvenanceHash::parse("2".repeat(64))
+                        .expect("fixture hash is valid"),
                 },
                 owner: program.behavior_units[0].clone(),
                 domain: RngDomainV1::ForbiddenNondeterministic,

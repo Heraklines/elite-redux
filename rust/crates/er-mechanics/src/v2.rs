@@ -408,7 +408,9 @@ mod tests {
     #[test]
     fn query_hooks_map_to_exactly_one_query() {
         assert_eq!(
-            MechanicHookV2::AccuracyQuery.query().expect("accuracy hook has a query"),
+            MechanicHookV2::AccuracyQuery
+                .query()
+                .expect("accuracy hook has a query"),
             MechanicQueryV2::Accuracy
         );
         assert!(MechanicHookV2::TurnEnd.query().is_err());

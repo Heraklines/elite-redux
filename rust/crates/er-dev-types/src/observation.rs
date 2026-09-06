@@ -135,7 +135,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn forensic_indirection_preserves_tagged_canonical_wire() -> Result<(), Box<dyn std::error::Error>> {
+    fn forensic_indirection_preserves_tagged_canonical_wire()
+    -> Result<(), Box<dyn std::error::Error>> {
         let forensic = ForensicObservationV1 {
             debug: DebugObservationV1 {
                 agent: AgentObservationV1 {
@@ -192,7 +193,10 @@ mod tests {
         expected.extend(b",\"profile\":\"FORENSIC\"}");
         let observation = DeveloperObservationV1::Forensic(Box::new(forensic));
         assert_eq!(er_canonical::canonical_bytes(&observation)?, expected);
-        assert_eq!(er_canonical::canonical_bytes(&observation.clone())?, expected);
+        assert_eq!(
+            er_canonical::canonical_bytes(&observation.clone())?,
+            expected
+        );
         Ok(())
     }
 }

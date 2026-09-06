@@ -54,8 +54,9 @@ fn wrong_schema_version_fails_closed() {
     let mut value: serde_json::Value =
         serde_json::from_slice(&frozen_catalog_bytes()).expect("fixture is valid JSON");
     value["schema_version"] = serde_json::json!(99);
-    let error = SemanticCatalogV1::from_bytes(&serde_json::to_vec(&value).expect("fixture encodes"))
-        .expect_err("schema version mismatch must fail");
+    let error =
+        SemanticCatalogV1::from_bytes(&serde_json::to_vec(&value).expect("fixture encodes"))
+            .expect_err("schema version mismatch must fail");
     assert_eq!(
         error,
         CatalogLoadError::SemanticSchemaVersion {
