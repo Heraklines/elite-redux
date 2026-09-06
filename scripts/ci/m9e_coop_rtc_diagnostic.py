@@ -79,7 +79,7 @@ def main(summary):
     run(["cargo", "clippy", "--manifest-path", "rust/Cargo.toml", "--locked", "-p", "er-web",
          "--example", "m9e_v7_coop_startup", "--no-deps", "--", "-D", "warnings"], "clippy")
     run(["pnpm", "install", "--frozen-lockfile"], "dependencies")
-    run(["pnpm", "exec", "tsc", "--noEmit", "--skipLibCheck", "--strict", "--target", "ESNext", "--module", "ESNext",
+    run(["pnpm", "exec", "tsc", "--ignoreConfig", "--noEmit", "--skipLibCheck", "--strict", "--target", "ESNext", "--module", "ESNext",
          "--moduleResolution", "bundler", "--lib", "ESNext,DOM", "--types", "node,vite/client",
          "src/rust-browser/routes/rust-current-rtc-entry.ts", SPEC], "typecheck", 120)
     if shutil.which("wasm-bindgen") is None:
