@@ -88,8 +88,9 @@ fn independent_setup(
         .modes
         .iter()
         .find(|mode| mode.cooperative && mode.supported)
-        .ok_or("missing cooperative source mode")?
-        .mode;
+        .ok_or("missing cooperative source mode")?;
+    let challenges = mode.challenge_selection && host;
+    let mode = mode.mode;
     let mut kernel = GameKernelV7::natural_start(
         profile()?,
         "owned-starter-formation".to_owned(),
@@ -108,8 +109,17 @@ fn independent_setup(
     press(&mut kernel, PhysicalKey::Space)?;
     navigate(&mut kernel, &format!("bootstrap/mode/{}", mode.get()))?;
     press(&mut kernel, PhysicalKey::Space)?;
-    navigate(&mut kernel, "bootstrap/challenge/done")?;
-    press(&mut kernel, PhysicalKey::Space)?;
+    let GameKernelLifecycleSnapshotV7::Bootstrap(after_mode) = kernel.snapshot()?.lifecycle
+    else {
+        return Err("mode selection was bypassed".into());
+    };
+    if challenges {
+        assert_eq!(after_mode.stage, RunBootstrapStageV1::ChallengeSelect);
+        navigate(&mut kernel, "bootstrap/challenge/done")?;
+        press(&mut kernel, PhysicalKey::Space)?;
+    } else {
+        assert_eq!(after_mode.stage, RunBootstrapStageV1::StarterSelect);
+    }
     let GameKernelLifecycleSnapshotV7::Bootstrap(before) = kernel.snapshot()?.lifecycle else {
         return Err("starter selection was bypassed".into());
     };
