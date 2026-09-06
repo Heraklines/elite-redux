@@ -22,8 +22,8 @@
       "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic"
     ]
   },
-  "baseline": "f3a00d7eae83169d8d5b49256c456a86bac834db",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34009767895",
+  "baseline": "791ae5b53333eaaf8edd8e91dcdba1de006e106d",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34011232052",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
