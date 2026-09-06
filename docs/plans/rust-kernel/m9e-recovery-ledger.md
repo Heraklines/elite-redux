@@ -2917,3 +2917,22 @@ Title65e8d60f/run34039742243 failedremotecompilation E0507: a pattern guard move
 effect into a temporary request vector. Compare exact pending count1, requestID
 and borrowed effect directly; same invariant, no clone/allocation. Baseline stays
 qualifiedstorage5b/run34037758849; all230/native/platform checks remain required.
+
+Title ef28c74e/run34040089919 compiled/formatted but its complete34-package Clippy
+collector exposed pre-existing er-content, er-dev-types and er-mechanics warnings.
+Retrieve only three named diagnostics (4292/1235/4648bytes) from remote archive
+9991487146, preserving complete remote logs. Seven exact source repairs retain
+error ordering and test assertions; box only Forensic observation payload, whose
+serde wire remains unchanged. Add a canonical-byte regression with hidden evidence.
+No existing constructor consumers were found in cached Rust source; full reverse
+compilation remains mandatory. No lint suppression or test exclusion.
+
+Exact Title companion mapping adds all tests from the three repaired packages,
+nine required targets and four exact identity maps while retaining all55 Title
+prerequisites, both native lanes and every platform/mutant requirement. Remote
+preflight a5c4634b2c5ed5e30334b7cb1490371693c02a39/run34041295702 passed232 harness
+tests in5.505s; allCIhashes verified. Pinned remote rustfmt repaired3299bytes,
+SHA30859010279acb6e64dcfa4c16160b7f4883029ee63cb70de1136360d8a82b57;
+all source before/after hashes verified. Full48768-byte harness log stays remote
+SHA97e59bca805ef3d51f0f949b8280730d0492535b35ca8df3961c10fb6d759490.
+Main comparison remains qualifiedstorage5b; actual Title qualification still pending.

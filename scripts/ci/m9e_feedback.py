@@ -54,6 +54,43 @@ TITLE_STORAGE_TRIGGERS = [
   "rust/crates/er-kernel/tests/m9e_title_storage.rs",
   "rust/crates/er-web/tests/m9e_title_storage.rs"
 ]
+TITLE_STORAGE_LINT_PATHS = [
+    "rust/crates/er-content/src/m5_pack.rs",
+    "rust/crates/er-content/src/m6_catalog.rs",
+    "rust/crates/er-content/src/moves.rs",
+    "rust/crates/er-content/tests/m6_catalog.rs",
+    "rust/crates/er-dev-types/src/observation.rs",
+    "rust/crates/er-mechanics/src/m6.rs",
+    "rust/crates/er-mechanics/src/v2.rs",
+]
+TITLE_STORAGE_LINT_TARGETS = {
+    "er-content": ["m3_moves_abilities", "m3_species_pack", "m4_pack", "m5_pack", "m6_catalog", "m6_pack"],
+    "er-dev-types": ["er_dev_types"],
+    "er-mechanics": ["er_mechanics", "program_validation"],
+}
+TITLE_STORAGE_LINT_IDS = {
+    "er-content:m3_moves_abilities": [
+        "selected_moves_match_the_manifest_and_are_canonically_ordered",
+        "selected_abilities_match_the_manifest_and_are_canonically_ordered",
+        "lookups_are_deterministic_and_reject_outside_content",
+        "move_validation_rejects_bad_ranges_effects_flags_and_capability",
+        "ability_validation_rejects_unknown_ids_and_unsupported_capability",
+        "move_serialization_round_trips_and_rejects_unknown_fields",
+        "ability_serialization_round_trips_and_rejects_unknown_fields",
+    ],
+    "er-content:m5_pack": [
+        "valid_pack_round_trips_through_loader",
+        "tampered_content_hash_is_rejected",
+        "program_slot_mismatch_is_rejected",
+        "generated_bootstrap_pack_closes_the_complete_catalog",
+    ],
+    "er-content:m6_catalog": [
+        "frozen_semantic_catalog_loads_and_validates",
+        "unknown_fields_fail_closed",
+        "wrong_schema_version_fails_closed",
+    ],
+    "er-dev-types:er_dev_types": ["observation::tests::forensic_indirection_preserves_tagged_canonical_wire"],
+}
 TITLE_STORAGE_IDS = {
   "er-kernel:m9e_title_storage": [
     "title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two",
@@ -730,13 +767,18 @@ def plan():
                             RTC_PATHS, RTC_TEST_IDS, browser_rtc_source_binding)
     title_focus = config.get("current_title_storage_focus", {})
     if title_focus and (not isinstance(title_focus, dict)
-                       or set(title_focus) != {"paths", "trigger_paths", "exact_test_ids"}
+                       or set(title_focus) != {"paths", "trigger_paths", "exact_test_ids", "lint_paths", "lint_targets", "lint_ids"}
                        or title_focus.get("paths") != TITLE_STORAGE_PATHS
                        or title_focus.get("trigger_paths") != TITLE_STORAGE_TRIGGERS
-                       or title_focus.get("exact_test_ids") != TITLE_STORAGE_IDS):
+                       or title_focus.get("exact_test_ids") != TITLE_STORAGE_IDS
+                       or title_focus.get("lint_paths") != TITLE_STORAGE_LINT_PATHS
+                       or title_focus.get("lint_targets") != TITLE_STORAGE_LINT_TARGETS
+                       or title_focus.get("lint_ids") != TITLE_STORAGE_LINT_IDS):
         raise RuntimeError("current Title storage policy identities disagree")
     title_changed = any(path in TITLE_STORAGE_TRIGGERS for path in product_changes)
-    title_session = bool(title_focus) and title_changed and all(path in TITLE_STORAGE_PATHS for path in product_changes)
+    title_allowed = [*TITLE_STORAGE_PATHS, *TITLE_STORAGE_LINT_PATHS]
+    title_session = bool(title_focus) and title_changed and all(path in title_allowed for path in product_changes)
+    title_lint_session = title_session and any(path in TITLE_STORAGE_LINT_PATHS for path in product_changes)
     owner_session = focus_policy(config, product_changes)
     owner_installed = any((ROOT / path).is_file() for path in OWNER_TRIGGERS)
     owner_changed = owner_installed and any(path in OWNER_PATHS for path in product_changes)
@@ -1014,7 +1056,9 @@ def plan():
         boundaries = [path for path in boundaries if path not in OWNER_PATHS]
     if title_session:
         execution_scope = merge_targets(damage_focus["execute"], TITLE_STORAGE_TARGETS)
-        boundaries = [path for path in boundaries if path not in TITLE_STORAGE_PATHS]
+        if title_lint_session:
+            execution_scope = merge_targets(execution_scope, {crate: ["*"] for crate in TITLE_STORAGE_LINT_TARGETS})
+        boundaries = [path for path in boundaries if path not in title_allowed]
     title_required = bool(title_focus) and (title_session or ("er-kernel" in selected | set(execution_scope or {}) and (
         execution_scope is None or "*" in execution_scope.get("er-kernel", [])
         or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))))
@@ -1141,6 +1185,9 @@ def plan():
     if title_session:
         result["required_native_targets"] = merge_targets(damage_focus["required_targets"], TITLE_STORAGE_TARGETS)
         result["required_native_test_ids"] = {**damage_focus["exact_test_ids"], **TITLE_STORAGE_IDS}
+        if title_lint_session:
+            result["required_native_targets"] = merge_targets(result["required_native_targets"], TITLE_STORAGE_LINT_TARGETS)
+            result["required_native_test_ids"] = {**result["required_native_test_ids"], **TITLE_STORAGE_LINT_IDS}
     if owner_session:
         result["required_native_targets"] = merge_targets(timer_focus["required_targets"], capture_focus["required_targets"])
         result["required_native_test_ids"] = {**timer_focus.get("exact_test_ids", {}), **capture_focus.get("exact_test_ids", {})}

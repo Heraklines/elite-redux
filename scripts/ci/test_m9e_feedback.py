@@ -5489,6 +5489,56 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
         self.assertEqual(self.config, before)
 
+    def test_title_lint_companions_keep_all_packages_targets_and_serialization_witnesses(self):
+        self.configure_title_storage_core_scope()
+        for crate in self.feedback.TITLE_STORAGE_LINT_TARGETS:
+            self.package(crate)
+        self.package("er-lint-reverse", '[dependencies]\ncontracts = { package = "er-dev-types", path = "../er-dev-types" }\n')
+        self.changed += self.feedback.TITLE_STORAGE_LINT_PATHS
+        selection = self.feedback.plan()
+        self.assertTrue(selection["current_title_storage_focus"])
+        self.assertEqual(len(self.feedback.TITLE_STORAGE_LINT_PATHS), 7)
+        self.assertIn("er-lint-reverse", selection["packages"])
+        self.assertNotIn("er-lint-reverse", selection["execution_scope"])
+        for crate, targets in self.feedback.TITLE_STORAGE_LINT_TARGETS.items():
+            self.assertEqual(selection["execution_scope"][crate], ["*"])
+            self.assertEqual(selection["required_native_targets"][crate], targets)
+        for identity, names in {**self.feedback.TITLE_STORAGE_IDS, **self.feedback.TITLE_STORAGE_LINT_IDS}.items():
+            self.assertEqual(selection["required_native_test_ids"][identity], names)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 64)
+        for flag in ("requires_title_storage", "requires_current_proposal", "requires_read_rebind",
+                     "requires_worker_storage", "requires_current_storage", "requires_browser_worker", "requires_browser_rtc",
+                     "requires_wasm", "requires_browser", "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(self.executed, [])
+
+    def test_title_lint_mapping_rejects_policy_drift_and_unmapped_neighbors(self):
+        self.configure_title_storage_core_scope()
+        original = copy.deepcopy(self.config["current_title_storage_focus"])
+        for key in ("lint_paths", "lint_targets", "lint_ids"):
+            self.config["current_title_storage_focus"] = copy.deepcopy(original)
+            self.config["current_title_storage_focus"].pop(key)
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "policy identities"):
+                self.feedback.plan()
+        self.config["current_title_storage_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for neighbor in ("rust/crates/er-content/src/other.rs", "rust/crates/er-dev-types/src/digest.rs",
+                         "rust/crates/er-mechanics/src/lib.rs", "rust/crates/er-dev-types/Cargo.toml"):
+            self.changed = [*self.feedback.TITLE_STORAGE_PATHS, *self.feedback.TITLE_STORAGE_LINT_PATHS, neighbor]
+            with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                self.feedback.plan()
+        exact = self.feedback.TITLE_STORAGE_LINT_IDS
+        rows = [(*identity.split(":"), names) for identity, names in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        for index, (crate, target, names) in enumerate(rows):
+            for name in names:
+                for replacement in ([item for item in names if item != name],
+                                    [item if item != name else item + "_renamed" for item in names], [*names, name]):
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+        self.assertEqual(self.executed, [])
+
     def test_title_storage_core_policy_missing_mapping_and_mixed_changes_fail_closed(self):
         self.configure_title_storage_core_scope()
         original = copy.deepcopy(self.config["current_title_storage_focus"])

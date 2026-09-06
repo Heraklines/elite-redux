@@ -103,7 +103,7 @@ pub enum DeveloperObservationV1 {
     Player(PlayerObservationV1),
     Agent(AgentObservationV1),
     Debug(DebugObservationV1),
-    Forensic(ForensicObservationV1),
+    Forensic(Box<ForensicObservationV1>),
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -128,4 +128,75 @@ pub fn authorize_observation_v1(
         return Err(ObservationErrorV1::HiddenStateDenied);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forensic_indirection_preserves_tagged_canonical_wire()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let forensic = ForensicObservationV1 {
+            debug: DebugObservationV1 {
+                agent: AgentObservationV1 {
+                    player: PlayerObservationV1 {
+                        sequence: SafeU53::new(7)?,
+                        virtual_time_ms: SafeU53::new(29)?,
+                        visible_state: PlayerVisibleStateV1 {
+                            seat: SeatId::new(SafeU53::new(1)?),
+                            canonical_visible_bytes: vec![1, 2, 3],
+                        },
+                        control_kind: Some("battle".into()),
+                        presentation: vec!["pending".into()],
+                    },
+                    menu_instance: None,
+                    selected_option: None,
+                    options: vec![],
+                    navigation: vec![],
+                    accepted_physical_inputs: vec![],
+                    actionable_owner: None,
+                    delta_from_sequence: None,
+                },
+                canonical_state_bytes: vec![4, 5],
+                protocol_bytes: Some(vec![6]),
+                scheduler_bytes: vec![7],
+                rng_audit_bytes: vec![8],
+                pending_material_bytes: vec![vec![9]],
+                live_resource_bytes: vec![10],
+            },
+            causal_graph: CausalGraphV1 {
+                maximum_nodes: 8,
+                maximum_edges: 16,
+                nodes: vec![],
+                edges: vec![],
+                truncated: false,
+            },
+            diagnostic_digest_tree: DiagnosticDigestTreeV1 {
+                mechanical_digest: "mechanical".into(),
+                diagnostic_root: "diagnostic".into(),
+                level: crate::digest::DiagnosticDigestLevelV1::Major,
+                maximum_nodes: 8,
+                nodes: vec![],
+                truncated: false,
+            },
+            retained_external_events: vec![vec![11]],
+            retained_internal_events: vec![vec![12]],
+            performance_bytes: vec![13],
+            provenance: vec!["source".into()],
+        };
+        // The established wire is a tagged object containing the unboxed payload.
+        // Compare every payload byte, including hidden evidence and pending data.
+        let payload = er_canonical::canonical_bytes(&forensic)?;
+        let mut expected = b"{\"observation\":".to_vec();
+        expected.extend(payload);
+        expected.extend(b",\"profile\":\"FORENSIC\"}");
+        let observation = DeveloperObservationV1::Forensic(Box::new(forensic));
+        assert_eq!(er_canonical::canonical_bytes(&observation)?, expected);
+        assert_eq!(
+            er_canonical::canonical_bytes(&observation.clone())?,
+            expected
+        );
+        Ok(())
+    }
 }

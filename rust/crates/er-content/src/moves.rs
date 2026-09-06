@@ -259,7 +259,6 @@ impl MoveDefinition {
             }
         }
 
-        let expected = expected;
         if *self != expected {
             return Err(MoveDefinitionError::DefinitionMismatch { id: self.id });
         }

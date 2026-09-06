@@ -326,7 +326,7 @@ impl SemanticCatalogV1 {
             if previous_source.is_some_and(|previous| previous >= &entry.source) {
                 return Err(CatalogLoadError::SourcesNotSortedUnique);
             }
-            if seen_sources.insert(&entry.source) == false {
+            if !seen_sources.insert(&entry.source) {
                 return Err(CatalogLoadError::SourcesNotSortedUnique);
             }
             if entry.behavior_unit_count == 0 {

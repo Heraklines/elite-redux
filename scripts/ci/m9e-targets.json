@@ -1,5 +1,56 @@
 {
   "current_title_storage_focus": {
+    "lint_paths": [
+      "rust/crates/er-content/src/m5_pack.rs",
+      "rust/crates/er-content/src/m6_catalog.rs",
+      "rust/crates/er-content/src/moves.rs",
+      "rust/crates/er-content/tests/m6_catalog.rs",
+      "rust/crates/er-dev-types/src/observation.rs",
+      "rust/crates/er-mechanics/src/m6.rs",
+      "rust/crates/er-mechanics/src/v2.rs"
+    ],
+    "lint_targets": {
+      "er-content": [
+        "m3_moves_abilities",
+        "m3_species_pack",
+        "m4_pack",
+        "m5_pack",
+        "m6_catalog",
+        "m6_pack"
+      ],
+      "er-dev-types": [
+        "er_dev_types"
+      ],
+      "er-mechanics": [
+        "er_mechanics",
+        "program_validation"
+      ]
+    },
+    "lint_ids": {
+      "er-content:m3_moves_abilities": [
+        "selected_moves_match_the_manifest_and_are_canonically_ordered",
+        "selected_abilities_match_the_manifest_and_are_canonically_ordered",
+        "lookups_are_deterministic_and_reject_outside_content",
+        "move_validation_rejects_bad_ranges_effects_flags_and_capability",
+        "ability_validation_rejects_unknown_ids_and_unsupported_capability",
+        "move_serialization_round_trips_and_rejects_unknown_fields",
+        "ability_serialization_round_trips_and_rejects_unknown_fields"
+      ],
+      "er-content:m5_pack": [
+        "valid_pack_round_trips_through_loader",
+        "tampered_content_hash_is_rejected",
+        "program_slot_mismatch_is_rejected",
+        "generated_bootstrap_pack_closes_the_complete_catalog"
+      ],
+      "er-content:m6_catalog": [
+        "frozen_semantic_catalog_loads_and_validates",
+        "unknown_fields_fail_closed",
+        "wrong_schema_version_fails_closed"
+      ],
+      "er-dev-types:er_dev_types": [
+        "observation::tests::forensic_indirection_preserves_tagged_canonical_wire"
+      ]
+    },
   "paths": [
     "rust/crates/er-cli/src/current_agent.rs",
     "rust/crates/er-cli/tests/m9e_current_repro.rs",
