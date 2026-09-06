@@ -354,7 +354,11 @@ fn natural_active(cli: &mut Cli, reference: &mut CurrentGameSession, native: boo
     unchanged(cli, &before_plan)?;
     let inputs: Vec<RawInputEvent> = serde_json::from_value(planned["plan"]["events"].clone())?;
     assert!(inputs.len() <= 4096);
-    let _ = writeln!(std::io::stderr(), "state-query natural plan: {} events", inputs.len());
+    let _ = writeln!(
+        std::io::stderr(),
+        "state-query natural plan: {} events",
+        inputs.len()
+    );
     for (index, input) in inputs.into_iter().enumerate() {
         if index % 64 == 0 {
             let _ = writeln!(std::io::stderr(), "state-query natural input {index}");
@@ -590,7 +594,10 @@ fn controlled_terminal(
 }
 
 fn exercise_queries(worker: bool) -> TestResult {
-    let _ = writeln!(std::io::stderr(), "state-query worker={worker}: prepare content");
+    let _ = writeln!(
+        std::io::stderr(),
+        "state-query worker={worker}: prepare content"
+    );
     let content = content();
     let mut reference = CurrentGameSession::natural_start(
         serde_json::from_value::<ProfileStateV1>(profile())?,
@@ -612,11 +619,17 @@ fn exercise_queries(worker: bool) -> TestResult {
     cli.result("session.create", json!({"session":SESSION,"start":start()}))?;
     let _ = writeln!(std::io::stderr(), "state-query worker={worker}: queries");
     query_batch(&mut cli, &reference, !worker)?;
-    let _ = writeln!(std::io::stderr(), "state-query worker={worker}: natural setup");
+    let _ = writeln!(
+        std::io::stderr(),
+        "state-query worker={worker}: natural setup"
+    );
     natural_active(&mut cli, &mut reference, !worker)?;
     let _ = writeln!(std::io::stderr(), "state-query worker={worker}: queries");
     query_batch(&mut cli, &reference, !worker)?;
-    let _ = writeln!(std::io::stderr(), "state-query worker={worker}: historical parity");
+    let _ = writeln!(
+        std::io::stderr(),
+        "state-query worker={worker}: historical parity"
+    );
     historical_selector_parity(&reference, &content)?;
     let _ = writeln!(std::io::stderr(), "state-query worker={worker}: rejections");
     rejection_batch(&mut cli, &reference, !worker)?;
