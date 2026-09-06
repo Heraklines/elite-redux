@@ -167,11 +167,19 @@ class CoopPolicyTests(unittest.TestCase):
 
     def test_entry_source_reference_preserves_all_validation_and_rejects_rebinding(self):
         proof, identity, binding = self.entry_fixture()
+        identity["files"] = {"rule_workspace": coop.digest(self.root / "rust/Cargo.toml"),
+                             "rule_toolchain": coop.digest(self.root / "rust/rust-toolchain.toml"),
+                             "content": coop.digest(self.root / "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json")}
         before = copy.deepcopy(proof)
         retained = coop.reference_entry_sources(proof, identity, binding, self.root)
         self.assertEqual(proof, before)
         self.assertLess(len(json.dumps(retained)), len(json.dumps(proof)))
         coop.validate_entry(retained, identity, binding, self.root)
+        self.assertNotIn("rust/Cargo.toml", retained["source_hashes"])
+        other_identity = copy.deepcopy(identity)
+        other_identity["files"]["content"] = "f" * 64
+        with self.assertRaisesRegex(RuntimeError, "conservation"):
+            coop.validate_entry(retained, other_identity, binding, self.root)
         rebound = copy.deepcopy(binding)
         rebound["source_hashes"][coop.PRODUCT_PATHS[0]] = "f" * 64
         with self.assertRaisesRegex(RuntimeError, "source reference"):

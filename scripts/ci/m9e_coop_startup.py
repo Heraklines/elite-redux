@@ -124,6 +124,15 @@ def object_hash(value):
     return hashlib.sha256((json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest()
 
 
+def entry_shared_sources(binding, identity):
+    shared = {path: value for path, value in binding["source_hashes"].items() if path in ENTRY_SOURCES}
+    for path, key in (("rust/Cargo.toml", "rule_workspace"), ("rust/rust-toolchain.toml", "rule_toolchain"),
+                      ("rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json", "content")):
+        if key in identity.get("files", {}):
+            shared[path] = identity["files"][key]
+    return shared
+
+
 def validate_entry(evidence, identity, binding, root):
     if (not isinstance(evidence, dict) or evidence.get("status") != "passed"
             or evidence.get("source_sha") != identity["product_sha"]
@@ -135,7 +144,7 @@ def validate_entry(evidence, identity, binding, root):
         raise RuntimeError("current co-op entry completion or same-run identity differs")
     hashes = evidence.get("source_hashes", {})
     if "source_binding_sha256" in evidence:
-        shared = {path: value for path, value in binding["source_hashes"].items() if path in ENTRY_SOURCES}
+        shared = entry_shared_sources(binding, identity)
         if (evidence["source_binding_sha256"] != object_hash(binding)
                 or set(hashes) != set(ENTRY_SOURCES) - set(shared)):
             raise RuntimeError("current co-op entry source reference differs from verified plan")
@@ -174,7 +183,7 @@ def reference_entry_sources(evidence, identity, binding, root):
     retained = {key: evidence[key] for key in ("status", "source_sha", "run_id", "run_attempt", "toolchain",
                 "executed_test_ids", "tests", "bundle_sha256", "worker_artifact", "cli_artifact", "test_artifact")}
     retained["logs"] = {key: evidence["logs"][key] for key in ("worker-build", "build", "execute-1", "execute-2")}
-    retained["source_hashes"] = {path: value for path, value in evidence["source_hashes"].items() if path not in binding["source_hashes"]}
+    retained["source_hashes"] = {path: value for path, value in evidence["source_hashes"].items() if path not in entry_shared_sources(binding, identity)}
     retained["source_binding_sha256"] = object_hash(binding)
     validate_entry(retained, identity, binding, root)
     return retained
