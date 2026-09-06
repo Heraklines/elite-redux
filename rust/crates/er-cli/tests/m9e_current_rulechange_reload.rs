@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_internal_event_v2::GameInternalEventKindV2;
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelStepV7, KernelPresentationOutcomeV2,
 };
@@ -697,7 +698,8 @@ impl Script {
 
     fn double_navigation_tick(&mut self, milliseconds: u64) -> Result<(), Box<dyn Error>> {
         // The independently declared rule traverses the two-option menu twice:
-        // Party -> Fight -> Party. Scheduling and replay advance once. Derive
+        // Party -> Fight -> Party. One timer fires; scheduling and replay advance once.
+        // Keep that exact TimerFired event in both expected steps. Derive
         // those unchanged fields with the BASE implementation; construct the
         // second exact UI consequence from the pre-event Party control. Never
         // run the modified worker to manufacture its own expected output.
@@ -721,7 +723,7 @@ impl Script {
             base_step,
             GameKernelStepV7 {
                 effects: vec![GameKernelEffectV7::UiChanged(fight_control.clone())],
-                internal_events: vec![],
+                internal_events: vec![GameInternalEventKindV2::TimerFired],
             }
         );
         let mut expected = self.reference.snapshot()?;
@@ -748,7 +750,7 @@ impl Script {
                 GameKernelEffectV7::UiChanged(fight_control),
                 GameKernelEffectV7::UiChanged(party_control),
             ],
-            internal_events: vec![],
+            internal_events: vec![GameInternalEventKindV2::TimerFired],
         };
         self.push(
             "platform.event",
