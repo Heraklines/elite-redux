@@ -424,11 +424,13 @@ fn capture_press(
     Ok(())
 }
 
+type OwnedChoicePublication = (Vec<StarterSelectionV1>, Vec<Vec<u8>>);
+
 fn choose_owned(
     kernel: &mut GameKernelV7,
     content: &PreparedGameContentV2,
     host: bool,
-) -> Result<(Vec<StarterSelectionV1>, Vec<Vec<u8>>), Box<dyn Error>> {
+) -> Result<OwnedChoicePublication, Box<dyn Error>> {
     let mode = content
         .bundle()
         .bootstrap
