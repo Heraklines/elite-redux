@@ -5161,7 +5161,10 @@ class FeedbackTests(unittest.TestCase):
         owner = self.configure_owner_scope()
         self.changed = ["rust/crates/er-kernel/tests/m9e_timers_v7.rs"]
         before = self.feedback.plan()
-        self.changed = ["rust/crates/er-kernel/tests/m9e_coop_v7.rs"]
+        # The existing timer scope requires its explicit causal trigger;
+        # an isolated co-op test path is intentionally not a new product scope.
+        self.changed = ["rust/crates/er-kernel/tests/m9e_timers_v7.rs",
+                        "rust/crates/er-kernel/tests/m9e_coop_v7.rs"]
         after = self.feedback.plan()
         self.assertFalse(after["current_proposal_focus"])
         self.assertTrue(after["requires_current_proposal"])

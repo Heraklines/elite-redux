@@ -882,6 +882,15 @@
     "execute": {"er-batch": ["*"], "er-kernel": ["*"], "er-state": ["*"], "er-protocol": ["*"], "er-agent-protocol": ["*"], "er-env": ["*"], "er-repro": ["*"], "er-cli": ["*"], "er-web": ["*"], "er-kernel-worker": ["*"], "er-lab": ["current_kernel_endpoint_v2", "current_kernel_endpoint_faults_v2", "current_kernel_supervisor_v2", "kernel_reload_acceptance", "kernel_reload_artifact"], "er-wasm": ["m9e_parity"]},
     "required_targets": {"er-batch":["m9e_current_batch"],"er-agent-protocol":["er_agent_protocol"],"er-kernel":["m9e_timers_v7","m9e_domain_journeys_v7","m9e_coop_v7","m9e_game_kernel_v7","m9e_snapshot_v7","m9e_material_retention_v7"],"er-repro":["m9e_current_repro"],"er-cli":["m9e_current_batch","m9e_current_repro","m9e_current_entry","m9e_current_reload","m9e_current_native_capture","m9e_current_validation"],"er-web":["m9e_host_v2","er_web"],"er-kernel-worker":["current_process_v2"],"er-lab":["current_kernel_endpoint_v2","current_kernel_endpoint_faults_v2","current_kernel_supervisor_v2"],"er-wasm":["m9e_parity"]},
     "exact_test_ids": {
+      "er-kernel:m9e_game_kernel_v7": [
+        "raw_keys_complete_natural_start_and_install_serialized_v6_state",
+        "nonterminal_battle_progresses_to_next_wave",
+        "final_wave_victory_terminates_the_run",
+        "natural_solo_battle_reaches_terminal_using_only_physical_keys",
+        "authority_ai_can_choose_a_legal_enemy_switch",
+        "held_action_cannot_cross_bootstrap_menu_instance",
+        "gamepad_buttons_drive_bootstrap_and_active_controls"
+      ],
       "er-kernel:m9e_timers_v7": ["transport_resume_preserves_unrelated_pause_reasons_and_clock_classes","staged_transport_generation_remains_paused_and_rejections_are_atomic","held_navigation_repeats_at_250ms_with_real_cursor_effects","snapshot_resume_and_time_chunking_preserve_ordered_consequences","release_blur_text_focus_and_duplicate_sources_cancel_or_suppress_repeats","menu_transition_retires_repeat_and_stale_snapshot_ownership_is_rejected","pause_reasons_preserve_remaining_delay_until_last_reason_is_removed","unequal_and_tied_deadlines_dispatch_in_chronological_timer_order","exhausted_allocator_and_consequence_budget_fail_atomically","invalid_directional_keyboard_and_gamepad_presses_preserve_full_snapshot","unsupported_later_timer_rolls_back_earlier_real_navigation"],
       "er-cli:m9e_current_native_capture": ["actual_native_capture_replays_natural_events_rejections_and_imported_history","actual_native_capture_rotation_fork_restore_and_byte_gaps_are_explicit","actual_native_capture_late_response_and_rejected_ingress_preserve_gameplay","actual_native_capture_browser_import_declares_native_suffix_at_original_frontier"],
       "er-cli:m9e_current_validation": ["ordinary_validate_save_accepts_v2_and_rejects_legacy_or_wrong_content","ordinary_capsule_validation_replays_current_and_rejects_tampered_or_legacy_input"],
