@@ -1,5 +1,9 @@
 //! GameKernelV7: sole production owner for the direct M9-E runtime path.
 
+#[path = "current_coop_setup_v7.rs"]
+pub mod current_coop_setup_v7;
+use current_coop_setup_v7::CurrentCoopSetupSnapshotV1;
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -151,6 +155,7 @@ pub struct GameKernelV7 {
     lifecycle: GameKernelLifecycleV7,
     private_battle_control: Option<PrivateBattleControlSnapshotV7>,
     current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
+    current_coop_setup: Option<CurrentCoopSetupSnapshotV1>,
     content: Arc<PreparedGameContentV2>,
     local_seat: SeatId,
     role: GameKernelRoleV7,
@@ -248,6 +253,7 @@ impl GameKernelV7 {
             lifecycle: GameKernelLifecycleV7::Bootstrap(bootstrap),
             private_battle_control: None,
             current_proposal: None,
+            current_coop_setup: None,
             content,
             local_seat,
             role,
@@ -290,6 +296,7 @@ impl GameKernelV7 {
             lifecycle: GameKernelLifecycleV7::Active(runtime),
             private_battle_control: None,
             current_proposal: None,
+            current_coop_setup: None,
             content,
             local_seat,
             role,
@@ -362,6 +369,7 @@ impl GameKernelV7 {
             lifecycle,
             private_battle_control: snapshot.private_battle_control,
             current_proposal: snapshot.current_proposal,
+            current_coop_setup: snapshot.current_coop_setup,
             content,
             local_seat,
             role,
@@ -431,6 +439,7 @@ impl GameKernelV7 {
             lifecycle,
             private_battle_control: self.private_battle_control.clone(),
             current_proposal: self.current_proposal.clone(),
+            current_coop_setup: self.current_coop_setup.clone(),
             authority_ai: self.authority_ai.as_ref().map(AuthorityAiV2::snapshot),
             input_router: self.input_router.clone(),
             scheduler: self.scheduler.clone(),
@@ -724,6 +733,7 @@ impl GameKernelV7 {
                 other => other,
             };
             if matches!(&self.lifecycle, GameKernelLifecycleV7::Bootstrap(bootstrap) if bootstrap.current_storage.is_some())
+                || self.current_coop_setup.is_some()
             {
                 let mut candidate = self.clone();
                 let step = candidate.bootstrap_input(event)?;
@@ -894,6 +904,9 @@ impl GameKernelV7 {
         generation: ConnectionGeneration,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if current_coop_setup_v7::is_setup_frame(bytes) {
+            return self.ingest_coop_setup(generation, bytes);
+        }
         let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
         if protocol.frame_context.context.connection_generation.get()
             != SafeU53::new(1).map_err(|_| GameKernelV7Error::Invalid)?
@@ -1401,6 +1414,10 @@ impl GameKernelV7 {
                     .accept_current_slots(request_id, slots)
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
                 self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
+        if self.current_coop_setup.is_some() {
+            self.advance_replay_sequence()?;
+            return self.advance_coop_bootstrap();
+        }
             }
             (
                 GamePlatformEffectV2::StorageRead { .. },
@@ -1413,6 +1430,10 @@ impl GameKernelV7 {
                     .accept_current_missing(request_id)
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
                 self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
+        if self.current_coop_setup.is_some() {
+            self.advance_replay_sequence()?;
+            return self.advance_coop_bootstrap();
+        }
             }
             (
                 GamePlatformEffectV2::StorageRead { slot, .. },
@@ -1681,6 +1702,10 @@ impl GameKernelV7 {
             Err(error) => return Err(GameKernelV7Error::Bootstrap(error.to_string())),
         }
         self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
+        if self.current_coop_setup.is_some() {
+            self.advance_replay_sequence()?;
+            return self.advance_coop_bootstrap();
+        }
         if bootstrap.stage != RunBootstrapStageV1::Complete {
             let next = bootstrap.current_storage_effect();
             let changed = before.as_ref().is_some_and(|before| before != bootstrap);
@@ -1708,6 +1733,10 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         }
         let bootstrap = bootstrap.clone();
+        self.complete_bootstrap_run(bootstrap)
+    }
+
+    fn complete_bootstrap_run(&mut self, bootstrap: RunBootstrapMachineV1) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
         if let Some(storage) = &bootstrap.current_storage {
@@ -1728,8 +1757,15 @@ impl GameKernelV7 {
                 .and_then(|protocol| protocol.connections.first())
                 .map(|connection| connection.peer_seat)
         {
-            expand_cooperative_topology_v6(&mut candidate, self.content.as_ref(), partner)
-                .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+            if let Some(owner) = &self.current_coop_setup {
+                let choices = owner.choices.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+                if bootstrap.selections.mode != Some(choices.mode) { return Err(GameKernelV7Error::Invalid); }
+                er_game::m9e_new_run_v6::expand_cooperative_choices_v7(&mut candidate, self.content.as_ref(), partner, &choices.starters)
+                    .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+            } else {
+                expand_cooperative_topology_v6(&mut candidate, self.content.as_ref(), partner)
+                    .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+            }
         }
         let command_instance = self.allocate_menu_instance()?;
         let command_control = command_root_control(

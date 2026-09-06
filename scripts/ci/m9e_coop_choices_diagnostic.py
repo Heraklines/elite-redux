@@ -1,4 +1,4 @@
-"""Remote F for explicit party formation, not integrated natural co-op setup."""
+"""Remote F for current owned natural setup; cross-entry integration remains separate."""
 import hashlib
 import json
 import os
@@ -16,10 +16,14 @@ COMPACT = REPORT / "compact"
 TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
-RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs"]
+RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs",
+                "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
+                "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs"]
 TEST_TARGET = "m9e_coop_choices_v7"
 TEST_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_preserve_host",
-            "invalid_peer_choices_preserve_entire_state_rng_and_allocator"]
+            "invalid_peer_choices_preserve_entire_state_rng_and_allocator",
+            "natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution",
+            "owned_startup_rejects_forged_frames_and_snapshots_atomically"]
 sequence = 0
 logs = {}
 failed_log = None
@@ -101,24 +105,24 @@ def main(summary):
     binary_hash = digest(binary)
     listing = run([str(binary), "--list", "--format", "terse"], "list", seconds=30, bound=16384).read_text()
     if listing != "".join(name + ": test\n" for name in TEST_IDS):
-        raise RuntimeError("exact two-test inventory differs")
+        raise RuntimeError("exact four-test inventory differs")
     summary["test_artifact"] = {"sha256": binary_hash, "bytes": binary.stat().st_size, "profile": artifact["profile"],
                                 "source_sha256": summary["source_hashes"][RUST_SOURCES[1]], "ids": TEST_IDS}
     output = run([str(binary), "--format", "terse", "--nocapture", "--test-threads=1"], "execute",
                  cwd=ROOT / "rust/crates/er-kernel", seconds=600, bound=16384).read_text()
     counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
-    if counts != [("2", "0", "0", "0", "0")]:
-        raise RuntimeError("exact two-test completion differs")
+    if counts != [("4", "0", "0", "0", "0")]:
+        raise RuntimeError("exact four-test completion differs")
     if (digest(binary) != binary_hash or digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
-    summary["tests"] = {"executed": 2, "passed": 2, "failed": 0, "skipped": 0}
+    summary["tests"] = {"executed": 4, "passed": 4, "failed": 0, "skipped": 0}
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
-    summary = {"status": "failed", "qualification": "focused explicit party formation only; no integrated network setup or M9 qualification",
+    summary = {"status": "failed", "qualification": "focused current kernel natural setup only; no cross-entry/platform integration or M9 qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "9b0697cbfbf39ad96be1d288ee7ab365722db5fa"}
     try:

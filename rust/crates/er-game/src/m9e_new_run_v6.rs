@@ -276,45 +276,7 @@ pub fn expand_cooperative_choices_v7(
     partner_seat: SeatId,
     starters: &[er_types::StarterSelectionV1],
 ) -> Result<(), NaturalRunV6Error> {
-    if starters.is_empty()
-        || starters.len() > content.bundle().bootstrap.maximum_starters
-        || starters
-            .iter()
-            .any(|starter| starter.owner_seat != partner_seat)
-        || starters.iter().enumerate().any(|(index, starter)| {
-            starters[..index]
-                .iter()
-                .any(|other| other.pokemon_id == starter.pokemon_id)
-        })
-    {
-        return Err(NaturalRunV6Error::Invalid);
-    }
-    let mut cost = 0_u16;
-    for starter in starters {
-        let index = usize::try_from(starter.pokemon_id.get().get())
-            .ok()
-            .and_then(|index| index.checked_sub(1))
-            .ok_or(NaturalRunV6Error::Invalid)?;
-        let entry = content
-            .bundle()
-            .bootstrap
-            .starters
-            .get(index)
-            .ok_or(NaturalRunV6Error::Invalid)?;
-        if entry.species_id.get() != starter.species_id
-            || entry.form_index != starter.form_index
-            || entry.ability_index != starter.ability_index
-            || entry.cost != starter.cost
-        {
-            return Err(NaturalRunV6Error::Invalid);
-        }
-        cost = cost
-            .checked_add(starter.cost)
-            .ok_or(NaturalRunV6Error::Invalid)?;
-    }
-    if cost > content.bundle().bootstrap.maximum_starter_cost {
-        return Err(NaturalRunV6Error::Invalid);
-    }
+    validate_cooperative_choices_v7(content, partner_seat, starters)?;
     let choices = starters
         .iter()
         .map(|starter| {
@@ -867,4 +829,48 @@ fn increment(value: SafeU53) -> Result<SafeU53, NaturalRunV6Error> {
         .checked_add(1)
         .ok_or(NaturalRunV6Error::Exhausted)?;
     safe(next)
+}
+
+/// Check explicit starter records against the prepared source catalog before retention.
+pub fn validate_cooperative_choices_v7(content: &PreparedGameContentV2, partner_seat: SeatId, starters: &[er_types::StarterSelectionV1]) -> Result<(), NaturalRunV6Error> {
+    if starters.is_empty()
+        || starters.len() > content.bundle().bootstrap.maximum_starters
+        || starters
+            .iter()
+            .any(|starter| starter.owner_seat != partner_seat)
+        || starters.iter().enumerate().any(|(index, starter)| {
+            starters[..index]
+                .iter()
+                .any(|other| other.pokemon_id == starter.pokemon_id)
+        })
+    {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let mut cost = 0_u16;
+    for starter in starters {
+        let index = usize::try_from(starter.pokemon_id.get().get())
+            .ok()
+            .and_then(|index| index.checked_sub(1))
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        let entry = content
+            .bundle()
+            .bootstrap
+            .starters
+            .get(index)
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        if entry.species_id.get() != starter.species_id
+            || entry.form_index != starter.form_index
+            || entry.ability_index != starter.ability_index
+            || entry.cost != starter.cost
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        cost = cost
+            .checked_add(starter.cost)
+            .ok_or(NaturalRunV6Error::Invalid)?;
+    }
+    if cost > content.bundle().bootstrap.maximum_starter_cost {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    Ok(())
 }

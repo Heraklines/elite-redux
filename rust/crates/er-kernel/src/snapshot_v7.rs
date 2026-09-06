@@ -88,6 +88,8 @@ pub struct CoreGameKernelSnapshotV7 {
     pub private_battle_control: Option<PrivateBattleControlSnapshotV7>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none" )]
+    pub current_coop_setup: Option<crate::game_kernel_v7::current_coop_setup_v7::CurrentCoopSetupSnapshotV1>,
     pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
@@ -260,6 +262,7 @@ impl CoreGameKernelSnapshotV7 {
                 }
             }
         }
+        crate::game_kernel_v7::current_coop_setup_v7::validate_snapshot(self, content).map_err(|_| SnapshotV7Error::Invalid)?;
         validate_current_owner_snapshot_v1(self, content).map_err(|_| SnapshotV7Error::Invalid)?;
         if current_menu_instance(&self.lifecycle)
             .is_some_and(|instance| instance >= self.next_menu_instance_id)
@@ -369,6 +372,7 @@ impl CoreGameKernelSnapshotV7 {
             lifecycle,
             private_battle_control: None,
             current_proposal: None,
+            current_coop_setup: None,
             input_router: source.input_router,
             scheduler: source.scheduler,
             protocol: source.protocol,
