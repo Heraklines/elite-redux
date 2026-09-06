@@ -1,0 +1,54 @@
+name: M9E Current Cost Focused Diagnostic
+on:
+  push:
+    branches: [codex/m9e-current-cost-focused-20260906]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-current-cost-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Restore existing dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust tooling remotely
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+      - name: Focused release cost measurement with full semantic assertions
+        run: python3 scripts/ci/m9e_cost_diagnostic.py
+      - name: Compact focused result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-cost-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-focused/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-cost-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-focused/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
