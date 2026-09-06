@@ -305,7 +305,7 @@ fn drain_presentations(
             &cli.result(
                 "session.presentation_settled",
                 json!({"session": SESSION, "event_id": pending.event_id,
-                "outcome": "SETTLED"}),
+                "outcome": {"kind": "SETTLED"}}),
             )?,
             &json!({"step": step, "observation": reference.observe()?}),
         )?;
