@@ -495,31 +495,18 @@ impl GameKernelV7 {
                 .moves
                 .iter()
                 .enumerate()
-                .map(|(index, slot)| {
-                    let Some(slot) = slot.as_ref() else {
-                        return Ok(None);
-                    };
-                    let definition = self
-                        .content
-                        .battle
-                        .move_definition(slot.move_id)
-                        .map_err(|_| GameKernelV7Error::Invalid)?;
-                    let max_pp = er_state::pokemon::calculate_max_pp(
-                        definition.base_pp,
-                        slot.pp_ups,
-                        slot.max_pp_override,
-                    )
-                    .map_err(|_| GameKernelV7Error::Invalid)?;
-                    if slot.pp_used >= max_pp {
-                        return Ok(None);
+                .filter_map(|(index, slot)| {
+                    let slot = slot.as_ref()?;
+                    let definition = self.content.battle.move_definition(slot.move_id).ok()?;
+                    if slot.pp_used >= definition.base_pp {
+                        return None;
                     }
-                    let move_slot =
-                        u8::try_from(index).map_err(|_| GameKernelV7Error::Invalid)?;
+                    let move_slot = u8::try_from(index).ok()?;
                     let power = match definition.power {
                         er_types::battle_model::MovePower::None => 0,
                         er_types::battle_model::MovePower::Value(power) => power,
                     };
-                    Ok(Some((
+                    Some((
                         slot.move_id,
                         move_slot,
                         power,
@@ -528,11 +515,8 @@ impl GameKernelV7 {
                             .iter()
                             .map(|target| target.position)
                             .collect::<Vec<_>>(),
-                    )))
+                    ))
                 })
-                .collect::<Result<Vec<_>, GameKernelV7Error>>()?
-                .into_iter()
-                .flatten()
                 .collect::<Vec<_>>();
             let actor_view = AiActorViewV1 {
                 pokemon: actor.id,
@@ -1241,7 +1225,7 @@ impl GameKernelV7 {
                 GamePlatformEffectV2::StorageRead { slot, .. },
                 KernelStorageResultV2::Read { bytes: Some(bytes) },
             ) => {
-                let save = GameSaveV2::decode(&bytes)
+                let mut save = GameSaveV2::decode(&bytes)
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
                 if &save.content_identity != self.content.identity() {
                     return Err(GameKernelV7Error::Storage(
@@ -1255,7 +1239,25 @@ impl GameKernelV7 {
                     .as_ref()
                     .map(|run| run.control.revision)
                     .unwrap_or(SafeU53::ZERO);
-                let next_revision = current_revision.max(increment_safe(control_revision)?);
+                let mut next_revision = current_revision.max(increment_safe(control_revision)?);
+                for presentation in self.pending_presentations.values() {
+                    next_revision = next_revision.max(increment_safe(presentation.event_id.get())?);
+                }
+                let live_platform = self
+                    .state()
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .identities
+                    .next_platform_request_id;
+                save.state.identities.next_platform_request_id = save
+                    .state
+                    .identities
+                    .next_platform_request_id
+                    .max(live_platform);
+                let next_menu_instance_id = rebind_loaded_control_v7(
+                    &mut save.state,
+                    next_revision,
+                    self.next_menu_instance_id,
+                )?;
                 let runtime = GameRuntimeV6::new_with_retention(
                     Some(save.state),
                     self.content.clone(),
@@ -1264,6 +1266,7 @@ impl GameKernelV7 {
                 )
                 .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.next_menu_instance_id = next_menu_instance_id;
                 self.private_battle_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot.clone(), save.generation);
@@ -3335,6 +3338,42 @@ fn complete_control(revision: SafeU53) -> GameControlPlanV2 {
         menu: None,
         actionable: false,
     }
+}
+
+/// Rebind live control ownership without regenerating the saved action or selection.
+/// The caller owns the complete cloned READ transaction, including these allocators.
+fn rebind_loaded_control_v7(
+    state: &mut GameStateV6,
+    revision: SafeU53,
+    next_menu: MenuInstanceId,
+) -> Result<MenuInstanceId, GameKernelV7Error> {
+    let Some(run) = state.active_run.as_mut() else {
+        return Ok(next_menu);
+    };
+    let control = &mut run.control;
+    control.validate().map_err(|_| GameKernelV7Error::Invalid)?;
+    // GameSaveV2 does not retain the exact private root/return-control owner.
+    if is_private_battle_leaf(control.kind) {
+        return Err(GameKernelV7Error::Invalid);
+    }
+    let next = if let Some(menu) = &mut control.menu {
+        let instance = next_menu.max(next_menu_after(menu.instance_id)?);
+        let next = next_menu_after(instance)?;
+        menu.instance_id = instance;
+        if let Some(context) = &mut control.action_context {
+            context.menu_instance = instance;
+        }
+        next
+    } else {
+        next_menu
+    };
+    control.revision = revision;
+    if let Some(context) = &mut control.action_context {
+        // Semantic operation IDs (especially canonical battle commands) stay exact.
+        context.authority_revision = revision;
+    }
+    control.validate().map_err(|_| GameKernelV7Error::Invalid)?;
+    Ok(next)
 }
 
 fn next_menu_after(current: MenuInstanceId) -> Result<MenuInstanceId, GameKernelV7Error> {

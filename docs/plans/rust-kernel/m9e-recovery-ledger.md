@@ -2802,3 +2802,42 @@ Remote preflightbd9973e3/run34034083008 PASSED254 harness tests and actual pinne
 BLAKE3 provider installation/import/all3 official32byte vectors. Compact artifact
 9989576783ZIP1443; helper hash verified against exact local edited source. No game
 qualification implied. Start exact main qualification after this scoped repair.
+
+Qualified owner checkpoint46496094719a2f739cdc76df6d2a9779fb28bc04/run34034142653:
+all four jobs passed;619 native A599/B20,zero failed/skipped,67 inventory targets,
+25 mandatory targets and21 exact-ID maps. Existing Wasm2, in-page Chromium2,
+typed-effect1, Worker2, codec3, actual CLI bridge and RTC2 passed. Both behavioral
+mutants detected and restored. Local bounded metadata/source audit checked26
+cached source hashes, reconstructed plan/inventory, complete disjoint partitions,
+phase wire hashes and aggregate equality. Aggregate22982 bytes SHA
+37ce8fe5b4dcd1253f6b84e83e641b1f9be6c6470fdd1435b41970b12c398cc4.
+Actual RTC exact receipt61119 bytes SHA2f8b01e3fd82ecdbcd19f9b9b3183cb1f66c6e98adbc78d2ff09dfd2f87d44d0;
+inner29923 bytes SHAce75324efc403750120842c497e36bb712ee4dc2c879bcf7c4ef17c0631d6ed4.
+The independent pinned BLAKE3 oracle verified exact bytes/preimages/digests and
+source binding; browser observed the exact Pending owner retire, one new visible
+presentation, private/duplicate conservation and acknowledged teardown. Retained
+snapshot/ledger checks remain explicitly source-bound producer evidence, not an
+independent full-snapshot reconstruction. Fixed generation1 only, no reconnect claim.
+
+Advance comparison only to this qualified owner, then integrate Active READ repair:
+saved control retains semantic action/selection but gets fresh revision/menu IDs;
+platform request highwater and unrelated pending presentation owners are conserved;
+clear old input/private owners transactionally and reject allocator exhaustion.
+Five new kernel tests plus retained seven and unchanged14 host IDs check actual
+loaded-state continuation, fresh raw generation-two Write, stale-action rejection,
+full rollback and preservation of unrelated work. Expected focused inventory624,
+subject to remote discovery; all owner/RTC/Worker/CLI/Wasm/causal controls remain.
+Source is READ659e1856 plus actual remote formatting ec2c222e and READ209 gate
+3a40836e. The exact209 gate preflight passed run34034669887; production kernel needed
+no formatting. Actual native/platform READ qualification is required before claims.
+
+Independent CLI control-query8f173ae91822705bb32d51d2c18616e59988db42/run34034480619
+also qualified all four jobs:619 native A599/B20,67 targets23 mandatory18 exact maps,
+actual query2 through nativeV7 and WorkerV2, all previous platform and both mutants.
+Metadata audit checked19 cached sources, complete partitions and matching actual
+CLI/Worker binaries across native lanes; aggregate19855 SHA
+6b4396a8bcd57c83bf24e91f2602d113f95de7258ccc77c220cabe2983f695e1.
+This non-ancestor is not the main comparison. State query may now qualify separately
+as its descendant; eventual main integration must retain newer owner/storage gates.
+Broad M9 remains unfinished, including natural Title storage, reconnect/expiry,
+source AI/content gaps, further tooling and final frozen engineering qualification.

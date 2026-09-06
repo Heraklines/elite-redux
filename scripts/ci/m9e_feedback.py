@@ -50,9 +50,16 @@ AI_SNAPSHOT_VALIDATION_IDS = [
     "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic",
 ]
 
-AI_MAX_PP_PATHS = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
-                   "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"]
-AI_MAX_PP_IDS = ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
+READ_REBIND_PATHS = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
+                     "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs",
+                     "rust/crates/er-web/tests/m9e_host_v2.rs"]
+READ_REBIND_IDS = [
+    "read_rebind_preserves_saved_semantics_and_executes_write_after_restore",
+    "read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root",
+    "read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion",
+    "read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior",
+    "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work",
+]
 
 # Exact source repairs required by the first full selected-package Clippy run.
 AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
@@ -681,6 +688,15 @@ def plan():
         raise RuntimeError("current storage policy identities disagree")
     storage_changed = any(path in storage_paths for path in product_changes)
     storage_session = storage_changed and all(path in storage_paths for path in product_changes)
+    from m9e_worker_storage import PRODUCT_PATHS as COMPOSITION_PATHS, TEST_IDS as COMPOSITION_IDS, source_binding as composition_binding
+    composition_policy = config.get("current_worker_storage_focus", {})
+    if composition_policy and (composition_policy.get("paths") != COMPOSITION_PATHS or composition_policy.get("test_ids") != COMPOSITION_IDS):
+        raise RuntimeError("worker storage composition policy identities disagree")
+    composition_changed = any(path in COMPOSITION_PATHS for path in product_changes)
+    # One storage integration may include its four exact IndexedDB prerequisites.
+    # Both adapter and composed Worker witnesses remain required below.
+    composition_allowed = [*COMPOSITION_PATHS, *STORAGE_SOURCE_PATHS]
+    composition_session = bool(composition_policy) and composition_changed and all(path in composition_allowed for path in product_changes)
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
@@ -723,14 +739,14 @@ def plan():
     ai_snapshot_changed = AI_SNAPSHOT_VALIDATION_PATHS[0] in product_changes
     ai_snapshot_session = (bool(ai_snapshot_focus) and ai_snapshot_changed
                            and set(product_changes) == set(AI_SNAPSHOT_VALIDATION_PATHS))
-    max_pp_focus = config.get("current_ai_max_pp_focus", {})
-    if max_pp_focus and (not isinstance(max_pp_focus, dict) or set(max_pp_focus) != {"paths", "exact_test_ids"}
-                       or max_pp_focus["paths"] != AI_MAX_PP_PATHS or max_pp_focus["exact_test_ids"] != AI_MAX_PP_IDS):
-        raise RuntimeError("current AI max-PP policy identities disagree")
-    max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
+    read_focus = config.get("current_read_rebind_focus", {})
+    if read_focus and (not isinstance(read_focus, dict) or set(read_focus) != {"paths", "exact_test_ids"}
+                       or read_focus["paths"] != READ_REBIND_PATHS or read_focus["exact_test_ids"] != READ_REBIND_IDS):
+        raise RuntimeError("current READ rebind policy identities disagree")
+    read_session = bool(read_focus) and set(product_changes) == set(READ_REBIND_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or max_pp_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -804,7 +820,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -860,6 +876,8 @@ def plan():
         execution_scope = timer_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
+        if composition_session:
+            boundaries = [path for path in boundaries if path not in COMPOSITION_PATHS]
         if storage_session:
             boundaries = [path for path in boundaries if path not in storage_paths]
         if browser_worker_session:
@@ -892,7 +910,7 @@ def plan():
         execution_scope = capture_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in capture_paths]
-    if damage_session:
+    if damage_session or composition_session:
         execution_scope = {crate: list(targets) for crate, targets in damage_focus["execute"].items()}
         damage_required_targets = {crate: list(targets) for crate, targets in damage_focus["required_targets"].items()}
         damage_exact_test_ids = dict(damage_focus["exact_test_ids"])
@@ -905,15 +923,17 @@ def plan():
                     if "*" not in current:
                         current.extend(target for target in targets if target not in current)
         browser_required = True
-        boundaries = [path for path in boundaries if path not in damage_paths and path not in damage_lint_paths
-                      and path not in damage_doc_paths]
+        boundaries = [path for path in boundaries if path not in (composition_allowed if composition_session else damage_paths)
+                      and (composition_session or (path not in damage_lint_paths and path not in damage_doc_paths))]
+        if composition_session and not (ROOT / "rust/crates/er-game/tests/m9e_damage_query.rs").is_file():
+            raise RuntimeError("worker storage composition requires the previously qualified AI query product")
     if ai_snapshot_session:
         execution_scope = {**timer_focus["execute"], "er-ai": ["*"]}
         ai_snapshot_targets = {**timer_focus["required_targets"], "er-ai": ["er_ai"]}
         ai_snapshot_ids = {**timer_focus["exact_test_ids"], "er-ai:er_ai": list(AI_SNAPSHOT_VALIDATION_IDS)}
         boundaries = [path for path in boundaries if path not in AI_SNAPSHOT_VALIDATION_PATHS]
-    if max_pp_session:
-        boundaries = [path for path in boundaries if path not in AI_MAX_PP_PATHS]
+    if read_session:
+        boundaries = [path for path in boundaries if path not in READ_REBIND_PATHS]
     if owner_session:
         execution_scope = merge_targets(timer_focus["execute"], capture_focus["execute"], {"er-kernel": ["*"]})
         boundaries = [path for path in boundaries if path not in OWNER_PATHS]
@@ -950,8 +970,9 @@ def plan():
             if widened == selected:
                 break
             selected = widened
-    storage_required = storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
-    rtc_required = owner_required or rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
+    composition_required = composition_session or (browser_required and (ROOT / COMPOSITION_PATHS[0]).is_file())
+    storage_required = composition_required or storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
+    rtc_required = owner_required or composition_required or rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
     browser_worker_required = storage_required or rtc_required or browser_worker_session or (browser_required and any(
         (ROOT / path).is_file() for path in (
             "src/rust-browser/routes/rust-current-worker-entry.ts",
@@ -963,6 +984,9 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
+              "current_worker_storage_focus": composition_session,
+              "requires_worker_storage": composition_required,
+              "worker_storage_binding": composition_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if composition_required else None,
               "requires_current_storage": storage_required,
               "current_storage_binding": storage_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if storage_required else None,
               "requires_browser_worker": browser_worker_required,
@@ -993,10 +1017,10 @@ def plan():
               "ai_damage_query_focus": damage_session,
               "ai_damage_query_lint_repair_focus": damage_lint_session,
               "ai_snapshot_validation_focus": ai_snapshot_session,
-              "current_ai_max_pp_focus": max_pp_session,
+              "current_read_rebind_focus": read_session,
               "requires_cli_executable": cli_executable_required,
               "required_native_test_ids": (ai_snapshot_ids if ai_snapshot_session
-                                           else damage_exact_test_ids if damage_session
+                                           else damage_exact_test_ids if damage_session or composition_session
                                            else cache_focus.get("exact_test_ids", {}) if cache_session
                                            else validation_focus.get("exact_test_ids", {}) if validation_session
                                            else retention_focus.get("exact_test_ids", {}) if retention_session
@@ -1008,7 +1032,7 @@ def plan():
               "requires_agent_protocol_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
               "required_native_targets": (ai_snapshot_targets if ai_snapshot_session
-                                          else damage_required_targets if damage_session
+                                          else damage_required_targets if damage_session or composition_session
                                           else cache_focus.get("required_targets", {}) if cache_session
                                           else validation_focus.get("required_targets", {}) if validation_session
                                           else retention_focus.get("required_targets", {}) if retention_session
@@ -1032,17 +1056,17 @@ def plan():
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_current_proposal_v7"]})
         result["required_native_test_ids"] = {**result["required_native_test_ids"], TARGET: NATIVE_IDS}
     # Once installed, every selected current game-kernel suite must keep all
-    # two max-PP witnesses, including later owner/AI/storage changes. Do not
+    # five READ witnesses, including later owner/AI/storage changes. Do not
     # replace or shorten the pre-existing game-kernel identity list.
-    max_pp_required = bool(max_pp_focus) and "er-kernel" in selected and (
+    read_required = bool(read_focus) and "er-kernel" in selected and (
         execution_scope is None or "*" in execution_scope.get("er-kernel", [])
         or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))
-    result["requires_ai_max_pp"] = max_pp_required
-    if max_pp_required:
+    result["requires_read_rebind"] = read_required
+    if read_required:
         identity = "er-kernel:m9e_game_kernel_v7"
         inherited = result["required_native_test_ids"].get(identity, timer_focus["exact_test_ids"][identity])
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
-            identity: [*inherited, *[name for name in AI_MAX_PP_IDS if name not in inherited]]}
+            identity: [*inherited, *[name for name in READ_REBIND_IDS if name not in inherited]]}
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
@@ -1051,7 +1075,7 @@ def plan():
                         for path in product_changes)
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (not (owner_session or max_pp_session) and ((storage_changed and not storage_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (composition_changed and not composition_session) or (not (owner_session or read_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -1299,6 +1323,11 @@ def verify_browser_worker_build(output, summary, *, rtc=False):
         if expected & rtc_assets:
             raise RuntimeError("current RTC and Worker emitted namespaces overlap")
         expected |= rtc_assets
+    if not rtc and summary["plan"].get("requires_worker_storage"):
+        composition_assets = set(summary["worker_storage_assets"]["manifest"]["assets"])
+        if expected & composition_assets:
+            raise RuntimeError("worker storage and prior Worker/RTC emitted namespaces overlap")
+        expected |= composition_assets
     if emitted != expected:
         raise RuntimeError("current Worker has unlisted emitted assets")
     shutil.copyfile(path, FULL / path.name)
@@ -1510,6 +1539,10 @@ def browser_checks(summary):
             raise RuntimeError("browser asset hash mismatch: " + name)
     shutil.copyfile(manifest_path, FULL / manifest_path.name)
     summary["browser_assets"] = {"manifest_sha256": digest(manifest_path), "assets": manifest["assets"]}
+    if summary.get("plan", {}).get("requires_worker_storage"):
+        import m9e_worker_storage as composition
+        run(["node", composition.PRODUCT_PATHS[2], "--out-dir", str(output)], "worker-storage-build", ROOT, env)
+        composition.build_evidence(output, summary, ROOT, FULL)
     if summary.get("plan", {}).get("requires_browser_rtc"):
         verify_browser_worker_build(output, summary, rtc=True)
     if summary.get("plan", {}).get("requires_browser_worker"):
@@ -1568,6 +1601,9 @@ def browser_checks(summary):
 
     if summary.get("plan", {}).get("requires_current_storage"):
         current_storage_checks(summary, env)
+    if summary.get("plan", {}).get("requires_worker_storage"):
+        import m9e_worker_storage as composition
+        composition.checks(ROOT, FULL, run, summary, env)
 
 
 def timer_behavioral_mutant(selection, summary, passed_test_ids):
@@ -1723,7 +1759,7 @@ def native_execution_order(selection, enumerated):
             "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
         if selection.get("material_retention_focus"):
             first[:0] = [("er-game", "m9e_material_retention"), ("er-kernel", "m9e_material_retention_v7")]
-        if selection.get("ai_damage_query_focus"):
+        if selection.get("ai_damage_query_focus") or selection.get("current_worker_storage_focus"):
             first[:0] = [("er-game", "m9e_damage_query")]
         if selection.get("requires_current_proposal"):
             first[:0] = [("er-kernel", "m9e_current_proposal_v7")]
@@ -1855,7 +1891,7 @@ def main(preflight_failure=None):
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
         if (selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus")
-                or selection.get("requires_current_proposal") or selection.get("requires_ai_max_pp")):
+                or selection.get("requires_current_proposal") or selection.get("requires_read_rebind") or selection.get("current_worker_storage_focus")):
             write_progress(summary, "lint", "selected-packages")
             try:
                 run(["cargo", "clippy", "--locked",
