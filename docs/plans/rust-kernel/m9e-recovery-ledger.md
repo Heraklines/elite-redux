@@ -2734,3 +2734,7 @@ This proves peer-aware bootstrap actors, not independent starter choice by both
 humans. Retrieved only compact named failures: A1102bytes/artifact9983402289ZIP4373,
 B819bytes/artifact9983355100ZIP3583. Both new tests and all unchanged controls must
 pass remotely before qualification; baseline remains791. No local workload ran.
+
+Owner89407335/run34014646379 stopped at formatting before test execution. Apply
+only the remote2470byte test-format patch fromcompact9983529224ZIP2927; no
+production change and no local formatter. Full remote qualification repeats.

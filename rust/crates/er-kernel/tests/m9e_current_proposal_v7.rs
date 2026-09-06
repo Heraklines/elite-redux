@@ -135,7 +135,11 @@ fn natural_coop_state(
     let cooperative_mode_id = cooperative_mode.mode;
     let mode_option = format!("bootstrap/mode/{}", cooperative_mode_id.get());
     let protocol = initial_battle_protocol_snapshot_v2(
-        &authority_protocol(host, SeatId::new(safe(2)), ConnectionGeneration::new(safe(1)))?,
+        &authority_protocol(
+            host,
+            SeatId::new(safe(2)),
+            ConnectionGeneration::new(safe(1)),
+        )?,
         host,
     )?;
     let mut kernel = GameKernelV7::natural_start(
@@ -169,9 +173,20 @@ fn natural_coop_state(
         cooperative_mode_id
     );
     let run = state.active_run.as_ref().ok_or("run missing")?;
-    assert_eq!(run.battle.as_ref().ok_or("battle missing")?.format.player_capacity, 2);
+    assert_eq!(
+        run.battle
+            .as_ref()
+            .ok_or("battle missing")?
+            .format
+            .player_capacity,
+        2
+    );
     for seat in [host, SeatId::new(safe(2))] {
-        assert!(run.party.iter().any(|pokemon| pokemon.owner_seat == Some(seat)));
+        assert!(
+            run.party
+                .iter()
+                .any(|pokemon| pokemon.owner_seat == Some(seat))
+        );
     }
     let snapshot = kernel
         .snapshot()
@@ -379,13 +394,18 @@ fn noncurrent_generation_raw_compatibility(
     let (mut state, revision, menu) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
     save_checkpoint(&mut state, revision, menu)?;
     let generation = ConnectionGeneration::new(safe(9));
-    let (mut authority, mut replica) = pair_from_state_at_generation(state, revision, content, generation)?;
+    let (mut authority, mut replica) =
+        pair_from_state_at_generation(state, revision, content, generation)?;
     let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
     assert!(replica.snapshot()?.current_proposal.is_none());
     let envelope = er_kernel::current_proposal_v7::decode_current_proposal_v1(&bytes)?;
     assert_eq!(envelope.connection_generation, generation);
     let before = authority.snapshot()?;
-    assert!(authority.ingest_network_frame(ConnectionGeneration::new(safe(8)), &bytes).is_err());
+    assert!(
+        authority
+            .ingest_network_frame(ConnectionGeneration::new(safe(8)), &bytes)
+            .is_err()
+    );
     assert_eq!(authority.snapshot()?, before);
     let raw = material(&authority.ingest_network_frame(generation, &bytes)?)?;
     GameMaterialV6::decode(&raw)?;
@@ -395,7 +415,10 @@ fn noncurrent_generation_raw_compatibility(
     assert!(replica.snapshot()?.current_proposal.is_none());
     assert!(authority.snapshot()?.current_proposal.is_none());
     let completed = replica.snapshot()?;
-    assert_eq!(replica.ingest_network_frame(generation, &raw)?, GameKernelStepV7::default());
+    assert_eq!(
+        replica.ingest_network_frame(generation, &raw)?,
+        GameKernelStepV7::default()
+    );
     assert_eq!(replica.snapshot()?, completed);
     Ok(())
 }
