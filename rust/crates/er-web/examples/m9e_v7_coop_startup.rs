@@ -2,8 +2,6 @@ use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-
-
 use er_kernel::game_kernel_v7::GameKernelRoleV7;
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
@@ -133,19 +131,29 @@ fn replica_config(
 use er_web::contracts_v2::{BrowserSessionContextV2, BrowserSessionInitializationV2};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let output = std::env::args_os().nth(1).map(PathBuf::from).ok_or("output missing")?;
+    let output = std::env::args_os()
+        .nth(1)
+        .map(PathBuf::from)
+        .ok_or("output missing")?;
     fs::create_dir_all(&output)?;
     let host = SeatId::new(safe(1)?);
     let guest = SeatId::new(safe(2)?);
     let generation = ConnectionGeneration::new(safe(1)?);
     for is_host in [true, false] {
         let local_seat = if is_host { host } else { guest };
-        let config = if is_host { authority_config(host, guest, generation)? }
-            else { replica_config(host, guest, generation)? };
+        let config = if is_host {
+            authority_config(host, guest, generation)?
+        } else {
+            replica_config(host, guest, generation)?
+        };
         let initialization = BrowserSessionInitializationV2::NaturalCoop {
             context: BrowserSessionContextV2 {
                 local_seat,
-                role: if is_host { GameKernelRoleV7::Authority } else { GameKernelRoleV7::Replica },
+                role: if is_host {
+                    GameKernelRoleV7::Authority
+                } else {
+                    GameKernelRoleV7::Replica
+                },
                 scheduler: scheduler(),
                 protocol: Some(initial_battle_protocol_snapshot_v2(&config, local_seat)?),
             },
@@ -155,8 +163,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             local_is_host: is_host,
         };
         let bytes = er_canonical::canonical_bytes(&initialization)?;
-        if bytes.is_empty() || bytes.len() > 65536 { return Err("bounded natural initialization required".into()); }
-        fs::write(output.join(if is_host { "coop-host-initialization.json" } else { "coop-guest-initialization.json" }), bytes)?;
+        if bytes.is_empty() || bytes.len() > 65536 {
+            return Err("bounded natural initialization required".into());
+        }
+        fs::write(
+            output.join(if is_host {
+                "coop-host-initialization.json"
+            } else {
+                "coop-guest-initialization.json"
+            }),
+            bytes,
+        )?;
     }
     Ok(())
 }

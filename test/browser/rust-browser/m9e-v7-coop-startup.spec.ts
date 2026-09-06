@@ -46,6 +46,52 @@ for (const [path, asset] of Object.entries(manifest.assets)) {
   served.set(`/assets/${path}`, bytes);
 }
 
+if (bundleBytes > 4 << 20) throw new Error("RTC bundle aggregate exceeds4MiB");
+for (const path of ["er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json",
+  "coop-authority-snapshot.json", "coop-replica-snapshot.json"]) {
+  const bytes = readBounded(path, path.endsWith(".js") ? 4 << 20 : 32 << 20);
+  if (bytes.length !== cohort.assets[path]?.bytes || digest(bytes) !== cohort.assets[path]?.sha256) throw new Error("RTC natural fixture/cohort mismatch");
+  served.set(`/assets/${path}`, bytes);
+}
+for (const [key, path] of [["glue_sha256", "er_web.js"], ["wasm_sha256", "er_web_bg.wasm"],
+  ["content_sha256", "game-content-bundle-v2.json"]] as const) {
+  if (manifest.cohort[key] !== cohort.assets[path].sha256) throw new Error("RTC cohort identity disagreement");
+}
+let server: Server;
+let address: string;
+test.beforeAll(async () => {
+  server = createServer((request, response) => {
+    const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    if (path === "/") { response.writeHead(200, { "content-type": "text/html" }); response.end("<!doctype html><html><body>Current RTC checkpoint pair</body></html>"); return; }
+    const body = served.get(path);
+    if (body == null) { response.writeHead(404); response.end(); return; }
+    response.writeHead(200, { "content-type": path.endsWith(".js") ? "text/javascript"
+      : path.endsWith(".wasm") ? "application/wasm" : "application/json", "cache-control": "no-store" });
+    response.end(body);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const bound = server.address();
+  if (bound == null || typeof bound === "string") throw new Error("RTC fixture did not bind TCP");
+  address = `http://127.0.0.1:${bound.port}`;
+});
+test.afterAll(async () => {
+  if (server == null) return;
+  const closed = once(server, "close"); server.close(); server.closeAllConnections(); await closed;
+});
+
+const setupBytes = readBounded("m9e-v7-coop-startup-assets.json", 16 << 10);
+const setup = JSON.parse(setupBytes.toString("utf8"));
+if (setup.source_sha !== manifest.source_sha || setup.schema_version !== 1
+  || Object.keys(setup.assets).sort().join(",") !== "coop-guest-initialization.json,coop-host-initialization.json") {
+  throw new Error("natural initialization source or inventory mismatch");
+}
+for (const [path, asset] of Object.entries(setup.assets) as [string, Asset][]) {
+  const bytes = readBounded(path, 64 << 10);
+  if (bytes.length !== asset.bytes || digest(bytes) !== asset.sha256) throw new Error("natural initialization hash mismatch");
+  served.set(`/assets/${path}`, bytes);
+}
+
 interface Pair { contexts: BrowserContext[]; left: Page; right: Page; workers: string[] }
 async function pair(browser: Browser): Promise<Pair> {
   const contexts: BrowserContext[] = [];
@@ -245,49 +291,4 @@ for (const hostFirst of [true, false]) {
       finally { await Promise.allSettled(peers.contexts.map(context => context.close())); }
     }
   });
-}
-if (bundleBytes > 4 << 20) throw new Error("RTC bundle aggregate exceeds4MiB");
-for (const path of ["er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json",
-  "coop-authority-snapshot.json", "coop-replica-snapshot.json"]) {
-  const bytes = readBounded(path, path.endsWith(".js") ? 4 << 20 : 32 << 20);
-  if (bytes.length !== cohort.assets[path]?.bytes || digest(bytes) !== cohort.assets[path]?.sha256) throw new Error("RTC natural fixture/cohort mismatch");
-  served.set(`/assets/${path}`, bytes);
-}
-for (const [key, path] of [["glue_sha256", "er_web.js"], ["wasm_sha256", "er_web_bg.wasm"],
-  ["content_sha256", "game-content-bundle-v2.json"]] as const) {
-  if (manifest.cohort[key] !== cohort.assets[path].sha256) throw new Error("RTC cohort identity disagreement");
-}
-let server: Server;
-let address: string;
-test.beforeAll(async () => {
-  server = createServer((request, response) => {
-    const path = new URL(request.url ?? "/", "http://localhost").pathname;
-    if (path === "/") { response.writeHead(200, { "content-type": "text/html" }); response.end("<!doctype html><html><body>Current RTC checkpoint pair</body></html>"); return; }
-    const body = served.get(path);
-    if (body == null) { response.writeHead(404); response.end(); return; }
-    response.writeHead(200, { "content-type": path.endsWith(".js") ? "text/javascript"
-      : path.endsWith(".wasm") ? "application/wasm" : "application/json", "cache-control": "no-store" });
-    response.end(body);
-  });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const bound = server.address();
-  if (bound == null || typeof bound === "string") throw new Error("RTC fixture did not bind TCP");
-  address = `http://127.0.0.1:${bound.port}`;
-});
-test.afterAll(async () => {
-  if (server == null) return;
-  const closed = once(server, "close"); server.close(); server.closeAllConnections(); await closed;
-});
-
-const setupBytes = readBounded("m9e-v7-coop-startup-assets.json", 16 << 10);
-const setup = JSON.parse(setupBytes.toString("utf8"));
-if (setup.source_sha !== manifest.source_sha || setup.schema_version !== 1
-  || Object.keys(setup.assets).sort().join(",") !== "coop-guest-initialization.json,coop-host-initialization.json") {
-  throw new Error("natural initialization source or inventory mismatch");
-}
-for (const [path, asset] of Object.entries(setup.assets) as [string, Asset][]) {
-  const bytes = readBounded(path, 64 << 10);
-  if (bytes.length !== asset.bytes || digest(bytes) !== asset.sha256) throw new Error("natural initialization hash mismatch");
-  served.set(`/assets/${path}`, bytes);
 }
