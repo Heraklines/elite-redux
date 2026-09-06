@@ -5,7 +5,6 @@ mod battle_kernel;
 mod battle_presentation;
 mod battle_replica;
 mod battle_ui;
-pub mod current_proposal_v7;
 pub mod game_kernel_v6;
 pub mod game_kernel_v7;
 pub mod input_router;

@@ -157,7 +157,6 @@ fn create_fixture() -> TestResult<Fixture> {
                 seed: "current-browser-cli-repro".to_owned(),
                 save_slots: vec!["preview-slot".to_owned()],
                 local_is_host: true,
-                existing_saves: false,
             }),
         })?,
         BrowserResponseV2::Ready

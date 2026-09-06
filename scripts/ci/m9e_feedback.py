@@ -29,73 +29,9 @@ TIMINGS = {}
 WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-lab", "current_kernel_supervisor_v2"),
                         ("er-cli", "m9e_current_reload"),
-                        ("er-cli", "m9e_current_repro")}
-
-TITLE_STORAGE_PATHS = [
-  "rust/crates/er-cli/src/current_agent.rs",
-  "rust/crates/er-cli/tests/m9e_current_repro.rs",
-  "rust/crates/er-cli/tests/m9e_current_title_storage.rs",
-  "rust/crates/er-env/src/current.rs",
-  "rust/crates/er-game/src/current_bootstrap_storage.rs",
-  "rust/crates/er-game/src/m72_bootstrap.rs",
-  "rust/crates/er-kernel/src/game_kernel_v7.rs",
-  "rust/crates/er-kernel/src/snapshot_v7.rs",
-  "rust/crates/er-kernel/tests/m9e_title_storage.rs",
-  "rust/crates/er-types/src/m72_bootstrap.rs",
-  "rust/crates/er-web/src/contracts_v2.rs",
-  "rust/crates/er-web/src/host_v2.rs",
-  "rust/crates/er-web/tests/m9e_host_v2.rs",
-  "rust/crates/er-web/tests/m9e_title_storage.rs",
-  "src/rust-browser/contracts/browser-contracts-v2.ts"
-]
-TITLE_STORAGE_TRIGGERS = [
-  "rust/crates/er-cli/tests/m9e_current_title_storage.rs",
-  "rust/crates/er-game/src/current_bootstrap_storage.rs",
-  "rust/crates/er-kernel/tests/m9e_title_storage.rs",
-  "rust/crates/er-web/tests/m9e_title_storage.rs"
-]
-TITLE_STORAGE_IDS = {
-  "er-kernel:m9e_title_storage": [
-    "title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two",
-    "title_inventory_is_bounded_actual_and_missing_read_returns_selection",
-    "title_cancel_retires_core_owner_without_reusing_ids_and_new_game_carries_floor",
-    "title_default_bytes_strict_extension_and_overflow_are_atomic",
-    "title_read_rejects_corrupt_nonlocal_private_and_inactive_saves_atomically",
-    "title_menu_revision_and_read_allocator_overflow_preserve_full_snapshot"
-  ],
-  "er-cli:m9e_current_title_storage": [
-    "current_cli_opt_in_title_list_cancel_read_matches_every_full_native_snapshot",
-    "current_cli_absent_flag_preserves_old_title_and_rejects_non_host_opt_in"
-  ],
-  "er-web:m9e_title_storage": [
-    "current_host_title_ingress_emits_typed_list_read_missing_and_cancel",
-    "current_host_default_wire_omits_opt_in_and_non_authority_is_rejected"
-  ],
-  "er-testkit:m72_foundation": [
-    "natural_bootstrap_completes_entire_observed_flow_with_raw_keys",
-    "held_input_cannot_cross_bootstrap_menu_instances",
-    "confirmation_cancel_restores_starter_menu_with_fresh_instance",
-    "navigation_planner_returns_raw_events_without_execution",
-    "legality_explains_disabled_option_without_enabling_it",
-    "preset_registry_is_content_pinned_and_path_confined",
-    "artifact_store_is_bounded_content_addressed_and_tears_down",
-    "search_is_semantic_sorted_and_state_claim_policy_is_explicit"
-  ]
-}
-TITLE_STORAGE_TARGETS = {
-  "er-kernel": [
-    "m9e_title_storage"
-  ],
-  "er-cli": [
-    "m9e_current_title_storage"
-  ],
-  "er-web": [
-    "m9e_title_storage"
-  ],
-  "er-testkit": [
-    "m72_foundation"
-  ]
-}
+                        ("er-cli", "m9e_current_repro"),
+                        ("er-cli", "m9e_current_control_query"),
+                        ("er-cli", "m9e_current_state_query")}
 
 AI_SNAPSHOT_VALIDATION_PATHS = ["rust/crates/er-ai/src/authority_v2.rs",
                                 "rust/crates/er-kernel/src/snapshot_v7.rs"]
@@ -114,17 +50,6 @@ AI_SNAPSHOT_VALIDATION_IDS = [
     "tests::first_legal_policy_is_deterministic_without_rng",
     "trainer_party::tests::rival_traits_and_post_processing_are_stable",
     "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic",
-]
-
-READ_REBIND_PATHS = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
-                     "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs",
-                     "rust/crates/er-web/tests/m9e_host_v2.rs"]
-READ_REBIND_IDS = [
-    "read_rebind_preserves_saved_semantics_and_executes_write_after_restore",
-    "read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root",
-    "read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion",
-    "read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior",
-    "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work",
 ]
 
 # Exact source repairs required by the first full selected-package Clippy run.
@@ -722,26 +647,31 @@ def plan():
     changed = capture(["git", "diff", "--name-only", base, "HEAD"]).splitlines()
     rust_changes = [path for path in changed if path.startswith("rust/")]
     timer_focus = config.get("timer_focus", {})
-    from m9e_current_proposal import (HELPER_PATH, OWNER_PATHS, OWNER_TRIGGERS, TARGET, NATIVE_IDS,
-                                      focus_policy, merge_targets, selected_owner, source_binding)
-    product_changes = [path for path in changed if path not in (HELPER_PATH, "scripts/ci/m9e_title_storage.py") and path not in config["infrastructure_paths"]
+    product_changes = [path for path in changed if path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
+    from m9e_phases import STATE_QUERY_PATHS, STATE_QUERY_TARGET, STATE_QUERY_TEST_IDS
+    state_query_focus = config.get("current_state_query_focus", {})
+    if state_query_focus and (state_query_focus.get("paths") != STATE_QUERY_PATHS
+                              or state_query_focus.get("test_ids") != STATE_QUERY_TEST_IDS):
+        raise RuntimeError("current state query policy identities disagree")
+    # The unique state witness cannot be smuggled into an older dispatcher scope.
+    # Shared current_agent.rs still belongs to explicit control/capture/repro cuts.
+    state_query_changed = STATE_QUERY_PATHS[2] in product_changes
+    state_query_session = bool(state_query_focus) and any(path in STATE_QUERY_PATHS for path in product_changes) and all(
+        path in STATE_QUERY_PATHS for path in product_changes)
+    from m9e_phases import CONTROL_QUERY_PATHS, CONTROL_QUERY_TARGET, CONTROL_QUERY_TEST_IDS
+    query_focus = config.get("current_control_query_focus", {})
+    if query_focus and (query_focus.get("paths") != CONTROL_QUERY_PATHS
+                        or query_focus.get("test_ids") != CONTROL_QUERY_TEST_IDS):
+        raise RuntimeError("current control query policy identities disagree")
+    # current_agent.rs belongs to earlier capture/repro/batch scopes as well.
+    # Only the unique new witness is an unconditional mixed-scope trigger;
+    # a dispatcher-only repair gets this full scope without stealing those cuts.
+    query_changed = bool(query_focus) and CONTROL_QUERY_PATHS[1] in product_changes
+    query_session = bool(query_focus) and any(path in CONTROL_QUERY_PATHS for path in product_changes) and all(
+        path in CONTROL_QUERY_PATHS for path in product_changes)
     from m9e_phases import (WORKER_SOURCE_PATHS, WORKER_TEST_IDS, WORKER_CODEC_IDS, browser_worker_source_binding,
                             RTC_PATHS, RTC_TEST_IDS, browser_rtc_source_binding)
-    title_focus = config.get("current_title_storage_focus", {})
-    if title_focus and (not isinstance(title_focus, dict)
-                       or set(title_focus) != {"paths", "trigger_paths", "exact_test_ids"}
-                       or title_focus.get("paths") != TITLE_STORAGE_PATHS
-                       or title_focus.get("trigger_paths") != TITLE_STORAGE_TRIGGERS
-                       or title_focus.get("exact_test_ids") != TITLE_STORAGE_IDS):
-        raise RuntimeError("current Title storage policy identities disagree")
-    title_changed = any(path in TITLE_STORAGE_TRIGGERS for path in product_changes)
-    title_session = bool(title_focus) and title_changed and all(path in TITLE_STORAGE_PATHS for path in product_changes)
-    import m9e_title_storage as retirement
-    retirement_session, retirement_installed = retirement.select_scope(config, product_changes, ROOT)
-    owner_session = focus_policy(config, product_changes)
-    owner_installed = any((ROOT / path).is_file() for path in OWNER_TRIGGERS)
-    owner_changed = owner_installed and any(path in OWNER_PATHS for path in product_changes)
     browser_worker_focus = config.get("current_browser_worker_focus", {})
     browser_worker_paths = browser_worker_focus.get("paths", [])
     if browser_worker_focus and (browser_worker_paths != WORKER_SOURCE_PATHS
@@ -765,15 +695,6 @@ def plan():
         raise RuntimeError("current storage policy identities disagree")
     storage_changed = any(path in storage_paths for path in product_changes)
     storage_session = storage_changed and all(path in storage_paths for path in product_changes)
-    from m9e_worker_storage import PRODUCT_PATHS as COMPOSITION_PATHS, TEST_IDS as COMPOSITION_IDS, source_binding as composition_binding
-    composition_policy = config.get("current_worker_storage_focus", {})
-    if composition_policy and (composition_policy.get("paths") != COMPOSITION_PATHS or composition_policy.get("test_ids") != COMPOSITION_IDS):
-        raise RuntimeError("worker storage composition policy identities disagree")
-    composition_changed = any(path in COMPOSITION_PATHS for path in product_changes)
-    # One storage integration may include its four exact IndexedDB prerequisites.
-    # Both adapter and composed Worker witnesses remain required below.
-    composition_allowed = [*COMPOSITION_PATHS, *STORAGE_SOURCE_PATHS]
-    composition_session = bool(composition_policy) and composition_changed and all(path in composition_allowed for path in product_changes)
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
@@ -816,14 +737,9 @@ def plan():
     ai_snapshot_changed = AI_SNAPSHOT_VALIDATION_PATHS[0] in product_changes
     ai_snapshot_session = (bool(ai_snapshot_focus) and ai_snapshot_changed
                            and set(product_changes) == set(AI_SNAPSHOT_VALIDATION_PATHS))
-    read_focus = config.get("current_read_rebind_focus", {})
-    if read_focus and (not isinstance(read_focus, dict) or set(read_focus) != {"paths", "exact_test_ids"}
-                       or read_focus["paths"] != READ_REBIND_PATHS or read_focus["exact_test_ids"] != READ_REBIND_IDS):
-        raise RuntimeError("current READ rebind policy identities disagree")
-    read_session = bool(read_focus) and set(product_changes) == set(READ_REBIND_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or query_session or state_query_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -897,7 +813,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -953,8 +869,6 @@ def plan():
         execution_scope = timer_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
-        if composition_session:
-            boundaries = [path for path in boundaries if path not in COMPOSITION_PATHS]
         if storage_session:
             boundaries = [path for path in boundaries if path not in storage_paths]
         if browser_worker_session:
@@ -987,7 +901,7 @@ def plan():
         execution_scope = capture_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in capture_paths]
-    if damage_session or composition_session:
+    if damage_session:
         execution_scope = {crate: list(targets) for crate, targets in damage_focus["execute"].items()}
         damage_required_targets = {crate: list(targets) for crate, targets in damage_focus["required_targets"].items()}
         damage_exact_test_ids = dict(damage_focus["exact_test_ids"])
@@ -1000,46 +914,30 @@ def plan():
                     if "*" not in current:
                         current.extend(target for target in targets if target not in current)
         browser_required = True
-        boundaries = [path for path in boundaries if path not in (composition_allowed if composition_session else damage_paths)
-                      and (composition_session or (path not in damage_lint_paths and path not in damage_doc_paths))]
-        if composition_session and not (ROOT / "rust/crates/er-game/tests/m9e_damage_query.rs").is_file():
-            raise RuntimeError("worker storage composition requires the previously qualified AI query product")
+        boundaries = [path for path in boundaries if path not in damage_paths and path not in damage_lint_paths
+                      and path not in damage_doc_paths]
     if ai_snapshot_session:
         execution_scope = {**timer_focus["execute"], "er-ai": ["*"]}
         ai_snapshot_targets = {**timer_focus["required_targets"], "er-ai": ["er_ai"]}
         ai_snapshot_ids = {**timer_focus["exact_test_ids"], "er-ai:er_ai": list(AI_SNAPSHOT_VALIDATION_IDS)}
         boundaries = [path for path in boundaries if path not in AI_SNAPSHOT_VALIDATION_PATHS]
-    if read_session:
-        boundaries = [path for path in boundaries if path not in READ_REBIND_PATHS]
-    if owner_session:
-        execution_scope = merge_targets(timer_focus["execute"], capture_focus["execute"], {"er-kernel": ["*"]})
-        boundaries = [path for path in boundaries if path not in OWNER_PATHS]
-    if title_session or retirement_session:
-        execution_scope = merge_targets(damage_focus["execute"], TITLE_STORAGE_TARGETS)
-        boundaries = [path for path in boundaries if path not in (retirement.PRODUCT_PATHS if retirement_session else TITLE_STORAGE_PATHS)]
-        if retirement_session and not all((ROOT / path).is_file() for path in TITLE_STORAGE_TRIGGERS):
-            raise RuntimeError("Title retirement requires installed current Title native ingress")
-    title_required = bool(title_focus) and (title_session or retirement_session or ("er-kernel" in selected | set(execution_scope or {}) and (
-        execution_scope is None or "*" in execution_scope.get("er-kernel", [])
-        or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))))
-    if title_required:
-        if execution_scope is not None:
-            execution_scope = merge_targets(execution_scope, TITLE_STORAGE_TARGETS)
-        selected.update(TITLE_STORAGE_TARGETS)
-        browser_required = True
-        current_session = True
-    owner_required = owner_changed or (owner_installed and selected_owner(selected | set(execution_scope or {}), execution_scope))
-    if owner_required:
-        # Additional witnesses preserve the old focus and all its required IDs.
-        if execution_scope is not None:
-            execution_scope = merge_targets(execution_scope, {"er-kernel": ["m9e_current_proposal_v7"]})
-        selected.add("er-kernel")
-        browser_required = True
-        current_session = True
     if execution_scope is not None:
         selected.update(execution_scope)
         if not native_worker_delta:
             current_session = True
+    query_selected_scope = "er-cli" in selected and (execution_scope is None
+        or "*" in execution_scope.get("er-cli", []) or CONTROL_QUERY_TARGET[1] in execution_scope.get("er-cli", []))
+    query_required = query_selected_scope and (query_session or (ROOT / CONTROL_QUERY_PATHS[1]).is_file()
+        or (execution_scope is not None and CONTROL_QUERY_TARGET[1] in execution_scope.get("er-cli", [])))
+    state_query_selected_scope = "er-cli" in selected and (execution_scope is None
+        or "*" in execution_scope.get("er-cli", []) or STATE_QUERY_TARGET[1] in execution_scope.get("er-cli", []))
+    state_query_required = state_query_selected_scope and (state_query_session or (ROOT / STATE_QUERY_PATHS[2]).is_file()
+        or (execution_scope is not None and STATE_QUERY_TARGET[1] in execution_scope.get("er-cli", [])))
+    if state_query_required and not state_query_focus:
+        raise RuntimeError("selected current state query target requires its exact policy")
+    query_required = query_required or state_query_required
+    if query_required and not query_focus:
+        raise RuntimeError("selected current control query target requires its exact policy")
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
@@ -1047,9 +945,10 @@ def plan():
         or (RUST / "crates/er-cli/tests" / (target + ".rs")).is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
+    endpoint_execution = endpoint_execution or query_required
     if endpoint_execution:
         selected.add("er-kernel-worker")
-    cli_executable_required = browser_required and (owner_required or retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
+    cli_executable_required = browser_required and (retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
         ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
     if cli_executable_required:
         selected.add("er-cli")
@@ -1061,10 +960,8 @@ def plan():
             if widened == selected:
                 break
             selected = widened
-    retirement_required = retirement_session or (browser_required and retirement_installed)
-    composition_required = retirement_required or composition_session or (browser_required and (ROOT / COMPOSITION_PATHS[0]).is_file())
-    storage_required = composition_required or storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
-    rtc_required = owner_required or composition_required or rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
+    storage_required = storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
+    rtc_required = rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
     browser_worker_required = storage_required or rtc_required or browser_worker_session or (browser_required and any(
         (ROOT / path).is_file() for path in (
             "src/rust-browser/routes/rust-current-worker-entry.ts",
@@ -1076,19 +973,10 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
-              "current_title_retirement_focus": retirement_session,
-              "requires_title_retirement": retirement_required,
-              "title_storage_binding": retirement.source_binding(ROOT, capture(["git", "rev-parse", "HEAD"] )) if retirement_required else None,
-              "current_worker_storage_focus": composition_session,
-              "requires_worker_storage": composition_required,
-              "worker_storage_binding": composition_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if composition_required else None,
               "requires_current_storage": storage_required,
               "current_storage_binding": storage_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if storage_required else None,
               "requires_browser_worker": browser_worker_required,
               "current_browser_rtc_focus": rtc_session,
-              "current_proposal_focus": owner_session,
-              "requires_current_proposal": owner_required,
-              "owner_source_binding": source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if owner_required else None,
               "requires_browser_rtc": rtc_required,
               "browser_rtc_binding": (browser_rtc_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"]))
                                       if rtc_required else None),
@@ -1112,12 +1000,13 @@ def plan():
               "ai_damage_query_focus": damage_session,
               "ai_damage_query_lint_repair_focus": damage_lint_session,
               "ai_snapshot_validation_focus": ai_snapshot_session,
-              "current_read_rebind_focus": read_session,
-              "current_title_storage_focus": title_session,
-              "requires_title_storage": title_required,
+              "current_state_query_focus": state_query_session,
+              "requires_current_state_query": state_query_required,
+              "current_control_query_focus": query_session,
+              "requires_current_control_query": query_required,
               "requires_cli_executable": cli_executable_required,
               "required_native_test_ids": (ai_snapshot_ids if ai_snapshot_session
-                                           else damage_exact_test_ids if damage_session or composition_session
+                                           else damage_exact_test_ids if damage_session
                                            else cache_focus.get("exact_test_ids", {}) if cache_session
                                            else validation_focus.get("exact_test_ids", {}) if validation_session
                                            else retention_focus.get("exact_test_ids", {}) if retention_session
@@ -1129,7 +1018,7 @@ def plan():
               "requires_agent_protocol_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or cli_reload_session or menu_session or batch_session,
               "timer_focus": timer_session,
               "required_native_targets": (ai_snapshot_targets if ai_snapshot_session
-                                          else damage_required_targets if damage_session or composition_session
+                                          else damage_required_targets if damage_session
                                           else cache_focus.get("required_targets", {}) if cache_session
                                           else validation_focus.get("required_targets", {}) if validation_session
                                           else retention_focus.get("required_targets", {}) if retention_session
@@ -1146,41 +1035,29 @@ def plan():
               "requires_worker_executable": endpoint_execution,
               "worker_lock_guard": worker_lock_guard,
               "features": "default"}
-    if title_session or retirement_session:
-        result["required_native_targets"] = merge_targets(damage_focus["required_targets"], TITLE_STORAGE_TARGETS)
-        result["required_native_test_ids"] = {**damage_focus["exact_test_ids"], **TITLE_STORAGE_IDS}
-    if owner_session:
-        result["required_native_targets"] = merge_targets(timer_focus["required_targets"], capture_focus["required_targets"])
-        result["required_native_test_ids"] = {**timer_focus.get("exact_test_ids", {}), **capture_focus.get("exact_test_ids", {})}
-    if owner_required:
-        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_current_proposal_v7"]})
-        result["required_native_test_ids"] = {**result["required_native_test_ids"], TARGET: NATIVE_IDS}
-    if title_required:
-        result["required_native_targets"] = merge_targets(result["required_native_targets"], TITLE_STORAGE_TARGETS)
-        result["required_native_test_ids"] = {**result["required_native_test_ids"], **TITLE_STORAGE_IDS}
-    # Once installed, every selected current game-kernel suite must keep all
-    # five READ witnesses, including later owner/AI/storage changes. Do not
-    # replace or shorten the pre-existing game-kernel identity list.
-    read_required = bool(read_focus) and "er-kernel" in selected and (
-        execution_scope is None or "*" in execution_scope.get("er-kernel", [])
-        or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))
-    result["requires_read_rebind"] = read_required
-    if read_required:
-        identity = "er-kernel:m9e_game_kernel_v7"
-        inherited = result["required_native_test_ids"].get(identity, timer_focus["exact_test_ids"][identity])
+    if query_required:
+        result["required_native_targets"] = {crate: list(targets)
+                                              for crate, targets in result["required_native_targets"].items()}
+        targets = result["required_native_targets"].setdefault("er-cli", [])
+        if CONTROL_QUERY_TARGET[1] not in targets:
+            targets.append(CONTROL_QUERY_TARGET[1])
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
-            identity: [*inherited, *[name for name in READ_REBIND_IDS if name not in inherited]]}
-        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
+                                               ":".join(CONTROL_QUERY_TARGET): list(CONTROL_QUERY_TEST_IDS)}
+    if state_query_required:
+        # The preceding query-required block already detached policy-owned lists.
+        targets = result["required_native_targets"].setdefault("er-cli", [])
+        if STATE_QUERY_TARGET[1] not in targets:
+            targets.append(STATE_QUERY_TARGET[1])
+        result["required_native_test_ids"] = {**result["required_native_test_ids"],
+                                               ":".join(STATE_QUERY_TARGET): list(STATE_QUERY_TEST_IDS)}
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
-    if title_changed and not title_session:
-        raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (storage_changed and not storage_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -1428,23 +1305,13 @@ def verify_browser_worker_build(output, summary, *, rtc=False):
         if expected & rtc_assets:
             raise RuntimeError("current RTC and Worker emitted namespaces overlap")
         expected |= rtc_assets
-    if not rtc and summary["plan"].get("requires_worker_storage"):
-        composition_assets = set(summary["worker_storage_assets"]["manifest"]["assets"])
-        if expected & composition_assets:
-            raise RuntimeError("worker storage and prior Worker/RTC emitted namespaces overlap")
-        expected |= composition_assets
-    if not rtc and summary["plan"].get("requires_title_retirement"):
-        retirement_assets = set(summary["title_storage_assets"]["manifest"]["assets"])
-        if expected & retirement_assets:
-            raise RuntimeError("Title retirement and prior emitted namespaces overlap")
-        expected |= retirement_assets
     if emitted != expected:
         raise RuntimeError("current Worker has unlisted emitted assets")
     shutil.copyfile(path, FULL / path.name)
     summary[key + "_assets"] = evidence
 
 
-def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort_assets=None, owner_context=None):
+def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort_assets=None):
     from m9e_phases import WORKER_TEST_IDS, RTC_TEST_IDS, validate_browser_worker_tests, validate_browser_rtc_tests
     selected_ids = RTC_TEST_IDS if rtc else WORKER_TEST_IDS
     expected_file = "m9e-v7-worker-rtc.spec.ts" if rtc else "m9e-v7-worker.spec.ts"
@@ -1475,14 +1342,7 @@ def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort
             raise RuntimeError("current Worker witness failed, skipped, retried or flaky")
         key = "positive" if spec["title"] == selected_ids[0] else "negative"
         attachments = [item for item in runs[0].get("attachments", [])
-                       if owner_context is not None or str(item.get("name", "")).startswith(prefix)]
-        receipt_bytes = None
-        if owner_context is not None:
-            from m9e_current_proposal import receipt_attachment
-            if not rtc:
-                raise RuntimeError("owner receipt evidence requires actual RTC witnesses")
-            compact, receipt_bytes = receipt_attachment(attachments, ROOT, key == "positive")
-            attachments = [compact]
+                       if str(item.get("name", "")).startswith(prefix)]
         if (len(attachments) != 1 or attachments[0].get("name") != prefix + key
                 or attachments[0].get("contentType") != "application/json"):
             raise RuntimeError("current Worker attachment missing, ambiguous or misplaced")
@@ -1503,17 +1363,9 @@ def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort
             raise RuntimeError("current Worker attachment requires one bounded body or file")
         if len(payload) > 4096:
             raise RuntimeError("current Worker attachment exceeds bound")
-        if owner_context is not None:
-            from m9e_current_proposal import parse, receipt_oracle
-            result[key] = parse(payload, 4096, canonical_required=False)
-            if key == "positive":
-                result["receipt_oracle"] = receipt_oracle(receipt_bytes, result[key], **owner_context)
-        else:
-            result[key] = json.loads(payload)
+        result[key] = json.loads(payload)
     if rtc:
-        validate_browser_rtc_tests(result, assets, binding, cohort_assets or {},
-                                   owner_binding=owner_context["binding"] if owner_context else None,
-                                   owner_helper_hash=owner_context["helper_hash"] if owner_context else None)
+        validate_browser_rtc_tests(result, assets, binding, cohort_assets or {})
     else:
         validate_browser_worker_tests(result, assets, binding)
     return result
@@ -1533,10 +1385,7 @@ def browser_worker_codec_evidence(report):
     return {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": WORKER_CODEC_IDS}
 
 
-def storage_node_evidence(report, *, title_retirement=False):
-    if title_retirement:
-        from m9e_title_storage import node_evidence
-        return node_evidence(report)
+def storage_node_evidence(report):
     from m9e_phases import STORAGE_SOURCE_PATHS, STORAGE_NODE_IDS, validate_storage_node
     suites = report.get("testResults", [])
     assertions = [item for suite in suites for item in suite.get("assertionResults", [])]
@@ -1616,7 +1465,7 @@ def current_storage_checks(summary, env):
     run(["pnpm", "exec", "vitest", "run", "--config", "test/node/vitest.config.ts",
          STORAGE_SOURCE_PATHS[2], "--reporter=json", "--outputFile=" + str(FULL / "current-storage-node-results.json")],
         "current-storage-node", ROOT)
-    summary["current_storage_node"] = storage_node_evidence(json.loads((FULL / "current-storage-node-results.json").read_text()), title_retirement=summary["plan"].get("requires_title_retirement", False))
+    summary["current_storage_node"] = storage_node_evidence(json.loads((FULL / "current-storage-node-results.json").read_text()))
     browser_env = {**env, "PLAYWRIGHT_JSON_OUTPUT_FILE": str(FULL / "current-storage-browser-results.json")}
     run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
          STORAGE_SOURCE_PATHS[3], "--workers=1", "--reporter=line,json"], "current-storage-browser", ROOT, browser_env)
@@ -1652,14 +1501,6 @@ def browser_checks(summary):
             raise RuntimeError("browser asset hash mismatch: " + name)
     shutil.copyfile(manifest_path, FULL / manifest_path.name)
     summary["browser_assets"] = {"manifest_sha256": digest(manifest_path), "assets": manifest["assets"]}
-    if summary.get("plan", {}).get("requires_worker_storage"):
-        import m9e_worker_storage as composition
-        run(["node", composition.PRODUCT_PATHS[2], "--out-dir", str(output)], "worker-storage-build", ROOT, env)
-        composition.build_evidence(output, summary, ROOT, FULL)
-    if summary.get("plan", {}).get("requires_title_retirement"):
-        import m9e_title_storage as retirement
-        run(["node", retirement.PRODUCT_PATHS[4], "--out-dir", str(output)], "title-storage-build", ROOT, env)
-        retirement.build_evidence(output, summary, ROOT, FULL, env["RUSTUP_TOOLCHAIN"])
     if summary.get("plan", {}).get("requires_browser_rtc"):
         verify_browser_worker_build(output, summary, rtc=True)
     if summary.get("plan", {}).get("requires_browser_worker"):
@@ -1691,39 +1532,15 @@ def browser_checks(summary):
             json.loads((FULL / "browser-worker-results.json").read_text()), summary["browser_worker_assets"],
             summary["plan"]["browser_worker_binding"])
     if summary.get("plan", {}).get("requires_browser_rtc"):
-        owner_context = None
-        if summary["plan"].get("requires_current_proposal"):
-            from m9e_current_proposal import prepare_provider, fixture_identity, revalidate_cohort, source_binding, HELPER_PATH
-            revalidate_cohort(output, summary["browser_assets"]["assets"])
-            primitive, provider = prepare_provider(True, os.environ["RUNNER_TEMP"], FULL)
-            owner_context = {"expected": fixture_identity(output, summary["browser_assets"]["assets"]),
-                             "primitive": primitive, "provider": provider,
-                             "binding": summary["plan"]["owner_source_binding"], "helper_hash": digest(ROOT / HELPER_PATH)}
-            if source_binding(ROOT, summary["product_sha"]) != owner_context["binding"]:
-                raise RuntimeError("owner source changed before browser receipt production")
         env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-rtc-results.json")
         run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
              "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts", "--workers=1", "--reporter=line,json"], "browser-rtc-journey", ROOT, env)
         summary["browser_rtc_tests"] = browser_worker_result_evidence(
             json.loads((FULL / "browser-rtc-results.json").read_text()), summary["browser_rtc_assets"],
-            summary["plan"]["browser_rtc_binding"], rtc=True, cohort_assets=summary["browser_assets"]["assets"], owner_context=owner_context)
-        if owner_context is not None:
-            revalidate_cohort(output, summary["browser_assets"]["assets"])
-            if (fixture_identity(output, summary["browser_assets"]["assets"]) != owner_context["expected"]
-                    or source_binding(ROOT, summary["product_sha"]) != owner_context["binding"]
-                    or digest(ROOT / HELPER_PATH) != owner_context["helper_hash"]):
-                raise RuntimeError("owner source or fixture changed during browser receipt production")
-            verify_browser_worker_build(output, summary, rtc=True)
-            verify_browser_worker_build(output, summary)
+            summary["plan"]["browser_rtc_binding"], rtc=True, cohort_assets=summary["browser_assets"]["assets"])
 
     if summary.get("plan", {}).get("requires_current_storage"):
         current_storage_checks(summary, env)
-    if summary.get("plan", {}).get("requires_worker_storage"):
-        import m9e_worker_storage as composition
-        composition.checks(ROOT, FULL, run, summary, env)
-    if summary.get("plan", {}).get("requires_title_retirement"):
-        import m9e_title_storage as retirement
-        retirement.checks(ROOT, FULL, run, summary, env, env["RUSTUP_TOOLCHAIN"])
 
 
 def timer_behavioral_mutant(selection, summary, passed_test_ids):
@@ -1874,18 +1691,20 @@ def write_progress(summary, phase, target=None):
 def native_execution_order(selection, enumerated):
     # Discovery and lint already covered every selected target. Exercise current
     # kernel changes before long process witnesses without changing membership.
+    if selection.get("current_state_query_focus"):
+        ordered = native_execution_order({**selection, "current_state_query_focus": False}, enumerated)
+        return sorted(ordered, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_state_query"))
+    if selection.get("current_control_query_focus"):
+        ordered = native_execution_order({**selection, "current_control_query_focus": False}, enumerated)
+        return sorted(ordered, key=lambda item: (item[4].name, item[2]) != ("er-cli", "m9e_current_control_query"))
     if selection.get("timer_focus"):
         first = [("er-kernel", name) for name in (
             "m9e_game_kernel_v7", "m9e_coop_v7", "m9e_snapshot_v7", "m9e_timers_v7", "m9e_domain_journeys_v7")]
         if selection.get("material_retention_focus"):
             first[:0] = [("er-game", "m9e_material_retention"), ("er-kernel", "m9e_material_retention_v7")]
-        if selection.get("ai_damage_query_focus") or selection.get("current_worker_storage_focus"):
+        if selection.get("ai_damage_query_focus"):
             first[:0] = [("er-game", "m9e_damage_query")]
-        if selection.get("requires_current_proposal"):
-            first[:0] = [("er-kernel", "m9e_current_proposal_v7")]
         first.extend([("er-wasm", "m9e_parity"), ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_reload")])
-        if selection.get("requires_title_storage"):
-            first[:0] = [(crate, target) for crate, targets in TITLE_STORAGE_TARGETS.items() for target in targets]
         priority = {identity: index for index, identity in enumerate(first)}
         return sorted(enumerated, key=lambda item: priority.get((item[4].name, item[2]), len(priority)))
     if selection.get("browser_cache_focus"):
@@ -1995,14 +1814,19 @@ def main(preflight_failure=None):
             tests.extend(f"{name}::{test_id}" for test_id in ids)
             summary["tests"]["selected"] += len(ids)
             enumerated.append((index, binary, name, ids, cwd, excluded_ids, env))
-        from m9e_current_proposal import validate_obligations
-        validate_obligations(selection, [{"crate": cwd.name, "target": name, "ids": ids}
-                                        for _, _, name, ids, cwd, _, _ in enumerated], summary["product_sha"])
         summary["required_native_target_counts"] = required_native_target_counts(
             selection.get("required_native_targets", {}),
             [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
         require_native_test_ids(selection.get("required_native_test_ids", {}),
                                 [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
+        from m9e_phases import validate_control_query_inventory
+        validate_control_query_inventory(selection, [
+            {"crate": cwd.name, "target": name, "ids": ids, "historical_excluded_ids": sorted(excluded)}
+            for _, _, name, ids, cwd, excluded, _ in enumerated])
+        from m9e_phases import validate_state_query_inventory
+        validate_state_query_inventory(selection, [
+            {"crate": cwd.name, "target": name, "ids": ids, "historical_excluded_ids": sorted(excluded)}
+            for _, _, name, ids, cwd, excluded, _ in enumerated])
         for item in selection["historical_dispositions"]:
             in_scope = execution_scope is None or item["target"] in execution_scope.get(item["crate"], []) or "*" in execution_scope.get(item["crate"], [])
             if in_scope and item["crate"] in selection["packages"] and summary["historical_dispositions"].count(item) != 1:
@@ -2012,8 +1836,7 @@ def main(preflight_failure=None):
         summary["selected_inventory_validated"] = True
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
-        if (selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus")
-                or selection.get("requires_current_proposal") or selection.get("requires_read_rebind") or selection.get("current_worker_storage_focus") or selection.get("requires_title_storage")):
+        if selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus"):
             write_progress(summary, "lint", "selected-packages")
             try:
                 run(["cargo", "clippy", "--locked",
