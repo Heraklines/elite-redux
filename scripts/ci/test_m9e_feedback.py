@@ -2546,7 +2546,7 @@ class FeedbackTests(unittest.TestCase):
             "er-save": ["er_save"], "er-scenario": ["er_scenario"],
             "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
             "er-state": ["er_state", "m4_foundation_properties"],
-            "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance"],
+            "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance", "m6_ability_parity", "m6_item_parity", "m6_move_parity", "m6_species_form_parity", "m6_properties"],
             "er-wasm": ["er_wasm"], "er-world": ["er_world"],
         }
         empty = {"er-content-compiler", "er_devplane", "er_wasm", "er_world"}
@@ -2598,11 +2598,11 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["execution_scope"], execution)
         self.assertEqual(selection["required_native_targets"], required)
         self.assertEqual(sum(map(len, policy["required_targets"].values())), 50)
-        self.assertEqual(sum(map(len, required.values())), 72)
+        self.assertEqual(sum(map(len, required.values())), 77)
         exact = selection["required_native_test_ids"]
         enumerated = [(crate, target, exact.get(f"{crate}:{target}", ["behavior"]))
                       for crate, targets in required.items() for target in targets]
-        self.assertEqual(len(self.feedback.required_native_target_counts(required, enumerated)), 72)
+        self.assertEqual(len(self.feedback.required_native_target_counts(required, enumerated)), 77)
         for index, (crate, target, ids) in enumerate(enumerated):
             if target not in policy["lint_repair_required_targets"].get(crate, []):
                 continue
@@ -2621,7 +2621,7 @@ class FeedbackTests(unittest.TestCase):
             for target in targets:
                 self.assertIn([crate, target], assignments["a"])
                 self.assertNotIn([crate, target], assignments["b"])
-        self.assertEqual(len(assignments["a"]) + len(assignments["b"]), 72)
+        self.assertEqual(len(assignments["a"]) + len(assignments["b"]), 77)
 
     def test_ai_damage_query_lint_companions_execute_with_full_clippy_and_platform(self):
         self.configure_ai_damage_query_scope()
@@ -2638,7 +2638,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(code, 0)
         if (self.full / "full-summary.json").is_file():
             summary = json.loads((self.full / "full-summary.json").read_text())
-        self.assertEqual(len(summary["required_native_target_counts"]), 72)
+        self.assertEqual(len(summary["required_native_target_counts"]), 77)
         for crate, targets in policy["lint_repair_execute"].items():
             for target in targets:
                 self.assertTrue(any(self.binary_crates[binary] == crate and self.binary_targets[binary] == target
@@ -2707,6 +2707,11 @@ class FeedbackTests(unittest.TestCase):
             "rust/crates/er-testkit/tests/m6_native_wasm.rs",
             "rust/crates/er-testkit/tests/support/m6_benchmark.rs",
             "rust/crates/er-testkit/tests/m6_performance.rs",
+            "rust/crates/er-testkit/tests/m6_ability_parity.rs",
+            "rust/crates/er-testkit/tests/m6_item_parity.rs",
+            "rust/crates/er-testkit/tests/m6_move_parity.rs",
+            "rust/crates/er-testkit/tests/m6_species_form_parity.rs",
+            "rust/crates/er-testkit/tests/m6_properties.rs",
         ]
         self.assertEqual(policy["lint_repair_paths"], expected)
         self.assertEqual(self.feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS, expected)

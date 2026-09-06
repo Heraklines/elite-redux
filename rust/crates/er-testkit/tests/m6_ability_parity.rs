@@ -124,18 +124,17 @@ fn cluster_inputs(manifest: &ClusterManifest) -> Vec<BespokeClusterInput<'_>> {
         .collect()
 }
 
+type AbilityProgramsAndContent = (
+    ValidatedSemanticCatalog,
+    ClusterManifest,
+    Vec<MechanicsProgramV2>,
+    PreparedBattleContentV3,
+);
+
 /// Builds the ten mapped ability routine programs (five mirrored pairs) with
 /// sequential program ids `1..=10`, plus the prepared content pack that indexes
 /// exactly those programs.
-fn build_programs_and_content() -> Result<
-    (
-        ValidatedSemanticCatalog,
-        ClusterManifest,
-        Vec<MechanicsProgramV2>,
-        PreparedBattleContentV3,
-    ),
-    Box<dyn Error>,
-> {
+fn build_programs_and_content() -> Result<AbilityProgramsAndContent, Box<dyn Error>> {
     let catalog = validated_catalog()?;
     let mapped = map_routine_catalog(catalog.behavior_units())?;
     let mut pack_programs: Vec<Option<MechanicsProgramV2>> = vec![None];

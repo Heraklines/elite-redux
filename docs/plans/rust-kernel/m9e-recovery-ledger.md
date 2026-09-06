@@ -2330,3 +2330,36 @@ log/proof caps and provenance remain. The existing diagnostic regression test
 requires the exact expanded suffix and unchanged ordinary gate command. Cargo's
 option behavior was checked in its official cargo-check documentation. No local
 workload, baseline advancement, platform qualification or completion claim.
+## Complete testkit target diagnostics and remaining parity repair
+
+d72c1345264441e1dd2413d1f7ff439175596c12 / run34000378703 passed remote
+formatting/build in3.522/153.273 seconds and discovered1,198 selected native IDs
+with72 mandatory nonempty targets. Full selected-package Clippy failed before
+native execution. The keep-going failure collector completed all25 packages in
+90.345 seconds:24 passed, er-testkit reported78 diagnostics across five remaining
+test targets. Its3434-byte index SHA256 is
+ a691a90e5e4b68e2f2b703b52a781c67c3655d8f1018844a289d2bc6a2afa269.
+Only the12741-byte compact summary,4319-byte failure excerpt, index and named
+38872-byte er-testkit log were retrieved from inspected bounded artifacts.
+
+Repair m6_ability_parity's private tuple type; retain the same tuple and callers.
+Repair m6_item_parity and m6_move_parity using informative expect/expect_err,
+fallible helper/test errors, equivalent Option predicates and redundant-borrow
+removal. Repair m6_species_form_parity with fallible fixture resolution and
+collection, preserving the original file search, diagnostics and failed-case
+conditions; remove its Copy clone. All their25 test names and assertions remain.
+
+The independently authored m6_properties repair addresses35 diagnostics through
+informative expectations, propagated existing replay-report errors, equivalent
+short-circuit conditions and Copy/borrow/Option idioms. Reviewed patch19026 bytes,
+SHA256 4387f377ded1dedecdc53a34329c753c64a74832873928d8ae24964e42864446.
+All12 ordinary test IDs and55 assertion sites remain; there are no generated
+proptest IDs. None of these repairs skips failures or suppresses lint rules.
+
+All five affected targets and their37 exact test IDs join mandatory execution.
+The conditional companion scope now has57 named repair paths and77 mandatory
+nonempty targets; pure-query50 and all165 harness test IDs remain unchanged.
+Full selected-package Clippy, reverse compilation, causal controls, Worker,
+platform and CLI proof requirements and existing size/time bounds remain. The
+sole qualified baseline is still f140b7687d44559e38e775147ad91835f62de8e8.
+No local formatter, compiler, test, benchmark or browser workload was run.

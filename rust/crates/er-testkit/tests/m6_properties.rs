@@ -206,7 +206,7 @@ fn generated_pokemon(
         species.id,
         0,
         25,
-        species.base_types.clone(),
+        species.base_types,
         BattleStats {
             hp: max_hp,
             attack: 100,
@@ -318,7 +318,7 @@ fn generated_single_battle(seed: u64, player_party_size: u64) -> TestResult<Gene
             ignore_abilities: false,
             source: None,
         },
-        battle_rng: BattleRngState::new(&format!("m6d-properties-battle-{seed}"), turn),
+        battle_rng: BattleRngState::new(format!("m6d-properties-battle-{seed}"), turn),
         command_state: CommandCollectionState::new(Vec::new(), Vec::new())?,
         faint_queue: Vec::new(),
         next_faint_occurrence: FaintOccurrenceId::ZERO,
@@ -513,18 +513,10 @@ fn check_state_invariants(
     // Topology uniqueness: no battler may occupy two field slots at once.
     let mut occupant_ids = BTreeSet::new();
     for entry in battle.field.slots.iter() {
-        if let Some(occupant) = entry.occupant {
-            if !occupant_ids.insert(occupant) {
-                panic!(
-                    "{}",
-                    fail(
-                        seed,
-                        case,
-                        trace,
-                        &format!("field topology assigned occupant twice"),
-                    )
-                );
-            }
+        if let Some(occupant) = entry.occupant
+            && !occupant_ids.insert(occupant)
+        {
+            return Err(fail(seed, case, trace, "field topology assigned occupant twice").into());
         }
     }
 
@@ -534,18 +526,16 @@ fn check_state_invariants(
     ] {
         for member in party.iter() {
             if member.hp > member.max_hp || (!member.fainted && member.hp == 0) {
-                panic!(
-                    "{}",
-                    fail(
-                        seed,
-                        case,
-                        trace,
-                        &format!(
-                            "{party_name} party member violates HP bounds (hp={}, max={}, fainted={})",
-                            member.hp, member.max_hp, member.fainted
-                        ),
-                    )
-                );
+                return Err(fail(
+                    seed,
+                    case,
+                    trace,
+                    &format!(
+                        "{party_name} party member violates HP bounds (hp={}, max={}, fainted={})",
+                        member.hp, member.max_hp, member.fainted
+                    ),
+                )
+                .into());
             }
             for slot in member.moves.iter().flatten() {
                 let definition =
@@ -570,15 +560,13 @@ fn check_state_invariants(
                     },
                 )?;
                 if slot.pp_used > max_pp {
-                    panic!(
-                        "{}",
-                        fail(
-                            seed,
-                            case,
-                            trace,
-                            &format!("pp_used {} exceeds resolved maximum {max_pp}", slot.pp_used),
-                        )
-                    );
+                    return Err(fail(
+                        seed,
+                        case,
+                        trace,
+                        &format!("pp_used {} exceeds resolved maximum {max_pp}", slot.pp_used),
+                    )
+                    .into());
                 }
             }
         }
@@ -592,10 +580,7 @@ fn check_state_invariants(
             assert!(occurrence.id > previous);
         }
         if !seen_ids.insert(occurrence.id) {
-            panic!(
-                "{}",
-                fail(seed, case, trace, "faint occurrence id appears twice")
-            );
+            return Err(fail(seed, case, trace, "faint occurrence id appears twice").into());
         }
         previous_id = Some(occurrence.id);
         assert!(occurrence.id < battle.next_faint_occurrence);
@@ -604,15 +589,13 @@ fn check_state_invariants(
             BattleSide::Enemy => &battle.enemy_party,
         };
         if !party.iter().any(|member| member.id == occurrence.pokemon) {
-            panic!(
-                "{}",
-                fail(
-                    seed,
-                    case,
-                    trace,
-                    "faint occurrence references a battler outside its side party",
-                )
-            );
+            return Err(fail(
+                seed,
+                case,
+                trace,
+                "faint occurrence references a battler outside its side party",
+            )
+            .into());
         }
     }
     Ok(())
@@ -684,39 +667,39 @@ fn m6d_turn_resolution_is_pure_and_deterministic_across_the_corpus() -> TestResu
             content(),
         )?;
         if first != second {
-            panic!(
-                "{}",
-                replay_report(
-                    seed,
-                    &case,
-                    &[TraceStep::new(
-                        "resolve_turn",
-                        &before,
-                        &first.after_state,
-                        format!(
-                            "outcome={:?} decision={:?}",
-                            first.outcome, first.next_decision
-                        ),
-                    )],
-                    "two identical resolutions produced different transitions",
-                )
-            );
+            return Err(replay_report(
+                seed,
+                &case,
+                &[TraceStep::new(
+                    "resolve_turn",
+                    &before,
+                    &first.after_state,
+                    format!(
+                        "outcome={:?} decision={:?}",
+                        first.outcome, first.next_decision
+                    ),
+                )],
+                "two identical resolutions produced different transitions",
+            )
+            .into());
         }
 
         check_state_invariants(seed, &case, &[], &first.after_state)?;
 
         // Terminal consistency: the derived outcome matches the recorded one
         // and a decided battle always completes its next decision.
-        let after_battle = first.after_state.battle.as_ref().unwrap();
+        let after_battle = first.after_state
+            .battle
+            .as_ref()
+            .expect("property battle fixture retains its battle");
         assert_eq!(derive_battle_outcome(after_battle), first.outcome);
         match (&first.outcome, &first.next_decision) {
             (BattleOutcome::Ongoing, _) => {}
             (decided, BattleNextDecision::Complete(completed)) => {
                 assert_eq!(decided, completed, "terminal mismatch for seed {seed}");
             }
-            (decided, other) => panic!(
-                "{}",
-                replay_report(
+            (decided, other) => {
+                return Err(replay_report(
                     seed,
                     &case,
                     &[TraceStep::new(
@@ -727,7 +710,8 @@ fn m6d_turn_resolution_is_pure_and_deterministic_across_the_corpus() -> TestResu
                     )],
                     &format!("decided outcome {decided:?} did not complete the next decision"),
                 )
-            ),
+                .into());
+            }
         }
     }
     Ok(())
@@ -806,11 +790,14 @@ fn m6d_pairwise_factor_matrix_keeps_all_invariants_after_resolution() -> TestRes
                     &commands,
                     AuthorityEpoch::new(safe(3)),
                     &turn_operation(&before)?,
-                    &pack,
+                    pack,
                 )?;
                 let case = format!("pairwise/status={status:?}/speed={speed}/hp_full={hp_full}");
                 check_state_invariants(0, &case, &[], &transition.after_state)?;
-                let after_battle = transition.after_state.battle.as_ref().unwrap();
+                let after_battle = transition.after_state
+                    .battle
+                    .as_ref()
+                    .expect("property battle fixture retains its battle");
                 assert_eq!(derive_battle_outcome(after_battle), transition.outcome);
             }
         }
@@ -830,7 +817,13 @@ fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consiste
 
         while trace.len() < 12 {
             check_state_invariants(seed, &case, &trace, &state)?;
-            if derive_battle_outcome(state.battle.as_ref().unwrap()) != BattleOutcome::Ongoing {
+            if derive_battle_outcome(
+                state
+                    .battle
+                    .as_ref()
+                    .expect("property battle fixture retains its battle"),
+            ) != BattleOutcome::Ongoing
+            {
                 break;
             }
             let commands = admit_singles_fight(&mut state, seed % 89 + trace.len() as u64)?;
@@ -852,7 +845,10 @@ fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consiste
                 ),
             ));
             check_state_invariants(seed, &case, &trace, &transition.after_state)?;
-            let after_battle = transition.after_state.battle.as_ref().unwrap();
+            let after_battle = transition.after_state
+                .battle
+                .as_ref()
+                .expect("property battle fixture retains its battle");
             assert_eq!(
                 derive_battle_outcome(after_battle),
                 transition.outcome,
@@ -880,7 +876,10 @@ fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consiste
 
         // Terminal consistency at campaign end: whenever the final state has a
         // decided outcome its recorded outcome completed identically.
-        let final_battle = state.battle.as_ref().unwrap();
+        let final_battle = state
+            .battle
+            .as_ref()
+            .expect("property battle fixture retains its battle");
         let final_outcome = derive_battle_outcome(final_battle);
         if final_outcome != BattleOutcome::Ongoing {
             assert_eq!(final_outcome, final_battle.outcome);
@@ -953,18 +952,16 @@ fn resolve_campaign_replacement(
         .unwrap_or(ReplacementSelection::NoLegalReplacement);
 
     let illegal = ReplacementSelection::selected(PartyIndex::ZERO, occurrence.pokemon);
-    if reserve.is_some() {
-        if validate_replacement_selection(&pending, occurrence_id, &illegal, pack).is_ok() {
-            panic!(
-                "{}",
-                fail(
-                    seed,
-                    case,
-                    trace,
-                    "an illegal replacement selection was accepted"
-                )
-            );
-        }
+    if reserve.is_some()
+        && validate_replacement_selection(&pending, occurrence_id, &illegal, pack).is_ok()
+    {
+        return Err(fail(
+            seed,
+            case,
+            trace,
+            "an illegal replacement selection was accepted",
+        )
+        .into());
     }
     validate_replacement_selection(&pending, occurrence_id, &selection, pack).map_err(
         |error| -> Box<dyn Error> {
@@ -997,8 +994,14 @@ fn resolve_campaign_replacement(
     ));
 
     // Replacements never consume turns or RNG and always mark their window.
-    let before_battle = before.battle.as_ref().unwrap();
-    let after_battle = transition.after_state.battle.as_ref().unwrap();
+    let before_battle = before
+        .battle
+        .as_ref()
+        .expect("property battle fixture retains its battle");
+    let after_battle = transition.after_state
+        .battle
+        .as_ref()
+        .expect("property battle fixture retains its battle");
     assert_eq!(after_battle.turn, before_battle.turn);
     assert_eq!(after_battle.battle_rng, before_battle.battle_rng);
     let resolved = after_battle
@@ -1032,7 +1035,10 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
 
         // Fault A: a stale turn operation id must never be admitted.
         let stale = {
-            let current = before.battle.as_ref().unwrap();
+            let current = before
+                .battle
+                .as_ref()
+                .expect("property battle fixture retains its battle");
             let wrong_turn = turn_result_operation_id(
                 current.battle_id,
                 current.wave,
@@ -1047,10 +1053,7 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
             )
         };
         if stale.is_ok() {
-            panic!(
-                "{}",
-                fail(seed, &case, &[], "a stale turn operation id was admitted")
-            );
+            return Err(fail(seed, &case, &[], "a stale turn operation id was admitted").into());
         }
         assert_eq!(
             before, admitted,
@@ -1060,7 +1063,10 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
         // Fault B: queueing a faint with the zero epoch fails closed.
         let mut faulted = before.clone();
         let queue_result = {
-            let battle = faulted.battle.as_mut().unwrap();
+            let battle = faulted
+                .battle
+                .as_mut()
+                .expect("property battle fixture retains its battle");
             queue_faint(
                 battle,
                 FaintCandidate::new(battle.enemy_party[0].id, enemy_slot(0)),
@@ -1077,7 +1083,10 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
         // Fault C: a replacement against a tampered material id is rejected.
         let mut with_faint = before.clone();
         {
-            let battle = with_faint.battle.as_mut().unwrap();
+            let battle = with_faint
+                .battle
+                .as_mut()
+                .expect("property battle fixture retains its battle");
             battle.player_party[0].hp = 0;
             battle.player_party[0].fainted = true;
             queue_faint(
@@ -1090,11 +1099,14 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
         let stored = *with_faint
             .battle
             .as_ref()
-            .unwrap()
+            .expect("property battle fixture retains its battle")
             .faint_queue
             .first()
-            .unwrap();
-        let battle_ref = with_faint.battle.as_ref().unwrap();
+            .expect("queue_faint inserted the property fixture occurrence");
+        let battle_ref = with_faint
+            .battle
+            .as_ref()
+            .expect("property battle fixture retains its battle");
         let wrong_material = replacement_operation_id(
             stored.source.epoch,
             battle_ref.battle_id,
@@ -1123,7 +1135,15 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
                 .is_err(),
             "a tampered replacement material was accepted for seed {seed}"
         );
-        assert_eq!(with_faint.battle.as_ref().unwrap().faint_queue.len(), 1);
+        assert_eq!(
+            with_faint
+                .battle
+                .as_ref()
+                .expect("property battle fixture retains its battle")
+                .faint_queue
+                .len(),
+            1
+        );
     }
     Ok(())
 }
@@ -1190,7 +1210,10 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
     let epoch = AuthorityEpoch::new(safe(11));
 
     let batch_one = {
-        let battle = state.battle.as_mut().unwrap();
+        let battle = state
+            .battle
+            .as_mut()
+            .expect("property battle fixture retains its battle");
         battle.enemy_party[0].hp = 0;
         battle.enemy_party[0].fainted = true;
         queue_faints(
@@ -1202,7 +1225,10 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
     };
 
     let batch_two = {
-        let battle = state.battle.as_mut().unwrap();
+        let battle = state
+            .battle
+            .as_mut()
+            .expect("property battle fixture retains its battle");
         battle.player_party[0].hp = 0;
         battle.player_party[0].fainted = true;
         queue_faints(
@@ -1216,7 +1242,10 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
         )?
     };
 
-    let battle = state.battle.as_ref().unwrap();
+    let battle = state
+        .battle
+        .as_ref()
+        .expect("property battle fixture retains its battle");
     let mut previous: Option<FaintOccurrenceId> = None;
     for occurrence in battle.faint_queue.iter() {
         if let Some(previous) = previous {
@@ -1560,7 +1589,7 @@ fn m6d_item_lifecycle_keeps_stack_charge_and_ledger_bounds_under_seeded_activity
                     "a live instance dropped below one stack"
                 );
                 assert!(
-                    instance.charges.map_or(true, |charges| charges >= 1),
+                    instance.charges.is_none_or(|charges| charges >= 1),
                     "a live charged instance dropped below one charge"
                 );
                 assert!(
@@ -1700,7 +1729,13 @@ fn m6d_snapshot_continuation_reproduces_uninterrupted_campaign_digests_exactly()
         let mut original = generated.state;
         let mut prefix_trace: Vec<TraceStep> = Vec::new();
         for _ in 0..2 {
-            if derive_battle_outcome(original.battle.as_ref().unwrap()) != BattleOutcome::Ongoing {
+            if derive_battle_outcome(
+                original
+                    .battle
+                    .as_ref()
+                    .expect("property battle fixture retains its battle"),
+            ) != BattleOutcome::Ongoing
+            {
                 break;
             }
             original = advance_one_turn(seed, &case, &mut prefix_trace, original)?;
@@ -1721,8 +1756,12 @@ fn m6d_snapshot_continuation_reproduces_uninterrupted_campaign_digests_exactly()
         let mut continued = restored;
         let mut full_trace: Vec<TraceStep> = prefix_trace.clone();
         for _ in 0..3 {
-            if derive_battle_outcome(uninterrupted.battle.as_ref().unwrap())
-                != BattleOutcome::Ongoing
+            if derive_battle_outcome(
+                uninterrupted
+                    .battle
+                    .as_ref()
+                    .expect("property battle fixture retains its battle"),
+            ) != BattleOutcome::Ongoing
             {
                 break;
             }

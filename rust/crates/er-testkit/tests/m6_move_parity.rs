@@ -390,7 +390,7 @@ fn full_witness_matrix_executes_through_prepared_dispatch() -> Result<(), Box<dy
                     );
                     assert_eq!(
                         summary.ordered_stages[0].stage,
-                        staged_modifier_label(program),
+                        staged_modifier_label(program)?,
                         "ordered evidence must preserve the compiled modifier stage"
                     );
                     assert!(!summary.ordered_stages[0].condition_matched.eq(&false));
@@ -402,26 +402,26 @@ fn full_witness_matrix_executes_through_prepared_dispatch() -> Result<(), Box<dy
 }
 
 /// The closed modifier label a compiled move routine stages.
-fn staged_modifier_label(program: &MechanicsProgramV2) -> &'static str {
+fn staged_modifier_label(program: &MechanicsProgramV2) -> Result<&'static str, Box<dyn Error>> {
     let binding = &program.bindings[0];
     let operation = &program.operations[usize::from(binding.operations.start)];
     let MechanicOperationV2::Query {
         stage, modifier, ..
     } = operation
     else {
-        panic!("compiled move routines are query-only");
+        return Err("compiled move routines are query-only".into());
     };
     match (modifier, stage) {
-        (QueryModifierV2::Add { .. }, QueryModifierStageV2::EarlyAdd) => "EARLY_ADD",
-        (QueryModifierV2::Set { .. }, QueryModifierStageV2::FinalOverride) => "FINAL_OVERRIDE",
-        _ => panic!("unexpected closed modifier shape"),
+        (QueryModifierV2::Add { .. }, QueryModifierStageV2::EarlyAdd) => Ok("EARLY_ADD"),
+        (QueryModifierV2::Set { .. }, QueryModifierStageV2::FinalOverride) => Ok("FINAL_OVERRIDE"),
+        _ => Err("unexpected closed modifier shape".into()),
     }
 }
 
-fn divergence_of(error: MoveParityError) -> MoveParityDivergence {
+fn divergence_of(error: MoveParityError) -> Result<MoveParityDivergence, Box<dyn Error>> {
     match error {
-        MoveParityError::Divergence(divergence) => *divergence,
-        other => panic!("expected divergence, got {other:?}"),
+        MoveParityError::Divergence(divergence) => Ok(*divergence),
+        other => Err(format!("expected divergence, got {other:?}").into()),
     }
 }
 
@@ -436,7 +436,7 @@ fn diagnostics_fire_on_altered_value_ordering_and_result() -> Result<(), Box<dyn
 
     let first_program = domain.direct_programs().first().expect("compiled surface");
     let compiled_unit = first_program.behavior_units[0].clone();
-    let expected_stage = staged_modifier_label(first_program);
+    let expected_stage = staged_modifier_label(first_program)?;
 
     let shards = domain
         .inventory()
@@ -447,7 +447,7 @@ fn diagnostics_fire_on_altered_value_ordering_and_result() -> Result<(), Box<dyn
         .expect("unit's source lives in some shard");
 
     // Baseline: untouched reference passes.
-    domain.run_shard_against(&shard, &witnesses, domain.direct_programs())?;
+    domain.run_shard_against(shard, &witnesses, domain.direct_programs())?;
 
     // Value tamper: altering the compiled constant changes the accumulator
     // result; the diagnostic names the exact unit and comparison surface.
@@ -455,10 +455,9 @@ fn diagnostics_fire_on_altered_value_ordering_and_result() -> Result<(), Box<dyn
     tampered_value[0].values.0[0] = er_mechanics::condition_v2::ValueNodeV2::Constant { value: 41 };
     let divergence = divergence_of(
         domain
-            .run_shard_against(&shard, &witnesses, &tampered_value)
-            .err()
-            .expect("value tamper must be detected"),
-    );
+            .run_shard_against(shard, &witnesses, &tampered_value)
+            .expect_err("value tamper must be detected"),
+    )?;
     assert_eq!(divergence.unit.as_ref(), Some(&compiled_unit));
     assert_eq!(
         divergence.stage,
@@ -477,9 +476,8 @@ fn diagnostics_fire_on_altered_value_ordering_and_result() -> Result<(), Box<dyn
     let divergence = divergence_of(
         domain
             .verify_domain_dispatch_closure_against(&swapped)
-            .err()
-            .expect("ordering tamper must be detected"),
-    );
+            .expect_err("ordering tamper must be detected"),
+    )?;
     assert!(
         divergence.detail.contains("first differing"),
         "diagnostic must localize the first difference: {}",
@@ -491,10 +489,9 @@ fn diagnostics_fire_on_altered_value_ordering_and_result() -> Result<(), Box<dyn
         domain.direct_programs().iter().skip(1).cloned().collect();
     let divergence = divergence_of(
         domain
-            .run_shard_against(&shard, &witnesses, &dropped)
-            .err()
-            .expect("result tamper must be detected"),
-    );
+            .run_shard_against(shard, &witnesses, &dropped)
+            .expect_err("result tamper must be detected"),
+    )?;
     assert_eq!(divergence.unit.as_ref(), Some(&compiled_unit));
     Ok(())
 }
@@ -511,8 +508,7 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
         first_bespoke_gap_unit(catalog.behavior_units()).expect("bespoke move units exist");
     let error = domain
         .require_compiled_unit(&bespoke_unit)
-        .err()
-        .expect("bespoke unit must not compile");
+        .expect_err("bespoke unit must not compile");
     assert!(matches!(
         error,
         MoveParityError::NotACompiledMoveUnit { .. }
@@ -533,8 +529,7 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
         .filter(|route| !route.behavior_units.is_empty())
         .collect();
     let error = build_move_domain_inventory(catalog.behavior_units(), &routines, &reduced_routes)
-        .err()
-        .expect("unassigned bespoke gap must fail closed");
+        .expect_err("unassigned bespoke gap must fail closed");
     assert!(matches!(
         error,
         MoveParityError::UnassignedBespokeGap { .. }
@@ -542,8 +537,7 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
 
     // Dropping every routine program leaves operand units residual.
     let error = build_move_domain_inventory(catalog.behavior_units(), &[], &routes)
-        .err()
-        .expect("residual operand unit must fail closed");
+        .expect_err("residual operand unit must fail closed");
     assert!(matches!(error, MoveParityError::ResidualOperandUnit { .. }));
 
     // A duplicated route collides instead of silently widening membership.
@@ -561,8 +555,7 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
         .collect();
     let error =
         build_move_domain_inventory(catalog.behavior_units(), &routines, &duplicated_routes)
-            .err()
-            .expect("duplicate bespoke route must fail closed");
+            .expect_err("duplicate bespoke route must fail closed");
     assert!(matches!(
         error,
         MoveParityError::DuplicateBespokeRoute { .. }
@@ -576,8 +569,7 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
         .remove(0);
     let error = domain
         .run_shard(&shard, &empty_witnesses)
-        .err()
-        .expect("missing witnesses must fail closed");
+        .expect_err("missing witnesses must fail closed");
     assert!(matches!(error, MoveParityError::WitnessMissing { .. }));
     Ok(())
 }

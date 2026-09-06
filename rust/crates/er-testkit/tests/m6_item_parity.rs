@@ -210,7 +210,7 @@ fn held_item_inventory_is_exactly_once_and_fully_closed() -> Result<(), Box<dyn 
 
     let mut missing = output.classifications.clone();
     missing.0.remove(held_entries[0]);
-    let error = item_parity::inventory_held_items(catalog.behavior_units(), &missing).unwrap_err();
+    let error = item_parity::inventory_held_items(catalog.behavior_units(), &missing).expect_err("tampered or forbidden item operation must be rejected");
     assert!(matches!(
         error,
         ItemParityError::UnclassifiedHeldItemUnit { .. }
@@ -221,7 +221,7 @@ fn held_item_inventory_is_exactly_once_and_fully_closed() -> Result<(), Box<dyn 
     unsupported.0[held_entries[1]].programs.clear();
     unsupported.0[held_entries[1]].bespoke = None;
     let error =
-        item_parity::inventory_held_items(catalog.behavior_units(), &unsupported).unwrap_err();
+        item_parity::inventory_held_items(catalog.behavior_units(), &unsupported).expect_err("tampered or forbidden item operation must be rejected");
     assert!(matches!(error, ItemParityError::UnsupportedIdentity { .. }));
 
     let mut phantom = output.classifications.clone();
@@ -234,7 +234,7 @@ fn held_item_inventory_is_exactly_once_and_fully_closed() -> Result<(), Box<dyn 
         registry_key: "PHANTOM_NOT_IN_CATALOG".to_owned(),
     };
     phantom.0.push(cloned);
-    let error = item_parity::inventory_held_items(catalog.behavior_units(), &phantom).unwrap_err();
+    let error = item_parity::inventory_held_items(catalog.behavior_units(), &phantom).expect_err("tampered or forbidden item operation must be rejected");
     assert!(matches!(
         error,
         ItemParityError::UnknownHeldItemClassification { .. }
@@ -414,7 +414,7 @@ fn lifecycle_campaign_witnesses_are_deterministic_and_complete() -> Result<(), B
     let mut previous: Option<SafeU53> = None;
     for draw in &first.audit_entries {
         draw.validate()?;
-        assert!(previous.map_or(true, |prior| draw.sequence > prior));
+        assert!(previous.is_none_or(|prior| draw.sequence > prior));
         previous = Some(draw.sequence);
     }
 
@@ -423,7 +423,7 @@ fn lifecycle_campaign_witnesses_are_deterministic_and_complete() -> Result<(), B
 
     // Positive witnesses, in order.
     assert!(steps[0].outcome.is_ok());
-    match steps[5].outcome.as_ref().unwrap() {
+    match steps[5].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Consume(evidence) => {
             assert_eq!(evidence.stacks_before, 3);
             assert_eq!(evidence.stacks_after, Some(2));
@@ -435,49 +435,49 @@ fn lifecycle_campaign_witnesses_are_deterministic_and_complete() -> Result<(), B
                 }
             ));
         }
-        other => panic!("step 5 should be a surviving consume, got {other:?}"),
+        other => return Err(format!("step 5 should be a surviving consume, got {other:?}").into()),
     }
-    match steps[6].outcome.as_ref().unwrap() {
+    match steps[6].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Consume(evidence) => {
             assert_eq!(evidence.outcome, ConsumeOutcome::Preserved);
             assert_eq!(evidence.stacks_after, Some(2));
         }
-        other => panic!("step 6 should be a preserved trigger, got {other:?}"),
+        other => return Err(format!("step 6 should be a preserved trigger, got {other:?}").into()),
     }
     // Preservation must not have moved either root.
     assert_eq!(
         steps[6].lifecycle_fingerprint_after,
         steps[5].lifecycle_fingerprint_after
     );
-    match steps[12].outcome.as_ref().unwrap() {
+    match steps[12].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Consume(evidence) => {
             assert!(matches!(
                 evidence.outcome,
                 ConsumeOutcome::Suppressed { expiry_turn: 20 }
             ));
         }
-        other => panic!("step 12 should be a suppressed trigger, got {other:?}"),
+        other => return Err(format!("step 12 should be a suppressed trigger, got {other:?}").into()),
     }
-    match steps[16].outcome.as_ref().unwrap() {
+    match steps[16].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Consume(evidence) => {
             assert_eq!(evidence.outcome, ConsumeOutcome::AlreadyConsumed);
         }
-        other => panic!("step 16 should be an idempotent duplicate, got {other:?}"),
+        other => return Err(format!("step 16 should be an idempotent duplicate, got {other:?}").into()),
     }
-    let restored = match steps[17].outcome.as_ref().unwrap() {
+    let restored = match steps[17].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Restore(evidence) => evidence.clone(),
-        other => panic!("step 17 should restore, got {other:?}"),
+        other => return Err(format!("step 17 should restore, got {other:?}").into()),
     };
     assert_eq!(restored.registry_key, "BERRY");
     assert!(steps[18].outcome.is_err());
 
     // Negative witnesses carry typed errors and provably change nothing.
-    let steal_error = steps[9].outcome.as_ref().unwrap_err();
+    let steal_error = steps[9].outcome.as_ref().expect_err("tampered or forbidden item operation must be rejected");
     assert!(matches!(
         steal_error,
         ItemLifecycleError::NotTransferable { .. }
     ));
-    let knock_error = steps[20].outcome.as_ref().unwrap_err();
+    let knock_error = steps[20].outcome.as_ref().expect_err("tampered or forbidden item operation must be rejected");
     assert!(matches!(knock_error, ItemLifecycleError::ItemAbsent { .. }));
     for rejected_step in [9usize, 18, 20] {
         assert_eq!(
@@ -488,9 +488,9 @@ fn lifecycle_campaign_witnesses_are_deterministic_and_complete() -> Result<(), B
     }
 
     // Eligibility probes agree on both gates before any trigger runs.
-    match steps[4].outcome.as_ref().unwrap() {
+    match steps[4].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Eligibility(ItemTriggerEligibility::Eligible) => {}
-        other => panic!("step 4 should be eligible, got {other:?}"),
+        other => return Err(format!("step 4 should be eligible, got {other:?}").into()),
     }
 
     // Ordered source stack tracks the live inventory and stays canonical.
@@ -574,7 +574,7 @@ fn prepared_and_direct_paths_agree_under_item_source_stacks() -> Result<(), Box<
     let roster = holders();
     let run =
         item_parity::run_item_campaign(&config("prepared-parity", &roster), &lifecycle_actions())?;
-    let item_sources = run.steps.last().unwrap().source_stack_after.clone();
+    let item_sources = run.steps.last().expect("item campaign emits source-stack evidence").source_stack_after.clone();
     assert!(!item_sources.is_empty());
 
     // Program sources give the folds real content so the comparison cannot
@@ -789,7 +789,7 @@ fn unmirrored_shapes_fail_closed_across_the_whole_campaign() -> Result<(), Box<d
         ExecutorMirror::UnmirroredShape { .. }
     ));
     let ExecutorMirror::Applied { evidence, .. } = &run.steps[3].mirror else {
-        panic!("berry consume must mirror");
+        return Err("berry consume must mirror".into());
     };
     // Spending the last stack maps to burn-then-remove: two evidence rows,
     // ending with the entry gone.
@@ -801,12 +801,12 @@ fn unmirrored_shapes_fail_closed_across_the_whole_campaign() -> Result<(), Box<d
 
     // The charged booster decremented both counters on the lifecycle root:
     // charges 5 -> 4 while stacks 2 -> 1.
-    match run.steps[2].outcome.as_ref().unwrap() {
+    match run.steps[2].outcome.as_ref().expect("expected item campaign witness outcome") {
         ItemStepEvidence::Consume(evidence) => {
             assert_eq!(evidence.stacks_before, 2);
             assert_eq!(evidence.stacks_after, Some(1));
         }
-        other => panic!("expected booster consume evidence, got {other:?}"),
+        other => return Err(format!("expected booster consume evidence, got {other:?}").into()),
     }
     run.final_state.validate()?;
     Ok(())

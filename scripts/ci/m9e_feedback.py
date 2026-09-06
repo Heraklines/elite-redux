@@ -85,6 +85,11 @@ AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-testkit/tests/m6_native_wasm.rs",
     "rust/crates/er-testkit/tests/support/m6_benchmark.rs",
     "rust/crates/er-testkit/tests/m6_performance.rs",
+    "rust/crates/er-testkit/tests/m6_ability_parity.rs",
+    "rust/crates/er-testkit/tests/m6_item_parity.rs",
+    "rust/crates/er-testkit/tests/m6_move_parity.rs",
+    "rust/crates/er-testkit/tests/m6_species_form_parity.rs",
+    "rust/crates/er-testkit/tests/m6_properties.rs",
 ]
 
 
@@ -98,7 +103,7 @@ AI_DAMAGE_QUERY_LINT_REPAIR_EXECUTE = {
     "er-scenario": ["er_scenario"],
     "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
     "er-state": ["er_state", "m4_foundation_properties"],
-    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance", "m6_ability_parity", "m6_item_parity", "m6_move_parity", "m6_species_form_parity", "m6_properties"],
     "er-wasm": ["er_wasm"],
     "er-world": ["er_world"],
 }
@@ -112,10 +117,57 @@ AI_DAMAGE_QUERY_LINT_REPAIR_REQUIRED_TARGETS = {
     "er-scenario": ["er_scenario"],
     "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
     "er-state": ["er_state", "m4_foundation_properties"],
-    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance", "m6_ability_parity", "m6_item_parity", "m6_move_parity", "m6_species_form_parity", "m6_properties"],
 }
 
 AI_DAMAGE_QUERY_LINT_REPAIR_EXACT_TEST_IDS = {
+    "er-testkit:m6_ability_parity": [
+        "closure_is_exact_complete_and_residual_free",
+        "four_slot_ordering_is_active_before_passive_and_permutation_invariant",
+        "overlapping_suppression_stacks_with_total_precedence_and_restores",
+        "suppression_gates_execution_but_reports_instead_of_dropping",
+        "false_conditions_exclude_bindings_without_mutations",
+        "immunity_gate_yields_to_suppression_then_bypass_precedence",
+        "rng_admission_is_zero_with_fail_closed_chance_probes",
+        "oracle_witnesses_agree_and_first_divergence_is_exact",
+        "prepared_query_and_trigger_dispatch_matches_direct_reference",
+    ],
+    "er-testkit:m6_item_parity": [
+        "held_item_inventory_is_exactly_once_and_fully_closed",
+        "lifecycle_campaign_witnesses_are_deterministic_and_complete",
+        "prepared_and_direct_paths_agree_under_item_source_stacks",
+        "unmirrored_shapes_fail_closed_across_the_whole_campaign",
+    ],
+    "er-testkit:m6_move_parity": [
+        "move_domain_inventory_is_exactly_once_and_residual_free",
+        "shard_assignment_is_deterministic_and_conserving",
+        "full_witness_matrix_executes_through_prepared_dispatch",
+        "diagnostics_fire_on_altered_value_ordering_and_result",
+        "unsupported_and_residual_identities_fail_closed",
+    ],
+    "er-testkit:m6_species_form_parity": [
+        "species_and_form_closure_is_exact_with_zero_residual",
+        "semantic_catalog_species_units_match_the_raw_closure",
+        "empty_string_is_a_first_class_base_form_key",
+        "overlay_admission_holds_for_every_species_identity",
+        "transform_copy_surface_is_exhaustive_and_fail_closed",
+        "typeless_identity_copies_explicitly_and_stays_out_of_the_chart",
+        "resolution_fails_closed_on_tampered_oracle_values",
+    ],
+    "er-testkit:m6_properties": [
+        "m6d_generated_states_pass_complete_content_validation_and_snapshot_round_trip",
+        "m6d_turn_resolution_is_pure_and_deterministic_across_the_corpus",
+        "m6d_pairwise_factor_matrix_keeps_all_invariants_after_resolution",
+        "m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consistency",
+        "m6d_faulted_inputs_fail_closed_without_mutating_their_input",
+        "m6d_topology_slots_are_unique_and_field_occupancy_is_unique_per_format",
+        "m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches",
+        "m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids",
+        "m6d_guard_chain_follows_audited_draw_thresholds_and_validates_throughout",
+        "m6d_item_lifecycle_keeps_stack_charge_and_ledger_bounds_under_seeded_activity",
+        "m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministically",
+        "m6d_snapshot_continuation_reproduces_uninterrupted_campaign_digests_exactly",
+    ],
     "er-testkit:m6_performance": [
         "content_preparation_reproduces_checksums_and_counts",
         "routine_dispatch_keeps_prepared_and_direct_identical",

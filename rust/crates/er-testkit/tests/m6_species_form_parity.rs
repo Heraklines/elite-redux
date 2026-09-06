@@ -23,6 +23,7 @@
 //!   one of the 534 form identities;
 //! - fail-closed resolution witnesses for tampered oracle values.
 
+use std::error::Error;
 use std::path::PathBuf;
 
 use serde_json::json;
@@ -54,7 +55,7 @@ use er_types::{BehaviorSourceId, SafeU53};
 /// Walks up from the crate manifest so the frozen fixture resolves under any
 /// integration layout (crate dir, workspace root, or a relocated checkout
 /// that keeps `fixtures/m6` or `rust/fixtures/m6` on the ancestor chain).
-fn resolve_fixture(name: &str) -> PathBuf {
+fn resolve_fixture(name: &str) -> Result<PathBuf, Box<dyn Error>> {
     let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     loop {
         for candidate in [
@@ -62,25 +63,24 @@ fn resolve_fixture(name: &str) -> PathBuf {
             dir.join("rust/fixtures/m6").join(name),
         ] {
             if candidate.is_file() {
-                return candidate;
+                return Ok(candidate);
             }
         }
         if !dir.pop() {
             break;
         }
     }
-    panic!(
+    Err(format!(
         "frozen m6 fixture `{name}` not found above {}",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ).into())
 }
 
-fn load_fixture(name: &str) -> serde_json::Value {
-    let path = resolve_fixture(name);
-    let bytes =
-        std::fs::read(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-    serde_json::from_slice(&bytes)
-        .unwrap_or_else(|error| panic!("parse {}: {error}", path.display()))
+fn load_fixture(name: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+    let path = resolve_fixture(name)?;
+    let bytes = std::fs::read(&path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    Ok(serde_json::from_slice(&bytes)
+        .map_err(|error| format!("parse {}: {error}", path.display()))?)
 }
 
 fn ability_table(raw: &serde_json::Value) -> AbilityTable {
@@ -100,12 +100,12 @@ fn frozen_closure(
 }
 
 #[test]
-fn species_and_form_closure_is_exact_with_zero_residual() {
+fn species_and_form_closure_is_exact_with_zero_residual() -> Result<(), Box<dyn Error>> {
     // The pinned derivation table must stand on its own before it may feed
     // the parity closure.
     validate_derivation().expect("generated derivation table validates");
 
-    let raw = load_fixture("raw-source-catalog-v2.json");
+    let raw = load_fixture("raw-source-catalog-v2.json")?;
     let table = ability_table(&raw);
     let species_entries = raw["species"].as_array().expect("species array");
     let form_entries = raw["forms"].as_array().expect("forms array");
@@ -186,7 +186,7 @@ fn species_and_form_closure_is_exact_with_zero_residual() {
                     // the copy rule is behavioral, not declarative.
                     let record = species_gap::resolve(metadata.id).expect("pinned record");
                     let ErGapSpeciesSource::ContentOf(source_species) = record.source else {
-                        panic!("class/source coherence broke for {}", metadata.id);
+                        return Err(format!("class/source coherence broke for {}", metadata.id).into());
                     };
                     let source_content = closure
                         .species_content(source_species)
@@ -263,12 +263,13 @@ fn species_and_form_closure_is_exact_with_zero_residual() {
             "species {species_id} keeps dense form indices"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn semantic_catalog_species_units_match_the_raw_closure() {
-    let raw = load_fixture("raw-source-catalog-v2.json");
-    let semantic_bytes = std::fs::read(resolve_fixture("semantic-catalog-v1.json"))
+fn semantic_catalog_species_units_match_the_raw_closure() -> Result<(), Box<dyn Error>> {
+    let raw = load_fixture("raw-source-catalog-v2.json")?;
+    let semantic_bytes = std::fs::read(resolve_fixture("semantic-catalog-v1.json")?)
         .expect("frozen semantic catalog exists");
     let semantic = SemanticCatalogV1::from_bytes(&semantic_bytes).expect("valid semantic catalog");
     semantic.validate().expect("semantic catalog validates");
@@ -284,11 +285,13 @@ fn semantic_catalog_species_units_match_the_raw_closure() {
         .behavior_units
         .iter()
         .filter(|unit| unit.semantic.effect.kind == CatalogEffectKind::SpeciesDefinition)
-        .map(|unit| match &unit.id.source {
-            BehaviorSourceId::Species { numeric_id } => numeric_id.get(),
-            other => panic!("species definition unit carries {other:?}"),
+        .map(|unit| -> Result<u64, Box<dyn Error>> {
+            match &unit.id.source {
+                BehaviorSourceId::Species { numeric_id } => Ok(numeric_id.get()),
+                other => Err(format!("species definition unit carries {other:?}").into()),
+            }
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
     semantic_species_ids.sort_unstable();
     semantic_species_ids.dedup();
 
@@ -302,6 +305,7 @@ fn semantic_catalog_species_units_match_the_raw_closure() {
     // Zero residual in both directions.
     assert_eq!(semantic_species_ids, raw_species_ids);
     assert_eq!(semantic_species_ids.len(), ORACLE_SPECIES_CLOSURE_COUNT);
+    Ok(())
 }
 
 #[test]
@@ -316,7 +320,7 @@ fn empty_string_is_a_first_class_base_form_key() {
         slot: FieldSlot::new(BattleSide::Player, 0).expect("in-range slot"),
     };
     let state = FormsStateV2::default()
-        .register_battler(scope.clone(), base.clone())
+        .register_battler(scope, base.clone())
         .expect("base-form registration validates");
     let applied = admit_tera(&state, BattleSide::Player, &scope, 0).expect("tera applies");
     assert_eq!(applied.outcome, FormsOutcomeV2::Applied);
@@ -329,8 +333,8 @@ fn empty_string_is_a_first_class_base_form_key() {
 }
 
 #[test]
-fn overlay_admission_holds_for_every_species_identity() {
-    let raw = load_fixture("raw-source-catalog-v2.json");
+fn overlay_admission_holds_for_every_species_identity() -> Result<(), Box<dyn Error>> {
+    let raw = load_fixture("raw-source-catalog-v2.json")?;
     let closure = frozen_closure(&raw);
 
     let evidence = prove_overlay_admission(&closure).expect("overlay admission proof");
@@ -351,11 +355,12 @@ fn overlay_admission_holds_for_every_species_identity() {
     assert_eq!(evidence.stance_pairs_exercised, 157);
     assert_eq!(evidence.mega_pairs_exercised, 157);
     assert_eq!(evidence.single_key_negative_witnesses, 1861);
+    Ok(())
 }
 
 #[test]
-fn transform_copy_surface_is_exhaustive_and_fail_closed() {
-    let raw = load_fixture("raw-source-catalog-v2.json");
+fn transform_copy_surface_is_exhaustive_and_fail_closed() -> Result<(), Box<dyn Error>> {
+    let raw = load_fixture("raw-source-catalog-v2.json")?;
     let closure = frozen_closure(&raw);
 
     let evidence = prove_transform_copy_surface(&closure).expect("transform copy surface proof");
@@ -369,6 +374,7 @@ fn transform_copy_surface_is_exhaustive_and_fail_closed() {
     // The single typeless identity (`493:18:unknown`) copies as the explicit
     // TYPELESS presentation instead of being skipped or mis-typed.
     assert_eq!(evidence.typeless_copies, 1);
+    Ok(())
 }
 
 /// Builds battler facts for one frozen form identity, as the parity harness
@@ -419,8 +425,8 @@ fn form_facts(
 }
 
 #[test]
-fn typeless_identity_copies_explicitly_and_stays_out_of_the_chart() {
-    let raw = load_fixture("raw-source-catalog-v2.json");
+fn typeless_identity_copies_explicitly_and_stays_out_of_the_chart() -> Result<(), Box<dyn Error>> {
+    let raw = load_fixture("raw-source-catalog-v2.json")?;
     let closure = frozen_closure(&raw);
 
     let target_form = closure
@@ -470,11 +476,12 @@ fn typeless_identity_copies_explicitly_and_stays_out_of_the_chart() {
         wire.get("kind").and_then(serde_json::Value::as_str),
         Some("TYPELESS")
     );
+    Ok(())
 }
 
 #[test]
-fn resolution_fails_closed_on_tampered_oracle_values() {
-    let raw = load_fixture("raw-source-catalog-v2.json");
+fn resolution_fails_closed_on_tampered_oracle_values() -> Result<(), Box<dyn Error>> {
+    let raw = load_fixture("raw-source-catalog-v2.json")?;
     let table = ability_table(&raw);
     let species_entries = raw["species"].as_array().expect("species array").clone();
     let form_entries = raw["forms"].as_array().expect("forms array").clone();
@@ -622,4 +629,5 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
         verify_identity_closure(&duplicate_keys, &form_entries, &table),
         Err(E::ClosureViolated(detail)) if detail.contains("duplicate species key")
     ));
+    Ok(())
 }
