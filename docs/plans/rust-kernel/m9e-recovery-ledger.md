@@ -2703,3 +2703,9 @@ from artifact9983027548ZIP12952. Four paths only: current proposal module, game 
 co-op test and new proposal test. The compact excerpt omitted the larger test portion;
 the bounded complete repair includes it. No local formatter/compiler/test was run.
 Baseline remains fully qualified791. This formatting correction needs a new exact run.
+Formatted owner24bd88ff/run34013243354 passed formatting and stopped during
+remote build: DecodedCurrentReceiptV1 lacked Debug, required by the workspace's
+-D missing-debug-implementations rule. Derive Debug on this decoded receipt helper;
+all fields already support Debug. No behavioral contract or witness changes.
+Retrieve only3533-byte named failure from1913-byte compact artifact9983134442.
+Runtime remains unqualified; comparison stays791 and the full focused run repeats.

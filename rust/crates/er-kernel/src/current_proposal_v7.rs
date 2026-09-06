@@ -129,6 +129,7 @@ where
         connection_generation: value.connection_generation,
     })
 }
+#[derive(Debug)]
 pub struct DecodedCurrentReceiptV1 {
     pub proposal: GameProposalEnvelopeV2,
     pub proposal_bytes: Vec<u8>,
