@@ -6,6 +6,7 @@ closed until their additional platform checks have an explicit executable map.
 """
 
 import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -32,7 +33,7 @@ WORKER_BOUND_TARGETS = {("er-lab", "current_kernel_endpoint_v2"),
                         ("er-cli", "m9e_current_repro"),
                         ("er-cli", "m9e_current_control_query"),
                         ("er-cli", "m9e_current_state_query"),
-                        ("er-cli", "m9e_current_state_query_worker")}
+                        ("er-cli", "m9e_current_state_query_worker"), ("er-cli", "m9e_current_rulechange_reload")}
 
 TITLE_STORAGE_PATHS = [
   "rust/crates/er-cli/src/current_agent.rs",
@@ -850,6 +851,12 @@ def plan():
     # Both adapter and composed Worker witnesses remain required below.
     composition_allowed = [*COMPOSITION_PATHS, *STORAGE_SOURCE_PATHS]
     composition_session = bool(composition_policy) and composition_changed and all(path in composition_allowed for path in product_changes)
+    from m9e_rulechange import RULE_TARGET, RULE_TEST, RULE_TEST_SOURCE, make_rule_policy
+    rule_focus = config.get("rulechange_focus", {})
+    if rule_focus and rule_focus.get("paths") != [RULE_TEST_SOURCE]:
+        raise RuntimeError("rulechange source policy must contain the single exact test path")
+    rule_changed = RULE_TEST_SOURCE in product_changes
+    rule_session = rule_changed and all(path == RULE_TEST_SOURCE for path in product_changes)
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
@@ -904,7 +911,7 @@ def plan():
     max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session or rule_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -1138,6 +1145,9 @@ def plan():
     query_required = query_required or state_query_required
     if query_required and not query_focus:
         raise RuntimeError("selected current control query target requires its exact policy")
+    rule_selected = ("er-cli" in selected and (execution_scope is None or "*" in execution_scope.get("er-cli", [])
+                     or RULE_TARGET in execution_scope.get("er-cli", []))
+                     and (rule_session or (ROOT / RULE_TEST_SOURCE).is_file()))
     # Older checkpoints can execute CLI suites before the reload target exists.
     # The explicit reload scope requires it even when missing; broad scopes bind
     # it whenever present, and exact required-target checks reject its removal.
@@ -1145,13 +1155,19 @@ def plan():
         or (RUST / "crates/er-cli/tests" / (target + ".rs")).is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
-    endpoint_execution = endpoint_execution or query_required
+    endpoint_execution = endpoint_execution or query_required or rule_selected
     if endpoint_execution:
         selected.add("er-kernel-worker")
     cli_executable_required = browser_required and (owner_required or retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
         ROOT / "test/browser/rust-browser/m9e-current-repro-bridge.ts").is_file())
     if cli_executable_required:
         selected.add("er-cli")
+    rule_selected = ("er-cli" in selected and (execution_scope is None or "*" in execution_scope.get("er-cli", [])
+                     or RULE_TARGET in execution_scope.get("er-cli", []))
+                     and (rule_session or (ROOT / RULE_TEST_SOURCE).is_file()))
+    if rule_selected:
+        endpoint_execution = True
+        selected.add("er-kernel-worker")
     # Explicit witness roots also need their reverse consumers compiled, even
     # when only the TypeScript bridge changed in this cumulative source delta.
     if execution_scope is not None or cli_executable_required or endpoint_execution:
@@ -1219,6 +1235,7 @@ def plan():
               "requires_current_state_query": state_query_required,
               "current_control_query_focus": query_session,
               "requires_current_control_query": query_required,
+              "rulechange_focus": rule_session,
               "requires_cli_executable": cli_executable_required,
               "required_native_test_ids": (ai_snapshot_ids if ai_snapshot_session
                                            else damage_exact_test_ids if damage_session or composition_session
@@ -1306,6 +1323,16 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
             identity: [*inherited, *[name for name in AI_MAX_PP_IDS if name not in inherited]]}
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
+    # A capability prerequisite follows the selected target, not this cut's diff.
+    # Clone policy maps so common required evidence never mutates config objects.
+    result["rule_worker"] = make_rule_policy(ROOT, capture(["git", "rev-parse", "HEAD"])) if rule_selected else None
+    if rule_selected:
+        result["required_native_targets"] = {key: list(value) for key, value in result["required_native_targets"].items()}
+        targets = result["required_native_targets"].setdefault("er-cli", [])
+        if RULE_TARGET not in targets:
+            targets.append(RULE_TARGET)
+        result["required_native_test_ids"] = dict(result["required_native_test_ids"])
+        result["required_native_test_ids"]["er-cli:" + RULE_TARGET] = [RULE_TEST]
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
     # to broad native success or bypass the timer and replica mutant gate.
@@ -1315,7 +1342,7 @@ def plan():
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -2115,6 +2142,10 @@ def main(preflight_failure=None):
             summary["build_only_targets"] = sorted(build_only)
             summary["execution_scope"] = execution_scope
             binaries = selected_binaries
+        from m9e_rulechange import RULE_TARGET, RULE_TEST, current_rule_worker
+        rule_selected = any((cwd.name, name) == ("er-cli", RULE_TARGET) for name, cwd in binaries.values())
+        if bool(selection.get("rule_worker")) != rule_selected:
+            raise RuntimeError("selected rulechange target is missing its derived-worker requirement")
         worker_executable = None
         if selection["requires_worker_executable"]:
             if not any((cwd.name, name) in WORKER_BOUND_TARGETS for name, cwd in binaries.values()):
@@ -2220,44 +2251,61 @@ def main(preflight_failure=None):
                             "phase": "native", "qualification": "pending"})
             enumerated = [item for item in enumerated if [item[4].name, item[2]] in assigned]
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
-            # Run even zero-test harnesses and fail if reported counts disagree.
-            write_progress(summary, "native", f"{cwd.name}:{name}")
-            output = FULL / f"execute-{index}.log"
-            start = time.monotonic()
-            print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
-            command = [binary, "--format", "terse"]
-            native_timer_parity = (cwd.name, name) == ("er-wasm", "m9e_parity")
-            if native_timer_parity or (cwd.name, name) in {
-                ("er-cli", "m9e_current_state_query"), ("er-cli", "m9e_current_state_query_worker")
-            }:
-                command.append("--nocapture")
-            for test_id in sorted(excluded_ids):
-                command.extend(["--skip", test_id])
-            try:
-                with output.open("w") as stream:
-                    code = subprocess.run(command, cwd=cwd,
-                                          env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
-            except subprocess.TimeoutExpired as error:
+            rule_context = contextlib.nullcontext((env, None))
+            if (cwd.name, name) == ("er-cli", RULE_TARGET):
+                if ids != [RULE_TEST] or excluded_ids:
+                    raise RuntimeError("rulechange witness requires the exact single ordinary test")
+                write_progress(summary, "rule-variant", name)
+                rule_context = current_rule_worker(sys.modules[__name__], summary, worker_executable)
+            with rule_context as (env, rule_evidence):
+                # Run even zero-test harnesses and fail if reported counts disagree.
+                write_progress(summary, "native", f"{cwd.name}:{name}")
+                output = FULL / f"execute-{index}.log"
+                start = time.monotonic()
+                print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
+                command = [binary, "--format", "terse"]
+                native_timer_parity = (cwd.name, name) == ("er-wasm", "m9e_parity")
+                if native_timer_parity or (cwd.name, name) in {
+                    ("er-cli", "m9e_current_state_query"), ("er-cli", "m9e_current_state_query_worker")
+                }:
+                    command.append("--nocapture")
+                for test_id in sorted(excluded_ids):
+                    command.extend(["--skip", test_id])
+                try:
+                    with output.open("w") as stream:
+                        code = subprocess.run(command, cwd=cwd,
+                                              env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=600).returncode
+                except subprocess.TimeoutExpired as error:
+                    TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
+                    summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
+                    raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
-                raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
-            TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
-            summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
-            counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
-            if not counts:
-                raise RuntimeError(f"missing test result: {output.name}")
-            passed, failed, skipped = map(int, counts.groups())
-            for key, count in (("executed", passed + failed), ("passed", passed), ("failed", failed), ("skipped", skipped)):
-                summary["tests"][key] += count
-            if code or failed or skipped or passed != len(ids):
-                raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
-            if os.environ.get("M9E_PHASE") == "native":
-                summary["completed_targets"].append([cwd.name, name])
-            if native_timer_parity:
-                expected = {"native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"}
-                if len(ids) != 2 or set(ids) != expected:
-                    raise RuntimeError("native eventwise parity witness identities/counts disagree")
-                summary["native_timer_parity_digest"] = timer_parity_digest(output.read_text(), "native")
+                counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
+                if not counts:
+                    raise RuntimeError(f"missing test result: {output.name}")
+                passed, failed, skipped = map(int, counts.groups())
+                for key, count in (("executed", passed + failed), ("passed", passed), ("failed", failed), ("skipped", skipped)):
+                    summary["tests"][key] += count
+                if code or failed or skipped or passed != len(ids):
+                    raise RuntimeError(f"test execution/count failure in {name}; see {output.name}")
+                if rule_evidence is not None and re.findall(
+                        r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out",
+                        output.read_text()) != [("1", "0", "0", "0", "0")]:
+                    raise RuntimeError(f"rulechange exact-one ordinary result disagrees; see {output.name}")
+                if os.environ.get("M9E_PHASE") == "native":
+                    summary["completed_targets"].append([cwd.name, name])
+                if native_timer_parity:
+                    expected = {"native_replays_v7_raw_inputs_eventwise", "native_replays_v7_held_timers_eventwise"}
+                    if len(ids) != 2 or set(ids) != expected:
+                        raise RuntimeError("native eventwise parity witness identities/counts disagree")
+                    summary["native_timer_parity_digest"] = timer_parity_digest(output.read_text(), "native")
+            if rule_evidence is not None:
+                # Context exit verifies siblings, source conservation and cleanup.
+                # Only the ordinary exact-one success above permits publication.
+                rule_evidence.update({"status": "passed", "target": RULE_TARGET, "test": RULE_TEST,
+                                      "tests": {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}})
+                summary["rule_worker"] = rule_evidence
         if not summary["tests"]["executed"] and not (os.environ.get("M9E_PHASE") == "native" and not enumerated):
             raise RuntimeError("zero tests executed")
         if os.environ.get("M9E_PHASE") != "native" and selection["requires_wasm"]:

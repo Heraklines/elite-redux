@@ -38,6 +38,12 @@ IDENTITY_FILES = {
     "workflow": ".github/workflows/m9e-focused-feedback.yml",
     "lock": "rust/Cargo.lock",
     "content": "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
+    "rule_helper": "scripts/ci/m9e_rulechange.py",
+    "rule_source": "rust/crates/er-kernel/src/game_kernel_v7.rs",
+    "rule_test": "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs",
+    "rule_workspace": "rust/Cargo.toml",
+    "rule_worker_manifest": "rust/crates/er-kernel-worker/Cargo.toml",
+    "rule_toolchain": "rust/rust-toolchain.toml",
 }
 WASM_IDS = {"wasm_replays_v7_raw_inputs_eventwise", "wasm_replays_v7_held_timers_eventwise"}
 BROWSER_IDS = {"natural V7 browser startup reaches the real battle command",
@@ -492,6 +498,21 @@ def validate_native(proof, expected_identity):
             or type(worker.get("bytes")) is not int or worker["bytes"] <= 0
             or not re.fullmatch(r"[0-9a-f]{64}", worker.get("sha256", ""))):
         raise RuntimeError("native worker artifact evidence is invalid")
+    from m9e_rulechange import RULE_TARGET, RULE_TEST, validate_rule_evidence
+    rule_key = "er-cli:" + RULE_TARGET
+    rule_selected = rule_key in by_target
+    if bool(plan.get("rule_worker")) != rule_selected:
+        raise RuntimeError("selected rulechange target has no required variant policy")
+    if rule_selected:
+        if (not plan.get("requires_worker_executable") or rule_key not in required
+                or by_target[rule_key] != [RULE_TEST] or actual.get(rule_key) != 1
+                or plan.get("required_native_test_ids", {}).get(rule_key) != [RULE_TEST]
+                or ["er-cli", RULE_TARGET] not in assignment["a"]):
+            raise RuntimeError("rulechange witness is missing exact identities or A ownership")
+        if lane == "a":
+            validate_rule_evidence(proof.get("rule_worker"), plan["rule_worker"], expected_identity, worker)
+    if "rule_worker" in proof and (lane != "a" or not rule_selected):
+        raise RuntimeError("rule evidence is outside the selected A-owned witness")
 
 
 def export_native(feedback, summary):
@@ -523,7 +544,7 @@ def export_native(feedback, summary):
         if file_hash(Path(worker["path"])) != worker["sha256"] or Path(worker["path"]).stat().st_size != worker["bytes"]:
             raise RuntimeError("native worker artifact changed after execution")
         proof["worker"] = {key: value for key, value in worker.items() if key != "path"}
-    for key in ("timer_mutant", "replica_mutant", "ledger_mutant"):
+    for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "rule_worker"):
         if key in summary:
             proof[key] = summary[key]
     transfer = Path(os.environ["M9E_PHASE_DIR"])
@@ -992,7 +1013,7 @@ def aggregate(feedback):
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
-            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
+            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "rule_worker") if key in native}}
 
 
 def compact_rtc_evidence(compact, full_hash):
@@ -1051,7 +1072,7 @@ def main():
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
             "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
-            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
+            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "rule_worker") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
             compact["first_failure"] = summary["first_failure"]

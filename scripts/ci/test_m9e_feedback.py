@@ -143,6 +143,49 @@ def current_storage_fixture(phases, binding=None):
                        {"fullName": name, "status": "passed", "failureMessages": []} for name in phases.STORAGE_NODE_IDS]}]}
     return binding, tests, {"suites": [{"specs": specs}], "errors": []}, node, node_report
 
+def rule_fixture(root):
+    import m9e_rulechange as rule
+    for key, path in rule.RULE_INPUTS.items():
+        source = root / path
+        source.parent.mkdir(parents=True, exist_ok=True)
+        if not source.exists():
+            source.write_text("synthetic " + key + "\n")
+    source = root / rule.RULE_SOURCE
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("fn timer() {\n" + rule.RULE_ORIGINAL + "}\n")
+    test = root / rule.RULE_TEST_SOURCE
+    test.parent.mkdir(parents=True, exist_ok=True)
+    test.write_text("// exact synthetic rule witness\n")
+    policy = rule.make_rule_policy(root, CANDIDATE)
+    worker = root / "rust/target/er-kernel-worker"
+    worker.parent.mkdir(parents=True, exist_ok=True)
+    worker.write_bytes(b"clean candidate worker")
+    worker.chmod(0o755)
+    clean = {"path": str(worker), "bytes": worker.stat().st_size,
+             "sha256": hashlib.sha256(worker.read_bytes()).hexdigest(), "source_sha": CANDIDATE,
+             "target": "x86_64-unknown-linux-gnu", "profile": "test",
+             "cargo_profile": {"test": False}, "cargo_package_id": "path+file:///clean#er-kernel-worker@0.1.0",
+             "manifest_path": rule.RULE_INPUTS["manifest"]}
+    identity = {"product_sha": CANDIDATE, "target": clean["target"], "toolchain": "rustc pinned",
+                "files": {"lock": policy["inputs"]["lock"], "rule_workspace": policy["inputs"]["workspace"],
+                          "rule_worker_manifest": policy["inputs"]["manifest"], "rule_toolchain": policy["inputs"]["toolchain"],
+                          "rule_source": policy["original_sha256"], "rule_test": policy["test_sha256"]}}
+    evidence = {"schema_version": 1, "status": "passed", "policy_sha256": hashlib.sha256(rule.encoded(policy)).hexdigest(),
+                **{key: policy[key] for key in ("source", "rule", "candidate_source_sha", "original_sha256", "derived_sha256", "inputs")},
+                "test": rule.RULE_TEST, "target": rule.RULE_TARGET,
+                "tests": {"executed": 1, "passed": 1, "failed": 0, "skipped": 0},
+                "derived_source_sha": "e" * 40, "parent_sha": CANDIDATE, "tree_sha": "3" * 40,
+                "parent_tree_sha": "4" * 40, "original_blob": "1" * 40, "derived_blob": "2" * 40,
+                "changed_paths": [rule.RULE_SOURCE], "source_mode": "100644", "patch_bytes": 700,
+                "patch_sha256": "9" * 64, "toolchain": identity["toolchain"], "cargo_version": "cargo 1.97.1",
+                "candidate_preserved_sha256": policy["original_sha256"], "pool_verified_after_test": True,
+                "clean_worker_sha256": clean["sha256"], "pool_files": ["base-worker", "rule-worker"],
+                "worker": {"source_sha": "e" * 40, "target": clean["target"], "profile": "test",
+                           "cargo_profile": clean["cargo_profile"], "package_identity": "er-kernel-worker@0.1.0",
+                           "manifest_path": clean["manifest_path"], "sha256": "8" * 64, "bytes": 200}}
+    return rule, policy, clean, identity, evidence
+
+
 class FeedbackTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-feedback-test-")
@@ -6699,6 +6742,289 @@ class FeedbackTests(unittest.TestCase):
                 with self.subTest(mode=mode), self.assertRaises(RuntimeError):
                     phases.validate_state_query_inventory(bad_plan, rows)
 
+    def test_rule_target_requirement_survives_later_cli_and_kernel_cuts_but_not_readiness(self):
+        self.configure_timer_scope()
+        rule, policy, _, _, _ = rule_fixture(self.root)
+        for changed in ([rule.RULE_TEST_SOURCE], ["rust/crates/er-kernel/src/game_kernel_v7.rs"]):
+            with self.subTest(changed=changed):
+                self.changed = changed
+                selection = self.feedback.plan()
+                self.assertEqual(selection["rule_worker"], policy)
+                self.assertTrue(selection["requires_worker_executable"])
+                self.assertTrue(selection["requires_browser"])
+                self.assertTrue(selection["requires_wasm"])
+                self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+                self.assertEqual(selection["required_native_test_ids"]["er-cli:" + rule.RULE_TARGET], [rule.RULE_TEST])
+                for key, ids in self.config["timer_focus"]["exact_test_ids"].items():
+                    self.assertEqual(selection["required_native_test_ids"][key], ids)
+        self.changed = ["rust/crates/er-cli/src/ordinary.rs"]
+        ordinary = self.feedback.plan()
+        self.assertEqual(ordinary["rule_worker"], policy)
+        self.assertIn(rule.RULE_TARGET, ordinary["required_native_targets"]["er-cli"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        with patch.object(rule, "make_rule_policy", side_effect=AssertionError("readiness must not derive workers")):
+            readiness = self.feedback.plan()
+        self.assertIsNone(readiness["rule_worker"])
+        self.assertEqual(readiness["packages"], ["er-canonical"])
+
+
+
+    def test_rule_scope_and_exact_target_reject_mixed_missing_renamed_or_extra_evidence(self):
+        self.configure_timer_scope()
+        rule, _, _, _, _ = rule_fixture(self.root)
+        for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock",
+                      "rust/crates/er-cli/Cargo.toml", "src/other.ts", "unmapped.json"):
+            self.changed = [rule.RULE_TEST_SOURCE, extra]
+            with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        self.changed = [rule.RULE_TEST_SOURCE]
+        selection = self.feedback.plan()
+        required = {"er-cli:" + rule.RULE_TARGET: [rule.RULE_TEST]}
+        for ids in ([], ["renamed"], [rule.RULE_TEST, "extra"], [rule.RULE_TEST, rule.RULE_TEST]):
+            with self.assertRaises(RuntimeError):
+                self.feedback.require_native_test_ids(required, [("er-cli", rule.RULE_TARGET, ids)])
+        (self.root / rule.RULE_TEST_SOURCE).unlink()
+        with self.assertRaisesRegex(RuntimeError, "absent"):
+            self.feedback.plan()
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+
+
+
+    def test_rule_publication_follows_lint_exact_one_execution_and_context_verification(self):
+        self.configure_timer_scope()
+        rule, _, _, _, _ = rule_fixture(self.root)
+        self.changed = [rule.RULE_TEST_SOURCE]
+        selection = self.feedback.plan()
+        selection.update({"packages": ["er-cli", "er-kernel-worker"], "execution_scope": {"er-cli": [rule.RULE_TARGET]},
+                          "required_native_targets": {"er-cli": [rule.RULE_TARGET]},
+                          "required_native_test_ids": {"er-cli:" + rule.RULE_TARGET: [rule.RULE_TEST]},
+                          "requires_cli_executable": False, "requires_wasm": False, "requires_browser": False,
+                          "timer_mutant": None, "replica_mutant": None, "ledger_mutant": None})
+        self.binary_ids = {"rule_binary": [rule.RULE_TEST]}
+        self.binary_crates = {"rule_binary": "er-cli"}
+        self.binary_targets = {"rule_binary": rule.RULE_TARGET}
+        self.extra_artifacts = [self.worker_executable_artifact()]
+        finished = []
+        @contextlib.contextmanager
+        def prepared(_feedback, _summary, _worker):
+            self.assertIn("clippy:er-cli", self.events)
+            self.assertIn("list:rule_binary", self.events)
+            yield {"BOUND_VARIANT": "yes"}, {"status": "prepared"}
+            finished.append(True)
+        for code, result in ((0, self.result_line(1)), (1, self.result_line(0, 1)),
+                             (0, self.result_line(1) + self.result_line(1)), (0, self.result_line(0))):
+            with self.subTest(code=code, result=result):
+                self.results = {"rule_binary": (code, result)}
+                with patch.object(self.feedback, "plan", return_value=selection), patch.object(rule, "current_rule_worker", prepared), \
+                        patch.dict(sys.modules, {self.feedback.__name__: self.feedback}):
+                    status, summary = self.invoke()
+                if code == 0 and result == self.result_line(1):
+                    self.assertEqual(status, 0)
+                    self.assertTrue(finished)
+                    self.assertEqual(summary["rule_worker"]["tests"], {"executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+                    self.assertEqual(self.binary_envs[-1][2], {"BOUND_VARIANT": "yes"})
+                else:
+                    self.assertNotEqual(status, 0)
+                    self.assertNotIn("rule_worker", summary)
+        selection["rule_worker"] = None
+        with patch.object(self.feedback, "plan", return_value=selection):
+            status, summary = self.invoke()
+        self.assertNotEqual(status, 0)
+        self.assertIn("derived-worker requirement", summary["first_failure"])
+
+
+
+class RuleDerivationTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="m9e-rule-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.rule, self.policy, self.clean, self.identity, self.evidence = rule_fixture(self.root)
+        self.report = self.root / "report"
+        self.report.mkdir()
+        self.calls, self.committed, self.defect = [], False, None
+        self.checkout = None
+        self.feedback = SimpleNamespace(ROOT=self.root, RUST=self.root / "rust", REPORT=self.report,
+                                        re=re, json=json, hashlib=hashlib, Path=Path, os=os,
+                                        tempfile=tempfile, shutil=shutil, run=self.command,
+                                        digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest())
+        self.summary = {"product_sha": CANDIDATE, "target": self.clean["target"], "profile": "test",
+                        "toolchain": self.identity["toolchain"], "plan": {"rule_worker": self.policy}}
+        # Native runner cache variables must not redirect these synthetic files.
+        self.environment = patch.dict(os.environ, {"CARGO_TARGET_DIR": str(self.root / "rust/target")})
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+
+    def metadata(self, feedback, args, cwd=None):
+        self.assertIs(feedback, self.feedback)
+        cwd = self.root if cwd is None else cwd
+        if args == ["git", "rev-parse", "HEAD"]:
+            return CANDIDATE if cwd == self.root or not self.committed else "e" * 40
+        if args == ["git", "diff", "--name-only", "HEAD", "--"]:
+            return "" if cwd == self.root or self.committed else self.rule.RULE_SOURCE
+        if args[:3] == ["git", "status", "--porcelain"]:
+            return ""
+        if args == ["git", "rev-parse", "HEAD^"]:
+            return "d" * 40 if self.defect == "parent" else CANDIDATE
+        if args[:3] == ["git", "rev-list", "--parents"]:
+            return " ".join(["e" * 40, CANDIDATE] + (["f" * 40] if self.defect == "merge" else []))
+        if args[:3] == ["git", "diff-tree", "--no-commit-id"]:
+            if "--name-only" in args:
+                return self.rule.RULE_SOURCE + ("\nother.rs" if self.defect == "extra-source" else "")
+            mode = "100755" if self.defect == "mode" else "100644"
+            return f":100644 {mode} {'1' * 40} {'2' * 40} M\t{self.rule.RULE_SOURCE}"
+        if args[:2] == ["git", "rev-parse"]:
+            value = args[2]
+            if value.startswith("HEAD^:"):
+                return "1" * 40
+            if value.startswith("HEAD:"):
+                return "2" * 40
+            if value == "HEAD^{tree}":
+                return "3" * 40
+            if value == CANDIDATE + "^{tree}":
+                return "4" * 40
+        if args == ["rustc", "--version"]:
+            return "rustc other" if self.defect == "compiler" else self.identity["toolchain"]
+        if args == ["rustc", "-vV"]:
+            return "host: " + self.identity["target"]
+        if args == ["cargo", "--version"]:
+            return "cargo 1.97.1"
+        raise AssertionError((args, cwd))
+
+    def command(self, args, name, cwd, env=None):
+        self.calls.append((args, name, cwd, env))
+        log = self.report / (name + ".log")
+        log.write_text("ok\n")
+        if name == "rule-worktree-create":
+            self.checkout = Path(args[-2])
+            self.checkout.mkdir()
+            for path in (*self.rule.RULE_INPUTS.values(), self.rule.RULE_SOURCE, self.rule.RULE_TEST_SOURCE):
+                destination = self.checkout / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(self.root / path, destination)
+        elif name == "rule-derive-commit":
+            self.committed = True
+            if self.defect == "cargo-input":
+                (self.checkout / "rust/Cargo.lock").write_text("changed lock")
+        elif name == "rule-source-patch":
+            log.write_text("declared one-file patch\n" * (1000 if self.defect == "patch-bound" else 1))
+        elif name == "rule-worker-build":
+            self.assertIn("--locked", args)
+            self.assertIn("--offline", args)
+            self.assertEqual(args[args.index("--profile") + 1], "test")
+            self.assertEqual(args[args.index("--target") + 1], self.clean["target"])
+            self.assertEqual(cwd, self.checkout / "rust")
+            build_root = Path(env["CARGO_TARGET_DIR"])
+            self.assertNotEqual(build_root, self.root / "rust/target")
+            binary = build_root / "debug/er-kernel-worker"
+            if self.defect == "outside":
+                binary = self.root / "outside/er-kernel-worker"
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            binary.write_bytes(b"clean candidate worker" if self.defect == "same-binary" else b"derived worker")
+            binary.chmod(0o755)
+            artifact = {"reason": "compiler-artifact", "target": {"name": "er-kernel-worker", "kind": ["bin"]},
+                        "profile": {"test": False}, "manifest_path": str(self.checkout / self.rule.RULE_INPUTS["manifest"]),
+                        "package_id": "path+file:///derived#er-kernel-worker@0.1.0", "executable": str(binary)}
+            if self.defect == "profile":
+                artifact["profile"]["test"] = True
+            elif self.defect == "manifest":
+                artifact["manifest_path"] = str(self.root / self.rule.RULE_INPUTS["manifest"])
+            elif self.defect == "package":
+                artifact["package_id"] = "path+file:///derived#other@0.1.0"
+            artifacts = [artifact]
+            if self.defect == "ambiguous":
+                second = build_root / "other/er-kernel-worker"
+                second.parent.mkdir()
+                second.write_bytes(binary.read_bytes())
+                second.chmod(0o755)
+                artifacts.append({**artifact, "executable": str(second)})
+            log.write_text("\n".join(json.dumps(item) for item in artifacts) + "\n")
+            if self.defect == "build":
+                raise RuntimeError("synthetic build failed")
+        return log
+
+    def test_rule_policy_and_proof_bind_exact_derivation_and_success(self):
+        self.rule.validate_rule_evidence(self.evidence, self.policy, self.identity, self.clean)
+        for key, value in (("schema_version", True), ("status", "prepared"), ("parent_sha", "d" * 40),
+                           ("changed_paths", [self.rule.RULE_SOURCE, "other.rs"]), ("source_mode", "100755"),
+                           ("derived_source_sha", CANDIDATE), ("tree_sha", "4" * 40), ("derived_blob", "1" * 40),
+                           ("test", "renamed"), ("target", "wrong"), ("patch_bytes", 16_385),
+                           ("patch_sha256", "bad"), ("candidate_preserved_sha256", "0" * 64),
+                           ("pool_verified_after_test", False), ("pool_files", ["base-worker", "rule-worker", "extra"]),
+                           ("tests", {"executed": 1, "passed": 0, "failed": 1, "skipped": 0})):
+            with self.subTest(key=key):
+                bad = {**self.evidence, key: value}
+                with self.assertRaises(RuntimeError):
+                    self.rule.validate_rule_evidence(bad, self.policy, self.identity, self.clean)
+        for key, value in (("bytes", 0), ("bytes", 128 * 1024 * 1024 + 1), ("sha256", self.clean["sha256"]),
+                           ("source_sha", CANDIDATE), ("cargo_profile", {"test": True}), ("package_identity", "other"),
+                           ("manifest_path", "../Cargo.toml")):
+            with self.subTest(worker=key):
+                bad = copy.deepcopy(self.evidence)
+                bad["worker"][key] = value
+                with self.assertRaises(RuntimeError):
+                    self.rule.validate_rule_evidence(bad, self.policy, self.identity, self.clean)
+        bad_identity = copy.deepcopy(self.identity)
+        bad_identity["files"]["rule_test"] = "0" * 64
+        with self.assertRaises(RuntimeError):
+            self.rule.validate_rule_evidence(self.evidence, self.policy, bad_identity, self.clean)
+        source = self.root / self.rule.RULE_SOURCE
+        source.write_text(self.rule.RULE_ORIGINAL * 2)
+        with self.assertRaisesRegex(RuntimeError, "exactly one"):
+            self.rule.make_rule_policy(self.root, CANDIDATE)
+
+    def test_rule_context_derives_once_and_cleans_before_publish(self):
+        with patch.object(self.rule, "bounded_capture", side_effect=self.metadata):
+            with self.rule.current_rule_worker(self.feedback, self.summary, self.clean) as (env, evidence):
+                base, variant = Path(env["ER_M9E_WORKER_EXECUTABLE"]), Path(env["ER_M9E_RULE_WORKER_EXECUTABLE"])
+                self.assertEqual(base.parent, variant.parent)
+                self.assertEqual(sorted(path.name for path in base.parent.iterdir()), ["base-worker", "rule-worker"])
+                self.assertEqual(env["ER_M9E_RULE_WORKER_PARENT_SHA"], CANDIDATE)
+                self.assertEqual(env["ER_M9E_RULE_WORKER_SOURCE_SHA"], "e" * 40)
+                self.assertEqual(evidence["status"], "prepared")
+                self.assertNotIn("candidate_preserved_sha256", evidence)
+            self.assertFalse(base.exists())
+            self.assertTrue(evidence["pool_verified_after_test"])
+            self.assertEqual(evidence["candidate_preserved_sha256"], self.policy["original_sha256"])
+            self.assertEqual(evidence["status"], "prepared")
+        names = [call[1] for call in self.calls]
+        self.assertLess(names.index("rule-materialize-source"), names.index("rule-derive-commit"))
+        self.assertLess(names.index("rule-derive-commit"), names.index("rule-worker-build"))
+        self.assertEqual(names[-1], "rule-worktree-remove")
+        evidence.update(status="passed", test=self.rule.RULE_TEST, target=self.rule.RULE_TARGET,
+                        tests={"executed": 1, "passed": 1, "failed": 0, "skipped": 0})
+        self.rule.validate_rule_evidence(evidence, self.policy, self.identity, self.clean)
+
+    def test_rule_derivation_artifact_and_build_failures_never_yield_or_escape_cleanup(self):
+        for defect in ("parent", "merge", "extra-source", "mode", "cargo-input", "compiler", "patch-bound",
+                       "manifest", "profile", "package", "outside", "ambiguous", "same-binary", "build"):
+            with self.subTest(defect=defect):
+                self.defect, self.committed, self.calls = defect, False, []
+                with patch.object(self.rule, "bounded_capture", side_effect=self.metadata), self.assertRaises(RuntimeError):
+                    with self.rule.current_rule_worker(self.feedback, self.summary, self.clean):
+                        self.fail("invalid derived source/artifact reached ordinary test")
+                self.assertEqual(self.calls[-1][1], "rule-worktree-remove")
+                self.assertEqual(self.feedback.digest(self.root / self.rule.RULE_SOURCE), self.policy["original_sha256"])
+                self.assertEqual(self.feedback.digest(Path(self.clean["path"])), self.clean["sha256"])
+
+    def test_rule_test_failure_or_pool_tamper_still_cleans_and_metadata_is_bounded(self):
+        for tamper in (False, True):
+            with self.subTest(tamper=tamper):
+                self.committed, self.calls = False, []
+                with patch.object(self.rule, "bounded_capture", side_effect=self.metadata), self.assertRaises(RuntimeError):
+                    with self.rule.current_rule_worker(self.feedback, self.summary, self.clean) as (env, evidence):
+                        if tamper:
+                            Path(env["ER_M9E_RULE_WORKER_EXECUTABLE"]).write_bytes(b"tampered")
+                        else:
+                            raise RuntimeError("ordinary witness failed")
+                self.assertEqual(self.calls[-1][1], "rule-worktree-remove")
+                self.assertEqual(evidence["status"], "prepared")
+                self.assertEqual(evidence["candidate_preserved_sha256"], self.policy["original_sha256"])
+        log = self.report / "metadata.log"
+        log.write_bytes(b"x" * 16_385)
+        with patch.object(self.feedback, "run", return_value=log), self.assertRaisesRegex(RuntimeError, "metadata exceeds"):
+            self.rule.bounded_capture(self.feedback, ["git", "rev-parse", "HEAD"])
+
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-phase-test-")
@@ -6911,6 +7237,74 @@ class PhaseTransferTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.phases.aggregate(None)
 
+    def test_rule_variant_is_required_by_actual_inventory_and_aggregate_only_accepts_a_owned_success(self):
+        rule, policy, clean, rule_identity, evidence = rule_fixture(self.root)
+        self.identity["files"].update(rule_identity["files"])
+        key = "er-cli:" + rule.RULE_TARGET
+        self.native["plan"].update(rule_worker=policy, requires_worker_executable=True)
+        self.native["plan"]["required_native_targets"]["er-cli"] = [rule.RULE_TARGET]
+        self.native["plan"]["required_native_test_ids"] = {key: [rule.RULE_TEST]}
+        self.native["inventory"].append({"crate": "er-cli", "target": rule.RULE_TARGET,
+                                         "ids": [rule.RULE_TEST], "historical_excluded_ids": []})
+        self.native["required_native_target_counts"][key] = 1
+        self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
+        self.native["inventory_sha256"] = self.phases.sha(self.phases.encoded(self.native["inventory"]))
+        self.native["assigned_targets"] = self.phases.partition(self.native["inventory"])["a"]
+        self.native["completed_targets"] = self.native["assigned_targets"]
+        self.native["tests"].update(selected=14, executed=12, passed=12)
+        self.native["worker"] = {name: value for name, value in clean.items() if name != "path"}
+        self.other = copy.deepcopy(self.native)
+        self.other["lane"] = "b"
+        self.other["assigned_targets"] = self.phases.partition(self.native["inventory"])["b"]
+        self.other["completed_targets"] = self.other["assigned_targets"]
+        self.other["tests"].update(executed=2, passed=2)
+        self.other["native_timer_parity_digest"] = None
+        self.native["rule_worker"] = evidence
+        self.assertIn(["er-cli", rule.RULE_TARGET], self.native["assigned_targets"])
+        self.assertNotIn(["er-cli", rule.RULE_TARGET], self.other["assigned_targets"])
+        self.phases.validate_native(self.native, self.identity)
+        self.phases.validate_native(self.other, self.identity)
+        for defect in ("missing", "wrong-test", "failed", "unselected-policy", "missing-required", "wrong-parent", "unrestored"):
+            with self.subTest(defect=defect):
+                bad = copy.deepcopy(self.native)
+                if defect == "missing":
+                    bad.pop("rule_worker")
+                elif defect == "wrong-test":
+                    bad["rule_worker"]["test"] = "renamed"
+                elif defect == "failed":
+                    bad["rule_worker"]["tests"].update(passed=0, failed=1)
+                elif defect == "unselected-policy":
+                    bad["plan"]["rule_worker"] = None
+                elif defect == "missing-required":
+                    bad["plan"]["required_native_targets"].pop("er-cli")
+                    bad["required_native_target_counts"].pop(key)
+                elif defect == "wrong-parent":
+                    bad["rule_worker"]["parent_sha"] = "d" * 40
+                else:
+                    bad["rule_worker"]["candidate_preserved_sha256"] = "0" * 64
+                bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+                with self.assertRaises(RuntimeError):
+                    self.phases.validate_native(bad, self.identity)
+        bad = copy.deepcopy(self.other)
+        bad["rule_worker"] = evidence
+        with self.assertRaisesRegex(RuntimeError, "A-owned"):
+            self.phases.validate_native(bad, self.identity)
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform["native_manifest_sha256"] = self.native_hash
+        self.platform["plan_sha256"] = self.native["plan_sha256"]
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+        self.assertEqual(result["qualification"], "passed")
+        self.assertEqual(result["tests"]["executed"], 14)
+        self.assertEqual(result["rule_worker"], evidence)
+        self.native.pop("rule_worker")
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.platform["native_manifest_sha256"] = self.native_hash
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), self.assertRaises(RuntimeError):
+            self.phases.aggregate(None)
     def test_phase_identity_rejects_source_build_and_run_mismatches(self):
         for key in ("product_sha", "workflow_sha", "run_id", "run_attempt", "profile", "target", "toolchain"):
             with self.subTest(key=key):
@@ -8841,521 +9235,5 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "changed source/lock"):
                 title.checks(self.root, self.full, remote, summary, env, "1.97.1")
             rebuilt.assert_not_called()
-
-class CurrentCostRecordTests(unittest.TestCase):
-    # Exact bounded record produced by release6e2bb145/run34043250096. This is
-    # parser evidence only; mutations never substitute for the real Rust probe.
-    PRODUCED = r'''{"architecture":"x86_64","bundle_bytes":15810979,"checkpoints":[{"checkpoint":"title","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":1,"observation_json_bytes":1567,"phases":[{"median_ns":1593,"min_ns":1543,"phase":"fork"},{"median_ns":2424,"min_ns":2394,"phase":"snapshot"},{"median_ns":2555,"min_ns":2444,"phase":"validate"},{"median_ns":461,"min_ns":430,"phase":"observe"},{"median_ns":629464,"min_ns":613204,"phase":"canonical_encode_snapshot"},{"median_ns":640375,"min_ns":629364,"phase":"canonical_digest_snapshot"},{"median_ns":17563,"min_ns":17512,"phase":"blake3_preencoded_snapshot"},{"median_ns":37420,"min_ns":37129,"phase":"apply_effectful_raw_input"},{"median_ns":2136496,"min_ns":2124153,"phase":"recorder_append"}],"recorder_capsule_bytes":77605,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":68327,"snapshot_digest":"9e7b9834bb4b1ea0e9d078b1d3e2ddb1352aba2de831aae9b7da7adf83b61996"},{"checkpoint":"mode","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":9,"observation_json_bytes":4379,"phases":[{"median_ns":4178,"min_ns":4117,"phase":"fork"},{"median_ns":9518,"min_ns":9447,"phase":"snapshot"},{"median_ns":10129,"min_ns":10108,"phase":"validate"},{"median_ns":1793,"min_ns":1763,"phase":"observe"},{"median_ns":648540,"min_ns":647548,"phase":"canonical_encode_snapshot"},{"median_ns":681191,"min_ns":680079,"phase":"canonical_digest_snapshot"},{"median_ns":18644,"min_ns":18595,"phase":"blake3_preencoded_snapshot"},{"median_ns":4101171,"min_ns":4038494,"phase":"apply_effectful_raw_input"},{"median_ns":10380876,"min_ns":10321375,"phase":"recorder_append"}],"recorder_capsule_bytes":738869,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":71145,"snapshot_digest":"c9e4373e6ff335ae0485ee2a6d9f823f6e24219a38f1770ba04fd7974eee9bb0"},{"checkpoint":"starter","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"SPACE"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":707,"observation_json_bytes":333602,"phases":[{"median_ns":98714,"min_ns":98363,"phase":"fork"},{"median_ns":981792,"min_ns":938079,"phase":"snapshot"},{"median_ns":1054968,"min_ns":1053105,"phase":"validate"},{"median_ns":96961,"min_ns":96170,"phase":"observe"},{"median_ns":3761558,"min_ns":3741881,"phase":"canonical_encode_snapshot"},{"median_ns":3877534,"min_ns":3814936,"phase":"canonical_digest_snapshot"},{"median_ns":95258,"min_ns":95158,"phase":"blake3_preencoded_snapshot"},{"median_ns":4272500,"min_ns":4255138,"phase":"apply_effectful_raw_input"},{"median_ns":16411907,"min_ns":16250916,"phase":"recorder_append"}],"recorder_capsule_bytes":1067916,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":400368,"snapshot_digest":"9dd00a7668a85f1311a873259c2b919e3bb9936dd93a2029d9a8eb196b2a0f56"},{"checkpoint":"active","event":{"input":{"data":{"browser_repeat":false,"code":{"kind":"ARROW_DOWN"},"focus":"GAME","printable":false},"kind":"KEY_DOWN"},"kind":"RAW_INPUT"},"event_effects":1,"menu_options":2,"observation_json_bytes":2050,"phases":[{"median_ns":3186,"min_ns":3076,"phase":"fork"},{"median_ns":113512,"min_ns":111398,"phase":"snapshot"},{"median_ns":121517,"min_ns":121396,"phase":"validate"},{"median_ns":92323,"min_ns":88545,"phase":"observe"},{"median_ns":90378,"min_ns":89917,"phase":"canonical_encode_snapshot"},{"median_ns":91381,"min_ns":91170,"phase":"canonical_digest_snapshot"},{"median_ns":2525,"min_ns":2525,"phase":"blake3_preencoded_snapshot"},{"median_ns":273330,"min_ns":268771,"phase":"apply_effectful_raw_input"},{"median_ns":1547377,"min_ns":1532760,"phase":"recorder_append"}],"recorder_capsule_bytes":12969,"recorder_maximum_bytes":16777216,"recorder_maximum_events":4096,"snapshot_canonical_bytes":8416,"snapshot_digest":"884799cb819b8a0a502a484715b136e214003b7d59aec6cd7a978770be3199ef"}],"content_identity":{"ai_hash":"3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9","battle_hash":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","bootstrap_hash":"e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a","bundle_hash":"blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429","oracle_sha":"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7","presentation_hash":"6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0","progression_hash":"751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695","run_hash":"879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428","scenario_hash":"e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8","semantic_catalog_hash":"a878c7487924a10f8508787ec560829efd72c5c5f101f022ad93c5358ec1ced0","world_hash":"c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"},"content_phases":[{"median_ns":52567776,"min_ns":50231488,"phase":"content_decode"},{"median_ns":206343510,"min_ns":205525914,"phase":"content_prepare_and_arc"}],"debug_assertions":false,"limitations":"Wall time includes optimizer barriers, scheduling, internal validation/allocation and internal destruction. Setup, verification and final input/output teardown excluded. Warm-process fixed-order samples; no allocator or live-memory claims. API costs overlap and are not additive components. Digest includes canonical encoding; preencoded BLAKE3 isolates hashing. Recorder append excludes event apply and recorder construction; measures one accepted event on an empty tail, not rotation or accumulated history. Not transport or whole-run latency.","os":"linux","probe":"current_native_phase_costs_preserve_semantics","samples_per_phase":3,"schema_version":1,"warmups_per_phase":1}'''
-
-    def setUp(self):
-        import m9e_current_cost as cost
-        self.cost = cost
-        self.value = json.loads(self.PRODUCED)
-        self.binding = {"architecture": "x86_64", "operating_system": "linux",
-                        "bundle_bytes": 15_810_979, "content_identity": copy.deepcopy(self.value["content_identity"])}
-
-    def raw(self, value=None):
-        value = self.value if value is None else value
-        return self.cost.PREFIX + json.dumps(value, sort_keys=True, separators=(",", ":")).encode() + b"\n"
-
-    def rejected(self, value):
-        with self.assertRaises(RuntimeError):
-            self.cost.parse_line(self.raw(value), **self.binding)
-
-    def test_actual_release_cost_record_reconstructs_bound_bytes_and_hash(self):
-        raw = self.raw()
-        self.assertEqual(len(raw), 6009)
-        self.assertEqual(hashlib.sha256(raw).hexdigest(), "5c8eb3c10b702ec14d68a2428279834041e10d8d957d4035033f3accbc0749d8")
-        parsed = self.cost.parse_line(raw, **self.binding)
-        self.assertEqual(parsed, self.value)
-        self.assertEqual(parsed["checkpoints"][2]["menu_options"], 707)
-        proof = {"line": raw.decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
-        self.assertEqual(self.cost.validate_record(proof, **self.binding), self.value)
-
-    def test_cost_record_rejects_incomplete_repeated_and_oversized_framing(self):
-        raw = self.raw()
-        for malformed in (raw[:-1], raw + raw, b"progress " + raw, raw + b"\n", raw.replace(b"\n", b"\r\n"),
-                          raw + b"trailing", b"M9E_CURRENT_COST_PROBE\n", raw.decode(), None,
-                          self.cost.PREFIX + b" " * (8192 - len(self.cost.PREFIX) - 1) + b"\n"):
-            with self.subTest(kind=type(malformed).__name__), self.assertRaises(RuntimeError):
-                self.cost.parse_line(malformed, **self.binding)
-
-    def test_cost_record_rejects_duplicate_json_keys_nonfinite_values_and_trailing_json(self):
-        raw = self.raw()
-        for malformed in (raw.replace(b'"schema_version":1', b'"schema_version":1,"schema_version":1'),
-                          raw.replace(b'"min_ns":1543', b'"min_ns":1543,"min_ns":1543'),
-                          raw.replace(b'"schema_version":1', b'"schema_version":NaN'),
-                          raw.replace(b'"schema_version":1', b'"schema_version":Infinity'),
-                          raw.replace(b'"schema_version":1', b'"schema_version":-Infinity'),
-                          raw[:-1] + b" {}\n", self.cost.PREFIX + b"\xff\n",
-                          self.cost.PREFIX + b"[]\n", self.cost.PREFIX + b"{" + b"\n"):
-            self.assertNotEqual(malformed, raw)
-            with self.assertRaises(RuntimeError):
-                self.cost.parse_line(malformed, **self.binding)
-
-    def test_cost_record_rejects_missing_unknown_and_wrong_typed_object_fields(self):
-        paths = [(), ("content_identity",), ("content_phases", 0), ("checkpoints", 0),
-                 ("checkpoints", 0, "phases", 0), ("checkpoints", 0, "event"),
-                 ("checkpoints", 0, "event", "input"), ("checkpoints", 0, "event", "input", "data"),
-                 ("checkpoints", 0, "event", "input", "data", "code")]
-        for path in paths:
-            original = self.value
-            for key in path:
-                original = original[key]
-            for mode in ("missing", "unknown"):
-                bad = copy.deepcopy(self.value)
-                row = bad
-                for key in path:
-                    row = row[key]
-                if mode == "missing":
-                    row.pop(next(iter(original)))
-                else:
-                    row["unrecognized"] = False
-                with self.subTest(path=path, mode=mode):
-                    self.rejected(bad)
-        bad = copy.deepcopy(self.value)
-        bad["checkpoints"][0]["event"]["input"]["data"] = []
-        self.rejected(bad)
-
-    def test_cost_record_rejects_boolean_counters_and_wrong_host_or_profile(self):
-        for key in ("schema_version", "warmups_per_phase", "samples_per_phase", "bundle_bytes"):
-            for replacement in (True, False, None, "1", 1.0, -1, self.cost.U64_MAX + 1):
-                bad = copy.deepcopy(self.value)
-                bad[key] = replacement
-                with self.subTest(key=key, replacement=replacement):
-                    self.rejected(bad)
-        for key, replacement in (("probe", "renamed"), ("architecture", "aarch64"), ("os", "windows"),
-                                 ("debug_assertions", True), ("debug_assertions", 0), ("limitations", "fast enough")):
-            bad = copy.deepcopy(self.value)
-            bad[key] = replacement
-            self.rejected(bad)
-
-    def test_cost_record_binds_all_actual_content_fields_and_typed_digest_prefixes(self):
-        for key in self.cost.IDENTITY_FIELDS:
-            for replacement in ("0" * 64, "bad", True):
-                bad = copy.deepcopy(self.value)
-                bad["content_identity"][key] = replacement
-                self.rejected(bad)
-            binding = copy.deepcopy(self.binding)
-            binding["content_identity"][key] = "0" * (40 if key == "oracle_sha" else 64)
-            with self.assertRaises(RuntimeError):
-                self.cost.parse_line(self.raw(), **binding)
-        for key, replacement in (("bundle_bytes", 1), ("bundle_bytes", True), ("architecture", "mips"),
-                                 ("operating_system", "darwin")):
-            binding = {**self.binding, key: replacement}
-            with self.assertRaises(RuntimeError):
-                self.cost.parse_line(self.raw(), **binding)
-
-    def test_cost_record_requires_every_phase_once_in_the_recorded_order(self):
-        for path in [("content_phases",), *[("checkpoints", i, "phases") for i in range(4)]]:
-            for mode in ("missing", "duplicate", "reorder", "renamed"):
-                bad = copy.deepcopy(self.value)
-                rows = bad
-                for key in path:
-                    rows = rows[key]
-                if mode == "missing":
-                    rows.pop()
-                elif mode == "duplicate":
-                    rows[-1] = copy.deepcopy(rows[0])
-                elif mode == "reorder":
-                    rows.reverse()
-                else:
-                    rows[0]["phase"] = "external_approximation"
-                self.rejected(bad)
-
-    def test_cost_record_accepts_zero_resolution_but_rejects_invalid_duration_order_and_types(self):
-        bad = copy.deepcopy(self.value)
-        for row in [*bad["content_phases"], *[phase for cp in bad["checkpoints"] for phase in cp["phases"]]]:
-            row["min_ns"] = row["median_ns"] = 0
-        self.assertEqual(self.cost.parse_line(self.raw(bad), **self.binding), bad)
-        for minimum, median in ((True, 1), (0, False), (1.0, 2), (2, 1), (-1, 0), (0, self.cost.U64_MAX + 1)):
-            bad = copy.deepcopy(self.value)
-            bad["checkpoints"][0]["phases"][0].update(min_ns=minimum, median_ns=median)
-            self.rejected(bad)
-
-    def test_cost_record_requires_four_actual_checkpoint_identities_and_snapshot_digests(self):
-        for mode in ("missing", "duplicate", "reorder", "extra", "digest", "kind"):
-            bad = copy.deepcopy(self.value)
-            rows = bad["checkpoints"]
-            if mode == "missing":
-                rows.pop()
-            elif mode == "duplicate":
-                rows[-1] = copy.deepcopy(rows[0])
-            elif mode == "reorder":
-                rows.reverse()
-            elif mode == "extra":
-                rows.append(copy.deepcopy(rows[0]))
-            elif mode == "digest":
-                rows[0]["snapshot_digest"] = "A" * 64
-            else:
-                rows[0]["checkpoint"] = "controlled_fixture"
-            self.rejected(bad)
-
-    def test_cost_record_rejects_changed_raw_event_or_coerced_boolean_controls(self):
-        for index in range(4):
-            for key, value in (("printable", True), ("printable", 0), ("browser_repeat", True),
-                               ("browser_repeat", 0), ("focus", "TEXT"), ("code", {"kind": "ESCAPE"})):
-                bad = copy.deepcopy(self.value)
-                bad["checkpoints"][index]["event"]["input"]["data"][key] = value
-                self.rejected(bad)
-            for path, replacement in ((["kind"], "TIMER"), (["input", "kind"], "KEY_UP")):
-                bad = copy.deepcopy(self.value)
-                event = bad["checkpoints"][index]["event"]
-                for part in path[:-1]:
-                    event = event[part]
-                event[path[-1]] = replacement
-                self.rejected(bad)
-
-    def test_cost_record_keeps_existing_recorder_caps_and_positive_measured_sizes(self):
-        for key in ("snapshot_canonical_bytes", "observation_json_bytes", "menu_options", "event_effects",
-                    "recorder_capsule_bytes", "recorder_maximum_bytes", "recorder_maximum_events"):
-            for value in (True, 0, -1, 1.0, self.cost.U64_MAX + 1):
-                bad = copy.deepcopy(self.value)
-                bad["checkpoints"][0][key] = value
-                self.rejected(bad)
-        for key, value in (("recorder_capsule_bytes", 16_777_217), ("recorder_maximum_bytes", 33_554_432),
-                           ("recorder_maximum_events", 8192)):
-            bad = copy.deepcopy(self.value)
-            bad["checkpoints"][0][key] = value
-            self.rejected(bad)
-
-    def test_cost_wire_record_rejects_tampering_missing_fields_and_invalid_unicode(self):
-        raw = self.raw()
-        proof = {"line": raw.decode(), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
-        for key in proof:
-            bad = dict(proof)
-            bad.pop(key)
-            with self.assertRaises(RuntimeError):
-                self.cost.validate_record(bad, **self.binding)
-        for key, value in (("line", proof["line"] + " "), ("line", "\ud800"), ("line", raw),
-                           ("bytes", True), ("bytes", len(raw) - 1), ("sha256", "0" * 64), ("extra", "ignored")):
-            with self.assertRaises(RuntimeError):
-                self.cost.validate_record({**proof, key: value}, **self.binding)
-
-class CurrentCostArtifactTests(unittest.TestCase):
-    def setUp(self):
-        import m9e_current_cost as cost
-        self.cost = cost
-        temporary = tempfile.TemporaryDirectory(prefix="m9e-release-artifact-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name).resolve()
-        self.repository = self.root / "candidate"
-        self.manifest = self.repository / "rust/crates/er-repro/Cargo.toml"
-        self.manifest.parent.mkdir(parents=True)
-        self.manifest.write_text('[package]\nname="er-repro"\nversion.workspace=true\n')
-        (self.repository / "rust/Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
-        self.source = self.repository / cost.SOURCE
-        self.source.parent.mkdir(parents=True)
-        self.source.write_text("// exact test source\n")
-        self.directory = self.root / "owned-release"
-        self.binary = self.directory / "release/deps/m9e_current_cost_probe-0123456789abcdef"
-        self.binary.parent.mkdir(parents=True)
-        self.binary.write_bytes(b"candidate executable fixture, never executed")
-        self.binary.chmod(0o700)
-        self.artifact = {"reason": "compiler-artifact", "manifest_path": str(self.manifest), "features": [],
-                         "package_id": "path+" + self.manifest.parent.as_uri() + "#0.1.0",
-                         "target": {"name": cost.TARGET[1], "kind": ["test"], "crate_types": ["bin"], "src_path": str(self.source)},
-                         "profile": {"opt_level": "3", "debug_assertions": False, "debuginfo": 0,
-                                     "overflow_checks": False, "test": True}, "executable": str(self.binary)}
-        self.finished = {"reason": "build-finished", "success": True}
-        self.records = [self.artifact, self.finished]
-
-    def discover(self, records=None, directory=None):
-        return self.cost.discover_release(self.records if records is None else records,
-                                         repository=self.repository,
-                                         target_directory=self.directory if directory is None else directory)
-
-    def test_cost_release_discovery_binds_exact_source_profile_and_executable_bytes(self):
-        executable, binding = self.discover()
-        self.assertEqual(executable, self.binary)
-        self.assertEqual(binding["sha256"], hashlib.sha256(self.binary.read_bytes()).hexdigest())
-        self.assertEqual(binding["bytes"], self.binary.stat().st_size)
-        self.assertEqual(binding["manifest_sha256"], hashlib.sha256(self.manifest.read_bytes()).hexdigest())
-        self.assertEqual(binding["source_sha256"], hashlib.sha256(self.source.read_bytes()).hexdigest())
-        self.assertEqual(binding["relative_path"], "release/deps/" + self.binary.name)
-        self.cost.check_executable(executable, binding)
-        self.artifact["profile"]["opt_level"] = "0"
-        self.assertEqual(binding["cargo_profile"]["opt_level"], "3")
-
-    def test_cost_release_discovery_rejects_missing_ambiguous_or_unfinished_builds(self):
-        for records in ([], [self.artifact], [self.finished], [self.artifact, self.artifact, self.finished],
-                        [self.artifact, self.finished, self.finished], [self.artifact, {**self.finished, "success": False}],
-                        [self.artifact, {**self.finished, "success": 1}], [None], self.artifact):
-            with self.assertRaises(RuntimeError):
-                self.discover(records)
-
-    def test_cost_release_discovery_rejects_wrong_package_target_source_features_and_profile(self):
-        mutations = [(["manifest_path"], str(self.source)), (["package_id"], "registry+unrelated#er-repro@0.1.0"),
-                     (["features"], ["alternate"]), (["target", "kind"], ["bench"]),
-                     (["target", "name"], "neighbor"), (["target", "crate_types"], ["lib"]),
-                     (["target", "src_path"], str(self.manifest)), (["profile", "opt_level"], "0"),
-                     (["profile", "debug_assertions"], True), (["profile", "debug_assertions"], 0),
-                     (["profile", "overflow_checks"], True), (["profile", "debuginfo"], False),
-                     (["profile", "test"], False), (["profile", "test"], 1), (["profile", "unknown"], False)]
-        for path, value in mutations:
-            bad = copy.deepcopy(self.records)
-            row = bad[0]
-            for key in path[:-1]:
-                row = row[key]
-            row[path[-1]] = value
-            with self.subTest(path=path), self.assertRaises(RuntimeError):
-                self.discover(bad)
-
-    def test_cost_release_discovery_confines_executable_to_owned_native_release_tree(self):
-        escaped = self.root / self.binary.name
-        escaped.write_bytes(self.binary.read_bytes())
-        escaped.chmod(0o700)
-        linked = self.binary.parent / "m9e_current_cost_probe-fedcba9876543210"
-        linked.symlink_to(escaped)
-        wrong_name = self.binary.parent / "not-the-cost-target"
-        wrong_name.write_bytes(self.binary.read_bytes())
-        wrong_name.chmod(0o700)
-        for path in (str(escaped), str(linked), str(wrong_name), "relative/release/deps/test", None,
-                     str(self.directory / "debug/deps" / self.binary.name)):
-            with self.assertRaises(RuntimeError):
-                self.discover([{**self.artifact, "executable": path}, self.finished])
-        alias = self.root / "alias"
-        alias.symlink_to(self.directory, target_is_directory=True)
-        with self.assertRaises(RuntimeError):
-            self.discover(directory=alias)
-        self.binary.chmod(0o600)
-        with self.assertRaises(RuntimeError):
-            self.discover()
-
-    def test_cost_release_executable_conservation_rejects_bytes_permissions_and_symlink_changes(self):
-        executable, binding = self.discover()
-        original = self.binary.read_bytes()
-        self.binary.write_bytes(b"X" * len(original))
-        with self.assertRaises(RuntimeError):
-            self.cost.check_executable(executable, binding)
-        self.binary.write_bytes(original)
-        self.binary.chmod(0o600)
-        with self.assertRaises(RuntimeError):
-            self.cost.check_executable(executable, binding)
-        self.binary.chmod(0o700)
-        self.cost.check_executable(executable, binding)
-        self.binary.unlink()
-        with self.assertRaises(RuntimeError):
-            self.cost.check_executable(executable, binding)
-
-    def test_cost_release_listing_matches_the_actual_sole_global_test_identity(self):
-        raw = (self.cost.TEST_ID + ": test\n").encode()
-        self.assertEqual(len(raw), 52)
-        self.cost.validate_listing(raw, [self.cost.TEST_ID])
-        for listing, identities in ((raw, []), (raw, [self.cost.TEST_ID] * 2), (raw, ["renamed"]),
-                                    (raw + raw, [self.cost.TEST_ID]), (raw[:-1], [self.cost.TEST_ID]),
-                                    (b"", [self.cost.TEST_ID]), (raw.replace(b": test", b": benchmark"), [self.cost.TEST_ID]),
-                                    (raw + b"ignored: test\n", [self.cost.TEST_ID]), (b"\xff", [self.cost.TEST_ID]),
-                                    (b"x" * 16385, [self.cost.TEST_ID])):
-            with self.assertRaises(RuntimeError):
-                self.cost.validate_listing(listing, identities)
-
-class CurrentCostContentBindingTests(unittest.TestCase):
-    MANIFEST = r'''{"components":{"ai":"3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9","battle":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","bootstrap":"e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a","meta":"4b6fdf238af42d40441175d2436c03e5dcec40117863a9e5600ba8127009be64","presentation":"6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0","progression":"751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695","run":"879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428","scenario":"e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8","world":"c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"},"content_hash":"blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429","counts":{"ai_behaviors":2586,"battle_species":1962,"bootstrap_starters":706,"meta_behaviors":6870,"presentation_mappings":55,"progression_species_forms":3384,"run_programs":3,"scenarios":91,"world_biomes":35},"oracle_sha":"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7","pending_bespoke_behaviors":0,"reachable_unsupported_behaviors":0,"schema_version":2,"unresolved_cross_references":0,"v1_production_fallbacks":0}'''
-
-    def setUp(self):
-        import m9e_current_cost as cost
-        self.cost = cost
-        temporary = tempfile.TemporaryDirectory(prefix="m9e-cost-content-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name).resolve()
-        self.manifest = json.loads(self.MANIFEST)
-        self.identity = json.loads(CurrentCostRecordTests.PRODUCED)["content_identity"]
-        # Minimal source-shape fixture for binding checks, not prepared game content.
-        self.bundle = {"schema_version": 2, "oracle_sha": self.identity["oracle_sha"],
-                       "content_hash": self.identity["bundle_hash"]}
-        for name, digest in self.manifest["components"].items():
-            self.bundle["scenarios" if name == "scenario" else name] = {"content_hash": digest}
-        self.bundle["battle"]["semantic_catalog_hash"] = self.identity["semantic_catalog_hash"]
-        self.bundle_path = self.root / cost.BUNDLE
-        self.manifest_path = self.root / cost.CONTENT_MANIFEST
-        self.bundle_path.parent.mkdir(parents=True)
-        self.write()
-
-    def write(self):
-        self.bundle_path.write_text(json.dumps(self.bundle, sort_keys=True))
-        self.manifest_path.write_text(json.dumps(self.manifest, sort_keys=True))
-
-    def test_cost_content_binding_projects_actual_v2_component_names_and_original_bytes(self):
-        binding = self.cost.read_content(self.root)
-        self.assertEqual(binding["identity"], self.identity)
-        for name, path in (("bundle", self.bundle_path), ("manifest", self.manifest_path)):
-            self.assertEqual(binding[name]["bytes"], path.stat().st_size)
-            self.assertEqual(binding[name]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
-        self.assertEqual(self.manifest["counts"]["bootstrap_starters"], 706)
-        before = binding["bundle"]["sha256"]
-        self.bundle_path.write_bytes(self.bundle_path.read_bytes() + b"\n")
-        changed = self.cost.read_content(self.root)
-        self.assertEqual(changed["identity"], binding["identity"])
-        self.assertNotEqual(changed["bundle"]["sha256"], before)
-
-    def test_cost_content_binding_rejects_each_source_component_and_manifest_identity_drift(self):
-        initial_bundle, initial_manifest = copy.deepcopy(self.bundle), copy.deepcopy(self.manifest)
-        for name in self.manifest["components"]:
-            self.bundle = copy.deepcopy(initial_bundle)
-            self.bundle["scenarios" if name == "scenario" else name]["content_hash"] = "0" * 64
-            self.write()
-            with self.subTest(component=name), self.assertRaises(RuntimeError):
-                self.cost.read_content(self.root)
-        for key, replacement in (("oracle_sha", "0" * 40), ("content_hash", "blake3-v1:" + "0" * 64),
-                                 ("schema_version", True), ("unresolved_cross_references", 1),
-                                 ("pending_bespoke_behaviors", False), ("v1_production_fallbacks", 1), ("extra", "ignored")):
-            self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
-            self.manifest[key] = replacement
-            self.write()
-            with self.assertRaises(RuntimeError):
-                self.cost.read_content(self.root)
-        self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
-        self.manifest["counts"]["bootstrap_starters"] = True
-        self.write()
-        with self.assertRaises(RuntimeError):
-            self.cost.read_content(self.root)
-        self.bundle, self.manifest = copy.deepcopy(initial_bundle), copy.deepcopy(initial_manifest)
-        self.bundle["meta"]["content_hash"] = self.manifest["components"]["meta"] = "bad"
-        self.write()
-        with self.assertRaises(RuntimeError):
-            self.cost.read_content(self.root)
-
-    def test_cost_content_reader_rejects_duplicate_invalid_oversized_or_redirected_files(self):
-        original = self.manifest_path.read_bytes()
-        for raw in (b"", b"\xff", b"[]", b"{}" + b" " * 16383,
-                    original.replace(b'"schema_version": 2', b'"schema_version": 2, "schema_version": 2')):
-            self.assertNotEqual(raw, original)
-            self.manifest_path.write_bytes(raw)
-            with self.assertRaises(RuntimeError):
-                self.cost.read_content(self.root)
-        self.manifest_path.write_bytes(original)
-        relocated = self.root / "elsewhere.json"
-        relocated.write_bytes(original)
-        self.manifest_path.unlink()
-        self.manifest_path.symlink_to(relocated)
-        with self.assertRaises(RuntimeError):
-            self.cost.read_content(self.root)
-
-class CurrentCostBoundedProcessTests(unittest.TestCase):
-    # These tiny Python processes run only on the remote Linux harness runner;
-    # they prove actual pipe/deadline/process-group behavior, not game execution.
-    def setUp(self):
-        import m9e_current_cost as cost
-        import sys
-        self.cost = cost
-        self.python = sys.executable
-        temporary = tempfile.TemporaryDirectory(prefix="m9e-cost-process-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.output = self.root / "output.log"
-        self.children = []
-        self.real_popen = subprocess.Popen
-
-    def spawn(self, *args, **kwargs):
-        self.assertIs(kwargs.get("start_new_session"), True)
-        self.assertNotIn("shell", kwargs)
-        child = self.real_popen(*args, **kwargs)
-        self.children.append(child)
-        return child
-
-    def tearDown(self):
-        import signal
-        # Failsafe for regressions in the helper itself; no owned test group
-        # may survive a failed assertion in this process integration fixture.
-        for child in self.children:
-            try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            child.wait(timeout=1)
-
-    def run_code(self, code, **overrides):
-        options = {"cwd": self.root, "environment": dict(os.environ), "output": self.output,
-                   "seconds": 3, "byte_limit": 1024, **overrides}
-        with patch.object(self.cost.subprocess, "Popen", side_effect=self.spawn):
-            return self.cost.run_bounded([self.python, "-c", code], **options)
-
-    def test_cost_runner_streams_combined_output_from_a_real_owned_session(self):
-        result = self.run_code("import os; os.write(1, str(os.getsid(0) == os.getpid()).encode()); os.write(2, b' stderr')")
-        self.assertEqual(self.output.read_bytes(), b"True stderr")
-        self.assertEqual(result["bytes"], 11)
-        self.assertEqual(result["sha256"], hashlib.sha256(b"True stderr").hexdigest())
-        self.assertEqual(result["path"], self.output)
-        self.assertLess(result["elapsed_seconds"], 3)
-        self.assertEqual(self.children[0].poll(), 0)
-        self.assertTrue(self.children[0].stdout.closed)
-
-    def test_cost_runner_nonzero_completion_cannot_supply_success_evidence(self):
-        with self.assertRaisesRegex(RuntimeError, "command exited 7"):
-            self.run_code("import os; os.write(1, b'expected failure'); raise SystemExit(7)")
-        self.assertEqual(self.output.read_bytes(), b"expected failure")
-        self.assertEqual(self.children[0].poll(), 7)
-        self.assertTrue(self.children[0].stdout.closed)
-
-    def test_cost_runner_stops_streaming_at_the_exact_output_bound(self):
-        with self.assertRaisesRegex(RuntimeError, "output exceeded"):
-            self.run_code("import os,time; os.write(1, b'x' * 1048576); time.sleep(10)", byte_limit=128)
-        self.assertEqual(self.output.read_bytes(), b"x" * 128)
-        self.assertIsNotNone(self.children[0].poll())
-        self.assertTrue(self.children[0].stdout.closed)
-
-    def test_cost_runner_deadline_kills_term_ignoring_parent_and_descendant(self):
-        import signal
-        import time
-        code = ("import signal,subprocess,sys,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
-                "child=subprocess.Popen([sys.executable,'-c','import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(10)']); "
-                "print(child.pid,flush=True); time.sleep(10)")
-        original = os.killpg
-        signals = []
-        def tracked(pid, sig):
-            signals.append((pid, sig))
-            return original(pid, sig)
-        with patch.object(self.cost.os, "killpg", side_effect=tracked), self.assertRaisesRegex(RuntimeError, "wall deadline"):
-            self.run_code(code, seconds=2)
-        child = self.children[0]
-        self.assertEqual(child.poll(), -signal.SIGKILL)
-        self.assertIn((child.pid, signal.SIGTERM), signals)
-        self.assertIn((child.pid, signal.SIGKILL), signals)
-        descendant = int(self.output.read_text().strip())
-        status = Path(f"/proc/{descendant}/stat")
-        running = True
-        for _ in range(20):
-            try:
-                running = status.read_text().split(") ", 1)[1].split()[0] != "Z"
-            except FileNotFoundError:
-                running = False
-            if not running:
-                break
-            time.sleep(0.01)
-        self.assertFalse(running, "owned descendant survived the group deadline")
-
-    def test_cost_runner_rejects_expired_budget_and_invalid_caps_before_spawn(self):
-        import time
-        for overrides in ({"seconds": True}, {"seconds": 901}, {"seconds": float("nan")},
-                          {"byte_limit": True}, {"byte_limit": 0}, {"byte_limit": (16 << 20) + 1},
-                          {"global_deadline": time.monotonic() - 1}, {"global_deadline": float("inf")}):
-            with self.assertRaises(RuntimeError):
-                self.run_code("pass", **overrides)
-            self.assertFalse(self.output.exists())
-            self.assertEqual(self.children, [])
-
-    def test_cost_runner_never_overwrites_an_existing_diagnostic(self):
-        self.output.write_bytes(b"retain prior diagnostic")
-        with self.assertRaises(FileExistsError):
-            self.run_code("pass")
-        self.assertEqual(self.output.read_bytes(), b"retain prior diagnostic")
-        self.assertEqual(self.children, [])
-
-    def test_cost_runner_attempts_kill_and_reap_after_term_cleanup_failure(self):
-        import signal
-        original = os.killpg
-        signals = []
-        def failed_term(pid, sig):
-            signals.append((pid, sig))
-            if sig == signal.SIGTERM:
-                raise PermissionError("simulated termination failure")
-            return original(pid, sig)
-        with patch.object(self.cost.os, "killpg", side_effect=failed_term), self.assertRaisesRegex(RuntimeError, "cleanup failed"):
-            self.run_code("pass")
-        child = self.children[0]
-        self.assertIn((child.pid, signal.SIGKILL), signals)
-        self.assertIsNotNone(child.poll())
-        self.assertTrue(child.stdout.closed)
 if __name__ == "__main__":
     unittest.main()
