@@ -68,7 +68,13 @@ def main(summary):
     summary["bundle_sha256"] = digest(ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json")
     run(["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true", "--check", str(ROOT / RULE_TEST_SOURCE)],
         "format", seconds=60, bound=262144)
-    toolchain = run(["rustc", "--version"], "compiler", seconds=30, bound=16384).read_text().strip()
+    compiler_output = run(["rustc", "--version"], "compiler", seconds=30, bound=16384).read_text()
+    # The first rustup proxy call can emit component installation diagnostics on
+    # stderr. Bind its sole compiler identity line, preserving the complete log.
+    versions = re.findall(r"^rustc 1\.97\.1 \([^\n]+\)$", compiler_output, re.M)
+    if len(versions) != 1:
+        raise RuntimeError("exact pinned compiler identity line required")
+    toolchain = versions[0]
     host = next(line.split(": ", 1)[1] for line in run(["rustc", "-vV"], "host", seconds=30, bound=16384).read_text().splitlines()
                 if line.startswith("host: "))
     build_summary = {"product_sha": sha, "target": host, "toolchain": toolchain, "profile": "test"}
