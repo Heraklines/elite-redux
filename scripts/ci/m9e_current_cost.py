@@ -5,9 +5,14 @@ fixture. Parsing a record alone does not qualify an executable or game semantics
 """
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
+import selectors
+import signal
+import subprocess
+import time
 import tomllib
 
 SOURCE = "rust/crates/er-repro/tests/m9e_current_cost_probe.rs"
@@ -287,3 +292,87 @@ def read_content(repository):
     if identity["oracle_sha"] != manifest["oracle_sha"] or identity["bundle_hash"] != manifest["content_hash"]:
         fail("actual bundle and manifest identities differ")
     return {"bundle": bundle_file, "manifest": manifest_file, "identity": identity}
+
+
+def run_bounded(command, *, cwd, environment, output, seconds, byte_limit, global_deadline=None):
+    """Run one owned Linux process group with streamed output and one shared deadline.
+
+    Cleanup time is reserved inside the requested ceiling. Failed or truncated
+    logs cannot be returned as successful execution evidence. No shell is used.
+    """
+    started = time.monotonic()
+    if (os.name != "posix" or type(command) is not list or not 1 <= len(command) <= 64
+            or any(type(arg) is not str or not arg or "\0" in arg or len(arg) > 4096 for arg in command)
+            or type(seconds) not in (int, float) or not 0 < seconds <= 900 or not math.isfinite(seconds)
+            or type(byte_limit) is not int or not 0 < byte_limit <= 16 << 20):
+        fail("bounded command arguments")
+    if global_deadline is not None and (type(global_deadline) not in (int, float) or not math.isfinite(global_deadline)):
+        fail("global command deadline type")
+    deadline = min(started + seconds, global_deadline if global_deadline is not None else started + seconds)
+    work_deadline = deadline - min(2.0, seconds / 4)
+    if work_deadline <= started:
+        fail("no execution/cleanup budget remains")
+    output = Path(output)
+    child = None
+    written = 0
+    selector = selectors.DefaultSelector()
+    try:
+        with output.open("xb") as sink:
+            child = subprocess.Popen(command, cwd=cwd, env=environment, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, start_new_session=True, bufsize=0)
+            selector.register(child.stdout, selectors.EVENT_READ)
+            while selector.get_map() or child.poll() is None:
+                remaining = work_deadline - time.monotonic()
+                if remaining <= 0:
+                    fail("command wall deadline expired")
+                for key, _ in selector.select(min(0.1, remaining)):
+                    chunk = os.read(key.fd, min(65536, byte_limit - written + 1))
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        continue
+                    admitted = chunk[:byte_limit - written]
+                    sink.write(admitted)
+                    written += len(admitted)
+                    if len(admitted) != len(chunk):
+                        fail("command output exceeded its byte bound")
+            if child.returncode != 0:
+                fail("command exited " + str(child.returncode))
+    finally:
+        try:
+            if child is not None:
+                cleanup_error = None
+                try:
+                    os.killpg(child.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                except OSError as error:
+                    cleanup_error = error
+                try:
+                    child.wait(timeout=max(0, min(0.2, deadline - time.monotonic())))
+                except subprocess.TimeoutExpired:
+                    pass
+                except OSError as error:
+                    cleanup_error = error
+                # Kill remaining descendants even if the immediate child has
+                # already exited or ignored SIGTERM. Every group is owned here.
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                except OSError as error:
+                    cleanup_error = error
+                try:
+                    child.wait(timeout=max(0, deadline - time.monotonic()))
+                except subprocess.TimeoutExpired as error:
+                    raise RuntimeError("current cost evidence: process group cleanup exceeded deadline") from error
+                if cleanup_error is not None:
+                    raise RuntimeError("current cost evidence: process group cleanup failed") from cleanup_error
+        finally:
+            selector.close()
+            if child is not None and child.stdout is not None:
+                child.stdout.close()
+    output_hash = file_hash(output)
+    finished = time.monotonic()
+    if finished > deadline:
+        fail("command completed outside its total deadline")
+    return {"path": output, "bytes": written, "sha256": output_hash, "elapsed_seconds": finished - started}

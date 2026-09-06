@@ -5,11 +5,10 @@ import os
 from pathlib import Path
 import platform
 import re
-import signal
 import subprocess
 import time
 
-from m9e_current_cost import check_executable, discover_release, parse_line, read_content, validate_listing
+from m9e_current_cost import check_executable, discover_release, parse_line, read_content, run_bounded, validate_listing
 
 ROOT = Path(__file__).resolve().parents[2]
 RUST = ROOT / "rust"
@@ -30,30 +29,9 @@ def digest(path):
 
 
 def run(command, name, seconds, bound=16 << 20, cwd=RUST):
-    path = FULL / name
-    deadline = min(DEADLINE, time.monotonic() + seconds)
-    with path.open("wb") as output:
-        child = subprocess.Popen(command, cwd=cwd, stdout=output, stderr=subprocess.STDOUT,
-                                 start_new_session=True)
-        try:
-            while child.poll() is None:
-                if time.monotonic() >= deadline or path.stat().st_size > bound:
-                    raise RuntimeError(f"bounded command failed: {name}")
-                time.sleep(0.1)
-            if child.returncode or path.stat().st_size > bound:
-                raise RuntimeError(f"command failed: {name}, exit={child.returncode}")
-        finally:
-            # Reap the command and its process group even after a timeout/failure.
-            try:
-                os.killpg(child.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            try:
-                child.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.killpg(child.pid, signal.SIGKILL)
-                child.wait(timeout=5)
-    return path
+    result = run_bounded(command, cwd=cwd, environment=dict(os.environ), output=FULL / name,
+                         seconds=seconds, byte_limit=bound, global_deadline=DEADLINE)
+    return result["path"]
 
 
 def main(summary):
@@ -74,7 +52,7 @@ def main(summary):
     os.environ["CARGO_TARGET_DIR"] = str(BUILD)
     base = ["--locked", "--release", "-p", "er-repro", "--test", TARGET]
     run(["cargo", "clippy", *base, "--no-deps", "--", "-D", "warnings"], "clippy.log", 600)
-    build = run(["cargo", "test", *base, "--no-run", "--message-format=json"], "build.jsonl", 1200)
+    build = run(["cargo", "test", *base, "--no-run", "--message-format=json"], "build.jsonl", 900)
     records = [json.loads(line) for line in build.read_text().splitlines() if line.startswith("{")]
     executable, artifact = discover_release(records, repository=ROOT, target_directory=BUILD.resolve())
     summary["release_artifact"] = artifact
@@ -85,7 +63,7 @@ def main(summary):
     validate_listing(listing, [TEST])
     check_executable(executable, artifact)
     output = run([str(executable), TEST, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"],
-                 "execute.log", 600, 262144).read_bytes()
+                 "execute.log", 600, 16384).read_bytes()
     if (not re.search(rb"test result: ok\. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;", output)
             or before != digest(executable)):
         raise RuntimeError("test completion or executable conservation mismatch")
