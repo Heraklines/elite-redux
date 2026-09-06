@@ -4869,6 +4869,380 @@ class FeedbackTests(unittest.TestCase):
                 self.assertIn("browser-worker-results" if name == "browser-worker-journey" else "browser-results",
                               env["PLAYWRIGHT_JSON_OUTPUT_FILE"])
 
+    def configure_owner_scope(self):
+        self.configure_browser_rtc_scope()
+        import m9e_current_proposal as owner
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for key in ("current_proposal_focus", "native_capture_focus"):
+            self.config[key] = policy[key]
+        for package in policy["native_capture_focus"]["execute"]:
+            self.package(package)
+        for path in owner.OWNER_PATHS:
+            source = self.root / path
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("owner source fixture: " + path)
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(owner.OWNER_PATHS)
+        return owner
+
+    def owner_receipt_fixture(self):
+        import m9e_current_proposal as owner
+        import m9e_phases as phases
+        rtc_binding, assets, tests, cohort = browser_rtc_fixture(phases)
+        binding = {"source_sha": CANDIDATE, "source_hashes": {path: "d" * 64 for path in owner.OWNER_PATHS}}
+        frame = {"sessionId": "fixture-session", "runId": "opaque-run", "sessionEpoch": 1, "seatMapId": "pair",
+                 "membershipRevision": 1, "senderSeatId": 1, "authoritySeatId": 1, "connectionGeneration": 1}
+        expected = {"authority_context": frame, "replica_context": {**frame, "senderSeatId": 2},
+                    "content_identity": {"fixture": "content"}, "game_run_id": 42, "initial_turn": 0}
+        action = {"kind": "BATTLE", "action": {"kind": "SELECT_MOVE", "actor": 2, "move_slot": 0}}
+        command = {"schema_version": 1, "context": {"operation_id": "fixture/operation", "authority_seat": 1,
+                   "authority_revision": 3, "menu_instance": 7}, "action": action}
+        proposal = owner.canonical({"schema_version": 2, "connection_generation": 1, "sender_seat": 2, "proposal": command})
+        state = {"schema_version": 6, "content_identity": expected["content_identity"], "identities": {}, "profile": {},
+                 "active_run": {"run_id": 42, "battle": {"turn": 1}}}
+        transition = {"schema_version": 6, "domain": "BATTLE_TURN", "operation_id": "fixture/operation", "authority_seat": 1,
+                      "authority_revision": 3, "content_identity": expected["content_identity"], "accepted_action": action,
+                      "before_digest": "blake3-v1:" + "a" * 64, "after_digest": "blake3-v1:" + "b" * 64,
+                      "after_state": state, "mutations": [], "rng_audit": [], "next_control": {},
+                      "presentation": [{"event_id": 1}, {"event_id": 2}], "platform_effects": []}
+        inner = owner.canonical({"kind": "BATTLE_TURN", "value": transition})
+        wire = {"kind": "CURRENT_PROPOSAL_MATERIAL_RECEIPT", "schema_version": 1, "authority_context": frame,
+                "proposal_hex": proposal.hex(), "proposal_digest": "sha256-json-bytes-v1:" + owner.sha(owner.canonical(list(proposal))),
+                "material_hex": inner.hex(), "material_digest": "sha256-json-bytes-v1:" + owner.sha(owner.canonical(list(inner))),
+                "material_fingerprint": "blake3-v1:" + "c" * 64}
+        raw = owner.canonical(wire)
+        positive = tests["positive"]
+        positive.update({"proposal_sha256": owner.sha(proposal), "proposal_bytes": len(proposal), "material_sha256": owner.sha(raw),
+                         "material_bytes": len(raw), "material_after_digest": transition["after_digest"],
+                         "receipt_kind": wire["kind"], "receipt_schema_version": 1, "inner_material_sha256": owner.sha(inner),
+                         "inner_material_bytes": len(inner), "receipt_proposal_digest": wire["proposal_digest"],
+                         "receipt_material_digest": wire["material_digest"], "receipt_material_fingerprint": wire["material_fingerprint"],
+                         "exact_owner_retired": True, "owner_before_kind": "PENDING", "owner_after_kind": None,
+                         "owner_publication_replay_sequence": 9, "owner_snapshot_sha256": "e" * 64})
+        calls = []
+        def primitive(data):
+            # This mock proves preimage selection only, never BLAKE3 correctness.
+            calls.append(data)
+            values = {owner.canonical(list(inner)): "c" * 64, owner.canonical(state): "b" * 64}
+            self.assertIn(data, values)
+            return values[data]
+        provider = {"wheel": dict(owner.WHEEL), "platform": "cp312-linux-x86_64", "vectors": list(owner.VECTORS),
+                    "verified_import": True, "download_limit": 512 << 10, "install_timeout": 60, "total_timeout": 120}
+        context = {"expected": expected, "primitive": primitive, "provider": provider, "binding": binding, "helper_hash": "f" * 64}
+        return owner, raw, tests, context, calls, rtc_binding, assets, cohort
+
+    def test_owner_exact_scope_and_required_native_ids(self):
+        owner = self.configure_owner_scope()
+        selection = self.feedback.plan()
+        self.assertTrue(selection["current_proposal_focus"])
+        self.assertEqual(selection["required_native_test_ids"][owner.TARGET], owner.NATIVE_IDS)
+        required = owner.merge_targets(self.config["timer_focus"]["required_targets"], self.config["native_capture_focus"]["required_targets"],
+                                       {"er-kernel": ["m9e_current_proposal_v7"]})
+        self.assertEqual(selection["required_native_targets"], required)
+        self.assertEqual(sum(map(len, required.values())), 25)
+        self.assertIn("*", selection["execution_scope"]["er-kernel"])
+        self.assertIn("er-reverse", selection["packages"])
+        for flag in ("requires_current_proposal", "requires_browser_rtc", "requires_browser_worker", "requires_browser",
+                     "requires_wasm", "requires_cli_executable", "requires_worker_executable", "timer_focus"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertNotIn(("er-kernel", "m9e_current_proposal_v7"), self.feedback.WORKER_BOUND_TARGETS)
+
+    def test_owner_installed_preserves_paired_ai_snapshot_scope_and_exact_obligations(self):
+        owner = self.configure_owner_scope()
+        self.configure_ai_snapshot_validation_scope()
+        selection = self.feedback.plan()
+        self.assertTrue(selection["ai_snapshot_validation_focus"])
+        self.assertTrue(selection["requires_current_proposal"])
+        self.assertFalse(selection["current_proposal_focus"])
+        self.assertTrue(selection["requires_browser_rtc"])
+        self.assertEqual(selection["required_native_test_ids"][owner.TARGET], owner.NATIVE_IDS)
+        self.assertEqual(selection["required_native_test_ids"]["er-ai:er_ai"], self.feedback.AI_SNAPSHOT_VALIDATION_IDS)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 24)
+        for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+            self.assertEqual(selection["required_native_test_ids"][identity], ids)
+        self.changed.append(owner.OWNER_TRIGGERS[0])
+        with self.assertRaisesRegex(RuntimeError, "exclusive mixed"):
+            self.feedback.plan()
+
+    def test_owner_kernel_lint_failure_precedes_execution_and_success_keeps_full_cone(self):
+        self.configure_owner_scope()
+        selection = self.feedback.plan()
+        self.binary_ids = {}
+        for crate, names in selection["execution_scope"].items():
+            if "*" in names:
+                names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for name in names:
+                binary = name if name not in self.binary_ids else crate + "--" + name
+                self.binary_ids[binary] = selection["required_native_test_ids"].get(f"{crate}:{name}", ["behavior"])
+                self.binary_crates[binary], self.binary_targets[binary] = crate, name
+        self.binary_ids["reverse_compiled_only"] = ["reverse"]
+        self.binary_crates["reverse_compiled_only"] = "er-reverse"
+        self.binary_targets["reverse_compiled_only"] = "reverse_compiled_only"
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        for lint_failure in (True, False):
+            with self.subTest(lint_failure=lint_failure):
+                self.clippy_codes = {"er-kernel": 1} if lint_failure else {}
+                self.executed.clear()
+                self.events.clear()
+                self.commands.clear()
+                with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                        patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                        patch.object(self.feedback, "replica_behavioral_mutant") as replica, \
+                        patch.object(self.feedback, "collect_clippy_failure_diagnostics") as diagnostics:
+                    code, summary = self.invoke()
+                if (self.full / "full-summary.json").is_file():
+                    summary = json.loads((self.full / "full-summary.json").read_text())
+                self.assertEqual(code, 1 if lint_failure else 0)
+                self.assertEqual(len(summary["required_native_target_counts"]), 25)
+                lint = [command for command in self.commands if command[:2] == ["cargo", "clippy"]]
+                self.assertEqual(len(lint), 1)
+                self.assertEqual([lint[0][index + 1] for index, part in enumerate(lint[0]) if part == "-p"], selection["packages"])
+                self.assertEqual(lint[0][-5:], ["--all-targets", "--no-deps", "--", "-D", "warnings"])
+                if lint_failure:
+                    self.assertIn("selected-packages-clippy", summary["first_failure"])
+                    self.assertEqual(self.executed, [])
+                    self.assertEqual(summary["tests"]["executed"], 0)
+                    diagnostics.assert_called_once()
+                    for control in (wasm, browser, timer, replica):
+                        control.assert_not_called()
+                else:
+                    self.assertIn("m9e_current_proposal_v7", self.executed)
+                    self.assertNotIn("reverse_compiled_only", self.executed)
+                    self.assertLess(self.events.index("clippy"), self.events.index("execute:" + self.executed[0]))
+                    count = sum(len(self.binary_ids[name]) for name in self.executed)
+                    self.assertEqual(summary["tests"], {"selected": count, "executed": count, "passed": count, "failed": 0, "skipped": 0})
+                    diagnostics.assert_not_called()
+                    for control in (wasm, browser, timer, replica):
+                        control.assert_called_once()
+
+    def test_owner_exclusive_mixed_scope_rejects_before_overlap(self):
+        owner = self.configure_owner_scope()
+        for extra in ("rust/crates/er-ai/src/lib.rs", "src/rust-browser/worker/current-rust-kernel-worker.ts"):
+            self.changed = [owner.OWNER_TRIGGERS[0], extra]
+            with self.assertRaisesRegex(RuntimeError, "exclusive mixed"):
+                self.feedback.plan()
+        self.assertEqual(self.executed, [])
+        self.assertFalse(any("build" in command for command in self.commands))
+
+    def test_owner_shared_existing_scope_retains_checks(self):
+        owner = self.configure_owner_scope()
+        self.changed = ["rust/crates/er-kernel/tests/m9e_timers_v7.rs"]
+        before = self.feedback.plan()
+        # The existing timer scope requires its explicit causal trigger;
+        # an isolated co-op test path is intentionally not a new product scope.
+        self.changed = ["rust/crates/er-kernel/tests/m9e_timers_v7.rs",
+                        "rust/crates/er-kernel/tests/m9e_coop_v7.rs"]
+        after = self.feedback.plan()
+        self.assertFalse(after["current_proposal_focus"])
+        self.assertTrue(after["requires_current_proposal"])
+        for key in ("timer_mutant", "replica_mutant", "timer_focus", "requires_agent_protocol_clippy", "requires_cli_clippy"):
+            self.assertEqual(after[key], before[key], key)
+        for crate, targets in self.config["timer_focus"]["required_targets"].items():
+            self.assertTrue(set(targets) <= set(after["required_native_targets"][crate]))
+        self.assertEqual(after["required_native_test_ids"][owner.TARGET], owner.NATIVE_IDS)
+
+    def test_owner_actual_selected_target_requires_rtc_without_diff(self):
+        owner = self.configure_owner_scope()
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        self.config["readiness_packages"] = ["er-kernel"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        selection = self.feedback.plan()
+        inventory = [{"crate": "er-kernel", "target": "m9e_current_proposal_v7", "ids": owner.NATIVE_IDS}]
+        owner.validate_obligations(selection, inventory, CANDIDATE)
+        for mutation in ({"requires_current_proposal": False}, {"requires_browser_rtc": False}, {"required_native_test_ids": {}}):
+            with self.assertRaises(RuntimeError):
+                owner.validate_obligations({**selection, **mutation}, inventory, CANDIDATE)
+        with self.assertRaises(RuntimeError):
+            owner.validate_obligations(selection, [], CANDIDATE)
+
+    def test_owner_receipt_attachment_exact_cardinality_and_bounds(self):
+        owner, raw, tests, context, _, binding, assets, cohort = self.owner_receipt_fixture()
+        report = browser_rtc_report(tests)
+        attachments = report["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"]
+        receipt = {"name": owner.RECEIPT_NAME, "contentType": "application/octet-stream", "body": base64.b64encode(raw).decode()}
+        attachments.append(receipt)
+        evidence = self.feedback.browser_worker_result_evidence(report, assets, binding, rtc=True, cohort_assets=cohort, owner_context=context)
+        self.assertIn("receipt_oracle", evidence)
+        for bad in (attachments[:1], attachments + [receipt], [attachments[0], {**receipt, "path": "escape"}],
+                    [attachments[0], {**receipt, "contentType": "application/json"}],
+                    [attachments[0], {**receipt, "body": "A" * (4 * ((owner.RECEIPT_LIMIT + 2) // 3) + 1)}]):
+            with self.assertRaises(RuntimeError):
+                owner.receipt_attachment(bad, self.root, True)
+        with self.assertRaises(RuntimeError):
+            owner.receipt_attachment(attachments, self.root, False)
+        with self.assertRaises(RuntimeError):
+            self.feedback.browser_worker_result_evidence(report, assets, binding, rtc=True, cohort_assets=cohort)
+
+    def test_owner_receipt_canonical_hex_and_identity_mutations(self):
+        owner, raw, tests, context, _, _, _, _ = self.owner_receipt_fixture()
+        wire = json.loads(raw)
+        mutations = [{**wire, "unknown": 1}, {**wire, "schema_version": True}, {**wire, "proposal_hex": wire["proposal_hex"].upper()},
+                     {**wire, "material_hex": "0"}, {**wire, "proposal_digest": "sha256-json-bytes-v1:" + "0" * 64},
+                     {**wire, "authority_context": {**wire["authority_context"], "runId": "wrong"}},
+                     {**wire, "authority_context": {**wire["authority_context"], "sessionEpoch": True}}]
+        for mutated in mutations:
+            with self.assertRaises((RuntimeError, AssertionError)):
+                owner.receipt_oracle(owner.canonical(mutated), tests["positive"], **context)
+        for data in (raw + b"\n", b'{"x":1,"x":2}', b'{"x":9007199254740992}', b'{"x":1.0}', b'{"x":NaN}'):
+            with self.assertRaises(RuntimeError):
+                owner.parse(data, owner.RECEIPT_LIMIT)
+        for key, value in (("game_run_id", 41), ("content_identity", {"fixture": "other"})):
+            changed = {**context, "expected": {**context["expected"], key: value}}
+            with self.assertRaises(RuntimeError):
+                owner.receipt_oracle(raw, tests["positive"], **changed)
+
+    def test_owner_receipt_oracle_uses_exact_independent_preimages(self):
+        owner, raw, tests, context, calls, _, _, _ = self.owner_receipt_fixture()
+        evidence = owner.receipt_oracle(raw, tests["positive"], **context)
+        wire = json.loads(raw)
+        inner = bytes.fromhex(wire["material_hex"])
+        state = json.loads(inner)["value"]["after_state"]
+        self.assertEqual(calls, [owner.canonical(list(inner)), owner.canonical(state)])
+        self.assertNotIn(inner, calls)
+        self.assertEqual(evidence["observed"]["material_sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(evidence["observed"]["inner_material_sha256"], hashlib.sha256(inner).hexdigest())
+        self.assertLessEqual(len(owner.canonical(evidence)), 4096)
+        with self.assertRaises(RuntimeError):
+            owner.receipt_oracle(raw, tests["positive"], **{**context, "primitive": lambda _: "0" * 64})
+
+    def test_owner_remote_wheel_download_and_install_fail_closed(self):
+        import m9e_current_proposal as owner
+        import zipfile
+        package = b"# verified synthetic provider for installer failure tests only\n"
+        name = "blake3/__init__.py"
+        record = name + ",sha256=" + base64.urlsafe_b64encode(hashlib.sha256(package).digest()).rstrip(b"=").decode() + "," + str(len(package)) + "\nblake3-1.0.8.dist-info/RECORD,,\n"
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w") as archive:
+            archive.writestr(name, package)
+            archive.writestr("blake3-1.0.8.dist-info/RECORD", record)
+        data = payload.getvalue()
+        wheel = {**owner.WHEEL, "bytes": len(data), "sha256": owner.sha(data)}
+        class Response(io.BytesIO):
+            status = 200
+            def geturl(self):
+                return wheel["url"]
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "GITHUB_RUN_ID": "42"}), \
+                patch.object(owner.sys, "version_info", (3, 12)), patch.object(owner.platform, "system", return_value="Linux"), \
+                patch.object(owner.platform, "machine", return_value="x86_64"), \
+                patch.object(owner.urllib.request, "build_opener") as opener, patch.object(owner.subprocess, "run") as install:
+            opener.return_value.open.return_value = Response(data)
+            with self.assertRaisesRegex(RuntimeError, "wheel byte/hash pin"):
+                owner.prepare_provider(True, self.root, self.full)
+            install.assert_not_called()
+            with patch.object(owner, "WHEEL", wheel):
+                opener.return_value.open.return_value = Response(data)
+                install.return_value = SimpleNamespace(returncode=1)
+                with self.assertRaisesRegex(RuntimeError, "install failed"):
+                    owner.prepare_provider(True, self.root, self.full)
+                args, kwargs = install.call_args
+                self.assertIn("--no-index", args[0])
+                self.assertIn("--isolated", args[0])
+                self.assertIn("--no-deps", args[0])
+                self.assertGreater(kwargs["timeout"], 0)
+                self.assertLessEqual(kwargs["timeout"], 60)
+                opener.return_value.open.return_value = Response(data)
+                install.side_effect = subprocess.TimeoutExpired("pip", 60)
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    owner.prepare_provider(True, self.root, self.full)
+            with patch.dict(owner.sys.modules, {"blake3": SimpleNamespace()}):
+                with self.assertRaisesRegex(RuntimeError, "preloaded"):
+                    owner.prepare_provider(True, self.root, self.full)
+
+        self.assertEqual(list(self.root.glob("m9e-owner-blake3-*")), [])
+        with patch.object(owner.signal, "getsignal", return_value="previous"), \
+                patch.object(owner.signal, "getitimer", return_value=(0, 0)), \
+                patch.object(owner.signal, "signal") as handler, patch.object(owner.signal, "setitimer") as timer:
+            with self.assertRaisesRegex(TimeoutError, "wall deadline"):
+                with owner.deadline(30):
+                    callback = handler.call_args.args[1]
+                    callback(None, None)
+            self.assertEqual(timer.call_args_list[0].args, (owner.signal.ITIMER_REAL, 30))
+            self.assertEqual(timer.call_args_list[-1].args, (owner.signal.ITIMER_REAL, 0))
+            self.assertEqual(handler.call_args_list[-1].args, (owner.signal.SIGALRM, "previous"))
+
+    def test_owner_dependency_is_platform_required_only(self):
+        import m9e_current_proposal as owner
+        with patch.object(owner.urllib.request, "build_opener") as network, patch.object(owner.subprocess, "run") as install:
+            self.assertIsNone(owner.prepare_provider(False, self.root, self.full))
+            with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
+                with self.assertRaisesRegex(RuntimeError, "remote runner"):
+                    owner.prepare_provider(True, self.root, self.full)
+            network.assert_not_called()
+            install.assert_not_called()
+        source = HARNESS.read_text()
+        self.assertEqual(source.count("prepare_provider(True,"), 1)
+        browser = source[source.index("def browser_checks("):source.index("def timer_behavioral_mutant(")]
+        self.assertIn('if summary["plan"].get("requires_current_proposal"):', browser)
+        self.assertNotIn("prepare_provider(", HARNESS.with_name("m9e_phases.py").read_text())
+
+    def test_owner_pending_snapshot_is_explicit_producer_evidence(self):
+        owner, raw, tests, context, _, _, _, _ = self.owner_receipt_fixture()
+        projection = owner.receipt_oracle(raw, tests["positive"], **context)
+        self.assertFalse(projection["independent_full_snapshot"])
+        self.assertEqual(projection["pending_snapshot_evidence"], "source-bound-browser-producer")
+        self.assertEqual(projection["runtime_ledger_evidence"], "source-bound-browser-producer")
+        for key, value in (("independent_full_snapshot", True), ("pending_snapshot_evidence", "independent"),
+                           ("runtime_ledger_evidence", "independent")):
+            with self.assertRaises(RuntimeError):
+                owner.validate_projection({**projection, key: value}, tests["positive"], context["binding"], context["helper_hash"])
+        for key, value in (("owner_before_kind", None), ("owner_after_kind", "PENDING"), ("exact_owner_retired", False),
+                           ("owner_publication_replay_sequence", True), ("owner_snapshot_sha256", "")):
+            with self.assertRaises(RuntimeError):
+                owner.validate_owner_fields({**tests["positive"], key: value})
+
+    def test_owner_platform_source_and_asset_revalidation(self):
+        owner = self.configure_owner_scope()
+        before = owner.source_binding(self.root, CANDIDATE)
+        path = self.root / owner.OWNER_PATHS[0]
+        path.write_text("changed after native source capture")
+        self.assertNotEqual(owner.source_binding(self.root, CANDIDATE), before)
+        path.unlink()
+        with self.assertRaises((RuntimeError, FileNotFoundError)):
+            owner.source_binding(self.root, CANDIDATE)
+        owner, _, _, context, _, _, _, _ = self.owner_receipt_fixture()
+        expected = context["expected"]
+        initial = {"schema_version": 6, "content_identity": expected["content_identity"], "active_run": {"run_id": 42, "battle": {"turn": 0}}}
+        assets = {}
+        for name, role, frame, peer in (("coop-authority-snapshot.json", "AUTHORITY", expected["authority_context"], 2),
+                                        ("coop-replica-snapshot.json", "REPLICA", expected["replica_context"], 1)):
+            raw = owner.canonical({"protocol": {"role": role, "frame_context": {"context": frame}, "connections": [{"peer_seat": peer}]},
+                                   "lifecycle": {"kind": "ACTIVE", "value": initial}})
+            (self.root / name).write_bytes(raw)
+            assets[name] = {"bytes": len(raw), "sha256": owner.sha(raw)}
+        self.assertEqual(owner.fixture_identity(self.root, assets), expected)
+        (self.root / "coop-replica-snapshot.json").write_bytes(b"{}")
+        with self.assertRaisesRegex(RuntimeError, "fixture asset"):
+            owner.fixture_identity(self.root, assets)
+        outside = self.root.parent / "outside-owner-fixture"
+        with self.assertRaises((RuntimeError, FileNotFoundError)):
+            owner.bounded_file(outside, self.root, 4096)
+
+    def test_owner_aggregate_requires_all_causal_obligations(self):
+        owner, raw, tests, context, _, binding, assets, cohort = self.owner_receipt_fixture()
+        import m9e_phases as phases
+        tests["receipt_oracle"] = owner.receipt_oracle(raw, tests["positive"], **context)
+        phases.validate_browser_rtc_tests(tests, assets, binding, cohort, owner_binding=context["binding"], owner_helper_hash=context["helper_hash"])
+        for key in ("negative", "receipt_oracle"):
+            bad = copy.deepcopy(tests)
+            bad.pop(key)
+            with self.assertRaises(RuntimeError):
+                phases.validate_browser_rtc_tests(bad, assets, binding, cohort, owner_binding=context["binding"], owner_helper_hash=context["helper_hash"])
+        for section, key, value in (("negative", "worker_closed", False), ("positive", "left_kernel_delivered", 1)):
+            bad = copy.deepcopy(tests)
+            bad[section][key] = value
+            with self.assertRaises(RuntimeError):
+                phases.validate_browser_rtc_tests(bad, assets, binding, cohort, owner_binding=context["binding"], owner_helper_hash=context["helper_hash"])
+        bad = copy.deepcopy(tests)
+        bad["receipt_oracle"]["provider"]["wheel"]["sha256"] = "0" * 64
+        with self.assertRaises(RuntimeError):
+            owner.legacy_rtc_view(bad, context["binding"], context["helper_hash"])
+        with self.assertRaises(RuntimeError):
+            owner.legacy_rtc_view(tests, context["binding"], "0" * 64)
+
+
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-phase-test-")

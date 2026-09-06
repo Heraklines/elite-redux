@@ -15,6 +15,10 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::current_proposal_v7::{
+    CurrentProposalOwnerSnapshotV1, validate_current_owner_snapshot_v1,
+    validate_current_proposal_quiescence_v1,
+};
 use crate::game_kernel_v7::{NAVIGATION_REPEAT_INTERVAL_MS_V7, navigation_button_v7};
 use crate::snapshot::{
     InputRouterSnapshotV2, KernelSchedulerSnapshotV2, PhysicalInputSourceV2,
@@ -82,6 +86,8 @@ pub struct CoreGameKernelSnapshotV7 {
     pub lifecycle: GameKernelLifecycleSnapshotV7,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub private_battle_control: Option<PrivateBattleControlSnapshotV7>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
     pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
@@ -223,6 +229,7 @@ impl CoreGameKernelSnapshotV7 {
                 }
             }
         }
+        validate_current_owner_snapshot_v1(self, content).map_err(|_| SnapshotV7Error::Invalid)?;
         if current_menu_instance(&self.lifecycle)
             .is_some_and(|instance| instance >= self.next_menu_instance_id)
         {
@@ -300,6 +307,8 @@ impl CoreGameKernelSnapshotV7 {
         {
             return Err(SnapshotV7Error::Migration);
         }
+        validate_current_proposal_quiescence_v1(source.protocol.as_ref(), &source.scheduler)
+            .map_err(|_| SnapshotV7Error::Migration)?;
         let next_menu_instance_id = next_menu_instance_from_v6(&source)?;
         let state = GameStateV6::migrate_from_v5(source.game_state, content.identity().clone())
             .map_err(|_| SnapshotV7Error::Migration)?;
@@ -328,6 +337,7 @@ impl CoreGameKernelSnapshotV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
             private_battle_control: None,
+            current_proposal: None,
             input_router: source.input_router,
             scheduler: source.scheduler,
             protocol: source.protocol,

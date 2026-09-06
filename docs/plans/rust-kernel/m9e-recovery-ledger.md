@@ -2654,3 +2654,45 @@ list the seven existing game-kernel test names in timer/retention/AI policy maps
 their targets and complete execution were already mandatory. The separate remote
 snapshot harness dfdea1ef/run34010125357 passed187 tests, but this runtime candidate
 must pass its own complete focused qualification before owner integration.
+
+## Qualified borrowed snapshot AI validation
+
+791ae5b53333eaaf8edd8e91dcdba1de006e106d / run34011232052 passed all four
+focused jobs. Native A611/B20:631 selected/executed/passed, zero skipped/failed;
+67 inventory targets,23 mandatory,18 exact-ID maps,63/4 disjoint assignments.
+All187 harness tests passed3.381s. Both timer/replica behavioral mutants were
+detected and their exact source restored. Wasm2, Chromium2, effects1, Worker2,
+codec3, actual CLI replay bridge and RTC2 passed. RTC proposal/material hashes,
+turn1->2, one new presentation delivery/settlement and disposal match qualifiedf3.
+The optimization removes discarded owned snapshot copies; no timing improvement
+is claimed from these non-controlled CI timings.
+
+17 committed source hashes, restored plan399e3bb9eeea86899cb584a10f5131f6c6a7148f96a8f314114cde7567bcc844,
+complete inventory/assignments and cross-phase manifest hashes independently checked.
+A62304 SHA fcb3f9eaa03e6961271eb25e773a72676d4b33d2e2cac531a265904cc1db5401;
+B58584 SHA f15722b39a58b4104a18c9887be059ba1f8ca8567aa8f46bfc9c1c6c55d9e9af;
+platform28919 SHA212e156ae36acd3c99b69d34240c74a44d21c0ef28c07158ae326b2868a47bb1;
+aggregate19811 SHA5900e71e0e822638adea1d7a1b936433a57a3da0e7ae2496a7b38130b9d6be35.
+Actual native CLI c6f014088fe30b62581ceecb4011f2b193e5e5b262906165d8736efd8db6f5c9;
+Wasm c2975347660f8a10548b12a158916f71027853c63611a0d5eb40647d65bb0107.
+Content/glue and replay/timer semantic digests unchanged. Large artifacts remain remote.
+
+## Current proposal ownership and receipt candidate
+
+Apply eight-path product493f54bd refreshed froma5f556a onto actualqualified791:
+one bounded pending current proposal, explicit terminal abandonment, and exact
+canonical proposal/material receipt validation before retiring ownership. Restore
+validation preserves retained identity and rejects malformed/oversized owners.
+The current receipt binds actual SHA256 byte vectors to the real BLAKE3 ledger;
+source-bound actual RTC positive test supplies those bytes as a third attachment
+across the existing two tests. Imported presentation conservation remains intact.
+This does not implement proposal retry/expiry, reconnect or imported presentation
+rehydration, which remain outstanding M9 work.
+
+Pair with prepared owner gatecf3a12ab, independently passed201 harness tests at
+6780e97a86f6c6766c7678e52306b2b861be019f/run34010180620. Actual source checks
+confirm gate base differs from current791 only by the audited comparison baseline;
+advance that baseline to791/run34011232052. The gate retains all prior native,
+CLI, Wasm, Worker, RTC and both mutation controls. The pinned receipt-hash wheel
+is downloaded and installed only on the remote runner. Runtime remains unqualified
+until this exact candidate completes its focused checks. Broad M9 remains incomplete.

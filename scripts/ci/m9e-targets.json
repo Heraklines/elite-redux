@@ -1,4 +1,23 @@
 {
+  "current_proposal_focus": {
+    "paths": [
+      "rust/crates/er-kernel/src/current_proposal_v7.rs",
+      "rust/crates/er-kernel/src/game_kernel_v7.rs",
+      "rust/crates/er-kernel/src/lib.rs",
+      "rust/crates/er-kernel/src/snapshot_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_coop_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs",
+      "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"
+    ],
+    "trigger_paths": ["rust/crates/er-kernel/src/current_proposal_v7.rs", "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs"],
+    "exact_test_ids": {
+      "er-kernel:m9e_current_proposal_v7": [
+        "current_proposal_publication_receipt_and_snapshot_conserve_ownership",
+        "current_proposal_rejection_duplicate_and_terminal_are_transactional"
+      ]
+    }
+  },
   "version": 1,
   "ai_snapshot_validation_focus": {
     "paths": [
@@ -22,8 +41,8 @@
       "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic"
     ]
   },
-  "baseline": "f3a00d7eae83169d8d5b49256c456a86bac834db",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34009767895",
+  "baseline": "791ae5b53333eaaf8edd8e91dcdba1de006e106d",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34011232052",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
