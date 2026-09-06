@@ -2999,3 +2999,27 @@ run34044952978 nowall4passed621native(A602/B19),69 inventory25mandatory20maps,
 journeys preserve all1412rawinputs and original test IDs in separateA/Btargets.
 Aggregate20019bytesSHAae5c723219d82d20c3d515d6f150d30bf593b0605bc1e9a2083a8f488d37dd2e.
 Queryproduct remains prepared for main integration after its storage/PP prerequisites.
+
+Title retirement d31411fad6cc0367ff28b8eedb2f717fb8a1b419/run34047497578 is now
+fully qualified:1031 native(A1013/B18),101inventory55mandatory23exactmaps,
+258harness, all actual platform and aggregate checks. The metadata audit matched
+60 cached sources, complete disjoint partitions, exact plan/proof/cohort hashes,
+23cancel/READ/rewritten-generation2 browser-oracle evidence, and prior RTC/mutants.
+Bounded platform61208 and aggregate44929 bytes came from named proof members only.
+Aggregate SHA256 eb8f1be4d763b2d8db7fb1abb50782aecadd209b55675c39d2697c01de1896ff.
+Browser assets, test binaries and complete logs remain remote.
+
+Integrate the independently qualified AI max-PP correction (4220f1ed/run34036531932)
+onto that ancestor: use the shared max-PP calculation for actual candidate admission,
+retain original move indices, order, scores and RNG, and keep last-PP choice plus
+full exhausted-party rollback witnesses. This is not whole source-AI or Elite/Hell
+fidelity. All Title/storage/READ/owner/Worker/RTC/CLI/Wasm and mutant prerequisites
+remain mandatory. Refreshed preflight1be158e29b53747a39f03641b560095dce80b7f5/
+run34047625489 passed264harness/6.053s. All3CI and2pinned-formattedRust hashes
+verified before integration; preserve the corrected Title oracle. Advance comparison
+only to auditedd314; this exact integrated runtime still requires all phases.
+
+Independent focused cost measurement5d805ed53a55ee749a1c4bcaa97713c49a19c934/
+run34048638706 passed with streamed output caps and bounded process-group cleanup.
+13rawcachedsources, actualreleaseartifact, unchangedcontent and6017-byte record hash
+were audited. This remains focused cost evidence, not integrated performance/Q.

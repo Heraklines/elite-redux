@@ -174,8 +174,12 @@
       "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work"
     ]
   },
-  "baseline": "748728a333433ee24acd83080b9006d378e286f0",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34042137836",
+  "current_ai_max_pp_focus": {
+    "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"],
+    "exact_test_ids": ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
+  },
+  "baseline": "d31411fad6cc0367ff28b8eedb2f717fb8a1b419",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34047497578",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_title_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],

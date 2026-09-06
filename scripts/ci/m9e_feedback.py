@@ -164,6 +164,10 @@ READ_REBIND_IDS = [
     "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work",
 ]
 
+AI_MAX_PP_PATHS = ["rust/crates/er-kernel/src/game_kernel_v7.rs",
+                   "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs"]
+AI_MAX_PP_IDS = ["authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng", "authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes"]
+
 # Exact source repairs required by the first full selected-package Clippy run.
 AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-state/src/bespoke_v2/forms.rs",
@@ -863,9 +867,14 @@ def plan():
                        or read_focus["paths"] != READ_REBIND_PATHS or read_focus["exact_test_ids"] != READ_REBIND_IDS):
         raise RuntimeError("current READ rebind policy identities disagree")
     read_session = bool(read_focus) and set(product_changes) == set(READ_REBIND_PATHS)
+    max_pp_focus = config.get("current_ai_max_pp_focus", {})
+    if max_pp_focus and (not isinstance(max_pp_focus, dict) or set(max_pp_focus) != {"paths", "exact_test_ids"}
+                       or max_pp_focus["paths"] != AI_MAX_PP_PATHS or max_pp_focus["exact_test_ids"] != AI_MAX_PP_IDS):
+        raise RuntimeError("current AI max-PP policy identities disagree")
+    max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or max_pp_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -1051,6 +1060,8 @@ def plan():
         ai_snapshot_targets = {**timer_focus["required_targets"], "er-ai": ["er_ai"]}
         ai_snapshot_ids = {**timer_focus["exact_test_ids"], "er-ai:er_ai": list(AI_SNAPSHOT_VALIDATION_IDS)}
         boundaries = [path for path in boundaries if path not in AI_SNAPSHOT_VALIDATION_PATHS]
+    if max_pp_session:
+        boundaries = [path for path in boundaries if path not in AI_MAX_PP_PATHS]
     if read_session:
         boundaries = [path for path in boundaries if path not in READ_REBIND_PATHS]
     if owner_session:
@@ -1156,6 +1167,7 @@ def plan():
               "ai_damage_query_focus": damage_session,
               "ai_damage_query_lint_repair_focus": damage_lint_session,
               "ai_snapshot_validation_focus": ai_snapshot_session,
+              "current_ai_max_pp_focus": max_pp_session,
               "current_read_rebind_focus": read_session,
               "current_title_storage_focus": title_session,
               "requires_title_storage": title_required,
@@ -1218,6 +1230,19 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
             identity: [*inherited, *[name for name in READ_REBIND_IDS if name not in inherited]]}
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
+    # Once installed, every selected current game-kernel suite must keep all
+    # two max-PP witnesses, including later owner/AI/storage changes. Do not
+    # replace or shorten the pre-existing game-kernel identity list.
+    max_pp_required = bool(max_pp_focus) and "er-kernel" in selected and (
+        execution_scope is None or "*" in execution_scope.get("er-kernel", [])
+        or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))
+    result["requires_ai_max_pp"] = max_pp_required
+    if max_pp_required:
+        identity = "er-kernel:m9e_game_kernel_v7"
+        inherited = result["required_native_test_ids"].get(identity, timer_focus["exact_test_ids"][identity])
+        result["required_native_test_ids"] = {**result["required_native_test_ids"],
+            identity: [*inherited, *[name for name in AI_MAX_PP_IDS if name not in inherited]]}
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
     (FULL / "plan.json").write_text(json.dumps(result, indent=2) + "\n")
     # A mixed batch/kernel or otherwise unmapped batch delta cannot fall through
     # to broad native success or bypass the timer and replica mutant gate.
@@ -1227,7 +1252,7 @@ def plan():
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -2060,7 +2085,7 @@ def main(preflight_failure=None):
         # Preserve complete discovery and identity evidence on lint failure,
         # while rejecting native lint errors before expensive test execution.
         if (selection.get("ai_damage_query_focus") or selection.get("ai_snapshot_validation_focus")
-                or selection.get("requires_current_proposal") or selection.get("requires_read_rebind") or selection.get("current_worker_storage_focus") or selection.get("requires_title_storage")):
+                or selection.get("requires_current_proposal") or selection.get("requires_read_rebind") or selection.get("current_worker_storage_focus") or selection.get("requires_title_storage") or selection.get("requires_ai_max_pp")):
             write_progress(summary, "lint", "selected-packages")
             try:
                 run(["cargo", "clippy", "--locked",
