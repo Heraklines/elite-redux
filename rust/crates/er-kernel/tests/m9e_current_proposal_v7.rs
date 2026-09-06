@@ -987,6 +987,14 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
         replica.snapshot()?.current_proposal,
         pending.current_proposal
     );
+    // The actual retention presentation blocks human input until acknowledged.
+    for presentation in replica.snapshot()?.pending_presentations {
+        replica.settle_presentation(presentation.event_id)?;
+    }
+    assert_eq!(
+        replica.snapshot()?.current_proposal,
+        pending.current_proposal
+    );
     press(&mut replica, PhysicalKey::Space)?;
     let private = replica.snapshot()?;
     assert!(private.private_battle_control.is_some());

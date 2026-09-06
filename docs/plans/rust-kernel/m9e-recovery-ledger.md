@@ -2738,3 +2738,16 @@ pass remotely before qualification; baseline remains791. No local workload ran.
 Owner89407335/run34014646379 stopped at formatting before test execution. Apply
 only the remote2470byte test-format patch fromcompact9983529224ZIP2927; no
 production change and no local formatter. Full remote qualification repeats.
+
+Owner57480489/run34014732097 nativeA passed format/build/selected Clippy and
+executed582 tests:581 passed, one failed at the private-menu precondition in
+current_proposal_publication_receipt_and_snapshot_conserve_ownership. The other
+new test (terminal/rejection/duplicate conservation) passed. The raw generation9
+compatibility helper ran before the failure and its assertions passed as well.
+Retrieved777byte named failure fromcompact9983691262ZIP4275; no full logs.
+The real retention material installed a BlocksHumanInput presentation. The test
+incorrectly attempted Fight before acknowledging it. Settle the actual pending
+presentation through the public API, assert proposal ownership remains exact,
+then open the private menu and retain every duplicate/overflow/eviction/full-
+snapshot assertion. No product change, bypass, or test deletion. NativeB and the
+whole checkpoint are not yet qualified; full focused acceptance must run again.
