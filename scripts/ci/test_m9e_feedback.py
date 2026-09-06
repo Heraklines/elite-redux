@@ -7297,5 +7297,106 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "released owner/template"):
             title.normalized_title_cancel(bad, initial)
 
+
+    def test_title_reference_menus_pin_order_actions_and_allocator(self):
+        import m9e_title_storage as title
+        initial = title.bootstrap_control("TITLE", 1, 1, 1)
+        self.assertEqual(initial["schema_version"], 2)
+        self.assertEqual(initial["menu"]["selected_option_id"], "bootstrap/title/new-game")
+        self.assertEqual([option["action"] for option in initial["menu"]["options"]], [
+            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_NEW_GAME"}},
+            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_EXISTING_SAVES"}}])
+        self.assertEqual(initial["menu"]["navigation"], [
+            {"from": "bootstrap/title/new-game", "direction": "DOWN", "to": "bootstrap/title/existing-saves"},
+            {"from": "bootstrap/title/existing-saves", "direction": "UP", "to": "bootstrap/title/new-game"}])
+        selected = title.bootstrap_control("EXISTING_SAVE_SELECT", 1, 8, 9)
+        self.assertEqual(selected["action_context"], {"authority_seat": 1, "authority_revision": 8, "menu_instance": 9,
+                                                    "operation_id": "bootstrap/existingsaveselect/8"})
+        self.assertEqual(selected["menu"]["options"][0]["action"],
+                         {"kind": "BOOTSTRAP", "action": {"kind": "SELECT_EXISTING_SAVE", "value": "controlled-slot"}})
+        for stage in ("EXISTING_SAVE_LISTING", "EXISTING_SAVE_LOADING"):
+            control = title.bootstrap_control(stage, 1, 10, 11)
+            self.assertEqual([row["option_id"] for row in control["menu"]["options"]], ["bootstrap/existing/cancel"])
+            self.assertEqual(control["menu"]["cancel"], {"kind": "BACK", "action": {"kind": "BOOTSTRAP", "action": {"kind": "CANCEL"}}})
+        for args in (("ACTIVE", 1, 1, 1), ("TITLE", True, 1, 1), ("TITLE", 1, 0, 1), ("TITLE", 1, 1, 1 << 53)):
+            with self.assertRaisesRegex(RuntimeError, "Title reference control"):
+                title.bootstrap_control(*args)
+
+    def test_title_request_references_keep_exact_effects_and_unrelated_core_fields(self):
+        import m9e_title_storage as title
+        initial, _, _ = self.title_normalization_fixture()
+        initial["lifecycle"]["value"]["control"] = title.bootstrap_control("TITLE", 1, 1, 1)
+        initial["lifecycle"]["value"]["control"]["menu"]["selected_option_id"] = "bootstrap/title/existing-saves"
+        before = copy.deepcopy(initial)
+        listed = title.title_request_reference(initial, "LIST")
+        self.assertEqual(listed["pending_platform"], [{"request_id": 1, "effect": {"kind": "STORAGE_LIST", "request": 1}}])
+        self.assertEqual(listed["replay_sequence"], 2)
+        self.assertEqual(listed["next_menu_instance_id"], 3)
+        owned = listed["lifecycle"]["value"]["current_storage"]["pending"]
+        self.assertEqual(owned, {"request_id": 1, "kind": {"kind": "LIST"}, "source_menu": 1,
+                                 "source_revision": 1, "waiting_menu": 2, "waiting_revision": 2})
+        self.assertEqual(listed["unrelated_core_evidence"], initial["unrelated_core_evidence"])
+        self.assertEqual(initial, before)
+        selected = title.title_slots_reference(listed)
+        self.assertEqual(selected["pending_platform"], [])
+        self.assertEqual(selected["replay_sequence"], 3)
+        self.assertEqual(selected["lifecycle"]["value"]["current_storage"]["slots"], ["controlled-slot"])
+        loaded = title.title_request_reference(selected, "READ")
+        self.assertEqual(loaded["replay_sequence"], 5)
+        self.assertEqual(loaded["pending_platform"], [{"request_id": 2, "effect": {"kind": "STORAGE_READ", "request": 2, "slot": "controlled-slot"}}])
+        self.assertEqual(loaded["lifecycle"]["value"]["current_storage"]["next_platform_request_id"], 3)
+        for value in (listed, loaded):
+            with self.assertRaisesRegex(RuntimeError, "released control"):
+                title.title_request_reference(value, "READ")
+        bad = copy.deepcopy(initial)
+        bad["lifecycle"]["value"]["current_storage"]["next_platform_request_id"] = (1 << 53) - 1
+        with self.assertRaisesRegex(RuntimeError, "allocator overflows"):
+            title.title_request_reference(bad, "LIST")
+
+    def test_title_write_reference_rejects_checksum_payload_and_causal_owner_drift(self):
+        import m9e_title_storage as title
+        from m9e_current_proposal import canonical
+        identity = {"fixture": "independent synthetic save metadata"}
+        state = {"content_identity": identity, "identities": {"next_platform_request_id": 1}, "active_run": {"control": {"kind": "SAVE"}}, "kept": [4, 9]}
+        before = {"lifecycle": {"kind": "ACTIVE", "value": copy.deepcopy(state)}, "pending_platform": [],
+                  "pending_presentations": [], "replay_sequence": 10, "scheduler": {"timers": []},
+                  "material_ledger": {"schema_version": 1, "next_authority_revision": 3, "records": []}}
+        saved_state = copy.deepcopy(state)
+        saved_state["identities"]["next_platform_request_id"] = 2
+        saved = {"schema_version": 2, "content_identity": identity, "generation": 1, "state": saved_state}
+        saved["checksum"] = "sha256-v1:" + title.sha(canonical(saved))
+        payload = canonical(saved)
+        presentation = {"event_id": 3, "semantic": {"kind": "CUE", "value": "SAVE"}, "blocking": "NON_BLOCKING", "skip": "ALLOWED"}
+        pending = copy.deepcopy(before)
+        pending.update({"pending_platform": [{"request_id": 1}], "pending_presentations": [presentation], "replay_sequence": 11})
+        callback = copy.deepcopy(pending)
+        callback.update({"pending_platform": [], "storage_frontiers": [{"slot": "controlled-slot", "generation": 1}], "replay_sequence": 12})
+        settled = copy.deepcopy(callback)
+        settled.update({"pending_presentations": [], "replay_sequence": 13})
+        continued = copy.deepcopy(settled)
+        continued["replay_sequence"] = 14
+        case = {"before": before, "pending": pending, "callback": callback, "settled": settled, "continued": continued,
+                "presentation": presentation, "request": {"kind": "WRITE", "request_id": 1, "slot": "controlled-slot", "generation": 1, "bytes": list(payload)}}
+        self.assertEqual(title.write_case_reference(case, 1, identity), (payload, saved))
+        for field in ("callback", "settled", "continued"):
+            bad = copy.deepcopy(case)
+            bad[field]["replay_sequence"] += 1
+            with self.assertRaisesRegex(RuntimeError, "Title"):
+                title.write_case_reference(bad, 1, identity)
+        bad = copy.deepcopy(case)
+        wrong = copy.deepcopy(saved)
+        wrong["checksum"] = "sha256-v1:" + "0" * 64
+        bad["request"]["bytes"] = list(canonical(wrong))
+        with self.assertRaisesRegex(RuntimeError, "checksum differs"):
+            title.write_case_reference(bad, 1, identity)
+        bad = copy.deepcopy(case)
+        bad["request"]["bytes"] += [32]
+        with self.assertRaisesRegex(RuntimeError, "noncanonical JSON"):
+            title.write_case_reference(bad, 1, identity)
+        bad = copy.deepcopy(case)
+        bad["before"]["lifecycle"]["value"]["kept"].append(10)
+        with self.assertRaisesRegex(RuntimeError, "changed saved gameplay"):
+            title.write_case_reference(bad, 1, identity)
+
 if __name__ == "__main__":
     unittest.main()

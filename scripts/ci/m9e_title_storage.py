@@ -227,3 +227,227 @@ def normalized_title_cancel(pending, initial):
     expected["pending_platform"] = []
     expected["replay_sequence"] = replay
     return expected
+
+
+def bootstrap_control(stage, owner, revision, instance):
+    """Reference for the three exact opt-in storage menus in this fixture."""
+    if not all(integer(value, 1) for value in (owner, revision, instance)):
+        raise RuntimeError("Title reference control allocator is invalid")
+    if stage == "TITLE":
+        rows = [("bootstrap/title/new-game", {"kind": "OPEN_NEW_GAME"}),
+                ("bootstrap/title/existing-saves", {"kind": "OPEN_EXISTING_SAVES"})]
+        kind, cancel = "TITLE", {"kind": "DISABLED"}
+    elif stage in ("EXISTING_SAVE_LISTING", "EXISTING_SAVE_LOADING", "EXISTING_SAVE_SELECT"):
+        rows = [] if stage != "EXISTING_SAVE_SELECT" else [
+            ("bootstrap/existing/0000", {"kind": "SELECT_EXISTING_SAVE", "value": "controlled-slot"})]
+        rows.append(("bootstrap/existing/cancel", {"kind": "CANCEL"}))
+        kind, cancel = "SAVE", {"kind": "BACK", "action": {"kind": "BOOTSTRAP", "action": {"kind": "CANCEL"}}}
+    else:
+        raise RuntimeError("Title reference control stage is unsupported")
+    identity = f"bootstrap/{stage.replace('_', '').lower()}/{revision}"
+    options = [{"option_id": name, "enabled": True, "visible": True,
+                "action": {"kind": "BOOTSTRAP", "action": action},
+                "layout": {"option_id": name, "row": index, "column": 0, "page": 0}}
+               for index, (name, action) in enumerate(rows)]
+    edges = []
+    for left, right in zip(rows, rows[1:]):
+        edges.extend([{"from": left[0], "direction": "DOWN", "to": right[0]},
+                      {"from": right[0], "direction": "UP", "to": left[0]}])
+    return {"schema_version": 2, "revision": revision, "kind": kind, "owner_seat": owner, "actionable": True,
+            "action_context": {"operation_id": identity, "authority_seat": owner,
+                               "authority_revision": revision, "menu_instance": instance},
+            "menu": {"instance_id": instance, "owner_seat": owner, "control_id": identity,
+                     "selected_option_id": rows[0][0], "options": options, "navigation": edges, "cancel": cancel}}
+
+
+def title_request_reference(before, kind):
+    """Reference for one raw Space down/up from Title or the returned inventory."""
+    import copy
+    owner = before["lifecycle"]["value"]
+    storage = owner["current_storage"]
+    expected_stage = "TITLE" if kind == "LIST" else "EXISTING_SAVE_SELECT"
+    if (before["lifecycle"]["kind"] != "BOOTSTRAP" or kind not in ("LIST", "READ")
+            or owner["stage"] != expected_stage or owner["pressed_keys"] or storage["pending"] is not None
+            or before["pending_platform"] or (kind == "READ" and storage["slots"] != ["controlled-slot"])):
+        raise RuntimeError("Title request does not start at its exact released control")
+    request = storage["next_platform_request_id"]
+    revision, instance = owner["control"]["revision"] + 1, owner["menu_instance_high_water"] + 1
+    if not all(integer(value, 1) for value in (request, request + 1, revision, instance, instance + 1, before["replay_sequence"] + 2)):
+        raise RuntimeError("Title request reference allocator overflows")
+    expected = copy.deepcopy(before)
+    target = expected["lifecycle"]["value"]
+    stage = "EXISTING_SAVE_LISTING" if kind == "LIST" else "EXISTING_SAVE_LOADING"
+    target["stage"] = stage
+    target["control"] = bootstrap_control(stage, storage["owner_seat"], revision, instance)
+    target["menu_instance_high_water"] = instance
+    target["current_storage"].update({"next_platform_request_id": request + 1, "missing_slot": None,
+        "pending": {"request_id": request, "kind": {"kind": "LIST"} if kind == "LIST" else
+                    {"kind": "READ", "value": {"slot": "controlled-slot"}},
+                    "source_menu": owner["menu_instance_high_water"], "source_revision": owner["control"]["revision"],
+                    "waiting_menu": instance, "waiting_revision": revision}})
+    effect = {"kind": "STORAGE_LIST", "request": request} if kind == "LIST" else {
+        "kind": "STORAGE_READ", "request": request, "slot": "controlled-slot"}
+    expected["pending_platform"] = [{"request_id": request, "effect": effect}]
+    expected["next_menu_instance_id"] = instance + 1
+    expected["replay_sequence"] += 2
+    return expected
+
+
+def title_list_reference(before, listed):
+    """Check natural navigation, actual LIST allocation and exact pending state."""
+    import copy
+    if set(listed) != {"before", "selected", "pending", "request_id"} or listed["before"] != before:
+        raise RuntimeError("Title LIST fixture continuity differs")
+    selected = copy.deepcopy(before)
+    owner = selected["lifecycle"]["value"]
+    if owner["control"]["menu"]["selected_option_id"] != "bootstrap/title/new-game":
+        raise RuntimeError("Title LIST navigation does not start at New Game")
+    owner["control"]["menu"]["selected_option_id"] = "bootstrap/title/existing-saves"
+    selected["replay_sequence"] += 2
+    pending = title_request_reference(selected, "LIST")
+    if (listed["selected"] != selected or listed["pending"] != pending
+            or listed["request_id"] != pending["pending_platform"][0]["request_id"]):
+        raise RuntimeError("Title LIST raw input or owned request reference differs")
+    return pending
+
+
+def title_slots_reference(pending):
+    import copy
+    owner = pending["lifecycle"]["value"]
+    if owner["current_storage"]["pending"]["kind"] != {"kind": "LIST"}:
+        raise RuntimeError("Title slots reference does not own LIST")
+    expected = copy.deepcopy(pending)
+    target = expected["lifecycle"]["value"]
+    revision, instance = owner["control"]["revision"] + 1, owner["menu_instance_high_water"] + 1
+    target["stage"] = "EXISTING_SAVE_SELECT"
+    target["control"] = bootstrap_control(target["stage"], owner["current_storage"]["owner_seat"], revision, instance)
+    target["menu_instance_high_water"] = instance
+    target["current_storage"].update({"pending": None, "slots": ["controlled-slot"], "missing_slot": None})
+    expected["pending_platform"] = []
+    expected["next_menu_instance_id"] = instance + 1
+    expected["replay_sequence"] += 1
+    if not all(integer(value, 1) for value in (instance + 1, expected["replay_sequence"])):
+        raise RuntimeError("Title slots reference allocator overflows")
+    return expected
+
+
+def write_case_reference(case, generation, content_identity):
+    """Check actual serialized GameSaveV2 and each owner-only callback transition."""
+    import copy
+    from m9e_current_proposal import canonical, parse
+    if set(case) != {"before", "pending", "callback", "settled", "continued", "request", "presentation"}:
+        raise RuntimeError("Title producer/rewrite fixture fields differ")
+    request = case["request"]
+    if (set(request) != {"request_id", "kind", "slot", "generation", "bytes"}
+            or request["kind"] != "WRITE" or request["slot"] != "controlled-slot"
+            or not integer(request["generation"], generation, generation) or not integer(request["request_id"], 1)
+            or not isinstance(request["bytes"], list) or not 0 < len(request["bytes"]) <= 4 << 20
+            or not all(integer(value, 0, 255) for value in request["bytes"])):
+        raise RuntimeError("Title actual Write bytes/identity differ")
+    payload = bytes(request["bytes"])
+    save = parse(payload, 4 << 20)
+    if (not isinstance(save, dict) or set(save) != {"schema_version", "content_identity", "generation", "state", "checksum"}
+            or save["checksum"] != "sha256-v1:" + sha(canonical({key: value for key, value in save.items() if key != "checksum"}))):
+        raise RuntimeError("Title actual GameSaveV2 checksum differs")
+    before, pending, callback = case["before"], case["pending"], case["callback"]
+    state = copy.deepcopy(before["lifecycle"]["value"])
+    if before["lifecycle"]["kind"] != "ACTIVE" or state["active_run"]["control"]["kind"] != "SAVE":
+        raise RuntimeError("Title Write does not execute the saved active control")
+    if state["identities"]["next_platform_request_id"] != request["request_id"]:
+        raise RuntimeError("Title Write reused its allocator frontier")
+    state["identities"]["next_platform_request_id"] += 1
+    if (not integer(save["schema_version"], 2, 2) or not integer(save["generation"], generation, generation)
+            or save["state"].get("content_identity") != content_identity
+            or save["content_identity"] != content_identity or save["state"] != state
+            or before["pending_platform"] or before["pending_presentations"]
+            or len(pending["pending_platform"]) != 1
+            or pending["pending_platform"][0]["request_id"] != request["request_id"]
+            or pending["pending_presentations"] != [case["presentation"]]
+            or case["presentation"]["semantic"] != {"kind": "CUE", "value": "SAVE"}
+            or case["presentation"]["event_id"] != before["material_ledger"]["next_authority_revision"]):
+        raise RuntimeError("Title actual Write changed saved gameplay or effect ownership")
+    expected = copy.deepcopy(pending)
+    expected["pending_platform"] = []
+    expected["storage_frontiers"] = [{"slot": "controlled-slot", "generation": generation}]
+    expected["replay_sequence"] += 1
+    if callback != expected:
+        raise RuntimeError("Title Written callback changed unrelated core fields")
+    expected["pending_presentations"] = []
+    expected["replay_sequence"] += 1
+    if case["settled"] != expected or expected["scheduler"]["timers"]:
+        raise RuntimeError("Title presentation settlement changed unrelated fields")
+    expected["replay_sequence"] += 1
+    if case["continued"] != expected:
+        raise RuntimeError("Title Write continuation changed unrelated fields")
+    return payload, save
+
+
+def fixture_oracle(fixture, content_hash):
+    """Independent complete 23-cancellation chain and saved-game continuation."""
+    if (not isinstance(fixture, dict) or set(fixture) != {"schema_version", "capability", "fixture_kind", "content_identity",
+            "natural_reached", "write", "initial", "cycles", "read_cancels", "load", "rewrite"}
+            or not integer(fixture["schema_version"], 1, 1) or fixture["capability"] != CAPABILITY
+            or fixture["fixture_kind"] != FIXTURE_KIND or not digest(content_hash)
+            or fixture["natural_reached"]["lifecycle"]["kind"] != "ACTIVE"
+            or fixture["natural_reached"]["lifecycle"]["value"]["active_run"]["control"]["kind"] != "BATTLE_COMMAND"
+            or len(fixture["cycles"]) != 21 or len(fixture["read_cancels"]) != 2):
+        raise RuntimeError("Title fixture identity/topology differs")
+    payload, save = write_case_reference(fixture["write"], 1, fixture["content_identity"])
+    rewrite_payload, _ = write_case_reference(fixture["rewrite"], 2, fixture["content_identity"])
+    initial = fixture["initial"]
+    owner = initial["lifecycle"]["value"]
+    if (owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 1)
+            or owner["current_storage"] != {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}
+            or owner["catalog"]["save_slots"] != ["new-run-destination"]
+            or initial["pending_platform"] or initial["pending_presentations"]):
+        raise RuntimeError("Title fixture does not begin at the exact opt-in natural menu")
+    previous = initial
+    cancelled = []
+    for index, cycle in enumerate(fixture["cycles"]):
+        if set(cycle) != {"mode", "before", "selected", "pending", "request_id", "cancelled"} or cycle["mode"] != (
+                "QUEUED_NOT_STARTED" if index == 1 else "ACTIVE_TRANSACTION"):
+            raise RuntimeError("Title cancellation mode inventory differs")
+        listing = {name: cycle[name] for name in ("before", "selected", "pending", "request_id")}
+        pending = title_list_reference(previous, listing)
+        expected = normalized_title_cancel(pending, initial)
+        if cycle["cancelled"] != expected:
+            raise RuntimeError("Title LIST Cancel changed a field outside exact released normalization")
+        cancelled.append({"request": cycle["request_id"], "kind": "LIST", "snapshot": sha(js_bytes(expected))})
+        previous = expected
+    for index, row in enumerate([*fixture["read_cancels"], fixture["load"]]):
+        fields = {"listing", "selected", "pending", "request_id", "loaded"} if index == 2 else {
+            "mode", "listing", "selected", "pending", "request_id", "cancelled"}
+        if set(row) != fields or (index < 2 and row["mode"] != ("ACTIVE_TRANSACTION" if index == 0 else "CALLBACK_READY")):
+            raise RuntimeError("Title READ mode/fixture inventory differs")
+        pending_list = title_list_reference(previous, row["listing"])
+        selected = title_slots_reference(pending_list)
+        pending = title_request_reference(selected, "READ")
+        if (row["selected"] != selected or row["pending"] != pending
+                or row["request_id"] != pending["pending_platform"][0]["request_id"]):
+            raise RuntimeError("Title actual inventory selection/READ owner differs")
+        if index < 2:
+            expected = normalized_title_cancel(pending, initial)
+            if row["cancelled"] != expected:
+                raise RuntimeError("Title READ Cancel changed unrelated core fields")
+            cancelled.append({"request": row["request_id"], "kind": "READ", "snapshot": sha(js_bytes(expected))})
+            previous = expected
+        else:
+            loaded = normalized_title_read(pending, save)
+            if (row["loaded"] != loaded or fixture["rewrite"]["before"] != loaded
+                    or save["state"]["identities"]["next_platform_request_id"] >= pending["lifecycle"]["value"]["current_storage"]["next_platform_request_id"]):
+                raise RuntimeError("Title READ changed saved semantics or lost the live allocator floor")
+    rewrite = fixture["rewrite"]
+    if rewrite["request"]["request_id"] <= fixture["load"]["request_id"]:
+        raise RuntimeError("Title raw second Write reused a retired request ID")
+    receipts = []
+    for case, session, generation, raw in ((fixture["write"], "title-controlled-producer", 1, payload),
+                                         (rewrite, "natural-title-reader", 2, rewrite_payload)):
+        metadata = [1, "m9e-title-retirement", content_hash, session, case["request"]["request_id"], "WRITE", "controlled-slot", generation]
+        receipts.append(sha(js_bytes(metadata) + b"\0" + raw))
+    return {"cancelled_requests": [row["request"] for row in cancelled],
+            "cancelled_snapshot_digest": sha(js_bytes(cancelled)), "queued_not_started_request_id": fixture["cycles"][1]["request_id"],
+            "highest_retired_id": cancelled[-1]["request"], "producer_receipt": receipts[0], "producer_payload_sha256": sha(payload),
+            "load_snapshot_sha256": sha(js_bytes(fixture["load"]["loaded"])), "rewrite_request_id": rewrite["request"]["request_id"],
+            "rewrite_generation": 2, "rewrite_payload_bytes": len(rewrite_payload), "rewrite_receipt": receipts[1],
+            "rewrite_payload_sha256": sha(rewrite_payload), "rewrite_callback_sha256": sha(js_bytes(rewrite["callback"])),
+            "rewrite_continued_sha256": sha(js_bytes(rewrite["continued"])), "presentation_id": rewrite["presentation"]["event_id"]}
