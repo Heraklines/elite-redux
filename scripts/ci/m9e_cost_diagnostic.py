@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 
-from m9e_current_cost import check_executable, discover_release, parse_line, read_content, run_bounded, validate_listing
+from m9e_current_cost import build_source_binding, check_executable, discover_release, parse_line, read_content, release_environment, run_bounded, validate_listing
 
 ROOT = Path(__file__).resolve().parents[2]
 RUST = ROOT / "rust"
@@ -43,7 +43,15 @@ def main(summary):
                "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
                "rust/crates/er-repro/Cargo.toml", "rust/crates/er-env/src/current.rs",
                "rust/crates/er-repro/src/current.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs"]
+    build_binding = build_source_binding(ROOT, sha)
+    sources = sorted(set(sources) | set(build_binding["source_hashes"]))
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
+    summary["cargo_manifests"] = build_binding["cargo_manifests"]
+    environment, summary["build_environment"] = release_environment(ROOT, BUILD.resolve(), dict(os.environ))
+    if BUILD.exists():
+        raise RuntimeError("release target must be fresh and owned by this invocation")
+    BUILD.mkdir(parents=True, exist_ok=False)
+    os.environ.update(environment)
     summary["bundle_sha256"] = digest(RUST / "fixtures/m9/engineering/game-content-bundle-v2.json")
     run(["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true", "--check", str(ROOT / SOURCE)],
         "format.log", 60, 262144)
@@ -73,6 +81,8 @@ def main(summary):
     evidence = parse_line(lines[0], architecture=platform.machine(), operating_system=platform.system().lower(),
                           bundle_bytes=content["bundle"]["bytes"], content_identity=content["identity"])
     check_executable(executable, artifact)
+    if build_source_binding(ROOT, sha) != build_binding:
+        raise RuntimeError("build source or workspace Cargo manifest changed during measurement")
     if read_content(ROOT) != content:
         raise RuntimeError("content bytes changed during release measurement")
     if any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items()):

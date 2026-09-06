@@ -376,3 +376,73 @@ def run_bounded(command, *, cwd, environment, output, seconds, byte_limit, globa
     if finished > deadline:
         fail("command completed outside its total deadline")
     return {"path": output, "bytes": written, "sha256": output_hash, "elapsed_seconds": finished - started}
+
+
+BUILD_SOURCE_PATHS = [SOURCE, "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_feedback.py",
+                      "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json",
+                      ".github/workflows/m9e-focused-feedback.yml", "rust/Cargo.lock", "rust/Cargo.toml",
+                      "rust/rust-toolchain.toml", "rust/crates/er-repro/Cargo.toml", CONTENT_MANIFEST,
+                      "rust/crates/er-game/src/m9e_content_v2.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-repro/src/current.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs"]
+
+
+def build_source_binding(repository, source_sha):
+    """Hash actual selected source and all workspace Cargo manifests outside measurements."""
+    repository = Path(repository).resolve()
+    lower_hex(source_sha, 40, "build source commit")
+    def checked(path):
+        if (not path.is_file() or path.is_symlink() or path.resolve() != path
+                or not 0 < path.stat().st_size <= 4 << 20):
+            fail("build source is missing, redirected or oversized")
+        return file_hash(path)
+    sources = {name: checked(repository / name) for name in BUILD_SOURCE_PATHS}
+    manifests = {str(path.relative_to(repository)): checked(path)
+                 for path in sorted((repository / "rust/crates").glob("*/Cargo.toml"))}
+    if not 1 <= len(manifests) <= 256 or "rust/crates/er-repro/Cargo.toml" not in manifests:
+        fail("workspace Cargo manifest inventory")
+    encoded = (json.dumps(manifests, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    return {"source_sha": source_sha, "source_hashes": sources,
+            "cargo_manifests": {"count": len(manifests), "sha256": hashlib.sha256(encoded).hexdigest()}}
+
+
+def release_environment(repository, target_directory, inherited):
+    """Allow the pinned native release build without hidden flags, profiles or wrappers.
+
+    Environment values are never included in evidence except the fixed nonsecret
+    Cargo/Rust settings returned separately. The owned target replaces any cache
+    directory inherited from the ordinary test-profile build.
+    """
+    repository = Path(repository).resolve()
+    target_directory = Path(target_directory)
+    if (not target_directory.is_absolute() or target_directory.resolve() != target_directory
+            or target_directory.is_symlink() or type(inherited) is not dict
+            or any(type(key) is not str or type(value) is not str for key, value in inherited.items())):
+        fail("release build environment or owned target type")
+    forbidden = {"RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC", "RUSTDOC", "RUSTC_BOOTSTRAP", "RUSTC_WRAPPER",
+                 "RUSTC_WORKSPACE_WRAPPER", "CARGO_WORKSPACE_WRAPPER", "CARGO_ENCODED_RUSTDOCFLAGS"}
+    for key in inherited:
+        if (key in forbidden or key.startswith(("CARGO_BUILD_", "CARGO_PROFILE_RELEASE_"))
+                or (key.startswith("CARGO_TARGET_") and key != "CARGO_TARGET_DIR")):
+            fail("unreviewed release compiler/profile/target override: " + key)
+    settings = {"CARGO_INCREMENTAL": "0", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0",
+                "RUSTUP_TOOLCHAIN": "1.97.1"}
+    if any(key in inherited and inherited[key] != value for key, value in settings.items()):
+        fail("inherited compiler/profile settings differ")
+    # Cargo walks ancestor directories and its home for config; record-less
+    # external aliases/flags/linkers must not alter this exact artifact claim.
+    directories = [repository / "rust", repository, *repository.parents]
+    cargo_home = inherited.get("CARGO_HOME")
+    if cargo_home:
+        directories.append(Path(cargo_home).resolve().parent)
+        config_paths = [Path(cargo_home).resolve() / name for name in ("config", "config.toml")]
+    else:
+        config_paths = [Path(inherited.get("HOME", str(Path.home()))) / ".cargo" / name
+                        for name in ("config", "config.toml")]
+    config_paths.extend(directory / ".cargo" / name for directory in directories for name in ("config", "config.toml"))
+    if any(path.exists() or path.is_symlink() for path in config_paths):
+        fail("release build has an unreviewed Cargo configuration file")
+    environment = dict(inherited)
+    environment.update(settings)
+    environment["CARGO_TARGET_DIR"] = str(target_directory)
+    return environment, {"settings": settings, "cargo_config_files": 0, "compiler_overrides": 0,
+                         "target": "native-host", "features": "default", "profile": "release"}
