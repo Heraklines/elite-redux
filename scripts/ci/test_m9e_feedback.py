@@ -6115,7 +6115,8 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-ai", "er_ai"], assignment["a"])
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
             ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-            ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+            ("er-cli", "m9e_current_reload")})
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["a"])
         for key in policies:
             for damage in ("missing", "restoration", "wrong_test"):
                 with self.subTest(key=key, damage=damage):
