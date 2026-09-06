@@ -2500,3 +2500,72 @@ at one byte over with a correct wire hash, unchanged source proof, validated
 restored semantics and independent64/128KiB caps. There are166 harness test
 declarations;59 exact companions,77 required native targets and all native IDs
 remain unchanged. No local test, formatter, build, installation or browser ran.
+
+## Qualified damage-query cut and bounded proof encoding
+
+1eead4142a16700bc087f34b2fad1dc9f69d4be9 / run34006023505 passed all four
+jobs: native A, native B, platform and Complete focused qualification. Advance
+the comparison baseline fromf140 to this exact reviewed candidate. This is focused
+qualification of the cumulative damage-query/repair cut, not completion of M9.
+All1,235 native IDs passed with zero failures/skips (A1,215/B20); all77 mandatory
+nonempty targets and124 total inventory targets are conserved. All166 harness
+tests passed in4.111s, including exact192KiB reconstructed proof and over-bound
+rejection. Both native lanes passed source formatting, build and selected-package
+Clippy; both A behavioral mutants were detected and original source restored.
+
+Exact bounded proof SHA256 and raw bytes:
+- Native A59904:9d73d99f6f200ef491debf383facbf2d518564465e66af7c4680420e71593e47.
+- Native B54019:1977a7898023c25ace2bcdfd93987ee478ba0bb296440db7642f7449490b5e63.
+- Platform30984:e0726c2a952a58f24e6ee53807203bf0f8fbdbd8ec27fba80605bdb522bf357b.
+- Aggregate17885:3ca9f32f689b0f46cb5b73bb2c1d2945388716a630215781951b32ae58f35810.
+- Plan:c6150f0ae846cbc7a3b31431f5b4eab959ea6c8e25f9d93b9a61aa1b293c9dfa.
+- Inventory:3bc1e20b9eb6602bad1ff1a44c1bffde19849d96035cdd278a0f0659100c03ce.
+
+The two v2 proofs carry identical compressed ID metadata (84969 decoded bytes),
+complete exact inventory, disjoint120/4 assigned target sets and matching completed
+sets. Required ID permutations, source/build/run identities and cross-phase hashes
+were reviewed. Content-manifest hash is unchanged fromf140. B target durations
+were host293159ms, CLI reload560258ms, batch477413ms and repro294777ms; these are
+ordinary test-profile timings, not an optimization benchmark.
+
+Platform passed Wasm2, in-page Chromium2, typed effects1, actual Worker2 and codec3.
+Held-timer digest8be9ebd2eebae0f5741a511e68542182bb9c67b5d2c312c259abae45eb0e6942
+matches native. The actual candidate CLI bridge replayed16 attempts from1417 to1433
+and rejected omitted-time divergence at1428. Its snapshot was
+blake3-v1:3ebd6118c4d9500bbbde971eb9100eb199cd0496c94ec367200b7a24ddeb8690.
+Worker positive remains2151 accepted events/1427 UI changes/BATTLE_COMMAND and
+final snapshot106e15d7551d782e13c6489108b0414b02333dc06a1d9e02e7192b0fa40490c6;
+negative ABI/request/termination cases released both pending owners and all bytes.
+No WebRTC or durable-storage capability is claimed by this qualification.
+
+Only compact results and named bounded proofs/harness log were retrieved:
+A compact9981128862/proof9981127994; B compact9981373995/proof9981373836;
+platform compact9981289719/proof9981289523; aggregate compact9981394713/evidence
+9981394874. The necessary A harness log36094 bytes came from inspected diagnostic
+9981129261; no complete diagnostics, CLI binary, browser assets or content pack
+were downloaded. All execution remained remote.
+
+## Actual Worker/WebRTC focused integration
+
+Integrate immutable RTC product781503bc8b5d9789fb2d0ca397f22b12df75799d59056716dce043ab39ca03ca
+with its refreshed five-file gate/builder, preserving the just-qualified proof fix.
+The three additive TypeScript sources provide two actual Workers communicating
+through actual ordered reliable RTCDataChannels at fixed connection generation1.
+Bind session/run/seat map/epoch/membership/authority before admission. Preserve
+bounded frames, queue bytes, buffered amount, timeouts, serialized Worker/effect
+ownership, accepted-sequence fault reporting and terminal disposal. Manual SDP
+uses no configured external ICE service. No default route or deployment changes.
+
+Require exactly two real Chromium RTC witnesses: a complete two-seat turn and
+negative identity/transport/termination behavior. Preserve actual Worker2/codec3,
+Wasm/in-page/typed controls, candidate CLI replay bridge, both native lanes and
+both behavioral mutants. Disjoint JS bundles are checked against the same exact
+Wasm/glue/content cohort and source manifest; all transfer and runtime caps remain.
+The existing storage-adapter gate is dormant until its own product is installed.
+All166 prior harness test bodies are preserved;16 gate tests give182. The original
+59-companion/77-target AI registry is retained for later appropriate scopes.
+
+This RTC cut is unqualified until its own full remote run passes. It does not
+claim reconnect, proposal retries/expiry, storage composition, full co-op recovery
+or M9 completion. Prepared snapshot optimization, proposal ownership, READ/IDB and
+Title work remain separate successors and require actual source/evidence refresh.

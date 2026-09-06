@@ -54,6 +54,32 @@ WORKER_TEST_IDS = ["current V7 Worker executes natural input and presentation se
 WORKER_CODEC_IDS = ["current V2 canonical payload preserves signed state values",
                     "current V2 canonical payload rejects ambiguous numeric values",
                     "current V2 envelope keeps correlation IDs nonnegative"]
+RTC_PATHS = ["src/rust-browser/adapters/current-rtc-transport.ts",
+             "src/rust-browser/routes/rust-current-rtc-entry.ts",
+             "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"]
+RTC_SOURCE_PATHS = WORKER_SOURCE_PATHS + RTC_PATHS
+RTC_TEST_IDS = ["two current Workers exchange real RTC proposals and converge one natural checkpoint turn",
+                "current RTC identity mismatch and stalled presentation teardown settle owned work"]
+STORAGE_SOURCE_PATHS = [
+    "src/rust-browser/adapters/current-storage-backend.ts",
+    "src/rust-browser/adapters/current-storage-owner.ts",
+    "test/node/rust-browser/engineering/current-storage-owner.test.ts",
+    "test/browser/rust-browser/m9e-current-storage.spec.ts",
+]
+STORAGE_NODE_IDS = [
+    "current storage owner freezes requests and separates durable callback acknowledgement",
+    "current storage owner bounds admission and rejects unsupported or malformed images before IO",
+    "current storage owner drains nested enqueue without rerunning durable writes",
+    "current storage owner fences unknown callback acceptance and late disposed work",
+    "current storage owner reconciles exact uncertain images and rejects changed receipts",
+]
+STORAGE_BROWSER_IDS = [
+    "current IndexedDB reconciles a committed write after dropped completion without rewriting",
+    "current IndexedDB preserves a competing writer when uncertain reconciliation conflicts",
+    "current IndexedDB settles a real aborted transaction and enforces namespace and slot bounds",
+]
+STORAGE_EVIDENCE_KEYS = ["reconciled", "conflict", "abort-bound"]
+
 LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
                   ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")}
 
@@ -479,7 +505,13 @@ def browser_worker_source_binding(root, product_sha):
             "pnpm_lock_sha256": file_hash(root / "pnpm-lock.yaml")}
 
 
-def validate_browser_worker_assets(evidence, binding, cohort_assets):
+def browser_rtc_source_binding(root, product_sha):
+    return {"source_sha": product_sha,
+            "source_hashes": {path: file_hash(root / path) for path in RTC_SOURCE_PATHS},
+            "pnpm_lock_sha256": file_hash(root / "pnpm-lock.yaml")}
+
+
+def validate_browser_worker_assets(evidence, binding, cohort_assets, *, rtc=False):
     if not isinstance(evidence, dict) or set(evidence) != {"manifest_sha256", "manifest"}:
         raise RuntimeError("current Worker asset proof fields disagree")
     manifest = evidence["manifest"]
@@ -491,7 +523,7 @@ def validate_browser_worker_assets(evidence, binding, cohort_assets):
             or not isinstance(binding, dict) or set(binding) != {"source_sha", "source_hashes", "pnpm_lock_sha256"}
             or not isinstance(binding["source_hashes"], dict)
             or manifest["source_sha"] != binding["source_sha"] or manifest["source_hashes"] != binding["source_hashes"]
-            or set(binding["source_hashes"]) != set(WORKER_SOURCE_PATHS)
+            or set(binding["source_hashes"]) != set(RTC_SOURCE_PATHS if rtc else WORKER_SOURCE_PATHS)
             or manifest["pnpm_lock_sha256"] != binding["pnpm_lock_sha256"]
             or manifest["builder_sha256"] != binding["source_hashes"][WORKER_SOURCE_PATHS[-1]]
             or not isinstance(manifest["vite_version"], str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?", manifest["vite_version"])
@@ -503,7 +535,8 @@ def validate_browser_worker_assets(evidence, binding, cohort_assets):
         if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
             raise RuntimeError("current Worker source digest is invalid")
     assets = manifest["assets"]
-    if not isinstance(assets, dict) or not 2 <= len(assets) <= 8 or manifest["entry"] != "current-worker-entry.js":
+    entry = "current-rtc-entry.js" if rtc else "current-worker-entry.js"
+    if not isinstance(assets, dict) or not 2 <= len(assets) <= 8 or manifest["entry"] != entry:
         raise RuntimeError("current Worker asset inventory is invalid")
     total = 0
     roles = {"entry": [], "worker": [], "chunk": []}
@@ -518,7 +551,8 @@ def validate_browser_worker_assets(evidence, binding, cohort_assets):
         roles[metadata["role"]].append(path)
     if (total > 4_194_304 or roles["entry"] != [manifest["entry"]] or roles["worker"] != [manifest["worker"]]
             or not isinstance(manifest["worker"], str)
-            or not re.fullmatch(r"current-rust-kernel-worker-[a-zA-Z0-9_-]+\.js", manifest["worker"])):
+            or not re.fullmatch(r"current-rtc-kernel-worker-[a-zA-Z0-9_-]+\.js" if rtc
+                                else r"current-rust-kernel-worker-[a-zA-Z0-9_-]+\.js", manifest["worker"])):
         raise RuntimeError("current Worker emitted entry/Worker roles disagree")
     expected_cohort = {key: cohort_assets.get(path, {}).get("sha256") for key, path in (
         ("glue_sha256", "er_web.js"), ("wasm_sha256", "er_web_bg.wasm"),
@@ -585,6 +619,78 @@ def validate_browser_worker_tests(tests, evidence, binding):
         raise RuntimeError("current Worker termination did not fence the client")
 
 
+def validate_browser_rtc_tests(tests, evidence, binding, cohort_assets):
+    if (not isinstance(tests, dict) or set(tests) != {"expected", "passed", "failed", "skipped", "selected_test_ids", "positive", "negative"}
+            or any(type(tests[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
+            or [tests[key] for key in ("expected", "passed", "failed", "skipped")] != [2, 2, 0, 0]
+            or tests["selected_test_ids"] != RTC_TEST_IDS):
+        raise RuntimeError("current RTC witness counts or identities disagree")
+    manifest = evidence["manifest"]
+    common = {"source_sha", "manifest_sha256", "worker_sha256", "worker_path", "glue_sha256", "wasm_sha256",
+              "content_sha256", "browser_worker_protocol", "generation", "observed_workers",
+              "authority_fixture_sha256", "replica_fixture_sha256"}
+    positive_fields = {"initial_turn", "final_turn", "proposal_sha256", "proposal_bytes", "material_sha256", "material_bytes",
+                       "proposal_operation_id", "material_revision", "material_after_digest", "presentation_count",
+                       "settled_presentation_count", "duplicate_proposal_effects", "duplicate_material_effects",
+                       "private_duplicate_snapshot_equal", "left_sent", "right_sent", "left_kernel_delivered",
+                       "right_kernel_delivered", "maximum_frame_bytes", "negotiated_frame_bound", "disconnected_events", "disposed"}
+    negative_fields = {"mismatch", "stalled_callback_aborted", "queued_snapshot_rejected", "disposal_acknowledged",
+                       "committed_delivery_failure_sequence", "pending_after", "queued_bytes_after", "worker_closed"}
+    for key, fields in (("positive", positive_fields), ("negative", negative_fields)):
+        item = tests[key]
+        if (not isinstance(item, dict) or set(item) != common | fields
+                or item["source_sha"] != binding["source_sha"] or item["manifest_sha256"] != evidence["manifest_sha256"]
+                or item["worker_path"] != manifest["worker"]
+                or item["worker_sha256"] != manifest["assets"][manifest["worker"]]["sha256"]
+                or any(item[field] != manifest["cohort"][field] for field in manifest["cohort"])
+                or item["authority_fixture_sha256"] != cohort_assets.get("coop-authority-snapshot.json", {}).get("sha256")
+                or item["replica_fixture_sha256"] != cohort_assets.get("coop-replica-snapshot.json", {}).get("sha256")):
+            raise RuntimeError("current RTC observed cohort or checkpoint binding disagrees")
+        for field, expected in (("browser_worker_protocol", 2), ("generation", 1), ("observed_workers", 2)):
+            if type(item[field]) is not int or item[field] != expected:
+                raise RuntimeError("current RTC actual Worker topology identity disagrees")
+        for field in ("authority_fixture_sha256", "replica_fixture_sha256"):
+            if not isinstance(item[field], str) or not re.fullmatch(r"[0-9a-f]{64}", item[field]):
+                raise RuntimeError("current RTC natural checkpoint hash is absent")
+    positive, negative = tests["positive"], tests["negative"]
+    counters = ("initial_turn", "final_turn", "proposal_bytes", "material_bytes", "material_revision", "presentation_count",
+                "settled_presentation_count", "duplicate_proposal_effects", "duplicate_material_effects", "left_sent",
+                "right_sent", "left_kernel_delivered", "right_kernel_delivered", "maximum_frame_bytes", "negotiated_frame_bound")
+    if any(type(positive[field]) is not int or not 0 <= positive[field] <= (1 << 53) - 1 for field in counters):
+        raise RuntimeError("current RTC causal counters are unsafe")
+    if (positive["final_turn"] != positive["initial_turn"] + 1 or positive["material_revision"] < 1
+            or not 1 <= positive["presentation_count"] <= 4096
+            or positive["presentation_count"] != positive["settled_presentation_count"]
+            or positive["duplicate_proposal_effects"] != 0 or positive["duplicate_material_effects"] != 0
+            or positive["private_duplicate_snapshot_equal"] is not True
+            or [positive[field] for field in ("left_sent", "right_sent", "left_kernel_delivered", "right_kernel_delivered")] != [4, 2, 2, 4]
+            or not 4096 <= positive["negotiated_frame_bound"] <= 1 << 20
+            or not max(positive["proposal_bytes"], positive["material_bytes"]) <= positive["maximum_frame_bytes"] <= positive["negotiated_frame_bound"]
+            or min(positive["proposal_bytes"], positive["material_bytes"]) < 1
+            or positive["disposed"] != [True, True] or any(type(value) is not bool for value in positive["disposed"])
+            or positive["disconnected_events"] != [1, 1] or any(type(value) is not int for value in positive["disconnected_events"])):
+        raise RuntimeError("current RTC turn/material/presentation/transport evidence disagrees")
+    for field in ("proposal_sha256", "material_sha256"):
+        if not isinstance(positive[field], str) or not re.fullmatch(r"[0-9a-f]{64}", positive[field]):
+            raise RuntimeError("current RTC frame or state digest is invalid")
+    if (not isinstance(positive["material_after_digest"], str)
+            or not re.fullmatch(r"blake3-v1:[0-9a-f]{64}", positive["material_after_digest"])):
+        raise RuntimeError("current RTC canonical material state digest is invalid")
+    if not isinstance(positive["proposal_operation_id"], str) or not 1 <= len(positive["proposal_operation_id"].encode()) <= 1024:
+        raise RuntimeError("current RTC proposal operation identity is absent or oversized")
+    mismatch = {"workers": 2, "rejected_readiness": 2, "rejected_queued_sends": 16, "invalid_admissions": 3,
+                "connected_events": [0, 0], "kernel_delivered": [0, 0], "snapshot_equal": True}
+    # Encoded equality distinguishes bools from integer counters in nested data.
+    if encoded(negative["mismatch"]) != encoded(mismatch):
+        raise RuntimeError("current RTC mismatched-cohort admission evidence disagrees")
+    if (negative["stalled_callback_aborted"] is not True or negative["queued_snapshot_rejected"] is not True
+            or negative["disposal_acknowledged"] is not False or negative["worker_closed"] is not True
+            or type(negative["committed_delivery_failure_sequence"]) is not int
+            or not 0 < negative["committed_delivery_failure_sequence"] <= (1 << 53) - 1
+            or any(type(negative[field]) is not int or negative[field] != 0 for field in ("pending_after", "queued_bytes_after"))):
+        raise RuntimeError("current RTC accepted-delivery teardown evidence disagrees")
+
+
 def validate_browser_worker_codec(evidence):
     if (not isinstance(evidence, dict) or set(evidence) != {"expected", "passed", "failed", "skipped", "selected_test_ids"}
             or any(type(evidence[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
@@ -592,6 +698,69 @@ def validate_browser_worker_codec(evidence):
             or evidence["selected_test_ids"] != WORKER_CODEC_IDS):
         raise RuntimeError("current Worker codec identities/counts disagree")
 
+
+def storage_source_binding(root, product_sha):
+    hashes = {}
+    for name in STORAGE_SOURCE_PATHS + ["pnpm-lock.yaml"]:
+        path = root / name
+        if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()) or not path.is_file() or not 0 < path.stat().st_size <= 4 * 1024 * 1024:
+            raise RuntimeError("current storage source binding path or size is invalid")
+        hashes[name] = file_hash(path)
+    return {"source_sha": product_sha, "source_hashes": {name: hashes[name] for name in STORAGE_SOURCE_PATHS},
+            "pnpm_lock_sha256": hashes["pnpm-lock.yaml"]}
+
+
+def validate_storage_binding(binding, product_sha):
+    if (not isinstance(binding, dict) or set(binding) != {"source_sha", "source_hashes", "pnpm_lock_sha256"}
+            or binding["source_sha"] != product_sha or not re.fullmatch(r"[0-9a-f]{40}", product_sha or "")
+            or not isinstance(binding["source_hashes"], dict) or set(binding["source_hashes"]) != set(STORAGE_SOURCE_PATHS)
+            or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                   for value in [*binding["source_hashes"].values(), binding["pnpm_lock_sha256"]])):
+        raise RuntimeError("current storage source identities disagree")
+
+
+def validate_storage_node(evidence):
+    if (not isinstance(evidence, dict) or set(evidence) != {"expected", "passed", "failed", "skipped", "selected_test_ids"}
+            or any(type(evidence[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
+            or evidence["expected"] != 5 or evidence["passed"] != 5 or evidence["failed"] != 0 or evidence["skipped"] != 0
+            or evidence["selected_test_ids"] != STORAGE_NODE_IDS):
+        raise RuntimeError("current storage Node identities/counts disagree")
+
+
+def validate_storage_browser(tests, binding):
+    keys = {"expected", "passed", "failed", "skipped", "selected_test_ids", *STORAGE_EVIDENCE_KEYS}
+    if (not isinstance(tests, dict) or set(tests) != keys
+            or any(type(tests[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
+            or tests["expected"] != 3 or tests["passed"] != 3 or tests["failed"] != 0 or tests["skipped"] != 0
+            or tests["selected_test_ids"] != STORAGE_BROWSER_IDS):
+        raise RuntimeError("current storage Chromium identities/counts disagree")
+    expected = {
+        "reconciled": {"transaction_committed": True, "completion_deliberately_dropped": True,
+                       "original_request": 1, "before_phase": "UNCERTAIN", "after_phase": "ACKNOWLEDGED",
+                       "actual_generation": 1, "writes": 1, "callbacks": 1, "reopened_exact_bytes": True,
+                       "slots_utf8_ordered": True, "payload_sha256": sha(bytes([0, 1, 255])),
+                       "operation": sha(b'[1,"logical-save","fixture-v2","stable-session",1,"WRITE","slot-a",1]\x00' + bytes([0, 1, 255]))},
+        "conflict": {"original_phase": "UNCERTAIN", "conflict_phase": "FAILED", "conflict_code": "CONFLICT",
+                     "competing_generation": 2, "competing_receipt": "c" * 64,
+                     "competing_exact_bytes_preserved": True, "original_writes": 1, "callbacks": 0},
+        "abort-bound": {"actual_abort_settled": True, "owner_abort_phase": "FAILED", "owner_write_outcome": "ABORTED",
+                        "aborted_record_absent": True, "original_request_retry_accepted": True, "slots": 64,
+                        "overflow_rejected_without_record": True, "existing_slot_replacement_allowed": True,
+                        "namespace_isolation": True},
+    }
+    for key, oracle in expected.items():
+        attachment = tests[key]
+        if (not isinstance(attachment, dict) or set(attachment) != {"schema_version", "capability", "source_sha", "source_hashes", "evidence"}
+                or type(attachment["schema_version"]) is not int or attachment["schema_version"] != 1
+                or attachment["capability"] != "INDEXEDDB_ADAPTER_ONLY"
+                or attachment["source_sha"] != binding["source_sha"] or attachment["source_hashes"] != binding["source_hashes"]
+                or len(encoded(attachment)) > 4096):
+            raise RuntimeError("current storage attachment scope/source/bounds disagree")
+        value = attachment["evidence"]
+        fields = set(oracle)
+        if (not isinstance(value, dict) or set(value) != fields
+                or any(type(value[name]) is not type(wanted) or value[name] != wanted for name, wanted in oracle.items())):
+            raise RuntimeError("current storage causal evidence disagrees")
 
 def validate_platform(proof, native, native_hash):
     if (proof.get("version") != 1 or proof.get("phase") != "platform"
@@ -612,6 +781,33 @@ def validate_platform(proof, native, native_hash):
         validate_browser_worker_codec(proof.get("browser_worker_codec"))
     elif any(key in proof for key in ("browser_worker_assets", "browser_worker_tests", "browser_worker_codec")):
         raise RuntimeError("platform cannot claim an unrequested current Worker capability")
+    if plan.get("requires_browser_rtc"):
+        binding = plan.get("browser_rtc_binding")
+        if (not plan.get("requires_browser_worker") or not isinstance(binding, dict)
+                or binding.get("source_sha") != native["identity"]["product_sha"]):
+            raise RuntimeError("current RTC plan omitted its Worker dependency or source binding")
+        worker_binding = plan["browser_worker_binding"]
+        if (binding.get("pnpm_lock_sha256") != worker_binding["pnpm_lock_sha256"]
+                or any(binding.get("source_hashes", {}).get(path) != worker_binding["source_hashes"][path]
+                       for path in WORKER_SOURCE_PATHS)):
+            raise RuntimeError("current RTC and Worker dependency source bindings disagree")
+        validate_browser_worker_assets(proof.get("browser_rtc_assets"), binding, proof.get("browser_assets", {}).get("assets", {}), rtc=True)
+        if set(proof["browser_rtc_assets"]["manifest"]["assets"]) & set(proof["browser_worker_assets"]["manifest"]["assets"]):
+            raise RuntimeError("current RTC and Worker bundle namespaces overlap")
+        validate_browser_rtc_tests(proof.get("browser_rtc_tests"), proof["browser_rtc_assets"], binding, proof["browser_assets"]["assets"])
+    elif any(key in proof for key in ("browser_rtc_assets", "browser_rtc_tests")):
+        raise RuntimeError("platform cannot claim an unrequested RTC capability")
+    if plan.get("requires_current_storage"):
+        if not all(plan.get(key) for key in ("requires_browser", "requires_browser_worker", "requires_wasm", "requires_cli_executable")):
+            raise RuntimeError("current storage plan omitted existing platform requirements")
+        binding = plan.get("current_storage_binding")
+        validate_storage_binding(binding, native["identity"]["product_sha"])
+        if binding["pnpm_lock_sha256"] != plan["browser_worker_binding"]["pnpm_lock_sha256"]:
+            raise RuntimeError("current storage and Worker lock cohorts disagree")
+        validate_storage_node(proof.get("current_storage_node"))
+        validate_storage_browser(proof.get("current_storage_browser"), binding)
+    elif any(key in proof for key in ("current_storage_node", "current_storage_browser")):
+        raise RuntimeError("platform cannot claim unrequested current storage")
     if plan["requires_wasm"]:
         wasm = proof.get("wasm_tests", {})
         if (wasm.get("expected") != 2 or wasm.get("passed") != 2 or wasm.get("failed") != 0
@@ -714,8 +910,28 @@ def aggregate(feedback):
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
-            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec") if key in result},
+            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
+
+
+def compact_rtc_evidence(compact, full_hash):
+    # Full platform/aggregate proofs retain every field and stay <=64KiB.
+    # Avoid duplicating optional new RTC detail in the existing16KiB summary.
+    for key in ("browser_rtc_assets", "browser_rtc_tests"):
+        if len(encoded(compact)) <= 16000:
+            break
+        if key in compact:
+            compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
+
+
+def compact_storage_evidence(compact, full_hash):
+    # The full platform/aggregate proof keeps exact adapter evidence <=64KiB.
+    # Only new storage details may become references after timing compaction.
+    for key in ("current_storage_browser", "current_storage_node"):
+        if len(encoded(compact)) <= 16000:
+            break
+        if key in compact:
+            compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
 
 
 def main():
@@ -753,7 +969,7 @@ def main():
             "phase", "status", "qualification", "product_sha", "identity", "tests",
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
-            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec",
+            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser",
             "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
@@ -762,6 +978,8 @@ def main():
             for key in ("native_target_timing_ms", "timing_ms"):
                 if key in compact:
                     compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
+        compact_rtc_evidence(compact, full_hash)
+        compact_storage_evidence(compact, full_hash)
         if len(encoded(compact)) > 16000:
             raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
         write_bounded(feedback.COMPACT / "summary.json", compact)

@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "baseline": "f140b7687d44559e38e775147ad91835f62de8e8",
-  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/33990371692",
+  "baseline": "1eead4142a16700bc087f34b2fad1dc9f69d4be9",
+  "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34006023505",
   "readiness_packages": ["er-canonical"],
   "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
@@ -744,6 +744,12 @@
     "required_targets": {"er-lab": ["current_kernel_endpoint_v2", "current_kernel_supervisor_v2"], "er-kernel-worker": ["current_process_v2"]},
     "reason": "Bounded current process supervisor with acknowledged worker context and bounded success-response serialization. Compile the full reverse cone and explicitly build the exact worker executable; bind it only to actual endpoint/supervisor process witnesses. Require the worker process target, preserve CLI and historical reload coverage, and run worker/lab Clippy. Shared session, timer and browser changes require their existing broader platform mapping; no lock exception."
   },
+  "current_browser_rtc_focus": {
+    "build_path": "scripts/build-kernel-m9e-v7-web.mjs",
+    "paths": ["src/rust-browser/adapters/current-rtc-transport.ts", "src/rust-browser/routes/rust-current-rtc-entry.ts", "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"],
+    "test_ids": ["two current Workers exchange real RTC proposals and converge one natural checkpoint turn", "current RTC identity mismatch and stalled presentation teardown settle owned work"],
+    "reason": "Exactly three additive fixed-generation RTC checkpoint paths. Reuse the full causal22 native scope and controls; retain both lanes, Worker2/codec3, Wasm2, inpage2, typed1 and source-bound CLI bridge. Require two separate actual RTC witnesses and complete artifact/causal/teardown proof. No lock, dependency, reconnect, fragmentation or production-route exemption."
+  },
   "current_browser_worker_focus": {
   "paths": [
     "src/rust-browser/contracts/browser-contracts-v2.ts",
@@ -1350,5 +1356,26 @@
         "m9e_damage_query"
       ]
     }
+  },
+  "current_storage_focus": {
+    "paths": [
+      "src/rust-browser/adapters/current-storage-backend.ts",
+      "src/rust-browser/adapters/current-storage-owner.ts",
+      "test/node/rust-browser/engineering/current-storage-owner.test.ts",
+      "test/browser/rust-browser/m9e-current-storage.spec.ts"
+    ],
+    "node_ids": [
+      "current storage owner freezes requests and separates durable callback acknowledgement",
+      "current storage owner bounds admission and rejects unsupported or malformed images before IO",
+      "current storage owner drains nested enqueue without rerunning durable writes",
+      "current storage owner fences unknown callback acceptance and late disposed work",
+      "current storage owner reconciles exact uncertain images and rejects changed receipts"
+    ],
+    "browser_ids": [
+      "current IndexedDB reconciles a committed write after dropped completion without rewriting",
+      "current IndexedDB preserves a competing writer when uncertain reconciliation conflicts",
+      "current IndexedDB settles a real aborted transaction and enforces namespace and slot bounds"
+    ],
+    "reason": "Exact additive current IndexedDB adapter scope. Inherit causal22 native execution and both controls, Worker2/codec3 and all existing platform/CLI bridge proofs. Add separate Node5/Chromium3 adapter-only witnesses and retain them on later browser-required cuts when adapter source exists. No Worker storage/gameplay or DELETE/LIST core claim."
   }
 }

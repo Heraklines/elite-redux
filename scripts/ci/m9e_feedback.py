@@ -628,7 +628,8 @@ def plan():
     timer_focus = config.get("timer_focus", {})
     product_changes = [path for path in changed if path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
-    from m9e_phases import WORKER_SOURCE_PATHS, WORKER_TEST_IDS, WORKER_CODEC_IDS, browser_worker_source_binding
+    from m9e_phases import (WORKER_SOURCE_PATHS, WORKER_TEST_IDS, WORKER_CODEC_IDS, browser_worker_source_binding,
+                            RTC_PATHS, RTC_TEST_IDS, browser_rtc_source_binding)
     browser_worker_focus = config.get("current_browser_worker_focus", {})
     browser_worker_paths = browser_worker_focus.get("paths", [])
     if browser_worker_focus and (browser_worker_paths != WORKER_SOURCE_PATHS
@@ -637,6 +638,21 @@ def plan():
         raise RuntimeError("current browser Worker policy identities disagree")
     browser_worker_changed = any(path in browser_worker_paths for path in product_changes)
     browser_worker_session = browser_worker_changed and all(path in browser_worker_paths for path in product_changes)
+    rtc_focus = config.get("current_browser_rtc_focus", {})
+    if rtc_focus and (rtc_focus.get("paths") != RTC_PATHS or rtc_focus.get("test_ids") != RTC_TEST_IDS
+                      or rtc_focus.get("build_path") != WORKER_SOURCE_PATHS[-1]):
+        raise RuntimeError("current RTC policy identities disagree")
+    rtc_allowed = [*RTC_PATHS, WORKER_SOURCE_PATHS[-1]]
+    rtc_session = bool(rtc_focus) and any(path in RTC_PATHS for path in product_changes) and all(
+        path in rtc_allowed for path in product_changes)
+    from m9e_phases import STORAGE_SOURCE_PATHS, STORAGE_NODE_IDS, STORAGE_BROWSER_IDS, storage_source_binding
+    storage_focus = config.get("current_storage_focus", {})
+    storage_paths = storage_focus.get("paths", [])
+    if storage_focus and (storage_paths != STORAGE_SOURCE_PATHS or storage_focus.get("node_ids") != STORAGE_NODE_IDS
+                          or storage_focus.get("browser_ids") != STORAGE_BROWSER_IDS):
+        raise RuntimeError("current storage policy identities disagree")
+    storage_changed = any(path in storage_paths for path in product_changes)
+    storage_session = storage_changed and all(path in storage_paths for path in product_changes)
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
@@ -673,7 +689,7 @@ def plan():
     damage_lint_session = damage_session and any(path in damage_lint_paths for path in product_changes)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -747,7 +763,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (damage_session and path in damage_doc_paths) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -803,8 +819,12 @@ def plan():
         execution_scope = timer_focus["execute"]
         browser_required = True
         boundaries = [path for path in boundaries if path not in timer_focus["paths"]]
+        if storage_session:
+            boundaries = [path for path in boundaries if path not in storage_paths]
         if browser_worker_session:
             boundaries = [path for path in boundaries if path not in browser_worker_paths]
+        if rtc_session:
+            boundaries = [path for path in boundaries if path not in rtc_allowed]
     if repro_session:
         execution_scope = repro_focus["execute"]
         browser_required = True
@@ -871,7 +891,9 @@ def plan():
             if widened == selected:
                 break
             selected = widened
-    browser_worker_required = browser_worker_session or (browser_required and any(
+    storage_required = storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
+    rtc_required = rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
+    browser_worker_required = storage_required or rtc_required or browser_worker_session or (browser_required and any(
         (ROOT / path).is_file() for path in (
             "src/rust-browser/routes/rust-current-worker-entry.ts",
             "src/rust-browser/worker/current-rust-kernel-worker.ts")))
@@ -882,7 +904,13 @@ def plan():
               "wasm_test": config.get("current_session_wasm_test") if current_session else None,
               "execution_scope": execution_scope,
               "requires_browser": browser_required,
+              "requires_current_storage": storage_required,
+              "current_storage_binding": storage_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if storage_required else None,
               "requires_browser_worker": browser_worker_required,
+              "current_browser_rtc_focus": rtc_session,
+              "requires_browser_rtc": rtc_required,
+              "browser_rtc_binding": (browser_rtc_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"]))
+                                      if rtc_required else None),
               "browser_worker_binding": (browser_worker_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"]))
                                          if browser_worker_required else None),
               "requires_cli_clippy": retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or menu_session or batch_session or any(re.fullmatch(r"rust/crates/er-cli/(?:src|tests)/.+\.rs", path) for path in changed),
@@ -936,7 +964,7 @@ def plan():
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
-    if unknown or boundaries or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
+    if unknown or boundaries or (storage_changed and not storage_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -1158,16 +1186,18 @@ def browser_bridge_evidence(playwright, binding):
     return evidence
 
 
-def verify_browser_worker_build(output, summary):
-    from m9e_phases import browser_worker_source_binding, validate_browser_worker_assets
-    path = output / "m9e-v7-worker-assets.json"
+def verify_browser_worker_build(output, summary, *, rtc=False):
+    from m9e_phases import browser_worker_source_binding, browser_rtc_source_binding, validate_browser_worker_assets
+    key = "browser_rtc" if rtc else "browser_worker"
+    path = output / ("m9e-v7-rtc-assets.json" if rtc else "m9e-v7-worker-assets.json")
     if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= 16_384:
         raise RuntimeError("current Worker build manifest path or size is invalid")
     evidence = {"manifest_sha256": digest(path), "manifest": json.loads(path.read_text())}
-    binding = summary["plan"]["browser_worker_binding"]
-    if binding != browser_worker_source_binding(ROOT, summary["product_sha"]):
+    binding = summary["plan"][key + "_binding"]
+    current_binding = browser_rtc_source_binding if rtc else browser_worker_source_binding
+    if binding != current_binding(ROOT, summary["product_sha"]):
         raise RuntimeError("current Worker checked-out source differs from native plan")
-    validate_browser_worker_assets(evidence, binding, summary["browser_assets"]["assets"])
+    validate_browser_worker_assets(evidence, binding, summary["browser_assets"]["assets"], rtc=rtc)
     manifest = evidence["manifest"]
     if manifest["vite_version"] != json.loads((ROOT / "node_modules/vite/package.json").read_text())["version"]:
         raise RuntimeError("current Worker Vite version differs from installed lock cohort")
@@ -1175,15 +1205,24 @@ def verify_browser_worker_build(output, summary):
         asset = output / name
         if asset.is_symlink() or not asset.is_file() or asset.stat().st_size != metadata["bytes"] or digest(asset) != metadata["sha256"]:
             raise RuntimeError("current Worker emitted asset hash or size mismatch")
-    emitted = {asset.name for asset in output.glob("current-*.js")}
-    if emitted != set(manifest["assets"]):
+    emitted = {asset.name for asset in output.glob("current-rtc-*.js" if rtc else "current-*.js")}
+    expected = set(manifest["assets"])
+    if not rtc and summary["plan"].get("requires_browser_rtc"):
+        rtc_assets = set(summary["browser_rtc_assets"]["manifest"]["assets"])
+        if expected & rtc_assets:
+            raise RuntimeError("current RTC and Worker emitted namespaces overlap")
+        expected |= rtc_assets
+    if emitted != expected:
         raise RuntimeError("current Worker has unlisted emitted assets")
     shutil.copyfile(path, FULL / path.name)
-    summary["browser_worker_assets"] = evidence
+    summary[key + "_assets"] = evidence
 
 
-def browser_worker_result_evidence(report, assets, binding):
-    from m9e_phases import WORKER_TEST_IDS, validate_browser_worker_tests
+def browser_worker_result_evidence(report, assets, binding, *, rtc=False, cohort_assets=None):
+    from m9e_phases import WORKER_TEST_IDS, RTC_TEST_IDS, validate_browser_worker_tests, validate_browser_rtc_tests
+    selected_ids = RTC_TEST_IDS if rtc else WORKER_TEST_IDS
+    expected_file = "m9e-v7-worker-rtc.spec.ts" if rtc else "m9e-v7-worker.spec.ts"
+    prefix = "m9e-current-rtc-" if rtc else "m9e-current-worker-"
     specs = []
     def collect(suite):
         specs.extend(suite.get("specs", []))
@@ -1192,12 +1231,12 @@ def browser_worker_result_evidence(report, assets, binding):
     for suite in report.get("suites", []):
         collect(suite)
     if (report.get("errors") or len(specs) != 2
-            or {spec.get("title") for spec in specs} != set(WORKER_TEST_IDS)):
+            or {spec.get("title") for spec in specs} != set(selected_ids)):
         raise RuntimeError("current Worker Chromium witness identities/counts disagree")
-    result = {"expected": 2, "passed": 2, "failed": 0, "skipped": 0, "selected_test_ids": WORKER_TEST_IDS}
+    result = {"expected": 2, "passed": 2, "failed": 0, "skipped": 0, "selected_test_ids": selected_ids}
     for spec in specs:
         file = spec.get("file", "").replace("\\", "/")
-        if file != "m9e-v7-worker.spec.ts" and file != "test/browser/rust-browser/m9e-v7-worker.spec.ts":
+        if file != expected_file and file != "test/browser/rust-browser/" + expected_file:
             raise RuntimeError("current Worker witness came from an unexpected source file")
         tests = spec.get("tests", [])
         if len(tests) != 1:
@@ -1208,10 +1247,10 @@ def browser_worker_result_evidence(report, assets, binding):
                 or test.get("status") != "expected" or len(runs) != 1 or runs[0].get("status") != "passed"
                 or type(runs[0].get("retry")) is not int or runs[0]["retry"] != 0):
             raise RuntimeError("current Worker witness failed, skipped, retried or flaky")
-        key = "positive" if spec["title"] == WORKER_TEST_IDS[0] else "negative"
+        key = "positive" if spec["title"] == selected_ids[0] else "negative"
         attachments = [item for item in runs[0].get("attachments", [])
-                       if str(item.get("name", "")).startswith("m9e-current-worker-")]
-        if (len(attachments) != 1 or attachments[0].get("name") != "m9e-current-worker-" + key
+                       if str(item.get("name", "")).startswith(prefix)]
+        if (len(attachments) != 1 or attachments[0].get("name") != prefix + key
                 or attachments[0].get("contentType") != "application/json"):
             raise RuntimeError("current Worker attachment missing, ambiguous or misplaced")
         attachment = attachments[0]
@@ -1232,7 +1271,10 @@ def browser_worker_result_evidence(report, assets, binding):
         if len(payload) > 4096:
             raise RuntimeError("current Worker attachment exceeds bound")
         result[key] = json.loads(payload)
-    validate_browser_worker_tests(result, assets, binding)
+    if rtc:
+        validate_browser_rtc_tests(result, assets, binding, cohort_assets or {})
+    else:
+        validate_browser_worker_tests(result, assets, binding)
     return result
 
 
@@ -1250,6 +1292,95 @@ def browser_worker_codec_evidence(report):
     return {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": WORKER_CODEC_IDS}
 
 
+def storage_node_evidence(report):
+    from m9e_phases import STORAGE_SOURCE_PATHS, STORAGE_NODE_IDS, validate_storage_node
+    suites = report.get("testResults", [])
+    assertions = [item for suite in suites for item in suite.get("assertionResults", [])]
+    path = suites[0].get("name", "").replace("\\", "/") if len(suites) == 1 else ""
+    if (report.get("success") is not True
+            or any(type(report.get(key)) is not int or report[key] != count for key, count in (
+                ("numTotalTests", 5), ("numPassedTests", 5), ("numFailedTests", 0), ("numPendingTests", 0)))
+            or len(suites) != 1 or (path != STORAGE_SOURCE_PATHS[2] and not path.endswith("/" + STORAGE_SOURCE_PATHS[2]))
+            or len(assertions) != 5 or {item.get("fullName") for item in assertions} != set(STORAGE_NODE_IDS)
+            or any(item.get("status") != "passed" or item.get("failureMessages") for item in assertions)):
+        raise RuntimeError("current storage Node source identities/counts disagree")
+    evidence = {"expected": 5, "passed": 5, "failed": 0, "skipped": 0, "selected_test_ids": STORAGE_NODE_IDS}
+    validate_storage_node(evidence)
+    return evidence
+
+
+def storage_browser_evidence(report, binding):
+    from m9e_phases import STORAGE_BROWSER_IDS, STORAGE_SOURCE_PATHS, STORAGE_EVIDENCE_KEYS, validate_storage_browser
+    specs = []
+    def collect(suite):
+        specs.extend(suite.get("specs", []))
+        for child in suite.get("suites", []):
+            collect(child)
+    for suite in report.get("suites", []):
+        collect(suite)
+    if report.get("errors") or len(specs) != 3 or {item.get("title") for item in specs} != set(STORAGE_BROWSER_IDS):
+        raise RuntimeError("current storage Chromium identities/counts disagree")
+    result = {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": STORAGE_BROWSER_IDS}
+    for spec in specs:
+        file = spec.get("file", "").replace("\\", "/")
+        if file not in (STORAGE_SOURCE_PATHS[3], "m9e-current-storage.spec.ts"):
+            raise RuntimeError("current storage witness came from an unexpected source file")
+        tests = spec.get("tests", [])
+        if len(tests) != 1:
+            raise RuntimeError("current storage witness must execute exactly once")
+        test = tests[0]
+        runs = test.get("results", [])
+        if (test.get("projectName") != "chromium" or test.get("expectedStatus") != "passed"
+                or test.get("status") != "expected" or len(runs) != 1 or runs[0].get("status") != "passed"
+                or type(runs[0].get("retry")) is not int or runs[0]["retry"] != 0):
+            raise RuntimeError("current storage witness failed, skipped, retried or flaky")
+        key = STORAGE_EVIDENCE_KEYS[STORAGE_BROWSER_IDS.index(spec["title"])]
+        attachments = [item for item in runs[0].get("attachments", []) if str(item.get("name", "")).startswith("m9e-current-storage-")]
+        if (len(attachments) != 1 or attachments[0].get("name") != "m9e-current-storage-" + key
+                or attachments[0].get("contentType") != "application/json"):
+            raise RuntimeError("current storage attachment missing, ambiguous or misplaced")
+        attachment = attachments[0]
+        if "body" in attachment and "path" not in attachment:
+            body = attachment["body"]
+            if not isinstance(body, str) or len(body) > 5500:
+                raise RuntimeError("current storage attachment exceeds bound")
+            payload = base64.b64decode(body, validate=True)
+            if base64.b64encode(payload).decode("ascii") != body:
+                raise RuntimeError("current storage attachment base64 is noncanonical")
+        elif "path" in attachment and "body" not in attachment:
+            path = Path(attachment["path"])
+            path = path if path.is_absolute() else ROOT / path
+            if (path.is_symlink() or not path.resolve().is_relative_to((ROOT / "test-results/rust-browser").resolve())
+                    or not path.is_file() or not 0 < path.stat().st_size <= 4096):
+                raise RuntimeError("current storage attachment path or size is invalid")
+            payload = path.read_bytes()
+        else:
+            raise RuntimeError("current storage attachment requires one bounded body or file")
+        if not 0 < len(payload) <= 4096:
+            raise RuntimeError("current storage attachment exceeds bound")
+        result[key] = json.loads(payload)
+    validate_storage_browser(result, binding)
+    return result
+
+
+def current_storage_checks(summary, env):
+    from m9e_phases import storage_source_binding, validate_storage_binding, STORAGE_SOURCE_PATHS
+    binding = summary["plan"]["current_storage_binding"]
+    validate_storage_binding(binding, summary["product_sha"])
+    if binding != storage_source_binding(ROOT, summary["product_sha"]):
+        raise RuntimeError("current storage checked-out source differs from native plan")
+    run(["pnpm", "exec", "vitest", "run", "--config", "test/node/vitest.config.ts",
+         STORAGE_SOURCE_PATHS[2], "--reporter=json", "--outputFile=" + str(FULL / "current-storage-node-results.json")],
+        "current-storage-node", ROOT)
+    summary["current_storage_node"] = storage_node_evidence(json.loads((FULL / "current-storage-node-results.json").read_text()))
+    browser_env = {**env, "PLAYWRIGHT_JSON_OUTPUT_FILE": str(FULL / "current-storage-browser-results.json")}
+    run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
+         STORAGE_SOURCE_PATHS[3], "--workers=1", "--reporter=line,json"], "current-storage-browser", ROOT, browser_env)
+    summary["current_storage_browser"] = storage_browser_evidence(
+        json.loads((FULL / "current-storage-browser-results.json").read_text()), binding)
+    if binding != storage_source_binding(ROOT, summary["product_sha"]):
+        raise RuntimeError("current storage witnesses changed their bound source or lock")
+
 def browser_checks(summary):
     run(["pnpm", "install", "--frozen-lockfile"], "browser-dependencies", ROOT)
     output = Path(os.environ["RUNNER_TEMP"]) / "m9e-v7-web"
@@ -1258,8 +1389,13 @@ def browser_checks(summary):
     env.pop("CARGO_TARGET_DIR", None)
     env["RUSTUP_TOOLCHAIN"] = tomllib.loads((RUST / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
     env.pop("M9E_BUILD_CURRENT_WORKER", None)
+    env.pop("M9E_BUILD_CURRENT_RTC", None)
     if summary.get("plan", {}).get("requires_browser_worker"):
         env["M9E_BUILD_CURRENT_WORKER"] = "1"
+    if summary.get("plan", {}).get("requires_browser_rtc"):
+        if not summary["plan"].get("requires_browser_worker"):
+            raise RuntimeError("current RTC browser build requires existing Worker witnesses")
+        env["M9E_BUILD_CURRENT_RTC"] = "1"
     run(["node", "scripts/build-kernel-m9e-v7-web.mjs", "--out-dir", str(output)], "browser-build", ROOT, env)
     manifest_path = output / "m9e-v7-web-assets.json"
     manifest = json.loads(manifest_path.read_text())
@@ -1272,6 +1408,8 @@ def browser_checks(summary):
             raise RuntimeError("browser asset hash mismatch: " + name)
     shutil.copyfile(manifest_path, FULL / manifest_path.name)
     summary["browser_assets"] = {"manifest_sha256": digest(manifest_path), "assets": manifest["assets"]}
+    if summary.get("plan", {}).get("requires_browser_rtc"):
+        verify_browser_worker_build(output, summary, rtc=True)
     if summary.get("plan", {}).get("requires_browser_worker"):
         verify_browser_worker_build(output, summary)
     run(["pnpm", "exec", "playwright", "install", "--with-deps", "chromium"], "browser-chromium-install", ROOT)
@@ -1300,6 +1438,16 @@ def browser_checks(summary):
         summary["browser_worker_tests"] = browser_worker_result_evidence(
             json.loads((FULL / "browser-worker-results.json").read_text()), summary["browser_worker_assets"],
             summary["plan"]["browser_worker_binding"])
+    if summary.get("plan", {}).get("requires_browser_rtc"):
+        env["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-rtc-results.json")
+        run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
+             "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts", "--workers=1", "--reporter=line,json"], "browser-rtc-journey", ROOT, env)
+        summary["browser_rtc_tests"] = browser_worker_result_evidence(
+            json.loads((FULL / "browser-rtc-results.json").read_text()), summary["browser_rtc_assets"],
+            summary["plan"]["browser_rtc_binding"], rtc=True, cohort_assets=summary["browser_assets"]["assets"])
+
+    if summary.get("plan", {}).get("requires_current_storage"):
+        current_storage_checks(summary, env)
 
 
 def timer_behavioral_mutant(selection, summary, passed_test_ids):

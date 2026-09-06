@@ -72,6 +72,77 @@ def browser_worker_report(tests):
     return {"suites": [{"specs": specs}], "errors": []}
 
 
+def browser_rtc_fixture(phases):
+    binding, assets, _, cohort = browser_worker_fixture(phases)
+    binding["source_hashes"] = {path: "b" * 64 for path in phases.RTC_SOURCE_PATHS}
+    manifest = assets["manifest"]
+    manifest.update({"entry": "current-rtc-entry.js", "worker": "current-rtc-kernel-worker-abc123.js",
+                     "source_hashes": binding["source_hashes"],
+                     "assets": {"current-rtc-entry.js": {"bytes": 5, "sha256": phases.sha(b"entry"), "role": "entry"},
+                                "current-rtc-kernel-worker-abc123.js": {"bytes": 6, "sha256": phases.sha(b"worker"), "role": "worker"}}})
+    assets["manifest_sha256"] = phases.sha(phases.encoded(manifest))
+    cohort.update({"coop-authority-snapshot.json": {"bytes": 10, "sha256": "1" * 64},
+                   "coop-replica-snapshot.json": {"bytes": 10, "sha256": "2" * 64}})
+    common = {"source_sha": CANDIDATE, "manifest_sha256": assets["manifest_sha256"],
+              "worker_sha256": manifest["assets"][manifest["worker"]]["sha256"], "worker_path": manifest["worker"],
+              **manifest["cohort"], "browser_worker_protocol": 2, "generation": 1, "observed_workers": 2,
+              "authority_fixture_sha256": "1" * 64, "replica_fixture_sha256": "2" * 64}
+    positive = {**common, "initial_turn": 0, "final_turn": 1, "proposal_sha256": "3" * 64, "proposal_bytes": 600,
+                "material_sha256": "4" * 64, "material_bytes": 60_000, "proposal_operation_id": "fixture/operation",
+                "material_revision": 3, "material_after_digest": "blake3-v1:" + "5" * 64, "presentation_count": 2,
+                "settled_presentation_count": 2, "duplicate_proposal_effects": 0, "duplicate_material_effects": 0,
+                "private_duplicate_snapshot_equal": True, "left_sent": 4, "right_sent": 2,
+                "left_kernel_delivered": 2, "right_kernel_delivered": 4, "maximum_frame_bytes": 60_000,
+                "negotiated_frame_bound": 65_536, "disconnected_events": [1, 1], "disposed": [True, True]}
+    negative = {**common, "mismatch": {"workers": 2, "rejected_readiness": 2, "rejected_queued_sends": 16,
+                "invalid_admissions": 3, "connected_events": [0, 0], "kernel_delivered": [0, 0], "snapshot_equal": True},
+                "stalled_callback_aborted": True, "queued_snapshot_rejected": True, "disposal_acknowledged": False,
+                "committed_delivery_failure_sequence": 9, "pending_after": 0, "queued_bytes_after": 0, "worker_closed": True}
+    tests = {"expected": 2, "passed": 2, "failed": 0, "skipped": 0, "selected_test_ids": list(phases.RTC_TEST_IDS),
+             "positive": positive, "negative": negative}
+    return binding, assets, tests, cohort
+
+
+def browser_rtc_report(tests):
+    report = browser_worker_report(tests)
+    for spec in report["suites"][0]["specs"]:
+        spec["file"] = "m9e-v7-worker-rtc.spec.ts"
+        for attachment in spec["tests"][0]["results"][0]["attachments"]:
+            attachment["name"] = attachment["name"].replace("current-worker-", "current-rtc-")
+    return report
+
+
+def current_storage_fixture(phases, binding=None):
+    binding = binding or {"source_sha": CANDIDATE, "source_hashes": {name: "d" * 64 for name in phases.STORAGE_SOURCE_PATHS},
+                          "pnpm_lock_sha256": "c" * 64}
+    values = {
+        "reconciled": {"transaction_committed": True, "completion_deliberately_dropped": True, "original_request": 1,
+                       "operation": hashlib.sha256(b'[1,"logical-save","fixture-v2","stable-session",1,"WRITE","slot-a",1]\x00' + bytes([0, 1, 255])).hexdigest(),
+                       "before_phase": "UNCERTAIN", "after_phase": "ACKNOWLEDGED",
+                       "actual_generation": 1, "payload_sha256": hashlib.sha256(bytes([0, 1, 255])).hexdigest(),
+                       "writes": 1, "callbacks": 1, "reopened_exact_bytes": True, "slots_utf8_ordered": True},
+        "conflict": {"original_phase": "UNCERTAIN", "conflict_phase": "FAILED", "conflict_code": "CONFLICT",
+                     "competing_generation": 2, "competing_receipt": "c" * 64, "competing_exact_bytes_preserved": True,
+                     "original_writes": 1, "callbacks": 0},
+        "abort-bound": {"actual_abort_settled": True, "owner_abort_phase": "FAILED", "owner_write_outcome": "ABORTED",
+                        "aborted_record_absent": True, "original_request_retry_accepted": True, "slots": 64,
+                        "overflow_rejected_without_record": True, "existing_slot_replacement_allowed": True, "namespace_isolation": True},
+    }
+    tests = {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": list(phases.STORAGE_BROWSER_IDS)}
+    specs = []
+    for title, key in zip(phases.STORAGE_BROWSER_IDS, phases.STORAGE_EVIDENCE_KEYS):
+        tests[key] = {"schema_version": 1, "capability": "INDEXEDDB_ADAPTER_ONLY", "source_sha": binding["source_sha"],
+                      "source_hashes": dict(binding["source_hashes"]), "evidence": values[key]}
+        specs.append({"title": title, "file": "m9e-current-storage.spec.ts", "tests": [{"projectName": "chromium",
+            "expectedStatus": "passed", "status": "expected", "results": [{"status": "passed", "retry": 0, "attachments": [{
+                "name": "m9e-current-storage-" + key, "contentType": "application/json",
+                "body": base64.b64encode(json.dumps(tests[key]).encode()).decode()}]}]}]})
+    node = {"expected": 5, "passed": 5, "failed": 0, "skipped": 0, "selected_test_ids": list(phases.STORAGE_NODE_IDS)}
+    node_report = {"success": True, "numTotalTests": 5, "numPassedTests": 5, "numFailedTests": 0, "numPendingTests": 0,
+                   "testResults": [{"name": phases.STORAGE_SOURCE_PATHS[2], "assertionResults": [
+                       {"fullName": name, "status": "passed", "failureMessages": []} for name in phases.STORAGE_NODE_IDS]}]}
+    return binding, tests, {"suites": [{"specs": specs}], "errors": []}, node, node_report
+
 class FeedbackTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="m9e-feedback-test-")
@@ -2873,6 +2944,199 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual({item[0] for item in ordered}, {item[0] for item in items})
         self.assertEqual(self.feedback.native_execution_order({}, items), items)
 
+    def configure_browser_rtc_scope(self):
+        self.configure_browser_worker_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["current_browser_rtc_focus"]
+        self.config["current_browser_rtc_focus"] = policy
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for path in policy["paths"]:
+            source = self.root / path
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("RTC source fixture: " + path)
+        self.changed = list(policy["paths"])
+
+    def test_rtc_scope_preserves_native_controls_worker_platform_and_future_browser_ownership(self):
+        self.configure_browser_rtc_scope()
+        import m9e_phases as phases
+        for changed in (phases.RTC_PATHS, phases.RTC_PATHS[:1], phases.RTC_PATHS[-1:],
+                        [*phases.RTC_PATHS, phases.WORKER_SOURCE_PATHS[-1]]):
+            self.changed = changed
+            selection = self.feedback.plan()
+            for flag in ("current_browser_rtc_focus", "requires_browser_rtc", "requires_browser_worker", "timer_focus",
+                         "requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable",
+                         "requires_cli_clippy", "requires_agent_protocol_clippy"):
+                self.assertTrue(selection[flag], flag)
+            self.assertEqual(selection["execution_scope"], self.config["timer_focus"]["execute"])
+            self.assertEqual(selection["required_native_test_ids"], self.config["timer_focus"]["exact_test_ids"])
+            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 22)
+            self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_timers_v7"]), 11)
+            self.assertEqual(selection["browser_rtc_binding"], phases.browser_rtc_source_binding(self.root, CANDIDATE))
+            self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+            self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+            self.assertIsNone(selection["ledger_mutant"])
+            self.assertIn("er-reverse", selection["packages"])
+        self.changed = ["rust/crates/er-kernel/src/game_kernel_v7.rs"]
+        self.assertTrue(self.feedback.plan()["requires_browser_rtc"])
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        with patch.object(phases, "browser_rtc_source_binding", side_effect=AssertionError("no RTC readiness binding")):
+            readiness = self.feedback.plan()
+        self.assertEqual(readiness["packages"], ["er-canonical"])
+        self.assertFalse(readiness["requires_browser_rtc"])
+        self.assertIsNone(readiness["browser_rtc_binding"])
+
+    def test_rtc_scope_rejects_mixed_paths_locks_missing_dependency_and_policy_drift(self):
+        self.configure_browser_rtc_scope()
+        import m9e_phases as phases
+        for extra in ("rust/Cargo.lock", "pnpm-lock.yaml", "package.json", "rust/crates/er-kernel/src/game_kernel_v7.rs",
+                      phases.WORKER_SOURCE_PATHS[0], "src/rust-browser/adapters/transport-adapter.ts", "test/browser/rust-browser/rtc-other.spec.ts"):
+            self.changed = [phases.RTC_PATHS[0], extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        self.changed = list(phases.RTC_PATHS)
+        missing = self.root / phases.WORKER_SOURCE_PATHS[2]
+        saved = missing.read_bytes()
+        missing.unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.feedback.plan()
+        missing.write_bytes(saved)
+        self.config["current_browser_rtc_focus"]["paths"].append("unmapped.json")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        with self.assertRaisesRegex(RuntimeError, "RTC policy identities"):
+            self.feedback.plan()
+
+    def test_rtc_report_requires_exact_real_attempts_bounded_attachments_and_causal_fields(self):
+        import m9e_phases as phases
+        binding, assets, tests, cohort = browser_rtc_fixture(phases)
+        parse = lambda report: self.feedback.browser_worker_result_evidence(report, assets, binding, rtc=True, cohort_assets=cohort)
+        self.assertEqual(parse(browser_rtc_report(tests)), tests)
+        for mutation in ("skipped", "retry", "file", "title", "attachment", "oversized", "wrong_source", "frame_bound",
+                         "no_turn", "false_delivered", "zero_presentations", "false_dispose", "false_mismatch", "bool_counter",
+                         "unprefixed_state_digest", "malformed_state_digest"):
+            bad = copy.deepcopy(tests)
+            if mutation == "wrong_source": bad["positive"]["source_sha"] = "0" * 40
+            if mutation == "frame_bound": bad["positive"]["material_bytes"] = 65_537
+            if mutation == "no_turn": bad["positive"]["final_turn"] = 0
+            if mutation == "false_delivered": bad["positive"]["right_kernel_delivered"] = 0
+            if mutation == "zero_presentations": bad["positive"]["presentation_count"] = 0
+            if mutation == "false_dispose": bad["negative"]["disposal_acknowledged"] = True
+            if mutation == "false_mismatch": bad["negative"]["mismatch"]["connected_events"] = [1, 0]
+            if mutation == "bool_counter": bad["positive"]["disconnected_events"] = [True, 1]
+            if mutation == "unprefixed_state_digest": bad["positive"]["material_after_digest"] = "5" * 64
+            if mutation == "malformed_state_digest": bad["positive"]["material_after_digest"] = "blake3-v1:" + "g" * 64
+            report = browser_rtc_report(bad)
+            spec = report["suites"][0]["specs"][0]
+            result = spec["tests"][0]["results"][0]
+            if mutation == "skipped": result["status"] = "skipped"
+            if mutation == "retry": result["retry"] = 1
+            if mutation == "file": spec["file"] = "m9e-v7-worker.spec.ts"
+            if mutation == "title": spec["title"] = "mock RTC bytes"
+            if mutation == "attachment": result["attachments"].append(copy.deepcopy(result["attachments"][0]))
+            if mutation == "oversized": result["attachments"][0]["body"] = base64.b64encode(b" " * 4097).decode()
+            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                parse(report)
+
+    def test_rtc_build_verifies_distinct_namespaces_installed_vite_and_all_dependency_hashes(self):
+        self.configure_browser_rtc_scope()
+        import m9e_phases as phases
+        selection = self.feedback.plan()
+        _, assets, _, cohort = browser_rtc_fixture(phases)
+        binding = selection["browser_rtc_binding"]
+        manifest = assets["manifest"]
+        manifest.update({"source_hashes": binding["source_hashes"], "builder_sha256": binding["source_hashes"][phases.WORKER_SOURCE_PATHS[-1]],
+                         "pnpm_lock_sha256": binding["pnpm_lock_sha256"]})
+        output = self.root / "rtc-build"
+        output.mkdir()
+        for name in manifest["assets"]:
+            (output / name).write_bytes(b"entry" if name == manifest["entry"] else b"worker")
+        (output / "m9e-v7-rtc-assets.json").write_bytes(phases.encoded(manifest))
+        vite = self.root / "node_modules/vite/package.json"
+        vite.parent.mkdir(parents=True)
+        vite.write_text(json.dumps({"version": manifest["vite_version"]}))
+        summary = {"product_sha": CANDIDATE, "plan": selection, "browser_assets": {"assets": cohort}}
+        self.feedback.verify_browser_worker_build(output, summary, rtc=True)
+        self.assertEqual(summary["browser_rtc_assets"]["manifest"], manifest)
+        vite.write_text(json.dumps({"version": "8.0.11"}))
+        with self.assertRaisesRegex(RuntimeError, "Vite version"):
+            self.feedback.verify_browser_worker_build(output, summary, rtc=True)
+        vite.write_text(json.dumps({"version": manifest["vite_version"]}))
+        (output / manifest["worker"]).write_bytes(b"broken")
+        with self.assertRaisesRegex(RuntimeError, "asset hash or size"):
+            self.feedback.verify_browser_worker_build(output, summary, rtc=True)
+        (output / manifest["worker"]).write_bytes(b"worker")
+        (output / "current-rtc-unlisted.js").write_bytes(b"extra")
+        with self.assertRaisesRegex(RuntimeError, "unlisted"):
+            self.feedback.verify_browser_worker_build(output, summary, rtc=True)
+        (output / "current-rtc-unlisted.js").unlink()
+        (self.root / phases.RTC_PATHS[0]).write_text("source changed after native plan")
+        with self.assertRaisesRegex(RuntimeError, "source differs"):
+            self.feedback.verify_browser_worker_build(output, summary, rtc=True)
+
+    def test_rtc_orchestration_preserves_worker_codec_bridge_and_adds_separate_report(self):
+        self.configure_browser_rtc_scope()
+        import m9e_phases as phases
+        summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test", "plan": self.feedback.plan()}
+        summary["cli_executable"] = self.feedback.discover_cli_executable([self.cli_executable_artifact()], summary)
+        _, bridge, _ = self.bridge_report()
+        bridge["executable_sha256"] = summary["cli_executable"]["sha256"]
+        old_report = self.bridge_report(bridge)[0]
+        _, typed_report = self.browser_reports()
+        worker_binding, worker_assets, worker_tests, _ = browser_worker_fixture(phases)
+        rtc_binding, rtc_assets, rtc_tests, _ = browser_rtc_fixture(phases)
+        output = self.root / "runner/m9e-v7-web"
+        output.mkdir(parents=True)
+        old_assets = {}
+        for name in ("er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json", "coop-authority-snapshot.json", "coop-replica-snapshot.json"):
+            path = output / name
+            path.write_bytes(b"existing browser cohort")
+            old_assets[name] = {"bytes": path.stat().st_size, "sha256": self.feedback.digest(path)}
+        for key in ("positive", "negative"):
+            rtc_tests[key]["authority_fixture_sha256"] = old_assets["coop-authority-snapshot.json"]["sha256"]
+            rtc_tests[key]["replica_fixture_sha256"] = old_assets["coop-replica-snapshot.json"]["sha256"]
+        (output / "m9e-v7-web-assets.json").write_text(json.dumps({"source_sha": CANDIDATE, "assets": old_assets, "browser_worker_protocol_version": 2}))
+        (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        codec_report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+            "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+            "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
+        calls = []
+        def run_browser(args, name, cwd=None, env=None):
+            calls.append((name, list(args), dict(env) if env else None))
+            reports = {"browser-journey": ("browser-results.json", old_report),
+                       "browser-effects": ("browser-effect-results.json", typed_report),
+                       "browser-worker-codec": ("browser-worker-codec-results.json", codec_report),
+                       "browser-worker-journey": ("browser-worker-results.json", browser_worker_report(worker_tests)),
+                       "browser-rtc-journey": ("browser-rtc-results.json", browser_rtc_report(rtc_tests))}
+            if name in reports:
+                filename, value = reports[name]
+                (self.full / filename).write_text(json.dumps(value))
+            return self.full / (name + ".log")
+        build_order = []
+        def verified_build(directory, value, *, rtc=False):
+            self.assertEqual(directory, output)
+            build_order.append(rtc)
+            value["browser_rtc_assets" if rtc else "browser_worker_assets"] = rtc_assets if rtc else worker_assets
+        summary["plan"].update({"browser_worker_binding": worker_binding, "browser_rtc_binding": rtc_binding})
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(self.root / "runner")}), \
+                patch.object(self.feedback, "run", side_effect=run_browser), \
+                patch.object(self.feedback, "verify_browser_worker_build", side_effect=verified_build):
+            self.feedback.browser_checks(summary)
+        self.assertEqual(build_order, [True, False])
+        self.assertEqual(summary["browser_current_repro_bridge"], bridge)
+        self.assertEqual(summary["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(summary["browser_tests"]["typed_effects"]["passed"], 1)
+        self.assertEqual(summary["browser_worker_tests"], worker_tests)
+        self.assertEqual(summary["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(summary["browser_rtc_tests"], rtc_tests)
+        self.assertEqual([name for name, _, _ in calls], ["browser-dependencies", "browser-build", "browser-chromium-install",
+                         "browser-journey", "browser-effects", "browser-worker-codec", "browser-worker-journey", "browser-rtc-journey"])
+        build_env = next(env for name, _, env in calls if name == "browser-build")
+        self.assertEqual(build_env["M9E_BUILD_CURRENT_WORKER"], "1")
+        self.assertEqual(build_env["M9E_BUILD_CURRENT_RTC"], "1")
+        for name, args, env in calls:
+            if name.endswith("journey"):
+                self.assertIn("--workers=1", args)
+                self.assertEqual(env["ER_M9E_CLI_SHA256"], bridge["executable_sha256"])
+        self.assertTrue(calls[-1][2]["PLAYWRIGHT_JSON_OUTPUT_FILE"].endswith("browser-rtc-results.json"))
+
     def configure_material_retention_scope(self):
         self.configure_timer_scope()
         policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["material_retention_focus"]
@@ -4197,6 +4461,282 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(child["M9E_REPORT_DIR"], os.environ["M9E_REPORT_DIR"])
             self.assertEqual(child["GITHUB_SHA"], CANDIDATE)
 
+    def configure_current_storage_scope(self):
+        self.configure_browser_worker_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())["current_storage_focus"]
+        self.config["current_storage_focus"] = policy
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for name in policy["paths"]:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("current storage source fixture: " + name)
+        self.changed = list(policy["paths"])
+
+    def test_current_storage_scope_preserves_causal_worker_and_future_browser_requirements(self):
+        self.configure_current_storage_scope()
+        import m9e_phases as phases
+        paths = ["src/rust-browser/adapters/current-storage-backend.ts", "src/rust-browser/adapters/current-storage-owner.ts",
+                 "test/node/rust-browser/engineering/current-storage-owner.test.ts", "test/browser/rust-browser/m9e-current-storage.spec.ts"]
+        self.assertEqual(self.config["current_storage_focus"]["paths"], paths)
+        for changed in [paths, *[[name] for name in paths], ["rust/crates/er-kernel/src/game_kernel_v7.rs"]]:
+            with self.subTest(changed=changed):
+                self.changed = changed
+                selection = self.feedback.plan()
+                for flag in ("requires_current_storage", "requires_browser_worker", "timer_focus", "requires_wasm", "requires_browser",
+                             "requires_cli_executable", "requires_worker_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+                    self.assertTrue(selection[flag], flag)
+                self.assertEqual(selection["execution_scope"], self.config["timer_focus"]["execute"])
+                self.assertEqual(selection["required_native_targets"], self.config["timer_focus"]["required_targets"])
+                self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 22)
+                self.assertEqual(selection["required_native_test_ids"], self.config["timer_focus"]["exact_test_ids"])
+                self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+                self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+                self.assertIsNone(selection["ledger_mutant"])
+                self.assertIn("er-reverse", selection["packages"])
+                self.assertNotIn("er-reverse", selection["execution_scope"])
+                self.assertEqual(selection["current_storage_binding"], phases.storage_source_binding(self.root, CANDIDATE))
+                self.assertEqual(selection["browser_worker_binding"], phases.browser_worker_source_binding(self.root, CANDIDATE))
+        self.changed = ["docs/plans/rust-kernel/m9e-progress.md"]
+        with patch.object(phases, "storage_source_binding", side_effect=AssertionError("readiness must not bind adapter")):
+            readiness = self.feedback.plan()
+        self.assertEqual(readiness["packages"], ["er-canonical"])
+        self.assertFalse(readiness["requires_current_storage"])
+        self.assertFalse(readiness["requires_browser_worker"])
+        self.assertIsNone(readiness["current_storage_binding"])
+
+    def test_current_storage_scope_rejects_mixed_paths_policy_drift_and_missing_sources(self):
+        self.configure_current_storage_scope()
+        entry = self.changed[0]
+        for extra in ("src/rust-browser/adapters/current-storage-other.ts", "src/rust-browser/routes/rust-current-worker-entry.ts",
+                      "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-web/src/host_v2.rs",
+                      "rust/Cargo.lock", "rust/crates/er-web/Cargo.toml", "pnpm-lock.yaml", "package.json",
+                      "test/browser/rust-browser/other.spec.ts", "unknown.json"):
+            with self.subTest(extra=extra):
+                self.changed = [entry, extra]
+                with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                    self.feedback.plan()
+        self.changed = [entry]
+        for field in ("paths", "node_ids", "browser_ids"):
+            original = list(self.config["current_storage_focus"][field])
+            self.config["current_storage_focus"][field][0] += "_renamed"
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "storage policy identities"):
+                self.feedback.plan()
+            self.config["current_storage_focus"][field] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        source = self.root / self.config["current_storage_focus"]["paths"][1]
+        source.unlink()
+        with self.assertRaisesRegex(RuntimeError, "storage source binding path"):
+            self.feedback.plan()
+        self.assertEqual(self.commands, [])
+        self.assertEqual(self.executed, [])
+
+    def test_current_storage_node_requires_all_five_exact_nonpending_source_identities(self):
+        import m9e_phases as phases
+        _, _, _, evidence, report = current_storage_fixture(phases)
+        self.assertEqual(self.feedback.storage_node_evidence(report), evidence)
+        self.assertEqual(len(phases.STORAGE_NODE_IDS), 5)
+        for index in range(5):
+            for action in ("missing", "rename", "duplicate", "failed", "pending"):
+                with self.subTest(index=index, action=action):
+                    bad = copy.deepcopy(report)
+                    ids = bad["testResults"][0]["assertionResults"]
+                    if action == "missing": ids.pop(index)
+                    elif action == "rename": ids[index]["fullName"] += "_renamed"
+                    elif action == "duplicate": ids.append(copy.deepcopy(ids[index]))
+                    else: ids[index]["status"] = action
+                    with self.assertRaisesRegex(RuntimeError, "storage Node"):
+                        self.feedback.storage_node_evidence(bad)
+        for field, value in (("success", False), ("numTotalTests", True), ("numFailedTests", 1), ("numPendingTests", 1)):
+            bad = copy.deepcopy(report)
+            bad[field] = value
+            with self.assertRaisesRegex(RuntimeError, "storage Node"):
+                self.feedback.storage_node_evidence(bad)
+        bad = copy.deepcopy(report)
+        bad["testResults"][0]["name"] = "test/node/wrong/current-storage-owner.test.ts"
+        with self.assertRaisesRegex(RuntimeError, "storage Node"):
+            self.feedback.storage_node_evidence(bad)
+
+    def test_current_storage_browser_requires_three_single_attempt_bound_attachments(self):
+        import m9e_phases as phases
+        binding, expected, report, _, _ = current_storage_fixture(phases)
+        self.assertEqual(self.feedback.storage_browser_evidence(report, binding), expected)
+        for index in range(3):
+            for action in ("missing", "rename", "duplicate", "wrong_file", "failed", "retry", "wrong_project", "attachment"):
+                with self.subTest(index=index, action=action):
+                    bad = copy.deepcopy(report)
+                    specs = bad["suites"][0]["specs"]
+                    spec = specs[index]
+                    test = spec["tests"][0]
+                    if action == "missing": specs.pop(index)
+                    elif action == "rename": spec["title"] += "_renamed"
+                    elif action == "duplicate": specs.append(copy.deepcopy(spec))
+                    elif action == "wrong_file": spec["file"] = "m9e-v7-worker.spec.ts"
+                    elif action == "failed": test["results"][0]["status"] = "failed"
+                    elif action == "retry": test["results"][0]["retry"] = 1
+                    elif action == "wrong_project": test["projectName"] = "firefox"
+                    else: test["results"][0]["attachments"] = []
+                    with self.assertRaisesRegex(RuntimeError, "storage"):
+                        self.feedback.storage_browser_evidence(bad, binding)
+        for action in ("oversized", "outside", "invalid_base64", "both", "misplaced"):
+            bad = copy.deepcopy(report)
+            attachment = bad["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"][0]
+            if action == "oversized": attachment["body"] = base64.b64encode(b"x" * 4097).decode()
+            elif action == "invalid_base64": attachment["body"] = "!!!!"
+            elif action == "both": attachment["path"] = "unused"
+            elif action == "misplaced": attachment["name"] = "m9e-current-storage-conflict"
+            else:
+                path = self.root / "outside.json"
+                path.write_text(json.dumps(expected["reconciled"]))
+                attachment.pop("body")
+                attachment["path"] = str(path)
+            with self.subTest(action=action), self.assertRaises((RuntimeError, ValueError)):
+                self.feedback.storage_browser_evidence(bad, binding)
+        inside = self.root / "test-results/rust-browser/storage.json"
+        inside.parent.mkdir(parents=True)
+        inside.write_text(json.dumps(expected["reconciled"]))
+        attachment = report["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"][0]
+        attachment.pop("body")
+        attachment["path"] = str(inside)
+        self.assertEqual(self.feedback.storage_browser_evidence(report, binding), expected)
+
+    def test_current_storage_causal_proofs_reject_changed_receipts_scope_and_every_expected_fact(self):
+        import m9e_phases as phases
+        binding, expected, _, _, _ = current_storage_fixture(phases)
+        phases.validate_storage_binding(binding, CANDIDATE)
+        phases.validate_storage_browser(expected, binding)
+        for key in phases.STORAGE_EVIDENCE_KEYS:
+            for name, value in expected[key]["evidence"].items():
+                bad = copy.deepcopy(expected)
+                bad[key]["evidence"][name] = not value if type(value) is bool else value + 1 if type(value) is int else "wrong"
+                with self.subTest(key=key, field=name), self.assertRaisesRegex(RuntimeError, "storage causal"):
+                    phases.validate_storage_browser(bad, binding)
+            for name in ("capability", "source_sha", "source_hashes", "schema_version"):
+                bad = copy.deepcopy(expected)
+                bad[key][name] = {"wrong": "a" * 64} if name == "source_hashes" else True if name == "schema_version" else "wrong"
+                with self.subTest(key=key, field=name), self.assertRaisesRegex(RuntimeError, "storage attachment"):
+                    phases.validate_storage_browser(bad, binding)
+        bad = copy.deepcopy(expected)
+        bad["reconciled"]["evidence"]["writes"] = True
+        with self.assertRaisesRegex(RuntimeError, "storage causal"):
+            phases.validate_storage_browser(bad, binding)
+        bad = copy.deepcopy(binding)
+        bad["source_hashes"].pop(phases.STORAGE_SOURCE_PATHS[0])
+        with self.assertRaisesRegex(RuntimeError, "storage source identities"):
+            phases.validate_storage_binding(bad, CANDIDATE)
+        bad = copy.deepcopy(expected)
+        bad["reconciled"]["worker_count"] = 1
+        with self.assertRaisesRegex(RuntimeError, "storage attachment"):
+            phases.validate_storage_browser(bad, binding)
+
+    def test_current_storage_commands_are_separate_source_bound_and_do_not_replace_existing_platform(self):
+        self.configure_current_storage_scope()
+        import m9e_phases as phases
+        summary = {"product_sha": CANDIDATE, "plan": self.feedback.plan()}
+        binding, expected, report, node, node_report = current_storage_fixture(phases, summary["plan"]["current_storage_binding"])
+        calls = []
+        def run_storage(args, name, cwd=None, env=None):
+            calls.append((list(args), name, cwd, dict(env) if env else None))
+            filename, data = ("current-storage-node-results.json", node_report) if name == "current-storage-node" else ("current-storage-browser-results.json", report)
+            (self.full / filename).write_text(json.dumps(data))
+            return self.full / (name + ".log")
+        environment = {"PLAYWRIGHT_JSON_OUTPUT_FILE": "old-report", "ER_M9E_CLI_SHA256": "f" * 64}
+        with patch.object(self.feedback, "run", side_effect=run_storage):
+            self.feedback.current_storage_checks(summary, environment)
+        self.assertEqual(environment["PLAYWRIGHT_JSON_OUTPUT_FILE"], "old-report")
+        self.assertEqual(summary["current_storage_node"], node)
+        self.assertEqual(summary["current_storage_browser"], expected)
+        self.assertEqual([item[1] for item in calls], ["current-storage-node", "current-storage-browser"])
+        self.assertEqual(calls[0][0][:4], ["pnpm", "exec", "vitest", "run"])
+        self.assertIn(phases.STORAGE_SOURCE_PATHS[2], calls[0][0])
+        self.assertEqual(calls[1][0][:4], ["pnpm", "exec", "playwright", "test"])
+        for flag in ("--workers=1", "--project=chromium", "--reporter=line,json", phases.STORAGE_SOURCE_PATHS[3]):
+            self.assertIn(flag, calls[1][0])
+        self.assertEqual(calls[1][3]["ER_M9E_CLI_SHA256"], "f" * 64)
+        source = self.root / phases.STORAGE_SOURCE_PATHS[0]
+        source.write_text("tampered after native binding")
+        with patch.object(self.feedback, "run", side_effect=AssertionError("changed source must not execute")), \
+                self.assertRaisesRegex(RuntimeError, "storage checked-out source"):
+            self.feedback.current_storage_checks(summary, environment)
+        source.write_text("current storage source fixture: " + phases.STORAGE_SOURCE_PATHS[0])
+        def mutate_after_run(args, name, cwd=None, env=None):
+            result = run_storage(args, name, cwd, env)
+            if name == "current-storage-browser": source.write_text("changed during test")
+            return result
+        with patch.object(self.feedback, "run", side_effect=mutate_after_run), \
+                self.assertRaisesRegex(RuntimeError, "storage witnesses changed"):
+            self.feedback.current_storage_checks(summary, environment)
+
+    def test_current_storage_full_browser_orchestration_preserves_worker_codec_and_actual_cli_bridge(self):
+        self.configure_current_storage_scope()
+        import m9e_phases as phases
+        summary = {"product_sha": CANDIDATE, "target": "x86_64-unknown-linux-gnu", "profile": "test",
+                   "plan": self.feedback.plan()}
+        summary["cli_executable"] = self.feedback.discover_cli_executable([self.cli_executable_artifact()], summary)
+        _, bridge, _ = self.bridge_report()
+        bridge["executable_sha256"] = summary["cli_executable"]["sha256"]
+        old_report = self.bridge_report(bridge)[0]
+        _, typed_report = self.browser_reports()
+        binding, worker_assets, worker_tests, _ = browser_worker_fixture(phases)
+        output = self.root / "runner/m9e-v7-web"
+        output.mkdir(parents=True)
+        old_assets = {}
+        for name in ("er_web.js", "er_web_bg.wasm", "game-content-bundle-v2.json",
+                     "coop-authority-snapshot.json", "coop-replica-snapshot.json"):
+            path = output / name
+            path.write_bytes(b"existing browser cohort")
+            old_assets[name] = {"bytes": path.stat().st_size, "sha256": self.feedback.digest(path)}
+        (output / "m9e-v7-web-assets.json").write_text(json.dumps({"source_sha": CANDIDATE,
+            "assets": old_assets, "browser_worker_protocol_version": 2}))
+        (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        codec_report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+            "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
+            "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
+        _, storage_tests, storage_report, storage_node, storage_node_report = current_storage_fixture(
+            phases, summary["plan"]["current_storage_binding"])
+        calls = []
+        def run_browser(args, name, cwd=None, env=None):
+            calls.append((name, list(args), dict(env) if env else None))
+            reports = {"browser-journey": ("browser-results.json", old_report),
+                       "browser-effects": ("browser-effect-results.json", typed_report),
+                       "browser-worker-codec": ("browser-worker-codec-results.json", codec_report),
+                       "browser-worker-journey": ("browser-worker-results.json", browser_worker_report(worker_tests)),
+                       "current-storage-node": ("current-storage-node-results.json", storage_node_report),
+                       "current-storage-browser": ("current-storage-browser-results.json", storage_report)}
+            if name in reports:
+                filename, value = reports[name]
+                (self.full / filename).write_text(json.dumps(value))
+            return self.full / (name + ".log")
+        def verified_build(directory, value):
+            self.assertEqual(directory, output)
+            value["browser_worker_assets"] = worker_assets
+        # Asset/source admission has a separate filesystem/hash fault test above;
+        # isolate only that step here to observe all existing and added commands.
+        summary["plan"]["browser_worker_binding"] = binding
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(self.root / "runner")}), \
+                patch.object(self.feedback, "run", side_effect=run_browser), \
+                patch.object(self.feedback, "verify_browser_worker_build", side_effect=verified_build):
+            self.feedback.browser_checks(summary)
+        self.assertEqual(summary["browser_current_repro_bridge"], bridge)
+        self.assertEqual(summary["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(summary["browser_tests"]["typed_effects"]["passed"], 1)
+        self.assertEqual(summary["browser_worker_tests"], worker_tests)
+        self.assertEqual(summary["browser_worker_codec"]["passed"], 3)
+        self.assertEqual([name for name, _, _ in calls], ["browser-dependencies", "browser-build", "browser-chromium-install",
+                         "browser-journey", "browser-effects", "browser-worker-codec", "browser-worker-journey", "current-storage-node", "current-storage-browser"])
+        self.assertEqual(summary["current_storage_node"], storage_node)
+        self.assertEqual(summary["current_storage_browser"], storage_tests)
+        storage_env = next(env for name, _, env in calls if name == "current-storage-browser")
+        self.assertIn("current-storage-browser-results", storage_env["PLAYWRIGHT_JSON_OUTPUT_FILE"])
+        self.assertEqual(storage_env["ER_M9E_CLI_SHA256"], bridge["executable_sha256"])
+        build_env = next(env for name, _, env in calls if name == "browser-build")
+        self.assertEqual(build_env["M9E_BUILD_CURRENT_WORKER"], "1")
+        for name, args, env in calls:
+            if name in ("browser-journey", "browser-worker-journey"):
+                self.assertIn("--workers=1", args)
+                self.assertEqual(env["ER_M9E_CLI_SHA256"], bridge["executable_sha256"])
+                self.assertIn("browser-worker-results" if name == "browser-worker-journey" else "browser-results",
+                              env["PLAYWRIGHT_JSON_OUTPUT_FILE"])
 
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
@@ -4343,6 +4883,65 @@ class PhaseTransferTests(unittest.TestCase):
             with self.subTest(field=field), self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
                 with self.assertRaises(RuntimeError):
                     self.phases.aggregate(None)
+
+    def test_rtc_aggregate_requires_both_native_lanes_all_old_proofs_and_bound_real_rtc(self):
+        worker_binding, worker_assets, worker_tests, _ = browser_worker_fixture(self.phases)
+        binding, assets, tests, cohort = browser_rtc_fixture(self.phases)
+        self.phases.validate_platform(self.platform, self.native, self.native_hash)
+        self.native["plan"].update({"requires_browser_worker": True, "browser_worker_binding": worker_binding,
+                                    "requires_browser_rtc": True, "browser_rtc_binding": binding})
+        self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
+        self.other["plan"] = copy.deepcopy(self.native["plan"])
+        self.other["plan_sha256"] = self.native["plan_sha256"]
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
+            "browser_worker_assets": worker_assets, "browser_worker_tests": worker_tests,
+            "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)},
+            "browser_rtc_assets": assets, "browser_rtc_tests": tests})
+        self.platform["browser_assets"]["assets"] = cohort
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            aggregate = self.phases.aggregate(None)
+            self.assertEqual(aggregate["qualification"], "passed")
+            self.assertEqual(aggregate["browser_rtc_tests"], tests)
+            self.assertEqual(aggregate["browser_worker_tests"], worker_tests)
+            with patch.dict(os.environ, {"M9E_NATIVE_B_RESULT": "cancelled"}), self.assertRaises(RuntimeError):
+                self.phases.aggregate(None)
+        for key in ("browser_rtc_assets", "browser_rtc_tests", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec",
+                    "wasm_tests", "browser_tests", "browser_current_repro_bridge"):
+            bad = copy.deepcopy(self.platform)
+            del bad[key]
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                self.phases.validate_platform(bad, self.native, self.native_hash)
+        for mutation in ("source", "role", "overlap", "checkpoint", "fake_delivery"):
+            bad = copy.deepcopy(self.platform)
+            manifest = bad["browser_rtc_assets"]["manifest"]
+            if mutation == "source": manifest["source_hashes"][self.phases.RTC_PATHS[0]] = "0" * 64
+            if mutation == "role": manifest["assets"][manifest["worker"]]["role"] = "chunk"
+            if mutation == "overlap": manifest["assets"][worker_assets["manifest"]["entry"]] = {"bytes": 1, "sha256": "0" * 64, "role": "chunk"}
+            if mutation == "checkpoint": bad["browser_rtc_tests"]["positive"]["authority_fixture_sha256"] = "0" * 64
+            if mutation == "fake_delivery": bad["browser_rtc_tests"]["positive"]["right_kernel_delivered"] = 0
+            bad["browser_rtc_assets"]["manifest_sha256"] = self.phases.sha(self.phases.encoded(manifest))
+            with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                self.phases.validate_platform(bad, self.native, self.native_hash)
+        native = copy.deepcopy(self.native)
+        native["plan"]["requires_browser_rtc"] = False
+        with self.assertRaisesRegex(RuntimeError, "unrequested RTC"):
+            self.phases.validate_platform(self.platform, native, self.native_hash)
+
+    def test_rtc_compact_summary_references_full_proof_without_raising_existing_bounds(self):
+        _, assets, tests, _ = browser_rtc_fixture(self.phases)
+        compact = {"existing": "x" * 14_500, "browser_rtc_assets": assets, "browser_rtc_tests": tests}
+        original = copy.deepcopy(compact)
+        self.phases.compact_rtc_evidence(compact, "a" * 64)
+        self.assertLessEqual(len(self.phases.encoded(compact)), 16000)
+        self.assertEqual(compact["existing"], original["existing"])
+        self.assertEqual(compact["browser_rtc_assets"], {"file": "phase-summary.json", "sha256": "a" * 64})
+        self.assertLessEqual(len(self.phases.encoded(original)), self.phases.MANIFEST_LIMIT)
+        small = {"browser_rtc_tests": tests}
+        self.phases.compact_rtc_evidence(small, "b" * 64)
+        self.assertEqual(small["browser_rtc_tests"], tests)
 
     def test_platform_requires_exact_parity_and_every_browser_witness(self):
         for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge"):
@@ -5079,6 +5678,86 @@ class PhaseTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "bridge"):
             self.phases.validate_platform(proof, self.native, self.native_hash)
 
+    def test_current_storage_aggregate_requires_adapter_worker_and_prior_platform_without_scope_inflation(self):
+        worker_binding, assets, worker_tests, cohort = browser_worker_fixture(self.phases)
+        binding, storage, _, node, _ = current_storage_fixture(self.phases)
+        # Old platform proofs cannot acquire an unrequested adapter capability.
+        bad = copy.deepcopy(self.platform)
+        bad["current_storage_node"] = node
+        with self.assertRaisesRegex(RuntimeError, "unrequested current storage"):
+            self.phases.validate_platform(bad, self.native, self.native_hash)
+        self.native["plan"].update({"requires_browser_worker": True, "browser_worker_binding": worker_binding,
+                                    "requires_current_storage": True, "current_storage_binding": binding})
+        self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
+        self.other["plan"] = copy.deepcopy(self.native["plan"])
+        self.other["plan_sha256"] = self.native["plan_sha256"]
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
+                              "browser_worker_assets": assets, "browser_worker_tests": worker_tests,
+                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                                                       "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)},
+                              "current_storage_node": node, "current_storage_browser": storage})
+        self.platform["browser_assets"]["assets"] = cohort
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            aggregate = self.phases.aggregate(None)
+        self.assertEqual(aggregate["qualification"], "passed")
+        self.assertEqual(aggregate["current_storage_browser"], storage)
+        self.assertEqual(aggregate["current_storage_node"], node)
+        self.assertEqual(aggregate["browser_worker_tests"], worker_tests)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(aggregate["browser_tests"]["typed_effects"]["passed"], 1)
+        self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
+        for key in ("current_storage_node", "current_storage_browser", "browser_worker_assets", "browser_worker_tests",
+                    "browser_worker_codec", "wasm_tests", "browser_tests", "browser_current_repro_bridge"):
+            bad = copy.deepcopy(self.platform)
+            del bad[key]
+            self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", bad)
+            with self.subTest(missing=key), self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+                    self.assertRaises(RuntimeError):
+                self.phases.aggregate(None)
+        bad = copy.deepcopy(self.platform)
+        bad["current_storage_browser"]["reconciled"]["capability"] = "WORKER_SAVE_GAMEPLAY"
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", bad)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+                self.assertRaisesRegex(RuntimeError, "storage attachment"):
+            self.phases.aggregate(None)
+        for field, value in (("requires_browser_worker", False), ("requires_cli_executable", False)):
+            altered = copy.deepcopy(self.native)
+            altered["plan"][field] = value
+            with self.subTest(field=field), self.assertRaises(RuntimeError):
+                self.phases.validate_platform(self.platform, altered, self.native_hash)
+        altered = copy.deepcopy(self.native)
+        altered["plan"]["current_storage_binding"]["pnpm_lock_sha256"] = "d" * 64
+        with self.assertRaisesRegex(RuntimeError, "lock cohorts"):
+            self.phases.validate_platform(self.platform, altered, self.native_hash)
+
+    def test_current_storage_compact_references_preserve_full_and_existing_evidence(self):
+        _, storage, _, node, _ = current_storage_fixture(self.phases)
+        full = {"current_storage_browser": storage, "current_storage_node": node,
+                "browser_worker_tests": {"existing": "x" * 13000}, "qualification": "passed"}
+        original = copy.deepcopy(full)
+        full_hash = self.phases.sha(self.phases.encoded(full))
+        compact = copy.deepcopy(full)
+        self.assertGreater(len(self.phases.encoded(compact)), 16000)
+        self.phases.compact_storage_evidence(compact, full_hash)
+        self.assertLessEqual(len(self.phases.encoded(compact)), 16000)
+        self.assertEqual(compact["current_storage_browser"], {"file": "phase-summary.json", "sha256": full_hash})
+        self.assertEqual(compact["current_storage_node"], node)
+        self.assertEqual(compact["browser_worker_tests"], full["browser_worker_tests"])
+        self.assertEqual(full, original)
+        small = {"current_storage_browser": storage, "current_storage_node": node}
+        unchanged = copy.deepcopy(small)
+        self.phases.compact_storage_evidence(small, full_hash)
+        self.assertEqual(small, unchanged)
+        # Existing detail alone can still exceed the cap; storage never trims it.
+        oversize = {**copy.deepcopy(full), "browser_worker_tests": {"existing": "x" * 16000}}
+        self.phases.compact_storage_evidence(oversize, full_hash)
+        self.assertGreater(len(self.phases.encoded(oversize)), 16000)
+        self.assertEqual(oversize["current_storage_node"], {"file": "phase-summary.json", "sha256": full_hash})
+        self.assertEqual(oversize["browser_worker_tests"]["existing"], "x" * 16000)
 
 if __name__ == "__main__":
     unittest.main()
