@@ -30,8 +30,10 @@ CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
     "harness": "scripts/ci/m9e_feedback.py",
     "phases": "scripts/ci/m9e_phases.py",
+    "owner_helper": "scripts/ci/m9e_current_proposal.py",
     "selftests": "scripts/ci/test_m9e_feedback.py",
     "config": "scripts/ci/m9e-targets.json",
+    "worker_storage": "scripts/ci/m9e_worker_storage.py",
     "workflow": ".github/workflows/m9e-focused-feedback.yml",
     "lock": "rust/Cargo.lock",
     "content": "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
@@ -80,16 +82,6 @@ STORAGE_BROWSER_IDS = [
 ]
 STORAGE_EVIDENCE_KEYS = ["reconciled", "conflict", "abort-bound"]
 
-CONTROL_QUERY_PATHS = ["rust/crates/er-cli/src/current_agent.rs",
-                       "rust/crates/er-cli/tests/m9e_current_control_query.rs"]
-CONTROL_QUERY_TARGET = ("er-cli", "m9e_current_control_query")
-CONTROL_QUERY_TEST_IDS = ["current_control_queries_are_read_only_and_plans_drive_natural_raw_input",
-                          "worker_control_queries_bind_current_control_and_preserve_rejections"]
-STATE_QUERY_PATHS = ["rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-lab/src/query.rs",
-                     "rust/crates/er-cli/tests/m9e_current_state_query.rs"]
-STATE_QUERY_TARGET = ("er-cli", "m9e_current_state_query")
-STATE_QUERY_TEST_IDS = ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture",
-                        "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"]
 LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
                   ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")}
 
@@ -348,45 +340,6 @@ def identity(feedback):
     }
 
 
-def validate_control_query_inventory(plan, inventory):
-    """Any selected current query target requires its exact process witness."""
-    selected = [item for item in inventory if (item["crate"], item["target"]) == CONTROL_QUERY_TARGET]
-    required = plan.get("requires_current_control_query", False)
-    if type(required) is not bool or (selected and not required):
-        raise RuntimeError("current control query requirement is absent or not boolean")
-    if not required:
-        return
-    identity = ":".join(CONTROL_QUERY_TARGET)
-    if (len(selected) != 1 or sorted(selected[0]["ids"]) != sorted(CONTROL_QUERY_TEST_IDS)
-            or selected[0]["historical_excluded_ids"]
-            or plan.get("requires_worker_executable") is not True
-            or plan.get("required_native_test_ids", {}).get(identity) != CONTROL_QUERY_TEST_IDS
-            or plan.get("required_native_targets", {}).get("er-cli", []).count(CONTROL_QUERY_TARGET[1]) != 1
-            or list(CONTROL_QUERY_TARGET) not in partition(inventory)["a"]):
-        raise RuntimeError("current control query process inventory, binding or lane ownership disagrees")
-
-
-def validate_state_query_inventory(plan, inventory):
-    """Any selected current query target requires its exact process witness."""
-    selected = [item for item in inventory if (item["crate"], item["target"]) == STATE_QUERY_TARGET]
-    required = plan.get("requires_current_state_query", False)
-    if type(required) is not bool or (selected and not required):
-        raise RuntimeError("current state query requirement is absent or not boolean")
-    if not required:
-        return
-    if plan.get("requires_current_control_query") is not True:
-        raise RuntimeError("current state query requires the exact control-query prerequisite")
-    validate_control_query_inventory(plan, inventory)
-    identity = ":".join(STATE_QUERY_TARGET)
-    if (len(selected) != 1 or sorted(selected[0]["ids"]) != sorted(STATE_QUERY_TEST_IDS)
-            or selected[0]["historical_excluded_ids"]
-            or plan.get("requires_worker_executable") is not True
-            or plan.get("required_native_test_ids", {}).get(identity) != STATE_QUERY_TEST_IDS
-            or plan.get("required_native_targets", {}).get("er-cli", []).count(STATE_QUERY_TARGET[1]) != 1
-            or list(STATE_QUERY_TARGET) not in partition(inventory)["a"]):
-        raise RuntimeError("current state query process inventory, binding or lane ownership disagrees")
-
-
 def validate_native(proof, expected_identity):
     if (proof.get("version") != 1 or proof.get("phase") != "native"
             or proof.get("status") != "passed" or proof.get("qualification") != "pending"
@@ -400,9 +353,9 @@ def validate_native(proof, expected_identity):
             raise RuntimeError("native phase requirements are not explicit booleans")
     counts = proof["tests"]
     inventory = proof["inventory"]
+    from m9e_current_proposal import validate_obligations
+    validate_obligations(plan, inventory, expected_identity["product_sha"])
     assignment = partition(inventory)
-    validate_control_query_inventory(plan, inventory)
-    validate_state_query_inventory(plan, inventory)
     lane = proof.get("lane")
     if lane not in assignment or proof.get("assigned_targets") != assignment[lane]:
         raise RuntimeError("native lane assignment is missing or differs from exact partition")
@@ -485,6 +438,10 @@ def validate_native(proof, expected_identity):
 def export_native(feedback, summary):
     """Called after full discovery/lint and this lane's complete execution."""
     expected = identity(feedback)
+    if summary["plan"].get("requires_current_proposal"):
+        from m9e_current_proposal import source_binding
+        if source_binding(feedback.ROOT, expected["product_sha"]) != summary["plan"].get("owner_source_binding"):
+            raise RuntimeError("owner source changed after native execution")
     if (summary["product_sha"] != expected["product_sha"] or summary["harness_sha"] != expected["files"]["harness"]
             or summary["lockfile_hash"] != expected["files"]["lock"] or summary["profile"] != expected["profile"]
             or summary["toolchain"] != expected["toolchain"] or summary["target"] != expected["target"]
@@ -670,7 +627,10 @@ def validate_browser_worker_tests(tests, evidence, binding):
         raise RuntimeError("current Worker termination did not fence the client")
 
 
-def validate_browser_rtc_tests(tests, evidence, binding, cohort_assets):
+def validate_browser_rtc_tests(tests, evidence, binding, cohort_assets, *, owner_binding=None, owner_helper_hash=None):
+    if owner_binding is not None:
+        from m9e_current_proposal import legacy_rtc_view
+        tests = legacy_rtc_view(tests, owner_binding, owner_helper_hash)
     if (not isinstance(tests, dict) or set(tests) != {"expected", "passed", "failed", "skipped", "selected_test_ids", "positive", "negative"}
             or any(type(tests[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
             or [tests[key] for key in ("expected", "passed", "failed", "skipped")] != [2, 2, 0, 0]
@@ -821,6 +781,8 @@ def validate_platform(proof, native, native_hash):
             or proof.get("plan_sha256") != native["plan_sha256"]):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
+    from m9e_current_proposal import validate_obligations
+    validate_obligations(plan, native["inventory"], native["identity"]["product_sha"])
     if plan.get("requires_browser_worker"):
         if not plan.get("requires_browser") or not plan.get("requires_wasm") or not plan.get("requires_cli_executable"):
             raise RuntimeError("current Worker plan omitted an existing platform requirement")
@@ -845,7 +807,9 @@ def validate_platform(proof, native, native_hash):
         validate_browser_worker_assets(proof.get("browser_rtc_assets"), binding, proof.get("browser_assets", {}).get("assets", {}), rtc=True)
         if set(proof["browser_rtc_assets"]["manifest"]["assets"]) & set(proof["browser_worker_assets"]["manifest"]["assets"]):
             raise RuntimeError("current RTC and Worker bundle namespaces overlap")
-        validate_browser_rtc_tests(proof.get("browser_rtc_tests"), proof["browser_rtc_assets"], binding, proof["browser_assets"]["assets"])
+        validate_browser_rtc_tests(proof.get("browser_rtc_tests"), proof["browser_rtc_assets"], binding, proof["browser_assets"]["assets"],
+                                   owner_binding=plan.get("owner_source_binding") if plan.get("requires_current_proposal") else None,
+                                   owner_helper_hash=native["identity"]["files"].get("owner_helper"))
     elif any(key in proof for key in ("browser_rtc_assets", "browser_rtc_tests")):
         raise RuntimeError("platform cannot claim an unrequested RTC capability")
     if plan.get("requires_current_storage"):
@@ -859,6 +823,8 @@ def validate_platform(proof, native, native_hash):
         validate_storage_browser(proof.get("current_storage_browser"), binding)
     elif any(key in proof for key in ("current_storage_node", "current_storage_browser")):
         raise RuntimeError("platform cannot claim unrequested current storage")
+    import m9e_worker_storage as composition
+    composition.validate_platform(proof, native)
     if plan["requires_wasm"]:
         wasm = proof.get("wasm_tests", {})
         if (wasm.get("expected") != 2 or wasm.get("passed") != 2 or wasm.get("failed") != 0
@@ -961,7 +927,7 @@ def aggregate(feedback):
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
-            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser") if key in result},
+            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
 
 
@@ -1020,7 +986,7 @@ def main():
             "phase", "status", "qualification", "product_sha", "identity", "tests",
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
-            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser",
+            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests",
             "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
@@ -1031,6 +997,8 @@ def main():
                     compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
         compact_rtc_evidence(compact, full_hash)
         compact_storage_evidence(compact, full_hash)
+        import m9e_worker_storage as composition
+        composition.compact(compact, full_hash, encoded)
         if len(encoded(compact)) > 16000:
             raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
         write_bounded(feedback.COMPACT / "summary.json", compact)

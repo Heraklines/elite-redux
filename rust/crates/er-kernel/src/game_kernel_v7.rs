@@ -49,6 +49,12 @@ use er_types::{
 };
 use thiserror::Error;
 
+use crate::current_proposal_v7::{
+    CurrentProposalMaterialReceiptV1, CurrentProposalOwnerSnapshotV1, MAX_CURRENT_RECEIPT_BYTES_V1,
+    RetainedCurrentProposalV1, TerminalAbandonedCurrentProposalV1, current_bytes_hex_v1,
+    decode_current_proposal_v1, json_bytes_sha256_v1, validate_current_pair_v1,
+    validate_current_proposal_quiescence_v1,
+};
 use crate::snapshot::{
     HeldLogicalButtonSnapshotV2, InputButtonLockSnapshotV2, InputRepeatSnapshotV2,
     InputRouterSnapshotV2, KernelSchedulerSnapshotV2, PhysicalInputSourceV2,
@@ -144,6 +150,7 @@ enum GameKernelLifecycleV7 {
 pub struct GameKernelV7 {
     lifecycle: GameKernelLifecycleV7,
     private_battle_control: Option<PrivateBattleControlSnapshotV7>,
+    current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
     content: Arc<PreparedGameContentV2>,
     local_seat: SeatId,
     role: GameKernelRoleV7,
@@ -215,6 +222,7 @@ impl GameKernelV7 {
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Bootstrap(bootstrap),
             private_battle_control: None,
+            current_proposal: None,
             content,
             local_seat,
             role,
@@ -256,6 +264,7 @@ impl GameKernelV7 {
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Active(runtime),
             private_battle_control: None,
+            current_proposal: None,
             content,
             local_seat,
             role,
@@ -327,6 +336,7 @@ impl GameKernelV7 {
         let value = Self {
             lifecycle,
             private_battle_control: snapshot.private_battle_control,
+            current_proposal: snapshot.current_proposal,
             content,
             local_seat,
             role,
@@ -395,6 +405,7 @@ impl GameKernelV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
             private_battle_control: self.private_battle_control.clone(),
+            current_proposal: self.current_proposal.clone(),
             authority_ai: self.authority_ai.as_ref().map(AuthorityAiV2::snapshot),
             input_router: self.input_router.clone(),
             scheduler: self.scheduler.clone(),
@@ -677,34 +688,14 @@ impl GameKernelV7 {
         if matches!(self.lifecycle, GameKernelLifecycleV7::Terminal { .. }) {
             return Ok(GameKernelStepV7::default());
         }
-        let directional_press = match &event {
-            RawInputEvent::KeyDown { code, .. } => {
-                navigation_button_v7(&PhysicalInputSourceV2::Keyboard(code.clone())).is_some()
-            }
-            RawInputEvent::GamepadDown { button } => {
-                navigation_button_v7(&PhysicalInputSourceV2::Gamepad(*button)).is_some()
-            }
-            _ => false,
-        };
-        let battle_press = matches!(
-            &event,
-            RawInputEvent::KeyDown { .. } | RawInputEvent::GamepadDown { .. }
-        ) && self
-            .current_control()
-            .is_some_and(|control| is_battle_navigation_control(control.kind));
-        if directional_press || battle_press {
-            // Battle UI can reject after registering physical, menu and timer owners.
-            // Keep direct kernel calls atomic; shared sessions currently stage
-            // this bounded path a second time until transaction reuse is added.
-            let mut candidate = self.clone();
-            let step = candidate.active_input(event)?;
-            candidate.retire_obsolete_repeats()?;
-            candidate.validate()?;
-            *self = candidate;
-            return Ok(step);
-        }
-        let step = self.active_input(event)?;
-        self.retire_obsolete_repeats()?;
+        // Every proposal-producing press includes physical/held/lock ownership.
+        // Stage ordinary controls too, so a late proposal or replay rejection
+        // cannot leave input state behind on direct kernel calls.
+        let mut candidate = self.clone();
+        let step = candidate.active_input(event)?;
+        candidate.retire_obsolete_repeats()?;
+        candidate.validate()?;
+        *self = candidate;
         Ok(step)
     }
     pub fn advance_time(
@@ -831,25 +822,164 @@ impl GameKernelV7 {
         self.handle_button(repeat.button)
     }
 
+    fn validate_current_network_pair(
+        &self,
+        generation: ConnectionGeneration,
+    ) -> Result<(), GameKernelV7Error> {
+        let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        let role = match self.role {
+            GameKernelRoleV7::Authority => EndpointRole::Authority,
+            GameKernelRoleV7::Replica => EndpointRole::Replica,
+        };
+        validate_current_pair_v1(protocol, self.local_seat, role, true)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        validate_current_proposal_quiescence_v1(Some(protocol), &self.scheduler)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        if generation != protocol.frame_context.context.connection_generation {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        Ok(())
+    }
+
     pub fn ingest_network_frame(
         &mut self,
         generation: ConnectionGeneration,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
-        if !protocol
-            .connections
-            .iter()
-            .any(|connection| connection.generation == generation)
+        if protocol.frame_context.context.connection_generation.get()
+            != SafeU53::new(1).map_err(|_| GameKernelV7Error::Invalid)?
         {
+            // Existing non-one-generation sessions retain their raw admission
+            // path. This is not a receipt-owner or generation-rebind witness.
+            if self.current_proposal.is_some()
+                || !protocol
+                    .connections
+                    .iter()
+                    .any(|connection| connection.generation == generation)
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            return match protocol.role {
+                EndpointRole::Authority => self.admit_game_proposal(bytes),
+                EndpointRole::Replica => self.apply_authority_material(bytes),
+            };
+        }
+        self.validate_current_network_pair(generation)?;
+        if bytes.is_empty() || bytes.len() > MAX_CURRENT_RECEIPT_BYTES_V1 {
             return Err(GameKernelV7Error::Invalid);
         }
-        match protocol.role {
-            EndpointRole::Authority => self.admit_game_proposal(bytes),
-            EndpointRole::Replica => self.apply_authority_material(bytes),
+        match self.role {
+            GameKernelRoleV7::Authority => {
+                let envelope =
+                    decode_current_proposal_v1(bytes).map_err(|_| GameKernelV7Error::Invalid)?;
+                if envelope.connection_generation != generation {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                let authority_context = self
+                    .protocol
+                    .as_ref()
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .frame_context
+                    .context
+                    .clone();
+                let mut candidate = self.clone();
+                // The compatibility API remains raw. Only this validated network
+                // transaction captures actual admitted input and committed output.
+                let mut step = candidate.admit_game_proposal(bytes)?;
+                if step.effects.is_empty() {
+                    return Ok(step); // Historical admission has no retained reply.
+                }
+                let mut matched = 0;
+                for effect in &mut step.effects {
+                    if let GameKernelEffectV7::AuthorityMaterial {
+                        operation_id,
+                        bytes: material,
+                    } = effect
+                    {
+                        if operation_id != &envelope.proposal.context.operation_id {
+                            return Err(GameKernelV7Error::Invalid);
+                        }
+                        let receipt = CurrentProposalMaterialReceiptV1::from_admission(
+                            bytes,
+                            material,
+                            authority_context.clone(),
+                        )
+                        .map_err(|_| GameKernelV7Error::Invalid)?;
+                        let decoded = receipt.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+                        let transition = decoded.material.transition();
+                        let snapshot = candidate.snapshot()?;
+                        if !snapshot.material_ledger.records.iter().any(|record| {
+                            &record.operation_id == operation_id
+                                && record.material_fingerprint == receipt.material_fingerprint
+                                && record.authority_revision == transition.authority_revision
+                                && record.after_digest == transition.after_digest
+                        }) || &transition.content_identity != self.content.identity()
+                        {
+                            return Err(GameKernelV7Error::Invalid);
+                        }
+                        *material = receipt
+                            .canonical_bytes()
+                            .map_err(|_| GameKernelV7Error::Invalid)?;
+                        matched += 1;
+                    }
+                }
+                if matched != 1 {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                candidate.validate()?;
+                *self = candidate;
+                Ok(step)
+            }
+            GameKernelRoleV7::Replica => {
+                if let Ok(receipt) = CurrentProposalMaterialReceiptV1::decode(bytes) {
+                    self.apply_current_receipt(receipt)
+                } else {
+                    self.apply_authority_material(bytes)
+                }
+            }
         }
     }
 
+    fn apply_current_receipt(
+        &mut self,
+        receipt: CurrentProposalMaterialReceiptV1,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let evidence = receipt.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+        let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        let transition = evidence.material.transition();
+        if protocol.peer_identity.peer.as_ref() != Some(&receipt.authority_context)
+            || evidence.proposal.sender_seat != self.local_seat
+            || &transition.content_identity != self.content.identity()
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        transition
+            .after_state
+            .validate_with(self.content.as_ref())
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let mut settle = false;
+        if let Some(CurrentProposalOwnerSnapshotV1::Pending { retained }) = &self.current_proposal
+            && retained.proposal_hex == receipt.proposal_hex
+        {
+            if retained.proposal_digest != receipt.proposal_digest
+                || retained.authority_peer_context != receipt.authority_context
+                || retained.publication_content_identity != transition.content_identity
+                || retained.publication_before_digest != transition.before_digest
+                || retained.publication_next_authority_revision != transition.authority_revision
+                || transition
+                    .after_state
+                    .active_run
+                    .as_ref()
+                    .map(|run| run.run_id)
+                    != Some(retained.publication_game_run_id)
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            settle = true;
+        }
+        self.apply_current_material(&evidence.material_bytes, settle, true)
+    }
     pub fn transport_changed(
         &mut self,
         generation: ConnectionGeneration,
@@ -868,6 +998,14 @@ impl GameKernelV7 {
         connected: bool,
     ) -> Result<(), GameKernelV7Error> {
         let protocol = self.protocol.as_mut().ok_or(GameKernelV7Error::Invalid)?;
+        // Generation-one current pairs cannot enter an unsupported rebind.
+        // Other historical protocol fixtures retain their existing staging API.
+        if (self.current_proposal.is_some()
+            || validate_current_pair_v1(protocol, self.local_seat, protocol.role, false).is_ok())
+            && generation.get() != safe_one()
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
         let connection = protocol
             .connections
             .first_mut()
@@ -930,14 +1068,44 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.apply_current_material(bytes, false, false)
+    }
+
+    fn apply_current_material(
+        &mut self,
+        bytes: &[u8],
+        settle: bool,
+        has_receipt: bool,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let was_terminal = matches!(self.lifecycle, GameKernelLifecycleV7::Terminal { .. });
+        if was_terminal && !has_receipt {
+            return Err(GameKernelV7Error::Invalid);
+        }
         let mut candidate = self.clone();
         candidate.restore_canonical_battle_control()?;
-        let runtime = candidate.active_runtime_mut()?;
+        let runtime = match &mut candidate.lifecycle {
+            GameKernelLifecycleV7::Active(runtime)
+            | GameKernelLifecycleV7::Terminal { runtime, .. } => runtime,
+            _ => return Err(GameKernelV7Error::Invalid),
+        };
         let outcome = runtime.apply_material_bytes(bytes).map_err(runtime_error)?;
         if outcome == GameMaterialApplyOutcomeV6::DuplicateApplied {
-            // Duplicate delivery must not reset a locally opened menu or
-            // resurrect presentation ownership after the renderer settles it.
+            if settle {
+                // Discard the canonical-control validation candidate. Receipt
+                // retirement starts from ORIGINAL private/UI/allocator state.
+                let mut retired = self.clone();
+                retired.current_proposal = None;
+                retired.advance_replay_sequence()?;
+                retired.validate()?;
+                *self = retired;
+            }
             return Ok(GameKernelStepV7::default());
+        }
+        if was_terminal {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        if settle {
+            candidate.current_proposal = None;
         }
         candidate.private_battle_control = None;
         let material = GameMaterialV6::decode(bytes)
@@ -954,9 +1122,8 @@ impl GameKernelV7 {
                 .collect(),
             internal_events: Vec::new(),
         };
-        // This slice delivers presentations and preserves no platform fan-out,
-        // including no duplicate storage work. Per-endpoint audio, asset and
-        // telemetry routing require separate completion ownership and tests.
+        // Replicas own presentation only. Never replay the material's platform
+        // or storage effects merely because a receipt accompanies its bytes.
         candidate.install_step_effects(&step.effects)?;
         if let Some(control) = candidate.current_control().cloned() {
             step.effects.push(GameKernelEffectV7::UiChanged(control));
@@ -966,7 +1133,6 @@ impl GameKernelV7 {
         *self = candidate;
         Ok(step)
     }
-
     pub fn settle_presentation(
         &mut self,
         event_id: er_types::PresentationEventId,
@@ -1059,7 +1225,7 @@ impl GameKernelV7 {
                 GamePlatformEffectV2::StorageRead { slot, .. },
                 KernelStorageResultV2::Read { bytes: Some(bytes) },
             ) => {
-                let save = GameSaveV2::decode(&bytes)
+                let mut save = GameSaveV2::decode(&bytes)
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
                 if &save.content_identity != self.content.identity() {
                     return Err(GameKernelV7Error::Storage(
@@ -1073,7 +1239,25 @@ impl GameKernelV7 {
                     .as_ref()
                     .map(|run| run.control.revision)
                     .unwrap_or(SafeU53::ZERO);
-                let next_revision = current_revision.max(increment_safe(control_revision)?);
+                let mut next_revision = current_revision.max(increment_safe(control_revision)?);
+                for presentation in self.pending_presentations.values() {
+                    next_revision = next_revision.max(increment_safe(presentation.event_id.get())?);
+                }
+                let live_platform = self
+                    .state()
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .identities
+                    .next_platform_request_id;
+                save.state.identities.next_platform_request_id = save
+                    .state
+                    .identities
+                    .next_platform_request_id
+                    .max(live_platform);
+                let next_menu_instance_id = rebind_loaded_control_v7(
+                    &mut save.state,
+                    next_revision,
+                    self.next_menu_instance_id,
+                )?;
                 let runtime = GameRuntimeV6::new_with_retention(
                     Some(save.state),
                     self.content.clone(),
@@ -1082,6 +1266,7 @@ impl GameKernelV7 {
                 )
                 .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.next_menu_instance_id = next_menu_instance_id;
                 self.private_battle_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot.clone(), save.generation);
@@ -1245,6 +1430,12 @@ impl GameKernelV7 {
         Ok(step)
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
+        if let Some(owner) = &self.current_proposal
+            && (self.role != GameKernelRoleV7::Replica
+                || owner.retained().publication_context.sender_seat_id != self.local_seat)
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
         if self
             .private_battle_control
             .as_ref()
@@ -1748,7 +1939,89 @@ impl GameKernelV7 {
                 connection_generation,
                 proposal,
             };
+            if connection_generation.get()
+                != SafeU53::new(1).map_err(|_| GameKernelV7Error::Invalid)?
+            {
+                if self.current_proposal.is_some() {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                let bytes = canonical_bytes(&envelope).map_err(|_| GameKernelV7Error::Invalid)?;
+                return Ok(GameKernelStepV7 {
+                    effects: vec![GameKernelEffectV7::ProposalReady {
+                        operation_id: action_context.operation_id,
+                        bytes,
+                    }],
+                    internal_events: Vec::new(),
+                });
+            }
+            self.validate_current_network_pair(connection_generation)?;
+            if !proposal_is_rooted_in_control(
+                self.canonical_battle_control(),
+                self.local_seat,
+                &envelope.proposal,
+            ) && !battle_proposal_is_rooted_in_control(
+                self.state(),
+                self.canonical_battle_control(),
+                self.local_seat,
+                &envelope.proposal,
+            ) {
+                return Err(GameKernelV7Error::Invalid);
+            }
             let bytes = canonical_bytes(&envelope).map_err(|_| GameKernelV7Error::Invalid)?;
+            decode_current_proposal_v1(&bytes).map_err(|_| GameKernelV7Error::Invalid)?;
+            let proposal_hex = current_bytes_hex_v1(&bytes);
+            if let Some(owner) = &self.current_proposal {
+                if !matches!(owner, CurrentProposalOwnerSnapshotV1::Pending { retained }
+                    if retained.proposal_hex == proposal_hex)
+                {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+            } else {
+                let mut canonical_state =
+                    self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
+                if let Some(private) = &self.private_battle_control {
+                    canonical_state
+                        .active_run
+                        .as_mut()
+                        .ok_or(GameKernelV7Error::Invalid)?
+                        .control = private.canonical_control.clone();
+                }
+                let publication_before_digest =
+                    er_game::m9e_material_v6::game_state_digest(&canonical_state)
+                        .map_err(|_| GameKernelV7Error::Invalid)?;
+                let publication_game_run_id = canonical_state
+                    .active_run
+                    .as_ref()
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .run_id;
+                let publication_next_authority_revision = self
+                    .active_runtime()?
+                    .snapshot()
+                    .material_ledger
+                    .next_authority_revision;
+                self.advance_replay_sequence()?;
+                let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+                self.current_proposal = Some(CurrentProposalOwnerSnapshotV1::Pending {
+                    retained: Box::new(RetainedCurrentProposalV1 {
+                        schema_version: 1,
+                        proposal_hex,
+                        proposal_digest: json_bytes_sha256_v1(&bytes)
+                            .map_err(|_| GameKernelV7Error::Invalid)?,
+                        publication_context: protocol.frame_context.context.clone(),
+                        authority_peer_context: protocol
+                            .peer_identity
+                            .peer
+                            .clone()
+                            .ok_or(GameKernelV7Error::Invalid)?,
+                        publication_content_identity: self.content.identity().clone(),
+                        publication_game_run_id,
+                        publication_before_digest,
+                        publication_next_authority_revision,
+                        publication_menu_highwater: self.next_menu_instance_id,
+                        publication_replay_sequence: self.replay_sequence,
+                    }),
+                });
+            }
             return Ok(GameKernelStepV7 {
                 effects: vec![GameKernelEffectV7::ProposalReady {
                     operation_id: action_context.operation_id,
@@ -2013,6 +2286,26 @@ impl GameKernelV7 {
             reason: reason.to_owned(),
         };
         let runtime = runtime.clone();
+        if let Some(CurrentProposalOwnerSnapshotV1::Pending { retained }) = &self.current_proposal {
+            let snapshot = runtime.snapshot();
+            let record = snapshot
+                .material_ledger
+                .records
+                .last()
+                .ok_or(GameKernelV7Error::Invalid)?;
+            self.current_proposal = Some(CurrentProposalOwnerSnapshotV1::TerminalAbandoned {
+                audit: Box::new(TerminalAbandonedCurrentProposalV1 {
+                    retained: retained.as_ref().clone(),
+                    terminal_id: terminal.terminal_id.clone(),
+                    terminal_reason: terminal.reason.clone(),
+                    terminal_operation_id: record.operation_id.clone(),
+                    terminal_material_fingerprint: record.material_fingerprint.clone(),
+                    terminal_authority_revision: record.authority_revision,
+                    terminal_after_digest: record.after_digest.clone(),
+                    abandonment_replay_sequence: self.replay_sequence,
+                }),
+            });
+        }
         self.lifecycle = GameKernelLifecycleV7::Terminal {
             runtime,
             terminal: terminal.clone(),
@@ -2454,10 +2747,6 @@ fn is_private_battle_leaf(kind: GameControlKindV2) -> bool {
             | GameControlKindV2::BattleTarget
             | GameControlKindV2::BattleSwitch
     )
-}
-
-fn is_battle_navigation_control(kind: GameControlKindV2) -> bool {
-    kind == GameControlKindV2::BattleCommand || is_private_battle_leaf(kind)
 }
 
 fn controls_differ_only_in_selection(left: &GameControlPlanV2, right: &GameControlPlanV2) -> bool {
@@ -3049,6 +3338,42 @@ fn complete_control(revision: SafeU53) -> GameControlPlanV2 {
         menu: None,
         actionable: false,
     }
+}
+
+/// Rebind live control ownership without regenerating the saved action or selection.
+/// The caller owns the complete cloned READ transaction, including these allocators.
+fn rebind_loaded_control_v7(
+    state: &mut GameStateV6,
+    revision: SafeU53,
+    next_menu: MenuInstanceId,
+) -> Result<MenuInstanceId, GameKernelV7Error> {
+    let Some(run) = state.active_run.as_mut() else {
+        return Ok(next_menu);
+    };
+    let control = &mut run.control;
+    control.validate().map_err(|_| GameKernelV7Error::Invalid)?;
+    // GameSaveV2 does not retain the exact private root/return-control owner.
+    if is_private_battle_leaf(control.kind) {
+        return Err(GameKernelV7Error::Invalid);
+    }
+    let next = if let Some(menu) = &mut control.menu {
+        let instance = next_menu.max(next_menu_after(menu.instance_id)?);
+        let next = next_menu_after(instance)?;
+        menu.instance_id = instance;
+        if let Some(context) = &mut control.action_context {
+            context.menu_instance = instance;
+        }
+        next
+    } else {
+        next_menu
+    };
+    control.revision = revision;
+    if let Some(context) = &mut control.action_context {
+        // Semantic operation IDs (especially canonical battle commands) stay exact.
+        context.authority_revision = revision;
+    }
+    control.validate().map_err(|_| GameKernelV7Error::Invalid)?;
+    Ok(next)
 }
 
 fn next_menu_after(current: MenuInstanceId) -> Result<MenuInstanceId, GameKernelV7Error> {
