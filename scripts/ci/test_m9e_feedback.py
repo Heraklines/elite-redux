@@ -7088,7 +7088,8 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "policy identities"):
             title.validate_policy({**original, "unknown": True})
 
-    def test_title_retirement_source_binding_requires_every_current_source_and_lock(self):
+    @patch("subprocess.run", side_effect=AssertionError("asset/source checks must not execute subprocesses"))
+    def test_title_retirement_source_binding_requires_every_current_source_and_lock(self, subprocess_run):
         import m9e_title_storage as title
         for name in [*title.SOURCE_PATHS, "pnpm-lock.yaml"]:
             path = self.root / name
@@ -7111,7 +7112,7 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         path.unlink()
         with self.assertRaisesRegex(RuntimeError, "bounded regular"):
             title.source_binding(self.root, CANDIDATE)
-        self.assertEqual(self.commands, [])
+        subprocess_run.assert_not_called()
 
     def test_title_retirement_owner_inventory_rejects_old_five_and_every_missing_identity(self):
         import m9e_title_storage as title
@@ -7170,7 +7171,8 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "Title retirement"):
                     title.validate_assets(bad, binding, cohort, "1.97.1")
 
-    def test_title_retirement_actual_asset_files_reject_tamper_and_unlisted_output(self):
+    @patch("subprocess.run", side_effect=AssertionError("asset/source checks must not execute subprocesses"))
+    def test_title_retirement_actual_asset_files_reject_tamper_and_unlisted_output(self, subprocess_run):
         title, binding, cohort, good = self.title_retirement_assets_fixture()
         output = self.root / "title-assets"
         output.mkdir()
@@ -7194,7 +7196,7 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         (output / "m9e-v7-title-storage-fixtures.json").write_bytes(b"[]")
         with self.assertRaisesRegex(RuntimeError, "fixture bytes"):
             title.bind_asset_files(output, binding, cohort, "1.97.1")
-        self.assertEqual(self.commands, [])
+        subprocess_run.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()
