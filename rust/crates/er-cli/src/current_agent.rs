@@ -12,7 +12,7 @@ use er_agent_protocol::{
 use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, KernelPresentationOutcomeV2};
-use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
+use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
 use er_state::m7_state::ProfileStateV1;
 use er_types::battle_ids::MenuInstanceId;
 use er_types::{MenuOptionId, RawInputEvent, SafeU53, SeatId};
@@ -71,6 +71,14 @@ struct ControlNavigationRequest {
     target: String,
     submit: bool,
     maximum_events: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CurrentStateRequest {
+    session: String,
+    query: Value,
+    maximum_bytes: usize,
 }
 
 #[derive(Debug)]
@@ -235,6 +243,8 @@ impl CurrentDispatcher {
                         | "session.checkpoint"
                         | "session.capsule.export"
                         | "session.capsule.status"
+                        | "state.query"
+                        | "state.inspect"
                         | "control.describe"
                         | "control.plan_navigation"
                         | "protocol.hello"
@@ -361,6 +371,66 @@ impl AgentDispatcherV1 for CurrentDispatcher {
 }
 
 impl CurrentDispatcher {
+    fn query_current_state(
+        &mut self,
+        params: &Value,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
+        let request: CurrentStateRequest =
+            serde_json::from_value(params.clone()).map_err(invalid_error)?;
+        if !(1..=1_048_576).contains(&request.maximum_bytes) {
+            return Err(invalid("current state query byte bound is invalid"));
+        }
+        let query: er_lab::StateQueryV1 =
+            serde_json::from_value(request.query.clone()).map_err(invalid_error)?;
+        // The historical selector enum permits ignored fields. Keep its public
+        // wire behavior unchanged while requiring exact current request shapes.
+        if serde_json::to_value(&query).map_err(backend)? != request.query {
+            return Err(invalid("current state query selector shape is invalid"));
+        }
+        let snapshot = self.session(params)?.snapshot()?;
+        let (lifecycle, profile, run, control) = match &snapshot.lifecycle {
+            GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => (
+                "BOOTSTRAP",
+                &bootstrap.profile,
+                None,
+                Some(&bootstrap.control),
+            ),
+            GameKernelLifecycleSnapshotV7::Active(state) => (
+                "ACTIVE",
+                &state.profile,
+                state.active_run.as_ref(),
+                state.active_run.as_ref().map(|run| &run.control),
+            ),
+            GameKernelLifecycleSnapshotV7::Terminal { state, control, .. } => (
+                "TERMINAL",
+                &state.profile,
+                state.active_run.as_ref(),
+                Some(control),
+            ),
+        };
+        let result =
+            er_lab::query_state_parts_v1(profile, run, control, query, request.maximum_bytes)
+                .map_err(backend)?;
+        let snapshot_digest = format!(
+            "blake3-v1:{}",
+            er_canonical::content_digest(&snapshot).map_err(backend)?
+        );
+        let response = json!({
+            "session": request.session,
+            "kernel_version": 7,
+            "content_identity": self.content.identity(),
+            "lifecycle": lifecycle,
+            "snapshot_digest": snapshot_digest,
+            "replay_sequence": snapshot.replay_sequence,
+            "result": result,
+        });
+        // Payload bytes and the complete JSON number-array envelope have separate
+        // bounds. A read-only overflow rejects without a capture attempt or gap.
+        context.admit_inline_success(&response)?;
+        Ok(response)
+    }
+
     fn describe_current_control(
         &mut self,
         params: &Value,
@@ -456,6 +526,7 @@ impl CurrentDispatcher {
         context: AgentResponseContextV1<'_>,
     ) -> Result<Value, AgentDispatchErrorV1> {
         match method {
+            "state.query" | "state.inspect" => self.query_current_state(params, context),
             "control.describe" => self.describe_current_control(params, context),
             "control.plan_navigation" => self.plan_current_navigation(params, context),
             "protocol.hello" => Ok(json!({
