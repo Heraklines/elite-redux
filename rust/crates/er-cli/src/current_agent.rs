@@ -38,6 +38,8 @@ pub(crate) enum CurrentStart {
         owner_seat: SeatId,
         save_slots: Vec<String>,
         local_is_host: bool,
+        #[serde(default)]
+        existing_saves: bool,
     },
     Snapshot {
         snapshot: Box<CoreGameKernelSnapshotV7>,
@@ -253,16 +255,23 @@ impl CurrentStart {
                 owner_seat,
                 save_slots,
                 local_is_host,
-            } => CurrentGameSession::natural_start(
-                *profile,
-                seed,
-                owner_seat,
-                save_slots,
-                local_is_host,
-                content,
-                None,
-            )
-            .map_err(backend),
+                existing_saves,
+            } => {
+                let mut session = CurrentGameSession::natural_start(
+                    *profile,
+                    seed,
+                    owner_seat,
+                    save_slots,
+                    local_is_host,
+                    content,
+                    None,
+                )
+                .map_err(backend)?;
+                if existing_saves {
+                    session.enable_current_title_storage().map_err(backend)?;
+                }
+                Ok(session)
+            }
             CurrentStart::Snapshot {
                 snapshot,
                 owner_seat,

@@ -83,7 +83,7 @@ STORAGE_BROWSER_IDS = [
 STORAGE_EVIDENCE_KEYS = ["reconciled", "conflict", "abort-bound"]
 
 LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-                  ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")}
+                  ("er-cli", "m9e_current_reload")}
 
 
 def inventory_and_assignment(enumerated, lane):
