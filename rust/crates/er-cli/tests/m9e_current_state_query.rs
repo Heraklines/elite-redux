@@ -243,7 +243,11 @@ fn query_batch(cli: &mut Cli, reference: &CurrentGameSession, native: bool) -> T
     unchanged(cli, &before)
 }
 
-fn raw(cli: &mut Cli, reference: &mut CurrentGameSession, input: RawInputEvent) -> TestResult {
+fn raw(
+    cli: &mut Cli,
+    reference: &mut CurrentGameSession,
+    input: RawInputEvent,
+) -> TestResult<CoreGameKernelSnapshotV7> {
     let step = reference.apply(CurrentExternalEvent::RawInput {
         input: input.clone(),
     })?;
@@ -254,10 +258,12 @@ fn raw(cli: &mut Cli, reference: &mut CurrentGameSession, input: RawInputEvent) 
         )?,
         &json!({"step": step, "observation": reference.observe()?}),
     )?;
+    let snapshot = reference.snapshot()?;
     same(
         &cli.result("session.snapshot", json!({"session": SESSION}))?,
-        &serde_json::to_value(reference.snapshot()?)?,
-    )
+        &serde_json::to_value(&snapshot)?,
+    )?;
+    Ok(snapshot)
 }
 
 fn key(code: PhysicalKey, down: bool) -> RawInputEvent {
@@ -276,16 +282,19 @@ fn key(code: PhysicalKey, down: bool) -> RawInputEvent {
 fn drain_presentations(
     cli: &mut Cli,
     reference: &mut CurrentGameSession,
+    snapshot: CoreGameKernelSnapshotV7,
     native: bool,
     settlements: &mut usize,
 ) -> TestResult {
-    let pending = reference.snapshot()?.pending_presentations;
-    if !pending.is_empty() && *settlements == 0 {
+    // raw() already validated this exact post-input snapshot and compared every
+    // field with the CLI. No reference transition occurs before this call.
+    let pending = snapshot.pending_presentations;
+    if pending.is_empty() {
+        return Ok(());
+    }
+    if *settlements == 0 {
         assert!(
-            matches!(
-                reference.snapshot()?.lifecycle,
-                GameKernelLifecycleSnapshotV7::Active(_)
-            ),
+            matches!(snapshot.lifecycle, GameKernelLifecycleSnapshotV7::Active(_)),
             "positive ownership witness must be current Active"
         );
         // Query successes and failures conserve actual pending ownership before
@@ -326,13 +335,14 @@ fn press(
     settlements: &mut usize,
 ) -> TestResult {
     raw(cli, reference, key(code.clone(), true))?;
-    raw(cli, reference, key(code, false))?;
-    drain_presentations(cli, reference, native, settlements)
+    let snapshot = raw(cli, reference, key(code, false))?;
+    drain_presentations(cli, reference, snapshot, native, settlements)
 }
 
 fn natural_active(cli: &mut Cli, reference: &mut CurrentGameSession, native: bool) -> TestResult {
     let mut settlements = 0;
-    drain_presentations(cli, reference, native, &mut settlements)?;
+    let snapshot = reference.snapshot()?;
+    drain_presentations(cli, reference, snapshot, native, &mut settlements)?;
     for _ in 0..3 {
         press(cli, reference, PhysicalKey::Space, native, &mut settlements)?;
     }
@@ -364,8 +374,8 @@ fn natural_active(cli: &mut Cli, reference: &mut CurrentGameSession, native: boo
         if index % 64 == 0 {
             let _ = writeln!(std::io::stderr(), "state-query native={native} raw={index}");
         }
-        raw(cli, reference, input)?;
-        drain_presentations(cli, reference, native, &mut settlements)?;
+        let snapshot = raw(cli, reference, input)?;
+        drain_presentations(cli, reference, snapshot, native, &mut settlements)?;
     }
     assert_eq!(
         reference
