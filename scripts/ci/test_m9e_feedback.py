@@ -6424,10 +6424,6 @@ class FeedbackTests(unittest.TestCase):
                               *phases.STATE_QUERY_IDENTITIES.items()):
             self.assertEqual(selection["required_native_test_ids"][":".join(target)], names)
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 14)
-        for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
-            self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
-        self.assertEqual(self.config, previous)
-        self.assertEqual(self.executed, [])
         self.assertEqual(selection["title_storage_binding"], title.source_binding(self.root, CANDIDATE))
         for identity, names in self.feedback.TITLE_STORAGE_IDS.items():
             self.assertEqual(selection["required_native_test_ids"][identity], names)
@@ -6787,6 +6783,10 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["timer_mutant"], previous["timer_focus"]["mutant"])
         self.assertEqual(selection["replica_mutant"], previous["timer_focus"]["replica_mutant"])
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 14)
+        for target, ids in (*phases.STATE_QUERY_IDENTITIES.items(), (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
+            self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
+        self.assertEqual(self.config, previous)
+        self.assertEqual(self.executed, [])
 
     def test_exact_cost_and_rule_pair_preserves_both_owners_and_every_existing_obligation(self):
         cost, phases, binding = self.configure_cost_scope()
