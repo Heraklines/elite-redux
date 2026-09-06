@@ -1,0 +1,53 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 34020101297 (main)
+timestamp: 2026-09-06T07-54-44Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260906 WAVES=150 - replay this run with:  SOAK_SEED=20260906 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED at wave 6 (seed 206780945): host at terminal phase TitlePhase. Survey stops here.
+[31m[1mSoakInvariantError[22m: [coop-soak] LOCKSTEP invariant breached at wave 85 (seed 20260906): reward shop did not advance both counters once (before=99 host=99 guest=99). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-09-06T07-54-06-752Z__seed-20260906__wave-85. Replay: SOAK_SEED=20260906[39m
+
+----- vitest result tail -----
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Errors [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯⎯[39m[1m[41m Uncaught Exception [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of null (reading 'isClassicFinalBoss')[39m
+[36m [2m❯[22m DamageAnimPhase.end src/phases/damage-anim-phase.ts:[2m110:35[22m[39m
+    [90m108|[39m   [35mpublic[39m override [34mend[39m(pokemon[33m?[39m[33m:[39m [33mPokemon[39m) {
+    [90m109|[39m     const target = pokemon ?? (this.getPokemon() as Pokemon | undefine…
+    [90m110|[39m     [35mif[39m (globalScene[33m.[39mcurrentBattle[33m.[39misClassicFinalBoss [33m&&[39m target) {
+    [90m   |[39m                                   [31m^[39m
+    [90m111|[39m       globalScene[33m.[39m[34minitFinalBossPhaseTwo[39m(target)[33m;[39m
+    [90m112|[39m     } [35melse[39m {
+[90m [2m❯[22m DamageAnimPhase.pinned [as end] test/tools/coop-duo-harness.ts:[2m2801:20[22m[39m
+[90m [2m❯[22m DamageAnimPhase.finishDamage src/phases/damage-anim-phase.ts:[2m53:12[22m[39m
+[90m [2m❯[22m TimerEvent.callback src/phases/damage-anim-phase.ts:[2m99:18[22m[39m
+[90m [2m❯[22m MockClock.update node_modules/.pnpm/phaser@3.90.0/node_modules/phaser/src/time/Clock.js:[2m395:36[22m[39m
+[90m [2m❯[22m test/tools/coop-duo-harness.ts:[2m2761:22[22m[39m
+[90m [2m❯[22m runOwned test/tools/coop-duo-harness.ts:[2m2746:9[22m[39m
+[90m [2m❯[22m MockClock.clock.update test/tools/coop-duo-harness.ts:[2m2761:7[22m[39m
+[90m [2m❯[22m Timeout._onTimeout test/mocks/mock-clock.ts:[2m16:12[22m[39m
+[90m [2m❯[22m listOnTimeout node:internal/timers:[2m608:17[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 07:48:09
+[2m   Duration [22m 395.19s[2m (transform 22.83s, setup 27.40s, import 389ms, tests 366.53s, environment 710ms)[22m
+
