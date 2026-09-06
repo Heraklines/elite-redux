@@ -41,6 +41,16 @@
       "trainer_party::tests::trainer_templates_and_party_selection_are_deterministic"
     ]
   },
+  "current_read_rebind_focus": {
+    "paths": ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs", "rust/crates/er-web/tests/m9e_host_v2.rs"],
+    "exact_test_ids": [
+      "read_rebind_preserves_saved_semantics_and_executes_write_after_restore",
+      "read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root",
+      "read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion",
+      "read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior",
+      "read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work"
+    ]
+  },
   "baseline": "1eead4142a16700bc087f34b2fad1dc9f69d4be9",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34006023505",
   "readiness_packages": ["er-canonical"],
