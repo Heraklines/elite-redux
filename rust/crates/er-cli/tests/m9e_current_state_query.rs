@@ -66,11 +66,12 @@ fn digest(value: &Value) -> TestResult<String> {
 }
 
 fn same(actual: &Value, expected: &Value) -> TestResult {
-    assert_eq!(
-        digest(actual)?,
-        digest(expected)?,
-        "complete canonical result differs"
-    );
+    // Compare every decoded field directly, including the query's canonical bytes
+    // and digest. Re-encoding and hashing both full bootstrap catalogs for every
+    // raw key adds no equality coverage; explicit snapshot digest checks remain.
+    if actual != expected {
+        return Err("complete decoded JSON result differs".into());
+    }
     Ok(())
 }
 
@@ -361,7 +362,7 @@ fn natural_active(cli: &mut Cli, reference: &mut CurrentGameSession, native: boo
     );
     for (index, input) in inputs.into_iter().enumerate() {
         if index % 64 == 0 {
-            let _ = writeln!(std::io::stderr(), "state-query natural input {index}");
+            let _ = writeln!(std::io::stderr(), "state-query native={native} raw={index}");
         }
         raw(cli, reference, input)?;
         drain_presentations(cli, reference, native, &mut settlements)?;
