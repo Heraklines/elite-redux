@@ -3178,7 +3178,7 @@ class FeedbackTests(unittest.TestCase):
             (output / name).write_bytes(b"entry" if name == manifest["entry"] else b"worker")
         (output / "m9e-v7-rtc-assets.json").write_bytes(phases.encoded(manifest))
         vite = self.root / "node_modules/vite/package.json"
-        vite.parent.mkdir(parents=True)
+        vite.parent.mkdir(parents=True, exist_ok=True)
         vite.write_text(json.dumps({"version": manifest["vite_version"]}))
         summary = {"product_sha": CANDIDATE, "plan": selection, "browser_assets": {"assets": cohort}}
         self.feedback.verify_browser_worker_build(output, summary, rtc=True)
@@ -5428,7 +5428,9 @@ class FeedbackTests(unittest.TestCase):
         self.assertFalse(selection["current_title_retirement_focus"])
         self.assertTrue(selection["requires_title_retirement"])
         self.changed = [*title.PRODUCT_PATHS, "src/unmapped-title-path.ts"]
-        selection = self.feedback.plan()
+        with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping") as failure:
+            self.feedback.plan()
+        selection = json.loads(str(failure.exception).split(": ", 1)[1])
         self.assertFalse(selection["current_title_retirement_focus"])
         self.assertIn("src/unmapped-title-path.ts", selection["unknown_paths"])
         self.assertTrue(selection["requires_title_retirement"])
@@ -7693,7 +7695,7 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         self.output.joinpath(manifest["fixture"]["path"]).write_bytes(b"{}")
         self.output.joinpath("m9e-v7-title-storage-assets.json").write_bytes(title.js_bytes(manifest) + b"\n")
         vite = self.root / "node_modules/vite/package.json"
-        vite.parent.mkdir(parents=True)
+        vite.parent.mkdir(parents=True, exist_ok=True)
         vite.write_text('{"version":"8.0.10"}')
         _, _, _, _, oracle, _, _ = self.title_browser_proof_fixture()
         summary = {"product_sha": CANDIDATE, "plan": {"title_storage_binding": binding}, "browser_assets": {"assets": cohort}}
