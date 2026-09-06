@@ -4,7 +4,7 @@ use super::*;
 use crate::current_proposal_v7::{MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1, decode_current_hex_v1};
 use er_game::m72_bootstrap::RunBootstrapSelectionsV1;
 use er_types::{FrameContext, GameContentIdentityV2};
-use er_types::run_ids::GameModeId;
+use er_types::battle_ids::GameModeId;
 
 const MAX_CHOICES_BYTES: usize = 16_384;
 const MAX_OWNER_BYTES: usize = 1_048_576;
