@@ -4661,7 +4661,8 @@ class PhaseTransferTests(unittest.TestCase):
 
     def test_native_manifest_index_encoding_keeps_wire_and_expansion_bounded(self):
         proof = self.native_with_repeated_required_ids()
-        proof["padding"] = "x" * self.phases.MANIFEST_LIMIT
+        proof["padding"] = ""
+        proof["padding"] = "x" * (self.phases.NATIVE_PROOF_LIMIT + 1 - len(self.phases.encoded(proof)))
         with self.assertRaisesRegex(RuntimeError, "64 KiB"):
             self.phases.write_bounded(self.root / "oversize-indexed.json", proof)
         with self.assertRaisesRegex(RuntimeError, "bounded expansion"):
@@ -4692,6 +4693,47 @@ class PhaseTransferTests(unittest.TestCase):
     def replace_compressed_id_bytes(self, wire, raw):
         wire["inventory_ids"] = {"decoded_bytes": len(raw),
                                  "data": base64.b64encode(self.phases.zlib.compress(raw, level=9)).decode("ascii")}
+
+    def test_compressed_native_proof_keeps_complete_evidence_above_old_expansion_limit(self):
+        proof = self.native_requiring_inventory_compression()
+        proof["plan"]["required_native_test_ids"]["er-battle:m7_query_cases"] = list(
+            reversed(proof["inventory"][-1]["ids"]))
+        proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        for lane in ("a", "b"):
+            with self.subTest(lane=lane):
+                candidate = copy.deepcopy(proof)
+                candidate["lane"] = lane
+                candidate["assigned_targets"] = self.phases.partition(candidate["inventory"])[lane]
+                candidate["completed_targets"] = list(reversed(candidate["assigned_targets"]))
+                if lane == "b":
+                    candidate["tests"].update({"executed": 2, "passed": 2})
+                    candidate["native_timer_parity_digest"] = None
+                self.phases.validate_native(candidate, self.identity)
+                self.assertGreater(len(self.phases.encoded(candidate)), 2 * self.phases.MANIFEST_LIMIT)
+                self.assertLess(len(self.phases.encoded(candidate)), self.phases.NATIVE_PROOF_LIMIT)
+                candidate["padding"] = ""
+                candidate["padding"] = "x" * (self.phases.NATIVE_PROOF_LIMIT - len(self.phases.encoded(candidate)))
+                self.assertEqual(len(self.phases.encoded(candidate)), self.phases.NATIVE_PROOF_LIMIT)
+                before = copy.deepcopy(candidate)
+                path = self.root / f"exact-expanded-{lane}.json"
+                digest = self.phases.write_bounded(path, candidate)
+                self.assertLessEqual(path.stat().st_size, self.phases.MANIFEST_LIMIT)
+                wire = json.loads(path.read_bytes())
+                self.assertEqual(wire["encoding"], self.phases.NATIVE_COMPRESSED_ID_ENCODING)
+                self.assertLessEqual(wire["inventory_ids"]["decoded_bytes"], 2 * self.phases.MANIFEST_LIMIT)
+                restored = self.phases.read_bounded(path, digest)
+                self.assertEqual(restored, before)
+                self.assertEqual(candidate, before)
+                self.phases.validate_native(restored, self.identity)
+                wire["proof"]["padding"] += "x"
+                data = self.phases.encoded(wire)
+                self.assertLessEqual(len(data), self.phases.MANIFEST_LIMIT)
+                path.write_bytes(data)
+                with self.assertRaisesRegex(RuntimeError, "bounded expansion"):
+                    self.phases.read_bounded(path, self.phases.sha(data))
+                candidate["padding"] += "x"
+                with self.assertRaisesRegex(RuntimeError, "64 KiB"):
+                    self.phases.write_bounded(self.root / f"over-expanded-{lane}.json", candidate)
 
     def test_compressed_native_ids_roundtrip_both_lanes_without_changing_semantics(self):
         proof = self.native_requiring_inventory_compression()
@@ -4874,8 +4916,14 @@ class PhaseTransferTests(unittest.TestCase):
         wire["inventory_ids"]["decoded_bytes"] += 1
         with self.assertRaisesRegex(RuntimeError, "bounds"):
             self.phases.unpack_native_ids(wire)
-        wire = self.phases.pack_native_inventory(proof)
-        wire["proof"]["plan"]["required_native_test_ids"]["er-battle:m7_query_cases"] = list(range(900))
+        expanded = copy.deepcopy(proof)
+        expanded["plan"]["required_native_test_ids"]["er-battle:m7_query_cases"] = list(
+            expanded["inventory"][-1]["ids"])
+        expanded["plan_sha256"] = self.phases.sha(self.phases.encoded(expanded["plan"]))
+        expanded["padding"] = ""
+        expanded["padding"] = "x" * (self.phases.NATIVE_PROOF_LIMIT - len(self.phases.encoded(expanded)))
+        wire = self.phases.pack_native_inventory(expanded)
+        wire["proof"]["padding"] += "x"
         self.assertLessEqual(len(self.phases.encoded(wire)), self.phases.MANIFEST_LIMIT)
         with self.assertRaisesRegex(RuntimeError, "bounded expansion"):
             self.phases.unpack_native_ids(wire)

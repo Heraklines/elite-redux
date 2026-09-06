@@ -21,6 +21,9 @@ import zlib
 
 
 MANIFEST_LIMIT = 64 * 1024
+# Wire bytes and decompressed ID bytes retain their independent 64/128 KiB caps.
+# The complete proof also repeats required IDs, target pairs and plan metadata.
+NATIVE_PROOF_LIMIT = 192 * 1024
 NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
@@ -206,7 +209,7 @@ def unpack_native_ids(value):
     # Every target is referenced at most once and each index is a permutation:
     # each target-pair list is also bounded by the inventory count. Cap the
     # complete reconstructed evidence as well as the 64 KiB wire representation.
-    if len(encoded(expanded)) > 2 * MANIFEST_LIMIT:
+    if len(encoded(expanded)) > NATIVE_PROOF_LIMIT:
         raise RuntimeError("reconstructed native proof exceeds its bounded expansion")
     if (expanded.get("plan_sha256") != sha(encoded(expanded["plan"]))
             or expanded.get("inventory_sha256") != sha(encoded(inventory))):
@@ -223,7 +226,7 @@ def pack_native_inventory(value):
     indexed = pack_native_ids(value)
     if (len(encoded(indexed)) <= MANIFEST_LIMIT or not isinstance(indexed, dict)
             or indexed.get("encoding") != NATIVE_ID_ENCODING
-            or len(encoded(value)) > 2 * MANIFEST_LIMIT):
+            or len(encoded(value)) > NATIVE_PROOF_LIMIT):
         return indexed
     proof = indexed["proof"]
     inventory = proof["inventory"]
@@ -283,7 +286,7 @@ def unpack_compressed_native_inventory(value):
                 for target, names in zip(inventory, lists)]
     # Existing partition/permutation validation checks full ID strings, exact
     # uniqueness, selected/excluded separation and target ownership. Existing
-    # semantic hashes and the complete 128 KiB expansion bound remain required.
+    # semantic hashes and the complete 192 KiB expansion bound remain required.
     return {"encoding": NATIVE_ID_ENCODING, "proof": {**proof, "inventory": restored}}
 
 

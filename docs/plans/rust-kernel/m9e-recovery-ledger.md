@@ -2467,3 +2467,36 @@ all165 harness declarations,77 required targets and existing exact IDs remain.
 No classifier relaxation, product change, test omission or baseline advance.
 Only6058-byte summary and4097-byte failure were retrieved from inspected3060-byte
 compact9980447478. Native A diagnostics7685 bytes remain remote. No local workload.
+
+## Separate proof reconstruction from bounded wire and decompression
+
+7299eea4cfe7cef5167f7b662954bdd080ee4f17 / run34004490011 completed all
+1,235 selected native tests: A1,215/B20 passed, none failed or skipped. Both
+native lanes passed formatting, full selected compilation and Clippy. A's timer
+and replica mutants were detected and their original source restored. B published
+proof296e10db892733d853eb6f8aebd34c4e4cefce58a0b51edb76a988023dfebd33.
+A then failed proof export with phase manifest exceeds64KiB; platform was skipped
+and aggregate failed. This is not qualification; f140/33990371692 remains baseline.
+
+Bounded A compact9980741056 ZIP3230 supplied summary7471/failure1712 bytes.
+Necessary named members from inspected diagnostic9980741274 ZIP203189 supplied
+full-summary86861 and native-inventory125705 bytes (compressed22014/26692).
+No complete archive was retrieved. B compact9980899848 ZIP3594 supplied only
+summary13359 bytes; its large diagnostics remain remote.
+
+Source/JSON inspection confirms all29 required ID lists are exact inventory
+permutations. The six reconstructed fields inventory/plan/assigned/completed/
+target timings/required counts alone occupy131165 minified UTF-8 bytes, already
+above the old131072 reconstruction guard before identity and mutation evidence.
+That guard incorrectly prevents the existing ID-only compression from running.
+Keep64KiB wire,128KiB decompressed IDs, exact hashes, complete evidence and every
+semantic validator; give complete reconstructed proof its own192KiB bound.
+This is an in-memory evidence bound, not a larger download or missing-test waiver.
+
+Retain existing v1/v2 roundtrip and tampering tests; adapt semantic-overflow
+witnesses to the explicit new bound. Add one regression exercising both lanes,
+complete repeated required IDs above128KiB, exact192KiB reconstruction, rejection
+at one byte over with a correct wire hash, unchanged source proof, validated
+restored semantics and independent64/128KiB caps. There are166 harness test
+declarations;59 exact companions,77 required native targets and all native IDs
+remain unchanged. No local test, formatter, build, installation or browser ran.
