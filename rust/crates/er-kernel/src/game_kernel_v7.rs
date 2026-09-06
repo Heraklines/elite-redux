@@ -846,6 +846,25 @@ impl GameKernelV7 {
         generation: ConnectionGeneration,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        if protocol.frame_context.context.connection_generation.get()
+            != SafeU53::new(1).map_err(|_| GameKernelV7Error::Invalid)?
+        {
+            // Existing non-one-generation sessions retain their raw admission
+            // path. This is not a receipt-owner or generation-rebind witness.
+            if self.current_proposal.is_some()
+                || !protocol
+                    .connections
+                    .iter()
+                    .any(|connection| connection.generation == generation)
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            return match protocol.role {
+                EndpointRole::Authority => self.admit_game_proposal(bytes),
+                EndpointRole::Replica => self.apply_authority_material(bytes),
+            };
+        }
         self.validate_current_network_pair(generation)?;
         if bytes.is_empty() || bytes.len() > MAX_CURRENT_RECEIPT_BYTES_V1 {
             return Err(GameKernelV7Error::Invalid);
@@ -1901,6 +1920,21 @@ impl GameKernelV7 {
                 connection_generation,
                 proposal,
             };
+            if connection_generation.get()
+                != SafeU53::new(1).map_err(|_| GameKernelV7Error::Invalid)?
+            {
+                if self.current_proposal.is_some() {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                let bytes = canonical_bytes(&envelope).map_err(|_| GameKernelV7Error::Invalid)?;
+                return Ok(GameKernelStepV7 {
+                    effects: vec![GameKernelEffectV7::ProposalReady {
+                        operation_id: action_context.operation_id,
+                        bytes,
+                    }],
+                    internal_events: Vec::new(),
+                });
+            }
             self.validate_current_network_pair(connection_generation)?;
             if !proposal_is_rooted_in_control(
                 self.canonical_battle_control(),

@@ -134,6 +134,10 @@ fn natural_coop_state(
         .ok_or("supported cooperative mode missing")?;
     let cooperative_mode_id = cooperative_mode.mode;
     let mode_option = format!("bootstrap/mode/{}", cooperative_mode_id.get());
+    let protocol = initial_battle_protocol_snapshot_v2(
+        &authority_protocol(host, SeatId::new(safe(2)), ConnectionGeneration::new(safe(1)))?,
+        host,
+    )?;
     let mut kernel = GameKernelV7::natural_start(
         profile()?,
         "m9e-natural-coop".to_owned(),
@@ -142,7 +146,7 @@ fn natural_coop_state(
         true,
         content,
         scheduler(),
-        None,
+        Some(protocol),
     )
     .map_err(|error| format!("natural co-op initialization failed: {error}"))?;
     press(&mut kernel, PhysicalKey::Space)?;
@@ -164,6 +168,11 @@ fn natural_coop_state(
         state.active_run.as_ref().ok_or("run missing")?.mode,
         cooperative_mode_id
     );
+    let run = state.active_run.as_ref().ok_or("run missing")?;
+    assert_eq!(run.battle.as_ref().ok_or("battle missing")?.format.player_capacity, 2);
+    for seat in [host, SeatId::new(safe(2))] {
+        assert!(run.party.iter().any(|pokemon| pokemon.owner_seat == Some(seat)));
+    }
     let snapshot = kernel
         .snapshot()
         .map_err(|error| format!("natural co-op snapshot failed: {error}"))?;
@@ -255,9 +264,17 @@ fn pair_from_state(
     revision: SafeU53,
     content: Arc<PreparedGameContentV2>,
 ) -> Result<(GameKernelV7, GameKernelV7), Box<dyn Error>> {
+    pair_from_state_at_generation(state, revision, content, ConnectionGeneration::new(safe(1)))
+}
+
+fn pair_from_state_at_generation(
+    state: GameStateV6,
+    revision: SafeU53,
+    content: Arc<PreparedGameContentV2>,
+    generation: ConnectionGeneration,
+) -> Result<(GameKernelV7, GameKernelV7), Box<dyn Error>> {
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
-    let generation = ConnectionGeneration::new(safe(1));
     let authority = GameKernelV7::from_active(
         state.clone(),
         revision,
@@ -356,6 +373,32 @@ fn bind_battle_root(state: &mut GameStateV6, owner: SeatId) -> Result<(), Box<dy
     Ok(())
 }
 
+fn noncurrent_generation_raw_compatibility(
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(), Box<dyn Error>> {
+    let (mut state, revision, menu) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
+    save_checkpoint(&mut state, revision, menu)?;
+    let generation = ConnectionGeneration::new(safe(9));
+    let (mut authority, mut replica) = pair_from_state_at_generation(state, revision, content, generation)?;
+    let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
+    assert!(replica.snapshot()?.current_proposal.is_none());
+    let envelope = er_kernel::current_proposal_v7::decode_current_proposal_v1(&bytes)?;
+    assert_eq!(envelope.connection_generation, generation);
+    let before = authority.snapshot()?;
+    assert!(authority.ingest_network_frame(ConnectionGeneration::new(safe(8)), &bytes).is_err());
+    assert_eq!(authority.snapshot()?, before);
+    let raw = material(&authority.ingest_network_frame(generation, &bytes)?)?;
+    GameMaterialV6::decode(&raw)?;
+    assert!(CurrentProposalMaterialReceiptV1::decode(&raw).is_err());
+    replica.ingest_network_frame(generation, &raw)?;
+    assert_eq!(replica.state(), authority.state());
+    assert!(replica.snapshot()?.current_proposal.is_none());
+    assert!(authority.snapshot()?.current_proposal.is_none());
+    let completed = replica.snapshot()?;
+    assert_eq!(replica.ingest_network_frame(generation, &raw)?, GameKernelStepV7::default());
+    assert_eq!(replica.snapshot()?, completed);
+    Ok(())
+}
 fn ordinary_publication_atomicity(
     content: Arc<PreparedGameContentV2>,
 ) -> Result<(), Box<dyn Error>> {
@@ -652,6 +695,7 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     let content = content()?;
     let generation = ConnectionGeneration::new(safe(1));
     ordinary_publication_atomicity(content.clone())?;
+    noncurrent_generation_raw_compatibility(content.clone())?;
     let (mut state, revision, _) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
     // Controlled guest-first canonical root, not a natural guest-first claim.
     // The actual retention material must still await the other human's command.
@@ -1022,7 +1066,7 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(1));
     // Natural cooperative bootstrap followed by an explicit final-wave checkpoint:
-    // one living enemy, two real human actors, and unchanged content/RNG rules.
+    // one living enemy, two runtime human-seat actors, and unchanged content/RNG rules.
     let (mut state, revision, _) = natural_coop_state(content.clone(), host)?;
     let run = state.active_run.as_mut().ok_or("run missing")?;
     let final_wave = WaveIndex::new(safe(200))?;

@@ -2718,3 +2718,19 @@ full snapshot round trip before exercising real lease arm/retirement or pauses.
 Do not expose the production private methods or remove ownership assertions.
 Named compact failure7330bytes fromartifact9983210181ZIP2228. Tests and actual
 platform qualification remain pending; comparison staysqualified791.
+Owner3903c950/run34013691597 passed formatting, production/test compilation and
+selected Clippy in both native lanes, then exposed two runtime failures. Existing
+host14 had13 passes and generation-nine NetworkFrame admission failed. Preserve
+that unchanged regression test and restore the existing raw publication/admission
+path for actual non-one-generation sessions; generation-one receipt ownership
+remains strict, and incoming generation alone cannot select the compatibility path.
+Add a generation-nine raw proposal/material and duplicate-conservation witness,
+including wrong-generation rejection without snapshot mutation. This compatibility
+path does not qualify receipt ownership after reconnect or generation rebinding.
+The two new owner tests also assumed a second actor after natural bootstrap with
+no protocol. Supply the real authority/guest protocol before bootstrap, as the
+existing cooperative witness does, and assert both runtime seat owners exist.
+This proves peer-aware bootstrap actors, not independent starter choice by both
+humans. Retrieved only compact named failures: A1102bytes/artifact9983402289ZIP4373,
+B819bytes/artifact9983355100ZIP3583. Both new tests and all unchanged controls must
+pass remotely before qualification; baseline remains791. No local workload ran.
