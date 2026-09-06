@@ -7330,6 +7330,49 @@ class PhaseTransferTests(unittest.TestCase):
                                                           "negative_divergence_position": 10, "snapshot_digest": "blake3-v1:" + "a" * 64}}
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
 
+    def test_platform_plan_reference_preserves_every_evidence_field_and_native_plan(self):
+        original = {**copy.deepcopy(self.platform), "plan": copy.deepcopy(self.native["plan"])}
+        before = copy.deepcopy(original)
+        native_before = copy.deepcopy(self.native)
+        result = self.phases.reference_platform_plan(original, self.native, self.native_hash)
+        self.assertEqual(result, self.platform)
+        self.assertEqual(original, before)
+        self.assertEqual(self.native, native_before)
+        self.phases.validate_platform(result, self.native, self.native_hash)
+        self.assertEqual(result["native_manifest_sha256"], self.native_hash)
+        self.assertEqual(result["plan_sha256"], self.native["plan_sha256"])
+
+    def test_platform_plan_reference_rejects_rebinding_and_missing_actual_evidence(self):
+        original = {**copy.deepcopy(self.platform), "plan": copy.deepcopy(self.native["plan"])}
+        changed = copy.deepcopy(original)
+        changed["plan"]["requires_wasm"] = False
+        with self.assertRaisesRegex(RuntimeError, "complete native plan"):
+            self.phases.reference_platform_plan(changed, self.native, self.native_hash)
+        with self.assertRaisesRegex(RuntimeError, "duplicated plan differs"):
+            self.phases.validate_platform(changed, self.native, self.native_hash)
+        with self.assertRaisesRegex(RuntimeError, "identity or completion"):
+            self.phases.reference_platform_plan(original, self.native, "0" * 64)
+        referenced = self.phases.reference_platform_plan(original, self.native, self.native_hash)
+        del referenced["wasm_tests"]
+        with self.assertRaisesRegex(RuntimeError, "Wasm identities"):
+            self.phases.validate_platform(referenced, self.native, self.native_hash)
+
+    def test_platform_plan_reference_keeps_unchanged_wire_limit_with_large_shared_plan(self):
+        native = copy.deepcopy(self.native)
+        native["plan"]["synthetic_shared_metadata"] = "x" * 65536
+        native["plan_sha256"] = self.phases.sha(self.phases.encoded(native["plan"]))
+        proof = {**copy.deepcopy(self.platform), "plan": copy.deepcopy(native["plan"]), "plan_sha256": native["plan_sha256"]}
+        self.assertGreater(len(self.phases.encoded(proof)), self.phases.MANIFEST_LIMIT)
+        with self.assertRaises(RuntimeError):
+            self.phases.write_bounded(self.root / "too-large.json", proof)
+        result = self.phases.reference_platform_plan(proof, native, self.native_hash)
+        self.assertEqual(self.phases.MANIFEST_LIMIT, 65536)
+        path = self.root / "referenced-platform.json"
+        digest = self.phases.write_bounded(path, result)
+        decoded = self.phases.read_bounded(path, digest)
+        self.assertEqual(decoded, result)
+        self.phases.validate_platform(decoded, native, self.native_hash)
+
     def test_control_query_aggregate_requires_both_lanes_exact_inventory_and_real_worker_binding(self):
         identity = ":".join(self.phases.CONTROL_QUERY_TARGET)
         binding, assets, tests, cohort = browser_worker_fixture(self.phases)

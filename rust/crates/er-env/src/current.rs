@@ -23,6 +23,7 @@ use thiserror::Error;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum CurrentExternalEvent {
+    RetryCoopSetup,
     RawInput {
         input: RawInputEvent,
     },
@@ -82,6 +83,13 @@ pub struct CurrentGameSession {
 }
 
 impl CurrentGameSession {
+    pub fn enable_current_coop_setup(&mut self) -> Result<(), CurrentSessionError> {
+        self.kernel
+            .as_mut()
+            .ok_or(CurrentSessionError::Disposed)?
+            .enable_current_coop_setup()?;
+        Ok(())
+    }
     pub fn enable_current_title_storage(&mut self) -> Result<(), CurrentSessionError> {
         self.kernel
             .as_mut()
@@ -306,6 +314,7 @@ fn reduce(
     event: CurrentExternalEvent,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
     match event {
+        CurrentExternalEvent::RetryCoopSetup => kernel.retry_current_coop_setup(),
         CurrentExternalEvent::RawInput { input } => kernel.raw_input(input),
         CurrentExternalEvent::AdvanceTime { milliseconds } => kernel.advance_time(milliseconds),
         CurrentExternalEvent::NetworkFrame { generation, bytes } => {

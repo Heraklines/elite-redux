@@ -14,6 +14,7 @@ er-game = { path = "../er-game" }
 er-kernel = { path = "../er-kernel" }
 er-kernel-worker = { path = "../er-kernel-worker" }
 er-lab = { path = "../er-lab" }
+er-protocol = { path = "../er-protocol" }
 er-repro = { path = "../er-repro" }
 er-save = { path = "../er-save" }
 er-state = { path = "../er-state" }
