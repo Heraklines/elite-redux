@@ -54,7 +54,7 @@
   "baseline": "1eead4142a16700bc087f34b2fad1dc9f69d4be9",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34006023505",
   "readiness_packages": ["er-canonical"],
-  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
+  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
   "shared_packages": ["er-kernel", "er-game", "er-state", "er-protocol", "er-types"],
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],
@@ -1455,5 +1455,10 @@
       "current IndexedDB settles a real aborted transaction and enforces namespace and slot bounds"
     ],
     "reason": "Exact additive current IndexedDB adapter scope. Inherit causal22 native execution and both controls, Worker2/codec3 and all existing platform/CLI bridge proofs. Add separate Node5/Chromium3 adapter-only witnesses and retain them on later browser-required cuts when adapter source exists. No Worker storage/gameplay or DELETE/LIST core claim."
+  },
+  "current_worker_storage_focus": {
+    "paths": ["src/rust-browser/routes/rust-current-storage-entry.ts", "rust/crates/er-web/examples/m9e_v7_storage_fixtures.rs", "scripts/build-kernel-m9e-storage-web.mjs", "test/browser/rust-browser/m9e-v7-worker-storage.spec.ts"],
+    "test_ids": ["current Worker stores and loads real GameSaveV2 bytes while presentation ownership remains independent", "current Worker reconciles an actual committed save after lost completion without repeating the write"],
+    "reason": "Separate controlled Active Worker/storage composition cut after qualified AI, RTC and IndexedDB adapter. Require AI50/causal native inventory, full reverse compilation including the Rust example, both controls, prior platform and exact real Worker2/3 controlled save witnesses. Later browser-required cuts retain composition when its actual route exists. No Bootstrap LIST, natural Save, production or crash recovery claim."
   }
 }

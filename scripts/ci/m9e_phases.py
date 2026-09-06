@@ -33,6 +33,7 @@ IDENTITY_FILES = {
     "owner_helper": "scripts/ci/m9e_current_proposal.py",
     "selftests": "scripts/ci/test_m9e_feedback.py",
     "config": "scripts/ci/m9e-targets.json",
+    "worker_storage": "scripts/ci/m9e_worker_storage.py",
     "workflow": ".github/workflows/m9e-focused-feedback.yml",
     "lock": "rust/Cargo.lock",
     "content": "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
@@ -822,6 +823,8 @@ def validate_platform(proof, native, native_hash):
         validate_storage_browser(proof.get("current_storage_browser"), binding)
     elif any(key in proof for key in ("current_storage_node", "current_storage_browser")):
         raise RuntimeError("platform cannot claim unrequested current storage")
+    import m9e_worker_storage as composition
+    composition.validate_platform(proof, native)
     if plan["requires_wasm"]:
         wasm = proof.get("wasm_tests", {})
         if (wasm.get("expected") != 2 or wasm.get("passed") != 2 or wasm.get("failed") != 0
@@ -924,7 +927,7 @@ def aggregate(feedback):
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
-            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser") if key in result},
+            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant") if key in native}}
 
 
@@ -983,7 +986,7 @@ def main():
             "phase", "status", "qualification", "product_sha", "identity", "tests",
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "platform_manifest_sha256",
-            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser",
+            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests",
             "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
@@ -994,6 +997,8 @@ def main():
                     compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
         compact_rtc_evidence(compact, full_hash)
         compact_storage_evidence(compact, full_hash)
+        import m9e_worker_storage as composition
+        composition.compact(compact, full_hash, encoded)
         if len(encoded(compact)) > 16000:
             raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
         write_bounded(feedback.COMPACT / "summary.json", compact)
