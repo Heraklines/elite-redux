@@ -39,6 +39,8 @@ pub enum BrowserSessionInitializationV2 {
         seed: String,
         save_slots: Vec<String>,
         local_is_host: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        existing_saves: bool,
     },
     ExistingSave {
         context: BrowserSessionContextV2,
@@ -61,6 +63,10 @@ pub enum BrowserSessionInitializationV2 {
     },
     /// Current causal capsule with explicit browser transport context.
     CurrentReproCapsule { capsule_bytes: Vec<u8> },
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

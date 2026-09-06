@@ -117,9 +117,23 @@ const coop = async () => {
   const privateAfterDuplicate = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
   const proposal = await rawPress(replica);
   const proposalBytes = networkBytes(proposal); if (proposalBytes == null) throw new Error("guest proposal missing");
+  const publishedOwner = (await replica.send({ kind: "SNAPSHOT" })).snapshot.current_proposal;
+  if (publishedOwner?.kind !== "PENDING") throw new Error("published proposal owner missing");
   const resolved = await authority.send({ kind: "NETWORK_FRAME", generation: 1, bytes: proposalBytes });
   const materialBytes = networkBytes(resolved); if (materialBytes == null) throw new Error("turn material missing");
-  const material = JSON.parse(decoder.decode(new Uint8Array(materialBytes)));
+  if (materialBytes.length > (1 << 20)) throw new Error("receipt exceeds frame bound");
+  const receipt = JSON.parse(decoder.decode(new Uint8Array(materialBytes)));
+  const proposalHex = Array.from(proposalBytes, byte => byte.toString(16).padStart(2, "0")).join("");
+  if (receipt.kind !== "CURRENT_PROPOSAL_MATERIAL_RECEIPT" || receipt.schema_version !== 1
+    || receipt.proposal_hex !== proposalHex || typeof receipt.material_hex !== "string"
+    || receipt.material_hex.length > 2 * (448 << 10) || !/^(?:[0-9a-f]{2})+$/u.test(receipt.material_hex)) {
+    throw new Error("invalid exact proposal material receipt");
+  }
+  const inner = Uint8Array.from(receipt.material_hex.match(/../gu), pair => Number.parseInt(pair, 16));
+  const material = JSON.parse(decoder.decode(inner));
+  if (material.kind !== "BATTLE_TURN" || !Array.isArray(material.value?.presentation)) {
+    throw new Error("receipt does not contain battle turn material");
+  }
   const expectedPresentation = material.value.presentation;
   const delivered = await replica.send({ kind: "NETWORK_FRAME", generation: 1, bytes: materialBytes }, false);
   const pending = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
@@ -134,6 +148,7 @@ const coop = async () => {
   const authorityAfter = (await authority.send({ kind: "SNAPSHOT" })).snapshot;
   const replicaAfter = (await replica.send({ kind: "SNAPSHOT" })).snapshot;
   return {
+    exactProposalOwnerRetired: pending.current_proposal == null,
     converged: sameSnapshot(authorityAfter.lifecycle, replicaAfter.lifecycle),
     turnAdvanced: authorityAfter.lifecycle.value.active_run.battle.turn > initialTurn,
     privateControlKind: control(privateMove).kind,
@@ -176,6 +191,7 @@ interface ResponseWire {
 }
 
 interface CoopResult {
+  exactProposalOwnerRetired: boolean;
   converged: boolean;
   turnAdvanced: boolean;
   privateControlKind: string;
@@ -354,6 +370,7 @@ test("two V7 browser hosts wait for both humans and converge one turn", async ({
   const result = await page.evaluate(() => globalThis.__m9eV7.coop());
   expect(result.turnAdvanced).toBe(true);
   expect(result.converged).toBe(true);
+  expect(result.exactProposalOwnerRetired).toBe(true);
   expect(result.privateControlKind).toBe("BATTLE_MOVE");
   expect(result.privateDuplicateEffects).toEqual([]);
   expect(result.privateSnapshotUnchanged).toBe(true);
