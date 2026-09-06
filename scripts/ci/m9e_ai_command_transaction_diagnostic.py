@@ -122,7 +122,7 @@ if __name__ == "__main__":
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "qualification": "focused AI command transaction only; no integration or M9 qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "56d79b255dd45c0f25fa034ca87d42287acb1690"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "98c04705f4010f4dd865ba5677451ce8599a91f3"}
     try:
         main(summary)
         if TARGET.exists():
