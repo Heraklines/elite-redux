@@ -1,4 +1,75 @@
 {
+  "current_title_retirement_focus": {
+    "paths": ["src/rust-browser/adapters/current-storage-owner.ts", "src/rust-browser/routes/rust-current-storage-entry.ts", "test/node/rust-browser/engineering/current-storage-owner.test.ts", "rust/crates/er-web/examples/m9e_v7_title_storage_fixtures.rs", "scripts/build-kernel-m9e-title-storage-web.mjs", "test/browser/rust-browser/m9e-v7-worker-title-storage.spec.ts"],
+    "trigger_paths": ["rust/crates/er-web/examples/m9e_v7_title_storage_fixtures.rs", "scripts/build-kernel-m9e-title-storage-web.mjs", "test/browser/rust-browser/m9e-v7-worker-title-storage.spec.ts"],
+    "test_ids": ["natural Title retires more than sixteen actual LIST/READ owners before loading and raw generation-two Write"],
+    "node_ids": [
+      "current storage owner freezes requests and separates durable callback acknowledgement",
+      "current storage owner bounds admission and rejects unsupported or malformed images before IO",
+      "current storage owner drains nested enqueue without rerunning durable writes",
+      "current storage owner fences unknown callback acceptance and late disposed work",
+      "current storage owner reconciles exact uncertain images and rejects changed receipts",
+      "Title cancellation drains queued read-only ownership without IO and never reuses evicted IDs",
+      "Title CANCELLING retains the sixteen-owner admission bound until running and queued work drains",
+      "Title retirement suppresses a queued delivery guard and releases its retained result once",
+      "Title retirement admits real abort classification but never reclaims an unclassified backend rejection",
+      "Title cancellation rejects writes, unknown acceptance, invalid evidence and impossible accepted callback races",
+      "Title backend deadlines and disposal never convert uncertain work into cancellation"
+    ]
+  },
+  "current_title_storage_focus": {
+  "paths": [
+    "rust/crates/er-cli/src/current_agent.rs",
+    "rust/crates/er-cli/tests/m9e_current_repro.rs",
+    "rust/crates/er-cli/tests/m9e_current_title_storage.rs",
+    "rust/crates/er-env/src/current.rs",
+    "rust/crates/er-game/src/current_bootstrap_storage.rs",
+    "rust/crates/er-game/src/m72_bootstrap.rs",
+    "rust/crates/er-kernel/src/game_kernel_v7.rs",
+    "rust/crates/er-kernel/src/snapshot_v7.rs",
+    "rust/crates/er-kernel/tests/m9e_title_storage.rs",
+    "rust/crates/er-types/src/m72_bootstrap.rs",
+    "rust/crates/er-web/src/contracts_v2.rs",
+    "rust/crates/er-web/src/host_v2.rs",
+    "rust/crates/er-web/tests/m9e_host_v2.rs",
+    "rust/crates/er-web/tests/m9e_title_storage.rs",
+    "src/rust-browser/contracts/browser-contracts-v2.ts"
+  ],
+  "trigger_paths": [
+    "rust/crates/er-cli/tests/m9e_current_title_storage.rs",
+    "rust/crates/er-game/src/current_bootstrap_storage.rs",
+    "rust/crates/er-kernel/tests/m9e_title_storage.rs",
+    "rust/crates/er-web/tests/m9e_title_storage.rs"
+  ],
+  "exact_test_ids": {
+    "er-kernel:m9e_title_storage": [
+      "title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two",
+      "title_inventory_is_bounded_actual_and_missing_read_returns_selection",
+      "title_cancel_retires_core_owner_without_reusing_ids_and_new_game_carries_floor",
+      "title_default_bytes_strict_extension_and_overflow_are_atomic",
+      "title_read_rejects_corrupt_nonlocal_private_and_inactive_saves_atomically",
+      "title_menu_revision_and_read_allocator_overflow_preserve_full_snapshot"
+    ],
+    "er-cli:m9e_current_title_storage": [
+      "current_cli_opt_in_title_list_cancel_read_matches_every_full_native_snapshot",
+      "current_cli_absent_flag_preserves_old_title_and_rejects_non_host_opt_in"
+    ],
+    "er-web:m9e_title_storage": [
+      "current_host_title_ingress_emits_typed_list_read_missing_and_cancel",
+      "current_host_default_wire_omits_opt_in_and_non_authority_is_rejected"
+    ],
+    "er-testkit:m72_foundation": [
+      "natural_bootstrap_completes_entire_observed_flow_with_raw_keys",
+      "held_input_cannot_cross_bootstrap_menu_instances",
+      "confirmation_cancel_restores_starter_menu_with_fresh_instance",
+      "navigation_planner_returns_raw_events_without_execution",
+      "legality_explains_disabled_option_without_enabling_it",
+      "preset_registry_is_content_pinned_and_path_confined",
+      "artifact_store_is_bounded_content_addressed_and_tears_down",
+      "search_is_semantic_sorted_and_state_claim_policy_is_explicit"
+    ]
+  }
+},
   "current_proposal_focus": {
     "paths": [
       "rust/crates/er-kernel/src/current_proposal_v7.rs",
@@ -54,7 +125,7 @@
   "baseline": "791ae5b53333eaaf8edd8e91dcdba1de006e106d",
   "baseline_evidence": "https://github.com/Heraklines/elite-redux/actions/runs/34011232052",
   "readiness_packages": ["er-canonical"],
-  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
+  "infrastructure_paths": [".github/workflows/m9e-focused-feedback.yml", "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_worker_storage.py", "scripts/ci/m9e_title_storage.py", "scripts/ci/m9e_phases.py", "scripts/ci/test_m9e_feedback.py", "scripts/ci/m9e-targets.json"],
   "documentation_prefixes": ["docs/plans/rust-kernel/m9e-"],
   "shared_packages": ["er-kernel", "er-game", "er-state", "er-protocol", "er-types"],
   "shared_witness_packages": ["er-kernel", "er-web", "er-wasm"],
@@ -1455,5 +1526,10 @@
       "current IndexedDB settles a real aborted transaction and enforces namespace and slot bounds"
     ],
     "reason": "Exact additive current IndexedDB adapter scope. Inherit causal22 native execution and both controls, Worker2/codec3 and all existing platform/CLI bridge proofs. Add separate Node5/Chromium3 adapter-only witnesses and retain them on later browser-required cuts when adapter source exists. No Worker storage/gameplay or DELETE/LIST core claim."
+  },
+  "current_worker_storage_focus": {
+    "paths": ["src/rust-browser/routes/rust-current-storage-entry.ts", "rust/crates/er-web/examples/m9e_v7_storage_fixtures.rs", "scripts/build-kernel-m9e-storage-web.mjs", "test/browser/rust-browser/m9e-v7-worker-storage.spec.ts"],
+    "test_ids": ["current Worker stores and loads real GameSaveV2 bytes while presentation ownership remains independent", "current Worker reconciles an actual committed save after lost completion without repeating the write"],
+    "reason": "Separate controlled Active Worker/storage composition cut after qualified AI, RTC and IndexedDB adapter. Require AI50/causal native inventory, full reverse compilation including the Rust example, both controls, prior platform and exact real Worker2/3 controlled save witnesses. Later browser-required cuts retain composition when its actual route exists. No Bootstrap LIST, natural Save, production or crash recovery claim."
   }
 }
