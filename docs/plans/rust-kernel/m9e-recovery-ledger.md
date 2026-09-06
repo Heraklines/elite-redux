@@ -2972,3 +2972,30 @@ passed257 harness cases; all5 changed CI hashes matched before copying. Product
 Rust fixture remains remotely formatted e6fa69d6105b9437b7bc3869d483ebe72b0ac06e2425a088c6303522cfbca98f.
 Comparison advances only to qualified748; full retirement runtime still pending.
 This is an integration checkpoint, not completion of M9.
+Retirement51f0668d/run34044688649 passed1031 native(A1013/B18),101 inventory,
+55 required targets and23 exact maps; platform failed before browser execution
+because the independent Title reference assumed display order and menuinstance1.
+GameMenuV2::new canonicalizes option/navigation order without changing layout or
+selection; enable_current_title_storage rebuilds the initial menu atinstance2,
+retaining revision1. Correct these explicit reference expectations, retain full
+snapshot comparisons, and pin the actual initial control in a regression test.
+No production Rust/browser behavior, fixture input, assertion or limit weakened.
+
+A small remote diagnostic read only the fixed prior5322322byte artifact on the
+runner and validated the exact7234546byte Rust fixture against the corrected
+oracle. No generated fixture or archive was downloaded to this PC. Initial
+attemptsfc858cba/run34047070610 and2bc84841/run34047192009 exposed allocator and
+cancellation-template assumptions after order repair; retain those failures.
+Finalpreflight62a0f612ce1140044e9bd555be62847f747e91df/run34047330139 passed258
+harness cases and the whole23-cancellation/actual READ/generation-two Write oracle.
+Compact9993497946ZIP2360 supplied only bounded summary+diagnostic; both changed
+CI hashes matched. This is prior-fixture F evidence, not new platform qualification.
+Comparison remainsfullyqualified748/run34042137836. Full corrected integration
+qualification remains required before advancing it or integrating PP/queries.
+
+Independent state/control querye2493b3eae91485a5a99d8c2684cde06e00fb301/
+run34044952978 nowall4passed621native(A602/B19),69 inventory25mandatory20maps,
+205harness. Exact23source/cross-phase/partition/RTC/mutant auditpassed. Bothstate
+journeys preserve all1412rawinputs and original test IDs in separateA/Btargets.
+Aggregate20019bytesSHAae5c723219d82d20c3d515d6f150d30bf593b0605bc1e9a2083a8f488d37dd2e.
+Queryproduct remains prepared for main integration after its storage/PP prerequisites.

@@ -203,7 +203,7 @@ def normalized_title_cancel(pending, initial):
             or len(pending["pending_platform"]) != 1
             or pending["pending_platform"][0]["request_id"] != owned["request_id"]
             or [row["option_id"] for row in template["control"]["menu"]["options"]]
-                != ["bootstrap/title/new-game", "bootstrap/title/existing-saves"]):
+                != ["bootstrap/title/existing-saves", "bootstrap/title/new-game"]):
         raise RuntimeError("Title Cancel has no exact released owner/template")
     revision = before["control"]["revision"] + 1
     instance = before["menu_instance_high_water"] + 1
@@ -253,6 +253,11 @@ def bootstrap_control(stage, owner, revision, instance):
     for left, right in zip(rows, rows[1:]):
         edges.extend([{"from": left[0], "direction": "DOWN", "to": right[0]},
                       {"from": right[0], "direction": "UP", "to": left[0]}])
+    # GameMenuV2::new stores canonical ID/direction order, independently of
+    # rendered row order and the explicitly selected New Game option.
+    options.sort(key=lambda option: option["option_id"])
+    directions = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+    edges.sort(key=lambda edge: (edge["from"], directions[edge["direction"]], edge["to"]))
     return {"schema_version": 2, "revision": revision, "kind": kind, "owner_seat": owner, "actionable": True,
             "action_context": {"operation_id": identity, "authority_seat": owner,
                                "authority_revision": revision, "menu_instance": instance},
@@ -403,7 +408,7 @@ def fixture_oracle(fixture, content_hash):
     rewrite_payload, _ = write_case_reference(fixture["rewrite"], 2, fixture["content_identity"])
     initial = fixture["initial"]
     owner = initial["lifecycle"]["value"]
-    if (initial["lifecycle"]["kind"] != "BOOTSTRAP" or owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 1)
+    if (initial["lifecycle"]["kind"] != "BOOTSTRAP" or owner["stage"] != "TITLE" or owner["pressed_keys"] or owner["control"] != bootstrap_control("TITLE", 1, 1, 2)
             or owner["current_storage"] != {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}
             or owner["catalog"]["save_slots"] != ["new-run-destination"]
             or initial["pending_platform"] or initial["pending_presentations"]):

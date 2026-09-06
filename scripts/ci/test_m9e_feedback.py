@@ -7435,7 +7435,7 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         control = {"kind": "TITLE", "revision": 1, "owner_seat": 1,
                    "action_context": {"authority_revision": 1, "menu_instance": 1, "operation_id": "bootstrap/title/1"},
                    "menu": {"instance_id": 1, "control_id": "bootstrap/title/1", "selected_option_id": "bootstrap/title/new-game",
-                            "options": [{"option_id": "bootstrap/title/new-game"}, {"option_id": "bootstrap/title/existing-saves"}]}}
+                            "options": [{"option_id": "bootstrap/title/existing-saves"}, {"option_id": "bootstrap/title/new-game"}]}}
         initial = {"lifecycle": {"kind": "BOOTSTRAP", "value": {"stage": "TITLE", "control": control,
                     "pressed_keys": [], "menu_instance_high_water": 1, "seed": "owned seed", "catalog": {"save_slots": ["new-destination"]},
                     "current_storage": {"owner_seat": 1, "pending": None, "next_platform_request_id": 1, "slots": [], "missing_slot": None}}},
@@ -7530,17 +7530,30 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
             title.normalized_title_cancel(bad, initial)
 
 
+    def test_title_reference_matches_actual_opt_in_menu_reallocation(self):
+        import m9e_title_storage as title
+        # Exact small control from Rust51f/run34044688649. Enabling storage
+        # rebuilds the initial menu at instance2 while keeping revision1.
+        produced = json.loads(r'''{"action_context":{"authority_revision":1,"authority_seat":1,"menu_instance":2,"operation_id":"bootstrap/title/1"},"actionable":true,"kind":"TITLE","menu":{"cancel":{"kind":"DISABLED"},"control_id":"bootstrap/title/1","instance_id":2,"navigation":[{"direction":"UP","from":"bootstrap/title/existing-saves","to":"bootstrap/title/new-game"},{"direction":"DOWN","from":"bootstrap/title/new-game","to":"bootstrap/title/existing-saves"}],"options":[{"action":{"action":{"kind":"OPEN_EXISTING_SAVES"},"kind":"BOOTSTRAP"},"enabled":true,"layout":{"column":0,"option_id":"bootstrap/title/existing-saves","page":0,"row":1},"option_id":"bootstrap/title/existing-saves","visible":true},{"action":{"action":{"kind":"OPEN_NEW_GAME"},"kind":"BOOTSTRAP"},"enabled":true,"layout":{"column":0,"option_id":"bootstrap/title/new-game","page":0,"row":0},"option_id":"bootstrap/title/new-game","visible":true}],"owner_seat":1,"selected_option_id":"bootstrap/title/new-game"},"owner_seat":1,"revision":1,"schema_version":2}''')
+        self.assertEqual(title.bootstrap_control("TITLE", 1, 1, 2), produced)
+        self.assertNotEqual(title.bootstrap_control("TITLE", 1, 1, 1), produced)
+        self.assertEqual(produced["menu"]["selected_option_id"], "bootstrap/title/new-game")
+        self.assertEqual([row["layout"]["row"] for row in produced["menu"]["options"]], [1, 0])
+
     def test_title_reference_menus_pin_order_actions_and_allocator(self):
         import m9e_title_storage as title
         initial = title.bootstrap_control("TITLE", 1, 1, 1)
         self.assertEqual(initial["schema_version"], 2)
         self.assertEqual(initial["menu"]["selected_option_id"], "bootstrap/title/new-game")
         self.assertEqual([option["action"] for option in initial["menu"]["options"]], [
-            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_NEW_GAME"}},
-            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_EXISTING_SAVES"}}])
+            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_EXISTING_SAVES"}},
+            {"kind": "BOOTSTRAP", "action": {"kind": "OPEN_NEW_GAME"}}])
         self.assertEqual(initial["menu"]["navigation"], [
-            {"from": "bootstrap/title/new-game", "direction": "DOWN", "to": "bootstrap/title/existing-saves"},
-            {"from": "bootstrap/title/existing-saves", "direction": "UP", "to": "bootstrap/title/new-game"}])
+            {"from": "bootstrap/title/existing-saves", "direction": "UP", "to": "bootstrap/title/new-game"},
+            {"from": "bootstrap/title/new-game", "direction": "DOWN", "to": "bootstrap/title/existing-saves"}])
+        self.assertEqual([option["option_id"] for option in initial["menu"]["options"]],
+                         ["bootstrap/title/existing-saves", "bootstrap/title/new-game"])
+        self.assertEqual([option["layout"]["row"] for option in initial["menu"]["options"]], [1, 0])
         selected = title.bootstrap_control("EXISTING_SAVE_SELECT", 1, 8, 9)
         self.assertEqual(selected["action_context"], {"authority_seat": 1, "authority_revision": 8, "menu_instance": 9,
                                                     "operation_id": "bootstrap/existingsaveselect/8"})
