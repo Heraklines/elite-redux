@@ -152,9 +152,8 @@ fn turn_execution_drives_real_presentations_and_rng() -> TestResult {
             > 0,
         "turn workload observed no presentation events"
     );
-    assert_eq!(
-        measurement.counters.get("rng_draws"),
-        measurement.counters.get("rng_draws"),
+    assert!(
+        measurement.counters.contains_key("rng_draws"),
         "RNG draw counter must be reported"
     );
     Ok(())

@@ -106,17 +106,16 @@ fn validated_catalog() -> Result<ValidatedSemanticCatalog, Box<dyn Error>> {
     ))?)
 }
 
+type CompiledFrozenContent = (
+    CompiledIdentity,
+    Vec<BehaviorUnitId>,
+    usize,
+    BattleContentPackV3,
+);
+
 /// Compiles the frozen catalog through the production pipeline into prepared
 /// content plus its checked identity fingerprints.
-fn compile_frozen_identity() -> Result<
-    (
-        CompiledIdentity,
-        Vec<BehaviorUnitId>,
-        usize,
-        BattleContentPackV3,
-    ),
-    Box<dyn Error>,
-> {
+fn compile_frozen_identity() -> Result<CompiledFrozenContent, Box<dyn Error>> {
     let catalog = validated_catalog()?;
     let mapped = map_routine_catalog(catalog.behavior_units())?;
     let behavior_units = mapped
@@ -303,7 +302,11 @@ fn full_m6_fixture_catalog_is_float_free_and_compiles_deterministically()
         "expected the full frozen M6 fixture set"
     );
     for path in entries {
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .expect("fixture directory entries have a final path component")
+            .to_string_lossy()
+            .to_string();
         let bytes = std::fs::read(&path)?;
         let value: Value = serde_json::from_slice(&bytes)
             .map_err(|error| format!("fixture {name} is invalid JSON: {error}"))?;

@@ -225,7 +225,6 @@ impl BenchmarkProfile {
     }
 
     /// Full frozen-catalog content preparations per measurement.
-
     pub const fn content_iterations(self) -> u32 {
         match self {
             Self::Debug => 2,
@@ -484,7 +483,7 @@ struct PreparedUnit {
 /// semantic-catalog unit through the production M6 preparation pipeline.
 fn prepare_one_content_unit(inputs: &ContentInputs) -> Result<PreparedUnit, BenchmarkError> {
     let validated = validated_catalog(&inputs.catalog_bytes)?;
-    if validated.oracle_sha().to_owned() != inputs.cluster_oracle_sha {
+    if validated.oracle_sha() != inputs.cluster_oracle_sha {
         return Err(BenchmarkError::fixture_message(
             "bespoke cluster manifest oracle SHA disagrees with the semantic catalog",
         ));
@@ -506,7 +505,7 @@ fn prepare_one_content_unit(inputs: &ContentInputs) -> Result<PreparedUnit, Benc
         .clusters
         .iter()
         .map(|cluster| BespokeAssignment {
-            mechanic: cluster.cluster.clone(),
+            mechanic: cluster.cluster,
             behavior_units: cluster.behavior_units.clone(),
         })
         .collect::<Vec<_>>();
@@ -847,7 +846,7 @@ pub fn run_bespoke_dispatch(
     let inputs = load_content_inputs()?;
     // Setup: pin the cluster manifest to the frozen catalog oracle identity.
     let validated = validated_catalog(&inputs.catalog_bytes)?;
-    if validated.oracle_sha().to_owned() != inputs.cluster_oracle_sha {
+    if validated.oracle_sha() != inputs.cluster_oracle_sha {
         return Err(BenchmarkError::fixture_message(
             "bespoke cluster manifest oracle SHA disagrees with the semantic catalog",
         ));
@@ -1046,10 +1045,7 @@ fn normalize_legacy_canonical_state(canonical: &mut Value) -> Result<(), Benchma
         .and_then(|slot_field| slot_field.get("slots"))
         .cloned()
         .ok_or_else(|| invalid("canonical battle field slots are missing"))?;
-    if format_slots.is_array() != true
-        || field_slots.is_array() != true
-        || format_slots != field_slots
-    {
+    if !format_slots.is_array() || !field_slots.is_array() || format_slots != field_slots {
         return Err(invalid(
             "canonical format.slots does not mirror field.slots as arrays",
         ));

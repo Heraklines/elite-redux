@@ -2296,3 +2296,37 @@ and their eight exact IDs join mandatory native execution:70 nonempty targets,
 48 named companion repair paths. Existing165 harness IDs, pure-query50 targets,
 ordinary full Clippy, reverse compilation, controls, platform proofs, bounds and
 f140 qualification baseline remain. No local workload or qualification claim.
+
+## Co-op and parity lint with complete failure diagnostics
+
+29cc883ec57ccddbe99142e71705ddfdf65ab340 / run33999750866 again passed
+remote formatting/build and discovered1,184 selected native IDs with70 required
+targets. Full selected-package Clippy failed before native execution. Lane B's
+failure-only pass completed all25 packages in69.604 seconds:24 passed; four newly
+reachable lint diagnostics remained in m6_coop_campaigns. Earlier target failures
+had prevented Cargo from scheduling this target. Retrieved only the12646-byte
+compact summary,7011-byte failure excerpt,3412-byte index and3784-byte named log.
+Index SHA256 e3101e6d280fb84d971c718548f58d0d7c234392817f5282493daf3cd3596da5.
+
+Repair its redundant initializer, two nested conditions and redundant return
+binding without changing the five tests or assertions. Add that exact source,
+target and five test IDs to the existing conditional repair scope. Lane A also
+reported eight diagnostics across m6_native_wasm and support/m6_benchmark in its
+named8248-byte package log. Repair the helper idioms and use a tuple alias and
+informative expect in the parity witness. Exact reviewed4221-byte patch SHA256
+dbea6521e13709418a346daa83586954a3571d83cd558416424e0a2082087207.
+Add its actual m6_performance consumer
+target and nine exact IDs. Its previous self-comparison could pass with no RNG
+counter; require the named counter to exist instead. This strengthens the stated
+assertion without claiming a positive draw count or optimized timing. Final
+scope is52 named paths and72 mandatory targets; pure-query50 remains unchanged.
+The existing165 harness IDs remain, with mandatory-count assertions extended.
+
+The failure-only per-package diagnostic command now uses Cargo --keep-going to
+visit independent targets after a target failure. The ordinary full selected-
+package Clippy command stays unchanged and still must succeed. Original error
+propagation, zero native execution after lint failure, all package/time/cleanup/
+log/proof caps and provenance remain. The existing diagnostic regression test
+requires the exact expanded suffix and unchanged ordinary gate command. Cargo's
+option behavior was checked in its official cargo-check documentation. No local
+workload, baseline advancement, platform qualification or completion claim.

@@ -803,6 +803,24 @@
   "boundary_policy": "fail planning until required shipping-adapter and Wasm targets are mapped; native-only evidence cannot certify these changes",
   "ai_damage_query_focus": {
     "lint_repair_exact_test_ids": {
+      "er-testkit:m6_performance": [
+        "content_preparation_reproduces_checksums_and_counts",
+        "routine_dispatch_keeps_prepared_and_direct_identical",
+        "bespoke_dispatch_routes_every_cluster_deterministically",
+        "turn_execution_drives_real_presentations_and_rng",
+        "solo_campaign_covers_the_scenario_set",
+        "coop_campaign_agrees_both_endpoints_deterministically",
+        "snapshot_restoration_round_trips_bytes_and_continues",
+        "release_ceiling_table_is_closed_over_workloads",
+        "qualification_report_is_machine_readable_and_fails_uncovered"
+      ],
+      "er-testkit:m6_coop_campaigns": [
+        "duplicate_delay_victory_campaign_completes_with_candidate_parity",
+        "disconnect_recovery_victory_campaign_restores_candidate_parity",
+        "victory_campaign_commits_turn_replacement_and_terminal",
+        "combined_fault_victory_campaign_completes_deterministically",
+        "duplicate_delay_victory_campaign_replays_identically"
+      ],
       "er-testkit:m6_solo_campaigns": [
         "planning_is_deterministic_and_fails_closed",
         "seeded_solo_campaigns_reach_terminal_outcomes_over_prepared_full_content",
@@ -888,7 +906,9 @@
         "m71_foundation",
         "m7_system_proof",
         "m6_solo_campaigns",
-        "m6_field_parity"
+        "m6_field_parity",
+        "m6_coop_campaigns",
+        "m6_performance"
       ],
       "er-wasm": [
         "er_wasm"
@@ -934,7 +954,9 @@
         "m71_foundation",
         "m7_system_proof",
         "m6_solo_campaigns",
-        "m6_field_parity"
+        "m6_field_parity",
+        "m6_coop_campaigns",
+        "m6_performance"
       ]
     },
     "lint_repair_doc_paths": ["rust/contracts/m71-api.md"],
@@ -986,7 +1008,11 @@
       "rust/crates/er-world/src/runtime.rs",
       "rust/crates/er-sim/benches/m4_runtime_benchmark.rs",
       "rust/crates/er-testkit/tests/m6_solo_campaigns.rs",
-      "rust/crates/er-testkit/tests/m6_field_parity.rs"
+      "rust/crates/er-testkit/tests/m6_field_parity.rs",
+      "rust/crates/er-testkit/tests/m6_coop_campaigns.rs",
+      "rust/crates/er-testkit/tests/m6_native_wasm.rs",
+      "rust/crates/er-testkit/tests/support/m6_benchmark.rs",
+      "rust/crates/er-testkit/tests/m6_performance.rs"
     ],
     "execute": {
       "er-batch": [

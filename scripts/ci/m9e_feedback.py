@@ -81,6 +81,10 @@ AI_DAMAGE_QUERY_LINT_REPAIR_PATHS = [
     "rust/crates/er-sim/benches/m4_runtime_benchmark.rs",
     "rust/crates/er-testkit/tests/m6_solo_campaigns.rs",
     "rust/crates/er-testkit/tests/m6_field_parity.rs",
+    "rust/crates/er-testkit/tests/m6_coop_campaigns.rs",
+    "rust/crates/er-testkit/tests/m6_native_wasm.rs",
+    "rust/crates/er-testkit/tests/support/m6_benchmark.rs",
+    "rust/crates/er-testkit/tests/m6_performance.rs",
 ]
 
 
@@ -94,7 +98,7 @@ AI_DAMAGE_QUERY_LINT_REPAIR_EXECUTE = {
     "er-scenario": ["er_scenario"],
     "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
     "er-state": ["er_state", "m4_foundation_properties"],
-    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance"],
     "er-wasm": ["er_wasm"],
     "er-world": ["er_world"],
 }
@@ -108,10 +112,28 @@ AI_DAMAGE_QUERY_LINT_REPAIR_REQUIRED_TARGETS = {
     "er-scenario": ["er_scenario"],
     "er-sim": ["er_sim", "m4_pair_snapshot_v3", "m4_raw_key_local"],
     "er-state": ["er_state", "m4_foundation_properties"],
-    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity"],
+    "er-testkit": ["m6_foundation", "m6_native_wasm", "m71_foundation", "m7_system_proof", "m6_solo_campaigns", "m6_field_parity", "m6_coop_campaigns", "m6_performance"],
 }
 
 AI_DAMAGE_QUERY_LINT_REPAIR_EXACT_TEST_IDS = {
+    "er-testkit:m6_performance": [
+        "content_preparation_reproduces_checksums_and_counts",
+        "routine_dispatch_keeps_prepared_and_direct_identical",
+        "bespoke_dispatch_routes_every_cluster_deterministically",
+        "turn_execution_drives_real_presentations_and_rng",
+        "solo_campaign_covers_the_scenario_set",
+        "coop_campaign_agrees_both_endpoints_deterministically",
+        "snapshot_restoration_round_trips_bytes_and_continues",
+        "release_ceiling_table_is_closed_over_workloads",
+        "qualification_report_is_machine_readable_and_fails_uncovered",
+    ],
+    "er-testkit:m6_coop_campaigns": [
+        "duplicate_delay_victory_campaign_completes_with_candidate_parity",
+        "disconnect_recovery_victory_campaign_restores_candidate_parity",
+        "victory_campaign_commits_turn_replacement_and_terminal",
+        "combined_fault_victory_campaign_completes_deterministically",
+        "duplicate_delay_victory_campaign_replays_identically",
+    ],
     "er-testkit:m6_solo_campaigns": [
         "planning_is_deterministic_and_fails_closed",
         "seeded_solo_campaigns_reach_terminal_outcomes_over_prepared_full_content",
@@ -208,7 +230,7 @@ def collect_clippy_failure_diagnostics(selection, summary):
              "source_sha": summary["product_sha"], "original_log": "selected-packages-clippy.log",
              "original_log_sha256": digest(FULL / "selected-packages-clippy.log"),
              "command_prefix": ["cargo", "clippy", "--locked", "-p"],
-             "command_suffix": ["--all-targets", "--no-deps", "--", "-D", "warnings"],
+             "command_suffix": ["--keep-going", "--all-targets", "--no-deps", "--", "-D", "warnings"],
              "cwd": "rust", "log_template": "clippy-diagnostics/{package}.log",
              "total_seconds": CLIPPY_DIAGNOSTIC_TOTAL_SECONDS,
              "package_seconds": CLIPPY_DIAGNOSTIC_PACKAGE_SECONDS,

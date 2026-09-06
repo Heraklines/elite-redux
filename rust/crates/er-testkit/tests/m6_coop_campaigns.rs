@@ -1068,7 +1068,7 @@ impl CampaignPump {
             endpoint,
             KernelInput::TransportChanged {
                 endpoint: self.seat(endpoint.peer()),
-                state: state,
+                state,
                 generation: self.connection_generation,
             },
         )?;
@@ -1173,14 +1173,13 @@ impl CampaignPump {
             if transport_op {
                 // The matched packet never reaches its receiver: it is torn
                 // down together with the endpoint's whole in-flight lane.
-                if let PacketBody::Frame(RawFrame::JsonValue(value)) = &self.queue[index].body {
-                    if let Some(operation) = value
+                if let PacketBody::Frame(RawFrame::JsonValue(value)) = &self.queue[index].body
+                    && let Some(operation) = value
                         .get("body")
                         .and_then(|body| body.get("operationId"))
                         .and_then(Value::as_str)
-                    {
-                        self.dropped_commit_ops.insert(operation.to_owned());
-                    }
+                {
+                    self.dropped_commit_ops.insert(operation.to_owned());
                 }
                 self.applied_actions.insert(action_index);
                 self.queue.remove(index);
@@ -1302,12 +1301,12 @@ impl CampaignPump {
     fn earliest_due_packet(&self) -> Option<usize> {
         let mut lane_heads: HashMap<(CoopPacketKind, Endpoint, Endpoint), u64> = HashMap::new();
         for packet in &self.queue {
-            if let Some(kind) = packet.kind {
-                if matches!(kind, CoopPacketKind::AuthorityCommit) {
-                    let key = (kind, packet.from, packet.to);
-                    let head = lane_heads.entry(key).or_insert(packet.seq);
-                    *head = (*head).min(packet.seq);
-                }
+            if let Some(kind) = packet.kind
+                && matches!(kind, CoopPacketKind::AuthorityCommit)
+            {
+                let key = (kind, packet.from, packet.to);
+                let head = lane_heads.entry(key).or_insert(packet.seq);
+                *head = (*head).min(packet.seq);
             }
         }
         self.queue
@@ -1787,10 +1786,7 @@ fn finish_and_verify(mut pump: CampaignPump) -> TestResult<CampaignEvidence> {
             .current_state()
             .ok_or_else(|| invalid("candidate replay never seeded a state"))?,
     )?;
-    let candidate_control = {
-        let control = terminal_observations["host"].1.clone();
-        control
-    };
+    let candidate_control = terminal_observations["host"].1.clone();
     assert_eq!(
         candidate_state, terminal_observations["host"].0,
         "candidate frontier diverged from the host terminal mechanics"
