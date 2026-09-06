@@ -197,11 +197,9 @@ impl CoreGameKernelSnapshotV7 {
                     match (&storage.pending, bootstrap.current_storage_effect()) {
                         (None, None) if self.pending_platform.is_empty() => {}
                         (Some(owner), Some(effect))
-                            if self.pending_platform
-                                == vec![PendingPlatformRequestV2 {
-                                    request_id: owner.request_id,
-                                    effect,
-                                }] => {}
+                            if self.pending_platform.len() == 1
+                                && self.pending_platform[0].request_id == owner.request_id
+                                && self.pending_platform[0].effect == effect => {}
                         _ => return Err(SnapshotV7Error::Invalid),
                     }
                 }

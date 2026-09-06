@@ -2912,3 +2912,8 @@ qualified621native/allplatform/mutants with27source checks; aggregate22912 SHA
 remain outside this main candidate and require later integration retaining READ5.
 State-query successor remains independently under test; wholeM9, final Q and the
 corrected final tag remain pending. No rollout, default activation or real-save IO.
+
+Title65e8d60f/run34039742243 failedremotecompilation E0507: a pattern guard moved
+effect into a temporary request vector. Compare exact pending count1, requestID
+and borrowed effect directly; same invariant, no clone/allocation. Baseline stays
+qualifiedstorage5b/run34037758849; all230/native/platform checks remain required.
