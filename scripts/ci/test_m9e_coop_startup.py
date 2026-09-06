@@ -165,6 +165,21 @@ class CoopPolicyTests(unittest.TestCase):
                 "started_bytes": 32318, "choices_sha256": "a" * 64, "started_sha256": "b" * 64})
         return {"current_coop_rtc": evidence, "browser_rtc_assets": {"manifest_sha256": "e" * 64, "manifest": rtc}}, native
 
+    def test_entry_source_reference_preserves_all_validation_and_rejects_rebinding(self):
+        proof, identity, binding = self.entry_fixture()
+        before = copy.deepcopy(proof)
+        retained = coop.reference_entry_sources(proof, identity, binding, self.root)
+        self.assertEqual(proof, before)
+        self.assertLess(len(json.dumps(retained)), len(json.dumps(proof)))
+        coop.validate_entry(retained, identity, binding, self.root)
+        rebound = copy.deepcopy(binding)
+        rebound["source_hashes"][coop.PRODUCT_PATHS[0]] = "f" * 64
+        with self.assertRaisesRegex(RuntimeError, "source reference"):
+            coop.validate_entry(retained, identity, rebound, self.root)
+        retained["logs"]["execute-2"]["elapsed_seconds"] = 601
+        with self.assertRaisesRegex(RuntimeError, "bounded"):
+            coop.validate_entry(retained, identity, binding, self.root)
+
     def test_platform_rejects_foreign_assets_incomplete_journeys_and_changed_material(self):
         proof, native = self.platform_fixture()
         coop.validate_platform(proof, native, self.root)

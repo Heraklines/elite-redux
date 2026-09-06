@@ -4,6 +4,7 @@ BASELINE_TARGETS = [["er-agent-protocol","er_agent_protocol"],["er-batch","er_ba
 import json
 import os
 from pathlib import Path
+os.environ["M9E_REPORT_DIR"] = str(Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/planner")
 import m9e_feedback as feedback
 import m9e_coop_startup as coop
 

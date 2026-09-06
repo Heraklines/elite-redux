@@ -120,6 +120,10 @@ def valid_hash(value):
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
+def object_hash(value):
+    return hashlib.sha256((json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest()
+
+
 def validate_entry(evidence, identity, binding, root):
     if (not isinstance(evidence, dict) or evidence.get("status") != "passed"
             or evidence.get("source_sha") != identity["product_sha"]
@@ -130,6 +134,12 @@ def validate_entry(evidence, identity, binding, root):
             or evidence.get("tests") != {"executed": 2, "passed": 2, "failed": 0, "skipped": 0}):
         raise RuntimeError("current co-op entry completion or same-run identity differs")
     hashes = evidence.get("source_hashes", {})
+    if "source_binding_sha256" in evidence:
+        shared = {path: value for path, value in binding["source_hashes"].items() if path in ENTRY_SOURCES}
+        if (evidence["source_binding_sha256"] != object_hash(binding)
+                or set(hashes) != set(ENTRY_SOURCES) - set(shared)):
+            raise RuntimeError("current co-op entry source reference differs from verified plan")
+        hashes = {**hashes, **shared}
     if (set(hashes) != set(ENTRY_SOURCES)
             or any(not valid_hash(value) or digest(Path(root) / path) != value for path, value in hashes.items())
             or any(hashes[path] != value for path, value in binding["source_hashes"].items() if path in hashes)
@@ -156,6 +166,18 @@ def validate_entry(evidence, identity, binding, root):
                 or not 0 < record["bytes"] <= (16384 if limit == 600 else 16 << 20)
                 or type(seconds) not in (int, float) or not 0 < seconds <= limit):
             raise RuntimeError("current co-op complete bounded build/execution logs required")
+
+
+def reference_entry_sources(evidence, identity, binding, root):
+    """Retain full diagnostics; reference only identical, already-bound plan hashes."""
+    validate_entry(evidence, identity, binding, root)
+    retained = {key: evidence[key] for key in ("status", "source_sha", "run_id", "run_attempt", "toolchain",
+                "executed_test_ids", "tests", "bundle_sha256", "worker_artifact", "cli_artifact", "test_artifact")}
+    retained["logs"] = {key: evidence["logs"][key] for key in ("worker-build", "build", "execute-1", "execute-2")}
+    retained["source_hashes"] = {path: value for path, value in evidence["source_hashes"].items() if path not in binding["source_hashes"]}
+    retained["source_binding_sha256"] = object_hash(binding)
+    validate_entry(retained, identity, binding, root)
+    return retained
 
 
 def execute_entry(root, full, identity, binding, ids, global_deadline):
@@ -191,13 +213,15 @@ def execute_entry(root, full, identity, binding, ids, global_deadline):
                 raise RuntimeError("current co-op actual individual test completion differs")
         if source_binding(root, identity["product_sha"]) != binding or time.monotonic() > global_deadline:
             raise RuntimeError("current co-op source conservation or shared deadline differs")
-        return evidence
+        return reference_entry_sources(evidence, identity, binding, root)
     finally:
         # Full logs stay in the owning native diagnostic artifact on either outcome.
         if (owned / "diagnostics").is_dir():
             shutil.copytree(owned / "diagnostics", full / "coop-entry")
         if (owned / "compact/summary.json").is_file():
             shutil.copyfile(owned / "compact/summary.json", full / "coop-entry-summary.json")
+        if (owned / "target").exists():
+            shutil.rmtree(owned / "target")
 
 
 def validate_lane(proof, root, partition):
