@@ -155,7 +155,7 @@ pub struct GameKernelV7 {
     lifecycle: GameKernelLifecycleV7,
     private_battle_control: Option<PrivateBattleControlSnapshotV7>,
     current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
-    current_coop_setup: Option<CurrentCoopSetupSnapshotV1>,
+    current_coop_setup: Option<Box<CurrentCoopSetupSnapshotV1>>,
     content: Arc<PreparedGameContentV2>,
     local_seat: SeatId,
     role: GameKernelRoleV7,
