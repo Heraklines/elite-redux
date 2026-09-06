@@ -2869,3 +2869,84 @@ after Load. It is explicitly a controlled Active save/load checkpoint. Natural
 Title discovery/cancellation, reconnect, AI fidelity and whole-M9 Q remain pending.
 This integration needs actual native/platform qualification; preflight alone is
 not a game result. No deployment, default activation or real player-save access.
+
+Qualified complete Worker storage checkpoint5b2c068883db862f21e30a06480aeb5bda57cb4a
+run34037758849: all4jobs passed,1013native A993/B20,zero failed/skipped,97inventory
+51mandatory/19exactmaps. AdapterNode5/Chromium3 and actualWorkercomposition2 passed
+alongside all prior Wasm/in-page/typed/Worker/codec/RTC/CLI bridge and both mutants.
+Audit verified38cachedsourcehashes, complete compressed-ID inventory and partitions,
+all phase wire hashes and exact aggregate/platform equality. Aggregate36616 bytes
+SHA66cade999bb477e25f91199685441eaa5b898a4ca1c2df29a5602d47bcc2ed90.
+Actual GameSaveV2 payload8278 bytes SHA
+ed7fee1f0bf9063839f46604f9f59e7f9c66b5da0686cea73161db6b1d493712;
+loaded-state rawWrite generation2 payloadSHA
+fcc32050114faee14294ec38888a7c58ae6565ca5594b5517041f5ad2f3b2180.
+Exact fixture snapshot/callback/receipt conservation and independent presentations
+passed; lost completion reconciled one actual write and one callback. Pending
+disposal without acknowledgement remains explicitly unconfirmed. This checkpoint
+qualifies controlled Active save/load, not yet natural Title storage/cancellation.
+All binaries, generated fixtures/assets and full logs remained remote.
+
+Advance comparison to that exact qualified storage ancestor and integrate the15
+prepared Title product paths. Opt-in current Title lists actual inventory, owns
+LIST/READ requests and cancellation, handles missing/corrupt/nonlocal/inactive saves,
+rebinds current control/allocator identity and preserves absent-flag historical bytes.
+Six kernel, two nativeCLI and two host tests plus eight historical bootstrap IDs
+are exact mandatory additions/prerequisites. All installed storage/owner/READ/AI/
+RTC/CLI/Worker/Wasm/causal and mutation checks remain required. Natural browser
+retirement/draining is a separate prepared follow-up; no such runtime claim yet.
+
+RemoteTitle230 preflight23b4d625/run34037977153 and pinnedrustfmt15Rustpaths passed;
+allbefore/after hashes matched, zero format patch. NativeB on qualifiedstorage took
+491191ms batch/580765ms reload/303897ms repro/286916ms host; A completed much earlier.
+Move the existing batch target toA to balance execution while preserving every
+selected test, exact source/build scope, complete disjoint partition and all caps.
+The first230 preflight53515024/run34039487916 exposed one old B-assignment assertion;
+update it to require batchinA and exactB3. Corrective47140f73/run34039611104 passed
+all230, verified4CIhashes. No test is omitted or weakened by this assignment change.
+Actual combined Title native/platform qualification is required before acceptance.
+
+Independent AI max-PP4220f1edfb04857488cd6ee330615cf2927ec995/run34036531932 also
+qualified621native/allplatform/mutants with27source checks; aggregate22912 SHA
+473365bf27594bb2026ad5154f83ba5a3229bfcd61b1ec241a4d292fd870653f. Its2product paths
+remain outside this main candidate and require later integration retaining READ5.
+State-query successor remains independently under test; wholeM9, final Q and the
+corrected final tag remain pending. No rollout, default activation or real-save IO.
+
+Title65e8d60f/run34039742243 failedremotecompilation E0507: a pattern guard moved
+effect into a temporary request vector. Compare exact pending count1, requestID
+and borrowed effect directly; same invariant, no clone/allocation. Baseline stays
+qualifiedstorage5b/run34037758849; all230/native/platform checks remain required.
+
+Title ef28c74e/run34040089919 compiled/formatted but its complete34-package Clippy
+collector exposed pre-existing er-content, er-dev-types and er-mechanics warnings.
+Retrieve only three named diagnostics (4292/1235/4648bytes) from remote archive
+9991487146, preserving complete remote logs. Seven exact source repairs retain
+error ordering and test assertions; box only Forensic observation payload, whose
+serde wire remains unchanged. Add a canonical-byte regression with hidden evidence.
+No existing constructor consumers were found in cached Rust source; full reverse
+compilation remains mandatory. No lint suppression or test exclusion.
+
+Exact Title companion mapping adds all tests from the three repaired packages,
+nine required targets and four exact identity maps while retaining all55 Title
+prerequisites, both native lanes and every platform/mutant requirement. Remote
+preflight a5c4634b2c5ed5e30334b7cb1490371693c02a39/run34041295702 passed232 harness
+tests in5.505s; allCIhashes verified. Pinned remote rustfmt repaired3299bytes,
+SHA30859010279acb6e64dcfa4c16160b7f4883029ee63cb70de1136360d8a82b57;
+all source before/after hashes verified. Full48768-byte harness log stays remote
+SHA97e59bca805ef3d51f0f949b8280730d0492535b35ca8df3961c10fb6d759490.
+Main comparison remains qualifiedstorage5b; actual Title qualification still pending.
+
+Title50da0bf5/run34041472828 passed build/fmt/fullselected Clippy and reached the
+actual kernel Title6. Five passed; the strict-extension negative failed because
+it mutated options[0] to OpenExistingSaves, already that sorted-ID option's action.
+GameMenuV2::new sorts option IDs; existing-saves sorts before new-game. The fixture
+had not forged anything. Select New Game by stable option ID, assert its original
+OpenNewGame action, alter it and assert fullsnapshot inequality before retaining
+restore rejection. No validator bypass, removed assertion or false product fix.
+
+Remote preflight89c547860b567c1a5ac6b24ff3b307835e331474/run34042046105 passed the
+232 current harness cases plus6 prepared PP integration cases=238 in5.904s. PP
+remains outside main. Actual remote rustfmt changed only this Title witness1075
+bytes; namedcompact9991967131ZIP1902/sourcehashes checked before applying. Exact
+Title native/platform qualification remains pending, comparisonstillqualified5b.

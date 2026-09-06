@@ -360,7 +360,7 @@ mod tests {
             side_rank: 0,
             field_position: 0,
             source_rank: rank,
-            numeric_id: Some(er_types::SafeU53::new(7).unwrap()),
+            numeric_id: Some(er_types::SafeU53::new(7).expect("fixture ID fits SafeU53")),
             registry_key: None,
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             behavior_unit_ordinal: ordinal,
@@ -408,7 +408,9 @@ mod tests {
     #[test]
     fn query_hooks_map_to_exactly_one_query() {
         assert_eq!(
-            MechanicHookV2::AccuracyQuery.query().unwrap(),
+            MechanicHookV2::AccuracyQuery
+                .query()
+                .expect("accuracy hook has a query"),
             MechanicQueryV2::Accuracy
         );
         assert!(MechanicHookV2::TurnEnd.query().is_err());

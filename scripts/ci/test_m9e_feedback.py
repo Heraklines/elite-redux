@@ -5451,6 +5451,208 @@ class FeedbackTests(unittest.TestCase):
             owner.legacy_rtc_view(bad, context["binding"], context["helper_hash"])
         with self.assertRaises(RuntimeError):
             owner.legacy_rtc_view(tests, context["binding"], "0" * 64)
+    def configure_title_storage_core_scope(self):
+        self.configure_composition_after_read_and_owner()
+        actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["current_title_storage_focus"] = actual["current_title_storage_focus"]
+        self.package("er-testkit")
+        self.package("er-title-reverse", '[dependencies]\nkit = { package = "er-testkit", path = "../er-testkit" }\n')
+        for name in self.feedback.TITLE_STORAGE_PATHS:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("current Title source fixture: " + name)
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(self.feedback.TITLE_STORAGE_PATHS)
+
+    def test_title_storage_core_requires_all_new_ingress_and_historical_bootstrap_witnesses(self):
+        self.configure_title_storage_core_scope()
+        before = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        self.assertEqual(len(self.feedback.TITLE_STORAGE_PATHS), 15)
+        self.assertEqual(len(self.feedback.TITLE_STORAGE_TRIGGERS), 4)
+        for flag in ("current_title_storage_focus", "requires_title_storage", "requires_current_proposal", "requires_read_rebind",
+                     "requires_worker_storage", "requires_current_storage", "requires_browser_worker", "requires_browser_rtc",
+                     "requires_wasm", "requires_browser", "requires_cli_executable", "requires_worker_executable", "timer_focus"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
+        for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
+            self.assertEqual(selection["required_native_test_ids"][identity], ids)
+            self.assertIn(identity.split(":")[1], selection["required_native_targets"][identity.split(":")[0]])
+        self.assertEqual([len(ids) for ids in self.feedback.TITLE_STORAGE_IDS.values()], [6, 2, 2, 8])
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-web:m9e_host_v2"]), 14)
+        self.assertIn("quiescent_v6_snapshot_migrates_without_gameplay_side_effects", selection["required_native_test_ids"]["er-kernel:m9e_snapshot_v7"])
+        self.assertIn("game_save_v2_restores_every_control_kind", selection["required_native_test_ids"]["er-kernel:m9e_domain_journeys_v7"])
+        self.assertIn("er-title-reverse", selection["packages"])
+        self.assertNotIn("er-title-reverse", selection["execution_scope"])
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+
+    def test_title_lint_companions_keep_all_packages_targets_and_serialization_witnesses(self):
+        self.configure_title_storage_core_scope()
+        for crate in self.feedback.TITLE_STORAGE_LINT_TARGETS:
+            self.package(crate)
+        self.package("er-lint-reverse", '[dependencies]\ncontracts = { package = "er-dev-types", path = "../er-dev-types" }\n')
+        self.changed += self.feedback.TITLE_STORAGE_LINT_PATHS
+        selection = self.feedback.plan()
+        self.assertTrue(selection["current_title_storage_focus"])
+        self.assertEqual(len(self.feedback.TITLE_STORAGE_LINT_PATHS), 7)
+        self.assertIn("er-lint-reverse", selection["packages"])
+        self.assertNotIn("er-lint-reverse", selection["execution_scope"])
+        for crate, targets in self.feedback.TITLE_STORAGE_LINT_TARGETS.items():
+            self.assertEqual(selection["execution_scope"][crate], ["*"])
+            self.assertEqual(selection["required_native_targets"][crate], targets)
+        for identity, names in {**self.feedback.TITLE_STORAGE_IDS, **self.feedback.TITLE_STORAGE_LINT_IDS}.items():
+            self.assertEqual(selection["required_native_test_ids"][identity], names)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 64)
+        for flag in ("requires_title_storage", "requires_current_proposal", "requires_read_rebind",
+                     "requires_worker_storage", "requires_current_storage", "requires_browser_worker", "requires_browser_rtc",
+                     "requires_wasm", "requires_browser", "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(self.executed, [])
+
+    def test_title_lint_mapping_rejects_policy_drift_and_unmapped_neighbors(self):
+        self.configure_title_storage_core_scope()
+        original = copy.deepcopy(self.config["current_title_storage_focus"])
+        for key in ("lint_paths", "lint_targets", "lint_ids"):
+            self.config["current_title_storage_focus"] = copy.deepcopy(original)
+            self.config["current_title_storage_focus"].pop(key)
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "policy identities"):
+                self.feedback.plan()
+        self.config["current_title_storage_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for neighbor in ("rust/crates/er-content/src/other.rs", "rust/crates/er-dev-types/src/digest.rs",
+                         "rust/crates/er-mechanics/src/lib.rs", "rust/crates/er-dev-types/Cargo.toml"):
+            self.changed = [*self.feedback.TITLE_STORAGE_PATHS, *self.feedback.TITLE_STORAGE_LINT_PATHS, neighbor]
+            with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                self.feedback.plan()
+        exact = self.feedback.TITLE_STORAGE_LINT_IDS
+        rows = [(*identity.split(":"), names) for identity, names in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        for index, (crate, target, names) in enumerate(rows):
+            for name in names:
+                for replacement in ([item for item in names if item != name],
+                                    [item if item != name else item + "_renamed" for item in names], [*names, name]):
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+        self.assertEqual(self.executed, [])
+
+    def test_title_storage_core_policy_missing_mapping_and_mixed_changes_fail_closed(self):
+        self.configure_title_storage_core_scope()
+        original = copy.deepcopy(self.config["current_title_storage_focus"])
+        for mutation in ("paths", "trigger_paths", "exact_test_ids", "extra", "type", "absent"):
+            with self.subTest(mutation=mutation):
+                policy = copy.deepcopy(original)
+                if mutation in ("paths", "trigger_paths"):
+                    policy[mutation].pop()
+                elif mutation == "exact_test_ids":
+                    policy[mutation]["er-kernel:m9e_title_storage"].pop()
+                elif mutation == "extra":
+                    policy["skip"] = True
+                elif mutation == "type":
+                    policy = True
+                else:
+                    policy = {}
+                self.config["current_title_storage_focus"] = policy
+                (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+                with self.assertRaisesRegex(RuntimeError, "policy identities|additional mapping"):
+                    self.feedback.plan()
+        self.config["current_title_storage_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        for extra in ("rust/Cargo.lock", "rust/crates/er-game/src/current_bootstrap_other.rs",
+                      "rust/crates/er-ai/src/authority_v2.rs", "src/rust-browser/routes/rust-current-storage-entry.ts",
+                      "src/rust-browser/routes/rust-current-rtc-entry.ts", "package.json"):
+            self.changed = [*self.feedback.TITLE_STORAGE_PATHS, extra]
+            with self.assertRaisesRegex(RuntimeError, "additional mapping|mixed source scope"):
+                self.feedback.plan()
+        for trigger in self.feedback.TITLE_STORAGE_TRIGGERS:
+            self.changed = [trigger]
+            self.assertTrue(self.feedback.plan()["current_title_storage_focus"])
+        self.assertEqual(self.executed, [])
+
+    def test_title_storage_core_exact_test_inventory_rejects_every_omission_rename_and_duplicate(self):
+        self.configure_title_storage_core_scope()
+        selection = self.feedback.plan()
+        exact = selection["required_native_test_ids"]
+        rows = [(*identity.split(":"), ids) for identity, ids in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        for identity, names in self.feedback.TITLE_STORAGE_IDS.items():
+            index = next(index for index, row in enumerate(rows) if ":".join(row[:2]) == identity)
+            crate, target, ids = rows[index]
+            for name in names:
+                for replacement in ([item for item in ids if item != name],
+                                    [item if item != name else item + "_renamed" for item in ids], [*ids, name]):
+                    with self.subTest(identity=identity, name=name, replacement=replacement):
+                        with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                            self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+
+    def test_title_storage_core_remains_required_for_later_snapshot_owner_read_and_composition(self):
+        self.configure_title_storage_core_scope()
+        self.configure_ai_snapshot_validation_scope()
+        snapshots = list(self.config["ai_snapshot_validation_focus"]["paths"])
+        for paths, count in ((snapshots, 28), (self.config["current_proposal_focus"]["paths"], 29),
+                             (self.config["current_read_rebind_focus"]["paths"], 27),
+                             (self.config["current_worker_storage_focus"]["paths"], 55)):
+            self.changed = list(paths)
+            selection = self.feedback.plan()
+            self.assertTrue(selection["requires_title_storage"])
+            self.assertFalse(selection["current_title_storage_focus"])
+            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), count)
+            for target, ids in self.feedback.TITLE_STORAGE_IDS.items():
+                self.assertEqual(selection["required_native_test_ids"][target], ids)
+            self.assertTrue(selection["requires_current_proposal"])
+            self.assertTrue(selection["requires_read_rebind"])
+            self.assertTrue(selection["requires_worker_storage"])
+        self.changed = ["docs/plans/rust-kernel/m9e-readiness.md"]
+        selection = self.feedback.plan()
+        self.assertFalse(selection["requires_title_storage"])
+        self.assertEqual(selection["packages"], ["er-canonical"])
+
+    def test_title_storage_core_full_clippy_and_execution_preserve_required_counts_and_controls(self):
+        self.configure_title_storage_core_scope()
+        selection = self.feedback.plan()
+        self.binary_ids = {}
+        for crate, targets in selection["execution_scope"].items():
+            if "*" in targets:
+                targets = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for target in targets:
+                binary = target if target not in self.binary_ids else crate + "--" + target
+                self.binary_ids[binary] = selection["required_native_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_crates[binary], self.binary_targets[binary] = crate, target
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+        for fail in (True, False):
+            self.clippy_codes["er-testkit"] = 1 if fail else 0
+            self.executed.clear()
+            self.events.clear()
+            self.commands.clear()
+            with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                    patch.object(self.feedback, "timer_behavioral_mutant") as timer, patch.object(self.feedback, "replica_behavioral_mutant") as replica, \
+                    patch.object(self.feedback, "collect_clippy_failure_diagnostics") as diagnostics:
+                code, summary = self.invoke()
+            if (self.full / "full-summary.json").is_file():
+                summary = json.loads((self.full / "full-summary.json").read_text())
+            self.assertEqual(code, 1 if fail else 0)
+            lint = [args for args in self.commands if args[:2] == ["cargo", "clippy"]]
+            self.assertEqual(len(lint), 1)
+            self.assertEqual([lint[0][index + 1] for index, word in enumerate(lint[0]) if word == "-p"], selection["packages"])
+            if fail:
+                self.assertEqual(self.executed, [])
+                diagnostics.assert_called_once()
+                for check in (wasm, browser, timer, replica):
+                    check.assert_not_called()
+            else:
+                self.assertEqual(len(summary["required_native_target_counts"]), 55)
+                for target, ids in self.feedback.TITLE_STORAGE_IDS.items():
+                    self.assertEqual(summary["required_native_target_counts"][target], len(ids))
+                self.assertEqual([(self.binary_crates[name], self.binary_targets[name]) for name in self.executed[:4]],
+                                 [(crate, target) for crate, targets in self.feedback.TITLE_STORAGE_TARGETS.items() for target in targets])
+                diagnostics.assert_not_called()
+                for check in (wasm, browser, timer, replica):
+                    check.assert_called_once()
+
     def configure_composition_after_read_and_owner(self):
         self.configure_worker_storage_composition_scope()
         self.configure_read_rebind_scope()
@@ -5677,6 +5879,543 @@ class FeedbackTests(unittest.TestCase):
             self.feedback.plan()
 
 
+    def configure_control_query_scope(self):
+        self.configure_browser_worker_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        for scope in ("current_control_query_focus", "native_capture_focus", "current_repro_focus",
+                      "current_batch_focus", "browser_cache_focus", "current_validation_focus"):
+            self.config[scope] = policy[scope]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-query-consumer", '[dependencies]\ner-cli = { path = "../er-cli" }\n')
+        self.changed = list(self.config["current_control_query_focus"]["paths"])
+
+    def test_control_query_scope_keeps_causal_inventory_and_every_platform_requirement(self):
+        self.configure_control_query_scope()
+        import m9e_phases as phases
+        policy = self.config["current_control_query_focus"]
+        self.assertEqual(policy["paths"], ["rust/crates/er-cli/src/current_agent.rs",
+                                          "rust/crates/er-cli/tests/m9e_current_control_query.rs"])
+        self.assertEqual(policy["test_ids"], phases.CONTROL_QUERY_TEST_IDS)
+        original = copy.deepcopy(self.config)
+        for changed in (policy["paths"], policy["paths"][:1], policy["paths"][1:]):
+            self.changed = list(changed) + ["docs/plans/rust-kernel/m9e-control-query.md"]
+            selection = self.feedback.plan()
+            for flag in ("current_control_query_focus", "requires_current_control_query", "timer_focus",
+                         "requires_browser_worker", "requires_browser", "requires_wasm", "requires_worker_executable",
+                         "requires_cli_executable", "requires_cli_clippy", "requires_agent_protocol_clippy"):
+                self.assertTrue(selection[flag], flag)
+            self.assertEqual(selection["execution_scope"], self.config["timer_focus"]["execute"])
+            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 23)
+            for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+                self.assertEqual(selection["required_native_test_ids"][identity], ids)
+            self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_control_query"], policy["test_ids"])
+            self.assertEqual(selection["required_native_targets"]["er-cli"].count("m9e_current_control_query"), 1)
+            self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+            self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+            self.assertIsNone(selection["ledger_mutant"])
+            self.assertIsNone(selection["worker_lock_guard"])
+            self.assertIn("er-query-consumer", selection["packages"])
+            self.assertNotIn("er-query-consumer", selection["execution_scope"])
+            self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(self.config, original)
+        self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+                                                ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+        self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
+        self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
+
+    def test_control_query_mixed_paths_reject_and_existing_dispatcher_overlap_keeps_its_scope(self):
+        self.configure_control_query_scope()
+        witness = "rust/crates/er-cli/tests/m9e_current_control_query.rs"
+        for extra in ("rust/crates/er-cli/src/current_commands.rs", "rust/crates/er-cli/src/current_native_capture.rs",
+                      "rust/crates/er-cli/tests/m9e_current_native_capture.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-repro/src/current.rs",
+                      "rust/crates/er-batch/src/current.rs", "rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock",
+                      "src/rust-browser/worker/current-rust-kernel-worker.ts", "unknown.json"):
+            with self.subTest(extra=extra):
+                self.changed = [witness, extra]
+                with self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                    self.feedback.plan()
+                self.assertFalse(json.loads((self.full / "plan.json").read_text())["current_control_query_focus"])
+        path = self.root / witness
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("actual target exists in later source")
+        for scope, trigger in (("native_capture_focus", "rust/crates/er-cli/src/current_native_capture.rs"),
+                               ("current_repro_focus", "rust/crates/er-repro/src/current.rs"),
+                               ("current_batch_focus", "rust/crates/er-batch/src/current.rs")):
+            self.changed = ["rust/crates/er-cli/src/current_agent.rs", trigger]
+            selection = self.feedback.plan()
+            self.assertFalse(selection["current_control_query_focus"])
+            self.assertTrue(selection[scope], scope)
+            self.assertEqual(selection["execution_scope"], self.config[scope]["execute"])
+            self.assertTrue(selection["requires_current_control_query"])
+            self.assertTrue(selection["requires_worker_executable"])
+
+    def test_control_query_binding_follows_selected_target_and_preserves_readiness(self):
+        self.configure_control_query_scope()
+        import m9e_phases as phases
+        source = self.root / phases.CONTROL_QUERY_PATHS[1]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("later target exists")
+        for changed in (["rust/crates/er-kernel/src/game_kernel_v7.rs"],
+                        ["rust/crates/er-cli/src/current_commands.rs"],
+                        ["rust/crates/er-cli/tests/another_current_target.rs"]):
+            self.changed = changed
+            selection = self.feedback.plan()
+            self.assertFalse(selection["current_control_query_focus"])
+            self.assertTrue(selection["requires_current_control_query"])
+            self.assertTrue(selection["requires_worker_executable"])
+            self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_control_query"], phases.CONTROL_QUERY_TEST_IDS)
+        self.changed = ["docs/plans/rust-kernel/m9e-control-query.md", "scripts/ci/m9e_feedback.py"]
+        selection = self.feedback.plan()
+        self.assertEqual(selection["packages"], self.config["readiness_packages"])
+        for flag in ("requires_current_control_query", "current_control_query_focus", "requires_worker_executable",
+                     "requires_cli_executable", "requires_browser_worker", "requires_browser", "requires_wasm"):
+            self.assertFalse(selection[flag], flag)
+        self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
+        self.config["current_session_focus"]["execute"]["er-cli"] = ["m9e_current_entry"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.assertFalse(self.feedback.plan()["requires_current_control_query"])
+        source.unlink()
+        self.config["current_session_focus"]["execute"]["er-cli"] = ["m9e_current_control_query"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.assertTrue(self.feedback.plan()["requires_current_control_query"])
+
+    def test_control_query_policy_and_exact_inventory_cannot_silently_weaken(self):
+        self.configure_control_query_scope()
+        import m9e_phases as phases
+        original = copy.deepcopy(self.config["current_control_query_focus"])
+        for field, value in (("paths", original["paths"] + ["rust/crates/er-cli/src/main.rs"]),
+                             ("test_ids", original["test_ids"][:1]), ("test_ids", ["renamed", "wrong"])):
+            self.config["current_control_query_focus"] = {**original, field: value}
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "control query policy identities"):
+                self.feedback.plan()
+        self.config["current_control_query_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        selection = self.feedback.plan()
+        required = selection["required_native_test_ids"]
+        rows = [(identity.split(":")[0], identity.split(":")[1], ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, rows)
+        for identity in required:
+            for mode in ("absent", "empty", "renamed", "duplicate"):
+                modified = [(crate, target, ([] if mode == "empty" else ["renamed"] if mode == "renamed"
+                                             else ids + ids[:1]) if f"{crate}:{target}" == identity else ids)
+                            for crate, target, ids in rows if mode != "absent" or f"{crate}:{target}" != identity]
+                with self.subTest(identity=identity, mode=mode), self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                    self.feedback.require_native_test_ids(required, modified)
+        source = self.root / phases.CONTROL_QUERY_PATHS[1]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("target exists")
+        self.config.pop("current_control_query_focus")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
+        with self.assertRaisesRegex(RuntimeError, "requires its exact policy"):
+            self.feedback.plan()
+
+    def control_query_mock_inventory(self, selection):
+        self.binary_ids = {}
+        for crate, names in selection["execution_scope"].items():
+            if names == ["*"]:
+                names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
+            for target in names:
+                binary = target if target not in self.binary_ids else crate + "--" + target
+                self.binary_ids[binary] = selection["required_native_test_ids"].get(f"{crate}:{target}", ["behavior"])
+                self.binary_crates[binary] = crate
+                self.binary_targets[binary] = target
+        self.extra_artifacts = [self.worker_executable_artifact(), self.cli_executable_artifact()]
+        self.results["m9e_parity"] = (0, "M9E_TIMER_PARITY_DIGEST=" + "d" * 64 + "\n" + self.result_line(passed=2))
+
+    def test_control_query_orchestration_discovers_and_lints_before_bound_process_execution(self):
+        self.configure_control_query_scope()
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_control_query"], 2)
+        self.assertEqual(len(summary["required_native_target_counts"]), 23)
+        self.assertEqual(self.executed[0], "m9e_current_control_query")
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        first = self.events.index("execute:m9e_current_control_query")
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, first)
+        for lint in ("cli-clippy", "agent-protocol-clippy", "er-env-clippy", "er-repro-clippy",
+                     "worker-clippy", "endpoint-clippy", "browser-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        query_environments = [(phase, env) for name, phase, env in self.binary_envs if name == "m9e_current_control_query"]
+        self.assertEqual([phase for phase, _ in query_environments], ["list", "execute"])
+        for _, env in query_environments:
+            self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+            self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+            self.assertEqual(env["ER_M9E_WORKER_BUILD_PROFILE"], "test")
+        self.assertIn("m9e_current_control_query::worker_control_queries_bind_current_control_and_preserve_rejections",
+                      timer.call_args.args[2])
+        timer.assert_called_once()
+        replica.assert_called_once()
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.assertIsNone(self.feedback.native_target_env("er-other", "m9e_current_control_query", None))
+        with self.assertRaisesRegex(RuntimeError, "no bound worker"):
+            self.feedback.native_target_env("er-cli", "m9e_current_control_query", None)
+
+    def test_control_query_orchestration_rejects_missing_worker_witness_and_early_lint_failure(self):
+        self.configure_control_query_scope()
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        original_ids = list(self.binary_ids["m9e_current_control_query"])
+        original_artifacts = list(self.extra_artifacts)
+        for failure in ("worker", "witness", "lint"):
+            self.executed.clear()
+            self.events.clear()
+            self.binary_envs.clear()
+            self.extra_artifacts = original_artifacts[1:] if failure == "worker" else original_artifacts
+            self.binary_ids["m9e_current_control_query"] = original_ids[:1] if failure == "witness" else original_ids
+            self.clippy_codes = {"er-cli": 1} if failure == "lint" else {}
+            code, summary = self.invoke()
+            self.assertEqual(code, 1)
+            self.assertEqual(self.executed, [])
+            self.assertIn({"worker": "real worker executable", "witness": "required native test identities",
+                           "lint": "cli-clippy exited 1"}[failure], summary["first_failure"])
+            if failure == "worker":
+                self.assertEqual(self.binary_envs, [])
+            if failure == "witness":
+                self.assertNotIn("clippy", self.events)
+
+    def test_control_query_priority_and_inventory_guard_are_crate_bound(self):
+        self.configure_control_query_scope()
+        import m9e_phases as phases
+        selection = self.feedback.plan()
+        identities = [("er-other", "m9e_current_control_query"), ("er-kernel", "m9e_coop_v7"),
+                      ("er-cli", "m9e_current_control_query"), ("er-kernel", "m9e_timers_v7")]
+        rows = [(index, f"binary-{index}", target, ["synthetic"], self.rust / "crates" / crate, set(), None)
+                for index, (crate, target) in enumerate(identities)]
+        prior = self.feedback.native_execution_order({"timer_focus": True}, rows)
+        ordered = self.feedback.native_execution_order(selection, rows)
+        self.assertEqual(ordered, [rows[2], *[row for row in prior if row != rows[2]]])
+        inventory = [{"crate": "er-cli", "target": "m9e_current_control_query",
+                      "ids": list(phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []}]
+        phases.validate_control_query_inventory(selection, inventory)
+        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": []})
+        for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded", "duplicate", "missing_target"):
+            bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
+            if mode == "missing_flag":
+                bad_plan.pop("requires_current_control_query")
+            elif mode == "false_flag":
+                bad_plan["requires_current_control_query"] = False
+            elif mode == "integer_flag":
+                bad_plan["requires_current_control_query"] = 1
+            elif mode == "missing_binding":
+                bad_plan["requires_worker_executable"] = False
+            elif mode == "wrong_crate":
+                bad_inventory[0]["crate"] = "er-other"
+            elif mode == "excluded":
+                bad_inventory[0]["historical_excluded_ids"] = ["forbidden_skip"]
+            elif mode == "duplicate":
+                bad_inventory.append(copy.deepcopy(bad_inventory[0]))
+            else:
+                bad_inventory = []
+            with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                phases.validate_control_query_inventory(bad_plan, bad_inventory)
+
+
+    def configure_state_query_scope(self):
+        self.configure_control_query_scope()
+        policy = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
+        self.config["current_state_query_focus"] = policy["current_state_query_focus"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.package("er-state-query-consumer", '[dependencies]\ner-lab = { path = "../er-lab" }\n')
+        self.changed = list(policy["current_state_query_focus"]["paths"])
+
+    def test_combined_queries_keep_title_read_storage_owner_and_exact_four_query_ids(self):
+        self.configure_state_query_scope()
+        self.configure_title_storage_core_scope()
+        import m9e_phases as phases
+        paths = sorted(set([*phases.CONTROL_QUERY_PATHS, *phases.STATE_QUERY_PATHS]))
+        self.assertEqual(len(paths), 4)
+        for name in (phases.CONTROL_QUERY_PATHS[1], phases.STATE_QUERY_PATHS[2]):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("installed query witness")
+        before = copy.deepcopy(self.config)
+        self.changed = paths
+        selection = self.feedback.plan()
+        for flag in ("current_state_query_focus", "current_control_query_focus", "requires_current_state_query",
+                     "requires_current_control_query", "requires_title_storage", "requires_read_rebind",
+                     "requires_current_proposal", "requires_worker_storage", "requires_current_storage",
+                     "requires_browser_worker", "requires_browser_rtc", "requires_browser", "requires_wasm",
+                     "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[flag], flag)
+        for target, names in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
+                              (phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS)):
+            self.assertEqual(selection["required_native_test_ids"][":".join(target)], names)
+        self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
+        for identity, names in self.feedback.TITLE_STORAGE_IDS.items():
+            self.assertEqual(selection["required_native_test_ids"][identity], names)
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+        self.assertEqual(self.executed, [])
+
+    def test_combined_queries_reject_neighbors_and_missing_prerequisite_policies(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        paths = sorted(set([*phases.CONTROL_QUERY_PATHS, *phases.STATE_QUERY_PATHS]))
+        for extra in ("rust/crates/er-cli/src/current_other.rs", "rust/crates/er-lab/src/other.rs",
+                      "rust/Cargo.lock", "rust/crates/er-kernel/src/game_kernel_v7.rs",
+                      "src/rust-browser/routes/rust-current-storage-entry.ts"):
+            self.changed = [*paths, extra]
+            with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+                self.feedback.plan()
+        self.changed = paths
+        original = copy.deepcopy(self.config)
+        for key in ("current_control_query_focus", "current_state_query_focus"):
+            self.config = copy.deepcopy(original)
+            self.config.pop(key)
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "policy|additional mapping"):
+                self.feedback.plan()
+        self.assertEqual(self.executed, [])
+
+    def test_state_query_scope_preserves_prerequisite_causal_inventory_and_platforms(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        policy = self.config["current_state_query_focus"]
+        self.assertEqual(policy["paths"], phases.STATE_QUERY_PATHS)
+        self.assertEqual(policy["test_ids"], phases.STATE_QUERY_TEST_IDS)
+        original = copy.deepcopy(self.config)
+        for changed in (policy["paths"], *[[path] for path in policy["paths"]]):
+            self.changed = changed + ["docs/plans/rust-kernel/m9e-state-query.md"]
+            selection = self.feedback.plan()
+            for flag in ("current_state_query_focus", "requires_current_state_query", "requires_current_control_query",
+                         "timer_focus", "requires_browser_worker", "requires_browser", "requires_wasm",
+                         "requires_worker_executable", "requires_cli_executable", "requires_cli_clippy",
+                         "requires_agent_protocol_clippy"):
+                self.assertTrue(selection[flag], flag)
+            self.assertEqual(selection["execution_scope"], self.config["timer_focus"]["execute"])
+            self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 24)
+            for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+                self.assertEqual(selection["required_native_test_ids"][identity], ids)
+            for target, ids in ((phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS),
+                                (phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS)):
+                self.assertEqual(selection["required_native_test_ids"][":".join(target)], ids)
+                self.assertEqual(selection["required_native_targets"][target[0]].count(target[1]), 1)
+            self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+            self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+            self.assertIsNone(selection["ledger_mutant"])
+            self.assertIsNone(selection["worker_lock_guard"])
+            if "rust/crates/er-lab/src/query.rs" in changed:
+                self.assertIn("er-state-query-consumer", selection["packages"])
+            self.assertNotIn("er-state-query-consumer", selection["execution_scope"])
+            self.assertEqual(selection["wasm_test"], "m9e_parity")
+        self.assertEqual(self.config, original)
+        self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+                                                ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+        self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
+        self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
+
+    def test_state_query_mixed_paths_reject_and_overlap_keeps_existing_scope(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        witness = phases.STATE_QUERY_PATHS[2]
+        for extra in (phases.CONTROL_QUERY_PATHS[1], "rust/crates/er-cli/src/current_commands.rs",
+                      "rust/crates/er-cli/src/current_native_capture.rs", "rust/crates/er-env/src/current.rs",
+                      "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-repro/src/current.rs",
+                      "rust/crates/er-batch/src/current.rs", "rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock",
+                      "src/rust-browser/worker/current-rust-kernel-worker.ts", "unknown.json"):
+            self.changed = [witness, extra]
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, "planning requires additional mapping"):
+                self.feedback.plan()
+        source = self.root / witness
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("later actual state target")
+        for scope, trigger in (("native_capture_focus", "rust/crates/er-cli/src/current_native_capture.rs"),
+                               ("current_repro_focus", "rust/crates/er-repro/src/current.rs"),
+                               ("current_batch_focus", "rust/crates/er-batch/src/current.rs"),
+                               ("current_control_query_focus", phases.CONTROL_QUERY_PATHS[1])):
+            self.changed = [phases.STATE_QUERY_PATHS[0], trigger]
+            selection = self.feedback.plan()
+            self.assertFalse(selection["current_state_query_focus"])
+            self.assertTrue(selection[scope], scope)
+            expected_scope = self.config["timer_focus" if scope == "current_control_query_focus" else scope]["execute"]
+            self.assertEqual(selection["execution_scope"], expected_scope)
+            self.assertTrue(selection["requires_current_state_query"])
+            self.assertTrue(selection["requires_current_control_query"])
+            self.assertTrue(selection["requires_worker_executable"])
+    def test_state_query_binding_follows_selected_target_and_preserves_readiness(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        source = self.root / phases.STATE_QUERY_PATHS[2]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("later target exists")
+        for changed in (["rust/crates/er-kernel/src/game_kernel_v7.rs"],
+                        ["rust/crates/er-cli/src/current_commands.rs"],
+                        ["rust/crates/er-cli/tests/another_current_target.rs"]):
+            self.changed = changed
+            selection = self.feedback.plan()
+            self.assertFalse(selection["current_state_query_focus"])
+            self.assertTrue(selection["requires_current_state_query"])
+            self.assertTrue(selection["requires_worker_executable"])
+            self.assertEqual(selection["required_native_test_ids"]["er-cli:m9e_current_state_query"], phases.STATE_QUERY_TEST_IDS)
+        self.changed = ["docs/plans/rust-kernel/m9e-control-query.md", "scripts/ci/m9e_feedback.py"]
+        selection = self.feedback.plan()
+        self.assertEqual(selection["packages"], self.config["readiness_packages"])
+        for flag in ("requires_current_state_query", "current_state_query_focus", "requires_worker_executable",
+                     "requires_cli_executable", "requires_browser_worker", "requires_browser", "requires_wasm"):
+            self.assertFalse(selection[flag], flag)
+        self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
+        self.config["current_session_focus"]["execute"]["er-cli"] = ["m9e_current_entry"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.assertFalse(self.feedback.plan()["requires_current_state_query"])
+        source.unlink()
+        self.config["current_session_focus"]["execute"]["er-cli"] = ["m9e_current_state_query"]
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.assertTrue(self.feedback.plan()["requires_current_state_query"])
+
+    def test_state_query_policy_and_exact_inventory_cannot_silently_weaken(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        original = copy.deepcopy(self.config["current_state_query_focus"])
+        for field, value in (("paths", original["paths"] + ["rust/crates/er-cli/src/main.rs"]),
+                             ("test_ids", original["test_ids"][:1]), ("test_ids", ["renamed", "wrong"])):
+            self.config["current_state_query_focus"] = {**original, field: value}
+            (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+            with self.assertRaisesRegex(RuntimeError, "state query policy identities"):
+                self.feedback.plan()
+        self.config["current_state_query_focus"] = original
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        selection = self.feedback.plan()
+        required = selection["required_native_test_ids"]
+        rows = [(identity.split(":")[0], identity.split(":")[1], ids) for identity, ids in required.items()]
+        self.feedback.require_native_test_ids(required, rows)
+        for identity in required:
+            for mode in ("absent", "empty", "renamed", "duplicate"):
+                modified = [(crate, target, ([] if mode == "empty" else ["renamed"] if mode == "renamed"
+                                             else ids + ids[:1]) if f"{crate}:{target}" == identity else ids)
+                            for crate, target, ids in rows if mode != "absent" or f"{crate}:{target}" != identity]
+                with self.subTest(identity=identity, mode=mode), self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                    self.feedback.require_native_test_ids(required, modified)
+        source = self.root / phases.STATE_QUERY_PATHS[2]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("target exists")
+        self.config.pop("current_state_query_focus")
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = ["rust/crates/er-cli/src/current_commands.rs"]
+        with self.assertRaisesRegex(RuntimeError, "requires its exact policy"):
+            self.feedback.plan()
+
+    def test_state_query_orchestration_discovers_and_lints_before_bound_process_execution(self):
+        self.configure_state_query_scope()
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        with patch.object(self.feedback, "wasm_checks") as wasm, patch.object(self.feedback, "browser_checks") as browser, \
+                patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
+                patch.object(self.feedback, "replica_behavioral_mutant") as replica:
+            code, summary = self.invoke()
+        self.assertEqual(code, 0, summary.get("first_failure"))
+        self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_state_query"], 2)
+        self.assertEqual(len(summary["required_native_target_counts"]), 24)
+        self.assertEqual(self.executed[0], "m9e_current_state_query")
+        query_command = next(args for args in self.commands
+                             if Path(args[0]).name == "m9e_current_state_query" and "--list" not in args)
+        self.assertEqual(query_command[1:], ["--format", "terse", "--nocapture"])
+        self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
+        first = self.events.index("execute:m9e_current_state_query")
+        for index, event in enumerate(self.events):
+            if event.startswith("clippy:"):
+                self.assertLess(index, first)
+        for lint in ("cli-clippy", "agent-protocol-clippy", "er-env-clippy", "er-repro-clippy",
+                     "worker-clippy", "endpoint-clippy", "browser-clippy"):
+            self.assertIn(lint, summary["timing_ms"])
+        query_environments = [(phase, env) for name, phase, env in self.binary_envs if name == "m9e_current_state_query"]
+        self.assertEqual([phase for phase, _ in query_environments], ["list", "execute"])
+        for _, env in query_environments:
+            self.assertEqual(env["ER_M9E_WORKER_SOURCE_SHA"], CANDIDATE)
+            self.assertEqual(env["ER_M9E_WORKER_EXECUTABLE_SHA256"], summary["worker_executable"]["sha256"])
+            self.assertEqual(env["ER_M9E_WORKER_BUILD_PROFILE"], "test")
+        self.assertIn("m9e_current_state_query::worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections",
+                      timer.call_args.args[2])
+        timer.assert_called_once()
+        replica.assert_called_once()
+        wasm.assert_called_once()
+        browser.assert_called_once()
+        self.assertIsNone(self.feedback.native_target_env("er-other", "m9e_current_state_query", None))
+        with self.assertRaisesRegex(RuntimeError, "no bound worker"):
+            self.feedback.native_target_env("er-cli", "m9e_current_state_query", None)
+
+    def test_state_query_orchestration_rejects_missing_worker_witness_and_early_lint_failure(self):
+        self.configure_state_query_scope()
+        selection = self.feedback.plan()
+        self.control_query_mock_inventory(selection)
+        original_ids = list(self.binary_ids["m9e_current_state_query"])
+        original_artifacts = list(self.extra_artifacts)
+        for failure in ("worker", "witness", "lint"):
+            self.executed.clear()
+            self.events.clear()
+            self.binary_envs.clear()
+            self.extra_artifacts = original_artifacts[1:] if failure == "worker" else original_artifacts
+            self.binary_ids["m9e_current_state_query"] = original_ids[:1] if failure == "witness" else original_ids
+            self.clippy_codes = {"er-cli": 1} if failure == "lint" else {}
+            code, summary = self.invoke()
+            self.assertEqual(code, 1)
+            self.assertEqual(self.executed, [])
+            self.assertIn({"worker": "real worker executable", "witness": "required native test identities",
+                           "lint": "cli-clippy exited 1"}[failure], summary["first_failure"])
+            if failure == "worker":
+                self.assertEqual(self.binary_envs, [])
+            if failure == "witness":
+                self.assertNotIn("clippy", self.events)
+
+    def test_state_query_priority_and_inventory_enforce_control_prerequisite(self):
+        self.configure_state_query_scope()
+        import m9e_phases as phases
+        selection = self.feedback.plan()
+        identities = [("er-other", "m9e_current_state_query"), ("er-kernel", "m9e_coop_v7"),
+                      phases.CONTROL_QUERY_TARGET, phases.STATE_QUERY_TARGET, ("er-kernel", "m9e_timers_v7")]
+        rows = [(index, f"binary-{index}", target, ["synthetic"], self.rust / "crates" / crate, set(), None)
+                for index, (crate, target) in enumerate(identities)]
+        prior_plan = {**selection, "current_state_query_focus": False}
+        prior = self.feedback.native_execution_order(prior_plan, rows)
+        self.assertEqual(self.feedback.native_execution_order(selection, rows), [rows[3], *[row for row in prior if row != rows[3]]])
+        inventory = [{"crate": target[0], "target": target[1], "ids": list(ids), "historical_excluded_ids": []}
+                     for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
+                                         (phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS))]
+        phases.validate_state_query_inventory(selection, inventory)
+        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["a"])
+        for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
+                     "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
+                     "state_ids", "plan_ids", "plan_target"):
+            bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
+            if mode == "missing_flag":
+                bad_plan.pop("requires_current_state_query")
+            elif mode in ("false_flag", "integer_flag"):
+                bad_plan["requires_current_state_query"] = False if mode == "false_flag" else 1
+            elif mode == "missing_binding":
+                bad_plan["requires_worker_executable"] = False
+            elif mode == "wrong_crate":
+                bad_inventory[1]["crate"] = "er-other"
+            elif mode == "excluded":
+                bad_inventory[1]["historical_excluded_ids"] = ["forbidden_skip"]
+            elif mode == "duplicate":
+                bad_inventory.append(copy.deepcopy(bad_inventory[1]))
+            elif mode == "missing_target":
+                bad_inventory.pop()
+            elif mode == "prerequisite_flag":
+                bad_plan["requires_current_control_query"] = False
+            elif mode == "prerequisite_target":
+                bad_inventory.pop(0)
+            elif mode == "prerequisite_ids":
+                bad_inventory[0]["ids"] = ["renamed"]
+            elif mode == "state_ids":
+                bad_inventory[1]["ids"] *= 2
+            elif mode == "plan_ids":
+                bad_plan["required_native_test_ids"][":".join(phases.STATE_QUERY_TARGET)] = ["renamed"]
+            else:
+                bad_plan["required_native_targets"]["er-cli"].remove(phases.STATE_QUERY_TARGET[1])
+            with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                phases.validate_state_query_inventory(bad_plan, bad_inventory)
 
 class PhaseTransferTests(unittest.TestCase):
     def setUp(self):
@@ -5737,6 +6476,153 @@ class PhaseTransferTests(unittest.TestCase):
                                                           "base_position": 9, "final_position": 12, "processed_attempts": 3,
                                                           "negative_divergence_position": 10, "snapshot_digest": "blake3-v1:" + "a" * 64}}
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+
+    def test_control_query_aggregate_requires_both_lanes_exact_inventory_and_real_worker_binding(self):
+        identity = ":".join(self.phases.CONTROL_QUERY_TARGET)
+        binding, assets, tests, cohort = browser_worker_fixture(self.phases)
+        for proof in (self.native, self.other):
+            proof["plan"].update({"requires_current_control_query": True, "requires_worker_executable": True,
+                                  "requires_browser_worker": True, "browser_worker_binding": binding,
+                                  "required_native_test_ids": {identity: list(self.phases.CONTROL_QUERY_TEST_IDS)}})
+            proof["plan"]["required_native_targets"]["er-cli"] = ["m9e_current_control_query"]
+            proof["required_native_target_counts"][identity] = 2
+            proof["inventory"].append({"crate": "er-cli", "target": "m9e_current_control_query",
+                                       "ids": sorted(self.phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []})
+            proof["inventory"].sort(key=lambda item: (item["crate"], item["target"]))
+            proof["assigned_targets"] = self.phases.partition(proof["inventory"])[proof["lane"]]
+            proof["completed_targets"] = list(proof["assigned_targets"])
+            proof["tests"]["selected"] += 2
+            if proof["lane"] == "a":
+                proof["tests"]["executed"] += 2
+                proof["tests"]["passed"] += 2
+            proof["worker"] = {"source_sha": CANDIDATE, "target": self.identity["target"], "profile": "test",
+                               "manifest_path": "rust/crates/er-kernel-worker/Cargo.toml", "cargo_profile": {"test": False},
+                               "bytes": 10, "sha256": "c" * 64}
+            proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+            proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+            self.phases.validate_native(proof, self.identity)
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
+                              "browser_worker_assets": assets, "browser_worker_tests": tests,
+                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                                                       "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)}})
+        self.platform["browser_assets"]["assets"] = cohort
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            aggregate = self.phases.aggregate(None)
+        self.assertEqual(aggregate["qualification"], "passed")
+        self.assertEqual(aggregate["tests"]["selected"], 15)
+        self.assertEqual(aggregate["tests"]["passed"], 15)
+        self.assertEqual(aggregate["browser_worker_tests"]["passed"], 2)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
+        for lane in ("a", "b"):
+            original = self.native if lane == "a" else self.other
+            for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b"):
+                proof = copy.deepcopy(original)
+                if mode == "missing":
+                    proof["inventory"] = [item for item in proof["inventory"] if item["target"] != "m9e_current_control_query"]
+                elif mode == "renamed":
+                    next(item for item in proof["inventory"] if item["target"] == "m9e_current_control_query")["ids"][0] = "renamed"
+                elif mode == "worker":
+                    proof["worker"] = None
+                elif mode == "flag":
+                    proof["plan"]["requires_current_control_query"] = False
+                else:
+                    proof["assigned_targets"] = [["er-cli", "m9e_current_control_query"]] if lane == "b" else []
+                proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+                proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+                if mode in ("missing", "renamed"):
+                    proof["assigned_targets"] = self.phases.partition(proof["inventory"])[lane]
+                    proof["completed_targets"] = list(proof["assigned_targets"])
+                with self.subTest(lane=lane, mode=mode), self.assertRaises(RuntimeError):
+                    self.phases.validate_native(proof, self.identity)
+        bad = copy.deepcopy(self.other)
+        bad["plan"]["requires_current_control_query"] = False
+        bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", bad)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            with self.assertRaises(RuntimeError):
+                self.phases.aggregate(None)
+
+    def test_state_query_aggregate_requires_both_lanes_exact_inventory_and_real_worker_binding(self):
+        identity = ":".join(self.phases.STATE_QUERY_TARGET)
+        binding, assets, tests, cohort = browser_worker_fixture(self.phases)
+        for proof in (self.native, self.other):
+            proof["plan"].update({"requires_current_state_query": True, "requires_worker_executable": True,
+                                  "requires_browser_worker": True, "browser_worker_binding": binding,
+                                  "required_native_test_ids": {identity: list(self.phases.STATE_QUERY_TEST_IDS)}})
+            proof["plan"]["required_native_targets"]["er-cli"] = ["m9e_current_state_query"]
+            proof["required_native_target_counts"][identity] = 2
+            proof["inventory"].append({"crate": "er-cli", "target": "m9e_current_state_query",
+                                       "ids": sorted(self.phases.STATE_QUERY_TEST_IDS), "historical_excluded_ids": []})
+            control_identity = ":".join(self.phases.CONTROL_QUERY_TARGET)
+            proof["plan"]["requires_current_control_query"] = True
+            proof["plan"]["required_native_test_ids"][control_identity] = list(self.phases.CONTROL_QUERY_TEST_IDS)
+            proof["plan"]["required_native_targets"]["er-cli"].append("m9e_current_control_query")
+            proof["required_native_target_counts"][control_identity] = 2
+            proof["inventory"].append({"crate": "er-cli", "target": "m9e_current_control_query",
+                                       "ids": sorted(self.phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []})
+            proof["inventory"].sort(key=lambda item: (item["crate"], item["target"]))
+            proof["assigned_targets"] = self.phases.partition(proof["inventory"])[proof["lane"]]
+            proof["completed_targets"] = list(proof["assigned_targets"])
+            proof["tests"]["selected"] += 4
+            if proof["lane"] == "a":
+                proof["tests"]["executed"] += 4
+                proof["tests"]["passed"] += 4
+            proof["worker"] = {"source_sha": CANDIDATE, "target": self.identity["target"], "profile": "test",
+                               "manifest_path": "rust/crates/er-kernel-worker/Cargo.toml", "cargo_profile": {"test": False},
+                               "bytes": 10, "sha256": "c" * 64}
+            proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+            proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+            self.phases.validate_native(proof, self.identity)
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
+                              "browser_worker_assets": assets, "browser_worker_tests": tests,
+                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                                                       "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)}})
+        self.platform["browser_assets"]["assets"] = cohort
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            aggregate = self.phases.aggregate(None)
+        self.assertEqual(aggregate["qualification"], "passed")
+        self.assertEqual(aggregate["tests"]["selected"], 17)
+        self.assertEqual(aggregate["tests"]["passed"], 17)
+        self.assertEqual(aggregate["browser_worker_tests"]["passed"], 2)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
+        self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
+        for lane in ("a", "b"):
+            original = self.native if lane == "a" else self.other
+            for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b"):
+                proof = copy.deepcopy(original)
+                if mode == "missing":
+                    proof["inventory"] = [item for item in proof["inventory"] if item["target"] != "m9e_current_state_query"]
+                elif mode == "renamed":
+                    next(item for item in proof["inventory"] if item["target"] == "m9e_current_state_query")["ids"][0] = "renamed"
+                elif mode == "worker":
+                    proof["worker"] = None
+                elif mode == "flag":
+                    proof["plan"]["requires_current_state_query"] = False
+                else:
+                    proof["assigned_targets"] = [["er-cli", "m9e_current_state_query"]] if lane == "b" else []
+                proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+                proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+                if mode in ("missing", "renamed"):
+                    proof["assigned_targets"] = self.phases.partition(proof["inventory"])[lane]
+                    proof["completed_targets"] = list(proof["assigned_targets"])
+                with self.subTest(lane=lane, mode=mode), self.assertRaises(RuntimeError):
+                    self.phases.validate_native(proof, self.identity)
+        bad = copy.deepcopy(self.other)
+        bad["plan"]["requires_current_state_query"] = False
+        bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", bad)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            with self.assertRaises(RuntimeError):
+                self.phases.aggregate(None)
 
     def test_phase_identity_rejects_source_build_and_run_mismatches(self):
         for key in ("product_sha", "workflow_sha", "run_id", "run_attempt", "profile", "target", "toolchain"):
@@ -5963,7 +6849,8 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-ai", "er_ai"], assignment["a"])
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
             ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
-            ("er-cli", "m9e_current_batch"), ("er-cli", "m9e_current_reload")})
+            ("er-cli", "m9e_current_reload")})
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["a"])
         for key in policies:
             for damage in ("missing", "restoration", "wrong_test"):
                 with self.subTest(key=key, damage=damage):
@@ -6538,14 +7425,15 @@ class PhaseTransferTests(unittest.TestCase):
         ])
         assignment = self.phases.partition(inventory)
         self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
-        self.assertIn(["er-cli", "m9e_current_batch"], assignment["b"])
+        self.assertIn(["er-cli", "m9e_current_batch"], assignment["a"])
+        self.assertNotIn(["er-cli", "m9e_current_batch"], assignment["b"])
         self.assertIn(["er-cli", "m9e_current_reload"], assignment["b"])
         self.assertNotIn(["er-cli", "m9e_current_reload"], assignment["a"])
         self.assertIn(["er-other", "m9e_current_reload"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
-        self.assertEqual(len(assignment["b"]), 4)
+        self.assertEqual(len(assignment["b"]), 3)
         self.assertEqual(len(assignment["a"]) + len(assignment["b"]), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
         self.assertEqual(sorted(assignment["a"] + assignment["b"]),
