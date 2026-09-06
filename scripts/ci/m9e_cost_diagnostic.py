@@ -9,6 +9,8 @@ import signal
 import subprocess
 import time
 
+from m9e_current_cost import check_executable, discover_release, parse_line, read_content, validate_listing
+
 ROOT = Path(__file__).resolve().parents[2]
 RUST = ROOT / "rust"
 REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-cost-focused"
@@ -54,42 +56,12 @@ def run(command, name, seconds, bound=16 << 20, cwd=RUST):
     return path
 
 
-def measurements(value):
-    expected = {"schema_version", "probe", "warmups_per_phase", "samples_per_phase",
-                "debug_assertions", "architecture", "os", "bundle_bytes", "content_identity",
-                "content_phases", "checkpoints", "limitations"}
-    if (set(value) != expected or value["schema_version"] != 1 or value["probe"] != TEST
-            or value["warmups_per_phase"] != 1 or value["samples_per_phase"] != 3
-            or value["debug_assertions"] is not False or value["os"] != "linux"
-            or value["architecture"] != platform.machine()
-            or value["bundle_bytes"] != (RUST / "fixtures/m9/engineering/game-content-bundle-v2.json").stat().st_size):
-        raise RuntimeError("measurement source/profile/schema mismatch")
-    checkpoint_names = ["title", "mode", "starter", "active"]
-    phases = ["fork", "snapshot", "validate", "observe", "canonical_encode_snapshot",
-              "canonical_digest_snapshot", "blake3_preencoded_snapshot", "apply_effectful_raw_input",
-              "recorder_append"]
-    if [row["checkpoint"] for row in value["checkpoints"]] != checkpoint_names:
-        raise RuntimeError("natural checkpoint inventory mismatch")
-    groups = [(value["content_phases"], ["content_decode", "content_prepare_and_arc"])]
-    groups += [(row["phases"], phases) for row in value["checkpoints"]]
-    for rows, names in groups:
-        if [row["phase"] for row in rows] != names:
-            raise RuntimeError("measurement phase inventory mismatch")
-        for row in rows:
-            if (set(row) != {"phase", "min_ns", "median_ns"}
-                    or any(type(row[key]) is not int for key in ("min_ns", "median_ns"))
-                    or not 0 <= row["min_ns"] <= row["median_ns"]):
-                raise RuntimeError("invalid measured duration")
-    # Rust owns the 38 full state/effect/capsule/replay assertions. These metadata
-    # checks do not replace them or establish the final cross-phase cost gate.
-    return value
-
-
 def main(summary):
     sha = os.environ["GITHUB_SHA"]
     if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() != sha:
         raise RuntimeError("checkout identity mismatch")
-    sources = [SOURCE, "scripts/ci/m9e_cost_diagnostic.py", ".github/workflows/m9e-current-cost-focused.yml",
+    sources = [SOURCE, "scripts/ci/m9e_cost_diagnostic.py", "scripts/ci/m9e_current_cost.py",
+               "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json", "rust/crates/er-game/src/m9e_content_v2.rs", ".github/workflows/m9e-current-cost-focused.yml",
                "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
                "rust/crates/er-repro/Cargo.toml", "rust/crates/er-env/src/current.rs",
                "rust/crates/er-repro/src/current.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs"]
@@ -97,37 +69,22 @@ def main(summary):
     summary["bundle_sha256"] = digest(RUST / "fixtures/m9/engineering/game-content-bundle-v2.json")
     run(["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true", "--check", str(ROOT / SOURCE)],
         "format.log", 60, 262144)
+    content = read_content(ROOT)
+    summary["content_binding"] = content
     os.environ["CARGO_TARGET_DIR"] = str(BUILD)
     base = ["--locked", "--release", "-p", "er-repro", "--test", TARGET]
     run(["cargo", "clippy", *base, "--no-deps", "--", "-D", "warnings"], "clippy.log", 600)
     build = run(["cargo", "test", *base, "--no-run", "--message-format=json"], "build.jsonl", 1200)
-    artifacts = []
-    for line in build.read_text().splitlines():
-        if not line.startswith("{"):
-            continue
-        record = json.loads(line)
-        target = record.get("target", {})
-        if (record.get("reason") == "compiler-artifact" and target.get("name") == TARGET
-                and target.get("kind") == ["test"] and record.get("executable")):
-            artifacts.append(record)
-    if len(artifacts) != 1:
-        raise RuntimeError("missing or ambiguous release test executable")
-    artifact = artifacts[0]
-    profile = artifact["profile"]
-    executable = Path(artifact["executable"])
-    if (Path(artifact["manifest_path"]).resolve() != (RUST / "crates/er-repro/Cargo.toml").resolve()
-            or Path(artifact["target"]["src_path"]).resolve() != (ROOT / SOURCE).resolve()
-            or profile.get("test") is not True or profile.get("debug_assertions") is not False
-            or profile.get("opt_level") != "3" or not executable.is_absolute()
-            or executable.is_symlink() or not executable.is_file()
-            or not executable.resolve().is_relative_to(BUILD.resolve())
-            or not os.access(executable, os.X_OK) or not 0 < executable.stat().st_size <= 128 << 20):
-        raise RuntimeError("release executable identity/profile mismatch")
-    before = digest(executable)
-    listing = run([str(executable), "--list", "--format", "terse"], "list.log", 30, 65536).read_text()
-    if [line[:-6] for line in listing.splitlines() if line.endswith(": test")] != [TEST]:
-        raise RuntimeError("focused test identity mismatch")
-    output = run([str(executable), "--format", "terse", "--nocapture", "--test-threads=1"],
+    records = [json.loads(line) for line in build.read_text().splitlines() if line.startswith("{")]
+    executable, artifact = discover_release(records, repository=ROOT, target_directory=BUILD.resolve())
+    summary["release_artifact"] = artifact
+    profile = artifact["cargo_profile"]
+    before = artifact["sha256"]
+    check_executable(executable, artifact)
+    listing = run([str(executable), "--list", "--format", "terse"], "list.log", 30, 16384).read_bytes()
+    validate_listing(listing, [TEST])
+    check_executable(executable, artifact)
+    output = run([str(executable), TEST, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"],
                  "execute.log", 600, 262144).read_bytes()
     if (not re.search(rb"test result: ok\. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;", output)
             or before != digest(executable)):
@@ -135,7 +92,11 @@ def main(summary):
     lines = [line for line in output.splitlines(keepends=True) if line.startswith(PREFIX)]
     if len(lines) != 1 or len(lines[0]) >= 8192 or not lines[0].endswith(b"\n"):
         raise RuntimeError("bounded measurement line mismatch")
-    evidence = measurements(json.loads(lines[0][len(PREFIX):]))
+    evidence = parse_line(lines[0], architecture=platform.machine(), operating_system=platform.system().lower(),
+                          bundle_bytes=content["bundle"]["bytes"], content_identity=content["identity"])
+    check_executable(executable, artifact)
+    if read_content(ROOT) != content:
+        raise RuntimeError("content bytes changed during release measurement")
     if any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items()):
         raise RuntimeError("source changed during measurement")
     summary.update(status="passed", tests={"selected": 1, "executed": 1, "passed": 1, "failed": 0, "skipped": 0},
