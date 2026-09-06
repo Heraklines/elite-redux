@@ -1900,7 +1900,7 @@ def main(preflight_failure=None):
             print(f"[m9e] execute {name}: {len(ids)} selected tests", flush=True)
             command = [binary, "--format", "terse"]
             native_timer_parity = (cwd.name, name) == ("er-wasm", "m9e_parity")
-            if native_timer_parity:
+            if native_timer_parity or (cwd.name, name) == ("er-cli", "m9e_current_state_query"):
                 command.append("--nocapture")
             for test_id in sorted(excluded_ids):
                 command.extend(["--skip", test_id])

@@ -5258,6 +5258,9 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["required_native_target_counts"]["er-cli:m9e_current_state_query"], 2)
         self.assertEqual(len(summary["required_native_target_counts"]), 24)
         self.assertEqual(self.executed[0], "m9e_current_state_query")
+        query_command = next(args for args in self.commands
+                             if Path(args[0]).name == "m9e_current_state_query" and "--list" not in args)
+        self.assertEqual(query_command[1:], ["--format", "terse", "--nocapture"])
         self.assertLess(max(index for index, event in enumerate(self.events) if event.startswith("list:")), self.events.index("clippy"))
         first = self.events.index("execute:m9e_current_state_query")
         for index, event in enumerate(self.events):
