@@ -3,7 +3,8 @@
 use super::*;
 use crate::current_proposal_v7::{MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1, decode_current_hex_v1};
 use er_game::m72_bootstrap::RunBootstrapSelectionsV1;
-use er_types::{FrameContext, GameContentIdentityV2, GameModeId};
+use er_types::{FrameContext, GameContentIdentityV2};
+use er_types::run_ids::GameModeId;
 
 const MAX_CHOICES_BYTES: usize = 16_384;
 const MAX_OWNER_BYTES: usize = 1_048_576;
@@ -262,19 +263,23 @@ pub(crate) fn validate_snapshot(
             | GameKernelLifecycleSnapshotV7::Terminal { state, .. },
             Some(started),
         ) => {
-            validate_started(started, owner, content)?;
-            // The run may progress and change its party. The frozen startup reply is
-            // bound to its run identity rather than requiring the initial party forever.
-            let initial = match started {
-                CurrentCoopFrameV1::CurrentCoopStarted { material_hex, .. } => {
-                    GameMaterialV6::decode(
-                        &decode_current_hex_v1(material_hex, MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1)
-                            .map_err(|_| GameKernelV7Error::Invalid)?,
-                    )
-                    .map_err(|_| GameKernelV7Error::Invalid)?
-                }
-                _ => return Err(GameKernelV7Error::Invalid),
-            };
+            let bytes = validate_started(started, owner, content)?;
+            let initial = GameMaterialV6::decode(&bytes).map_err(|_| GameKernelV7Error::Invalid)?;
+            let fingerprint = crate::current_proposal_v7::current_material_fingerprint_v1(&bytes)
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+            if snapshot.material_ledger.next_authority_revision <= safe_one()
+                || snapshot.material_ledger.records.is_empty()
+                || snapshot.material_ledger.records.iter().any(|record| {
+                    record.authority_revision == safe_one()
+                        && (record.operation_id != initial.transition().operation_id
+                            || record.after_digest != initial.transition().after_digest
+                            || record.material_fingerprint != fingerprint)
+                })
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            // The run may progress and change its party; retain the initial reply
+            // while binding its identity and any still-retained first ledger entry.
             if state.active_run.as_ref().is_some_and(|run| {
                 initial
                     .transition()
@@ -381,6 +386,8 @@ impl GameKernelV7 {
     }
 
     pub(super) fn advance_coop_bootstrap(&mut self) -> Result<GameKernelStepV7> {
+        let generation = self.current_coop_setup.as_ref().ok_or(GameKernelV7Error::Invalid)?.local.connection_generation;
+        self.validate_current_network_pair(generation)?;
         let GameKernelLifecycleV7::Bootstrap(bootstrap) = &self.lifecycle else {
             return Err(GameKernelV7Error::Invalid);
         };
@@ -388,6 +395,12 @@ impl GameKernelV7 {
             .current_coop_setup
             .as_mut()
             .ok_or(GameKernelV7Error::Invalid)?;
+        if bootstrap.selections.mode.is_some_and(|selected| {
+            !self.content.bundle().bootstrap.modes.iter().any(|mode| mode.mode == selected && mode.cooperative && mode.supported)
+                || owner.choices.as_ref().is_some_and(|choices| choices.mode != selected)
+        }) {
+            return Err(GameKernelV7Error::Invalid);
+        }
         if self.role == GameKernelRoleV7::Replica
             && bootstrap.stage == RunBootstrapStageV1::WaitingForPartner
             && owner.choices.is_none()
