@@ -2654,3 +2654,266 @@ list the seven existing game-kernel test names in timer/retention/AI policy maps
 their targets and complete execution were already mandatory. The separate remote
 snapshot harness dfdea1ef/run34010125357 passed187 tests, but this runtime candidate
 must pass its own complete focused qualification before owner integration.
+
+## Qualified borrowed snapshot AI validation
+
+791ae5b53333eaaf8edd8e91dcdba1de006e106d / run34011232052 passed all four
+focused jobs. Native A611/B20:631 selected/executed/passed, zero skipped/failed;
+67 inventory targets,23 mandatory,18 exact-ID maps,63/4 disjoint assignments.
+All187 harness tests passed3.381s. Both timer/replica behavioral mutants were
+detected and their exact source restored. Wasm2, Chromium2, effects1, Worker2,
+codec3, actual CLI replay bridge and RTC2 passed. RTC proposal/material hashes,
+turn1->2, one new presentation delivery/settlement and disposal match qualifiedf3.
+The optimization removes discarded owned snapshot copies; no timing improvement
+is claimed from these non-controlled CI timings.
+
+17 committed source hashes, restored plan399e3bb9eeea86899cb584a10f5131f6c6a7148f96a8f314114cde7567bcc844,
+complete inventory/assignments and cross-phase manifest hashes independently checked.
+A62304 SHA fcb3f9eaa03e6961271eb25e773a72676d4b33d2e2cac531a265904cc1db5401;
+B58584 SHA f15722b39a58b4104a18c9887be059ba1f8ca8567aa8f46bfc9c1c6c55d9e9af;
+platform28919 SHA212e156ae36acd3c99b69d34240c74a44d21c0ef28c07158ae326b2868a47bb1;
+aggregate19811 SHA5900e71e0e822638adea1d7a1b936433a57a3da0e7ae2496a7b38130b9d6be35.
+Actual native CLI c6f014088fe30b62581ceecb4011f2b193e5e5b262906165d8736efd8db6f5c9;
+Wasm c2975347660f8a10548b12a158916f71027853c63611a0d5eb40647d65bb0107.
+Content/glue and replay/timer semantic digests unchanged. Large artifacts remain remote.
+
+## Current proposal ownership and receipt candidate
+
+Apply eight-path product493f54bd refreshed froma5f556a onto actualqualified791:
+one bounded pending current proposal, explicit terminal abandonment, and exact
+canonical proposal/material receipt validation before retiring ownership. Restore
+validation preserves retained identity and rejects malformed/oversized owners.
+The current receipt binds actual SHA256 byte vectors to the real BLAKE3 ledger;
+source-bound actual RTC positive test supplies those bytes as a third attachment
+across the existing two tests. Imported presentation conservation remains intact.
+This does not implement proposal retry/expiry, reconnect or imported presentation
+rehydration, which remain outstanding M9 work.
+
+Pair with prepared owner gatecf3a12ab, independently passed201 harness tests at
+6780e97a86f6c6766c7678e52306b2b861be019f/run34010180620. Actual source checks
+confirm gate base differs from current791 only by the audited comparison baseline;
+advance that baseline to791/run34011232052. The gate retains all prior native,
+CLI, Wasm, Worker, RTC and both mutation controls. The pinned receipt-hash wheel
+is downloaded and installed only on the remote runner. Runtime remains unqualified
+until this exact candidate completes its focused checks. Broad M9 remains incomplete.
+Owner candidatec1ae46dff/run34012900744 stopped at remote Rust formatting before
+native test execution or platform qualification. Apply exact remote rustfmt repair
+74116 bytes SHA df4eb4ea03d00e01d46da368c0f5e86c7373df348dc27ac1e889051bda61dca2
+from artifact9983027548ZIP12952. Four paths only: current proposal module, game kernel,
+co-op test and new proposal test. The compact excerpt omitted the larger test portion;
+the bounded complete repair includes it. No local formatter/compiler/test was run.
+Baseline remains fully qualified791. This formatting correction needs a new exact run.
+Formatted owner24bd88ff/run34013243354 passed formatting and stopped during
+remote build: DecodedCurrentReceiptV1 lacked Debug, required by the workspace's
+-D missing-debug-implementations rule. Derive Debug on this decoded receipt helper;
+all fields already support Debug. No behavioral contract or witness changes.
+Retrieve only3533-byte named failure from1913-byte compact artifact9983134442.
+Runtime remains unqualified; comparison stays791 and the full focused run repeats.
+Owner3f07ac9c/run34013476181 compiled the production receipt helper and reached
+integration-test compilation. Five calls used crate-private snapshot scheduler
+conversions, unavailable from an external integration test. Replace only that
+fixture plumbing with explicit public import/export scheduler-state bridges;
+preserve and validate every timer/pause/allocator/disposal field, and assert the
+full snapshot round trip before exercising real lease arm/retirement or pauses.
+Do not expose the production private methods or remove ownership assertions.
+Named compact failure7330bytes fromartifact9983210181ZIP2228. Tests and actual
+platform qualification remain pending; comparison staysqualified791.
+Owner3903c950/run34013691597 passed formatting, production/test compilation and
+selected Clippy in both native lanes, then exposed two runtime failures. Existing
+host14 had13 passes and generation-nine NetworkFrame admission failed. Preserve
+that unchanged regression test and restore the existing raw publication/admission
+path for actual non-one-generation sessions; generation-one receipt ownership
+remains strict, and incoming generation alone cannot select the compatibility path.
+Add a generation-nine raw proposal/material and duplicate-conservation witness,
+including wrong-generation rejection without snapshot mutation. This compatibility
+path does not qualify receipt ownership after reconnect or generation rebinding.
+The two new owner tests also assumed a second actor after natural bootstrap with
+no protocol. Supply the real authority/guest protocol before bootstrap, as the
+existing cooperative witness does, and assert both runtime seat owners exist.
+This proves peer-aware bootstrap actors, not independent starter choice by both
+humans. Retrieved only compact named failures: A1102bytes/artifact9983402289ZIP4373,
+B819bytes/artifact9983355100ZIP3583. Both new tests and all unchanged controls must
+pass remotely before qualification; baseline remains791. No local workload ran.
+
+Owner89407335/run34014646379 stopped at formatting before test execution. Apply
+only the remote2470byte test-format patch fromcompact9983529224ZIP2927; no
+production change and no local formatter. Full remote qualification repeats.
+
+Owner57480489/run34014732097 nativeA passed format/build/selected Clippy and
+executed582 tests:581 passed, one failed at the private-menu precondition in
+current_proposal_publication_receipt_and_snapshot_conserve_ownership. The other
+new test (terminal/rejection/duplicate conservation) passed. The raw generation9
+compatibility helper ran before the failure and its assertions passed as well.
+Retrieved777byte named failure fromcompact9983691262ZIP4275; no full logs.
+The real retention material installed a BlocksHumanInput presentation. The test
+incorrectly attempted Fight before acknowledging it. Settle the actual pending
+presentation through the public API, assert proposal ownership remains exact,
+then open the private menu and retain every duplicate/overflow/eviction/full-
+snapshot assertion. No product change, bypass, or test deletion. NativeB and the
+whole checkpoint are not yet qualified; full focused acceptance must run again.
+
+Improve the existing focused edit loop by prioritizing the exact er-kernel:
+m9e_current_proposal_v7 target whenever current proposal coverage is required.
+This happens after full discovery and lint; it neither changes selected IDs nor
+native lane assignment, and all other targets retain their prior relative order.
+Add a harness regression covering same-name decoys, inherited AI priority, input
+conservation and complete unchanged target payloads. The expected harness total
+becomes202, subject to actual remote execution. No local Python was executed.
+
+Ownerdb1e339f/run34016135794 completed both native lanes: A599/B20,619 total,
+zero skipped/failed;67 inventory targets25 mandatory21 exact maps. Both mutants
+were detected and exact source restored. A63328 SHA
+bfff71634323f600949bf29a6e229d45edb6f9a34f8f6453e0d1f569dbd236fe;
+B59583 SHA43277912f703ab5ed7f11d0a099b568cebd3a4a6fc5a8047ead4f105c5610ae1.
+Native CLI SHA agrees across lanes:f6de8e466560503c455d1cec4f88496ec296f2ce44c06db187a6971bb430e5b1.
+Platform passed Wasm checks, then existing in-page browser tests had1pass/1fail:
+the cooperative fixture treated the new receipt as bare material and read an
+undefined value.presentation. Named3426byte failure fromcompact9984332539ZIP1185;
+large platform diagnostics2111950 and browser assets4654685 remain remote.
+Update only the in-page witness to require the bounded exact proposal receipt,
+decode its canonical lowercase material hex and preserve all existing actual
+presentation/convergence/duplicate assertions. Also observe actual pending owner
+and its retirement after delivery. Bind this exact companion in the owner source
+policy/helper (now9 paths), and add a harness check rejecting an omitted companion
+or an unrelated neighboring spec. Expected harness203; native/browser IDs unchanged.
+The separate solo Worker witness emits local authority raw material and needs no
+receipt adaptation. RTC already checks receipt bytes independently. Broad M9 and
+this exact owner checkpoint remain unqualified until all phases pass.
+
+Owner3edda186/run34017743908 passed both native lanes but platform rejected a
+regular file byte bound while preparing the independent receipt provider. Compact
+platform9984871581ZIP626: failure39 bytes; summary532 bytes. Existing in-page,
+Worker, codec and Wasm steps completed before the provider failure; no RTC proof.
+Correct provider verification to permit empty installed package members only when
+the hash-pinned wheel and verified RECORD contain exactly empty bytes. Keep normal
+source/receipt reads nonempty; exact installed byte equality, bounds and containment
+remain mandatory. Add regression: verified empty marker reaches import; truncated
+module and mutated marker reject before import; default empty read rejects.
+Remote side preflightd278a918/run34033976406 passed254 harness tests but actual
+provider installation then rejected the official vector. Upstream BLAKE3 1.8.2
+vectors reveal two copied outputs held33 bytes, not32. Use exact first32 bytes and
+explicitly validate digest width. Source URL:
+https://github.com/BLAKE3-team/BLAKE3/blob/1.8.2/test_vectors/test_vectors.json
+Sidebd9973e35cafefba38a089fa3ded3446797938ed now tests actual pinned wheel/provider
+plus254 combined harness cases. Main expected204 after this regression; no product
+or native selection changes. Full owner qualification remains required.
+
+Remote preflightbd9973e3/run34034083008 PASSED254 harness tests and actual pinned
+BLAKE3 provider installation/import/all3 official32byte vectors. Compact artifact
+9989576783ZIP1443; helper hash verified against exact local edited source. No game
+qualification implied. Start exact main qualification after this scoped repair.
+
+Qualified owner checkpoint46496094719a2f739cdc76df6d2a9779fb28bc04/run34034142653:
+all four jobs passed;619 native A599/B20,zero failed/skipped,67 inventory targets,
+25 mandatory targets and21 exact-ID maps. Existing Wasm2, in-page Chromium2,
+typed-effect1, Worker2, codec3, actual CLI bridge and RTC2 passed. Both behavioral
+mutants detected and restored. Local bounded metadata/source audit checked26
+cached source hashes, reconstructed plan/inventory, complete disjoint partitions,
+phase wire hashes and aggregate equality. Aggregate22982 bytes SHA
+37ce8fe5b4dcd1253f6b84e83e641b1f9be6c6470fdd1435b41970b12c398cc4.
+Actual RTC exact receipt61119 bytes SHA2f8b01e3fd82ecdbcd19f9b9b3183cb1f66c6e98adbc78d2ff09dfd2f87d44d0;
+inner29923 bytes SHAce75324efc403750120842c497e36bb712ee4dc2c879bcf7c4ef17c0631d6ed4.
+The independent pinned BLAKE3 oracle verified exact bytes/preimages/digests and
+source binding; browser observed the exact Pending owner retire, one new visible
+presentation, private/duplicate conservation and acknowledged teardown. Retained
+snapshot/ledger checks remain explicitly source-bound producer evidence, not an
+independent full-snapshot reconstruction. Fixed generation1 only, no reconnect claim.
+
+Advance comparison only to this qualified owner, then integrate Active READ repair:
+saved control retains semantic action/selection but gets fresh revision/menu IDs;
+platform request highwater and unrelated pending presentation owners are conserved;
+clear old input/private owners transactionally and reject allocator exhaustion.
+Five new kernel tests plus retained seven and unchanged14 host IDs check actual
+loaded-state continuation, fresh raw generation-two Write, stale-action rejection,
+full rollback and preservation of unrelated work. Expected focused inventory624,
+subject to remote discovery; all owner/RTC/Worker/CLI/Wasm/causal controls remain.
+Source is READ659e1856 plus actual remote formatting ec2c222e and READ209 gate
+3a40836e. The exact209 gate preflight passed run34034669887; production kernel needed
+no formatting. Actual native/platform READ qualification is required before claims.
+
+Independent CLI control-query8f173ae91822705bb32d51d2c18616e59988db42/run34034480619
+also qualified all four jobs:619 native A599/B20,67 targets23 mandatory18 exact maps,
+actual query2 through nativeV7 and WorkerV2, all previous platform and both mutants.
+Metadata audit checked19 cached sources, complete partitions and matching actual
+CLI/Worker binaries across native lanes; aggregate19855 SHA
+6b4396a8bcd57c83bf24e91f2602d113f95de7258ccc77c220cabe2983f695e1.
+This non-ancestor is not the main comparison. State query may now qualify separately
+as its descendant; eventual main integration must retain newer owner/storage gates.
+Broad M9 remains unfinished, including natural Title storage, reconnect/expiry,
+source AI/content gaps, further tooling and final frozen engineering qualification.
+
+READ checkpoint0fcde2f871faed85560926e1f78b0726d3c4c1c0/run34035988852 qualified:
+all four jobs passed,624 native A604/B20,zero skipped/failed,67 inventory targets,
+23 mandatory/18 exact maps. Current kernel12 including all5 READ regressions;
+host14 and owner2 retained. Wasm/in-page/typed/Worker/codec/CLI bridge/RTC passed,
+both mutants detected/restored. Metadata audit verified28 source hashes, restored
+plan and complete disjoint inventory, all cross-phase hashes, receipt binding and
+unchanged RTC material semantics. Aggregate22913 bytes SHA
+542edc273f12460f57d91bd7217c3aa96cc5c3680f2fdd603085697ffde5a074.
+Only bounded proof metadata downloaded: A63318/B59572/platform32852/aggregate22913;
+all runtime binaries, browser assets and full logs remained remote.
+
+Use this qualified READ ancestor for complete Worker storage integration: the four
+independently qualified adapter1b4cb519 product paths plus four Worker composition
+paths, with the actual READ rebind/generation-two-write revision. The same I gate
+requires adapter Node5/Chromium3, actual two-Worker composition2, all installed
+owner/READ/AI/RTC/CLI/Worker/Wasm/causal checks and both mutants. Scope permits only
+these exact eight related paths; unknown neighboring files and missing adapter
+sources reject. Remote harness preflight82009b14/run34037420185 passed225 cases;
+ce5f84d7/run34037517720 repeated225 and formatted the exact Rust fixture. Verified
+all CI hashes plus source before/after; format patch23454 bytes SHA
+96631c3a4a213d48719a96a42ce83cc8d02cd7feeb9950de334114b31c280c72.
+Composition uses actual GameSaveV2 bytes through two Workers, independent pending
+presentations, committed-write reconciliation, and a fresh raw generation-two Write
+after Load. It is explicitly a controlled Active save/load checkpoint. Natural
+Title discovery/cancellation, reconnect, AI fidelity and whole-M9 Q remain pending.
+This integration needs actual native/platform qualification; preflight alone is
+not a game result. No deployment, default activation or real player-save access.
+
+Qualified complete Worker storage checkpoint5b2c068883db862f21e30a06480aeb5bda57cb4a
+run34037758849: all4jobs passed,1013native A993/B20,zero failed/skipped,97inventory
+51mandatory/19exactmaps. AdapterNode5/Chromium3 and actualWorkercomposition2 passed
+alongside all prior Wasm/in-page/typed/Worker/codec/RTC/CLI bridge and both mutants.
+Audit verified38cachedsourcehashes, complete compressed-ID inventory and partitions,
+all phase wire hashes and exact aggregate/platform equality. Aggregate36616 bytes
+SHA66cade999bb477e25f91199685441eaa5b898a4ca1c2df29a5602d47bcc2ed90.
+Actual GameSaveV2 payload8278 bytes SHA
+ed7fee1f0bf9063839f46604f9f59e7f9c66b5da0686cea73161db6b1d493712;
+loaded-state rawWrite generation2 payloadSHA
+fcc32050114faee14294ec38888a7c58ae6565ca5594b5517041f5ad2f3b2180.
+Exact fixture snapshot/callback/receipt conservation and independent presentations
+passed; lost completion reconciled one actual write and one callback. Pending
+disposal without acknowledgement remains explicitly unconfirmed. This checkpoint
+qualifies controlled Active save/load, not yet natural Title storage/cancellation.
+All binaries, generated fixtures/assets and full logs remained remote.
+
+Advance comparison to that exact qualified storage ancestor and integrate the15
+prepared Title product paths. Opt-in current Title lists actual inventory, owns
+LIST/READ requests and cancellation, handles missing/corrupt/nonlocal/inactive saves,
+rebinds current control/allocator identity and preserves absent-flag historical bytes.
+Six kernel, two nativeCLI and two host tests plus eight historical bootstrap IDs
+are exact mandatory additions/prerequisites. All installed storage/owner/READ/AI/
+RTC/CLI/Worker/Wasm/causal and mutation checks remain required. Natural browser
+retirement/draining is a separate prepared follow-up; no such runtime claim yet.
+
+RemoteTitle230 preflight23b4d625/run34037977153 and pinnedrustfmt15Rustpaths passed;
+allbefore/after hashes matched, zero format patch. NativeB on qualifiedstorage took
+491191ms batch/580765ms reload/303897ms repro/286916ms host; A completed much earlier.
+Move the existing batch target toA to balance execution while preserving every
+selected test, exact source/build scope, complete disjoint partition and all caps.
+The first230 preflight53515024/run34039487916 exposed one old B-assignment assertion;
+update it to require batchinA and exactB3. Corrective47140f73/run34039611104 passed
+all230, verified4CIhashes. No test is omitted or weakened by this assignment change.
+Actual combined Title native/platform qualification is required before acceptance.
+
+Independent AI max-PP4220f1edfb04857488cd6ee330615cf2927ec995/run34036531932 also
+qualified621native/allplatform/mutants with27source checks; aggregate22912 SHA
+473365bf27594bb2026ad5154f83ba5a3229bfcd61b1ec241a4d292fd870653f. Its2product paths
+remain outside this main candidate and require later integration retaining READ5.
+State-query successor remains independently under test; wholeM9, final Q and the
+corrected final tag remain pending. No rollout, default activation or real-save IO.
+
+Title65e8d60f/run34039742243 failedremotecompilation E0507: a pattern guard moved
+effect into a temporary request vector. Compare exact pending count1, requestID
+and borrowed effect directly; same invariant, no clone/allocation. Baseline stays
+qualifiedstorage5b/run34037758849; all230/native/platform checks remain required.

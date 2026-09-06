@@ -10,6 +10,60 @@ const directory = process.env.M9E_V7_WEB_DIR;
 if (directory == null) throw new Error("M9E_V7_WEB_DIR is required");
 const root = realpathSync(directory);
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+// Independent browser-side oracle over ACTUAL transport bytes. It never obtains
+// proposal identity from a receiver's owner and does not call the Rust codec.
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value != null && typeof value === "object") return `{${Object.entries(value)
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`).join(",")}}`;
+  const encoded = JSON.stringify(value);
+  if (encoded == null) throw new Error("receipt oracle received a non-JSON value");
+  return encoded;
+}
+function exactKeys(value: Record<string, unknown>, expected: string[]): void {
+  expect(Object.keys(value).sort()).toEqual(expected.sort());
+}
+function receiptOracle(receiptBytes: number[], proposalBytes: number[], authorityContext: unknown) {
+  expect(receiptBytes.length).toBeGreaterThan(0);
+  expect(receiptBytes.length).toBeLessThanOrEqual(1 << 20);
+  const encoded = Buffer.from(receiptBytes);
+  const wire = JSON.parse(encoded.toString("utf8"));
+  exactKeys(wire, ["kind", "schema_version", "proposal_hex", "proposal_digest", "authority_context",
+    "material_hex", "material_digest", "material_fingerprint"]);
+  expect(wire.kind).toBe("CURRENT_PROPOSAL_MATERIAL_RECEIPT");
+  expect(wire.schema_version).toBe(1);
+  expect(Buffer.from(canonical(wire))).toEqual(encoded);
+  const decodeHex = (value: unknown, maximum: number): Buffer => {
+    expect(typeof value).toBe("string");
+    const text = value as string;
+    expect(text.length).toBeGreaterThan(0); expect(text.length).toBeLessThanOrEqual(maximum * 2);
+    expect(text).toMatch(/^(?:[0-9a-f]{2})+$/u);
+    return Buffer.from(text, "hex");
+  };
+  const proposal = decodeHex(wire.proposal_hex, 16 << 10);
+  const inner = decodeHex(wire.material_hex, 448 << 10);
+  expect(proposal).toEqual(Buffer.from(proposalBytes));
+  const vectorDigest = (bytes: Buffer) => `sha256-json-bytes-v1:${digest(Buffer.from(JSON.stringify(Array.from(bytes))))}`;
+  expect(wire.proposal_digest).toBe(vectorDigest(proposal));
+  expect(wire.material_digest).toBe(vectorDigest(inner));
+  expect(wire.material_fingerprint).toMatch(/^blake3-v1:[0-9a-f]{64}$/u);
+  expect(wire.authority_context).toEqual(authorityContext);
+  const envelope = JSON.parse(proposal.toString("utf8"));
+  const material = JSON.parse(inner.toString("utf8"));
+  expect(Buffer.from(canonical(envelope))).toEqual(proposal);
+  expect(Buffer.from(canonical(material))).toEqual(inner);
+  expect(envelope.schema_version).toBe(2); expect(envelope.connection_generation).toBe(1);
+  expect(material.value.schema_version).toBe(6);
+  expect(material.value.operation_id).toBe(envelope.proposal.context.operation_id);
+  expect(material.value.authority_revision).toBe(envelope.proposal.context.authority_revision);
+  expect(material.value.authority_seat).toBe(envelope.proposal.context.authority_seat);
+  expect(material.value.accepted_action).toEqual(envelope.proposal.action);
+  expect(wire.authority_context.senderSeatId).toBe(material.value.authority_seat);
+  expect(wire.authority_context.authoritySeatId).toBe(material.value.authority_seat);
+  expect(envelope.sender_seat).not.toBe(material.value.authority_seat);
+  return { wire, material, inner };
+}
 function readBounded(path: string, maximum: number): Buffer {
   if (!/^[a-zA-Z0-9_.-]+$/u.test(path) || path === "." || path === "..") throw new Error("RTC fixture path invalid");
   const absolute = resolve(root, path);
@@ -98,7 +152,8 @@ async function pair(browser: Browser, mismatch = false): Promise<Pair> {
         ? frame.senderSeatId : null;
       if (seat == null) throw new Error("natural fixture local seat unavailable");
       const evidence = { frames: [] as { direction: string; generation: number; bytes: number[] }[],
-        frameBytes: 0, presentations: [] as number[], stall: false, stalled: false, aborted: false };
+        frameBytes: 0, presentations: [] as number[], stall: false, stalled: false, aborted: false,
+        publicationSnapshot: null as Promise<any> | null };
       const options = { assets,
         checkpoint: snapshot, context: { local_seat: seat, role: protocol.role, protocol: null,
           scheduler: { disposed: false, next_timer_id: 0, timers: [], pauses: [] } },
@@ -126,6 +181,15 @@ async function pair(browser: Browser, mismatch = false): Promise<Pair> {
           }
           evidence.frameBytes += bytes.length;
           evidence.frames.push({ direction, generation, bytes: Array.from(bytes) });
+          // Queue a real Worker snapshot from the synchronous send observation,
+          // before a later RTC receive task can enqueue the authority reply.
+          // Do not await inside effect delivery; the same queue must finish it.
+          if (direction === "sent" && bytes[0] === 123 && evidence.publicationSnapshot == null
+            && JSON.parse(new TextDecoder().decode(bytes)).schema_version === 2) {
+            evidence.publicationSnapshot = (globalThis as any).__rtcCurrent.peer.dispatch({ kind: "SNAPSHOT" })
+              .then((result: any) => ({ ok: true, snapshot: result.response.snapshot }),
+                (error: unknown) => ({ ok: false, error: String(error) }));
+          }
         },
       };
       const expectedCheckpoint = structuredClone(snapshot);
@@ -242,12 +306,32 @@ test("two current Workers exchange real RTC proposals and converge one natural c
     expect(proposalWire.sender_seat).toBe(2);
     expect(proposalWire.connection_generation).toBe(1);
     const material = await lastSent(peers.left);
-    const materialWire = JSON.parse(Buffer.from(material).toString("utf8"));
+    const receiptProof = receiptOracle(material, proposal, initialLeft.protocol.frame_context.context);
+    const deliveredProposal = await peers.left.evaluate(() => (globalThis as any).__rtcCurrent.evidence.frames
+      .findLast((frame: any) => frame.direction === "received").bytes);
+    const deliveredReceipt = await peers.right.evaluate(() => (globalThis as any).__rtcCurrent.evidence.frames
+      .findLast((frame: any) => frame.direction === "received").bytes);
+    expect(deliveredProposal).toEqual(proposal); expect(deliveredReceipt).toEqual(material);
+    const publication = await peers.right.evaluate(async () => await (globalThis as any).__rtcCurrent.evidence.publicationSnapshot);
+    expect(publication?.ok).toBe(true);
+    const pendingOwner = publication.snapshot.current_proposal;
+    expect(pendingOwner.kind).toBe("PENDING");
+    expect(pendingOwner.retained.proposal_hex).toBe(Buffer.from(proposal).toString("hex"));
+    expect(pendingOwner.retained.proposal_digest).toBe(receiptProof.wire.proposal_digest);
+    const materialWire = receiptProof.material;
     expect(materialWire.value.schema_version).toBe(6);
     expect(materialWire.value.authority_revision).toBe(pendingMaterial.value.authority_revision + 1);
     const leftFinal = await snapshot(peers.left); const rightFinal = await snapshot(peers.right);
     expect(leftFinal.lifecycle.value.active_run.battle.turn).toBe(initialTurn + 1);
     expect(rightFinal.lifecycle).toEqual(leftFinal.lifecycle);
+    expect(rightFinal.current_proposal ?? null).toBe(null);
+    expect(materialWire.value.after_state).toEqual(rightFinal.lifecycle.value);
+    const receiptRecord = rightFinal.material_ledger.records.at(-1);
+    expect(receiptRecord.operation_id).toBe(materialWire.value.operation_id);
+    expect(receiptRecord.authority_revision).toBe(materialWire.value.authority_revision);
+    expect(receiptRecord.after_digest).toBe(materialWire.value.after_digest);
+    expect(receiptRecord.material_fingerprint).toBe(receiptProof.wire.material_fingerprint);
+    expect(leftFinal.material_ledger.records.at(-1)).toEqual(receiptRecord);
     // INITIALIZE restores the exact checkpoint without re-emitting its old
     // presentation owners. Preserve those owners while settling every new one.
     expect(leftFinal.pending_presentations).toEqual(initialLeft.pending_presentations);
@@ -293,6 +377,13 @@ test("two current Workers exchange real RTC proposals and converge one natural c
     const evidence = { ...binding(peers.workers), initial_turn: initialTurn, final_turn: initialTurn + 1,
       proposal_sha256: digest(Uint8Array.from(proposal)), proposal_bytes: proposal.length,
       material_sha256: digest(Uint8Array.from(material)), material_bytes: material.length,
+      receipt_kind: receiptProof.wire.kind, receipt_schema_version: 1,
+      inner_material_sha256: digest(receiptProof.inner), inner_material_bytes: receiptProof.inner.length,
+      receipt_proposal_digest: receiptProof.wire.proposal_digest, receipt_material_digest: receiptProof.wire.material_digest,
+      receipt_material_fingerprint: receiptProof.wire.material_fingerprint, exact_owner_retired: true,
+      owner_before_kind: pendingOwner.kind, owner_after_kind: null,
+      owner_publication_replay_sequence: pendingOwner.retained.publication_replay_sequence,
+      owner_snapshot_sha256: digest(Buffer.from(canonical(publication.snapshot))),
       proposal_operation_id: proposalWire.proposal.context.operation_id,
       material_revision: materialWire.value.authority_revision, material_after_digest: materialWire.value.after_digest,
       presentation_count: expectedIds.length, settled_presentation_count: expectedIds.length,
@@ -304,6 +395,12 @@ test("two current Workers exchange real RTC proposals and converge one natural c
       disconnected_events: [endLeft.disconnectedEvents, endRight.disconnectedEvents], disposed: [true, true] };
     const bytes = Buffer.from(JSON.stringify(evidence)); expect(bytes.length).toBeLessThanOrEqual(4096);
     await testInfo.attach("m9e-current-rtc-positive", { body: bytes, contentType: "application/json" });
+    // Full bytes remain remote; later gate independently validates the bindings
+    // and exports only compact facts/hashes within existing local evidence caps.
+    const receiptAttachment = Buffer.from(material);
+    expect(receiptAttachment.length).toBeLessThanOrEqual(1 << 20);
+    await testInfo.attach("m9e-current-rtc-exact-receipt", {
+      body: receiptAttachment, contentType: "application/octet-stream" });
   } finally { await closePair(peers); }
 });
 
