@@ -52,9 +52,9 @@ jobs:
           end
           aggregate = jobs.fetch('focused')
           raise 'missing aggregate dependency' unless aggregate.fetch('needs').sort == %w[native_a native_b native_c platform]
-          raise 'third result binding' unless aggregate.fetch('env')['M9E_NATIVE_C_RESULT'] == '${{ needs.native_c.result }}'
-          raise 'third manifest binding' unless aggregate.fetch('env')['M9E_NATIVE_C_MANIFEST_SHA256'] == '${{ needs.native_c.outputs.manifest_sha256 }}'
-          third = aggregate.fetch('steps').select {|step| step.fetch('with', {})['artifact-ids'] == '${{ needs.native_c.outputs.proof_artifact_id }}'}
+          raise 'third result binding' unless aggregate.fetch('env')['M9E_NATIVE_C_RESULT'] == '$' + '{{ needs.native_c.result }}'
+          raise 'third manifest binding' unless aggregate.fetch('env')['M9E_NATIVE_C_MANIFEST_SHA256'] == '$' + '{{ needs.native_c.outputs.manifest_sha256 }}'
+          third = aggregate.fetch('steps').select {|step| step.fetch('with', {})['artifact-ids'] == '$' + '{{ needs.native_c.outputs.proof_artifact_id }}'}
           raise 'third same-run download' unless third.length == 1 && third[0]['if'] == "needs.native_c.result == 'success'" && third[0]['with']['merge-multiple'] == true
           puts 'Passed: parsed existing-runner graph, three mandatory native jobs and exact third proof transfer.'
           RUBY

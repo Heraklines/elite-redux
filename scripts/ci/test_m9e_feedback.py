@@ -7225,7 +7225,7 @@ class PhaseTransferTests(unittest.TestCase):
             with self.subTest(lane="b", mutant=key):
                 proof = copy.deepcopy(self.other)
                 proof[key] = {"status": "detected"}
-                with self.assertRaisesRegex(RuntimeError, "lane B cannot claim lane A mutant"):
+                with self.assertRaisesRegex(RuntimeError, "non-A lane cannot claim lane A mutant"):
                     self.phases.validate_native(proof, self.identity)
 
     def test_ai_damage_query_proof_keeps_full_required_ids_both_mutants_and_platform_bridge(self):
@@ -7290,7 +7290,8 @@ class PhaseTransferTests(unittest.TestCase):
         other["lane"] = "b"
         other["assigned_targets"] = assignment["b"]
         other["completed_targets"] = assignment["b"]
-        other["tests"].update({"executed": selected - passed, "passed": selected - passed})
+        other_count = sum(len(row["ids"]) for row in other["inventory"] if [row["crate"], row["target"]] in assignment["b"] )
+        other["tests"].update({"executed": other_count, "passed": other_count})
         other["native_timer_parity_digest"] = None
         for key in policies:
             other.pop(key)
@@ -7299,7 +7300,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": proof["plan_sha256"]})
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity):
             aggregate = self.phases.aggregate(None)
         self.assertEqual(aggregate["tests"]["passed"], selected)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
@@ -7307,7 +7308,7 @@ class PhaseTransferTests(unittest.TestCase):
             self.assertEqual(aggregate[key], proof[key])
         self.platform["browser_current_repro_bridge"]["time_omission_rejected"] = False
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity), \
                 self.assertRaisesRegex(RuntimeError, "bridge"):
             self.phases.aggregate(None)
 
@@ -7364,7 +7365,7 @@ class PhaseTransferTests(unittest.TestCase):
             other.pop(key)
         self.phases.validate_native(other, self.identity)
         other["ledger_mutant"] = proof["ledger_mutant"]
-        with self.assertRaisesRegex(RuntimeError, "lane B"):
+        with self.assertRaisesRegex(RuntimeError, "non-A lane"):
             self.phases.validate_native(other, self.identity)
         other.pop("ledger_mutant")
         self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", proof)
@@ -7372,7 +7373,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.platform["native_manifest_sha256"] = self.native_hash
         self.platform["plan_sha256"] = proof["plan_sha256"]
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity):
             result = self.phases.aggregate(None)
         for key in policies:
             self.assertEqual(result[key], proof[key])
@@ -7380,7 +7381,7 @@ class PhaseTransferTests(unittest.TestCase):
         missing = copy.deepcopy(proof)
         missing.pop("ledger_mutant")
         self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", missing)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity), \
                 self.assertRaisesRegex(RuntimeError, "mutant"):
             self.phases.aggregate(None)
 
@@ -7619,14 +7620,14 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(legacy_path.read_bytes(), self.phases.encoded(self.phases.pack_native_ids(legacy)))
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": proof["plan_sha256"]})
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity):
             result = self.phases.aggregate(None)
         self.assertEqual(result["tests"], {"selected": 913, "executed": 913, "passed": 913, "failed": 0, "skipped": 0})
         self.assertEqual(result["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         self.assertEqual(result["inventory_sha256"], proof["inventory_sha256"])
         candidate["completed_targets"] = []
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", candidate)
-        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity), \
+        with self.phase_environment(native=proof), patch.object(self.phases, "identity", return_value=self.identity), \
                 self.assertRaisesRegex(RuntimeError, "completed targets"):
             self.phases.aggregate(None)
 
@@ -7769,8 +7770,8 @@ class PhaseTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "64 KiB"):
             self.phases.write_bounded(self.root / "compressed-still-oversized.json", proof)
 
-    def phase_environment(self):
-        third = copy.deepcopy(self.native)
+    def phase_environment(self, native=None):
+        third = copy.deepcopy(self.native if native is None else native)
         third["lane"] = "c"
         third["assigned_targets"] = self.phases.partition(third["inventory"])["c"]
         third["completed_targets"] = list(third["assigned_targets"])
