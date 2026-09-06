@@ -12,10 +12,9 @@ use er_agent_protocol::{
 use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, KernelPresentationOutcomeV2};
-use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
+use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_state::m7_state::ProfileStateV1;
-use er_types::battle_ids::MenuInstanceId;
-use er_types::{MenuOptionId, RawInputEvent, SafeU53, SeatId};
+use er_types::{RawInputEvent, SafeU53, SeatId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -54,31 +53,6 @@ struct CreateRequest {
     start: CurrentStart,
     #[serde(default)]
     capture_limits: CaptureLimits,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ControlDescriptionRequest {
-    session: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ControlNavigationRequest {
-    session: String,
-    expected_menu_instance: MenuInstanceId,
-    expected_control_digest: String,
-    target: String,
-    submit: bool,
-    maximum_events: usize,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CurrentStateRequest {
-    session: String,
-    query: Value,
-    maximum_bytes: usize,
 }
 
 #[derive(Debug)]
@@ -243,10 +217,6 @@ impl CurrentDispatcher {
                         | "session.checkpoint"
                         | "session.capsule.export"
                         | "session.capsule.status"
-                        | "state.query"
-                        | "state.inspect"
-                        | "control.describe"
-                        | "control.plan_navigation"
                         | "protocol.hello"
                         | "content.inspect"
                         | "lab.health"
@@ -371,159 +341,6 @@ impl AgentDispatcherV1 for CurrentDispatcher {
 }
 
 impl CurrentDispatcher {
-    fn query_current_state(
-        &mut self,
-        params: &Value,
-        context: AgentResponseContextV1<'_>,
-    ) -> Result<Value, AgentDispatchErrorV1> {
-        let request: CurrentStateRequest =
-            serde_json::from_value(params.clone()).map_err(invalid_error)?;
-        if !(1..=1_048_576).contains(&request.maximum_bytes) {
-            return Err(invalid("current state query byte bound is invalid"));
-        }
-        let query: er_lab::StateQueryV1 =
-            serde_json::from_value(request.query.clone()).map_err(invalid_error)?;
-        // The historical selector enum permits ignored fields. Keep its public
-        // wire behavior unchanged while requiring exact current request shapes.
-        if serde_json::to_value(&query).map_err(backend)? != request.query {
-            return Err(invalid("current state query selector shape is invalid"));
-        }
-        let snapshot = self.session(params)?.snapshot()?;
-        let (lifecycle, profile, run, control) = match &snapshot.lifecycle {
-            GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => (
-                "BOOTSTRAP",
-                &bootstrap.profile,
-                None,
-                Some(&bootstrap.control),
-            ),
-            GameKernelLifecycleSnapshotV7::Active(state) => (
-                "ACTIVE",
-                &state.profile,
-                state.active_run.as_ref(),
-                state.active_run.as_ref().map(|run| &run.control),
-            ),
-            GameKernelLifecycleSnapshotV7::Terminal { state, control, .. } => (
-                "TERMINAL",
-                &state.profile,
-                state.active_run.as_ref(),
-                Some(control),
-            ),
-        };
-        let result = er_lab::query_state_parts_v1(
-            profile,
-            run,
-            control,
-            query,
-            request.maximum_bytes,
-        )
-        .map_err(backend)?;
-        let snapshot_digest = format!(
-            "blake3-v1:{}",
-            er_canonical::content_digest(&snapshot).map_err(backend)?
-        );
-        let response = json!({
-            "session": request.session,
-            "kernel_version": 7,
-            "content_identity": self.content.identity(),
-            "lifecycle": lifecycle,
-            "snapshot_digest": snapshot_digest,
-            "replay_sequence": snapshot.replay_sequence,
-            "result": result,
-        });
-        // Payload bytes and the complete JSON number-array envelope have separate
-        // bounds. A read-only overflow rejects without a capture attempt or gap.
-        context.admit_inline_success(&response)?;
-        Ok(response)
-    }
-
-    fn describe_current_control(
-        &mut self,
-        params: &Value,
-        context: AgentResponseContextV1<'_>,
-    ) -> Result<Value, AgentDispatchErrorV1> {
-        let request: ControlDescriptionRequest =
-            serde_json::from_value(params.clone()).map_err(invalid_error)?;
-        let observation = self.session(params)?.observe()?;
-        let digest = er_canonical::content_digest(&observation.control).map_err(backend)?;
-        let description = observation
-            .control
-            .as_ref()
-            .map(er_lab::describe_control_v1)
-            .transpose()
-            .map_err(backend)?;
-        let response = json!({
-            "session": request.session, "kernel_version": 7,
-            "content_identity": observation.content_identity,
-            "control_digest": format!("blake3-v1:{digest}"), "description": description
-        });
-        context.admit_inline_success(&response)?;
-        Ok(response)
-    }
-
-    fn plan_current_navigation(
-        &mut self,
-        params: &Value,
-        context: AgentResponseContextV1<'_>,
-    ) -> Result<Value, AgentDispatchErrorV1> {
-        let request: ControlNavigationRequest =
-            serde_json::from_value(params.clone()).map_err(invalid_error)?;
-        if request.target.is_empty()
-            || request.target.len() > 256
-            || !(1..=4096).contains(&request.maximum_events)
-            || !request
-                .expected_control_digest
-                .strip_prefix("blake3-v1:")
-                .is_some_and(|hex| {
-                    hex.len() == 64
-                        && hex
-                            .bytes()
-                            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-                })
-        {
-            return Err(invalid(
-                "current navigation target, digest or event bound is invalid",
-            ));
-        }
-        let observation = self.session(params)?.observe()?;
-        let digest = format!(
-            "blake3-v1:{}",
-            er_canonical::content_digest(&observation.control).map_err(backend)?
-        );
-        if digest != request.expected_control_digest {
-            return Err(backend("current control digest is stale"));
-        }
-        let control = observation
-            .control
-            .ok_or_else(|| backend("current control has no menu"))?;
-        control.validate().map_err(backend)?;
-        if !control.actionable {
-            return Err(backend("current control is not actionable"));
-        }
-        let menu = control
-            .menu
-            .as_ref()
-            .ok_or_else(|| backend("current control has no menu"))?;
-        if menu.instance_id != request.expected_menu_instance {
-            return Err(backend("current menu instance is stale"));
-        }
-        let plan = er_lab::plan_navigation_v1(
-            &menu.logical_menu().map_err(backend)?,
-            request.expected_menu_instance,
-            MenuOptionId::new(request.target).map_err(invalid_error)?,
-            request.submit,
-            request.maximum_events,
-        )
-        .map_err(backend)?;
-        let response = json!({
-            "session": request.session, "kernel_version": 7,
-            "content_identity": observation.content_identity, "control_digest": digest, "plan": plan
-        });
-        // This is a read-only physical-input plan. It neither executes events nor
-        // settles presentation ownership; a later caller must submit the events.
-        context.admit_inline_success(&response)?;
-        Ok(response)
-    }
-
     fn dispatch_current(
         &mut self,
         method: &str,
@@ -531,9 +348,6 @@ impl CurrentDispatcher {
         context: AgentResponseContextV1<'_>,
     ) -> Result<Value, AgentDispatchErrorV1> {
         match method {
-            "state.query" | "state.inspect" => self.query_current_state(params, context),
-            "control.describe" => self.describe_current_control(params, context),
-            "control.plan_navigation" => self.plan_current_navigation(params, context),
             "protocol.hello" => Ok(json!({
                 "protocol_version": 1,
                 "kernel_version": 7,
