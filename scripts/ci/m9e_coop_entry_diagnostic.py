@@ -156,6 +156,7 @@ def main(summary):
     summary["test_artifact"] = {"sha256": binary_hash, "bytes": binary.stat().st_size, "profile": artifact["profile"],
                                 "source_sha256": summary["source_hashes"][RUST_SOURCES[1]], "ids": TEST_IDS}
     executions = []
+    os.environ["ER_M9E_ENTRY_PROGRESS"] = str(FULL / "entry-progress.txt")
     for index, test_id in enumerate(TEST_IDS):
         output = run([str(binary), "--exact", test_id, "--format", "terse", "--nocapture", "--test-threads=1"],
                      f"execute-{index + 1}", cwd=ROOT / "rust/crates/er-cli", seconds=600, bound=16384).read_text()
