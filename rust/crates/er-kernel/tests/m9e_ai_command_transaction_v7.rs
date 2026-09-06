@@ -73,7 +73,7 @@ fn navigate_down(kernel: &mut GameKernelV7, option: &str) -> Result<(), Box<dyn 
     Err("raw menu target unreachable".into())
 }
 
-fn natural(
+fn actor_fixture(
     content: Arc<PreparedGameContentV2>,
     cooperative: bool,
 ) -> Result<GameKernelV7, Box<dyn Error>> {
@@ -91,7 +91,7 @@ fn natural(
         SeatId::new(safe(1)),
         vec!["ai-command-slot".to_owned()],
         true,
-        content,
+        content.clone(),
         KernelSchedulerSnapshotV2 {
             next_timer_id: Some(SafeU53::ZERO),
             timers: Vec::new(),
@@ -100,7 +100,7 @@ fn natural(
         },
         None,
     )?;
-    // This witness uses the established raw constructor for its actor topology.
+    // Start from the established raw constructor before controlled expansion.
     // It does not claim independent peer setup or source trainer provenance.
     press(&mut kernel, PhysicalKey::Space)?;
     navigate_down(&mut kernel, &mode_option)?;
@@ -113,6 +113,29 @@ fn natural(
     navigate_down(&mut kernel, "bootstrap/starter/confirm")?;
     for _ in 0..4 {
         press(&mut kernel, PhysicalKey::Space)?;
+    }
+    if cooperative {
+        let original = kernel.snapshot()?;
+        let GameKernelLifecycleSnapshotV7::Active(mut state) = original.lifecycle else {
+            return Err("active root missing before controlled expansion".into());
+        };
+        // Explicit controlled two-actor fixture, using the existing expansion
+        // and a fresh ledger root. No peer handshake or natural history claim.
+        er_game::m9e_new_run_v6::expand_cooperative_topology_v6(
+            &mut state,
+            content.as_ref(),
+            SeatId::new(safe(2)),
+        )?;
+        kernel = GameKernelV7::from_active(
+            state,
+            original.material_ledger.next_authority_revision,
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content.clone(),
+            original.input_router,
+            original.scheduler,
+            original.protocol,
+        )?;
     }
     let snapshot = kernel.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &snapshot.lifecycle else {
@@ -151,7 +174,7 @@ fn restore(
 #[test]
 fn later_actor_rejection_preserves_the_complete_ai_command_owner() -> Result<(), Box<dyn Error>> {
     let content = content()?;
-    let original = natural(content.clone(), true)?.snapshot()?;
+    let original = actor_fixture(content.clone(), true)?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(mut state) = original.lifecycle else {
         return Err("active cooperative state missing".into());
     };
@@ -214,7 +237,7 @@ fn later_actor_rejection_preserves_the_complete_ai_command_owner() -> Result<(),
 fn command_cursor_rejection_preserves_ai_sequence_and_all_other_owners()
 -> Result<(), Box<dyn Error>> {
     let content = content()?;
-    let original = natural(content.clone(), false)?.snapshot()?;
+    let original = actor_fixture(content.clone(), false)?.snapshot()?;
     let maximum = (1_u64 << 53) - 1;
     assert!(SafeU53::new(maximum).is_ok());
     assert!(SafeU53::new(maximum + 1).is_err());
@@ -253,7 +276,7 @@ fn command_cursor_rejection_preserves_ai_sequence_and_all_other_owners()
 fn complete_two_actor_preparation_commits_once_and_replays_identical_commands()
 -> Result<(), Box<dyn Error>> {
     let content = content()?;
-    let mut kernel = natural(content.clone(), true)?;
+    let mut kernel = actor_fixture(content.clone(), true)?;
     let before = kernel.snapshot()?;
     let commands = kernel.prepare_authority_ai_commands()?;
     assert_eq!(commands.len(), 2);
