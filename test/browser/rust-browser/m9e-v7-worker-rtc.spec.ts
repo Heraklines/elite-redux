@@ -248,7 +248,18 @@ test("two current Workers exchange real RTC proposals and converge one natural c
     const leftFinal = await snapshot(peers.left); const rightFinal = await snapshot(peers.right);
     expect(leftFinal.lifecycle.value.active_run.battle.turn).toBe(initialTurn + 1);
     expect(rightFinal.lifecycle).toEqual(leftFinal.lifecycle);
-    expect(leftFinal.pending_presentations).toEqual([]); expect(rightFinal.pending_presentations).toEqual([]);
+    // INITIALIZE restores the exact checkpoint without re-emitting its old
+    // presentation owners. Preserve those owners while settling every new one.
+    expect(leftFinal.pending_presentations).toEqual(initialLeft.pending_presentations);
+    expect(rightFinal.pending_presentations).toEqual(initialRight.pending_presentations);
+    for (const [page, initial] of [[peers.left, initialLeft], [peers.right, initialRight]] as const) {
+      const delivered = await page.evaluate(() => (globalThis as any).__rtcCurrent.evidence.presentations);
+      const inherited = initial.pending_presentations.map((effect: any) => effect.event_id);
+      expect(delivered.length).toBeGreaterThan(0);
+      expect(delivered.every((eventId: number) => !inherited.includes(eventId))).toBe(true);
+      expect(new Set(delivered).size).toBe(delivered.length);
+      expect((await status(page)).settledPresentations).toBe(delivered.length);
+    }
     const deliveredIds = await peers.right.evaluate(() => (globalThis as any).__rtcCurrent.evidence.presentations);
     const expectedIds = materialWire.value.presentation.map((effect: any) => effect.event_id);
     expect(expectedIds.length).toBeGreaterThan(0);

@@ -2585,3 +2585,25 @@ Native selected/executed counts are zero; platform was skipped and aggregate
 failed. RTC remains unqualified and1eead414/run34006023505 remains the comparison
 baseline. A compact9981444398 (inspected ZIP3203) provided summary1358 and bounded
 failure12125 bytes. All validation for the correction runs remotely.
+
+## RTC imported presentation ownership correction
+
+22a2b922b4f95b7d62d2f2d90c1db7652060fb14 / run34007935002 passed
+both native lanes (597 A /20 B,617 total, no failures or skips) and all182
+harness tests. Both behavioral mutants were detected and restored. The actual
+RTC negative witness passed; the positive witness failed after a converged turn
+because the exact imported checkpoint still owned nonblocking WORLD presentation1.
+INITIALIZE restores that snapshot without re-emitting inherited presentations.
+
+Require both final pending-presentation arrays to equal their exact initial
+arrays. Independently require each Worker's newly delivered IDs to be disjoint
+from inherited owners, nonempty, unique and fully settled. Preserve replica
+material ID equality, full duplicate snapshot conservation, actual transport
+closure and acknowledged disposal. No cue is deleted and no synthetic settlement
+is injected. This witness covers newly emitted turn effects; imported-presentation
+rehydration remains outside this RTC cut and is not claimed as complete.
+
+Only compact platform summary579/failure4233 bytes were retrieved from inspected
+artifact9981919051 (ZIP1545). The qualified comparison baseline remains
+1eead4142a16700bc087f34b2fad1dc9f69d4be9 /34006023505 until the corrected
+candidate passes the complete focused remote gate. No local runtime execution.
