@@ -240,15 +240,68 @@ pub fn construct_natural_run_v6(
     Ok(state)
 }
 
+/// Historical fixture expansion. Current owned setup supplies both seats' choices.
 pub fn expand_cooperative_topology_v6(
     state: &mut GameStateV6,
     content: &PreparedGameContentV2,
     partner_seat: SeatId,
 ) -> Result<(), NaturalRunV6Error> {
+    let species = state.active_run.as_ref().and_then(|run| run.party.first())
+        .map(|pokemon| pokemon.species_id).ok_or(NaturalRunV6Error::Invalid)?;
+    let starter = content.bundle().bootstrap.starters.iter()
+        .find(|starter| starter.species_id != species).ok_or(NaturalRunV6Error::Invalid)?;
+    expand_selected_cooperative_topology_v7(state, content, partner_seat, &[(starter.species_id, starter.form_index)])
+}
+
+/// Form the partner party from confirmed choices; no fallback selects a species.
+/// The caller must additionally validate causal peer identity and confirmation.
+/// This operation stages identities, RNG and all party/field changes atomically.
+pub fn expand_cooperative_choices_v7(
+    state: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+    partner_seat: SeatId,
+    starters: &[er_types::StarterSelectionV1],
+) -> Result<(), NaturalRunV6Error> {
+    if starters.is_empty() || starters.len() > content.bundle().bootstrap.maximum_starters
+        || starters.iter().any(|starter| starter.owner_seat != partner_seat)
+        || starters.iter().enumerate().any(|(index, starter)| starters[..index].iter()
+            .any(|other| other.pokemon_id == starter.pokemon_id))
+    {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let mut cost = 0_u16;
+    for starter in starters {
+        let index = usize::try_from(starter.pokemon_id.get().get()).ok()
+            .and_then(|index| index.checked_sub(1)).ok_or(NaturalRunV6Error::Invalid)?;
+        let entry = content.bundle().bootstrap.starters.get(index).ok_or(NaturalRunV6Error::Invalid)?;
+        if entry.species_id.get() != starter.species_id || entry.form_index != starter.form_index
+            || entry.ability_index != starter.ability_index || entry.cost != starter.cost
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        cost = cost.checked_add(starter.cost).ok_or(NaturalRunV6Error::Invalid)?;
+    }
+    if cost > content.bundle().bootstrap.maximum_starter_cost {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let choices = starters.iter().map(|starter| (er_types::battle_ids::SpeciesId::new(starter.species_id), starter.form_index))
+        .collect::<Vec<_>>();
+    let mut candidate = state.clone();
+    expand_selected_cooperative_topology_v7(&mut candidate, content, partner_seat, &choices)?;
+    *state = candidate;
+    Ok(())
+}
+
+fn expand_selected_cooperative_topology_v7(
+    state: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+    partner_seat: SeatId,
+    starters: &[(er_types::battle_ids::SpeciesId, u16)],
+) -> Result<(), NaturalRunV6Error> {
     state
         .validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    let (mode_id, biome_id, player_species, enemy_species, run_rng) = {
+    let (mode_id, biome_id, enemy_species, run_rng) = {
         let run = state
             .active_run
             .as_ref()
@@ -272,10 +325,6 @@ pub fn expand_cooperative_topology_v6(
         (
             run.mode,
             run.world.biome,
-            run.party
-                .first()
-                .map(|pokemon| pokemon.species_id)
-                .ok_or(NaturalRunV6Error::Invalid)?,
             battle.enemy_party[0].species_id,
             run.run_rng.clone(),
         )
@@ -283,13 +332,6 @@ pub fn expand_cooperative_topology_v6(
     let mode = content
         .world
         .mode(mode_id)
-        .ok_or(NaturalRunV6Error::Invalid)?;
-    let partner_starter = content
-        .bundle()
-        .bootstrap
-        .starters
-        .iter()
-        .find(|starter| starter.species_id != player_species)
         .ok_or(NaturalRunV6Error::Invalid)?;
     let biome = content
         .world
@@ -303,19 +345,12 @@ pub fn expand_cooperative_topology_v6(
         .ok_or(NaturalRunV6Error::Invalid)?;
     let mut rng = RngRuntime::from_states(run_rng, None)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    let partner_id = state
-        .identities
-        .allocate_pokemon_id()
-        .map_err(|_| NaturalRunV6Error::Exhausted)?;
-    let partner = pokemon(
-        content,
-        &mut rng,
-        partner_id,
-        Some(partner_seat),
-        partner_starter.species_id,
-        partner_starter.form_index,
-        mode.starting_level,
-    )?;
+    let mut partners = Vec::with_capacity(starters.len());
+    for &(species, form) in starters {
+        let id = state.identities.allocate_pokemon_id().map_err(|_| NaturalRunV6Error::Exhausted)?;
+        partners.push(pokemon(content, &mut rng, id, Some(partner_seat), species, form, mode.starting_level)?);
+    }
+    let partner_id = partners.first().map(|pokemon| pokemon.id).ok_or(NaturalRunV6Error::Invalid)?;
     let partner_enemy_id = state
         .identities
         .allocate_pokemon_id()
@@ -345,7 +380,7 @@ pub fn expand_cooperative_topology_v6(
         .first()
         .map(|pokemon| pokemon.id)
         .ok_or(NaturalRunV6Error::Invalid)?;
-    run.party.push(partner);
+    run.party.extend(partners);
     battle.enemy_party.push(partner_enemy);
     battle.format = BattleFormat::forced_coop_doubles();
     battle.field = FieldState::new_for_format(
