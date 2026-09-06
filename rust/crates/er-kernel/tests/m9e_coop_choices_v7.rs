@@ -109,8 +109,7 @@ fn independent_setup(
     press(&mut kernel, PhysicalKey::Space)?;
     navigate(&mut kernel, &format!("bootstrap/mode/{}", mode.get()))?;
     press(&mut kernel, PhysicalKey::Space)?;
-    let GameKernelLifecycleSnapshotV7::Bootstrap(after_mode) = kernel.snapshot()?.lifecycle
-    else {
+    let GameKernelLifecycleSnapshotV7::Bootstrap(after_mode) = kernel.snapshot()?.lifecycle else {
         return Err("mode selection was bypassed".into());
     };
     if challenges {
