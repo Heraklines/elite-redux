@@ -168,9 +168,24 @@ impl CoreGameKernelSnapshotV7 {
                     || !self.input_router.held_buttons.is_empty()
                     || !self.input_router.locks.is_empty()
                     || !self.input_router.repeats.is_empty()
-                    || !self.pending_platform.is_empty()
+                    || (bootstrap.current_storage.is_none() && !self.pending_platform.is_empty())
                 {
                     return Err(SnapshotV7Error::Invalid);
+                }
+                if let Some(storage) = &bootstrap.current_storage {
+                    if self.protocol.is_some() || self.authority_ai.is_none() || self.scheduler.disposed
+                        || !self.storage_frontiers.is_empty()
+                        || self.material_ledger != AppliedGameMaterialLedgerV1::new(safe_one()).map_err(|_| SnapshotV7Error::Invalid)?
+                        || !self.scheduler.timers.is_empty() || !self.scheduler.pauses.is_empty()
+                        || !self.pending_presentations.is_empty() || !self.input_router.suppressed_printable_keys.is_empty()
+                        || self.next_menu_instance_id.get().get() != bootstrap.menu_instance_high_water.get().get().checked_add(1).ok_or(SnapshotV7Error::Invalid)? {
+                        return Err(SnapshotV7Error::Invalid);
+                    }
+                    match (&storage.pending, bootstrap.current_storage_effect()) {
+                        (None, None) if self.pending_platform.is_empty() => {}
+                        (Some(owner), Some(effect)) if self.pending_platform == vec![PendingPlatformRequestV2 { request_id: owner.request_id, effect }] => {}
+                        _ => return Err(SnapshotV7Error::Invalid),
+                    }
                 }
             }
             GameKernelLifecycleSnapshotV7::Active(state) => {

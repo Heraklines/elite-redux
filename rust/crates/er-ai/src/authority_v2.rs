@@ -40,13 +40,6 @@ pub struct AuthorityAiSnapshotV2 {
     pub rng_audit: Vec<AiRngEvidenceV2>,
 }
 
-impl AuthorityAiSnapshotV2 {
-    /// Validate saved AI state without allocating a runtime owner or copying content.
-    pub fn validate(&self) -> Result<(), AuthorityAiErrorV2> {
-        validate_snapshot(self)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct AuthorityAiV2 {
     content: Arc<PreparedAiPolicyContentV2>,

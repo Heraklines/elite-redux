@@ -194,6 +194,24 @@ pub enum GameKernelV7Error {
 }
 
 impl GameKernelV7 {
+    /// Current solo capability, enabled only on an unobserved quiescent natural Title.
+    pub fn enable_current_title_storage(&mut self) -> Result<(), GameKernelV7Error> {
+        if self.role != GameKernelRoleV7::Authority || self.protocol.is_some()
+            || !self.pending_platform.is_empty() || !self.pending_presentations.is_empty()
+            || self.scheduler.disposed || !self.scheduler.timers.is_empty() || !self.scheduler.pauses.is_empty()
+            || self.replay_sequence != SafeU53::ZERO {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let mut candidate = self.clone();
+        let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut candidate.lifecycle else {
+            return Err(GameKernelV7Error::Invalid);
+        };
+        bootstrap.enable_current_storage().map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn natural_start(
         profile: ProfileStateV1,
@@ -683,6 +701,13 @@ impl GameKernelV7 {
                 }
                 other => other,
             };
+            if matches!(&self.lifecycle, GameKernelLifecycleV7::Bootstrap(bootstrap) if bootstrap.current_storage.is_some()) {
+                let mut candidate = self.clone();
+                let step = candidate.bootstrap_input(event)?;
+                candidate.validate()?;
+                *self = candidate;
+                return Ok(step);
+            }
             return self.bootstrap_input(event);
         }
         if matches!(self.lifecycle, GameKernelLifecycleV7::Terminal { .. }) {
@@ -1171,6 +1196,9 @@ impl GameKernelV7 {
         &mut self,
         request_id: PlatformRequestId,
     ) -> Result<(), GameKernelV7Error> {
+        if matches!(&self.lifecycle, GameKernelLifecycleV7::Bootstrap(bootstrap) if bootstrap.current_storage.is_some()) {
+            return Err(GameKernelV7Error::Invalid);
+        }
         self.pending_platform
             .remove(&request_id)
             .map(|_| ())
@@ -1194,6 +1222,9 @@ impl GameKernelV7 {
         request_id: PlatformRequestId,
         result: KernelStorageResultV2,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if matches!(self.lifecycle, GameKernelLifecycleV7::Bootstrap(_)) {
+            return self.apply_bootstrap_storage_result(request_id, result);
+        }
         let pending = self
             .pending_platform
             .get(&request_id)
@@ -1310,6 +1341,60 @@ impl GameKernelV7 {
         self.pending_platform.remove(&request_id);
         self.advance_replay_sequence()?;
         Ok(step)
+    }
+
+    fn apply_bootstrap_storage_result(&mut self, request_id: PlatformRequestId, result: KernelStorageResultV2)
+        -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.validate()?;
+        let GameKernelLifecycleV7::Bootstrap(bootstrap) = &self.lifecycle else { return Err(GameKernelV7Error::Invalid); };
+        let storage = bootstrap.current_storage.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        let effect = bootstrap.current_storage_effect().ok_or(GameKernelV7Error::Invalid)?;
+        let pending = self.pending_platform.get(&request_id).ok_or(GameKernelV7Error::Invalid)?;
+        if pending.effect != effect || platform_request_id(&effect) != request_id { return Err(GameKernelV7Error::Invalid); }
+        let floor = storage.next_platform_request_id;
+        let bootstrap_revision = bootstrap.control.revision;
+        match (effect, result) {
+            (GamePlatformEffectV2::StorageList { .. }, KernelStorageResultV2::Slots { slots }) => {
+                let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut self.lifecycle else { return Err(GameKernelV7Error::Invalid); };
+                bootstrap.accept_current_slots(request_id, slots).map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
+                self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
+            }
+            (GamePlatformEffectV2::StorageRead { .. }, KernelStorageResultV2::Read { bytes: None }) => {
+                let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut self.lifecycle else { return Err(GameKernelV7Error::Invalid); };
+                bootstrap.accept_current_missing(request_id).map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
+                self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
+            }
+            (GamePlatformEffectV2::StorageRead { slot, .. }, KernelStorageResultV2::Read { bytes: Some(bytes) }) => {
+                let mut save = GameSaveV2::decode(&bytes).map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
+                if &save.content_identity != self.content.identity() { return Err(GameKernelV7Error::Storage("loaded save content identity differs".to_owned())); }
+                save.state.validate_with(self.content.as_ref()).map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
+                let run = save.state.active_run.as_ref().ok_or_else(|| GameKernelV7Error::Storage("Title load requires an active solo run".to_owned()))?;
+                if self.content.world.mode(run.mode).is_none_or(|mode| mode.cooperative)
+                    || run.control.owner_seat != Some(self.local_seat)
+                    || run.control.action_context.as_ref().is_some_and(|context| context.authority_seat != self.local_seat)
+                    || run.party.iter().chain(run.storage.iter().map(|stored| &stored.pokemon)).any(|pokemon| pokemon.owner_seat != Some(self.local_seat))
+                    || run.battle.as_ref().is_some_and(|battle| battle.authority_seat != self.local_seat
+                        || battle.enemy_party.iter().any(|pokemon| pokemon.owner_seat.is_some()))
+                    || is_private_battle_leaf(run.control.kind) {
+                    return Err(GameKernelV7Error::Storage("Title load requires exact solo/local public control ownership".to_owned()));
+                }
+                let revision = increment_safe(bootstrap_revision)?.max(increment_safe(run.control.revision)?);
+                save.state.identities.next_platform_request_id = save.state.identities.next_platform_request_id.max(floor);
+                let next_menu = rebind_loaded_control_v7(&mut save.state, revision, self.next_menu_instance_id)?;
+                let runtime = GameRuntimeV6::new_with_retention(Some(save.state), self.content.clone(), revision, MATERIAL_RETENTION_V7)
+                    .map_err(runtime_error)?;
+                self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.next_menu_instance_id = next_menu;
+                self.private_battle_control = None;
+                self.clear_input()?;
+                self.storage_frontiers.insert(slot, save.generation);
+            }
+            _ => return Err(GameKernelV7Error::Storage("storage outcome does not match current Title owner".to_owned())),
+        }
+        self.pending_platform.remove(&request_id).ok_or(GameKernelV7Error::Invalid)?;
+        self.advance_replay_sequence()?;
+        let control = self.current_control().cloned().ok_or(GameKernelV7Error::Invalid)?;
+        Ok(GameKernelStepV7 { effects: vec![GameKernelEffectV7::UiChanged(control)], internal_events: Vec::new() })
     }
 
     pub fn admit_game_proposal(
@@ -1436,6 +1521,14 @@ impl GameKernelV7 {
         {
             return Err(GameKernelV7Error::Invalid);
         }
+        if let GameKernelLifecycleV7::Bootstrap(bootstrap) = &self.lifecycle
+            && let Some(storage) = &bootstrap.current_storage
+            && (self.role != GameKernelRoleV7::Authority
+                || self.protocol.is_some()
+                || storage.owner_seat != self.local_seat)
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
         if self
             .private_battle_control
             .as_ref()
@@ -1472,6 +1565,9 @@ impl GameKernelV7 {
         let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut self.lifecycle else {
             return Err(GameKernelV7Error::Invalid);
         };
+        let previous = bootstrap.current_storage_effect();
+        let current_storage = bootstrap.current_storage.is_some();
+        let before = current_storage.then(|| bootstrap.clone());
         match bootstrap.raw_input(event) {
             Ok(_) => {}
             Err(RunBootstrapErrorV1::RejectedInput) => {
@@ -1481,10 +1577,21 @@ impl GameKernelV7 {
         }
         self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
         if bootstrap.stage != RunBootstrapStageV1::Complete {
-            return Ok(GameKernelStepV7 {
+            let next = bootstrap.current_storage_effect();
+            let changed = before.as_ref().is_some_and(|before| before != bootstrap);
+            let mut step = GameKernelStepV7 {
                 effects: vec![GameKernelEffectV7::UiChanged(bootstrap.control.clone())],
                 internal_events: Vec::new(),
-            });
+            };
+            if previous != next {
+                if let Some(previous) = previous {
+                    self.pending_platform.remove(&platform_request_id(&previous)).ok_or(GameKernelV7Error::Invalid)?;
+                }
+                if let Some(next) = next { step.effects.push(GameKernelEffectV7::Platform(next)); }
+                self.install_step_effects(&step.effects)?;
+            }
+            if changed { self.advance_replay_sequence()?; }
+            return Ok(step);
         }
         if self.role != GameKernelRoleV7::Authority {
             return Err(GameKernelV7Error::Invalid);
@@ -1492,6 +1599,9 @@ impl GameKernelV7 {
         let bootstrap = bootstrap.clone();
         let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        if let Some(storage) = &bootstrap.current_storage {
+            candidate.identities.next_platform_request_id = candidate.identities.next_platform_request_id.max(storage.next_platform_request_id);
+        }
         let cooperative = candidate
             .active_run
             .as_ref()

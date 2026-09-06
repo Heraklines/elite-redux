@@ -1,16 +1,19 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m7_progression_control::generic_vertical_control_v2;
+use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_material_v6::{AppliedGameMaterialLedgerV1, GamePlatformEffectV2};
-use er_game::m9e_runtime_v6::{GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeV6};
+use er_game::m9e_runtime_v6::{
+    GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeV6,
+};
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7, KernelStorageResultV2,
 };
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::{
-    CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7, PendingPlatformRequestV2, SnapshotV7Error, StorageFrontierSnapshotV1,
+    CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7, PendingPlatformRequestV2,
+    SnapshotV7Error, StorageFrontierSnapshotV1,
 };
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
@@ -19,8 +22,11 @@ use er_state::m7_state::{
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
-use er_types::{GameActionV1, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2, OperationId, PlatformRequestId,
-    PresentationEventId, RunOutcome, SafeU53, SaveActionV1, SeatId, TimeClass, TimerId};
+use er_types::{
+    GameActionV1, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2, OperationId,
+    PlatformRequestId, PresentationEventId, RunOutcome, SafeU53, SaveActionV1, SeatId, TimeClass,
+    TimerId,
+};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -628,8 +634,12 @@ fn restore_read_fixture(
     snapshot: CoreGameKernelSnapshotV7,
     content: Arc<PreparedGameContentV2>,
 ) -> Result<GameKernelV7, Box<dyn Error>> {
-    Ok(GameKernelV7::from_snapshot(snapshot, SeatId::new(safe(1)),
-        GameKernelRoleV7::Authority, content)?)
+    Ok(GameKernelV7::from_snapshot(
+        snapshot,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content,
+    )?)
 }
 
 fn controlled_read_save_menu(
@@ -643,19 +653,47 @@ fn controlled_read_save_menu(
     let GameKernelLifecycleSnapshotV7::Active(mut state) = natural.lifecycle.clone() else {
         return Err("natural source is not active".into());
     };
-    state.identities.next_platform_request_id = state.identities.next_platform_request_id.max(safe(platform));
-    state.active_run.as_mut().ok_or("natural run absent")?.control = generic_vertical_control_v2(
-        MenuInstanceId::new(safe(menu)), safe(revision), SeatId::new(safe(1)),
-        OperationId::new(format!("read-rebind/controlled/{menu}"))?, GameControlKindV2::Save,
+    state.identities.next_platform_request_id = state
+        .identities
+        .next_platform_request_id
+        .max(safe(platform));
+    state
+        .active_run
+        .as_mut()
+        .ok_or("natural run absent")?
+        .control = generic_vertical_control_v2(
+        MenuInstanceId::new(safe(menu)),
+        safe(revision),
+        SeatId::new(safe(1)),
+        OperationId::new(format!("read-rebind/controlled/{menu}"))?,
+        GameControlKindV2::Save,
         "read-rebind/controlled-save",
-        &[("save/action".to_owned(), GameActionV1::Save { action }),
-          ("save/cancel".to_owned(), GameActionV1::Save { action: SaveActionV1::Cancel })],
-        GameMenuCancelV2::Back { action: Box::new(GameActionV1::Save { action: SaveActionV1::Cancel }) },
+        &[
+            ("save/action".to_owned(), GameActionV1::Save { action }),
+            (
+                "save/cancel".to_owned(),
+                GameActionV1::Save {
+                    action: SaveActionV1::Cancel,
+                },
+            ),
+        ],
+        GameMenuCancelV2::Back {
+            action: Box::new(GameActionV1::Save {
+                action: SaveActionV1::Cancel,
+            }),
+        },
     )?;
     // Fresh, explicitly controlled Save boundary; never rewrite the natural ledger.
-    Ok(GameKernelV7::from_active(state, safe(revision), SeatId::new(safe(1)),
-        GameKernelRoleV7::Authority, content, natural.input_router.clone(),
-        natural.scheduler.clone(), None)?)
+    Ok(GameKernelV7::from_active(
+        state,
+        safe(revision),
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content,
+        natural.input_router.clone(),
+        natural.scheduler.clone(),
+        None,
+    )?)
 }
 
 fn read_rebind_fixture() -> Result<ReadRebindFixture, Box<dyn Error>> {
@@ -666,34 +704,78 @@ fn read_rebind_fixture() -> Result<ReadRebindFixture, Box<dyn Error>> {
         natural.settle_presentation(pending.event_id)?;
     }
     let natural = natural.snapshot()?;
-    let mut writer = controlled_read_save_menu(&natural, content.clone(),
-        SaveActionV1::Write { slot: "read-rebind-slot".to_owned() }, 30, 10, 1)?;
-    let bytes = press(&mut writer, PhysicalKey::Space)?.effects.into_iter().find_map(|effect| {
-        match effect {
-            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageWrite { bytes, generation, .. }) => {
+    let mut writer = controlled_read_save_menu(
+        &natural,
+        content.clone(),
+        SaveActionV1::Write {
+            slot: "read-rebind-slot".to_owned(),
+        },
+        30,
+        10,
+        1,
+    )?;
+    let bytes = press(&mut writer, PhysicalKey::Space)?
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageWrite {
+                bytes,
+                generation,
+                ..
+            }) => {
                 assert_eq!(generation, safe(1));
                 Some(bytes)
             }
             _ => None,
-        }
-    }).ok_or("actual Save emitted no bytes")?;
+        })
+        .ok_or("actual Save emitted no bytes")?;
     let saved = GameSaveV2::decode(&bytes)?;
-    let write_pending = writer.snapshot()?.pending_platform.into_iter().next().ok_or("actual Write owner absent")?;
-    let mut loader = controlled_read_save_menu(&natural, content.clone(),
-        SaveActionV1::Load { slot: "read-rebind-slot".to_owned() }, 80, 20, 40)?;
-    let preload_control = loader.current_control().ok_or("Load control absent")?.clone();
+    let write_pending = writer
+        .snapshot()?
+        .pending_platform
+        .into_iter()
+        .next()
+        .ok_or("actual Write owner absent")?;
+    let mut loader = controlled_read_save_menu(
+        &natural,
+        content.clone(),
+        SaveActionV1::Load {
+            slot: "read-rebind-slot".to_owned(),
+        },
+        80,
+        20,
+        40,
+    )?;
+    let preload_control = loader
+        .current_control()
+        .ok_or("Load control absent")?
+        .clone();
     // Keep the actual initiating key held across the asynchronous READ.
-    let request = loader.raw_input(key_down(PhysicalKey::Space))?.effects.into_iter().find_map(|effect| {
-        match effect {
-            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, .. }) => Some(request),
+    let request = loader
+        .raw_input(key_down(PhysicalKey::Space))?
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, .. }) => {
+                Some(request)
+            }
             _ => None,
-        }
-    }).ok_or("actual Load emitted no READ")?;
+        })
+        .ok_or("actual Load emitted no READ")?;
     let pending = loader.snapshot()?;
     assert!(!pending.input_router.pressed.is_empty());
     assert_eq!(pending.pending_platform.len(), 1);
     assert_eq!(pending.pending_presentations.len(), 1);
-    Ok(ReadRebindFixture { content, saved, bytes, pending, request, natural, write_pending, preload_control })
+    Ok(ReadRebindFixture {
+        content,
+        saved,
+        bytes,
+        pending,
+        request,
+        natural,
+        write_pending,
+        preload_control,
+    })
 }
 
 fn accept_read(
@@ -701,11 +783,17 @@ fn accept_read(
     request: PlatformRequestId,
     bytes: &[u8],
 ) -> Result<GameKernelStepV7, Box<dyn Error>> {
-    Ok(loader.apply_storage_result(request, KernelStorageResultV2::Read { bytes: Some(bytes.to_vec()) })?)
+    Ok(loader.apply_storage_result(
+        request,
+        KernelStorageResultV2::Read {
+            bytes: Some(bytes.to_vec()),
+        },
+    )?)
 }
 
 #[test]
-fn read_rebind_preserves_saved_semantics_and_executes_write_after_restore() -> Result<(), Box<dyn Error>> {
+fn read_rebind_preserves_saved_semantics_and_executes_write_after_restore()
+-> Result<(), Box<dyn Error>> {
     let fixture = read_rebind_fixture()?;
     let mut loader = restore_read_fixture(fixture.pending.clone(), fixture.content.clone())?;
     let step = accept_read(&mut loader, fixture.request, &fixture.bytes)?;
@@ -714,14 +802,29 @@ fn read_rebind_preserves_saved_semantics_and_executes_write_after_restore() -> R
     let GameKernelLifecycleSnapshotV7::Active(live_state) = &fixture.pending.lifecycle else {
         return Err("pending READ is not active".into());
     };
-    expected_state.identities.next_platform_request_id = live_state.identities.next_platform_request_id;
-    assert!(live_state.identities.next_platform_request_id > fixture.saved.state.identities.next_platform_request_id);
+    expected_state.identities.next_platform_request_id =
+        live_state.identities.next_platform_request_id;
+    assert!(
+        live_state.identities.next_platform_request_id
+            > fixture.saved.state.identities.next_platform_request_id
+    );
     let revision = fixture.pending.material_ledger.next_authority_revision;
     let instance = fixture.pending.next_menu_instance_id;
-    let expected_control = &mut expected_state.active_run.as_mut().ok_or("saved run absent")?.control;
+    let expected_control = &mut expected_state
+        .active_run
+        .as_mut()
+        .ok_or("saved run absent")?
+        .control;
     expected_control.revision = revision;
-    expected_control.menu.as_mut().ok_or("saved menu absent")?.instance_id = instance;
-    let context = expected_control.action_context.as_mut().ok_or("saved context absent")?;
+    expected_control
+        .menu
+        .as_mut()
+        .ok_or("saved menu absent")?
+        .instance_id = instance;
+    let context = expected_control
+        .action_context
+        .as_mut()
+        .ok_or("saved context absent")?;
     context.authority_revision = revision;
     context.menu_instance = instance;
     let expected_control = expected_control.clone();
@@ -730,17 +833,33 @@ fn read_rebind_preserves_saved_semantics_and_executes_write_after_restore() -> R
     expected.material_ledger = AppliedGameMaterialLedgerV1::new(revision)?;
     expected.next_menu_instance_id = MenuInstanceId::new(safe(instance.get().get() + 1));
     expected.pending_platform.clear();
-    expected.storage_frontiers = vec![StorageFrontierSnapshotV1 { slot: "read-rebind-slot".to_owned(), generation: safe(1) }];
+    expected.storage_frontiers = vec![StorageFrontierSnapshotV1 {
+        slot: "read-rebind-slot".to_owned(),
+        generation: safe(1),
+    }];
     expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
     expected.input_router.pressed.clear();
     expected.input_router.held_buttons.clear();
     expected.input_router.locks.clear();
     assert_eq!(loaded, expected);
-    assert_eq!(step.effects, vec![GameKernelEffectV7::UiChanged(expected_control)]);
+    assert_eq!(
+        step.effects,
+        vec![GameKernelEffectV7::UiChanged(expected_control)]
+    );
     assert!(step.internal_events.is_empty());
-    assert!(loader.raw_input(RawInputEvent::KeyUp { code: PhysicalKey::Space })?.effects.is_empty());
+    assert!(
+        loader
+            .raw_input(RawInputEvent::KeyUp {
+                code: PhysicalKey::Space
+            })?
+            .effects
+            .is_empty()
+    );
     assert_eq!(loader.snapshot()?, loaded);
-    let mut restored = restore_read_fixture(serde_json::from_slice(&serde_json::to_vec(&loaded)?)?, fixture.content.clone())?;
+    let mut restored = restore_read_fixture(
+        serde_json::from_slice(&serde_json::to_vec(&loaded)?)?,
+        fixture.content.clone(),
+    )?;
     for pending in loaded.pending_presentations {
         loader.settle_presentation(pending.event_id)?;
         restored.settle_presentation(pending.event_id)?;
@@ -749,20 +868,39 @@ fn read_rebind_preserves_saved_semantics_and_executes_write_after_restore() -> R
     let next = press(&mut loader, PhysicalKey::Space)?;
     assert_eq!(next, press(&mut restored, PhysicalKey::Space)?);
     assert_eq!(loader.snapshot()?, restored.snapshot()?);
-    let next_presentation = next.effects.iter().find_map(|effect| match effect {
-        GameKernelEffectV7::Presentation(value) => Some(value.event_id),
-        _ => None,
-    }).ok_or("post-load Write presentation absent")?;
+    let next_presentation = next
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Presentation(value) => Some(value.event_id),
+            _ => None,
+        })
+        .ok_or("post-load Write presentation absent")?;
     assert_eq!(next_presentation.get(), revision);
-    assert!(fixture.pending.pending_presentations.iter().all(|pending| pending.event_id < next_presentation));
-    let (request, bytes) = next.effects.iter().find_map(|effect| match effect {
-        GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageWrite { request, slot, generation, bytes }) => {
-            assert_eq!(slot, "read-rebind-slot");
-            assert_eq!(*generation, safe(2));
-            Some((*request, bytes))
-        }
-        _ => None,
-    }).ok_or("post-load raw Write did not execute")?;
+    assert!(
+        fixture
+            .pending
+            .pending_presentations
+            .iter()
+            .all(|pending| pending.event_id < next_presentation)
+    );
+    let (request, bytes) = next
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageWrite {
+                request,
+                slot,
+                generation,
+                bytes,
+            }) => {
+                assert_eq!(slot, "read-rebind-slot");
+                assert_eq!(*generation, safe(2));
+                Some((*request, bytes))
+            }
+            _ => None,
+        })
+        .ok_or("post-load raw Write did not execute")?;
     assert!(request > fixture.request);
     let written = GameSaveV2::decode(bytes)?;
     assert_eq!(written.generation, safe(2));
@@ -770,32 +908,76 @@ fn read_rebind_preserves_saved_semantics_and_executes_write_after_restore() -> R
     loader.apply_storage_result(request, KernelStorageResultV2::Written)?;
     assert_eq!(loader.snapshot()?.storage_frontiers[0].generation, safe(2));
     let after = loader.snapshot()?;
-    assert!(loader.apply_storage_result(fixture.request, KernelStorageResultV2::Read { bytes: Some(fixture.bytes) }).is_err());
+    assert!(
+        loader
+            .apply_storage_result(
+                fixture.request,
+                KernelStorageResultV2::Read {
+                    bytes: Some(fixture.bytes)
+                }
+            )
+            .is_err()
+    );
     assert_eq!(loader.snapshot()?, after);
     Ok(())
 }
 
 #[test]
-fn read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root() -> Result<(), Box<dyn Error>> {
+fn read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root()
+-> Result<(), Box<dyn Error>> {
     let fixture = read_rebind_fixture()?;
     let mut loader = restore_read_fixture(fixture.pending.clone(), fixture.content.clone())?;
     accept_read(&mut loader, fixture.request, &fixture.bytes)?;
     let loaded = loader.snapshot()?;
     let state = loader.state().ok_or("loaded state absent")?.clone();
-    let mut runtime = GameRuntimeV6::new(Some(state), fixture.content.clone(), loaded.material_ledger.next_authority_revision)?;
-    let old_control = &fixture.saved.state.active_run.as_ref().ok_or("saved run absent")?.control;
+    let mut runtime = GameRuntimeV6::new(
+        Some(state),
+        fixture.content.clone(),
+        loaded.material_ledger.next_authority_revision,
+    )?;
+    let old_control = &fixture
+        .saved
+        .state
+        .active_run
+        .as_ref()
+        .ok_or("saved run absent")?
+        .control;
     let before = runtime.snapshot();
     for control in [old_control, &fixture.preload_control] {
-        let old_action = control.menu.as_ref().ok_or("old menu absent")?.selected_action().ok_or("old action absent")?.clone();
-        let input = if matches!(&old_action, GameActionV1::Save { action: SaveActionV1::Write { .. } }) {
+        let old_action = control
+            .menu
+            .as_ref()
+            .ok_or("old menu absent")?
+            .selected_action()
+            .ok_or("old action absent")?
+            .clone();
+        let input = if matches!(
+            &old_action,
+            GameActionV1::Save {
+                action: SaveActionV1::Write { .. }
+            }
+        ) {
             GameDomainExecutionInputV1::SaveGeneration(safe(2))
-        } else { GameDomainExecutionInputV1::None };
+        } else {
+            GameDomainExecutionInputV1::None
+        };
         for update_revision in [false, true] {
             let mut stale = control.action_context.clone().ok_or("old context absent")?;
-            if update_revision { stale.authority_revision = loaded.material_ledger.next_authority_revision; }
-            assert!(runtime.execute(old_action.clone(), GameActionDispatchContextV1 {
-                action: stale, input: input.clone(), authority: true,
-            }).is_err());
+            if update_revision {
+                stale.authority_revision = loaded.material_ledger.next_authority_revision;
+            }
+            assert!(
+                runtime
+                    .execute(
+                        old_action.clone(),
+                        GameActionDispatchContextV1 {
+                            action: stale,
+                            input: input.clone(),
+                            authority: true,
+                        }
+                    )
+                    .is_err()
+            );
             assert_eq!(runtime.snapshot(), before);
         }
     }
@@ -803,22 +985,63 @@ fn read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root(
     let GameKernelLifecycleSnapshotV7::Active(battle_state) = fixture.natural.lifecycle else {
         return Err("natural battle absent".into());
     };
-    let original_control = battle_state.active_run.as_ref().ok_or("natural run absent")?.control.clone();
+    let original_control = battle_state
+        .active_run
+        .as_ref()
+        .ok_or("natural run absent")?
+        .control
+        .clone();
     // Canonical natural battle state in a real encoded save; no private leaf/root fabrication.
     let battle_save = GameSaveV2::new(fixture.content.identity().clone(), safe(1), battle_state)?;
     let mut battle = restore_read_fixture(fixture.pending.clone(), fixture.content.clone())?;
     accept_read(&mut battle, fixture.request, &battle_save.encode()?)?;
-    let rebound = battle.current_control().ok_or("battle control absent")?.clone();
-    assert_eq!(rebound.action_context.as_ref().map(|context| &context.operation_id),
-        original_control.action_context.as_ref().map(|context| &context.operation_id));
-    assert!(rebound.menu.as_ref().ok_or("rebound menu absent")?.instance_id > original_control.menu.as_ref().ok_or("old menu absent")?.instance_id);
-    for pending in battle.snapshot()?.pending_presentations { battle.settle_presentation(pending.event_id)?; }
+    let rebound = battle
+        .current_control()
+        .ok_or("battle control absent")?
+        .clone();
+    assert_eq!(
+        rebound
+            .action_context
+            .as_ref()
+            .map(|context| &context.operation_id),
+        original_control
+            .action_context
+            .as_ref()
+            .map(|context| &context.operation_id)
+    );
+    assert!(
+        rebound
+            .menu
+            .as_ref()
+            .ok_or("rebound menu absent")?
+            .instance_id
+            > original_control
+                .menu
+                .as_ref()
+                .ok_or("old menu absent")?
+                .instance_id
+    );
+    for pending in battle.snapshot()?.pending_presentations {
+        battle.settle_presentation(pending.event_id)?;
+    }
     press(&mut battle, PhysicalKey::Space)?;
-    assert_eq!(battle.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleMove));
+    assert_eq!(
+        battle.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::BattleMove)
+    );
     let leaf = battle.snapshot()?;
-    assert_eq!(leaf.private_battle_control.as_ref().map(|owner| &owner.canonical_control), Some(&rebound));
+    assert_eq!(
+        leaf.private_battle_control
+            .as_ref()
+            .map(|owner| &owner.canonical_control),
+        Some(&rebound)
+    );
     leaf.validate(fixture.content.as_ref())?;
-    let private_save = GameSaveV2::new(fixture.content.identity().clone(), safe(1), battle.state().ok_or("private state absent")?.clone())?;
+    let private_save = GameSaveV2::new(
+        fixture.content.identity().clone(),
+        safe(1),
+        battle.state().ok_or("private state absent")?.clone(),
+    )?;
     let mut rejected = restore_read_fixture(fixture.pending.clone(), fixture.content.clone())?;
     assert!(accept_read(&mut rejected, fixture.request, &private_save.encode()?).is_err());
     assert_eq!(rejected.snapshot()?, fixture.pending);
@@ -826,7 +1049,8 @@ fn read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root(
 }
 
 #[test]
-fn read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion() -> Result<(), Box<dyn Error>> {
+fn read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion()
+-> Result<(), Box<dyn Error>> {
     let fixture = read_rebind_fixture()?;
     for case in 0..5 {
         let mut pending = fixture.pending.clone();
@@ -835,77 +1059,141 @@ fn read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion() -> 
             0 => pending.next_menu_instance_id = MenuInstanceId::new(SafeU53::MAX),
             1 => {
                 let control = &mut saved.active_run.as_mut().ok_or("saved run absent")?.control;
-                control.menu.as_mut().ok_or("saved menu absent")?.instance_id = MenuInstanceId::new(SafeU53::MAX);
-                control.action_context.as_mut().ok_or("saved context absent")?.menu_instance = MenuInstanceId::new(SafeU53::MAX);
+                control
+                    .menu
+                    .as_mut()
+                    .ok_or("saved menu absent")?
+                    .instance_id = MenuInstanceId::new(SafeU53::MAX);
+                control
+                    .action_context
+                    .as_mut()
+                    .ok_or("saved context absent")?
+                    .menu_instance = MenuInstanceId::new(SafeU53::MAX);
             }
             2 => {
                 let control = &mut saved.active_run.as_mut().ok_or("saved run absent")?.control;
                 control.revision = SafeU53::MAX;
-                control.action_context.as_mut().ok_or("saved context absent")?.authority_revision = SafeU53::MAX;
+                control
+                    .action_context
+                    .as_mut()
+                    .ok_or("saved context absent")?
+                    .authority_revision = SafeU53::MAX;
             }
             3 => pending.pending_presentations[0].event_id = PresentationEventId::new(SafeU53::MAX),
             _ => pending.replay_sequence = SafeU53::MAX,
         }
-        let bytes = GameSaveV2::new(fixture.content.identity().clone(), safe(1), saved)?.encode()?;
+        let bytes =
+            GameSaveV2::new(fixture.content.identity().clone(), safe(1), saved)?.encode()?;
         let mut loader = restore_read_fixture(pending.clone(), fixture.content.clone())?;
-        assert!(accept_read(&mut loader, fixture.request, &bytes).is_err(), "case {case}");
+        assert!(
+            accept_read(&mut loader, fixture.request, &bytes).is_err(),
+            "case {case}"
+        );
         assert_eq!(loader.snapshot()?, pending, "case {case}");
     }
     Ok(())
 }
 
 #[test]
-fn read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior() -> Result<(), Box<dyn Error>> {
+fn read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior() -> Result<(), Box<dyn Error>>
+{
     let fixture = read_rebind_fixture()?;
     let mut state = fixture.saved.state.clone();
     state.identities.next_platform_request_id = safe(500);
     let control = &mut state.active_run.as_mut().ok_or("saved run absent")?.control;
-    control.menu.as_mut().ok_or("saved menu absent")?.instance_id = MenuInstanceId::new(safe(600));
-    control.action_context.as_mut().ok_or("saved context absent")?.menu_instance = MenuInstanceId::new(safe(600));
+    control
+        .menu
+        .as_mut()
+        .ok_or("saved menu absent")?
+        .instance_id = MenuInstanceId::new(safe(600));
+    control
+        .action_context
+        .as_mut()
+        .ok_or("saved context absent")?
+        .menu_instance = MenuInstanceId::new(safe(600));
     let mut pending = fixture.pending.clone();
     pending.pending_presentations[0].event_id = PresentationEventId::new(safe(700));
     let bytes = GameSaveV2::new(fixture.content.identity().clone(), safe(1), state)?.encode()?;
     let mut loader = restore_read_fixture(pending.clone(), fixture.content.clone())?;
     accept_read(&mut loader, fixture.request, &bytes)?;
     let loaded = loader.snapshot()?;
-    assert_eq!(loader.state().ok_or("loaded state absent")?.identities.next_platform_request_id, safe(500));
+    assert_eq!(
+        loader
+            .state()
+            .ok_or("loaded state absent")?
+            .identities
+            .next_platform_request_id,
+        safe(500)
+    );
     assert_eq!(loaded.next_menu_instance_id, MenuInstanceId::new(safe(602)));
-    assert_eq!(loader.current_control().map(|control| control.revision), Some(safe(701)));
+    assert_eq!(
+        loader.current_control().map(|control| control.revision),
+        Some(safe(701))
+    );
     assert_eq!(loaded.pending_presentations, pending.pending_presentations);
 
     let mut no_run = fixture.saved.state;
     no_run.active_run = None;
-    let bytes = GameSaveV2::new(fixture.content.identity().clone(), safe(1), no_run.clone())?.encode()?;
+    let bytes =
+        GameSaveV2::new(fixture.content.identity().clone(), safe(1), no_run.clone())?.encode()?;
     let mut loader = restore_read_fixture(fixture.pending.clone(), fixture.content.clone())?;
     let step = accept_read(&mut loader, fixture.request, &bytes)?;
     let loaded = loader.snapshot()?;
     assert!(loader.current_control().is_none());
     assert!(step.effects.is_empty());
-    no_run.identities.next_platform_request_id = loader.state().ok_or("loaded profile state absent")?.identities.next_platform_request_id;
+    no_run.identities.next_platform_request_id = loader
+        .state()
+        .ok_or("loaded profile state absent")?
+        .identities
+        .next_platform_request_id;
     assert_eq!(loader.state(), Some(&no_run));
     assert!(no_run.identities.next_platform_request_id > fixture.request.get());
-    assert_eq!(loaded.next_menu_instance_id, fixture.pending.next_menu_instance_id);
-    assert_eq!(loaded.pending_presentations, fixture.pending.pending_presentations);
+    assert_eq!(
+        loaded.next_menu_instance_id,
+        fixture.pending.next_menu_instance_id
+    );
+    assert_eq!(
+        loaded.pending_presentations,
+        fixture.pending.pending_presentations
+    );
     loaded.validate(fixture.content.as_ref())?;
     Ok(())
 }
 
 #[test]
-fn read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work() -> Result<(), Box<dyn Error>> {
+fn read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work()
+-> Result<(), Box<dyn Error>> {
     let fixture = read_rebind_fixture()?;
     let GameKernelLifecycleSnapshotV7::Active(mut state) = fixture.natural.lifecycle.clone() else {
         return Err("natural run absent".into());
     };
     state.identities.next_platform_request_id = safe(fixture.request.get().get() + 1);
-    let revision = state.active_run.as_ref().ok_or("run absent")?.control.revision;
+    let revision = state
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?
+        .control
+        .revision;
     // Explicit concurrent-owner fixture: retain the exact emitted WRITE and READ,
     // but start a fresh canonical BattleCommand boundary with no presentation block.
-    let source = GameKernelV7::from_active(state, revision, SeatId::new(safe(1)),
-        GameKernelRoleV7::Authority, fixture.content.clone(), fixture.natural.input_router.clone(),
-        fixture.natural.scheduler.clone(), None)?;
+    let source = GameKernelV7::from_active(
+        state,
+        revision,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        fixture.content.clone(),
+        fixture.natural.input_router.clone(),
+        fixture.natural.scheduler.clone(),
+        None,
+    )?;
     let mut source = source.snapshot()?;
-    source.pending_platform = vec![fixture.write_pending.clone(), fixture.pending.pending_platform[0].clone()];
-    source.pending_platform.sort_by_key(|pending| pending.request_id);
+    source.pending_platform = vec![
+        fixture.write_pending.clone(),
+        fixture.pending.pending_platform[0].clone(),
+    ];
+    source
+        .pending_platform
+        .sort_by_key(|pending| pending.request_id);
     let mut source = restore_read_fixture(source, fixture.content.clone())?;
     source.raw_input(key_down(PhysicalKey::ArrowDown))?;
     let mut before = source.snapshot()?;
@@ -936,7 +1224,14 @@ fn read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work() 
     expected_scheduler.timers = vec![unrelated];
     assert_eq!(after.scheduler, expected_scheduler);
     assert_eq!(after.pending_platform, vec![fixture.write_pending]);
-    assert!(loader.raw_input(RawInputEvent::KeyUp { code: PhysicalKey::ArrowDown })?.effects.is_empty());
+    assert!(
+        loader
+            .raw_input(RawInputEvent::KeyUp {
+                code: PhysicalKey::ArrowDown
+            })?
+            .effects
+            .is_empty()
+    );
     assert_eq!(loader.snapshot()?, after);
     let selected = loader.current_control().cloned();
     assert!(loader.advance_time(safe(500))?.effects.is_empty());
