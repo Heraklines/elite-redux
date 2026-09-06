@@ -7398,5 +7398,134 @@ class WorkerStorageEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "changed saved gameplay"):
             title.write_case_reference(bad, 1, identity)
 
+
+    def title_browser_proof_fixture(self):
+        import base64
+        title, binding, cohort, assets = self.title_retirement_assets_fixture()
+        oracle = {"cancelled_requests": [*range(1, 22), 23, 25], "queued_not_started_request_id": 2,
+                  "highest_retired_id": 25, "rewrite_request_id": 28, "rewrite_generation": 2,
+                  "rewrite_payload_bytes": 1234, "presentation_id": 75,
+                  **{key: "a" * 64 for key in ("cancelled_snapshot_digest", "producer_receipt", "producer_payload_sha256",
+                      "load_snapshot_sha256", "rewrite_receipt", "rewrite_payload_sha256", "rewrite_callback_sha256", "rewrite_continued_sha256")}}
+        measured = {key: value for key, value in oracle.items() if key != "cancelled_requests"}
+        measured.update({"cancelled": 23, "list_cancels": 21, "read_cancels": 2, "queued_not_started_cancels": 1,
+            "list_emissions": 24, "native_transaction_cancels": 21, "native_gets": 210,
+            "native_get_limit_per_transaction": 20000, "native_deadline_ms": 8000,
+            "all_native_completions_after_cancel": True, "callback_queued_before_retirement": True,
+            "lists": 23, "reads": 3, "writes": 2, "reader_callbacks": 5, "presentation_settlements": 1,
+            "stale_callbacks_conserve_snapshot": True, "stale_rendered_cancel_not_sent": True,
+            "disposed": True, "queue_empty": True,
+            "correlated_sequences": [[request, 10 + index * 12, 11 + index * 12] for index, request in enumerate(oracle["cancelled_requests"])]})
+        manifest = assets["manifest"]
+        item = {"schema_version": 1, "capability": title.CAPABILITY, "fixture_kind": title.FIXTURE_KIND,
+                "source_sha": CANDIDATE, "manifest_sha256": assets["manifest_sha256"], "fixture_sha256": manifest["fixture"]["sha256"],
+                "worker_sha256": manifest["assets"][manifest["worker"]]["sha256"], "observed_worker_count": 2,
+                "cohort": manifest["cohort"], "evidence": measured}
+        tests = {"expected": 1, "passed": 1, "failed": 0, "skipped": 0, "selected_test_ids": list(title.TEST_IDS), "retirement": item}
+        attachment = {"name": title.ATTACHMENT, "contentType": "application/json", "body": base64.b64encode(title.js_bytes(item)).decode()}
+        report = {"errors": [], "suites": [{"suites": [{"specs": [{"title": title.TEST_IDS[0], "file": title.PRODUCT_PATHS[5],
+            "ok": True, "tests": [{"projectName": "chromium", "expectedStatus": "passed", "status": "expected",
+            "results": [{"status": "passed", "retry": 0, "errors": [], "attachments": [attachment]}]}]}]}]}]}
+        return title, binding, cohort, assets, oracle, tests, report
+
+    def test_title_browser_proof_accepts_exact_inline_and_contained_file_evidence(self):
+        title, binding, cohort, assets, oracle, tests, report = self.title_browser_proof_fixture()
+        title.validate_tests(tests, assets, oracle, binding, cohort, "1.97.1")
+        self.assertEqual(title.test_evidence(report, assets, oracle, binding, cohort, "1.97.1", self.root), tests)
+        attachment = report["suites"][0]["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"][0]
+        target = self.root / "test-results/rust-browser/title.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(title.js_bytes(tests["retirement"]))
+        del attachment["body"]
+        attachment["path"] = "test-results/rust-browser/title.json"
+        self.assertEqual(title.test_evidence(report, assets, oracle, binding, cohort, "1.97.1", self.root), tests)
+        attachment["path"] = str(self.root / "outside.json")
+        (self.root / "outside.json").write_bytes(title.js_bytes(tests["retirement"]))
+        with self.assertRaisesRegex(RuntimeError, "bounded regular"):
+            title.test_evidence(report, assets, oracle, binding, cohort, "1.97.1", self.root)
+
+    def test_title_browser_proof_rejects_every_missing_or_changed_causal_fact(self):
+        title, binding, cohort, assets, oracle, tests, _ = self.title_browser_proof_fixture()
+        for key, value in tests["retirement"]["evidence"].items():
+            if key in ("native_gets", "correlated_sequences"):
+                continue
+            with self.subTest(key=key):
+                bad = copy.deepcopy(tests)
+                bad["retirement"]["evidence"][key] = (not value) if isinstance(value, bool) else value + 1 if isinstance(value, int) else "b" * 64
+                with self.assertRaisesRegex(RuntimeError, "measured facts"):
+                    title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
+                del bad["retirement"]["evidence"][key]
+                with self.assertRaisesRegex(RuntimeError, "measured facts"):
+                    title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
+        for key in ("queue_empty", "disposed", "all_native_completions_after_cancel"):
+            bad = copy.deepcopy(tests)
+            bad["retirement"]["evidence"][key] = 1
+            with self.assertRaisesRegex(RuntimeError, "measured facts"):
+                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
+        for gets in (True, 20, 420001):
+            bad = copy.deepcopy(tests)
+            bad["retirement"]["evidence"]["native_gets"] = gets
+            with self.assertRaisesRegex(RuntimeError, "measured facts"):
+                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
+
+    def test_title_browser_proof_rejects_reordered_reused_and_uncorrelated_cancel_sequences(self):
+        title, binding, cohort, assets, oracle, tests, _ = self.title_browser_proof_fixture()
+        sequence = tests["retirement"]["evidence"]["correlated_sequences"]
+        for replacement in (sequence[:-1], list(reversed(sequence)), [sequence[0]] * 23,
+                            [[True, *sequence[0][1:]], *sequence[1:]],
+                            [[sequence[0][0], sequence[0][1], sequence[0][2] + 1], *sequence[1:]]):
+            bad = copy.deepcopy(tests)
+            bad["retirement"]["evidence"]["correlated_sequences"] = replacement
+            with self.assertRaisesRegex(RuntimeError, "sequence inventory|correlation"):
+                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
+        for key, value in (("cancelled_requests", list(range(1, 24))), ("highest_retired_id", 24),
+                           ("rewrite_request_id", 27), ("rewrite_generation", True), ("producer_receipt", "invalid")):
+            with self.assertRaisesRegex(RuntimeError, "reduced fixture oracle"):
+                title.validate_tests(tests, assets, {**oracle, key: value}, binding, cohort, "1.97.1")
+
+    def test_title_browser_report_rejects_wrong_source_retry_project_and_attempt_inventory(self):
+        title, binding, cohort, assets, oracle, _, report = self.title_browser_proof_fixture()
+        for target, key, value in (("spec", "title", "adapter-only"), ("spec", "file", "wrong.spec.ts"), ("spec", "ok", False),
+                ("test", "projectName", "firefox"), ("test", "expectedStatus", "failed"), ("test", "status", "flaky"),
+                ("run", "retry", 1), ("run", "retry", False), ("run", "status", "skipped"), ("run", "errors", ["failure"])):
+            with self.subTest(target=target, key=key):
+                bad = copy.deepcopy(report)
+                spec = bad["suites"][0]["suites"][0]["specs"][0]
+                item = spec if target == "spec" else spec["tests"][0] if target == "test" else spec["tests"][0]["results"][0]
+                item[key] = value
+                with self.assertRaisesRegex(RuntimeError, "Title retirement Chromium"):
+                    title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
+        for target in ("specs", "tests", "results"):
+            bad = copy.deepcopy(report)
+            suite = bad["suites"][0]["suites"][0]
+            owner = suite if target == "specs" else suite["specs"][0] if target == "tests" else suite["specs"][0]["tests"][0]
+            owner[target] *= 2
+            with self.assertRaisesRegex(RuntimeError, "Title retirement Chromium"):
+                title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
+
+    def test_title_browser_attachment_rejects_duplicate_fields_sources_and_oversized_encodings(self):
+        import base64
+        title, binding, cohort, assets, oracle, tests, report = self.title_browser_proof_fixture()
+        for key, value in (("observed_worker_count", 1), ("schema_version", True), ("source_sha", BASE),
+                           ("fixture_kind", "CONTROLLED_ONLY"), ("worker_sha256", "f" * 64)):
+            bad = copy.deepcopy(tests)
+            bad["retirement"][key] = value
+            with self.assertRaisesRegex(RuntimeError, "attachment source/topology"):
+                title.validate_tests(bad, assets, oracle, binding, cohort, "1.97.1")
+        for mutation in ("duplicate", "body_and_file", "neither", "name", "mime", "oversize", "bad_base64", "duplicate_json"):
+            with self.subTest(mutation=mutation):
+                bad = copy.deepcopy(report)
+                attachments = bad["suites"][0]["suites"][0]["specs"][0]["tests"][0]["results"][0]["attachments"]
+                item = attachments[0]
+                if mutation == "duplicate": attachments.append(copy.deepcopy(item))
+                if mutation == "body_and_file": item["path"] = "test-results/rust-browser/title.json"
+                if mutation == "neither": del item["body"]
+                if mutation == "name": item["name"] += "-renamed"
+                if mutation == "mime": item["contentType"] = "text/plain"
+                if mutation == "oversize": item["body"] = "A" * 5468
+                if mutation == "bad_base64": item["body"] = "!invalid!"
+                if mutation == "duplicate_json": item["body"] = base64.b64encode(b'{"schema_version":1,"schema_version":1}').decode()
+                with self.assertRaisesRegex(RuntimeError, "Title retirement"):
+                    title.test_evidence(bad, assets, oracle, binding, cohort, "1.97.1", self.root)
 if __name__ == "__main__":
     unittest.main()

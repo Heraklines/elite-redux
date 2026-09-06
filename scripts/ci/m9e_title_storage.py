@@ -451,3 +451,164 @@ def fixture_oracle(fixture, content_hash):
             "rewrite_generation": 2, "rewrite_payload_bytes": len(rewrite_payload), "rewrite_receipt": receipts[1],
             "rewrite_payload_sha256": sha(rewrite_payload), "rewrite_callback_sha256": sha(js_bytes(rewrite["callback"])),
             "rewrite_continued_sha256": sha(js_bytes(rewrite["continued"])), "presentation_id": rewrite["presentation"]["event_id"]}
+
+
+PROOF_KEYS = ("title_storage_assets", "title_storage_oracle", "title_storage_tests")
+ATTACHMENT = "m9e-current-worker-title-storage-retirement"
+
+
+def validate_oracle(oracle):
+    fields = {"cancelled_requests", "cancelled_snapshot_digest", "queued_not_started_request_id", "highest_retired_id",
+              "producer_receipt", "producer_payload_sha256", "load_snapshot_sha256", "rewrite_request_id",
+              "rewrite_generation", "rewrite_payload_bytes", "rewrite_receipt", "rewrite_payload_sha256",
+              "rewrite_callback_sha256", "rewrite_continued_sha256", "presentation_id"}
+    numeric = {"queued_not_started_request_id", "highest_retired_id", "rewrite_request_id", "rewrite_generation",
+               "rewrite_payload_bytes", "presentation_id"}
+    if (not isinstance(oracle, dict) or set(oracle) != fields
+            or oracle["cancelled_requests"] != [*range(1, 22), 23, 25]
+            or any(type(value) is not int for value in oracle["cancelled_requests"])
+            or not all(digest(oracle[key]) for key in fields - numeric - {"cancelled_requests"})
+            or any(not integer(oracle[key], value, value) for key, value in
+                   (("queued_not_started_request_id", 2), ("highest_retired_id", 25), ("rewrite_request_id", 28), ("rewrite_generation", 2)))
+            or not integer(oracle["rewrite_payload_bytes"], 1, 4 << 20)
+            or not integer(oracle["presentation_id"], 1)):
+        raise RuntimeError("Title retirement reduced fixture oracle differs")
+
+
+def validate_tests(tests, assets, oracle, binding, cohort, toolchain):
+    validate_assets(assets, binding, cohort, toolchain)
+    validate_oracle(oracle)
+    if (not isinstance(tests, dict)
+            or set(tests) != {"expected", "passed", "failed", "skipped", "selected_test_ids", "retirement"}
+            or any(not integer(tests[key], value, value) for key, value in
+                   (("expected", 1), ("passed", 1), ("failed", 0), ("skipped", 0)))
+            or tests["selected_test_ids"] != TEST_IDS):
+        raise RuntimeError("Title retirement exact browser test identity/count differs")
+    manifest = assets["manifest"]
+    common = {"schema_version": 1, "capability": CAPABILITY, "fixture_kind": FIXTURE_KIND,
+              "source_sha": binding["source_sha"], "manifest_sha256": assets["manifest_sha256"],
+              "fixture_sha256": manifest["fixture"]["sha256"],
+              "worker_sha256": manifest["assets"][manifest["worker"]]["sha256"],
+              "observed_worker_count": 2, "cohort": manifest["cohort"]}
+    item = tests["retirement"]
+    if (not isinstance(item, dict) or set(item) != {*common, "evidence"}
+            or any(type(item[key]) is not type(value) or js_bytes(item[key]) != js_bytes(value) for key, value in common.items())
+            or len(js_bytes(item)) > 4096):
+        raise RuntimeError("Title retirement attachment source/topology/bound differs")
+    expected = {key: value for key, value in oracle.items() if key != "cancelled_requests"}
+    expected.update({"cancelled": 23, "list_cancels": 21, "read_cancels": 2, "queued_not_started_cancels": 1,
+        "list_emissions": 24, "native_transaction_cancels": 21, "native_get_limit_per_transaction": 20000,
+        "native_deadline_ms": 8000, "all_native_completions_after_cancel": True,
+        "callback_queued_before_retirement": True, "lists": 23, "reads": 3, "writes": 2, "reader_callbacks": 5,
+        "presentation_settlements": 1, "stale_callbacks_conserve_snapshot": True, "stale_rendered_cancel_not_sent": True,
+        "disposed": True, "queue_empty": True})
+    measured = item["evidence"]
+    if (not isinstance(measured, dict) or set(measured) != {*expected, "native_gets", "correlated_sequences"}
+            or any(type(measured[key]) is not type(value) or js_bytes(measured[key]) != js_bytes(value) for key, value in expected.items())
+            or not integer(measured["native_gets"], 21, 21 * 20000)):
+        raise RuntimeError("Title retirement measured facts differ from the independent fixture")
+    sequences = measured["correlated_sequences"]
+    if not isinstance(sequences, list) or len(sequences) != 23:
+        raise RuntimeError("Title retirement sequence inventory differs")
+    last = 0
+    for request, row in zip(oracle["cancelled_requests"], sequences):
+        if (not isinstance(row, list) or len(row) != 3 or not all(integer(value, 1) for value in row)
+                or row[0] != request or row[1] <= last or row[2] != row[1] + 1):
+            raise RuntimeError("Title retirement accepted Cancel/post-snapshot correlation differs")
+        last = row[2]
+
+
+def test_evidence(report, assets, oracle, binding, cohort, toolchain, root):
+    """Accept exactly one unretried Chromium witness and one bounded attachment."""
+    import base64
+    import json
+    from pathlib import Path
+    specs = []
+    def visit(suite):
+        specs.extend(suite.get("specs", []))
+        for child in suite.get("suites", []):
+            visit(child)
+    for suite in report.get("suites", []):
+        visit(suite)
+    if report.get("errors") or len(specs) != 1 or specs[0].get("title") != TEST_IDS[0]:
+        raise RuntimeError("Title retirement Chromium report identities differ")
+    spec = specs[0]
+    if (str(spec.get("file", "")).replace("\\", "/") not in (PRODUCT_PATHS[5], "m9e-v7-worker-title-storage.spec.ts")
+            or spec.get("ok") is not True or len(spec.get("tests", [])) != 1):
+        raise RuntimeError("Title retirement Chromium source/attempt differs")
+    test = spec["tests"][0]
+    runs = test.get("results", [])
+    if (test.get("projectName") != "chromium" or test.get("expectedStatus") != "passed" or test.get("status") != "expected"
+            or len(runs) != 1 or runs[0].get("status") != "passed" or not integer(runs[0].get("retry", 0), 0, 0)
+            or runs[0].get("errors") or runs[0].get("error")):
+        raise RuntimeError("Title retirement Chromium retried/skipped/failed")
+    attachments = [item for item in runs[0].get("attachments", []) if str(item.get("name", "")).startswith("m9e-current-worker-title-storage")]
+    if (len(attachments) != 1 or attachments[0].get("name") != ATTACHMENT
+            or attachments[0].get("contentType") != "application/json"):
+        raise RuntimeError("Title retirement exact attachment missing/duplicated")
+    item = attachments[0]
+    if ("body" in item) == ("path" in item):
+        raise RuntimeError("Title retirement attachment requires exactly one body or file")
+    if "body" in item:
+        body = item["body"]
+        if not isinstance(body, str) or not 0 < len(body) <= 5464:
+            raise RuntimeError("Title retirement attachment exceeds bound")
+        try:
+            raw = base64.b64decode(body, validate=True)
+        except ValueError as error:
+            raise RuntimeError("Title retirement attachment base64 is invalid") from error
+        if base64.b64encode(raw).decode() != body:
+            raise RuntimeError("Title retirement attachment base64 is noncanonical")
+    else:
+        path = Path(item["path"])
+        path = path if path.is_absolute() else root / path
+        raw = bounded_file(root / "test-results/rust-browser", path, 4096)
+    if not 0 < len(raw) <= 4096:
+        raise RuntimeError("Title retirement attachment exceeds bound")
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise RuntimeError("Title retirement attachment repeats a JSON field")
+            result[key] = value
+        return result
+    result = {"expected": 1, "passed": 1, "failed": 0, "skipped": 0, "selected_test_ids": list(TEST_IDS),
+              "retirement": json.loads(raw, object_pairs_hook=unique)}
+    validate_tests(result, assets, oracle, binding, cohort, toolchain)
+    return result
+
+
+def build_evidence(output, summary, root, full, toolchain):
+    import json
+    import shutil
+    binding = summary["plan"]["title_storage_binding"]
+    if binding != source_binding(root, summary["product_sha"]):
+        raise RuntimeError("Title retirement source changed before build validation")
+    assets, raw = bind_asset_files(output, binding, summary["browser_assets"]["assets"], toolchain)
+    oracle = fixture_oracle(json.loads(raw), assets["manifest"]["cohort"]["content_sha256"])
+    validate_oracle(oracle)
+    if assets["manifest"]["vite_version"] != json.loads(bounded_file(root, "node_modules/vite/package.json", 1 << 20))["version"]:
+        raise RuntimeError("Title retirement installed Vite version differs")
+    shutil.copyfile(output / "m9e-v7-title-storage-assets.json", full / "m9e-v7-title-storage-assets.json")
+    summary["title_storage_assets"] = assets
+    summary["title_storage_oracle"] = oracle
+
+
+def checks(root, full, run, summary, env, toolchain):
+    import json
+    from pathlib import Path
+    binding = summary["plan"]["title_storage_binding"]
+    if binding != source_binding(root, summary["product_sha"]):
+        raise RuntimeError("Title retirement source changed before browser witness")
+    report_path = full / "title-storage-results.json"
+    run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts",
+         "--project=chromium", PRODUCT_PATHS[5], "--workers=1", "--reporter=line,json"],
+        "title-storage-journey", root, {**env, "PLAYWRIGHT_JSON_OUTPUT_FILE": str(report_path)})
+    summary["title_storage_tests"] = test_evidence(json.loads(bounded_file(full, report_path, 1 << 20)),
+        summary["title_storage_assets"], summary["title_storage_oracle"], binding, summary["browser_assets"]["assets"], toolchain, root)
+    if binding != source_binding(root, summary["product_sha"]):
+        raise RuntimeError("Title retirement witness changed source/lock")
+    repeated = dict(summary)
+    build_evidence(Path(env["M9E_V7_WEB_DIR"]), repeated, root, full, toolchain)
+    if any(repeated[key] != summary[key] for key in PROOF_KEYS[:2]):
+        raise RuntimeError("Title retirement witness changed emitted cohort/fixture")
