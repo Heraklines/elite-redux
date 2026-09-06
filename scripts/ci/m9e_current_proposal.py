@@ -58,10 +58,12 @@ WHEEL = {
     "bytes": 388001,
     "sha256": "504d1399b7fb91dfe5c25722d2807990493185faa1917456455480c36867adb5",
 }
-# Official BLAKE3 1.8.2 test_vectors/test_vectors.json; input repeats 0..250.
+# Official BLAKE3 1.8.2 test_vectors/test_vectors.json: first 32 output bytes.
+# https://github.com/BLAKE3-team/BLAKE3/blob/1.8.2/test_vectors/test_vectors.json
+# Input repeats 0..250.
 VECTORS = {0: "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
-           3: "e1be4d7a8ab5560aa4199eea339849ba8e293d55ca0a81006726d184519e647f5b",
-           2048: "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a9a"}
+           3: "e1be4d7a8ab5560aa4199eea339849ba8e293d55ca0a81006726d184519e647f",
+           2048: "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a"}
 
 
 def require(condition, message):
@@ -514,7 +516,9 @@ def install_provider(work, log_directory):
         require(members.get(path.relative_to(target).as_posix()) == data, "import path or module bytes mismatch")
     primitive = lambda data: module.blake3(data).hexdigest()
     for length, expected in VECTORS.items():
-        require(primitive(bytes(index % 251 for index in range(length))) == expected, "official primitive vector")
+        require(digest_value(expected), "official primitive vector width")
+        require(primitive(bytes(index % 251 for index in range(length))) == expected,
+                "official primitive vector at input length " + str(length))
     remaining(120)
     return primitive, {"wheel": dict(WHEEL), "platform": "cp312-linux-x86_64", "vectors": list(VECTORS),
                        "verified_import": True, "download_limit": 512 << 10, "install_timeout": 60, "total_timeout": 120}
