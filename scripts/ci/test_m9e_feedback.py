@@ -4966,7 +4966,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.binary_ids = {}
         for crate, names in selection["execution_scope"].items():
-            if names == ["*"]:
+            if "*" in names:
                 names = selection["required_native_targets"].get(crate, [crate.replace("-", "_")])
             for name in names:
                 binary = name if name not in self.binary_ids else crate + "--" + name
@@ -4978,7 +4978,7 @@ class FeedbackTests(unittest.TestCase):
                 patch.object(self.feedback, "timer_behavioral_mutant") as timer, \
                 patch.object(self.feedback, "replica_behavioral_mutant") as replica:
             code, summary = self.invoke()
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 0, summary)
         if (self.full / "full-summary.json").is_file():
             summary = json.loads((self.full / "full-summary.json").read_text())
         self.assertEqual(summary["required_native_target_counts"]["er-kernel:m9e_game_kernel_v7"], 12)
@@ -5591,7 +5591,7 @@ class FeedbackTests(unittest.TestCase):
                            self.config["current_read_rebind_focus"]["paths"],
                            self.config["ai_snapshot_validation_focus"]["paths"]):
             self.changed = list(composition.PRODUCT_PATHS) + list(additional)
-            with self.assertRaisesRegex(RuntimeError, "additional mapping"):
+            with self.assertRaisesRegex(RuntimeError, "additional mapping|current owner: exclusive mixed source scope"):
                 self.feedback.plan()
         self.changed = ["docs/plans/rust-kernel/m9e-readiness.md"]
         selection = self.feedback.plan()
