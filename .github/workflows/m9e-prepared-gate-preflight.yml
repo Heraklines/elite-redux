@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '363'
+      M9E_EXPECTED_TESTS: '365'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -23,10 +23,6 @@ jobs:
           persist-credentials: false
           submodules: false
           lfs: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /scripts/ci/
-            /.github/workflows/m9e-focused-feedback.yml
       - name: Verify candidate and execute only harness selftests
         shell: bash
         run: |
@@ -59,6 +55,9 @@ jobs:
           puts 'Passed: parsed existing-runner graph, three mandatory native jobs and exact third proof transfer.'
           RUBY
           workflow_result=$?
+          python3 scripts/ci/m9e_coop_preflight.py >> "$RUNNER_TEMP/m9e-preflight/diagnostics/workflow-validation.log" 2>&1
+          plan_result=$?
+          if [ "$plan_result" -ne 0 ]; then workflow_result=$plan_result; fi
           python3 -m unittest discover -s scripts/ci -p 'test_m9e*.py' -v > "$RUNNER_TEMP/m9e-preflight/diagnostics/harness-tests.log" 2>&1
           result=$?
           set -e

@@ -33,6 +33,14 @@ const MAXIMUM_SESSIONS: usize = 256;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub(crate) enum CurrentStart {
+    NaturalCoop {
+        profile: Box<ProfileStateV1>,
+        seed: String,
+        owner_seat: SeatId,
+        save_slots: Vec<String>,
+        local_is_host: bool,
+        protocol: Box<er_protocol::ProtocolRuntimeSnapshotV2>,
+    },
     Natural {
         profile: Box<ProfileStateV1>,
         seed: String,
@@ -141,6 +149,17 @@ impl CurrentDispatcher {
         self.reserve_id(&request.session)?;
         let (owner_seat, role) = match &request.start {
             CurrentStart::Natural { owner_seat, .. } => (*owner_seat, GameKernelRoleV7::Authority),
+            CurrentStart::NaturalCoop {
+                owner_seat,
+                protocol,
+                ..
+            } => (
+                *owner_seat,
+                match protocol.role {
+                    er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
+                    er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
+                },
+            ),
             CurrentStart::Snapshot {
                 owner_seat, role, ..
             } => (*owner_seat, *role),
@@ -279,6 +298,27 @@ impl CurrentStart {
         content: Arc<PreparedGameContentV2>,
     ) -> Result<CurrentGameSession, AgentDispatchErrorV1> {
         match self {
+            CurrentStart::NaturalCoop {
+                profile,
+                seed,
+                owner_seat,
+                save_slots,
+                local_is_host,
+                protocol,
+            } => {
+                let mut session = CurrentGameSession::natural_start(
+                    *profile,
+                    seed,
+                    owner_seat,
+                    save_slots,
+                    local_is_host,
+                    content,
+                    Some(*protocol),
+                )
+                .map_err(backend)?;
+                session.enable_current_coop_setup().map_err(backend)?;
+                Ok(session)
+            }
             CurrentStart::Natural {
                 profile,
                 seed,
@@ -341,6 +381,7 @@ impl AgentDispatcherV1 for CurrentDispatcher {
             "session.raw_input"
                 | "session.advance_time"
                 | "session.network_frame"
+                | "session.coop.retry"
                 | "session.transport_changed"
                 | "session.presentation_settled"
                 | "session.storage_result"
@@ -585,6 +626,7 @@ impl CurrentDispatcher {
                 },
                 method, context,
             ),
+            "session.coop.retry" => self.apply(params, CurrentExternalEvent::RetryCoopSetup, method, context),
             "session.network_frame" => self.apply(
                 params,
                 CurrentExternalEvent::NetworkFrame {

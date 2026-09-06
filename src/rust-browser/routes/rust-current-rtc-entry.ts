@@ -1,19 +1,23 @@
 import {
-  type BrowserRequestV2, type BrowserResponseEnvelopeV2, type BrowserSessionContextV2,
+  type BrowserRequestV2, type BrowserResponseEnvelopeV2, type BrowserSessionContextV2, type BrowserSessionInitializationV2,
   type CurrentJsonObject, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2,
 } from "../contracts/browser-contracts-v2";
 import { CurrentRtcTransportV1, type CurrentRtcIdentityV1 } from "../adapters/current-rtc-transport";
 import { createCurrentDevelopmentWorkerV2, BrowserEffectRouterV2, CurrentWorkerRequestErrorV2, type CurrentRustBrowserHostV2 } from "./rust-current-worker-entry";
 import type { CurrentWorkerAssetsV2 } from "../worker/rust-wasm-loader";
 
-export interface CurrentRtcPeerOptionsV1 {
+interface CurrentRtcPeerCommonOptionsV1 {
   assets: CurrentWorkerAssetsV2;
   identity: CurrentRtcIdentityV1;
-  checkpoint: CurrentJsonObject;
   context: BrowserSessionContextV2;
   present(effect: GamePresentationEffectV2Wire, signal: AbortSignal): void | Promise<void>;
   frame?(direction: "sent" | "received", generation: number, bytes: Uint8Array): void;
 }
+export type CurrentRtcPeerOptionsV1 = CurrentRtcPeerCommonOptionsV1 & (
+  | { checkpoint: CurrentJsonObject; natural_start?: never }
+  | { checkpoint?: never; natural_start: { profile: CurrentJsonObject; seed: string;
+      save_slots: string[]; local_is_host: boolean } }
+);
 interface PendingOperation {
   bytes: Uint8Array;
   timer: number;
@@ -28,8 +32,9 @@ export class CurrentRtcCommittedDeliveryError extends Error {
   constructor(readonly accepted_sequence: number, reason: string) { super(reason); }
 }
 
-/** Additive development owner: fixed-generation checkpoint pair, not a lobby,
- * join-from-Title implementation, reconnect manager or production selector.
+/** Additive development owner for an explicitly paired fixed-generation session.
+ * Supports checkpoint restore and independent Title setup; no lobby discovery,
+ * reconnect manager or production selector.
  */
 export class CurrentDevelopmentRtcPeerV1 {
   readonly #options: CurrentRtcPeerOptionsV1;
@@ -61,8 +66,10 @@ export class CurrentDevelopmentRtcPeerV1 {
   #deliveryFailure: { acceptance: "ACCEPTED"; accepted_sequence: number; message: string } | null = null;
 
   constructor(options: CurrentRtcPeerOptionsV1) {
+    if (options.natural_start != null && options.checkpoint != null) throw new Error("current RTC binding does not match one initialization owner");
     const owned = encodeCanonicalJsonV2({ assets: options.assets, identity: options.identity,
-      checkpoint: options.checkpoint, context: options.context });
+      ...(options.natural_start == null ? { checkpoint: options.checkpoint } : { natural_start: options.natural_start }),
+      context: options.context });
     try {
       if (owned.byteLength > 16 << 20) throw new Error("current RTC initial owner data exceeds16MiB");
       options = { ...JSON.parse(new TextDecoder().decode(owned)), present: options.present, frame: options.frame };
@@ -116,16 +123,18 @@ export class CurrentDevelopmentRtcPeerV1 {
     if (this.#initialized || this.#initializing || this.#closed) throw new Error("current RTC checkpoint is already owned or closed");
     this.#initializing = true;
     try {
-      const response = await this.#enqueue({ kind: "INITIALIZE", initialization: { kind: "SNAPSHOT",
-        context: this.#options.context, snapshot: this.#options.checkpoint } });
+      const initialization: BrowserSessionInitializationV2 = this.#options.natural_start == null
+        ? { kind: "SNAPSHOT", context: this.#options.context, snapshot: this.#options.checkpoint }
+        : { kind: "NATURAL_COOP", context: this.#options.context, ...this.#options.natural_start };
+      const response = await this.#enqueue({ kind: "INITIALIZE", initialization });
       this.#initialized = true;
       return response;
     } finally { this.#initializing = false; }
   }
 
   dispatch(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
-    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "RAW_INPUT", "ADVANCE_TIME"].includes(request.kind)) {
-      return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/snapshot scope"));
+    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
+      return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot scope"));
     }
     if (request.kind !== "SNAPSHOT" && !this.#transport?.status.connected) {
       return Promise.reject(new Error("current RTC gameplay requires its admitted peer connection"));
@@ -154,10 +163,14 @@ export class CurrentDevelopmentRtcPeerV1 {
 
   async offer(): Promise<string> {
     this.#startSignaling();
-    this.#attach(this.#pc.createDataChannel("er-current-development-v2", { ordered: true, protocol: "er-current-v2" }));
+    const channel = this.#pc.createDataChannel("er-current-development-v2", { ordered: true, protocol: "er-current-v2" });
     try {
       await boundedOperation(this.#pc.setLocalDescription(await boundedOperation(this.#pc.createOffer(), this.#abort.signal)), this.#abort.signal);
       await this.#waitIce();
+      // Local offer preparation has its own bounded signaling operations. No
+      // peer can open this channel before the returned SDP is answered. Attach
+      // now so its unchanged handshake deadline covers the peer exchange.
+      this.#attach(channel);
       return boundedSdp(this.#pc.localDescription?.sdp);
     } catch (error) { this.#fail(error); throw error; }
   }
@@ -335,12 +348,15 @@ export class CurrentDevelopmentRtcPeerV1 {
 }
 
 function assertCheckpointBinding(options: CurrentRtcPeerOptionsV1): void {
-  const protocol = options.checkpoint.protocol as CurrentJsonObject | null;
+  const natural = options.natural_start != null;
+  const protocol = (natural ? options.context.protocol : options.checkpoint?.protocol) as CurrentJsonObject | null;
   const frame = (protocol?.frame_context as CurrentJsonObject | undefined)?.context as CurrentJsonObject | undefined;
   const connections = protocol?.connections;
   const rebinds = protocol?.staged_rebinds;
   const peer = Array.isArray(connections) ? connections[0] as CurrentJsonObject : null;
-  if (options.checkpoint.schema_version !== 7 || options.context.local_seat !== options.identity.local_seat
+  if ((!natural && options.checkpoint?.schema_version !== 7)
+    || (natural && (options.checkpoint != null || options.natural_start?.local_is_host !== (options.context.role === "AUTHORITY")))
+    || options.context.local_seat !== options.identity.local_seat
     || options.assets.content_sha256 !== options.identity.content_sha256 || options.identity.generation !== 1
     || options.context.role !== protocol?.role || frame?.sessionId !== options.identity.session_id
     || frame?.runId !== options.identity.run_id || frame?.authoritySeatId !== options.identity.authority_seat

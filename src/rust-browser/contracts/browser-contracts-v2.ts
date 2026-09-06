@@ -19,6 +19,8 @@ export interface BrowserSessionContextV2 {
 }
 
 export type BrowserSessionInitializationV2 =
+  | { kind: "NATURAL_COOP"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
+      seed: string; save_slots: string[]; local_is_host: boolean }
   | { kind: "NATURAL_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
       seed: string; save_slots: string[]; local_is_host: boolean; existing_saves?: boolean }
   | { kind: "EXISTING_SAVE"; context: BrowserSessionContextV2; save: CurrentJsonObject }
@@ -49,7 +51,7 @@ export type BrowserRequestV2 =
   | { kind: "STORAGE_RESULT"; request_id: number; result: BrowserStorageResultV2 }
   | { kind: "PRESENTATION_SETTLED"; event_id: number; outcome: BrowserPresentationOutcomeV2 }
   | { kind: "LIFECYCLE"; event: "SUSPEND" | "RESUME" | "HIDDEN" | "VISIBLE" | "PAGE_HIDE" | "PAGE_SHOW" }
-  | { kind: "SNAPSHOT" | "EXPORT_REPRO" | "DISPOSE" };
+  | { kind: "SNAPSHOT" | "EXPORT_REPRO" | "RETRY_COOP_SETUP" | "DISPOSE" };
 
 export interface BrowserRequestEnvelopeV2 {
   version: 2;

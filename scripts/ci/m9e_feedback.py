@@ -772,6 +772,16 @@ def plan():
     product_changes = [path for path in changed if path not in (HELPER_PATH, "scripts/ci/m9e_title_storage.py") and path not in config["infrastructure_paths"]
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
     import m9e_current_cost as cost
+    import m9e_coop_startup as coop
+    coop_session, coop_installed = coop.select_scope(config, product_changes, ROOT)
+    coop_guard = None
+    if coop_session and any(path in changed for path in ("rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock")):
+        if not all(path in changed for path in ("rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock")):
+            raise RuntimeError("co-op manifest and lock dependency changes must be paired")
+        coop_guard = coop.dependency_guard(
+            capture(["git", "show", f"{base}:rust/crates/er-cli/Cargo.toml"]), (RUST / "crates/er-cli/Cargo.toml").read_text(),
+            capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text())
+        coop_guard["baseline_sha"] = base
     from m9e_rulechange import RULE_TEST_SOURCE
     # These two independently established witnesses have separate owning jobs.
     # Map their exact pair explicitly; additional product paths still fail the
@@ -918,7 +928,7 @@ def plan():
     max_pp_session = bool(max_pp_focus) and set(product_changes) == set(AI_MAX_PP_PATHS)
     timer_session = any(path in timer_focus.get("trigger_paths", []) for path in product_changes) and all(
         path in timer_focus.get("paths", []) for path in product_changes)
-    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session or cost_session or rule_session
+    timer_session = timer_session or retention_session or browser_worker_session or damage_session or rtc_session or storage_session or ai_snapshot_session or owner_session or read_session or composition_session or title_session or retirement_session or query_session or state_query_session or max_pp_session or cost_session or rule_session or coop_session
     worker_focus = config.get("worker_session_focus", {})
     worker_paths = worker_focus.get("paths", [])
     worker_session = any(path in worker_paths for path in rust_changes) and all(
@@ -992,7 +1002,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -1120,6 +1130,10 @@ def plan():
         boundaries = [path for path in boundaries if path not in (retirement.PRODUCT_PATHS if retirement_session else title_allowed)]
         if retirement_session and not all((ROOT / path).is_file() for path in TITLE_STORAGE_TRIGGERS):
             raise RuntimeError("Title retirement requires installed current Title native ingress")
+    if coop_session:
+        execution_scope = merge_targets(timer_focus["execute"], capture_focus["execute"], coop.NATIVE_TARGETS,
+                                        {"er-game": ["m9e_new_run_v6"]})
+        boundaries = [path for path in boundaries if path not in coop.PRODUCT_PATHS]
     title_required = bool(title_focus) and (title_session or retirement_session or ("er-kernel" in selected | set(execution_scope or {}) and (
         execution_scope is None or "*" in execution_scope.get("er-kernel", [])
         or "m9e_game_kernel_v7" in execution_scope.get("er-kernel", []))))
@@ -1141,6 +1155,13 @@ def plan():
         selected.update(execution_scope)
         if not native_worker_delta:
             current_session = True
+    coop_required = coop_installed and (coop_session or any(crate in selected and (execution_scope is None
+        or "*" in execution_scope.get(crate, []) or target in execution_scope.get(crate, [])) for crate, target in (coop.KERNEL_TARGET, coop.ENTRY_TARGET)))
+    if coop_required:
+        execution_scope = merge_targets(execution_scope, coop.NATIVE_TARGETS) if execution_scope is not None else None
+        selected.update(coop.NATIVE_TARGETS)
+        browser_required = True
+        current_session = True
     query_selected_scope = "er-cli" in selected and (execution_scope is None
         or "*" in execution_scope.get("er-cli", []) or CONTROL_QUERY_TARGET[1] in execution_scope.get("er-cli", []))
     query_required = query_selected_scope and (query_session or (ROOT / CONTROL_QUERY_PATHS[1]).is_file()
@@ -1169,7 +1190,7 @@ def plan():
         or (RUST / "crates/er-cli/tests" / (target + ".rs")).is_file()) and (
         execution_scope is None or "*" in execution_scope.get(crate, [])
         or target in execution_scope.get(crate, [])) for crate, target in WORKER_BOUND_TARGETS)
-    endpoint_execution = endpoint_execution or query_required or rule_selected
+    endpoint_execution = endpoint_execution or query_required or rule_selected or coop_required
     if endpoint_execution:
         selected.add("er-kernel-worker")
     cli_executable_required = browser_required and (owner_required or retention_session or capture_session or cache_session or validation_session or timer_session or repro_session or batch_session or (
@@ -1193,7 +1214,7 @@ def plan():
     retirement_required = retirement_session or (browser_required and retirement_installed)
     composition_required = retirement_required or composition_session or (browser_required and (ROOT / COMPOSITION_PATHS[0]).is_file())
     storage_required = composition_required or storage_session or (browser_required and any((ROOT / path).is_file() for path in STORAGE_SOURCE_PATHS[:2]))
-    rtc_required = owner_required or composition_required or rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
+    rtc_required = coop_required or owner_required or composition_required or rtc_session or (browser_required and any((ROOT / path).is_file() for path in RTC_PATHS))
     browser_worker_required = storage_required or rtc_required or browser_worker_session or (browser_required and any(
         (ROOT / path).is_file() for path in (
             "src/rust-browser/routes/rust-current-worker-entry.ts",
@@ -1245,6 +1266,10 @@ def plan():
               "current_read_rebind_focus": read_session,
               "current_title_storage_focus": title_session,
               "requires_title_storage": title_required,
+              "current_coop_startup_focus": coop_session,
+              "requires_current_coop_startup": coop_required,
+              "current_coop_startup_binding": coop.source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if coop_required else None,
+              "current_coop_dependency_guard": coop_guard,
               "current_cost_probe_focus": cost_session,
               "requires_current_cost_probe": cost_required,
               "current_cost_source_binding": cost.build_source_binding(ROOT, capture(["git", "rev-parse", "HEAD"])) if cost_required else None,
@@ -1340,6 +1365,11 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"],
             identity: [*inherited, *[name for name in AI_MAX_PP_IDS if name not in inherited]]}
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": ["m9e_game_kernel_v7"]})
+    if coop_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], coop.NATIVE_TARGETS)
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], **coop.NATIVE_IDS}
+        if coop_session:
+            result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-game": ["m9e_new_run_v6"]})
     if cost_required:
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {cost.TARGET[0]: [cost.TARGET[1]]})
         result["required_native_test_ids"] = {**result["required_native_test_ids"], ":".join(cost.TARGET): [cost.TEST_ID]}
@@ -1362,7 +1392,7 @@ def plan():
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session and not coop_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session or coop_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     return result
 
@@ -2281,8 +2311,10 @@ def main(preflight_failure=None):
             enumerated = [item for item in enumerated if [item[4].name, item[2]] in assigned]
         from m9e_phases import identity as phase_identity
         import m9e_current_cost as cost
-        release_identity = phase_identity(sys.modules[__name__]) if selection.get("requires_current_cost_probe") else None
+        import m9e_coop_startup as coop
+        release_identity = phase_identity(sys.modules[__name__]) if (selection.get("requires_current_cost_probe") or selection.get("requires_current_coop_startup")) else None
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
+            coop_target = (cwd.name, name) == coop.ENTRY_TARGET
             rule_target = (cwd.name, name) == ("er-cli", RULE_TARGET)
             rule_context = contextlib.nullcontext((env, None))
             if rule_target:
@@ -2317,6 +2349,13 @@ def main(preflight_failure=None):
                             source_binding=selection["current_cost_source_binding"], discovered_ids=ids,
                             global_deadline=native_deadline)
                         code = 0
+                    elif coop_target:
+                        if (not selection.get("requires_current_coop_startup") or os.environ.get("M9E_PHASE") != "native"
+                                or os.environ.get("M9E_NATIVE_LANE") != "a" or excluded_ids or "current_coop_entry" in summary):
+                            raise RuntimeError("co-op optimized override is outside its exactly-once native A scope")
+                        summary["current_coop_entry"] = coop.execute_entry(ROOT, FULL, release_identity,
+                            selection["current_coop_startup_binding"], ids, native_deadline)
+                        code = 0
                     elif rule_target:
                         command = [binary, RULE_TEST, "--exact", "--format", "terse", "--nocapture", "--test-threads=1"]
                         result = cost.run_bounded(command, cwd=cwd, environment=env, output=output,
@@ -2332,10 +2371,14 @@ def main(preflight_failure=None):
                     raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
-                counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
-                if not counts:
-                    raise RuntimeError(f"missing test result: {output.name}")
-                passed, failed, skipped = map(int, counts.groups())
+                if coop_target:
+                    actual = summary["current_coop_entry"]["tests"]
+                    passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
+                else:
+                    counts = re.search(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output.read_text())
+                    if not counts:
+                        raise RuntimeError(f"missing test result: {output.name}")
+                    passed, failed, skipped = map(int, counts.groups())
                 for key, count in (("executed", passed + failed), ("passed", passed), ("failed", failed), ("skipped", skipped)):
                     summary["tests"][key] += count
                 if code or failed or skipped or passed != len(ids):
@@ -2471,6 +2514,6 @@ def preflight_environment():
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=True)
     with (FULL / "harness-tests.log").open("w") as stream:
-        preflight = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/ci", "-p", "test_m9e_feedback.py", "-v"],
+        preflight = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/ci", "-p", "test_m9e*.py", "-v"],
                                    cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, env=preflight_environment())
     sys.exit(main("feedback harness self-tests failed; see harness-tests.log" if preflight.returncode else None))
