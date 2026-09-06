@@ -354,7 +354,11 @@ fn natural_active(cli: &mut Cli, reference: &mut CurrentGameSession, native: boo
     unchanged(cli, &before_plan)?;
     let inputs: Vec<RawInputEvent> = serde_json::from_value(planned["plan"]["events"].clone())?;
     assert!(inputs.len() <= 4096);
-    for input in inputs {
+    eprintln!("state-query natural plan: {} events", inputs.len());
+    for (index, input) in inputs.into_iter().enumerate() {
+        if index % 64 == 0 {
+            eprintln!("state-query natural input {index}");
+        }
         raw(cli, reference, input)?;
         drain_presentations(cli, reference, native, &mut settlements)?;
     }
@@ -586,6 +590,7 @@ fn controlled_terminal(
 }
 
 fn exercise_queries(worker: bool) -> TestResult {
+    eprintln!("state-query worker={worker}: prepare content");
     let content = content();
     let mut reference = CurrentGameSession::natural_start(
         serde_json::from_value::<ProfileStateV1>(profile())?,
@@ -596,6 +601,7 @@ fn exercise_queries(worker: bool) -> TestResult {
         Arc::clone(&content),
         None,
     )?;
+    eprintln!("state-query worker={worker}: launch CLI");
     let mut cli = Cli::new(worker, &content)?;
     let hello = cli.result("protocol.hello", json!({}))?;
     assert_eq!(
@@ -604,10 +610,15 @@ fn exercise_queries(worker: bool) -> TestResult {
     );
     assert_eq!(hello["capture"]["supported"], !worker);
     cli.result("session.create", json!({"session":SESSION,"start":start()}))?;
+    eprintln!("state-query worker={worker}: queries");
     query_batch(&mut cli, &reference, !worker)?;
+    eprintln!("state-query worker={worker}: natural setup");
     natural_active(&mut cli, &mut reference, !worker)?;
+    eprintln!("state-query worker={worker}: queries");
     query_batch(&mut cli, &reference, !worker)?;
+    eprintln!("state-query worker={worker}: historical parity");
     historical_selector_parity(&reference, &content)?;
+    eprintln!("state-query worker={worker}: rejections");
     rejection_batch(&mut cli, &reference, !worker)?;
     let active_before = checkpoint(&mut cli, &reference, !worker)?;
     reject(
@@ -632,6 +643,7 @@ fn exercise_queries(worker: bool) -> TestResult {
             "UNAVAILABLE"
         );
     }
+    eprintln!("state-query worker={worker}: terminal");
     let terminal = controlled_terminal(&reference, Arc::clone(&content))?;
     cli.result("session.close", json!({"session":SESSION}))?;
     cli.result(
