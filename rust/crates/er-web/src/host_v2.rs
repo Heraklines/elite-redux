@@ -330,6 +330,7 @@ impl BrowserKernelHostV2 {
                 self.disposed = true;
                 return Ok(bytes);
             }
+            BrowserRequestV2::RetryCoopSetup => CurrentExternalEvent::RetryCoopSetup,
             BrowserRequestV2::RawInput { event } => CurrentExternalEvent::RawInput { input: event },
             BrowserRequestV2::ProposalFrame { bytes } => {
                 CurrentExternalEvent::ProposalFrame { bytes }
@@ -479,6 +480,17 @@ impl BrowserKernelHostV2 {
         initialization: BrowserSessionInitializationV2,
     ) -> Result<(CurrentGameSession, CurrentReproRecorderV1, SafeU53), BrowserWebErrorV2> {
         let session = match initialization {
+            BrowserSessionInitializationV2::NaturalCoop { context, profile, seed, save_slots, local_is_host } => {
+                let expected_role = match context.protocol.as_ref().ok_or(BrowserWebErrorV2::Invalid)?.role {
+                    er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
+                    er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
+                };
+                if context.role != expected_role { return Err(BrowserWebErrorV2::Invalid); }
+                let mut session = CurrentGameSession::natural_start_with_scheduler(profile, seed, context.local_seat,
+                    save_slots, local_is_host, self.content.clone(), context.scheduler, context.protocol)?;
+                session.enable_current_coop_setup()?;
+                session
+            }
             BrowserSessionInitializationV2::NaturalStart {
                 context,
                 profile,

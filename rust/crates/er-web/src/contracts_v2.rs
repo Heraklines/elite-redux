@@ -33,6 +33,13 @@ pub struct BrowserSessionContextV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserSessionInitializationV2 {
+    NaturalCoop {
+        context: BrowserSessionContextV2,
+        profile: ProfileStateV1,
+        seed: String,
+        save_slots: Vec<String>,
+        local_is_host: bool,
+    },
     NaturalStart {
         context: BrowserSessionContextV2,
         profile: ProfileStateV1,
@@ -103,6 +110,7 @@ pub enum BrowserStorageResultV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserRequestV2 {
+    RetryCoopSetup,
     Initialize {
         initialization: Box<BrowserSessionInitializationV2>,
     },

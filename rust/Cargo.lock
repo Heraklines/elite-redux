@@ -300,6 +300,7 @@ dependencies = [
  "er-kernel",
  "er-kernel-worker",
  "er-lab",
+ "er-protocol",
  "er-repro",
  "er-save",
  "er-state",
