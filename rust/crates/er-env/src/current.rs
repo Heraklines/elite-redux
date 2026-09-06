@@ -82,11 +82,6 @@ pub struct CurrentGameSession {
 }
 
 impl CurrentGameSession {
-    pub fn enable_current_title_storage(&mut self) -> Result<(), CurrentSessionError> {
-        self.kernel.as_mut().ok_or(CurrentSessionError::Disposed)?.enable_current_title_storage()?;
-        Ok(())
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn natural_start(
         profile: ProfileStateV1,

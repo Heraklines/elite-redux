@@ -10,7 +10,7 @@ use er_game::m9e_content_v2::{
 };
 use er_game::m9e_material_v6::{GamePlatformEffectV2, GameTelemetryEventV2};
 use er_kernel::game_kernel_v7::{
-    GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2,
+    GameKernelEffectV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2,
     KernelStorageResultV2,
 };
 use er_repro::current::{
@@ -485,10 +485,7 @@ impl BrowserKernelHostV2 {
                 seed,
                 save_slots,
                 local_is_host,
-                existing_saves,
-            } => {
-                if existing_saves && context.role != GameKernelRoleV7::Authority { return Err(BrowserWebErrorV2::Invalid); }
-                let mut session = CurrentGameSession::natural_start_with_scheduler(
+            } => CurrentGameSession::natural_start_with_scheduler(
                 profile,
                 seed,
                 context.local_seat,
@@ -497,10 +494,7 @@ impl BrowserKernelHostV2 {
                 self.content.clone(),
                 context.scheduler,
                 context.protocol,
-                )?;
-                if existing_saves { session.enable_current_title_storage()?; }
-                session
-            }
+            )?,
             BrowserSessionInitializationV2::ExistingSave { context, save } => {
                 save.validate().map_err(|_| BrowserWebErrorV2::Invalid)?;
                 if &save.content_identity != self.content.identity() {
@@ -863,7 +857,6 @@ mod transaction_tests {
                     seed: "browser-transaction".to_owned(),
                     save_slots: vec!["preview-slot".to_owned()],
                     local_is_host: true,
-                    existing_saves: false,
                 }),
             },
         )?;

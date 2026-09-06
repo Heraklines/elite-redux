@@ -49,8 +49,6 @@ pub struct StarterSelectionV1 {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
 pub enum BootstrapActionV1 {
     OpenNewGame,
-    OpenExistingSaves,
-    SelectExistingSave(String),
     SelectMode(GameModeId),
     SelectChallenge {
         id: SetupChoiceIdV1,
@@ -92,9 +90,6 @@ impl BootstrapActionV1 {
                 return Err(BootstrapActionErrorV1::DeveloperOnlyDifficulty);
             }
             Self::SelectSaveSlot(slot) if slot.is_empty() => {
-                return Err(BootstrapActionErrorV1::EmptyIdentity);
-            }
-            Self::SelectExistingSave(slot) if slot.is_empty() || slot.len() > 256 => {
                 return Err(BootstrapActionErrorV1::EmptyIdentity);
             }
             _ => {}

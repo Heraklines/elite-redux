@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use er_canonical::canonical_bytes;
-use er_state::m7_state::GameStateV5;
+use er_state::m7_state::{GameStateV5, ProfileStateV1, RunStateV3};
 use er_types::battle_ids::PokemonId;
 use er_types::{GameContentIdentity, GameControlPlanV2};
 use serde::{Deserialize, Serialize};
@@ -193,62 +193,53 @@ pub fn query_state_v1(
     query: StateQueryV1,
     maximum_bytes: usize,
 ) -> Result<StateQueryResultV1, LabQueryErrorV1> {
+    query_state_parts_v1(
+        &state.profile,
+        state.active_run.as_ref(),
+        state.active_run.as_ref().map(|run| &run.control),
+        query,
+        maximum_bytes,
+    )
+}
+
+/// Select immutable shared fields without converting a current V6 state to V5.
+/// The caller chooses the actual control for its lifecycle; this function does
+/// not reconstruct a control, run, content identity, allocator, or kernel.
+pub fn query_state_parts_v1(
+    profile: &ProfileStateV1,
+    active_run: Option<&RunStateV3>,
+    control: Option<&GameControlPlanV2>,
+    query: StateQueryV1,
+    maximum_bytes: usize,
+) -> Result<StateQueryResultV1, LabQueryErrorV1> {
     if maximum_bytes == 0 {
         return Err(LabQueryErrorV1::Invalid);
     }
     let bytes = match &query {
-        StateQueryV1::Profile => canonical_bytes(&state.profile),
-        StateQueryV1::Run => canonical_bytes(&state.active_run),
-        StateQueryV1::Party => canonical_bytes(
-            &state
-                .active_run
-                .as_ref()
-                .ok_or(LabQueryErrorV1::StatePath)?
-                .party,
-        ),
+        StateQueryV1::Profile => canonical_bytes(profile),
+        StateQueryV1::Run => canonical_bytes(&active_run),
+        StateQueryV1::Party => {
+            canonical_bytes(&active_run.ok_or(LabQueryErrorV1::StatePath)?.party)
+        }
         StateQueryV1::Pokemon(id) => {
-            let pokemon = state
-                .active_run
-                .as_ref()
+            let pokemon = active_run
                 .and_then(|run| run.party.iter().find(|pokemon| pokemon.id == *id))
                 .ok_or(LabQueryErrorV1::StatePath)?;
             canonical_bytes(pokemon)
         }
-        StateQueryV1::Battle => canonical_bytes(
-            &state
-                .active_run
-                .as_ref()
-                .ok_or(LabQueryErrorV1::StatePath)?
-                .battle,
-        ),
-        StateQueryV1::Control => canonical_bytes(
-            &state
-                .active_run
-                .as_ref()
-                .ok_or(LabQueryErrorV1::StatePath)?
-                .control,
-        ),
-        StateQueryV1::World => canonical_bytes(
-            &state
-                .active_run
-                .as_ref()
-                .ok_or(LabQueryErrorV1::StatePath)?
-                .world,
-        ),
-        StateQueryV1::Progression => canonical_bytes(
-            &state
-                .active_run
-                .as_ref()
-                .ok_or(LabQueryErrorV1::StatePath)?
-                .progression_queue,
-        ),
-        StateQueryV1::Scenario => canonical_bytes(
-            &state
-                .active_run
-                .as_ref()
-                .ok_or(LabQueryErrorV1::StatePath)?
-                .scenario,
-        ),
+        StateQueryV1::Battle => {
+            canonical_bytes(&active_run.ok_or(LabQueryErrorV1::StatePath)?.battle)
+        }
+        StateQueryV1::Control => canonical_bytes(control.ok_or(LabQueryErrorV1::StatePath)?),
+        StateQueryV1::World => {
+            canonical_bytes(&active_run.ok_or(LabQueryErrorV1::StatePath)?.world)
+        }
+        StateQueryV1::Progression => {
+            canonical_bytes(&active_run.ok_or(LabQueryErrorV1::StatePath)?.progression_queue)
+        }
+        StateQueryV1::Scenario => {
+            canonical_bytes(&active_run.ok_or(LabQueryErrorV1::StatePath)?.scenario)
+        }
     }
     .map_err(|error| LabQueryErrorV1::Canonical(error.to_string()))?;
     if bytes.len() > maximum_bytes {

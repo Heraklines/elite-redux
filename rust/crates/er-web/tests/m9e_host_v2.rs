@@ -186,7 +186,6 @@ fn natural_host() -> Result<(BrowserKernelHostV2, u64), Box<dyn Error>> {
                 seed: "browser-v2-natural".to_owned(),
                 save_slots: vec!["preview-slot".to_owned()],
                 local_is_host: true,
-                    existing_saves: false,
             }),
         },
     )
@@ -1155,8 +1154,6 @@ fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Er
             _ => None,
         })
         .ok_or("storage read request missing")?;
-    let pending_load = loader.kernel_ref().ok_or("kernel missing")?.snapshot()?;
-    let saved = GameSaveV2::decode(&first_write.bytes)?;
     send(
         &mut loader,
         load_sequence,
@@ -1170,52 +1167,6 @@ fn browser_storage_results_apply_cas_and_loaded_state() -> Result<(), Box<dyn Er
     let loaded = loader.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     assert_eq!(loaded.storage_frontiers[0].generation, safe(1));
     assert!(loaded.pending_platform.is_empty());
-    assert_eq!(loaded.pending_presentations, pending_load.pending_presentations);
-    let GameKernelLifecycleSnapshotV7::Active(loaded_state) = &loaded.lifecycle else {
-        return Err("loaded state is not active".into());
-    };
-    let GameKernelLifecycleSnapshotV7::Active(pending_state) = &pending_load.lifecycle else {
-        return Err("pending state is not active".into());
-    };
-    let mut expected_state = saved.state.clone();
-    expected_state.identities.next_platform_request_id = saved.state.identities.next_platform_request_id
-        .max(pending_state.identities.next_platform_request_id);
-    let expected_control = &mut expected_state.active_run.as_mut().ok_or("saved run absent")?.control;
-    let loaded_control = &loaded_state.active_run.as_ref().ok_or("loaded run absent")?.control;
-    let loaded_menu = loaded_control.menu.as_ref().ok_or("loaded menu absent")?.instance_id;
-    assert!(loaded_menu > expected_control.menu.as_ref().ok_or("saved menu absent")?.instance_id);
-    assert!(loaded_menu >= pending_load.next_menu_instance_id);
-    assert_eq!(loaded_control.revision, loaded.material_ledger.next_authority_revision);
-    expected_control.revision = loaded_control.revision;
-    expected_control.menu.as_mut().ok_or("saved menu absent")?.instance_id = loaded_menu;
-    let expected_context = expected_control.action_context.as_mut().ok_or("saved context absent")?;
-    expected_context.authority_revision = loaded_control.revision;
-    expected_context.menu_instance = loaded_menu;
-    assert_eq!(loaded_state, &expected_state);
-    load_sequence += 1;
-    for pending in &loaded.pending_presentations {
-        send(&mut loader, load_sequence, BrowserRequestV2::PresentationSettled {
-            event_id: pending.event_id, outcome: BrowserPresentationOutcomeV2::Settled,
-        })?;
-        load_sequence += 1;
-    }
-    let BrowserResponseV2::Effects { batch } = press(&mut loader, &mut load_sequence, PhysicalKey::Space)? else {
-        return Err("post-load raw Save returned no effects".into());
-    };
-    let next_write = batch.effects.iter().find_map(|effect| match effect {
-        BrowserEffectV2::StorageRequest { request } => Some(request),
-        _ => None,
-    }).ok_or("post-load raw Save emitted no Write")?;
-    assert_eq!(next_write.generation, Some(safe(2)));
-    assert!(next_write.request_id > read.request_id);
-    assert_eq!(GameSaveV2::decode(&next_write.bytes)?.generation, safe(2));
-    let next_pending = loader.kernel_ref().ok_or("kernel missing")?.snapshot()?;
-    assert!(next_pending.pending_presentations.iter().all(|next| loaded.pending_presentations
-        .iter().all(|previous| previous.event_id < next.event_id)));
-    send(&mut loader, load_sequence, BrowserRequestV2::StorageResult {
-        request_id: next_write.request_id, result: BrowserStorageResultV2::Written,
-    })?;
-    assert_eq!(loader.kernel_ref().ok_or("kernel missing")?.snapshot()?.storage_frontiers[0].generation, safe(2));
     Ok(())
 }
 
@@ -1591,7 +1542,6 @@ fn current_session_and_browser_match_natural_input_and_external_outcomes()
                 seed: "browser-session-parity".to_owned(),
                 save_slots: vec!["preview-slot".to_owned()],
                 local_is_host: true,
-                    existing_saves: false,
             }),
         },
     )?;

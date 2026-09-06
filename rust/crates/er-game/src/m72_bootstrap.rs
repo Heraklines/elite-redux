@@ -17,17 +17,10 @@ use thiserror::Error;
 
 pub const RUN_BOOTSTRAP_SCHEMA_VERSION_V1: u32 = 1;
 
-#[path = "current_bootstrap_storage.rs"]
-mod current_storage;
-pub use current_storage::{CurrentBootstrapStorageV1, PendingBootstrapStorageV1, BootstrapStorageKindV1};
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RunBootstrapStageV1 {
     Title,
-    ExistingSaveListing,
-    ExistingSaveSelect,
-    ExistingSaveLoading,
     ModeSelect,
     ChallengeSelect,
     StarterSelect,
@@ -83,8 +76,6 @@ pub struct RunBootstrapMachineV1 {
     pub menu_instance_high_water: MenuInstanceId,
     pub catalog: BootstrapCatalogV1,
     pub pressed_keys: BTreeSet<PhysicalKey>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_storage: Option<CurrentBootstrapStorageV1>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -161,7 +152,6 @@ impl RunBootstrapMachineV1 {
             menu_instance_high_water: first_instance,
             catalog,
             pressed_keys: BTreeSet::new(),
-            current_storage: None,
         };
         value.replace_control(owner_seat)?;
         value.validate()?;
@@ -183,23 +173,10 @@ impl RunBootstrapMachineV1 {
         {
             return Err(RunBootstrapErrorV1::Invalid);
         }
-        self.validate_starters()?;
-        self.validate_current_storage()
+        self.validate_starters()
     }
 
     pub fn raw_input(&mut self, input: RawInputEvent) -> Result<bool, RunBootstrapErrorV1> {
-        if self.current_storage.is_some() {
-            self.validate()?;
-            let mut candidate = self.clone();
-            let changed = candidate.raw_input_transaction(input)?;
-            candidate.validate()?;
-            *self = candidate;
-            return Ok(changed);
-        }
-        self.raw_input_transaction(input)
-    }
-
-    fn raw_input_transaction(&mut self, input: RawInputEvent) -> Result<bool, RunBootstrapErrorV1> {
         match input {
             RawInputEvent::KeyDown {
                 code,
@@ -273,21 +250,6 @@ impl RunBootstrapMachineV1 {
     }
 
     pub fn apply_game_action(&mut self, action: GameActionV1) -> Result<(), RunBootstrapErrorV1> {
-        if self.current_storage.is_some() {
-            self.validate()?;
-            let menu = self.control.menu.as_ref().ok_or(RunBootstrapErrorV1::IllegalAction)?;
-            if menu.selected_action() != Some(&action) && menu.cancel_action() != Some(&action) {
-                return Err(RunBootstrapErrorV1::IllegalAction);
-            }
-            let mut candidate = self.clone();
-            candidate.apply_game_action_transaction(action)?;
-            *self = candidate;
-            return Ok(());
-        }
-        self.apply_game_action_transaction(action)
-    }
-
-    fn apply_game_action_transaction(&mut self, action: GameActionV1) -> Result<(), RunBootstrapErrorV1> {
         let GameActionV1::Bootstrap { action } = action else {
             return Err(RunBootstrapErrorV1::IllegalAction);
         };
@@ -309,7 +271,6 @@ impl RunBootstrapMachineV1 {
     }
 
     fn apply_action(&mut self, action: BootstrapActionV1) -> Result<(), RunBootstrapErrorV1> {
-        if self.apply_current_storage_action(&action)? { return Ok(()); }
         match (self.stage, action) {
             (RunBootstrapStageV1::Title, BootstrapActionV1::OpenNewGame) => {
                 self.stage = RunBootstrapStageV1::ModeSelect;
@@ -321,7 +282,7 @@ impl RunBootstrapMachineV1 {
                     .iter()
                     .find(|entry| entry.mode == mode)
                     .ok_or(RunBootstrapErrorV1::IllegalAction)?;
-                if !policy.supported || (self.current_storage.is_some() && policy.cooperative) {
+                if !policy.supported {
                     return Err(RunBootstrapErrorV1::UnsupportedMode);
                 }
                 self.selections.mode = Some(mode);
@@ -514,7 +475,6 @@ impl RunBootstrapMachineV1 {
             owner,
             revision,
             instance,
-            self.current_storage.as_ref(),
         )?;
         Ok(())
     }
@@ -527,11 +487,7 @@ fn build_control(
     owner: SeatId,
     revision: SafeU53,
     instance: MenuInstanceId,
-    storage: Option<&CurrentBootstrapStorageV1>,
 ) -> Result<GameControlPlanV2, RunBootstrapErrorV1> {
-    if let Some(entries) = current_storage::control_entries(stage, storage)? {
-        return build_menu_control(stage, owner, revision, instance, entries);
-    }
     let (kind, entries, cancel) = match stage {
         RunBootstrapStageV1::Title => (
             GameControlKindV2::Title,
@@ -550,7 +506,7 @@ fn build_control(
                 .map(|mode| {
                     (
                         format!("bootstrap/mode/{}", mode.mode.get()),
-                        mode.supported && (storage.is_none() || !mode.cooperative),
+                        mode.supported,
                         BootstrapActionV1::SelectMode(mode.mode),
                     )
                 })
@@ -675,16 +631,7 @@ fn build_control(
                 revision,
             ));
         }
-        RunBootstrapStageV1::ExistingSaveListing | RunBootstrapStageV1::ExistingSaveSelect
-        | RunBootstrapStageV1::ExistingSaveLoading => return Err(RunBootstrapErrorV1::Invalid),
     };
-    build_menu_control(stage, owner, revision, instance, (kind, entries, cancel))
-}
-
-type BootstrapControlEntries = (GameControlKindV2, Vec<(String, bool, BootstrapActionV1)>, Option<BootstrapActionV1>);
-
-fn build_menu_control(stage: RunBootstrapStageV1, owner: SeatId, revision: SafeU53,
-    instance: MenuInstanceId, (kind, entries, cancel): BootstrapControlEntries) -> Result<GameControlPlanV2, RunBootstrapErrorV1> {
     let mut options = Vec::with_capacity(entries.len());
     let mut ids = Vec::with_capacity(entries.len());
     for (row, (id, enabled, action)) in entries.into_iter().enumerate() {
