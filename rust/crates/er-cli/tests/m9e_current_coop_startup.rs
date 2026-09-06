@@ -81,6 +81,7 @@ struct Endpoint {
     browser: BrowserKernelHostV2,
     browser_sequence: u64,
     host: bool,
+    observed_control: Option<GameControlPlanV2>,
 }
 impl Endpoint {
     fn new(content: Arc<PreparedGameContentV2>, worker: bool, host: bool) -> TestResult<Self> {
@@ -107,6 +108,7 @@ impl Endpoint {
             browser: BrowserKernelHostV2::from_content(content),
             browser_sequence: 0,
             host,
+            observed_control: None,
         };
         endpoint.browser_request(BrowserRequestV2::Initialize {
             initialization: Box::new(BrowserSessionInitializationV2::NaturalCoop {
@@ -173,10 +175,13 @@ impl Endpoint {
         Ok(snapshot)
     }
     fn control(&mut self) -> TestResult<GameControlPlanV2> {
-        let value = self
-            .cli
-            .result("session.observe", json!({"session":SESSION}))?;
-        Ok(serde_json::from_value(value["control"].clone())?)
+        if let Some(control) = &self.observed_control {
+            return Ok(control.clone());
+        }
+        let value = self.cli.result("session.observe", json!({"session":SESSION}))?;
+        let control: GameControlPlanV2 = serde_json::from_value(value["control"].clone())?;
+        self.observed_control = Some(control.clone());
+        Ok(control)
     }
     fn event(&mut self, event: CurrentExternalEvent) -> TestResult<GameKernelStepV7> {
         let (method, params, request) = match event {
@@ -201,6 +206,7 @@ impl Endpoint {
             _ => return Err("unsupported focused event".into()),
         };
         let result = self.cli.result(method, params)?;
+        self.observed_control = serde_json::from_value(result["observation"]["control"].clone())?;
         let step: GameKernelStepV7 = serde_json::from_value(result["step"].clone())?;
         let BrowserResponseV2::Effects { batch } = self.browser_request(request)? else {
             return Err("browser effect response absent".into());
@@ -289,18 +295,11 @@ impl Endpoint {
                 .iter()
                 .position(|option| option.option_id.as_str() == target)
                 .ok_or("target absent")?;
-            let down = (wanted + menu.options.len() - current) % menu.options.len();
-            let up = (current + menu.options.len() - wanted) % menu.options.len();
-            assert!(
-                self.press(if up < down {
-                    PhysicalKey::ArrowUp
-                } else {
-                    PhysicalKey::ArrowDown
-                })?
-                .is_empty()
-            );
+            // The actual bootstrap graph is a non-wrapping ordered list.
+            let key = if wanted < current { PhysicalKey::ArrowUp } else { PhysicalKey::ArrowDown };
+            assert!(self.press(key)?.is_empty());
         }
-        Err("raw target unreachable".into())
+        Err(format!("raw target {target} unreachable from {:?}", self.control()?.menu.map(|menu| menu.selected_option_id)).into())
     }
     fn choose(&mut self, content: &PreparedGameContentV2) -> TestResult<ChoicePublication> {
         let mode = content

@@ -153,11 +153,17 @@ def main(summary):
         raise RuntimeError("exact two-test inventory differs")
     summary["test_artifact"] = {"sha256": binary_hash, "bytes": binary.stat().st_size, "profile": artifact["profile"],
                                 "source_sha256": summary["source_hashes"][RUST_SOURCES[1]], "ids": TEST_IDS}
-    output = run([str(binary), "--format", "terse", "--nocapture", "--test-threads=1"], "execute",
-                 cwd=ROOT / "rust/crates/er-cli", seconds=600, bound=16384).read_text()
-    counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
-    if counts != [("2", "0", "0", "0", "0")]:
-        raise RuntimeError("exact two-test completion differs")
+    executions = []
+    for index, test_id in enumerate(TEST_IDS):
+        output = run([str(binary), "--exact", test_id, "--format", "terse", "--nocapture", "--test-threads=1"],
+                     f"execute-{index + 1}", cwd=ROOT / "rust/crates/er-cli", seconds=600, bound=16384).read_text()
+        counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
+        if counts != [("1", "0", "0", "0", "1")]:
+            raise RuntimeError("exact individual backend test completion differs")
+        executions.append(test_id)
+    if executions != TEST_IDS:
+        raise RuntimeError("both mandatory backend executions required")
+    summary["executed_test_ids"] = executions
     if (digest(worker_binary) != worker_hash or digest(cli_binary) != cli_hash or digest(binary) != binary_hash or digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
