@@ -122,7 +122,7 @@ def parse(data, maximum, *, canonical_required=True):
     return value
 
 
-def bounded_file(path, root, maximum):
+def bounded_file(path, root, maximum, *, allow_empty=False):
     path, root = Path(path), Path(root).resolve(strict=True)
     require(path.is_absolute(), "absolute contained file required")
     require(path.resolve(strict=True).is_relative_to(root), "file escapes root")
@@ -131,7 +131,8 @@ def bounded_file(path, root, maximum):
         if component == root:
             break
     before = path.stat()
-    require(stat.S_ISREG(before.st_mode) and 0 < before.st_size <= maximum, "regular file byte bound")
+    require(stat.S_ISREG(before.st_mode) and (0 if allow_empty else 1) <= before.st_size <= maximum,
+            "regular file byte bound: " + path.relative_to(root).as_posix())
     with path.open("rb") as stream:
         data = stream.read(maximum + 1)
     after = path.stat()
@@ -492,7 +493,10 @@ def install_provider(work, log_directory):
     require(completed.returncode == 0, "pinned wheel install failed")
     for name, data in members.items():
         if name.startswith("blake3/"):
-            require(bounded_file(target / name, target, 16 << 20) == data, "installed provider differs from verified wheel")
+            # Wheels may contain empty package markers (for example py.typed).
+            # Only the exact hash-pinned, RECORD-verified member permits emptiness.
+            require(bounded_file(target / name, target, 16 << 20, allow_empty=not data) == data,
+                    "installed provider differs from verified wheel")
     require(not any(name == "blake3" or name.startswith("blake3.") for name in sys.modules), "late preloaded BLAKE3 ambiguity")
     previous = list(sys.path)
     try:
