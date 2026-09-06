@@ -149,10 +149,17 @@ impl CurrentDispatcher {
         self.reserve_id(&request.session)?;
         let (owner_seat, role) = match &request.start {
             CurrentStart::Natural { owner_seat, .. } => (*owner_seat, GameKernelRoleV7::Authority),
-            CurrentStart::NaturalCoop { owner_seat, protocol, .. } => (*owner_seat, match protocol.role {
-                er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
-                er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
-            }),
+            CurrentStart::NaturalCoop {
+                owner_seat,
+                protocol,
+                ..
+            } => (
+                *owner_seat,
+                match protocol.role {
+                    er_protocol::EndpointRole::Authority => GameKernelRoleV7::Authority,
+                    er_protocol::EndpointRole::Replica => GameKernelRoleV7::Replica,
+                },
+            ),
             CurrentStart::Snapshot {
                 owner_seat, role, ..
             } => (*owner_seat, *role),
@@ -291,9 +298,24 @@ impl CurrentStart {
         content: Arc<PreparedGameContentV2>,
     ) -> Result<CurrentGameSession, AgentDispatchErrorV1> {
         match self {
-            CurrentStart::NaturalCoop { profile, seed, owner_seat, save_slots, local_is_host, protocol } => {
-                let mut session = CurrentGameSession::natural_start(*profile, seed, owner_seat, save_slots,
-                    local_is_host, content, Some(*protocol)).map_err(backend)?;
+            CurrentStart::NaturalCoop {
+                profile,
+                seed,
+                owner_seat,
+                save_slots,
+                local_is_host,
+                protocol,
+            } => {
+                let mut session = CurrentGameSession::natural_start(
+                    *profile,
+                    seed,
+                    owner_seat,
+                    save_slots,
+                    local_is_host,
+                    content,
+                    Some(*protocol),
+                )
+                .map_err(backend)?;
                 session.enable_current_coop_setup().map_err(backend)?;
                 Ok(session)
             }

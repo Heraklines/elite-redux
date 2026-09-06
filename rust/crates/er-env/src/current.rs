@@ -84,7 +84,10 @@ pub struct CurrentGameSession {
 
 impl CurrentGameSession {
     pub fn enable_current_coop_setup(&mut self) -> Result<(), CurrentSessionError> {
-        self.kernel.as_mut().ok_or(CurrentSessionError::Disposed)?.enable_current_coop_setup()?;
+        self.kernel
+            .as_mut()
+            .ok_or(CurrentSessionError::Disposed)?
+            .enable_current_coop_setup()?;
         Ok(())
     }
     pub fn enable_current_title_storage(&mut self) -> Result<(), CurrentSessionError> {
