@@ -634,14 +634,14 @@ def validate_lane(proof, repository, partition):
             or plan.get("required_native_test_ids", {}).get(":".join(TARGET)) != [TEST_ID]
             or proof.get("required_native_target_counts", {}).get(":".join(TARGET)) != 1
             or list(TARGET) not in partition(inventory)["a"]
-            or list(TARGET) in partition(inventory)["b"]):
+            or any(list(TARGET) in targets for lane, targets in partition(inventory).items() if lane != "a")):
         fail("cost global inventory, exact ID, count or A ownership")
     binding = plan.get("current_cost_source_binding")
     if build_source_binding(repository, proof["identity"]["product_sha"]) != binding:
         fail("cost selected source binding differs from candidate")
-    if proof["lane"] == "b":
+    if proof["lane"] in {"b", "c"}:
         if "current_cost_probe" in proof or list(TARGET) in proof["completed_targets"]:
-            fail("lane B cannot claim release cost execution")
+            fail("non-A lane cannot claim release cost execution")
         return
     if (proof["lane"] != "a" or proof["completed_targets"].count(list(TARGET)) != 1
             or proof["assigned_targets"].count(list(TARGET)) != 1
