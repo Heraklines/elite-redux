@@ -402,7 +402,11 @@ impl Endpoint {
             replay_current_capsule_v1(&capsule, content()?, CurrentReproLimitsV1::default())?;
         assert_eq!(replay.snapshot()?, self.checkpoint()?);
         assert_eq!(replay.observe()?, self.session.observe()?);
-        phase(if self.host { "H captured" } else { "G captured" })?;
+        phase(if self.host {
+            "H captured"
+        } else {
+            "G captured"
+        })?;
         Ok(capsule)
     }
     fn restore_same(&mut self) -> TestResult {
