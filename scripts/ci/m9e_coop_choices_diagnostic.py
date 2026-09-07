@@ -18,7 +18,7 @@ os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
 RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs",
                 "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
-                "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs"]
+                "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs"]
 TEST_TARGET = "m9e_coop_choices_v7"
 TEST_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_preserve_host",
             "constructed_cooperative_victory_preserves_each_seat_on_next_wave",
