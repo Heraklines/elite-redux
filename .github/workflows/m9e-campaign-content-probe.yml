@@ -32,7 +32,7 @@ jobs:
           digest = hashlib.sha256(raw).hexdigest()
           assert digest == '640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4'
           bundle = json.loads(raw)
-          ids = [10, 33, 39, 43, 45, 61, 64, 78, 79, 108, 110, 175, 314, 331, 580]
+          ids = [165]
           moves = [row for row in bundle['battle']['moves'] if row and row['id'] in ids]
           assert len(moves) == len(ids)
           selected_species = {13, 16, 19, 21, 60, 88}
