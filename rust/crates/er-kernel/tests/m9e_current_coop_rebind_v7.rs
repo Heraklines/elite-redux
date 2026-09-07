@@ -808,9 +808,20 @@ fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_paus
     )?;
     // Use the public scheduler to create the unrelated owner's actual pause.
     // Preserve every existing timer/allocator and restore through normal validation.
-    initial.scheduler.pauses.extend(scheduler.export_restorable_state().pauses.into_iter().map(|pause| TimeClassPauseSnapshotV2 {
-        endpoint: pause.endpoint, time_class: pause.time_class, reasons: pause.reasons,
-    }));
+    initial
+        .scheduler
+        .pauses
+        .extend(
+            scheduler
+                .export_restorable_state()
+                .pauses
+                .into_iter()
+                .map(|pause| TimeClassPauseSnapshotV2 {
+                    endpoint: pause.endpoint,
+                    time_class: pause.time_class,
+                    reasons: pause.reasons,
+                }),
+        );
     let mut host = GameKernelV7::from_snapshot(
         initial,
         SeatId::new(safe(1)),
