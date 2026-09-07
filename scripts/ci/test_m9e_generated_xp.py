@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import m9e_feedback as feedback
 import m9e_generated_xp as generated
+from m9e_current_proposal import merge_targets
 
 
 class GeneratedXpTests(unittest.TestCase):
@@ -48,7 +49,7 @@ class GeneratedXpTests(unittest.TestCase):
 
     def native(self):
         plan = self.plan()
-        generated.apply_plan(self.config, plan, self.root, self.capture, feedback.merge_targets)
+        generated.apply_plan(self.config, plan, self.root, self.capture, merge_targets)
         identity = {"files": {"content": generated.FILES[generated.MANIFEST]["sha256"]},
                     "generated_fixture_inputs": generated.bind(self.root, self.capture)}
         inventory = [{"crate": key.split(":")[0], "target": key.split(":")[1],
@@ -161,9 +162,9 @@ class GeneratedXpTests(unittest.TestCase):
         plan = self.plan()
         original = copy.deepcopy(plan)
         with self.small_files():
-            generated.apply_plan({}, plan, self.root, self.capture, feedback.merge_targets)
+            generated.apply_plan({}, plan, self.root, self.capture, merge_targets)
             self.assertEqual(plan, original)
-            generated.apply_plan(self.config, plan, self.root, self.capture, feedback.merge_targets)
+            generated.apply_plan(self.config, plan, self.root, self.capture, merge_targets)
             self.assertTrue(plan["requires_generated_xp_fixtures"])
             self.assertEqual(plan["required_native_targets"]["er-game"], ["existing"])
             self.assertEqual(plan["required_native_test_ids"]["er-game:existing"], ["old_witness"])
