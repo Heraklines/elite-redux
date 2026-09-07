@@ -795,9 +795,10 @@ fn execute_battle(
         }
         slot.occupant = Some(replacement);
         faint.replacement = er_types::battle_model::ReplacementProgress::Applied;
+        let next_owner = next_battle_control_owner(&candidate)?;
         install_battle_command_control(
             &mut candidate,
-            owner,
+            next_owner,
             action_context.authority_seat,
             safe_increment(action_context.authority_revision)?,
             action_context.menu_instance,
@@ -848,9 +849,10 @@ fn execute_battle(
                 .outcome = RunOutcome::Defeat;
         }
         BattleOutcome::Ongoing => {
+            let owner = next_battle_control_owner(&candidate)?;
             install_battle_command_control(
                 &mut candidate,
-                action_context.authority_seat,
+                owner,
                 action_context.authority_seat,
                 safe_increment(action_context.authority_revision)?,
                 action_context.menu_instance,
@@ -2215,6 +2217,31 @@ fn queue_current_player_faints(
             .ok_or(GameRuntimeV6Error::Invalid)?;
     }
     Ok(())
+}
+
+fn next_battle_control_owner(state: &GameStateV6) -> Result<er_types::SeatId, GameRuntimeV6Error> {
+    let run = state.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let battle = run.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    if let Some(faint) = battle.faint_queue.iter().find(|faint| {
+        faint.slot.side == er_types::battle_ids::BattleSide::Player
+            && faint.replacement == er_types::battle_model::ReplacementProgress::Pending
+    }) {
+        return faint.owner_seat.ok_or(GameRuntimeV6Error::Action);
+    }
+    battle
+        .field
+        .slots
+        .iter()
+        .filter(|slot| slot.slot.side == er_types::battle_ids::BattleSide::Player)
+        .find_map(|slot| {
+            run.party
+                .iter()
+                .find(|pokemon| {
+                    Some(pokemon.id) == slot.occupant && !pokemon.fainted && pokemon.hp > 0
+                })
+                .and_then(|pokemon| pokemon.owner_seat)
+        })
+        .ok_or(GameRuntimeV6Error::Action)
 }
 
 fn install_battle_replacement_control(
