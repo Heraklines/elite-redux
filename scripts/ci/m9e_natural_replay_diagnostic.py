@@ -107,7 +107,7 @@ def main(summary):
     summary["test_artifact"] = {"sha256": binary_hash, "bytes": binary.stat().st_size, "profile": artifact["profile"],
                                 "source_sha256": summary["source_hashes"][RUST_SOURCES[1]], "ids": TEST_IDS}
     output = run([str(binary), "--format", "terse", "--nocapture", "--test-threads=1"], "execute",
-                 cwd=ROOT / "rust/crates/er-repro", seconds=1200, bound=16384).read_text()
+                 cwd=ROOT / "rust/crates/er-repro", seconds=900, bound=16384).read_text()
     counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
     if counts != [("1", "0", "0", "0", "0")]:
         raise RuntimeError("exact one-test completion differs")
