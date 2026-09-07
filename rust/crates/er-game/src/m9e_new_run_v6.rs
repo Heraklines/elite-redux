@@ -432,6 +432,24 @@ pub fn advance_to_next_encounter_v6(
         .validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     let mut next = state.clone();
+    // Default between-wave rest follows the global ten-wave checkpoint cadence.
+    // Heal the persistent party before selecting the next player field occupant.
+    if let Some(run) = next.active_run.as_mut() {
+        if run.wave.get().get() % 10 == 0 {
+            for pokemon in &mut run.party {
+                pokemon.hp = pokemon.max_hp;
+                pokemon.fainted = false;
+                pokemon.status = StatusState {
+                    kind: StatusKind::None,
+                    toxic_turn_count: 0,
+                    sleep_turns_remaining: None,
+                };
+                for slot in pokemon.moves.iter_mut().flatten() {
+                    slot.pp_used = 0;
+                }
+            }
+        }
+    }
     let (previous, next_wave_value, biome_id, mode_id, run_rng, run_seed, player_id) = {
         let run = next.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
         let previous = run.battle.clone().ok_or(NaturalRunV6Error::Invalid)?;
