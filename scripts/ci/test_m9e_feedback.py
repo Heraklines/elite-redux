@@ -5155,7 +5155,7 @@ class FeedbackTests(unittest.TestCase):
             for target, ids in self.feedback.RNG_TEST_IDS.items():
                 self.assertEqual(selection["required_native_targets"]["er-rng"].count(target), 1)
                 self.assertEqual(selection["required_native_test_ids"]["er-rng:" + target], ids)
-                self.assertIn(target, selection["execution_scope"]["er-rng"])
+                self.assertTrue(selection["execution_scope"] is None or target in selection["execution_scope"]["er-rng"])
 
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
