@@ -211,9 +211,20 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
     let snapshot = kernel.snapshot()?;
     let before = kernel.state().ok_or("current state absent")?.clone();
     let old_run = before.active_run.as_ref().ok_or("run absent")?;
-    let task = old_run.progression_queue.tasks.first().ok_or("earned experience task absent")?;
-    assert!(matches!(task.kind, er_state::m7_state::ProgressionTaskKindV2::GrantExperience(_)));
-    let old_pokemon = old_run.party.iter().find(|pokemon| pokemon.id == task.pokemon).ok_or("recipient absent")?;
+    let task = old_run
+        .progression_queue
+        .tasks
+        .first()
+        .ok_or("earned experience task absent")?;
+    assert!(matches!(
+        task.kind,
+        er_state::m7_state::ProgressionTaskKindV2::GrantExperience(_)
+    ));
+    let old_pokemon = old_run
+        .party
+        .iter()
+        .find(|pokemon| pokemon.id == task.pokemon)
+        .ok_or("recipient absent")?;
     assert!(!old_pokemon.fainted);
     let mut restored = GameKernelV7::from_snapshot(
         snapshot,
@@ -226,27 +237,57 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
         press(&mut restored, PhysicalKey::Space)?
     );
     let after = kernel.state().ok_or("state after experience absent")?;
-    let new_run = after.active_run.as_ref().ok_or("run after experience absent")?;
-    let pokemon = new_run.party.iter().find(|pokemon| pokemon.id == task.pokemon).ok_or("recipient lost")?;
-    assert!(pokemon.level > old_pokemon.level, "natural task did not increase level");
-    assert_ne!(pokemon.stats, old_pokemon.stats, "level gain left persistent battle stats stale");
+    let new_run = after
+        .active_run
+        .as_ref()
+        .ok_or("run after experience absent")?;
+    let pokemon = new_run
+        .party
+        .iter()
+        .find(|pokemon| pokemon.id == task.pokemon)
+        .ok_or("recipient lost")?;
+    assert!(
+        pokemon.level > old_pokemon.level,
+        "natural task did not increase level"
+    );
+    assert_ne!(
+        pokemon.stats, old_pokemon.stats,
+        "level gain left persistent battle stats stale"
+    );
     let species = content.battle.species(pokemon.species_id)?;
-    let form = content.battle.form(&er_types::FormId::parse(format!("{}:{}", pokemon.species_id.get().get(), pokemon.form_index))?)?;
+    let form = content.battle.form(&er_types::FormId::parse(format!(
+        "{}:{}",
+        pokemon.species_id.get().get(),
+        pokemon.form_index
+    ))?)?;
     let base = form.stat_override.unwrap_or(species.base_stats);
-    let expected_hp = (2 * base.hp + u32::from(pokemon.ivs[0].get()) + pokemon.permanent_bonuses.hp)
-        * u32::from(pokemon.level)
-        / 100
-        + u32::from(pokemon.level)
-        + 10;
+    let expected_hp =
+        (2 * base.hp + u32::from(pokemon.ivs[0].get()) + pokemon.permanent_bonuses.hp)
+            * u32::from(pokemon.level)
+            / 100
+            + u32::from(pokemon.level)
+            + 10;
     assert_eq!(pokemon.stats.hp, expected_hp);
     assert_eq!(pokemon.max_hp, expected_hp);
-    assert_eq!(pokemon.hp, old_pokemon.hp + expected_hp - old_pokemon.max_hp);
-    assert_eq!(pokemon.max_hp - pokemon.hp, old_pokemon.max_hp - old_pokemon.hp);
+    assert_eq!(
+        pokemon.hp,
+        old_pokemon.hp + expected_hp - old_pokemon.max_hp
+    );
+    assert_eq!(
+        pokemon.max_hp - pokemon.hp,
+        old_pokemon.max_hp - old_pokemon.hp
+    );
     for (old, new) in [
         (old_pokemon.stats.attack, pokemon.stats.attack),
         (old_pokemon.stats.defense, pokemon.stats.defense),
-        (old_pokemon.stats.special_attack, pokemon.stats.special_attack),
-        (old_pokemon.stats.special_defense, pokemon.stats.special_defense),
+        (
+            old_pokemon.stats.special_attack,
+            pokemon.stats.special_attack,
+        ),
+        (
+            old_pokemon.stats.special_defense,
+            pokemon.stats.special_defense,
+        ),
         (old_pokemon.stats.speed, pokemon.stats.speed),
     ] {
         assert!(new >= old, "level gain reduced a persistent stat");
@@ -255,10 +296,24 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
     assert_eq!(new_run.run_rng, old_run.run_rng);
     assert_eq!(
         new_run.battle.as_ref().ok_or("battle absent")?.battle_rng,
-        old_run.battle.as_ref().ok_or("old battle absent")?.battle_rng
+        old_run
+            .battle
+            .as_ref()
+            .ok_or("old battle absent")?
+            .battle_rng
     );
-    for unchanged in old_run.party.iter().filter(|pokemon| pokemon.id != task.pokemon) {
-        assert_eq!(new_run.party.iter().find(|pokemon| pokemon.id == unchanged.id), Some(unchanged));
+    for unchanged in old_run
+        .party
+        .iter()
+        .filter(|pokemon| pokemon.id != task.pokemon)
+    {
+        assert_eq!(
+            new_run
+                .party
+                .iter()
+                .find(|pokemon| pokemon.id == unchanged.id),
+            Some(unchanged)
+        );
     }
     assert_eq!(kernel.snapshot()?, restored.snapshot()?);
     kernel.snapshot()?.validate(&content)?;
