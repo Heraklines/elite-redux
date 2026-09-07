@@ -1282,3 +1282,62 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
 -> Result<(), Box<dyn Error>> {
     run_natural_cooperative_battles(true)
 }
+
+#[test]
+fn natural_cooperative_switches_use_each_seats_complete_party_without_cross_owner_choices()
+-> Result<(), Box<dyn Error>> {
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
+    let generation = ConnectionGeneration::new(safe(1));
+    let mut host = owned_title(content.clone(), true)?;
+    let mut guest = owned_title(content.clone(), false)?;
+    let (_, frames) = choose_combat_party(&mut guest, &content, false)?;
+    let (_, waiting) = choose_combat_party(&mut host, &content, true)?;
+    assert!(waiting.is_empty());
+    let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
+    guest.ingest_network_frame(generation, &started)?;
+    let initial = host.state().ok_or("run missing")?.clone();
+    let run = initial.active_run.as_ref().ok_or("active run missing")?;
+    assert!(run.party.len() > 6, "regression requires a combined party beyond one seat's index range");
+    let mut selected = Vec::new();
+    for seat in [SeatId::new(safe(1)), SeatId::new(safe(2))] {
+        for kernel in [&mut host, &mut guest] {
+            for pending in kernel.snapshot()?.pending_presentations {
+                kernel.settle_presentation(pending.event_id)?;
+            }
+        }
+        let state = host.state().ok_or("state missing")?;
+        let run = state.active_run.as_ref().ok_or("run missing")?;
+        let battle = run.battle.as_ref().ok_or("battle missing")?;
+        let own_party = run.party.iter().filter(|pokemon| pokemon.owner_seat == Some(seat)).collect::<Vec<_>>();
+        let actor = own_party.iter().find(|pokemon| battle.field.slots.iter().any(|slot| slot.occupant == Some(pokemon.id))).ok_or("active owner actor missing")?.id;
+        let expected = own_party.iter().enumerate().filter(|(_, pokemon)| !pokemon.fainted && pokemon.hp > 0 && !battle.field.slots.iter().any(|slot| slot.occupant == Some(pokemon.id))).map(|(index, pokemon)| (index, pokemon.id)).collect::<Vec<_>>();
+        let &(index, target) = expected.last().ok_or("owned reserve missing")?;
+        selected.push((seat, target));
+        let is_host = seat.get().get() == 1;
+        let kernel = if is_host { &mut host } else { &mut guest };
+        assert_eq!(kernel.current_control().ok_or("control missing")?.owner_seat, Some(seat));
+        navigate(kernel, "battle/command/party")?;
+        play_press(kernel)?;
+        let menu = kernel.current_control().and_then(|control| control.menu.as_ref()).ok_or("switch menu missing")?;
+        let actual = menu.options.iter().filter_map(|option| match option.action {
+            er_types::GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectSwitch { actor: offered, party_slot } } => {
+                assert_eq!(offered, actor);
+                Some(usize::from(party_slot.get()))
+            }
+            _ => None,
+        }).collect::<Vec<_>>();
+        assert_eq!(actual, expected.iter().map(|(index, _)| *index).collect::<Vec<_>>(), "switch menu must list exactly the owning seat's living reserves");
+        navigate(kernel, &format!("battle/switch/{index}"))?;
+        let step = play_press(kernel)?;
+        deliver_play_step(&mut host, &mut guest, step, is_host, false)?;
+    }
+    let run = host.state().and_then(|state| state.active_run.as_ref()).ok_or("final run missing")?;
+    let battle = run.battle.as_ref().ok_or("final battle missing")?;
+    for (owner, id) in selected {
+        assert!(run.party.iter().any(|pokemon| pokemon.id == id && pokemon.owner_seat == Some(owner)));
+        assert!(battle.field.slots.iter().any(|slot| slot.occupant == Some(id)), "submitted local slot must switch the exact owning reserve");
+    }
+    assert_eq!(host.state(), guest.state());
+    Ok(())
+}

@@ -25,6 +25,7 @@ TEST_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_prese
             "invalid_peer_choices_preserve_entire_state_rng_and_allocator",
             "natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect",
             "natural_cooperative_fixed_party_replaces_guest_and_converges_to_defeat",
+            "natural_cooperative_switches_use_each_seats_complete_party_without_cross_owner_choices",
             "natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution",
             "owned_startup_rejects_forged_frames_and_snapshots_atomically"]
 sequence = 0
@@ -138,7 +139,7 @@ def main(summary):
     if (digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
-    summary["tests"] = {"executed": 7, "passed": 7, "failed": 0, "skipped": 0}
+    summary["tests"] = {"executed": 8, "passed": 8, "failed": 0, "skipped": 0}
     summary["compatibility_tests"] = {"executed": 19, "passed": 19, "failed": 0, "skipped": 0}
 
 
