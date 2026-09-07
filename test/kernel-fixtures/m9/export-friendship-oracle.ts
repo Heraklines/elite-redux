@@ -105,14 +105,15 @@ test("export actual pinned friendship and candy method observations", async () =
     const moody = getMoodyModeState();
     const event = timedEventManager.activeEvent();
     expect(scene.gameMode.isClassic).toBe(true);
-    expect(scene.gameMode.isFun).toBe(false);
+    expect(scene.gameMode.isFun).toBeUndefined();
     expect(isFunDebugModeActive(scene.gameMode.isFun)).toBe(false);
     expect(moody).toBeNull();
     // GameWrapper disables timed events; this is an explicit harness limitation.
     expect(Reflect.get(timedEventManager, "disabled")).toBe(true);
     expect(event).toBeUndefined();
     return {
-      mode_id: scene.gameMode.modeId, classic: scene.gameMode.isClassic, fun: scene.gameMode.isFun,
+      mode_id: scene.gameMode.modeId, classic: scene.gameMode.isClassic, fun: scene.gameMode.isFun === true,
+      fun_source_type: typeof scene.gameMode.isFun,
       fun_debug: isFunDebugModeActive(scene.gameMode.isFun), moody: null,
       timed_events_disabled_by_harness: true, active_event: null,
       classic_multiplier: f64(timedEventManager.getClassicFriendshipMultiplier()),

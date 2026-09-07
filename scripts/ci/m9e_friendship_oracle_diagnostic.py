@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "22285aefe9c4588f5abbc9500801cbaececaef31646646d7f947975ecff9ce75"
 BOUNDED_HELPER_BYTES = 38615
-EXPORTER_SHA256 = "784a148e18416612ba7410f64abacd979d0dc92574cc4324ca2bc5b859508145"
+EXPORTER_SHA256 = "de9245b5fc842c432fe47a0f6db018ec10a68daba4388da8f9bd7db2a6263dc2"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -176,6 +176,10 @@ ORACLE_PINS = {
   "src/data/elite-redux/moody/moody-runtime-game-adapter.ts": [
     "d5e316a6f5ec1fbf550993f4f8552bb93253109eb762331b955fdcb150ee0b80",
     105998
+  ],
+  "src/game-mode.ts": [
+    "836ff150ce901f95b4a20b5962ee55ba7e6fff0c21e9b0e619cec3228d3d9370",
+    28647
   ]
 }
 

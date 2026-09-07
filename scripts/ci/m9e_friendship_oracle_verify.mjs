@@ -67,9 +67,10 @@ function rates(row) {
   integer(row.equivalentWave, 1, 1000000, "equivalent wave");
 }
 function context(row, index, setup) {
-  keys(row, ["mode_id", "classic", "fun", "fun_debug", "moody", "timed_events_disabled_by_harness",
+  keys(row, ["mode_id", "classic", "fun", "fun_source_type", "fun_debug", "moody", "timed_events_disabled_by_harness",
     "active_event", "classic_multiplier", "fusions_boosted", "reward_rates", "cap_registry", "sources", "held_boosters"], "context");
   integer(row.mode_id, 0, 100, "mode ID");
+  same(row.fun_source_type, "undefined", "actual optional Classic flag");
   same([row.classic, row.fun, row.fun_debug, row.moody, row.timed_events_disabled_by_harness, row.active_event,
     row.fusions_boosted], [true, false, false, null, true, null, false], "explicit admitted harness context");
   finite(f64(row.classic_multiplier, "classic multiplier"), Number.MIN_VALUE, 10000, "positive Classic scope");
