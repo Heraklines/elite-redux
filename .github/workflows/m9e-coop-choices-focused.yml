@@ -1,7 +1,7 @@
 name: M9E Confirmed Cooperative Choices Focused Diagnostic
 on:
   push:
-    branches: [codex/m9e-coop-choices-focused-20260906]
+    branches: [codex/m9e-coop-admission-compat-focused-20260907]
 permissions:
   contents: read
 concurrency:
