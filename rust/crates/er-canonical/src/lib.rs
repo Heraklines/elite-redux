@@ -2934,8 +2934,8 @@ mod value_digest_tests {
         ];
         for value in values {
             assert_eq!(
-                content_digest_value(&value).unwrap(),
-                content_digest(&value).unwrap()
+                content_digest_value(&value).expect("valid JSON"),
+                content_digest(&value).expect("valid JSON")
             );
         }
         let original = json!({"nested": {"hp": 7, "pp": [1, 2]}, "ordered": [1, 2]});
@@ -2945,8 +2945,8 @@ mod value_digest_tests {
             json!({"nested": {"hp": 7, "pp": [1, 2]}, "ordered": [2, 1]}),
         ] {
             assert_ne!(
-                content_digest_value(&original).unwrap(),
-                content_digest_value(&changed).unwrap()
+                content_digest_value(&original).expect("valid JSON"),
+                content_digest_value(&changed).expect("valid JSON")
             );
         }
     }

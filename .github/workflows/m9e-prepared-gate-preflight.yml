@@ -1,7 +1,7 @@
 name: M9E Prepared Gate Preflight
 on:
   push:
-    branches: [codex/m9e-recovery-integration-preflight-20260907]
+    branches: [codex/m9e-struggle-integration-preflight-20260907]
 permissions:
   contents: read
   actions: read
