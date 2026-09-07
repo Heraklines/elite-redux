@@ -212,39 +212,75 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
     let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = kernel.snapshot()?.lifecycle else {
         return Err("natural starter setup missing".into());
     };
-    let mut remaining = bootstrap.catalog.maximum_starter_cost;
-    let mut starters = Vec::new();
-    // Choose a strong legal party from the actual offered catalog, without
-    // replacing content, changing the seed, or injecting battle state.
-    let mut choices = bootstrap
-        .catalog
-        .starters
-        .iter()
-        .map(|starter| {
-            let species = content
-                .battle
-                .species(er_types::battle_ids::SpeciesId::new(starter.species_id))?;
-            let stats = species.base_stats;
-            let score = stats.hp
-                + stats.defense
-                + stats.special_defense
-                + stats.speed
-                + 2 * stats.attack.max(stats.special_attack);
-            Ok((score, starter))
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    choices.sort_by_key(|(score, starter)| {
-        (std::cmp::Reverse(*score), starter.cost, starter.pokemon_id)
-    });
-    for (_, starter) in choices {
-        if starter.cost <= remaining {
-            remaining -= starter.cost;
-            starters.push(starter.pokemon_id);
-            if starters.len() == 6.min(bootstrap.catalog.maximum_starters) {
-                break;
+    let budget = usize::from(bootstrap.catalog.maximum_starter_cost);
+    let capacity = 6.min(bootstrap.catalog.maximum_starters);
+    // Evaluate only the actual catalog and level-five starting moves. The
+    // previous base-stat-only choice had just five damaging PP; a party needs
+    // enough usable attacks as well as strength to reach its next checkpoint.
+    let mut choices = Vec::new();
+    for starter in &bootstrap.catalog.starters {
+        let species_id = er_types::battle_ids::SpeciesId::new(starter.species_id);
+        let species = content.battle.species(species_id)?;
+        let progression = content.progression.species(species_id, starter.form_index)
+            .ok_or("starter progression absent")?;
+        let mut moves = Vec::new();
+        for entry in &progression.level_moves {
+            if entry.level > 0 && entry.level <= 5 && !moves.contains(&entry.move_id) {
+                moves.push(entry.move_id);
+            }
+        }
+        let mut damaging_pp = 0_u64;
+        let mut best_attack = 0_u64;
+        for move_id in moves.into_iter().rev().take(4) {
+            let definition = content.battle.move_definition(move_id)?;
+            let er_types::battle_model::MovePower::Value(power) = definition.power else {
+                continue;
+            };
+            if power == 0 {
+                continue;
+            }
+            damaging_pp += u64::from(definition.base_pp);
+            let offense = match definition.category {
+                er_types::battle_model::MoveCategory::Physical => species.base_stats.attack,
+                er_types::battle_model::MoveCategory::Special => species.base_stats.special_attack,
+                er_types::battle_model::MoveCategory::Status => continue,
+            };
+            best_attack = best_attack.max(u64::from(power) * u64::from(offense));
+        }
+        if best_attack == 0 || damaging_pp == 0 {
+            continue;
+        }
+        let bulk = u64::from(species.base_stats.hp)
+            + u64::from(species.base_stats.defense)
+            + u64::from(species.base_stats.special_defense);
+        let score = best_attack * bulk * (20 + damaging_pp.min(120));
+        choices.push((score, starter));
+    }
+    choices.sort_by_key(|(_, starter)| starter.pokemon_id);
+    let mut plans = vec![vec![None; capacity + 1]; budget + 1];
+    plans[0][0] = Some((0_u64, Vec::new()));
+    for (score, starter) in choices {
+        let cost = usize::from(starter.cost);
+        if cost > budget {
+            continue;
+        }
+        for spent in (cost..=budget).rev() {
+            for count in (1..=capacity).rev() {
+                let Some((previous_score, previous_party)) = plans[spent - cost][count - 1].clone() else {
+                    continue;
+                };
+                let candidate_score = previous_score + score;
+                if plans[spent][count].as_ref().is_none_or(|(best, _)| candidate_score > *best) {
+                    let mut party = previous_party;
+                    party.push(starter.pokemon_id);
+                    plans[spent][count] = Some((candidate_score, party));
+                }
             }
         }
     }
+    let starters = plans.into_iter().flatten().flatten()
+        .max_by_key(|(score, _)| *score)
+        .ok_or("no affordable combat-ready party")?.1;
     assert!(
         !starters.is_empty(),
         "no legal offered starter fits the budget"
