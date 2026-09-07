@@ -164,6 +164,11 @@ impl CampaignRecorder {
             self.position,
         )?;
         self.segments += 1;
+        if self.segments % 64 == 0 {
+            let wave = self.session.kernel_ref()?.state().and_then(|state| state.active_run.as_ref())
+                .map(|run| run.wave.get().get()).unwrap_or(0);
+            writeln!(std::io::stdout().lock(), "M9E_REPLAY_PROGRESS events={} segments={} wave={wave}", self.position, self.segments)?;
+        }
         Ok(())
     }
 }
@@ -217,24 +222,56 @@ fn press(
     Ok(step)
 }
 
-fn navigate_down_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dyn Error>> {
-    let bound = kernel
-        .current_control()
-        .and_then(|control| control.menu.as_ref())
-        .map(|menu| menu.options.len() + 1)
-        .ok_or("current control has no menu")?;
-    for _ in 0..bound {
-        let selected = kernel
-            .current_control()
-            .and_then(|control| control.menu.as_ref())
-            .map(|menu| menu.selected_option_id.as_str() == option)
-            .unwrap_or(false);
-        if selected {
-            return Ok(());
+fn navigate_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dyn Error>> {
+    // Use only the navigation graph exposed by the actual current control.
+    // Preserve the same starter/move choices without walking the long way
+    // around the catalog or omitting any event from causal recording.
+    let route = {
+        let menu = kernel.current_control().and_then(|control| control.menu.as_ref())
+            .ok_or("current control has no menu")?;
+        let start = menu.selected_option_id.as_str();
+        let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();
+        for edge in &menu.navigation {
+            adjacent.entry(edge.from.as_str()).or_default().push(edge);
         }
-        press(kernel, PhysicalKey::ArrowDown)?;
+        let mut queue = std::collections::VecDeque::from([start]);
+        let mut seen = std::collections::BTreeSet::from([start]);
+        let mut previous = std::collections::BTreeMap::new();
+        while let Some(node) = queue.pop_front() {
+            if node == option {
+                break;
+            }
+            for edge in adjacent.get(node).into_iter().flatten() {
+                if seen.insert(edge.to.as_str()) {
+                    let key = match edge.direction {
+                        er_types::NavigationDirection::Up => PhysicalKey::ArrowUp,
+                        er_types::NavigationDirection::Down => PhysicalKey::ArrowDown,
+                        er_types::NavigationDirection::Left => PhysicalKey::ArrowLeft,
+                        er_types::NavigationDirection::Right => PhysicalKey::ArrowRight,
+                    };
+                    previous.insert(edge.to.as_str(), (node, key));
+                    queue.push_back(edge.to.as_str());
+                }
+            }
+        }
+        let mut keys = Vec::new();
+        let mut cursor = option;
+        while cursor != start {
+            let (parent, key) = previous.get(cursor).ok_or("offered option is not reachable")?;
+            keys.push(key.clone());
+            cursor = parent;
+        }
+        keys.reverse();
+        keys
+    };
+    for key in route {
+        press(kernel, key)?;
     }
-    Err(format!("option {option} was not reachable by Down").into())
+    if !kernel.current_control().and_then(|control| control.menu.as_ref())
+        .is_some_and(|menu| menu.selected_option_id == option) {
+        return Err("raw navigation did not reach its offered option".into());
+    }
+    Ok(())
 }
 
 fn submit_strongest_move(
@@ -333,7 +370,7 @@ fn submit_strongest_move(
                     .collect::<Vec<_>>()
             )
         })?;
-    navigate_down_to(kernel, target_option.as_str())?;
+    navigate_to(kernel, target_option.as_str())?;
     press(kernel, PhysicalKey::Space)
 }
 
@@ -433,10 +470,10 @@ fn natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200
         "no legal offered starter fits the budget"
     );
     for starter in starters {
-        navigate_down_to(&mut kernel, &format!("bootstrap/starter/{}", starter.get()))?;
+        navigate_to(&mut kernel, &format!("bootstrap/starter/{}", starter.get()))?;
         press(&mut kernel, PhysicalKey::Space)?;
     }
-    navigate_down_to(&mut kernel, "bootstrap/starter/confirm")?;
+    navigate_to(&mut kernel, "bootstrap/starter/confirm")?;
     for _ in 0..4 {
         press(&mut kernel, PhysicalKey::Space)?;
     }
