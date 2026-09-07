@@ -942,7 +942,7 @@ fn prepare_post_battle_progression(
                 let growth = content.progression.growth_rate(species.growth_rate)?;
                 let threshold = growth
                     .experience_by_level
-                    .get(usize::from(pokemon.level) + 1)?;
+                    .get(usize::from(pokemon.level))?;
                 let amount = threshold
                     .get()
                     .get()
@@ -2594,7 +2594,6 @@ fn grant_experience_v2(
     let level = growth
         .experience_by_level
         .partition_point(|required| required.get().get() <= experience)
-        .saturating_sub(1)
         .max(1);
     let level = u16::try_from(level).map_err(|_| GameRuntimeV6Error::Invalid)?;
     let pokemon = persistent_pokemon_mut(state, pokemon_id)?;
