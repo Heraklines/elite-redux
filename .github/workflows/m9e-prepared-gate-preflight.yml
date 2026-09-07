@@ -99,6 +99,22 @@ jobs:
           if len(peer) != 51095 or hashlib.sha256(peer).hexdigest() != 'f4341575ba92f9a3975f610790e14faaa5450d5e6ac3f931df2df70758de10de':
               raise RuntimeError('same-run B identity differs')
           summary = json.loads(raw)
+          inventory_receipt = summary['native_inventory']
+          if inventory_receipt.get('file') != 'native-inventory.json' or inventory_receipt.get('targets') != 85:
+              raise RuntimeError('retained inventory reference differs')
+          inventory_path = paths[0].parent / inventory_receipt['file']
+          if not inventory_path.is_file() or inventory_path.stat().st_size > 262144:
+              raise RuntimeError('retained inventory metadata bound')
+          inventory_raw = inventory_path.read_bytes()
+          if hashlib.sha256(inventory_raw).hexdigest() != inventory_receipt['sha256']:
+              raise RuntimeError('retained inventory hash differs')
+          inventory = json.loads(inventory_raw)
+          if (set(inventory) != {'native_inventory', 'assigned_targets', 'completed_targets'}
+              or len(inventory['native_inventory']) != inventory_receipt['targets']
+              or len(inventory['assigned_targets']) != summary['assigned_targets']['count']
+              or len(inventory['completed_targets']) != summary['completed_targets']['count']):
+              raise RuntimeError('retained inventory and assignment counts differ')
+          summary.update(inventory)
           previous = phases.unpack_native_ids(json.loads(peer))
           expected = previous['identity']
           if (summary['product_sha'] != 'cbcd4a8ba1b6e913a3fa41edcb03a634b00520f2'
