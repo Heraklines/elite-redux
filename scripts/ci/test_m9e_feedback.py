@@ -5073,6 +5073,54 @@ class FeedbackTests(unittest.TestCase):
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
         self.changed = list(policy["paths"])
 
+    def configure_ai_command_transaction_scope(self):
+        self.configure_ai_max_pp_scope()
+        self.config["current_ai_command_transaction_focus"] = copy.deepcopy(self.feedback.AI_COMMAND_POLICY)
+        (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+
+    def test_ai_command_scope_preserves_existing_identities_and_platform_obligations(self):
+        self.configure_ai_command_transaction_scope()
+        before = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        for flag in ("current_ai_command_transaction_focus", "requires_ai_command_transaction", "requires_ai_max_pp",
+                     "requires_current_proposal", "timer_focus", "requires_browser_rtc", "requires_browser_worker",
+                     "requires_browser", "requires_wasm", "requires_cli_executable", "requires_worker_executable"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.AI_COMMAND_TARGET], self.feedback.AI_COMMAND_IDS)
+        self.assertIn(self.feedback.AI_COMMAND_TARGET, selection["required_native_targets"]["er-kernel"])
+        self.assertIn(self.feedback.AI_COMMAND_TARGET, selection["execution_scope"]["er-kernel"])
+        self.assertIn("m9e_new_run_v6", selection["required_native_targets"]["er-game"])
+        for identity, ids in self.config["timer_focus"]["exact_test_ids"].items():
+            self.assertTrue(set(ids).issubset(selection["required_native_test_ids"][identity]), identity)
+        self.assertEqual(selection["timer_mutant"], self.config["timer_focus"]["mutant"])
+        self.assertEqual(selection["replica_mutant"], self.config["timer_focus"]["replica_mutant"])
+        self.assertEqual(self.config, before)
+
+    def test_ai_command_witnesses_remain_required_during_later_owner_changes(self):
+        self.configure_ai_command_transaction_scope()
+        self.changed = list(self.config["current_proposal_focus"]["paths"])
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_ai_command_transaction_focus"])
+        self.assertTrue(selection["requires_ai_command_transaction"])
+        self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.AI_COMMAND_TARGET], self.feedback.AI_COMMAND_IDS)
+        self.changed = ["docs/plans/rust-kernel/m9e-note.md"]
+        self.assertFalse(self.feedback.plan()["requires_ai_command_transaction"])
+
+    def test_ai_command_exact_inventory_rejects_missing_renamed_and_duplicate_witnesses(self):
+        self.configure_ai_command_transaction_scope()
+        exact = self.feedback.plan()["required_native_test_ids"]
+        rows = [(*identity.split(":"), ids) for identity, ids in exact.items()]
+        self.feedback.require_native_test_ids(exact, rows)
+        index = next(index for index, row in enumerate(rows) if row[:2] == ("er-kernel", self.feedback.AI_COMMAND_TARGET))
+        crate, target, ids = rows[index]
+        for name in self.feedback.AI_COMMAND_IDS:
+            for replacement in ([item for item in ids if item != name],
+                                [item if item != name else item + "_renamed" for item in ids], [*ids, name]):
+                with self.subTest(name=name, replacement=replacement):
+                    with self.assertRaisesRegex(RuntimeError, "required native test identities"):
+                        self.feedback.require_native_test_ids(exact, rows[:index] + [(crate, target, replacement)] + rows[index + 1:])
+
     def test_ai_max_pp_combined_retirement_title_read_storage_owner_keeps_all_fourteen_kernel_ids(self):
         title = self.configure_title_retirement_scope()
         actual = json.loads(HARNESS.with_name("m9e-targets.json").read_text())
