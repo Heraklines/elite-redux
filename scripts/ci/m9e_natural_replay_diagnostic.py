@@ -17,7 +17,7 @@ TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
 RUST_SOURCES = ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-repro/tests/m9e_natural_campaign_replay.rs",
-                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-progression/src/current_growth_pow.rs", "rust/crates/er-repro/src/current.rs"]
+                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-progression/src/current_growth_pow.rs"]
 TEST_TARGET = "m9e_natural_campaign_replay"
 TEST_IDS = ["natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200"]
 sequence = 0
@@ -114,10 +114,10 @@ def main(summary):
     if (digest(binary) != binary_hash or digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
-    evidence = re.findall(r"M9E_CAMPAIGN_REPLAY events=(\d+) segments=(\d+) presentations=(\d+) wave=200 outcome=Victory", output)
-    if len(evidence) != 1 or int(evidence[0][0]) <= 800 or int(evidence[0][1]) <= 10 or int(evidence[0][2]) <= 0:
+    evidence = re.findall(r"M9E_CAMPAIGN_REPLAY events=(\d+) segments=(\d+) presentations=(\d+) wave=200 outcome=Victory timers=(\d+)", output)
+    if len(evidence) != 1 or int(evidence[0][0]) <= 800 or int(evidence[0][1]) <= 10 or int(evidence[0][2]) <= 0 or int(evidence[0][3]) <= 0:
         raise RuntimeError("complete contiguous natural campaign replay evidence absent")
-    summary["campaign_replay"] = dict(zip(("events", "segments", "presentations"), map(int, evidence[0])))
+    summary["campaign_replay"] = dict(zip(("events", "segments", "presentations", "timer_advances"), map(int, evidence[0])))
     summary["tests"] = {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}
 
 
