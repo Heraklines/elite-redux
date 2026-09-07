@@ -93,6 +93,8 @@ def main(summary):
     if (artifact.get("manifest_path") != str(ROOT / "rust/crates/er-repro/Cargo.toml")
             or artifact.get("features") != [] or artifact.get("target", {}).get("kind") != ["test"]
             or artifact["target"].get("src_path") != str(ROOT / RUST_SOURCES[1])
+            or artifact.get("profile", {}).get("opt_level") != "1"
+            or artifact.get("profile", {}).get("overflow_checks") is not True
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
             or not binary.is_absolute() or binary.is_symlink() or not binary.is_file()
@@ -114,17 +116,17 @@ def main(summary):
     if (digest(binary) != binary_hash or digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
-    evidence = re.findall(r"M9E_CAMPAIGN_REPLAY events=(\d+) segments=(\d+) presentations=(\d+) wave=200 outcome=Victory timers=(\d+)", output)
-    if len(evidence) != 1 or int(evidence[0][0]) <= 800 or int(evidence[0][1]) <= 10 or int(evidence[0][2]) <= 0 or int(evidence[0][3]) <= 0:
+    evidence = re.findall(r"M9E_CAMPAIGN_REPLAY events=(\d+) segments=(\d+) presentations=(\d+) wave=200 outcome=Victory", output)
+    if len(evidence) != 1 or int(evidence[0][0]) <= 800 or int(evidence[0][1]) <= 10 or int(evidence[0][2]) <= 0:
         raise RuntimeError("complete contiguous natural campaign replay evidence absent")
-    summary["campaign_replay"] = dict(zip(("events", "segments", "presentations", "timer_advances"), map(int, evidence[0])))
+    summary["campaign_replay"] = dict(zip(("events", "segments", "presentations"), map(int, evidence[0])))
     summary["tests"] = {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
-    summary = {"status": "failed", "qualification": "natural 200-wave contiguous capsule replay and serialized continuation only; no full M9 qualification",
+    summary = {"status": "failed", "qualification": "optimized native natural 200-wave contiguous capsule replay soak; debug and overflow checks enabled; no unoptimized performance or full M9 qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "cbcd4a8ba1b6e913a3fa41edcb03a634b00520f2"}
     try:

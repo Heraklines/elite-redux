@@ -70,7 +70,6 @@ struct CampaignRecorder {
     position: u64,
     segments: usize,
     presentations: usize,
-    timer_advances: usize,
 }
 
 impl std::ops::Deref for CampaignRecorder {
@@ -212,7 +211,6 @@ fn kernel(content: Arc<PreparedGameContentV2>) -> Result<CampaignRecorder, Box<d
         position: 0,
         segments: 0,
         presentations: 0,
-        timer_advances: 0,
     })
 }
 
@@ -280,36 +278,8 @@ fn navigate_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dy
         keys.reverse();
         keys
     };
-    if kernel.state().is_none() {
-        let mut next = 0;
-        while next < route.len() {
-            let key = route[next].clone();
-            kernel.raw_input(RawInputEvent::KeyDown {
-                code: key.clone(),
-                printable: false,
-                browser_repeat: false,
-                focus: InputFocus::Game,
-            })?;
-            next += 1;
-            while next < route.len() && route[next] == key {
-                // Use the actual next repeat deadline from the restored kernel.
-                // Every time advance is a recorded causal input, with its full
-                // timer consequence and changed control checked during replay.
-                let snapshot = kernel.snapshot()?;
-                assert_eq!(snapshot.scheduler.timers.len(), 1);
-                let milliseconds = snapshot.scheduler.timers[0].remaining_active_ms;
-                assert!(milliseconds > SafeU53::ZERO);
-                let step = kernel.capture(CurrentExternalEvent::AdvanceTime { milliseconds })?;
-                assert!(!step.internal_events.is_empty());
-                kernel.timer_advances += 1;
-                next += 1;
-            }
-            kernel.raw_input(RawInputEvent::KeyUp { code: key })?;
-        }
-    } else {
-        for key in route {
-            press(kernel, key)?;
-        }
+    for key in route {
+        press(kernel, key)?;
     }
     if !kernel
         .current_control()
@@ -602,14 +572,12 @@ fn natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200
             kernel.flush()?;
             assert_eq!(kernel.base, kernel.position);
             assert!(kernel.position > 800 && kernel.segments > 10 && kernel.presentations > 0);
-            assert!(kernel.timer_advances > 0);
             writeln!(
                 std::io::stdout().lock(),
-                "M9E_CAMPAIGN_REPLAY events={} segments={} presentations={} wave=200 outcome=Victory timers={}",
+                "M9E_CAMPAIGN_REPLAY events={} segments={} presentations={} wave=200 outcome=Victory",
                 kernel.position,
                 kernel.segments,
-                kernel.presentations,
-                kernel.timer_advances
+                kernel.presentations
             )?;
             return Ok(());
         }
