@@ -5076,6 +5076,7 @@ class FeedbackTests(unittest.TestCase):
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
+        self.package("er-game")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
