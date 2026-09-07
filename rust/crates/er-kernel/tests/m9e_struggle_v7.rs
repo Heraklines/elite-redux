@@ -10,7 +10,7 @@ use er_state::m7_state::{
 };
 use er_types::battle_ids::WaveIndex;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
-use er_types::{GameControlKindV2, SafeU53, SeatId};
+use er_types::{SafeU53, SeatId};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
