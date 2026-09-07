@@ -30,6 +30,13 @@ NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "growth_pow_source": "rust/crates/er-progression/src/current_growth_pow.rs",
+    "growth_manifest": "rust/crates/er-progression/Cargo.toml",
+    "growth_test": "rust/crates/er-progression/tests/m9e_growth_levels.rs",
+    "growth_witness": "rust/crates/er-progression/tests/fixtures/m9e_growth_oracle.json",
+    "natural_campaign_test": "rust/crates/er-kernel/tests/m9e_natural_campaign_v7.rs",
+    "natural_replay_manifest": "rust/crates/er-repro/Cargo.toml",
+    "natural_replay_test": "rust/crates/er-repro/tests/m9e_natural_campaign_replay.rs",
     "struggle_test": "rust/crates/er-kernel/tests/m9e_struggle_v7.rs",
     "struggle_resolver": "rust/crates/er-battle/src/m7_resolver.rs",
     "struggle_snapshot": "rust/crates/er-kernel/src/snapshot_v7.rs",
@@ -43,6 +50,9 @@ IDENTITY_FILES = {
     "recovery_selftests": "scripts/ci/test_m9e_recovery_integration.py",
     "ai_commands_test": "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs",
     "ai_commands_selftests": "scripts/ci/test_m9e_ai_commands.py",
+    "campaign_replay_helper": "scripts/ci/m9e_campaign_replay.py",
+    "campaign_replay_producer": "scripts/ci/m9e_natural_replay_diagnostic.py",
+    "campaign_replay_selftests": "scripts/ci/test_m9e_campaign_replay.py",
     "coop_helper": "scripts/ci/m9e_coop_startup.py",
     "coop_selftests": "scripts/ci/test_m9e_coop_startup.py",
     "harness": "scripts/ci/m9e_feedback.py",
@@ -583,6 +593,8 @@ def validate_native(proof, expected_identity):
     cost.validate_lane(proof, ROOT, partition)
     import m9e_coop_startup as coop
     coop.validate_lane(proof, ROOT, partition)
+    import m9e_campaign_replay as campaign_replay
+    campaign_replay.validate_lane(proof, ROOT, partition)
 
 
 def export_native(feedback, summary):
@@ -610,6 +622,8 @@ def export_native(feedback, summary):
              "native_timer_parity_digest": summary.get("native_timer_parity_digest"), "cli": None}
     if "current_cost_probe" in summary:
         proof["current_cost_probe"] = summary["current_cost_probe"]
+    if "natural_campaign_replay" in summary:
+        proof["natural_campaign_replay"] = summary["natural_campaign_replay"]
     if "current_coop_entry" in summary:
         proof["current_coop_entry"] = summary["current_coop_entry"]
     worker = summary.get("worker_executable")
@@ -1074,6 +1088,7 @@ def platform(feedback):
 
 def aggregate(feedback):
     import m9e_coop_startup as coop
+    import m9e_campaign_replay as campaign_replay
     if any(os.environ.get(key) != "success" for key in ("M9E_NATIVE_A_RESULT", "M9E_NATIVE_B_RESULT", "M9E_NATIVE_C_RESULT", "M9E_NATIVE_D_RESULT", "M9E_PLATFORM_RESULT")):
         raise RuntimeError("required native/platform job is absent, failed, skipped or cancelled")
     directory = Path(os.environ["M9E_PHASE_DIR"])
@@ -1124,6 +1139,7 @@ def aggregate(feedback):
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native},
             **{key: third[key] for key in ("rule_worker",) if key in third},
+            **campaign_replay.aggregate_reference(native, native_hash),
             **coop.aggregate_reference(native, result, native_hash, os.environ["M9E_PLATFORM_MANIFEST_SHA256"])}
 
 
@@ -1161,7 +1177,7 @@ def compact_worker_evidence(compact, full_hash):
 
 def compact_summary(summary, full_hash, timings):
     compact = {key: summary[key] for key in (
-        "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup",
+        "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup", "natural_campaign_replay",
         "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
         "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "platform_manifest_sha256",
         "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",

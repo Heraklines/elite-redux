@@ -204,7 +204,7 @@ class CoopPolicyTests(unittest.TestCase):
         self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
         self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(coop.KERNEL_TARGET), list(phases.CONTROL_QUERY_TARGET)])
         self.assertEqual(len({tuple(pair) for targets in assignment.values() for pair in targets}), len(rows))
-        self.assertEqual(sum(len(row["ids"]) for row in rows), 10)
+        self.assertEqual(sum(len(row["ids"]) for row in rows), 11)
 
     def test_platform_rejects_foreign_assets_incomplete_journeys_and_changed_material(self):
         proof, native = self.platform_fixture()

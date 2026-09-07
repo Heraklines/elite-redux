@@ -504,23 +504,65 @@ pub fn advance_to_next_encounter_v6(
         .allocate_pokemon_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let enemy = pokemon(content, &mut rng, enemy_id, None, enemy_species, 0, level)?;
+    let format = if mode.cooperative {
+        BattleFormat::forced_coop_doubles()
+    } else {
+        BattleFormat::single()
+    };
+    let player_ids = if mode.cooperative {
+        let run = next.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+        let mut owners = BTreeMap::new();
+        for pokemon in &run.party {
+            let seat = pokemon.owner_seat.ok_or(NaturalRunV6Error::Invalid)?;
+            let living = owners.entry(seat).or_insert(None);
+            if living.is_none() && !pokemon.fainted {
+                *living = Some(pokemon.id);
+            }
+        }
+        if owners.len() != 2 {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        let authority = owners
+            .remove(&previous.authority_seat)
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        let partner = owners
+            .into_values()
+            .next()
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        vec![authority, partner]
+    } else {
+        vec![Some(player_id)]
+    };
+    let mut enemy_party = vec![enemy];
+    for _ in 1..format.enemy_capacity {
+        let species = select_encounter_species(biome, &mut rng)?;
+        let id = next
+            .identities
+            .allocate_pokemon_id()
+            .map_err(|_| NaturalRunV6Error::Exhausted)?;
+        enemy_party.push(pokemon(content, &mut rng, id, None, species, 0, level)?);
+    }
     let battle_id = next
         .identities
         .allocate_battle_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
-    let format = BattleFormat::single();
-    let player_slot =
-        FieldSlot::new(BattleSide::Player, 0).map_err(|_| NaturalRunV6Error::Invalid)?;
-    let enemy_slot =
-        FieldSlot::new(BattleSide::Enemy, 0).map_err(|_| NaturalRunV6Error::Invalid)?;
-    let field = FieldState::new_for_format(
-        &format,
-        vec![
-            FieldSlotState::new(player_slot, Some(player_id)),
-            FieldSlotState::new(enemy_slot, Some(enemy.id)),
-        ],
-    )
-    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let mut slots = Vec::new();
+    for (position, occupant) in player_ids.into_iter().enumerate() {
+        let position = u8::try_from(position).map_err(|_| NaturalRunV6Error::Invalid)?;
+        slots.push(FieldSlotState::new(
+            FieldSlot::new(BattleSide::Player, position).map_err(|_| NaturalRunV6Error::Invalid)?,
+            occupant,
+        ));
+    }
+    for (position, enemy) in enemy_party.iter().enumerate() {
+        let position = u8::try_from(position).map_err(|_| NaturalRunV6Error::Invalid)?;
+        slots.push(FieldSlotState::new(
+            FieldSlot::new(BattleSide::Enemy, position).map_err(|_| NaturalRunV6Error::Invalid)?,
+            Some(enemy.id),
+        ));
+    }
+    let field = FieldState::new_for_format(&format, slots)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     let battle_seed = format!("{run_seed}:battle:{next_wave_value}");
     let battle_rng = rng
         .initialize_battle(&battle_seed, next_wave)
@@ -544,7 +586,7 @@ pub fn advance_to_next_encounter_v6(
         turn: battle_rng.turn,
         format,
         authority_seat: previous.authority_seat,
-        enemy_party: vec![enemy],
+        enemy_party,
         field,
         weather: WeatherState {
             kind: WeatherKind::None,
@@ -670,11 +712,9 @@ fn pokemon(
         .progression
         .growth_rate(progression.growth_rate)
         .ok_or(NaturalRunV6Error::Invalid)?;
-    let experience = growth
-        .experience_by_level
-        .get(usize::from(level.saturating_sub(1)))
-        .copied()
-        .ok_or(NaturalRunV6Error::Invalid)?;
+    let experience =
+        er_progression::progression::current_growth_experience_for_level(growth, level)
+            .map_err(|_| NaturalRunV6Error::Invalid)?;
     let mut ivs = [Iv::new(0).map_err(|_| NaturalRunV6Error::Invalid)?; 6];
     for iv in &mut ivs {
         let draw = rng

@@ -347,12 +347,13 @@ fn assert_eventwise_parity_contract() -> Result<(), Box<dyn Error>> {
     // The controlled fixture now starts with fresh ledger/replay bookkeeping,
     // and private navigation retains its exact canonical/return controls. Both
     // change snapshot evidence; canonical material also uses the retained root.
-    // Earned XP now uses the correct indexed level and recalculates persistent
-    // stats. Updated from native run 34077553184 on 9ab8c0ae; Wasm must
-    // independently match this same complete eventwise report digest.
+    // Current XP tables start at level 1. Correcting both reward and level
+    // indices changes persistent XP, with the independent natural regression
+    // binding the source threshold. Native run 34091578658 on 90798ca7 binds
+    // this unchanged trace; Wasm must independently match its full report.
     assert_eq!(
         report_digest,
-        "4794ef6ec5fa95d0b5ac5c4a71f71fcb0ed275f11531ef6285b7bf4cae180e12"
+        "42da262041f8b58b7c0bf95253e5560cfd1b4c2b571b46419555df6df94278f4"
     );
     Ok(())
 }

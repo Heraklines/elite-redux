@@ -209,13 +209,56 @@ CANONICAL_IDS = ["tests::accepts_signed_safe_integers_and_rejects_signed_overflo
 STRUGGLE_TARGET = "m9e_struggle_v7"
 STRUGGLE_IDS = ["exhausted_authority_ai_struggle_commits_once_and_replays","exhausted_player_struggle_is_typeless_preserves_pp_and_replays"]
 STRUGGLE_PATHS = ["rust/crates/er-battle/src/m7_resolver.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs","rust/crates/er-kernel/tests/m9e_struggle_v7.rs"]
+GROWTH_TARGET = "m9e_growth_levels"
+GROWTH_IDS = ["current_growth_matches_pinned_javascript_for_every_u16_level", "current_growth_rejects_zero_level_unknown_rate_and_incomplete_table"]
+CAMPAIGN_TARGET = "m9e_natural_campaign_v7"
+CAMPAIGN_IDS = ["natural_current_campaign_reaches_policy_terminal_without_state_injection"]
+REPLAY_TARGET = "m9e_natural_campaign_replay"
+REPLAY_IDS = ["natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200"]
+CAMPAIGN_TARGETS = {"er-progression": GROWTH_TARGET, "er-kernel": CAMPAIGN_TARGET, "er-repro": REPLAY_TARGET}
+CAMPAIGN_TEST_IDS = {"er-progression": GROWTH_IDS, "er-kernel": CAMPAIGN_IDS, "er-repro": REPLAY_IDS}
+CAMPAIGN_PATHS = ["rust/Cargo.lock", "rust/crates/er-progression/Cargo.toml", "rust/crates/er-progression/src/current_growth_pow.rs",
+                  "rust/crates/er-progression/tests/m9e_growth_levels.rs", "rust/crates/er-progression/tests/fixtures/m9e_growth_oracle.json",
+                  "rust/crates/er-kernel/tests/m9e_natural_campaign_v7.rs", "rust/crates/er-repro/Cargo.toml",
+                  "rust/crates/er-repro/tests/m9e_natural_campaign_replay.rs"]
+RECOVERY_DEV_EDGES = {"er-progression": {"sha2": {"workspace": True}},
+                      "er-repro": {"er-battle": {"path": "../er-battle"}, "er-state": {"path": "../er-state"}}}
+
+
+def recovery_dependency_guard(before_manifests, after_manifests, before_lock, after_lock):
+    """Admit only the three reviewed test dependencies and their existing lock edges."""
+    if set(before_manifests) != set(RECOVERY_DEV_EDGES) or set(after_manifests) != set(RECOVERY_DEV_EDGES):
+        raise RuntimeError("recovery test dependency manifest inventory differs")
+    for crate, additions in RECOVERY_DEV_EDGES.items():
+        expected = tomllib.loads(before_manifests[crate])
+        dependencies = expected.setdefault("dev-dependencies", {})
+        if set(additions) & set(dependencies):
+            raise RuntimeError("recovery test dependency must be a new dev edge")
+        dependencies.update(additions)
+        if tomllib.loads(after_manifests[crate]) != expected:
+            raise RuntimeError("recovery manifest changed beyond exact test dependencies")
+    expected_lock = tomllib.loads(before_lock)
+    for crate, additions in RECOVERY_DEV_EDGES.items():
+        matches = [package for package in expected_lock.get("package", []) if package.get("name") == crate]
+        if len(matches) != 1 or set(additions) & set(matches[0].get("dependencies", [])):
+            raise RuntimeError("recovery lock requires one package without the new test edges")
+        for dependency in additions:
+            if len([package for package in expected_lock["package"] if package.get("name") == dependency]) != 1:
+                raise RuntimeError("recovery test dependency must already exist uniquely in the lock")
+        matches[0]["dependencies"] = sorted([*matches[0].get("dependencies", []), *additions])
+    if tomllib.loads(after_lock) != expected_lock:
+        raise RuntimeError("recovery lock changed beyond exact test dependency edges")
+    return {"status": "verified", "dev_dependencies": RECOVERY_DEV_EDGES,
+            "manifests": [f"rust/crates/{crate}/Cargo.toml" for crate in RECOVERY_DEV_EDGES], "lock": "rust/Cargo.lock"}
+
+
 RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
                   "rust/crates/er-kernel/tests/" + REPLACEMENT_TARGET + ".rs",
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
                   "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
                   "rust/crates/er-wasm/tests/m9e_parity.rs",
-                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS]
-RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS}
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs"]
+RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS}
 
 
 def select_recovery_scope(config, changed):
@@ -223,7 +266,7 @@ def select_recovery_scope(config, changed):
     if policy is not None and policy != RECOVERY_POLICY:
         raise RuntimeError("current recovery integration policy identities disagree")
     scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
-    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3])) and not scoped:
+    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7])) and not scoped:
         raise RuntimeError("natural replacement integration product delta is unmapped")
     return scoped, policy is not None
 
@@ -831,8 +874,15 @@ def plan():
     recovery_session, replacement_installed = select_recovery_scope(config, product_changes)
     coop_changes = [path for path in product_changes if path in coop.PRODUCT_PATHS] if recovery_session else product_changes
     coop_session, coop_installed = coop.select_scope(config, coop_changes, ROOT)
+    recovery_guard = None
+    if recovery_session:
+        before_manifests = {crate: capture(["git", "show", f"{base}:rust/crates/{crate}/Cargo.toml"]) for crate in RECOVERY_DEV_EDGES}
+        after_manifests = {crate: (RUST / f"crates/{crate}/Cargo.toml").read_text() for crate in RECOVERY_DEV_EDGES}
+        recovery_guard = recovery_dependency_guard(before_manifests, after_manifests,
+            capture(["git", "show", f"{base}:rust/Cargo.lock"]), (RUST / "Cargo.lock").read_text())
+        recovery_guard["baseline_sha"] = base
     coop_guard = None
-    if coop_session and any(path in changed for path in ("rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock")):
+    if coop_session and recovery_guard is None and any(path in changed for path in ("rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock")):
         if not all(path in changed for path in ("rust/crates/er-cli/Cargo.toml", "rust/Cargo.lock")):
             raise RuntimeError("co-op manifest and lock dependency changes must be paired")
         coop_guard = coop.dependency_guard(
@@ -1330,6 +1380,7 @@ def plan():
               "current_ai_max_pp_focus": max_pp_session,
               "current_ai_command_transaction_focus": ai_commands_session,
               "current_recovery_integration": recovery_session,
+              "current_recovery_dependency_guard": recovery_guard,
               "current_read_rebind_focus": read_session,
               "current_title_storage_focus": title_session,
               "requires_title_storage": title_required,
@@ -1459,6 +1510,15 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + STRUGGLE_TARGET: list(STRUGGLE_IDS)}
         if result["execution_scope"] is not None:
             result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [STRUGGLE_TARGET]})
+    campaign_required = replacement_installed and bool(set(CAMPAIGN_TARGETS) & selected)
+    result["requires_natural_campaign_witnesses"] = campaign_required
+    if campaign_required:
+        result["packages"] = sorted(set(result["packages"]) | set(CAMPAIGN_TARGETS))
+        for crate, target in CAMPAIGN_TARGETS.items():
+            result["required_native_targets"] = merge_targets(result["required_native_targets"], {crate: [target]})
+            result["required_native_test_ids"] = {**result["required_native_test_ids"], crate + ":" + target: list(CAMPAIGN_TEST_IDS[crate])}
+            if result["execution_scope"] is not None:
+                result["execution_scope"] = merge_targets(result["execution_scope"], {crate: [target]})
     canonical_required = replacement_installed and ("er-kernel" in selected or "er-canonical" in selected)
     result["requires_canonical_value_digest"] = canonical_required
     if canonical_required:
@@ -2426,9 +2486,11 @@ def main(preflight_failure=None):
         from m9e_phases import identity as phase_identity
         import m9e_current_cost as cost
         import m9e_coop_startup as coop
-        release_identity = phase_identity(sys.modules[__name__]) if (selection.get("requires_current_cost_probe") or selection.get("requires_current_coop_startup")) else None
+        import m9e_campaign_replay as campaign_replay
+        release_identity = phase_identity(sys.modules[__name__]) if (selection.get("requires_current_cost_probe") or selection.get("requires_current_coop_startup") or selection.get("requires_natural_campaign_witnesses")) else None
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             coop_target = (cwd.name, name) == coop.ENTRY_TARGET
+            replay_target = (cwd.name, name) == campaign_replay.TARGET
             rule_target = (cwd.name, name) == ("er-cli", RULE_TARGET)
             rule_context = contextlib.nullcontext((env, None))
             if rule_target:
@@ -2463,6 +2525,13 @@ def main(preflight_failure=None):
                             source_binding=selection["current_cost_source_binding"], discovered_ids=ids,
                             global_deadline=native_deadline)
                         code = 0
+                    elif replay_target:
+                        if (not selection.get("requires_natural_campaign_witnesses") or excluded_ids
+                                or "natural_campaign_replay" in summary):
+                            raise RuntimeError("campaign replay optimized override is outside its exact scope")
+                        summary["natural_campaign_replay"] = campaign_replay.execute(
+                            ROOT, FULL, release_identity, ids, native_deadline)
+                        code = 0
                     elif coop_target:
                         if (not selection.get("requires_current_coop_startup") or os.environ.get("M9E_PHASE") != "native"
                                 or os.environ.get("M9E_NATIVE_LANE") != "a" or excluded_ids or "current_coop_entry" in summary):
@@ -2485,7 +2554,10 @@ def main(preflight_failure=None):
                     raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
-                if coop_target:
+                if replay_target:
+                    actual = summary["natural_campaign_replay"]["tests"]
+                    passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
+                elif coop_target:
                     actual = summary["current_coop_entry"]["tests"]
                     passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
                 else:
