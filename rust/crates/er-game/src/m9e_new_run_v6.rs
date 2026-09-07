@@ -228,6 +228,7 @@ pub fn construct_natural_run_v6(
     let mut profile = bootstrap.profile.clone();
     profile.statistics.runs_started = increment(profile.statistics.runs_started)?;
     let state = GameStateV6 {
+        current_battle_participation: None,
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: content.identity().clone(),
         identities,
@@ -240,6 +241,21 @@ pub fn construct_natural_run_v6(
     Ok(state)
 }
 
+/// Focused observation-only constructor. Default construction and production ingress stay unchanged.
+pub fn construct_natural_run_v6_with_participation(
+    bootstrap: &RunBootstrapMachineV1,
+    content: &PreparedGameContentV2,
+    authority_revision: SafeU53,
+) -> Result<GameStateV6, NaturalRunV6Error> {
+    let mut state = construct_natural_run_v6(bootstrap, content, authority_revision)?;
+    let run = state.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+    state.current_battle_participation = Some(
+        er_state::current_battle_participation::CurrentBattleParticipationV1::fresh(run, safe(1)?)
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
+    );
+    state.validate_with(content).map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    Ok(state)
+}
 /// Historical fixture expansion. Current owned setup supplies both seats' choices.
 pub fn expand_cooperative_topology_v6(
     state: &mut GameStateV6,
@@ -611,6 +627,15 @@ pub fn advance_to_next_encounter_v6(
         next_faint_occurrence: FaintOccurrenceId::new(safe(1)?),
         outcome: BattleOutcome::Ongoing,
     });
+    if let Some(prior) = &state.current_battle_participation {
+        next.current_battle_participation = Some(
+            er_state::current_battle_participation::CurrentBattleParticipationV1::fresh(
+                next.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?,
+                prior.next_occurrence,
+            )
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
+        );
+    }
     if next.profile.statistics.highest_wave < next_wave {
         next.profile.statistics.highest_wave = next_wave;
     }

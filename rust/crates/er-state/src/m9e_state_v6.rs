@@ -31,6 +31,8 @@ pub struct GameStateV6 {
     pub identities: GameIdentityAllocatorStateV1,
     pub profile: ProfileStateV1,
     pub active_run: Option<RunStateV3>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_battle_participation: Option<crate::current_battle_participation::CurrentBattleParticipationV1>,
 }
 
 pub trait GameStateV6ContentContext {
@@ -164,7 +166,13 @@ impl GameStateV6 {
         };
         legacy
             .validate()
-            .map_err(|error| GameStateV6Error::Source(error.to_string()))
+            .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
+        if let Some(participation) = &self.current_battle_participation {
+            participation
+                .validate(self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?)
+                .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
+        }
+        Ok(())
     }
 
     pub fn validate_with(
@@ -217,6 +225,7 @@ impl GameStateV6 {
             identities,
             profile: source.profile,
             active_run: source.active_run,
+            current_battle_participation: None,
         };
         value.validate()?;
         Ok(value)

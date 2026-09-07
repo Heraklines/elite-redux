@@ -476,6 +476,9 @@ impl GameActionDispatcherV1 {
             });
         }
         let mut candidate = execution.candidate.ok_or(GameRuntimeV6Error::Invalid)?;
+        if candidate.active_run.is_none() {
+            candidate.current_battle_participation = None;
+        }
         let next_control = normalize_next_control(
             &mut candidate,
             safe_increment(context.action.authority_revision)?,
@@ -818,11 +821,27 @@ fn execute_battle(
     else {
         return Err(GameRuntimeV6Error::Invalid);
     };
-    let transition = resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
-        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    let (transition, observations) = if before.current_battle_participation.is_some() {
+        let (transition, observations) = er_battle::m7_resolver::resolve_turn_v5_with_current_observations(
+            &project_v5(before), commands, &content.battle, authority,
+        ).map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        (transition, Some(observations))
+    } else {
+        (resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?, None)
+    };
+    let participation = match (&before.current_battle_participation, observations) {
+        (Some(owner), Some(events)) => Some(owner.observe_turn(
+            before.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?,
+            transition.after_state.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?,
+            &events,
+        ).map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?),
+        (None, None) => None,
+        _ => return Err(GameRuntimeV6Error::Invalid),
+    };
     let outcome = transition.outcome;
     let rng_audit = transition.rng_audit;
-    let mut candidate = adopt_v5(before, transition.after_state)?;
+    let mut candidate = adopt_v5_with_participation(before, transition.after_state, participation)?;
     queue_current_player_faints(before, &mut candidate, &transition.presentation)?;
     match outcome {
         BattleOutcome::Victory => {
@@ -2567,10 +2586,19 @@ fn project_v5(state: &GameStateV6) -> GameStateV5 {
 }
 
 fn adopt_v5(before: &GameStateV6, after: GameStateV5) -> Result<GameStateV6, GameRuntimeV6Error> {
+    adopt_v5_with_participation(before, after, before.current_battle_participation.clone())
+}
+
+fn adopt_v5_with_participation(
+    before: &GameStateV6,
+    after: GameStateV5,
+    participation: Option<er_state::current_battle_participation::CurrentBattleParticipationV1>,
+) -> Result<GameStateV6, GameRuntimeV6Error> {
     after
         .validate()
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let candidate = GameStateV6 {
+        current_battle_participation: participation,
         schema_version: before.schema_version,
         content_identity: before.content_identity.clone(),
         identities: before.identities.clone(),
