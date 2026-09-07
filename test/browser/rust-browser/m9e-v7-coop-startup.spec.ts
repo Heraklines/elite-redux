@@ -315,7 +315,9 @@ for (const hostFirst of [true, false]) {
         if (second.length !== bytes.length || bytes.some((byte: number, index: number) => byte !== second[index])) {
           throw new Error("read-only exports changed the recorded input stream");
         }
-        const canonical = (value: any): string => JSON.stringify(value);
+        const canonical = (value: any): string => JSON.stringify(value, (_key, item) =>
+          item != null && typeof item === "object" && !Array.isArray(item)
+            ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
         if (canonical(await owner.snapshot()) !== canonical(before)) throw new Error("export changed the live current snapshot");
         const worker = new Worker(workerPath, { type: "module", name: "m9e-real-current-capsule-replay" });
         let sequence = 0;
@@ -327,7 +329,15 @@ for (const hostFirst of [true, false]) {
           const message = (event: MessageEvent) => {
             clean();
             try {
-              if (!(event.data instanceof ArrayBuffer) || event.data.byteLength === 0 || event.data.byteLength > 32 << 20) throw new Error("bounded replay response required");
+              if (!(event.data instanceof ArrayBuffer)) {
+                const diagnostic = event.data;
+                throw new Error("actual replay Worker rejected: " + JSON.stringify({
+                  kind: diagnostic?.kind, code: diagnostic?.code, message: String(diagnostic?.message).slice(0, 512),
+                  acceptance: diagnostic?.acceptance, request_id: diagnostic?.request_id, sequence: diagnostic?.sequence,
+                  accepted_sequence: diagnostic?.accepted_sequence,
+                }));
+              }
+              if (event.data.byteLength === 0 || event.data.byteLength > 32 << 20) throw new Error("bounded replay response required");
               const result = JSON.parse(new TextDecoder().decode(event.data));
               if (result.version !== 2 || result.request_id !== expected + 1 || result.accepted_sequence !== expected
                 || result.response.kind === "FAULT") throw new Error("replay response correlation or acceptance differs");
@@ -335,7 +345,7 @@ for (const hostFirst of [true, false]) {
             } catch (issue) { reject(issue); }
           };
           worker.addEventListener("message", message); worker.addEventListener("error", error);
-          const envelope = new TextEncoder().encode(JSON.stringify({ version: 2, request_id: expected + 1, sequence: expected, request: payload }));
+          const envelope = new TextEncoder().encode(canonical({ version: 2, request_id: expected + 1, sequence: expected, request: payload }));
           if (envelope.byteLength > 16 << 20) { clean(); reject(new Error("replay request exceeds current ingress bound")); return; }
           worker.postMessage(envelope.buffer, [envelope.buffer]);
         });
