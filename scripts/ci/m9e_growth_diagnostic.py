@@ -57,7 +57,7 @@ def main(summary):
                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-game/src/m9e_material_v6.rs",
                "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
                "rust/crates/er-game/Cargo.toml", "rust/crates/er-kernel/Cargo.toml",
-               "src/data/exp.ts", "rust/crates/er-progression/Cargo.toml", "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_growth_diagnostic.py",
+               "src/data/exp.ts", "rust/crates/er-progression/Cargo.toml", "rust/crates/er-progression/tests/fixtures/m9e_growth_oracle.json", "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_growth_diagnostic.py",
                ".github/workflows/m9e-growth-focused.yml",
                "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"]
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
@@ -134,7 +134,8 @@ console.log(JSON.stringify({ cases: rows.length, bytes: bytes.length }));
         raise RuntimeError("bounded growth witness required")
     summary["growth_oracle"]["witness_bytes"] = witness_path.stat().st_size
     summary["growth_oracle"]["witness_sha256"] = digest(witness_path)
-    os.environ["M9E_GROWTH_ORACLE"] = str(oracle_path)
+    if witness_path.read_bytes() != (ROOT / "rust/crates/er-progression/tests/fixtures/m9e_growth_oracle.json").read_bytes():
+        raise RuntimeError("frozen growth witness differs from actual pinned JavaScript")
     run(["cargo", "clippy", "--locked", "-p", "er-game", "--lib", "--no-deps", "--", "-D", "warnings"], "clippy-game")
     run(["cargo", "clippy", "--locked", "-p", "er-progression", "--test", TEST_TARGET, "--no-deps", "--", "-D", "warnings"], "clippy-test")
     build = run(["cargo", "test", "--locked", "-p", "er-progression", "--test", TEST_TARGET,

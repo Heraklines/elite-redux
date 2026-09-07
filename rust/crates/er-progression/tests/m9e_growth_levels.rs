@@ -4,38 +4,63 @@ use er_progression::GrowthRateDefinitionV1;
 use er_progression::progression::current_growth_experience_for_level;
 use er_types::SafeU53;
 use er_types::run_ids::{Experience, GrowthRateId};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OracleWitness {
+    schema: u8,
+    source_blob: String,
+    node_version: String,
+    cases: usize,
+    encoding: String,
+    curves: Vec<OracleCurve>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OracleCurve {
+    rate: u8,
+    table: Vec<u64>,
+    sha256: String,
+}
+
+// This 10 KiB witness was generated remotely from the pinned TypeScript body.
+// Its six hashes cover all 393,210 u64 results, not selected boundary examples.
+// The focused producer regenerates and byte-compares it against actual Node/V8.
 #[test]
 fn current_growth_matches_pinned_javascript_for_every_u16_level() -> Result<(), Box<dyn Error>> {
-    let path = std::env::var("M9E_GROWTH_ORACLE")?;
-    let bytes = std::fs::read(path)?;
-    assert!(bytes.len() < 16 * 1024 * 1024);
-    let rows: Vec<(u8, u16, u64)> = serde_json::from_slice(&bytes)?;
-    let per_growth = usize::from(u16::MAX);
-    assert_eq!(rows.len(), 6 * per_growth);
-    for growth_id in 0_u8..6 {
-        let begin = usize::from(growth_id) * per_growth;
-        let table = rows[begin..begin + 100]
+    let witness: OracleWitness =
+        serde_json::from_slice(include_bytes!("fixtures/m9e_growth_oracle.json"))?;
+    assert_eq!(witness.schema, 1);
+    assert_eq!(witness.source_blob, "7100a23e24cc7f5fa29742da8f95300b4fceb57a");
+    assert_eq!(witness.node_version, "v22.23.2");
+    assert_eq!(witness.cases, 6 * usize::from(u16::MAX));
+    assert_eq!(witness.encoding, "u64-big-endian");
+    assert_eq!(witness.curves.len(), 6);
+    for (rate, curve) in witness.curves.iter().enumerate() {
+        assert_eq!(usize::from(curve.rate), rate);
+        assert_eq!(curve.table.len(), 100);
+        let table = curve
+            .table
             .iter()
-            .map(|(_, _, value)| SafeU53::new(*value).map(Experience::new))
+            .map(|value| SafeU53::new(*value).map(Experience::new))
             .collect::<Result<Vec<_>, _>>()?;
         let growth = GrowthRateDefinitionV1 {
-            id: GrowthRateId::new(growth_id),
+            id: GrowthRateId::new(curve.rate),
             experience_by_level: table.clone(),
         };
-        for (index, &(actual_id, level, expected)) in
-            rows[begin..begin + per_growth].iter().enumerate()
-        {
-            assert_eq!(actual_id, growth_id);
-            assert_eq!(usize::from(level), index + 1);
-            assert_eq!(
-                current_growth_experience_for_level(&growth, level)?
-                    .get()
-                    .get(),
-                expected,
-                "pinned oracle differs at growth={growth_id}, level={level}"
-            );
+        let mut digest = Sha256::new();
+        for level in 1..=u16::MAX {
+            let value = current_growth_experience_for_level(&growth, level)?.get().get();
+            digest.update(value.to_be_bytes());
         }
+        assert_eq!(
+            format!("{:x}", digest.finalize()),
+            curve.sha256,
+            "pinned oracle differs for growth={rate}"
+        );
         assert_eq!(growth.experience_by_level, table);
     }
     Ok(())
