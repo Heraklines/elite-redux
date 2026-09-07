@@ -129,7 +129,7 @@ if __name__ == "__main__":
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "qualification": "optimized native natural 200-wave contiguous capsule replay soak; debug and overflow checks enabled; no unoptimized performance or full M9 qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "cbcd4a8ba1b6e913a3fa41edcb03a634b00520f2"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "2bfe69d0179f342583335b056dc5393055c368d3"}
     try:
         main(summary)
         if TARGET.exists():

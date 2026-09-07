@@ -104,7 +104,7 @@ impl CampaignRecorder {
         // and importing a capsule preserves input state before the key-up.
         // Starter catalogs make each bootstrap observation large. Export each
         // bootstrap event before the bounded recorder could rotate it away.
-        if self.session.kernel_ref()?.state().is_none() || self.position - self.base == 64 {
+        if self.session.kernel_ref()?.state().is_none() || self.position - self.base == 32 {
             self.flush()?;
         }
         Ok(step)

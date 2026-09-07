@@ -1,7 +1,7 @@
 name: M9E Natural Campaign Replay Focused Diagnostic
 on:
   push:
-    branches: [codex/m9e-natural-replay-focused-20260907]
+    branches: [codex/m9e-replay-window-focused-20260907]
 permissions:
   contents: read
 concurrency:
