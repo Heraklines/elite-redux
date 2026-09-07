@@ -498,7 +498,7 @@ def validate_state_query_inventory(plan, inventory):
         raise RuntimeError("current state query process inventory, binding or lane ownership disagrees")
     for target, ids in STATE_QUERY_IDENTITIES.items():
         rows = [item for item in selected if (item["crate"], item["target"]) == target]
-        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "d"
+        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "e"
         if (len(rows) != 1 or rows[0]["ids"] != ids or rows[0]["historical_excluded_ids"]
                 or plan.get("required_native_test_ids", {}).get(":".join(target)) != ids
                 or plan.get("required_native_targets", {}).get("er-cli", []).count(target[1]) != 1

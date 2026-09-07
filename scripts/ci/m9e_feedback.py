@@ -278,7 +278,16 @@ def select_recovery_scope(config, changed):
     if policy is not None and policy != RECOVERY_POLICY:
         raise RuntimeError("current recovery integration policy identities disagree")
     scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
-    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7], *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, *XP_PATHS)) and not scoped:
+    # Shared compiler metadata already belongs to the exact historical lint cut.
+    # Defer only that overlap to its existing policy/whole-scope checks below;
+    # this does not admit the cut or exempt any XP-only source.
+    legacy_damage_pair = {"rust/crates/er-battle/src/m7_resolver.rs",
+                          "rust/crates/er-game/tests/m9e_damage_query.rs"}
+    legacy_lint_review = (legacy_damage_pair.issubset(changed)
+                          or set(AI_DAMAGE_QUERY_LINT_REPAIR_PATHS).issubset(changed))
+    xp_triggers = [path for path in XP_PATHS
+                   if not (legacy_lint_review and path in AI_DAMAGE_QUERY_LINT_REPAIR_PATHS)]
+    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7], *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, *xp_triggers)) and not scoped:
         raise RuntimeError("natural replacement integration product delta is unmapped")
     return scoped, policy is not None
 
