@@ -304,6 +304,37 @@ pub fn resolve_turn_v5(
     })
 }
 
+/// Resolve the command's effective move without mutating PP or consuming RNG.
+/// An exhausted selected slot falls back only when every real move is exhausted.
+pub fn effective_move_definition_v5<'a>(
+    content: &'a PreparedBattleContentV3,
+    actor: &PokemonStateV5,
+    move_slot: MoveSlotIndex,
+) -> Result<(&'a MoveDefinitionV3, bool), BattleV5Error> {
+    let selected = move_slot_state(actor, move_slot)?;
+    let definition = content.move_definition(selected.move_id)
+        .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+    let maximum = calculate_max_pp(definition.base_pp, selected.pp_ups, selected.max_pp_override)
+        .map_err(|_| BattleV5Error::MoveSlot)?;
+    if selected.pp_used < maximum {
+        return Ok((definition, false));
+    }
+    for slot in actor.moves.iter().flatten() {
+        let candidate = content.move_definition(slot.move_id)
+            .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+        let maximum = calculate_max_pp(candidate.base_pp, slot.pp_ups, slot.max_pp_override)
+            .map_err(|_| BattleV5Error::MoveSlot)?;
+        if slot.pp_used < maximum {
+            return Err(BattleV5Error::MoveSlot);
+        }
+    }
+    let struggle = MoveId::new(SafeU53::new(165).map_err(|_| BattleV5Error::MoveSlot)?)
+        .map_err(|_| BattleV5Error::MoveSlot)?;
+    let definition = content.move_definition(struggle)
+        .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+    Ok((definition, true))
+}
+
 fn build_actions(
     run: &RunStateV3,
     commands: &CommandSet,
@@ -322,10 +353,7 @@ fn build_actions(
         let (priority, effective_speed) = match &command {
             BattleCommand::Switch { .. } => (i8::MAX, actor.stats.speed),
             BattleCommand::Fight { move_slot, .. } => {
-                let slot = move_slot_state(actor, *move_slot)?;
-                let definition = content
-                    .move_definition(slot.move_id)
-                    .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+                let (definition, _) = effective_move_definition_v5(content, actor, *move_slot)?;
                 let sources = active_sources(actor, definition.id);
                 let context = mechanics_context(actor, battle, &sources);
                 let priority = execute_query_v2(
@@ -462,29 +490,16 @@ fn execute_move(
     let actor_snapshot = pokemon(run, actor_id)
         .ok_or(BattleV5Error::InactiveActor(actor_id))?
         .clone();
-    let slot_snapshot = *move_slot_state(&actor_snapshot, move_slot)?;
-    let definition = content
-        .move_definition(slot_snapshot.move_id)
-        .map_err(|error| BattleV5Error::Content(error.to_string()))?;
-    let max_pp = calculate_max_pp(
-        definition.base_pp,
-        slot_snapshot.pp_ups,
-        slot_snapshot.max_pp_override,
-    )
-    .map_err(|_| BattleV5Error::MoveSlot)?;
-    if slot_snapshot.pp_used >= max_pp {
-        return Err(BattleV5Error::MoveSlot);
+    let (definition, struggle) = effective_move_definition_v5(content, &actor_snapshot, move_slot)?;
+    if !struggle {
+        let actor = pokemon_mut(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
+        let slot = move_slot_state_mut(actor, move_slot)?;
+        let before_pp = slot.pp_used;
+        slot.pp_used = slot.pp_used.checked_add(1).ok_or(BattleV5Error::Overflow)?;
+        mutations.push(BattleMutation::PpChanged {
+            pokemon: actor_id, move_slot, before: before_pp, after: slot.pp_used,
+        });
     }
-    let actor = pokemon_mut(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
-    let slot = move_slot_state_mut(actor, move_slot)?;
-    let before_pp = slot.pp_used;
-    slot.pp_used = slot.pp_used.checked_add(1).ok_or(BattleV5Error::Overflow)?;
-    mutations.push(BattleMutation::PpChanged {
-        pokemon: actor_id,
-        move_slot,
-        before: before_pp,
-        after: slot.pp_used,
-    });
     presentation.push(BattlePresentationCueV5::MoveUsed {
         pokemon: actor_id,
         move_id: definition.id,
@@ -554,6 +569,22 @@ fn execute_move(
     let after_move = execute_hook_v2(content, &context, MechanicHookV2::AfterMove)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
     mechanics_evidence.extend(after_move.operations);
+    if struggle && hit_any {
+        let actor = pokemon_mut(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
+        let before_hp = actor.hp;
+        let recoil = (actor.max_hp / 4).max(1);
+        actor.hp = actor.hp.saturating_sub(recoil);
+        actor.fainted = actor.hp == 0;
+        mutations.push(BattleMutation::HpChanged {
+            pokemon: actor_id, before: before_hp, after: actor.hp,
+        });
+        presentation.push(BattlePresentationCueV5::HpChanged {
+            pokemon: actor_id, before: before_hp, after: actor.hp,
+        });
+        if actor.fainted {
+            presentation.push(BattlePresentationCueV5::Fainted { pokemon: actor_id });
+        }
+    }
     Ok(if hit_any {
         ActionDisposition::Executed
     } else {
@@ -712,15 +743,7 @@ pub fn query_simulated_move_damage_v5(
         return Err(BattleV5Error::InactiveActor(actor_id));
     }
     let actor = pokemon(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
-    let slot = move_slot_state(actor, move_slot)?;
-    let definition = content
-        .move_definition(slot.move_id)
-        .map_err(|error| BattleV5Error::Content(error.to_string()))?;
-    let max_pp = calculate_max_pp(definition.base_pp, slot.pp_ups, slot.max_pp_override)
-        .map_err(|_| BattleV5Error::MoveSlot)?;
-    if slot.pp_used >= max_pp {
-        return Err(BattleV5Error::MoveSlot);
-    }
+    let (definition, _) = effective_move_definition_v5(content, actor, move_slot)?;
     let target_id = occupant(run, target_slot).ok_or(BattleV5Error::Target)?;
     let target = pokemon(run, target_id).ok_or(BattleV5Error::Target)?;
     if target.fainted {
@@ -812,15 +835,16 @@ fn calculate_damage_with_variance(
         .and_then(|value| value.checked_div(50))
         .and_then(|value| value.checked_add(2))
         .ok_or(BattleV5Error::Overflow)?;
-    if actor.types.primary == definition.move_type
-        || actor.types.secondary == Some(definition.move_type)
+    let typeless = definition.id.get().get() == 165;
+    if !typeless && (actor.types.primary == definition.move_type
+        || actor.types.secondary == Some(definition.move_type))
     {
         damage = damage
             .checked_mul(3)
             .and_then(|value| value.checked_div(2))
             .ok_or(BattleV5Error::Overflow)?;
     }
-    let effectiveness = type_effectiveness(content, definition.move_type, target);
+    let effectiveness = if typeless { (1, 1) } else { type_effectiveness(content, definition.move_type, target) };
     damage = damage
         .checked_mul(effectiveness.0)
         .and_then(|value| value.checked_div(effectiveness.1))

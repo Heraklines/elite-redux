@@ -527,7 +527,7 @@ impl GameKernelV7 {
                 .iter()
                 .find(|pokemon| pokemon.id == actor_id)
                 .ok_or(GameKernelV7Error::Invalid)?;
-            let moves = actor
+            let mut moves = actor
                 .moves
                 .iter()
                 .enumerate()
@@ -569,6 +569,20 @@ impl GameKernelV7 {
                 .into_iter()
                 .flatten()
                 .collect::<Vec<_>>();
+            if moves.is_empty() {
+                let index = actor.moves.iter().position(Option::is_some).ok_or(GameKernelV7Error::Invalid)?;
+                let index = u8::try_from(index).map_err(|_| GameKernelV7Error::Invalid)?;
+                let slot = er_types::battle_ids::MoveSlotIndex::new(index).map_err(|_| GameKernelV7Error::Invalid)?;
+                let (definition, struggle) = er_battle::m7_resolver::effective_move_definition_v5(
+                    &self.content.battle, actor, slot,
+                ).map_err(|_| GameKernelV7Error::Invalid)?;
+                if !struggle { return Err(GameKernelV7Error::Invalid); }
+                let er_types::battle_model::MovePower::Value(power) = definition.power else {
+                    return Err(GameKernelV7Error::Invalid);
+                };
+                moves.push((definition.id, index, power, definition.priority,
+                    player_targets.iter().map(|target| target.position).collect::<Vec<_>>()));
+            }
             let actor_view = AiActorViewV1 {
                 pokemon: actor.id,
                 hp: actor.hp,
@@ -620,11 +634,11 @@ impl GameKernelV7 {
                                 }
                             };
                             (
-                                type_effectiveness_percent(
+                                if move_id.get().get() == 165 { 100 } else { type_effectiveness_percent(
                                     self.content.as_ref(),
                                     definition.move_type,
                                     target,
-                                ),
+                                ) },
                                 accuracy,
                             )
                         } else {
@@ -2140,6 +2154,7 @@ impl GameKernelV7 {
                 let revision = self.active_runtime()?.next_authority_revision();
                 let mut control = move_select_control(
                     self.state().ok_or(GameKernelV7Error::Invalid)?,
+                    &self.content.battle,
                     self.local_seat,
                     instance,
                     revision,
@@ -3166,6 +3181,7 @@ fn command_root_control(
 
 fn move_select_control(
     state: &GameStateV6,
+    content: &er_content::pack::m6_prepared::PreparedBattleContentV3,
     seat: SeatId,
     instance: MenuInstanceId,
     revision: SafeU53,
@@ -3184,24 +3200,15 @@ fn move_select_control(
         seat,
     )
     .map_err(|_| GameKernelV7Error::Invalid)?;
-    let entries = pokemon
-        .moves
-        .iter()
-        .enumerate()
-        .filter_map(|(index, slot)| {
-            slot.as_ref()?;
-            let move_slot = u8::try_from(index).ok()?;
-            Some((
-                format!("battle/move/{move_slot}"),
-                GameActionV1::Battle {
-                    action: er_types::BattleUiActionV1::SelectMove {
-                        actor,
-                        move_slot: er_types::battle_ids::MoveSlotIndex::new(move_slot).ok()?,
-                    },
-                },
-            ))
-        })
-        .collect::<Vec<_>>();
+    let first_slot = pokemon.moves.iter().position(Option::is_some).ok_or(GameKernelV7Error::Invalid)?;
+    let entries = pokemon.moves.iter().enumerate().filter_map(|(index, slot)| {
+        slot.as_ref()?;
+        let move_slot = er_types::battle_ids::MoveSlotIndex::new(u8::try_from(index).ok()?).ok()?;
+        let (_, struggle) = er_battle::m7_resolver::effective_move_definition_v5(content, pokemon, move_slot).ok()?;
+        if struggle && index != first_slot { return None; }
+        Some((if struggle { "battle/move/struggle".to_owned() } else { format!("battle/move/{}", move_slot.get()) },
+            GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectMove { actor, move_slot } }))
+    }).collect::<Vec<_>>();
     generic_vertical_control_v2(
         instance,
         revision,
