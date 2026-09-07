@@ -110,18 +110,25 @@ fn submit_strongest_move(
         .ok_or("move menu is absent")?;
     let state = kernel.state().ok_or("state is absent")?;
     let run = state.active_run.as_ref().ok_or("run is absent")?;
-    let actor = run
-        .party
+    let battle = run.battle.as_ref().ok_or("battle is absent")?;
+    let source_slot = battle
+        .field
+        .slots
         .iter()
-        .find(|pokemon| {
-            run.battle.as_ref().is_some_and(|battle| {
-                battle.field.slots.iter().any(|slot| {
-                    slot.slot.side == er_types::battle_ids::BattleSide::Player
-                        && slot.occupant == Some(pokemon.id)
-                })
-            })
+        .find(|slot| {
+            slot.slot.side == er_types::battle_ids::BattleSide::Player && slot.occupant.is_some()
         })
-        .ok_or("active player is absent")?;
+        .ok_or("player field is absent")?
+        .slot;
+    let target_slot = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| {
+            slot.slot.side == er_types::battle_ids::BattleSide::Enemy && slot.occupant.is_some()
+        })
+        .ok_or("enemy field is absent")?
+        .slot;
     let target_option = menu
         .options
         .iter()
@@ -132,15 +139,17 @@ fn submit_strongest_move(
             else {
                 return None;
             };
-            let move_id = actor.moves[usize::from(move_slot.get())]?.move_id;
-            let definition = content.battle.move_definition(move_id).ok()?;
-            let power = match definition.power {
-                er_types::battle_model::MovePower::None => 0,
-                er_types::battle_model::MovePower::Value(power) => power,
-            };
-            Some((power, option.option_id.clone()))
+            let damage = er_battle::m7_resolver::query_simulated_move_damage_v5(
+                &content.battle,
+                run,
+                source_slot,
+                move_slot,
+                target_slot,
+            )
+            .ok()?;
+            Some((damage, option.option_id.clone()))
         })
-        .max_by_key(|(power, _)| *power)
+        .max_by_key(|(damage, _)| *damage)
         .map(|(_, option)| option)
         .ok_or("no move option is available")?;
     navigate_down_to(kernel, target_option.as_str())?;
@@ -206,12 +215,11 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
             .iter()
             .map(|pokemon| {
                 (
-                    pokemon.id,
-                    pokemon.species_id,
+                    pokemon.id.get().get(),
+                    pokemon.species_id.get().get(),
                     pokemon.level,
                     pokemon.hp,
-                    pokemon.stats,
-                    pokemon.moves,
+                    pokemon.moves.map(|slot| slot.map(|value| (value.move_id.get().get(), value.pp_used))),
                 )
             })
             .collect::<Vec<_>>();
@@ -224,12 +232,11 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
                     .iter()
                     .map(|pokemon| {
                         (
-                            pokemon.id,
-                            pokemon.species_id,
+                            pokemon.id.get().get(),
+                            pokemon.species_id.get().get(),
                             pokemon.level,
                             pokemon.hp,
-                            pokemon.stats,
-                            pokemon.moves,
+                            pokemon.moves.map(|slot| slot.map(|value| (value.move_id.get().get(), value.pp_used))),
                         )
                     })
                     .collect::<Vec<_>>()
