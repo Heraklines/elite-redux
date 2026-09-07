@@ -626,7 +626,10 @@ fn observed_save_snapshot_and_material_replay_preserve_ownership() -> TestResult
     else {
         return Err("conflicting material duplicate must be rejected".into());
     };
-    assert_eq!(message, GameMaterialV6Error::ConflictingDuplicate.to_string());
+    assert_eq!(
+        message,
+        GameMaterialV6Error::ConflictingDuplicate.to_string()
+    );
     assert_eq!(serde_json::to_vec(&replica.snapshot())?, accepted);
     Ok(())
 }
