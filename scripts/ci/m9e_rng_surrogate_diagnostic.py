@@ -17,9 +17,11 @@ COMPACT = REPORT / "compact"
 TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
-RUST_SOURCES = ["rust/crates/er-rng/tests/m9e_shifted_utf16.rs", "rust/crates/er-rng/src/phaser.rs", "rust/crates/er-rng/src/battle.rs"]
+RUST_SOURCES = ["rust/crates/er-rng/tests/m9e_shifted_utf16.rs", "rust/crates/er-rng/src/phaser.rs", "rust/crates/er-rng/src/battle.rs", "rust/crates/er-rng/tests/m3_rng.rs"]
 TEST_TARGET = "m9e_shifted_utf16"
 TEST_IDS = ["shifted_utf16_battle_draws_and_initialization_match_pinned_phaser", "shifted_utf16_speed_shuffle_matches_pinned_phaser_and_restores_outer_rng"]
+M3_IDS = ["audit_fingerprints_recompute_and_tampering_is_rejected","battle_cache_resumes_then_increment_turn_resows","battle_construction_uses_wave_offset_and_sixteen_closed_character_draws","battle_draw_advances_only_the_cached_substream","callsite_and_shift_failures_leave_runtime_and_audit_unchanged","callsite_identity_is_closed_and_pinned","consuming_and_nonconsuming_raw_range_paths_are_distinct","eventual_rng_vectors_are_ingested_only_after_manifest_publication","exhausted_sequence_rolls_back_an_entire_multi_draw_shuffle","frac_uses_the_corrected_0x200000_coercion_term","integer_preserves_fractional_binary64_instead_of_coercing_to_uint","integer_range_rejects_width_above_safe_u53_before_drawing","nested_scene_and_pokemon_wrappers_emit_one_logical_entry","one_sequence_is_monotonic_across_offset_and_battle_streams","pick_and_shuffle_apply_the_selected_slice_draw_rules","pick_is_one_logical_audit_and_empty_pick_is_atomic","primitive_transition_and_integer_have_exact_golden_bits","range_turn_and_offset_rejections_are_atomic","real_range_overflow_discards_its_staged_draws","sow_is_deterministic_and_uses_utf16_code_units","speed_offset_shuffle_restores_run_and_context_with_per_swap_audits","state_boundaries_reject_noncanonical_or_poisoned_forms","state_strings_and_json_preserve_full_width_bits","wrapper_fast_paths_audit_without_swapping_or_drawing"]
+LIB_IDS = ["phaser::tests::hash_uses_signed_to_int32_for_final_and_intermediate_accumulators","phaser::tests::rnd_never_mutates_the_private_seed_hash_accumulator","phaser::tests::sow_resets_the_private_hash_accumulator_before_reseeding","phaser::tests::state_setter_preserves_private_seed_hash_accumulator"]
 sequence = 0
 logs = {}
 failed_log = None
@@ -45,9 +47,10 @@ def run(args, name, *, cwd=None, seconds=900, bound=16 << 20):
     return output
 
 
-def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
-    run(["cargo", "clippy", "--locked", "-p", "er-rng", "--test", test_target, "--no-deps", "--", "-D", "warnings"], name_prefix + "clippy-test")
-    build = run(["cargo", "test", "--locked", "-p", "er-rng", "--test", test_target,
+def execute_target(summary, test_target, test_source, test_ids, name_prefix="", library=False):
+    target_args = ["--lib"] if library else ["--test", test_target]
+    run(["cargo", "clippy", "--locked", "-p", "er-rng", *target_args, "--no-deps", "--", "-D", "warnings"], name_prefix + "clippy-test")
+    build = run(["cargo", "test", "--locked", "-p", "er-rng", *target_args,
                  "--no-run", "--message-format=json"], name_prefix + "build")
     rows = [json.loads(line) for line in build.read_text().splitlines() if line.startswith("{")]
     if [row.get("success") for row in rows if row.get("reason") == "build-finished"] != [True]:
@@ -58,7 +61,7 @@ def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
     artifact = matches[0]
     binary = Path(artifact.get("executable") or "")
     if (artifact.get("manifest_path") != str(ROOT / "rust/crates/er-rng/Cargo.toml")
-            or artifact.get("features") != [] or artifact.get("target", {}).get("kind") != ["test"]
+            or artifact.get("features") != [] or artifact.get("target", {}).get("kind") != (["lib"] if library else ["test"])
             or artifact["target"].get("src_path") != str(ROOT / test_source)
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
@@ -132,6 +135,9 @@ def main(summary):
     summary["oracle"] = {"sha256": digest(oracle), "bytes": oracle.stat().st_size, "cases": 69, "node": node, "phaser_commit": commit,
                          "reference_sha256": {name: expected for name, _, expected in references}}
     summary["test_artifact"] = execute_target(summary, TEST_TARGET, RUST_SOURCES[0], TEST_IDS)
+    summary["library_artifact"] = execute_target(summary, "er_rng", "rust/crates/er-rng/src/lib.rs", LIB_IDS, "library-", library=True)
+    summary["m3_artifact"] = execute_target(summary, "m3_rng", "rust/crates/er-rng/tests/m3_rng.rs", M3_IDS, "m3-")
+    summary["compatibility_tests"] = {"executed": 28, "passed": 28, "failed": 0, "skipped": 0}
     if any(digest(ROOT / name) != expected for name, expected in summary["source_hashes"].items()) or digest(oracle) != summary["oracle"]["sha256"]:
         raise RuntimeError("source or reference changed during execution")
     summary["tests"] = {"executed": 2, "passed": 2, "failed": 0, "skipped": 0}
