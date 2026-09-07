@@ -84,7 +84,7 @@ def main(summary):
     checked = run(["cargo", "test", "--locked", "-p", "er-canonical", "--lib", "--", "--test-threads=1"],
                   "canonical-value-regressions", seconds=600, bound=262144).read_text()
     matches = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", checked)
-    if len(matches) != 1 or matches[0][:4] != ("2", "0", "0", "0"):
+    if matches != [("32", "0", "0", "0", "0")]:
         raise RuntimeError("complete canonical library including both new value regressions required")
     summary["canonical_tests"] = {"executed": 32, "passed": 32, "failed": 0, "skipped": 0}
     compiler_output = run(["rustc", "--version"], "compiler", seconds=30, bound=16384).read_text()
