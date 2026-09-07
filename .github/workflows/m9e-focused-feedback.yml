@@ -286,6 +286,93 @@ jobs:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
 
+  native_d:
+    outputs:
+      manifest_sha256: ${{ steps.native.outputs.native_manifest_sha256 }}
+      has_cli: ${{ steps.native.outputs.has_cli }}
+      proof_artifact_id: ${{ steps.native-proof.outputs.artifact-id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      M9E_NATIVE_LANE: d
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Restore dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Restore native test build
+        uses: actions/cache@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Complete native checks and evidence
+        id: native
+        env:
+          M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
+          M9E_PHASE: native
+          M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
+        run: python3 scripts/ci/m9e_feedback.py
+      # Only successful complete native checks publish these single-file payloads.
+      # Producer checks raw bytes/count before upload (64 KiB proof, 128 MiB CLI).
+      - name: Bound native proof
+        id: native-proof
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-d-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m9e-phase/proof/native-d.json
+          if-no-files-found: error
+          retention-days: 2
+      - name: Compact result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-d-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Optional bounded source formatting repair
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-format-repair-c-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-feedback/format-repair.patch
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Full remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-native-d-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/m9e-feedback/full/
+            test-results/rust-browser/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve native compilation after failed checks
+        if: failure()
+        uses: actions/cache/save@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+
   platform:
     needs: native_a
     runs-on: ubuntu-24.04
@@ -436,7 +523,7 @@ jobs:
 
   focused:
     name: Complete focused qualification
-    needs: [native_a, native_b, native_c, platform]
+    needs: [native_a, native_b, native_c, native_d, platform]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -448,6 +535,8 @@ jobs:
       M9E_NATIVE_B_MANIFEST_SHA256: ${{ needs.native_b.outputs.manifest_sha256 }}
       M9E_NATIVE_C_RESULT: ${{ needs.native_c.result }}
       M9E_NATIVE_C_MANIFEST_SHA256: ${{ needs.native_c.outputs.manifest_sha256 }}
+      M9E_NATIVE_D_RESULT: ${{ needs.native_d.result }}
+      M9E_NATIVE_D_MANIFEST_SHA256: ${{ needs.native_d.outputs.manifest_sha256 }}
       M9E_PLATFORM_RESULT: ${{ needs.platform.result }}
       M9E_NATIVE_MANIFEST_SHA256: ${{ needs.native_a.outputs.manifest_sha256 }}
       M9E_PLATFORM_MANIFEST_SHA256: ${{ needs.platform.outputs.manifest_sha256 }}
@@ -464,11 +553,13 @@ jobs:
           M9E_NATIVE_A_ID: ${{ needs.native_a.outputs.proof_artifact_id }}
           M9E_NATIVE_B_ID: ${{ needs.native_b.outputs.proof_artifact_id }}
           M9E_NATIVE_C_ID: ${{ needs.native_c.outputs.proof_artifact_id }}
+          M9E_NATIVE_D_ID: ${{ needs.native_d.outputs.proof_artifact_id }}
           M9E_PLATFORM_ID: ${{ needs.platform.outputs.proof_artifact_id }}
         run: |
           if [[ "$M9E_NATIVE_A_RESULT" == success ]]; then [[ "$M9E_NATIVE_A_ID" =~ ^[1-9][0-9]*$ ]]; fi
           if [[ "$M9E_NATIVE_B_RESULT" == success ]]; then [[ "$M9E_NATIVE_B_ID" =~ ^[1-9][0-9]*$ ]]; fi
           if [[ "$M9E_NATIVE_C_RESULT" == success ]]; then [[ "$M9E_NATIVE_C_ID" =~ ^[1-9][0-9]*$ ]]; fi
+          if [[ "$M9E_NATIVE_D_RESULT" == success ]]; then [[ "$M9E_NATIVE_D_ID" =~ ^[1-9][0-9]*$ ]]; fi
           if [[ "$M9E_PLATFORM_RESULT" == success ]]; then [[ "$M9E_PLATFORM_ID" =~ ^[1-9][0-9]*$ ]]; fi
       - uses: actions/download-artifact@v7
         if: needs.native_a.result == 'success'
@@ -486,6 +577,12 @@ jobs:
         if: needs.native_c.result == 'success'
         with:
           artifact-ids: ${{ needs.native_c.outputs.proof_artifact_id }}
+          path: ${{ runner.temp }}/m9e-phase/proof
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        if: needs.native_d.result == 'success'
+        with:
+          artifact-ids: ${{ needs.native_d.outputs.proof_artifact_id }}
           path: ${{ runner.temp }}/m9e-phase/proof
           merge-multiple: true
       - uses: actions/download-artifact@v7
