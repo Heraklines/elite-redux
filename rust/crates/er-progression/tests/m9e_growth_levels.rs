@@ -34,7 +34,10 @@ fn current_growth_matches_pinned_javascript_for_every_u16_level() -> Result<(), 
     let witness: OracleWitness =
         serde_json::from_slice(include_bytes!("fixtures/m9e_growth_oracle.json"))?;
     assert_eq!(witness.schema, 1);
-    assert_eq!(witness.source_blob, "7100a23e24cc7f5fa29742da8f95300b4fceb57a");
+    assert_eq!(
+        witness.source_blob,
+        "7100a23e24cc7f5fa29742da8f95300b4fceb57a"
+    );
     assert_eq!(witness.node_version, "v22.23.2");
     assert_eq!(witness.cases, 6 * usize::from(u16::MAX));
     assert_eq!(witness.encoding, "u64-big-endian");
@@ -53,7 +56,9 @@ fn current_growth_matches_pinned_javascript_for_every_u16_level() -> Result<(), 
         };
         let mut digest = Sha256::new();
         for level in 1..=u16::MAX {
-            let value = current_growth_experience_for_level(&growth, level)?.get().get();
+            let value = current_growth_experience_for_level(&growth, level)?
+                .get()
+                .get();
             digest.update(value.to_be_bytes());
         }
         assert_eq!(
