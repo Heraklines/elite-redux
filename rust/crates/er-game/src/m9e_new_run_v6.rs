@@ -270,18 +270,29 @@ pub fn construct_natural_run_v6_with_pending_experience(
     cap_policy: er_state::current_experience_owner::CurrentExperienceCapPolicyV1,
 ) -> Result<GameStateV6, NaturalRunV6Error> {
     use er_progression::content_v2::ExperienceSourceFormV2;
-    use er_state::current_experience_owner::{CurrentExperienceEncounterV1, CurrentExperienceOwnerV1, CurrentExperienceSourceV1};
+    use er_state::current_experience_owner::{
+        CurrentExperienceEncounterV1, CurrentExperienceOwnerV1, CurrentExperienceSourceV1,
+    };
     use er_state::m9e_state_v6::GameStateV6ContentContext;
-    let mut state = construct_natural_run_v6_with_participation(bootstrap, content, authority_revision)?;
-    let run = state.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+    let mut state =
+        construct_natural_run_v6_with_participation(bootstrap, content, authority_revision)?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
     if !content.supports_current_experience_mode(run.mode) {
         return Err(NaturalRunV6Error::Invalid);
     }
-    let observation = state.current_battle_participation.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+    let observation = state
+        .current_battle_participation
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
     let battle = run.battle.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
     let mut sources = Vec::with_capacity(battle.enemy_party.len());
     for pokemon in &battle.enemy_party {
-        let metadata = content.progression.experience_for_compiled_form(pokemon.species_id, pokemon.form_index)
+        let metadata = content
+            .progression
+            .experience_for_compiled_form(pokemon.species_id, pokemon.form_index)
             .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
         sources.push(CurrentExperienceSourceV1 {
             pokemon: pokemon.id,
@@ -296,11 +307,23 @@ pub fn construct_natural_run_v6_with_pending_experience(
         });
     }
     sources.sort_by_key(|source| source.pokemon);
-    let experience = CurrentExperienceOwnerV1::fresh(observation, run, state.content_identity.clone(),
-        cap_policy, CurrentExperienceEncounterV1::OrdinaryWild, sources)
+    let experience = CurrentExperienceOwnerV1::fresh(
+        observation,
+        run,
+        state.content_identity.clone(),
+        cap_policy,
+        CurrentExperienceEncounterV1::OrdinaryWild,
+        sources,
+    )
+    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    state
+        .current_battle_participation
+        .as_mut()
+        .ok_or(NaturalRunV6Error::Invalid)?
+        .experience = Some(experience);
+    state
+        .validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    state.current_battle_participation.as_mut().ok_or(NaturalRunV6Error::Invalid)?.experience = Some(experience);
-    state.validate_with(content).map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     Ok(state)
 }
 
@@ -496,7 +519,11 @@ pub fn advance_to_next_encounter_v6(
         .validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     // Rebase/settlement is deliberately not implemented. Never drop source context or pending work.
-    if state.current_battle_participation.as_ref().is_some_and(|owner| owner.experience.is_some()) {
+    if state
+        .current_battle_participation
+        .as_ref()
+        .is_some_and(|owner| owner.experience.is_some())
+    {
         return Err(NaturalRunV6Error::Invalid);
     }
     let mut next = state.clone();

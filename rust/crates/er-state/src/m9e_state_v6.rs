@@ -41,11 +41,15 @@ pub trait GameStateV6ContentContext {
     fn has_mode(&self, mode: GameModeId) -> bool;
     fn has_species_form(&self, species: SpeciesId, form: u16) -> bool;
     fn has_move(&self, move_id: MoveId) -> bool;
-    fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool { false }
+    fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
+        false
+    }
     fn current_experience_source_matches(
         &self,
         _source: &crate::current_experience_owner::CurrentExperienceSourceV1,
-    ) -> bool { false }
+    ) -> bool {
+        false
+    }
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -174,7 +178,11 @@ impl GameStateV6 {
             .validate()
             .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
         if let Some(participation) = &self.current_battle_participation {
-            if participation.experience.as_ref().is_some_and(|owner| owner.content_identity != self.content_identity) {
+            if participation
+                .experience
+                .as_ref()
+                .is_some_and(|owner| owner.content_identity != self.content_identity)
+            {
                 return Err(GameStateV6Error::Content);
             }
             participation
@@ -189,10 +197,19 @@ impl GameStateV6 {
         content: &impl GameStateV6ContentContext,
     ) -> Result<(), GameStateV6Error> {
         self.validate()?;
-        if let Some(owner) = self.current_battle_participation.as_ref().and_then(|value| value.experience.as_ref()) {
+        if let Some(owner) = self
+            .current_battle_participation
+            .as_ref()
+            .and_then(|value| value.experience.as_ref())
+        {
             if !content.supports_current_experience_mode(owner.mode)
-                || !owner.enemy_sources.iter().all(|source| content.current_experience_source_matches(source))
-            { return Err(GameStateV6Error::Content); }
+                || !owner
+                    .enemy_sources
+                    .iter()
+                    .all(|source| content.current_experience_source_matches(source))
+            {
+                return Err(GameStateV6Error::Content);
+            }
         }
         if &self.content_identity != content.identity() {
             return Err(GameStateV6Error::Content);

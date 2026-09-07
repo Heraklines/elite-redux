@@ -6,14 +6,21 @@ use er_types::{GameContentIdentityV2, SafeU53, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::current_battle_participation::{CurrentBattleParticipantV1, CurrentBattleParticipationV1};
+use crate::current_battle_participation::{
+    CurrentBattleParticipantV1, CurrentBattleParticipationV1,
+};
 use crate::m7_state::RunStateV3;
 
 pub const CURRENT_EXPERIENCE_ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 pub const MAX_PENDING_EXPERIENCE_V1: usize = 6;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value", deny_unknown_fields)]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "kind",
+    content = "value",
+    deny_unknown_fields
+)]
 pub enum CurrentExperienceCapPolicyV1 {
     NormalClassic,
     Override(i32),
@@ -22,11 +29,18 @@ pub enum CurrentExperienceCapPolicyV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CurrentExperienceEncounterV1 { OrdinaryWild, OrdinaryTrainer }
+pub enum CurrentExperienceEncounterV1 {
+    OrdinaryWild,
+    OrdinaryTrainer,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CurrentExperienceContinuationV1 { BattleTail, WaveVictoryTail, RunDefeatTail }
+pub enum CurrentExperienceContinuationV1 {
+    BattleTail,
+    WaveVictoryTail,
+    RunDefeatTail,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -100,8 +114,10 @@ impl CurrentExperienceOwnerV1 {
         encounter: CurrentExperienceEncounterV1,
         enemy_sources: Vec<CurrentExperienceSourceV1>,
     ) -> Result<Self, CurrentExperienceOwnerError> {
-        if !observation.faints.is_empty() || !observation.participants.is_empty()
-            || observation.next_turn.get().get() != 1 || observation.experience.is_some()
+        if !observation.faints.is_empty()
+            || !observation.participants.is_empty()
+            || observation.next_turn.get().get() != 1
+            || observation.experience.is_some()
         {
             return Err(CurrentExperienceOwnerError::Unsupported);
         }
@@ -124,51 +140,101 @@ impl CurrentExperienceOwnerV1 {
     }
 
     /// Structural restore checks, not proof of source phase order or neutral eligibility.
-    pub fn validate(&self, observation: &CurrentBattleParticipationV1, run: &RunStateV3)
-        -> Result<(), CurrentExperienceOwnerError>
-    {
-        let battle = run.battle.as_ref().ok_or(CurrentExperienceOwnerError::Invalid)?;
+    pub fn validate(
+        &self,
+        observation: &CurrentBattleParticipationV1,
+        run: &RunStateV3,
+    ) -> Result<(), CurrentExperienceOwnerError> {
+        let battle = run
+            .battle
+            .as_ref()
+            .ok_or(CurrentExperienceOwnerError::Invalid)?;
         if self.content_identity.oracle_sha.as_str() != CURRENT_EXPERIENCE_ORACLE
-            || self.run != observation.run || self.run != run.run_id
-            || self.battle != observation.battle || self.battle != battle.battle_id
-            || self.wave != observation.wave || self.wave != run.wave
-            || self.authority != observation.authority || self.authority != battle.authority_seat
-            || self.mode != run.mode || self.next_observation != observation.next_occurrence
+            || self.run != observation.run
+            || self.run != run.run_id
+            || self.battle != observation.battle
+            || self.battle != battle.battle_id
+            || self.wave != observation.wave
+            || self.wave != run.wave
+            || self.authority != observation.authority
+            || self.authority != battle.authority_seat
+            || self.mode != run.mode
+            || self.next_observation != observation.next_occurrence
             || self.next_pending_id == SafeU53::ZERO
-        { return Err(CurrentExperienceOwnerError::Invalid); }
+        {
+            return Err(CurrentExperienceOwnerError::Invalid);
+        }
         if self.cap_policy != CurrentExperienceCapPolicyV1::NormalClassic
             || self.encounter != CurrentExperienceEncounterV1::OrdinaryWild
             || !(1..=200).contains(&run.wave.get().get())
             || self.pending.len() > MAX_PENDING_EXPERIENCE_V1
-        { return Err(CurrentExperienceOwnerError::Unsupported); }
-        if self.enemy_sources.len() != observation.enemy_roster.len()
-            || !self.enemy_sources.windows(2).all(|pair| pair[0].pokemon < pair[1].pokemon)
-        { return Err(CurrentExperienceOwnerError::Invalid); }
-        for (source, id) in self.enemy_sources.iter().zip(&observation.enemy_roster) {
-            let pokemon = battle.enemy_party.iter().find(|pokemon| pokemon.id == *id)
-                .ok_or(CurrentExperienceOwnerError::Invalid)?;
-            if source.pokemon != *id || source.species != pokemon.species_id
-                || source.compiled_form != pokemon.form_index
-                || match source.source_form { None => source.compiled_form != 0, Some(index) => index.checked_add(1) != Some(source.compiled_form) }
-            { return Err(CurrentExperienceOwnerError::Invalid); }
+        {
+            return Err(CurrentExperienceOwnerError::Unsupported);
         }
-        let expected = observation.faints.iter().filter(|faint| faint.slot.side == BattleSide::Enemy)
+        if self.enemy_sources.len() != observation.enemy_roster.len()
+            || !self
+                .enemy_sources
+                .windows(2)
+                .all(|pair| pair[0].pokemon < pair[1].pokemon)
+        {
+            return Err(CurrentExperienceOwnerError::Invalid);
+        }
+        for (source, id) in self.enemy_sources.iter().zip(&observation.enemy_roster) {
+            let pokemon = battle
+                .enemy_party
+                .iter()
+                .find(|pokemon| pokemon.id == *id)
+                .ok_or(CurrentExperienceOwnerError::Invalid)?;
+            if source.pokemon != *id
+                || source.species != pokemon.species_id
+                || source.compiled_form != pokemon.form_index
+                || match source.source_form {
+                    None => source.compiled_form != 0,
+                    Some(index) => index.checked_add(1) != Some(source.compiled_form),
+                }
+            {
+                return Err(CurrentExperienceOwnerError::Invalid);
+            }
+        }
+        let expected = observation
+            .faints
+            .iter()
+            .filter(|faint| faint.slot.side == BattleSide::Enemy)
             .collect::<Vec<_>>();
-        if expected.len() != self.pending.len() { return Err(CurrentExperienceOwnerError::Invalid); }
+        if expected.len() != self.pending.len() {
+            return Err(CurrentExperienceOwnerError::Invalid);
+        }
         let recipients = recipient_snapshot(run)?;
         for (index, (pending, faint)) in self.pending.iter().zip(expected).enumerate() {
-            let source = self.enemy_sources.iter().find(|source| source.pokemon == faint.pokemon)
+            let source = self
+                .enemy_sources
+                .iter()
+                .find(|source| source.pokemon == faint.pokemon)
                 .ok_or(CurrentExperienceOwnerError::Invalid)?;
-            let pokemon = battle.enemy_party.iter().find(|pokemon| pokemon.id == faint.pokemon)
+            let pokemon = battle
+                .enemy_party
+                .iter()
+                .find(|pokemon| pokemon.id == faint.pokemon)
                 .ok_or(CurrentExperienceOwnerError::Invalid)?;
-            if pending.id == SafeU53::ZERO || pending.id >= self.next_pending_id
-                || pending.observation != faint.occurrence || pending.source != *source
-                || pending.defeated_level != pokemon.level || pending.participants != faint.participants
-                || pending.recipients != recipients || pending.continuation != continuation(battle.outcome)
-                || (index > 0 && self.pending[index - 1].id.get().checked_add(1) != Some(pending.id.get()))
-            { return Err(CurrentExperienceOwnerError::Invalid); }
+            if pending.id == SafeU53::ZERO
+                || pending.id >= self.next_pending_id
+                || pending.observation != faint.occurrence
+                || pending.source != *source
+                || pending.defeated_level != pokemon.level
+                || pending.participants != faint.participants
+                || pending.recipients != recipients
+                || pending.continuation != continuation(battle.outcome)
+                || (index > 0
+                    && self.pending[index - 1].id.get().checked_add(1) != Some(pending.id.get()))
+            {
+                return Err(CurrentExperienceOwnerError::Invalid);
+            }
         }
-        if self.pending.last().is_some_and(|last| last.id.get().checked_add(1) != Some(self.next_pending_id.get())) {
+        if self
+            .pending
+            .last()
+            .is_some_and(|last| last.id.get().checked_add(1) != Some(self.next_pending_id.get()))
+        {
             return Err(CurrentExperienceOwnerError::Invalid);
         }
         Ok(())
@@ -177,34 +243,69 @@ impl CurrentExperienceOwnerV1 {
     /// Conserves context across common material application. Settlement is not yet a supported successor.
     pub fn validate_successor(&self, next: &Self) -> Result<(), CurrentExperienceOwnerError> {
         if !self.pending.is_empty() {
-            return if self == next { Ok(()) } else { Err(CurrentExperienceOwnerError::Unsupported) };
+            return if self == next {
+                Ok(())
+            } else {
+                Err(CurrentExperienceOwnerError::Unsupported)
+            };
         }
         let mut expected = self.clone();
         expected.next_observation = next.next_observation;
         expected.next_pending_id = next.next_pending_id;
         expected.pending = next.pending.clone();
-        if expected != *next || next.next_observation < self.next_observation
-            || next.pending.first().is_some_and(|pending| pending.id != self.next_pending_id || pending.observation < self.next_observation)
+        if expected != *next
+            || next.next_observation < self.next_observation
+            || next.pending.first().is_some_and(|pending| {
+                pending.id != self.next_pending_id || pending.observation < self.next_observation
+            })
             || (next.pending.is_empty() && next.next_pending_id != self.next_pending_id)
-        { return Err(CurrentExperienceOwnerError::Invalid); }
+        {
+            return Err(CurrentExperienceOwnerError::Invalid);
+        }
         Ok(())
     }
 
-    pub fn observe_next(&self, observation: &CurrentBattleParticipationV1, run: &RunStateV3)
-        -> Result<Self, CurrentExperienceOwnerError>
-    {
-        if !self.pending.is_empty() { return Err(CurrentExperienceOwnerError::Unsupported); }
-        let battle = run.battle.as_ref().ok_or(CurrentExperienceOwnerError::Invalid)?;
+    pub fn observe_next(
+        &self,
+        observation: &CurrentBattleParticipationV1,
+        run: &RunStateV3,
+    ) -> Result<Self, CurrentExperienceOwnerError> {
+        if !self.pending.is_empty() {
+            return Err(CurrentExperienceOwnerError::Unsupported);
+        }
+        let battle = run
+            .battle
+            .as_ref()
+            .ok_or(CurrentExperienceOwnerError::Invalid)?;
         let mut candidate = self.clone();
-        for faint in observation.faints.iter().filter(|faint| faint.occurrence >= self.next_observation) {
-            if faint.slot.side != BattleSide::Enemy { continue; }
-            if candidate.pending.len() == MAX_PENDING_EXPERIENCE_V1 { return Err(CurrentExperienceOwnerError::Unsupported); }
-            let source = self.enemy_sources.iter().find(|source| source.pokemon == faint.pokemon)
-                .ok_or(CurrentExperienceOwnerError::Invalid)?.clone();
-            let defeated = battle.enemy_party.iter().find(|pokemon| pokemon.id == faint.pokemon)
+        for faint in observation
+            .faints
+            .iter()
+            .filter(|faint| faint.occurrence >= self.next_observation)
+        {
+            if faint.slot.side != BattleSide::Enemy {
+                continue;
+            }
+            if candidate.pending.len() == MAX_PENDING_EXPERIENCE_V1 {
+                return Err(CurrentExperienceOwnerError::Unsupported);
+            }
+            let source = self
+                .enemy_sources
+                .iter()
+                .find(|source| source.pokemon == faint.pokemon)
+                .ok_or(CurrentExperienceOwnerError::Invalid)?
+                .clone();
+            let defeated = battle
+                .enemy_party
+                .iter()
+                .find(|pokemon| pokemon.id == faint.pokemon)
                 .ok_or(CurrentExperienceOwnerError::Invalid)?;
-            let next = candidate.next_pending_id.get().checked_add(1)
-                .and_then(|value| SafeU53::new(value).ok()).ok_or(CurrentExperienceOwnerError::Exhausted)?;
+            let next = candidate
+                .next_pending_id
+                .get()
+                .checked_add(1)
+                .and_then(|value| SafeU53::new(value).ok())
+                .ok_or(CurrentExperienceOwnerError::Exhausted)?;
             candidate.pending.push(CurrentPendingExperienceV1 {
                 id: candidate.next_pending_id,
                 observation: faint.occurrence,
@@ -222,14 +323,23 @@ impl CurrentExperienceOwnerV1 {
     }
 }
 
-fn recipient_snapshot(run: &RunStateV3) -> Result<Vec<CurrentExperienceRecipientV1>, CurrentExperienceOwnerError> {
-    run.party.iter().map(|pokemon| Ok(CurrentExperienceRecipientV1 {
-        pokemon: pokemon.id,
-        owner: pokemon.owner_seat.ok_or(CurrentExperienceOwnerError::Invalid)?,
-        hp: pokemon.hp,
-        level: pokemon.level,
-        experience: pokemon.experience,
-    })).collect()
+fn recipient_snapshot(
+    run: &RunStateV3,
+) -> Result<Vec<CurrentExperienceRecipientV1>, CurrentExperienceOwnerError> {
+    run.party
+        .iter()
+        .map(|pokemon| {
+            Ok(CurrentExperienceRecipientV1 {
+                pokemon: pokemon.id,
+                owner: pokemon
+                    .owner_seat
+                    .ok_or(CurrentExperienceOwnerError::Invalid)?,
+                hp: pokemon.hp,
+                level: pokemon.level,
+                experience: pokemon.experience,
+            })
+        })
+        .collect()
 }
 
 fn continuation(outcome: BattleOutcome) -> CurrentExperienceContinuationV1 {

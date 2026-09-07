@@ -567,7 +567,10 @@ impl GameActionDispatcherV1 {
 }
 
 fn has_pending_experience(state: &GameStateV6) -> bool {
-    state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+    state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|owner| owner.experience.as_ref())
         .is_some_and(|owner| !owner.pending.is_empty())
 }
 
@@ -578,7 +581,12 @@ fn execute_domain(
     context: &GameActionDispatchContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     if before.is_some_and(has_pending_experience)
-        && !matches!(action, GameActionV1::Save { action: SaveActionV1::Write { .. } })
+        && !matches!(
+            action,
+            GameActionV1::Save {
+                action: SaveActionV1::Write { .. }
+            }
+        )
     {
         return Err(GameRuntimeV6Error::Action);
     }
@@ -874,7 +882,10 @@ fn execute_battle(
     queue_current_player_faints(before, &mut candidate, &transition.presentation)?;
     if has_pending_experience(&candidate) {
         // This unresolved tail cannot run the legacy one-level grant or later battle actions.
-        let run = candidate.active_run.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+        let run = candidate
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
         run.control = GameControlPlanV2 {
             schema_version: er_types::GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
             revision: safe_increment(action_context.authority_revision)?,
@@ -884,7 +895,11 @@ fn execute_battle(
             menu: None,
             actionable: false,
         };
-        return Ok(DomainExecutionV1 { candidate: Some(candidate), rng_audit, ..Default::default() });
+        return Ok(DomainExecutionV1 {
+            candidate: Some(candidate),
+            rng_audit,
+            ..Default::default()
+        });
     }
     match outcome {
         BattleOutcome::Victory => {

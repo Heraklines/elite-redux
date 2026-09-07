@@ -419,15 +419,21 @@ impl PreparedProgressionContentV2 {
         species: SpeciesId,
         compiled_form: u16,
     ) -> Result<&SpeciesExperienceMetadataV2, ProgressionContentV2Error> {
-        let metadata = self.species(species, compiled_form)
+        let metadata = self
+            .species(species, compiled_form)
             .and_then(|row| row.experience.as_ref())
             .ok_or(ProgressionContentV2Error::ExperienceUnsupported)?;
         let matches = match metadata.source_form {
-            ExperienceSourceFormV2::Species => compiled_form == 0 && metadata.source_form_count == 0,
-            ExperienceSourceFormV2::Form(index) => index < metadata.source_form_count
-                && index.checked_add(1) == Some(compiled_form),
+            ExperienceSourceFormV2::Species => {
+                compiled_form == 0 && metadata.source_form_count == 0
+            }
+            ExperienceSourceFormV2::Form(index) => {
+                index < metadata.source_form_count && index.checked_add(1) == Some(compiled_form)
+            }
         };
-        if !matches { return Err(ProgressionContentV2Error::ExperienceUnsupported); }
+        if !matches {
+            return Err(ProgressionContentV2Error::ExperienceUnsupported);
+        }
         Ok(metadata)
     }
 

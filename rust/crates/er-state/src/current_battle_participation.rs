@@ -247,7 +247,9 @@ impl CurrentBattleParticipationV1 {
             }
         }
         if let Some(experience) = &self.experience {
-            experience.validate(self, run).map_err(|_| CurrentBattleParticipationError::Invalid)?;
+            experience
+                .validate(self, run)
+                .map_err(|_| CurrentBattleParticipationError::Invalid)?;
         }
         Ok(())
     }
@@ -405,12 +407,19 @@ impl CurrentBattleParticipationV1 {
         }
         candidate.next_turn = after_battle.turn;
         if let Some(experience) = &self.experience {
-            candidate.experience = Some(experience.observe_next(&candidate, after)
-                .map_err(|error| match error {
-                    crate::current_experience_owner::CurrentExperienceOwnerError::Exhausted => CurrentBattleParticipationError::Exhausted,
-                    crate::current_experience_owner::CurrentExperienceOwnerError::Unsupported => CurrentBattleParticipationError::Unsupported,
-                    crate::current_experience_owner::CurrentExperienceOwnerError::Invalid => CurrentBattleParticipationError::Invalid,
-                })?);
+            candidate.experience = Some(experience.observe_next(&candidate, after).map_err(
+                |error| match error {
+                    crate::current_experience_owner::CurrentExperienceOwnerError::Exhausted => {
+                        CurrentBattleParticipationError::Exhausted
+                    }
+                    crate::current_experience_owner::CurrentExperienceOwnerError::Unsupported => {
+                        CurrentBattleParticipationError::Unsupported
+                    }
+                    crate::current_experience_owner::CurrentExperienceOwnerError::Invalid => {
+                        CurrentBattleParticipationError::Invalid
+                    }
+                },
+            )?);
         }
         candidate.validate(after)?;
         Ok(candidate)

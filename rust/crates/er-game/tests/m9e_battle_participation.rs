@@ -830,11 +830,25 @@ fn experience_state() -> TestResult<GameStateV6> {
         selection.seed = format!("m9e-pending-experience/{index}");
         selection.validate()?;
         let observed = construct_natural_run_v6_with_participation(&selection, &content, safe(1)?)?;
-        let battle = observed.active_run.as_ref().and_then(|run| run.battle.as_ref()).ok_or("natural battle")?;
-        if battle.enemy_party.iter().all(|pokemon| content.progression
-            .experience_for_compiled_form(pokemon.species_id, pokemon.form_index).is_ok()) {
-            return Ok(er_game::m9e_new_run_v6::construct_natural_run_v6_with_pending_experience(
-                &selection, &content, safe(1)?, CurrentExperienceCapPolicyV1::NormalClassic)?);
+        let battle = observed
+            .active_run
+            .as_ref()
+            .and_then(|run| run.battle.as_ref())
+            .ok_or("natural battle")?;
+        if battle.enemy_party.iter().all(|pokemon| {
+            content
+                .progression
+                .experience_for_compiled_form(pokemon.species_id, pokemon.form_index)
+                .is_ok()
+        }) {
+            return Ok(
+                er_game::m9e_new_run_v6::construct_natural_run_v6_with_pending_experience(
+                    &selection,
+                    &content,
+                    safe(1)?,
+                    CurrentExperienceCapPolicyV1::NormalClassic,
+                )?,
+            );
         }
     }
     Err("64 natural seeds found no unambiguous XP source; regenerated metadata is mandatory".into())
@@ -843,18 +857,30 @@ fn experience_state() -> TestResult<GameStateV6> {
 fn experience_runtime() -> TestResult<GameRuntimeV6> {
     let state = experience_state()?;
     let mut runtime = GameRuntimeV6::new(None, content()?, safe(1)?)?;
-    dispatch(&mut runtime, GameActionV1::Bootstrap { action: BootstrapActionV1::Confirm },
-        GameDomainExecutionInputV1::BootstrapCandidate(state))?;
+    dispatch(
+        &mut runtime,
+        GameActionV1::Bootstrap {
+            action: BootstrapActionV1::Confirm,
+        },
+        GameDomainExecutionInputV1::BootstrapCandidate(state),
+    )?;
     Ok(runtime)
 }
 
-fn experience(runtime: &GameRuntimeV6) -> TestResult<&er_state::current_experience_owner::CurrentExperienceOwnerV1> {
-    owner(runtime)?.experience.as_ref().ok_or_else(|| "pending XP context required".into())
+fn experience(
+    runtime: &GameRuntimeV6,
+) -> TestResult<&er_state::current_experience_owner::CurrentExperienceOwnerV1> {
+    owner(runtime)?
+        .experience
+        .as_ref()
+        .ok_or_else(|| "pending XP context required".into())
 }
 
 fn reach_pending_experience(runtime: &mut GameRuntimeV6) -> TestResult {
     for _ in 0..MAX_SCRIPTED_TURNS {
-        if !experience(runtime)?.pending.is_empty() { return Ok(()); }
+        if !experience(runtime)?.pending.is_empty() {
+            return Ok(());
+        }
         if run(runtime)?.battle.as_ref().ok_or("battle")?.outcome != BattleOutcome::Ongoing {
             return Err("natural battle ended without the required enemy faint".into());
         }
@@ -872,67 +898,138 @@ fn reach_pending_experience(runtime: &mut GameRuntimeV6) -> TestResult {
 #[test]
 fn natural_enemy_faint_owns_unresolved_experience_without_applying_amount() -> TestResult {
     let mut runtime = experience_runtime()?;
-    let original = run(&runtime)?.party.iter().map(|pokemon| (pokemon.id, pokemon.level, pokemon.experience)).collect::<Vec<_>>();
+    let original = run(&runtime)?
+        .party
+        .iter()
+        .map(|pokemon| (pokemon.id, pokemon.level, pokemon.experience))
+        .collect::<Vec<_>>();
     let source = experience(&runtime)?.enemy_sources.clone();
     reach_pending_experience(&mut runtime)?;
     let pending = &experience(&runtime)?.pending;
     assert_eq!(pending.len(), 1);
-    let faint = owner(&runtime)?.faints.iter().find(|faint| faint.slot.side == BattleSide::Enemy).ok_or("enemy faint")?;
+    let faint = owner(&runtime)?
+        .faints
+        .iter()
+        .find(|faint| faint.slot.side == BattleSide::Enemy)
+        .ok_or("enemy faint")?;
     assert_eq!(pending[0].observation, faint.occurrence);
     assert_eq!(pending[0].participants, faint.participants);
     assert_eq!(pending[0].source, source[0]);
     assert_eq!(pending[0].id, safe(1)?);
     assert_eq!(experience(&runtime)?.next_pending_id, safe(2)?);
-    assert_eq!(experience(&runtime)?.next_observation, owner(&runtime)?.next_occurrence);
-    assert_eq!(run(&runtime)?.party.iter().map(|pokemon| (pokemon.id, pokemon.level, pokemon.experience)).collect::<Vec<_>>(), original);
+    assert_eq!(
+        experience(&runtime)?.next_observation,
+        owner(&runtime)?.next_occurrence
+    );
+    assert_eq!(
+        run(&runtime)?
+            .party
+            .iter()
+            .map(|pokemon| (pokemon.id, pokemon.level, pokemon.experience))
+            .collect::<Vec<_>>(),
+        original
+    );
     assert_eq!(pending[0].recipients.len(), run(&runtime)?.party.len());
     for (recipient, pokemon) in pending[0].recipients.iter().zip(&run(&runtime)?.party) {
-        assert_eq!((recipient.pokemon, recipient.hp, recipient.level, recipient.experience),
-            (pokemon.id, pokemon.hp, pokemon.level, pokemon.experience));
+        assert_eq!(
+            (
+                recipient.pokemon,
+                recipient.hp,
+                recipient.level,
+                recipient.experience
+            ),
+            (pokemon.id, pokemon.hp, pokemon.level, pokemon.experience)
+        );
     }
     assert!(run(&runtime)?.progression_queue.tasks.is_empty());
     assert_eq!(run(&runtime)?.control.kind, GameControlKindV2::Waiting);
     assert!(!run(&runtime)?.control.actionable);
-    assert_eq!(pending[0].continuation, er_state::current_experience_owner::CurrentExperienceContinuationV1::WaveVictoryTail);
+    assert_eq!(
+        pending[0].continuation,
+        er_state::current_experience_owner::CurrentExperienceContinuationV1::WaveVictoryTail
+    );
     Ok(())
 }
 
 #[test]
-fn pending_experience_survives_real_save_replay_and_rejects_owner_stripping_material() -> TestResult {
+fn pending_experience_survives_real_save_replay_and_rejects_owner_stripping_material() -> TestResult
+{
     use er_game::m9e_material_v6::{GamePlatformEffectV2, game_state_digest};
     let mut runtime = experience_runtime()?;
     reach_pending_experience(&mut runtime)?;
     let snapshot = runtime.snapshot();
     let snapshot_bytes = er_canonical::canonical_bytes(&snapshot)?;
-    let mut replica = GameRuntimeV6::from_snapshot(serde_json::from_slice(&snapshot_bytes)?, content()?)?;
-    assert_eq!(er_canonical::canonical_bytes(&replica.snapshot())?, snapshot_bytes);
+    let mut replica =
+        GameRuntimeV6::from_snapshot(serde_json::from_slice(&snapshot_bytes)?, content()?)?;
+    assert_eq!(
+        er_canonical::canonical_bytes(&replica.snapshot())?,
+        snapshot_bytes
+    );
     let expected = experience(&runtime)?.clone();
-    let saved = dispatch(&mut runtime,
-        GameActionV1::Save { action: er_types::SaveActionV1::Write { slot: "pending-xp".to_owned() } },
-        GameDomainExecutionInputV1::SaveGeneration(safe(1)?))?;
-    let bytes = saved.platform_effects.iter().find_map(|effect| match effect {
-        GamePlatformEffectV2::StorageWrite { bytes, .. } => Some(bytes),
-        _ => None,
-    }).ok_or("actual Save write")?;
+    let saved = dispatch(
+        &mut runtime,
+        GameActionV1::Save {
+            action: er_types::SaveActionV1::Write {
+                slot: "pending-xp".to_owned(),
+            },
+        },
+        GameDomainExecutionInputV1::SaveGeneration(safe(1)?),
+    )?;
+    let bytes = saved
+        .platform_effects
+        .iter()
+        .find_map(|effect| match effect {
+            GamePlatformEffectV2::StorageWrite { bytes, .. } => Some(bytes),
+            _ => None,
+        })
+        .ok_or("actual Save write")?;
     let decoded = GameSaveV2::decode(bytes)?;
     assert_eq!(&decoded.encode()?, bytes);
-    assert_eq!(decoded.state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref()), Some(&expected));
-    assert_eq!(replica.apply_material_bytes(&saved.material_bytes)?, GameMaterialApplyOutcomeV6::Applied);
-    assert_eq!(replica.apply_material_bytes(&saved.material_bytes)?, GameMaterialApplyOutcomeV6::DuplicateApplied);
+    assert_eq!(
+        decoded
+            .state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|owner| owner.experience.as_ref()),
+        Some(&expected)
+    );
+    assert_eq!(
+        replica.apply_material_bytes(&saved.material_bytes)?,
+        GameMaterialApplyOutcomeV6::Applied
+    );
+    assert_eq!(
+        replica.apply_material_bytes(&saved.material_bytes)?,
+        GameMaterialApplyOutcomeV6::DuplicateApplied
+    );
     assert_eq!(replica.snapshot(), runtime.snapshot());
     assert_eq!(experience(&runtime)?, &expected);
 
     let mut stripped = saved.material.clone();
-    let GameMaterialV6::GameAction(transition) = &mut stripped else { return Err("Save GameAction material required".into()); };
-    transition.after_state.current_battle_participation.as_mut().ok_or("owner")?.experience = None;
+    let GameMaterialV6::GameAction(transition) = &mut stripped else {
+        return Err("Save GameAction material required".into());
+    };
+    transition
+        .after_state
+        .current_battle_participation
+        .as_mut()
+        .ok_or("owner")?
+        .experience = None;
     transition.after_state.validate_with(content()?.as_ref())?;
     transition.after_digest = game_state_digest(&transition.after_state)?;
-    for mutation in &mut transition.mutations { mutation.after_digest = transition.after_digest.clone(); }
+    for mutation in &mut transition.mutations {
+        mutation.after_digest = transition.after_digest.clone();
+    }
     stripped.validate()?; // Otherwise valid material and state; only before→after XP conservation rejects it.
     let mut guarded = GameRuntimeV6::from_snapshot(snapshot, content()?)?;
     let before = er_canonical::canonical_bytes(&guarded.snapshot())?;
-    let error = guarded.apply_material_bytes(&stripped.canonical_bytes()?).err().ok_or("stripped owner must fail")?;
-    assert_eq!(error, GameRuntimeV6Error::Material(GameMaterialV6Error::Invalid.to_string()));
+    let error = guarded
+        .apply_material_bytes(&stripped.canonical_bytes()?)
+        .err()
+        .ok_or("stripped owner must fail")?;
+    assert_eq!(
+        error,
+        GameRuntimeV6Error::Material(GameMaterialV6Error::Invalid.to_string())
+    );
     assert_eq!(er_canonical::canonical_bytes(&guarded.snapshot())?, before);
     Ok(())
 }
@@ -943,52 +1040,100 @@ fn pending_experience_unsettled_tail_rejects_actions_and_next_encounter() -> Tes
     reach_pending_experience(&mut runtime)?;
     let before = er_canonical::canonical_bytes(&runtime.snapshot())?;
     for action in [
-        GameActionV1::Terminal { action: er_types::TerminalActionV1::ReturnToTitle },
-        GameActionV1::Save { action: er_types::SaveActionV1::Load { slot: "pending-xp".to_owned() } },
-        GameActionV1::Reward { action: RewardActionV1::Decline },
-        GameActionV1::Battle { action: BattleUiActionV1::OpenFight },
+        GameActionV1::Terminal {
+            action: er_types::TerminalActionV1::ReturnToTitle,
+        },
+        GameActionV1::Save {
+            action: er_types::SaveActionV1::Load {
+                slot: "pending-xp".to_owned(),
+            },
+        },
+        GameActionV1::Reward {
+            action: RewardActionV1::Decline,
+        },
+        GameActionV1::Battle {
+            action: BattleUiActionV1::OpenFight,
+        },
     ] {
         assert!(dispatch(&mut runtime, action, GameDomainExecutionInputV1::None).is_err());
         assert_eq!(er_canonical::canonical_bytes(&runtime.snapshot())?, before);
     }
-    assert!(er_game::m9e_new_run_v6::advance_to_next_encounter_v6(runtime.state().ok_or("state")?, runtime.content()).is_err());
+    assert!(
+        er_game::m9e_new_run_v6::advance_to_next_encounter_v6(
+            runtime.state().ok_or("state")?,
+            runtime.content()
+        )
+        .is_err()
+    );
     assert_eq!(er_canonical::canonical_bytes(&runtime.snapshot())?, before);
     Ok(())
 }
 
 #[test]
 fn pending_experience_restore_rejects_source_policy_and_frontier_forgeries() -> TestResult {
-    use er_state::current_experience_owner::{CurrentExperienceCapPolicyV1, CurrentExperienceEncounterV1};
+    use er_state::current_experience_owner::{
+        CurrentExperienceCapPolicyV1, CurrentExperienceEncounterV1,
+    };
     let mut runtime = experience_runtime()?;
     reach_pending_experience(&mut runtime)?;
     let original = runtime.snapshot();
     for case in 0..8 {
         let mut forged = original.clone();
-        let xp = forged.state.as_mut().and_then(|state| state.current_battle_participation.as_mut())
-            .and_then(|owner| owner.experience.as_mut()).ok_or("owner")?;
+        let xp = forged
+            .state
+            .as_mut()
+            .and_then(|state| state.current_battle_participation.as_mut())
+            .and_then(|owner| owner.experience.as_mut())
+            .ok_or("owner")?;
         match case {
             0 => xp.cap_policy = CurrentExperienceCapPolicyV1::Ignored,
             1 => xp.cap_policy = CurrentExperienceCapPolicyV1::Override(100),
             2 => xp.encounter = CurrentExperienceEncounterV1::OrdinaryTrainer,
             3 => xp.next_pending_id = safe(3)?,
             4 => xp.next_observation = safe(xp.next_observation.get() + 1)?,
-            5 => { xp.enemy_sources[0].unadjusted_base_exp = safe(xp.enemy_sources[0].unadjusted_base_exp.get() + 1)?; xp.pending[0].source = xp.enemy_sources[0].clone(); }
+            5 => {
+                xp.enemy_sources[0].unadjusted_base_exp =
+                    safe(xp.enemy_sources[0].unadjusted_base_exp.get() + 1)?;
+                xp.pending[0].source = xp.enemy_sources[0].clone();
+            }
             6 => xp.pending[0].recipients.reverse(),
             _ => xp.enemy_sources[0].source_form = Some(0),
         }
-        assert!(GameRuntimeV6::from_snapshot(forged, content()?).is_err(), "forgery {case}");
+        assert!(
+            GameRuntimeV6::from_snapshot(forged, content()?).is_err(),
+            "forgery {case}"
+        );
     }
-    let other_mode = content()?.bundle().bootstrap.modes.iter().find(|mode| mode.key != "CLASSIC")
-        .map(|mode| mode.mode).ok_or("non-Classic content mode required")?;
+    let other_mode = content()?
+        .bundle()
+        .bootstrap
+        .modes
+        .iter()
+        .find(|mode| mode.key != "CLASSIC")
+        .map(|mode| mode.mode)
+        .ok_or("non-Classic content mode required")?;
     let mut forged_mode = original.clone();
     let state = forged_mode.state.as_mut().ok_or("state")?;
     state.active_run.as_mut().ok_or("run")?.mode = other_mode;
-    state.current_battle_participation.as_mut().and_then(|owner| owner.experience.as_mut()).ok_or("owner")?.mode = other_mode;
+    state
+        .current_battle_participation
+        .as_mut()
+        .and_then(|owner| owner.experience.as_mut())
+        .ok_or("owner")?
+        .mode = other_mode;
     state.validate()?; // Structural match alone is insufficient: prepared content rejects this mode.
     assert!(GameRuntimeV6::from_snapshot(forged_mode, content()?).is_err());
     let mut unknown = serde_json::to_value(experience(&runtime)?)?;
-    unknown.as_object_mut().ok_or("owner object")?.insert("summon_override".to_owned(), serde_json::Value::Bool(true));
-    assert!(serde_json::from_value::<er_state::current_experience_owner::CurrentExperienceOwnerV1>(unknown).is_err());
+    unknown
+        .as_object_mut()
+        .ok_or("owner object")?
+        .insert("summon_override".to_owned(), serde_json::Value::Bool(true));
+    assert!(
+        serde_json::from_value::<er_state::current_experience_owner::CurrentExperienceOwnerV1>(
+            unknown
+        )
+        .is_err()
+    );
     assert_eq!(runtime.snapshot(), original);
     Ok(())
 }
@@ -996,7 +1141,11 @@ fn pending_experience_restore_rejects_source_policy_and_frontier_forgeries() -> 
 #[test]
 fn pending_experience_counter_exhaustion_rolls_back_real_enemy_faint() -> TestResult {
     let mut state = experience_state()?;
-    state.current_battle_participation.as_mut().and_then(|owner| owner.experience.as_mut()).ok_or("owner")?
+    state
+        .current_battle_participation
+        .as_mut()
+        .and_then(|owner| owner.experience.as_mut())
+        .ok_or("owner")?
         .next_pending_id = safe(9_007_199_254_740_991)?;
     state.validate_with(content()?.as_ref())?;
     let mut runtime = GameRuntimeV6::new(Some(state), content()?, safe(1)?)?;
@@ -1006,7 +1155,10 @@ fn pending_experience_counter_exhaustion_rolls_back_real_enemy_faint() -> TestRe
         match turn(&mut runtime, selected) {
             Ok(_) => {}
             Err(error) => {
-                assert!(error.to_string().contains("counter is exhausted"), "{error}");
+                assert!(
+                    error.to_string().contains("counter is exhausted"),
+                    "{error}"
+                );
                 assert_eq!(er_canonical::canonical_bytes(&runtime.snapshot())?, before);
                 assert!(experience(&runtime)?.pending.is_empty());
                 return Ok(());
