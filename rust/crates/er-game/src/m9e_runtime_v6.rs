@@ -2625,7 +2625,10 @@ fn refresh_current_pokemon_stats(
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let nature = content
         .progression
-        .nature(pokemon.effective_nature)
+        .pack()
+        .natures
+        .iter()
+        .find(|nature| nature.id == pokemon.effective_nature)
         .ok_or(GameRuntimeV6Error::Action)?;
     let stats = er_progression::progression::calculate_pokemon_stats(
         pokemon,

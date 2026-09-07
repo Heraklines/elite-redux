@@ -254,6 +254,11 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
         pokemon.stats, old_pokemon.stats,
         "level gain left persistent battle stats stale"
     );
+    assert_eq!(
+        pokemon.level,
+        old_pokemon.level + 1,
+        "next-level experience threshold awarded an extra level"
+    );
     let species = content.battle.species(pokemon.species_id)?;
     let form = content.battle.form(&er_types::FormId::parse(format!(
         "{}:{}",
