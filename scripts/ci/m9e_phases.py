@@ -30,6 +30,17 @@ NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "rng_phaser": "rust/crates/er-rng/src/phaser.rs",
+    "rng_runtime": "rust/crates/er-rng/src/battle.rs",
+    "rng_library": "rust/crates/er-rng/src/lib.rs",
+    "rng_audit": "rust/crates/er-rng/src/audit.rs",
+    "rng_manifest": "rust/crates/er-rng/Cargo.toml",
+    "rng_m3_test": "rust/crates/er-rng/tests/m3_rng.rs",
+    "rng_utf16_test": "rust/crates/er-rng/tests/m9e_shifted_utf16.rs",
+    "rng_reference": "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json",
+    "rng_reference_producer": "scripts/ci/m9e_rng_surrogate_oracle.cjs",
+    "rng_diagnostic": "scripts/ci/m9e_rng_surrogate_diagnostic.py",
+
     "growth_pow_source": "rust/crates/er-progression/src/current_growth_pow.rs",
     "growth_manifest": "rust/crates/er-progression/Cargo.toml",
     "growth_test": "rust/crates/er-progression/tests/m9e_growth_levels.rs",
@@ -137,7 +148,7 @@ LANE_C_TARGETS = {("er-cli", "m9e_current_batch"), ("er-lab", "current_kernel_su
                   ("er-kernel", "m9e_material_retention_v7"), ("er-cli", "m9e_current_rulechange_reload"),
                  }
 LANE_D_TARGETS = {STATE_QUERY_TARGET, ("er-web", "m9e_host_v2"),
-                  ("er-repro", "m9e_natural_campaign_replay"), ("er-kernel-worker", "current_process_v2")}
+                  ("er-repro", "m9e_natural_campaign_replay"), ("er-kernel-worker", "current_process_v2"), ("er-rng", "er_rng"), ("er-rng", "m3_rng"), ("er-rng", "m9e_shifted_utf16")}
 STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
                           STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 
@@ -1167,7 +1178,7 @@ def compact_storage_evidence(compact, full_hash):
 def compact_worker_evidence(compact, full_hash):
     # Native and browser worker bytes, profiles and hashes stay in the full proof.
     # The bounded result index may refer to each exact field of that same proof.
-    for key in ("worker_executables", "browser_worker_assets"):
+    for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
         if len(encoded(compact)) <= 16000:
             break
         if key in compact:

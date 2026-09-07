@@ -8,7 +8,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
     def setUp(self):
         self.config = {"current_recovery_integration": copy.deepcopy(feedback.RECOVERY_POLICY)}
 
-    def test_exact_twenty_six_path_composition_preserves_policy(self):
+    def test_exact_thirty_one_path_composition_preserves_policy(self):
         original = copy.deepcopy(self.config)
         for paths in (feedback.RECOVERY_PATHS, list(reversed(feedback.RECOVERY_PATHS))):
             self.assertEqual(feedback.select_recovery_scope(self.config, paths), (True, True))
@@ -31,12 +31,12 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
         self.assertEqual(feedback.select_recovery_scope({}, feedback.AI_COMMAND_PATHS), (False, False))
 
     def test_policy_rejects_missing_reordered_or_extra_source_and_test_ids(self):
-        for key in ("paths", "replacement_test_ids", "progression_test_ids", "checkpoint_test_ids", "canonical_test_ids", "struggle_test_ids", "campaign_test_ids"):
+        for key in ("paths", "replacement_test_ids", "progression_test_ids", "checkpoint_test_ids", "canonical_test_ids", "struggle_test_ids", "campaign_test_ids", "rng_test_ids"):
             for operation in ("pop", "reverse", "append"):
                 changed = copy.deepcopy(self.config)
                 values = changed["current_recovery_integration"][key]
                 if isinstance(values, dict):
-                    values = values["er-progression"]
+                    values = values["er_rng" if key == "rng_test_ids" else "er-progression"]
                 if operation == "reverse" and len(values) == 1:
                     values[0] = "unverified"
                 elif operation == "append":
@@ -75,3 +75,23 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
                     feedback.select_recovery_scope(config, paths)
             with self.assertRaisesRegex(RuntimeError, "unmapped"):
                 feedback.select_recovery_scope(config, [*feedback.RECOVERY_PATHS, "rust/unrelated.rs"])
+
+    def test_rng_sources_cannot_bypass_complete_integration(self):
+        for config in ({}, self.config):
+            for path in feedback.RNG_PATHS:
+                with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                    feedback.select_recovery_scope(config, [path])
+
+    def test_rng_policy_cannot_omit_or_duplicate_any_target_identity(self):
+        for target in feedback.RNG_TEST_IDS:
+            for operation in ("remove_target", "remove_id", "duplicate_id"):
+                config = copy.deepcopy(self.config)
+                ids = config["current_recovery_integration"]["rng_test_ids"]
+                if operation == "remove_target":
+                    del ids[target]
+                elif operation == "remove_id":
+                    ids[target].pop()
+                else:
+                    ids[target].append(ids[target][0])
+                with self.assertRaisesRegex(RuntimeError, "identities"):
+                    feedback.select_recovery_scope(config, feedback.RECOVERY_PATHS)
