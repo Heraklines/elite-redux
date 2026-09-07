@@ -178,8 +178,27 @@ jobs:
               destination = retained_root / name
               destination.parent.mkdir(parents=True, exist_ok=True)
               destination.write_bytes(source)
-          phases.ROOT = retained_root
-          phases.validate_native(proof, expected)
+          # Cargo package identities include the original checkout path. Keep
+          # that path and temporarily restore only differing named sources for
+          # metadata validation, then restore this candidate before any tests.
+          import contextlib
+          @contextlib.contextmanager
+          def retained_source_view():
+              backups = {}
+              try:
+                  for name in sorted(names):
+                      actual = pathlib.Path.cwd() / name
+                      retained = (retained_root / name).read_bytes()
+                      current = actual.read_bytes()
+                      if current != retained:
+                          backups[actual] = current
+                          actual.write_bytes(retained)
+                  yield
+              finally:
+                  for actual, current in backups.items():
+                      actual.write_bytes(current)
+          with retained_source_view():
+              phases.validate_native(proof, expected)
           indexed = phases.pack_native_ids(proof)
           ids = phases.encoded([[item['ids'], item['historical_excluded_ids']] for item in proof['inventory']])
           import base64, zlib
@@ -193,7 +212,9 @@ jobs:
           restored = phases.read_bounded(output, wire_hash)
           if restored != proof:
               raise RuntimeError('complete native proof changed on roundtrip')
-          phases.validate_native(restored, expected)
+          with retained_source_view():
+              phases.validate_native(restored, expected)
+          subprocess.run(['git', 'diff', '--exit-code', '--quiet', 'HEAD', '--'], check=True, timeout=30)
           receipt = {'qualification': 'metadata transport only; source run remains failed',
               'source_sha': os.environ['GITHUB_SHA'], 'retained_run': '34085416670',
               'old_wire_bytes': len(phases.encoded(old_wire)), 'wire_bytes': output.stat().st_size,
