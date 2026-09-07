@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io::Write;
 use std::sync::Arc;
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
@@ -515,10 +516,11 @@ fn natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200
             kernel.flush()?;
             assert_eq!(kernel.base, kernel.position);
             assert!(kernel.position > 800 && kernel.segments > 10 && kernel.presentations > 0);
-            println!(
+            writeln!(
+                std::io::stdout().lock(),
                 "M9E_CAMPAIGN_REPLAY events={} segments={} presentations={} wave=200 outcome=Victory",
                 kernel.position, kernel.segments, kernel.presentations
-            );
+            )?;
             return Ok(());
         }
         let kind = kernel
