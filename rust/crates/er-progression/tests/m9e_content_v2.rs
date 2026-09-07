@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 use er_progression::content_v2::{
-    CaptureBallDefinitionV2, LevelMoveV2, PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V2,
-    ExperienceBoostV2, ExperienceSourceFormV2, ProgressionContentPackV2,
+    CaptureBallDefinitionV2, ExperienceBoostV2, ExperienceSourceFormV2, LevelMoveV2,
+    PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V2, ProgressionContentPackV2,
     ProgressionContentV2Error, SpeciesExperienceMetadataV2, SpeciesProgressionDefinitionV2,
 };
 use er_progression::{GrowthRateDefinitionV1, NatureDefinitionV1};
@@ -102,25 +102,39 @@ fn metadata(
 fn mapped_pack() -> Result<ProgressionContentPackV2, Box<dyn Error>> {
     let mut pack = pack()?;
     pack.species[0].experience = Some(metadata(
-        70, ExperienceSourceFormV2::Species, 2, None, "ordinary",
+        70,
+        ExperienceSourceFormV2::Species,
+        2,
+        None,
+        "ordinary",
     )?);
     let mut first = pack.species[0].clone();
     first.form = 1;
     first.experience = Some(metadata(
-        100, ExperienceSourceFormV2::Form(0), 2, Some("ordinary"), "ordinary",
+        100,
+        ExperienceSourceFormV2::Form(0),
+        2,
+        Some("ordinary"),
+        "ordinary",
     )?);
     let mut second = first.clone();
     second.form = 2;
     // formSpriteKey can override formKey; classification must follow the former.
     second.experience = Some(metadata(
-        200, ExperienceSourceFormV2::Form(1), 2, Some("different-form-key"), "mega",
+        200,
+        ExperienceSourceFormV2::Form(1),
+        2,
+        Some("different-form-key"),
+        "mega",
     )?);
     pack.species.extend([first, second]);
     pack.content_hash = pack.recompute_hash()?;
     Ok(pack)
 }
 
-fn validate_metadata_pack(pack: &mut ProgressionContentPackV2) -> Result<(), ProgressionContentV2Error> {
+fn validate_metadata_pack(
+    pack: &mut ProgressionContentPackV2,
+) -> Result<(), ProgressionContentV2Error> {
     pack.content_hash = pack.recompute_hash()?;
     pack.validate(
         &BTreeSet::from([pack.species[0].species]),
@@ -163,7 +177,14 @@ fn source_form_lookup_distinguishes_species_row_and_first_form() -> Result<(), B
         &BTreeSet::from([MoveId::try_from_u64(22)?]),
     )?;
     let species = SpeciesId::try_from_u64(1)?;
-    assert_eq!(pack.species[0].experience.as_ref().ok_or("base metadata")?.base_exp, SafeU53::new(70)?);
+    assert_eq!(
+        pack.species[0]
+            .experience
+            .as_ref()
+            .ok_or("base metadata")?
+            .base_exp,
+        SafeU53::new(70)?
+    );
     let first = prepared.experience_for_source_form(species, 0)?;
     assert_eq!(first.base_exp, SafeU53::new(100)?);
     assert_eq!(first.source_form, ExperienceSourceFormV2::Form(0));
@@ -171,9 +192,15 @@ fn source_form_lookup_distinguishes_species_row_and_first_form() -> Result<(), B
     assert_eq!(second.base_exp, SafeU53::new(200)?);
     assert_eq!(second.source_form, ExperienceSourceFormV2::Form(1));
     assert_eq!(second.boost, ExperienceBoostV2::Mega);
-    assert_eq!(second.source_form_key.as_deref(), Some("different-form-key"));
+    assert_eq!(
+        second.source_form_key.as_deref(),
+        Some("different-form-key")
+    );
     assert_eq!(prepared.experience_for_source_form(species, 2)?, first);
-    assert_eq!(prepared.experience_for_source_form(species, u16::MAX)?, first);
+    assert_eq!(
+        prepared.experience_for_source_form(species, u16::MAX)?,
+        first
+    );
     let bytes = serde_json::to_vec(&pack)?;
     let restored: ProgressionContentPackV2 = serde_json::from_slice(&bytes)?;
     assert_eq!(restored, pack);
@@ -195,33 +222,65 @@ fn source_form_lookup_distinguishes_species_row_and_first_form() -> Result<(), B
 }
 
 #[test]
-fn inconsistent_experience_cohorts_and_classifications_fail_validation() -> Result<(), Box<dyn Error>> {
+fn inconsistent_experience_cohorts_and_classifications_fail_validation()
+-> Result<(), Box<dyn Error>> {
     for case in 0..8 {
         let mut pack = mapped_pack()?;
         match case {
             0 => pack.species[0].experience = None,
             1 => pack.species[1].experience = None,
-            2 => pack.species[1].experience.as_mut().ok_or("metadata")?.source_form = ExperienceSourceFormV2::Form(1),
-            3 => pack.species[1].experience.as_mut().ok_or("metadata")?.source_form_count = 1,
-            4 => pack.species[1].experience.as_mut().ok_or("metadata")?.source_form_key = None,
-            5 => pack.species[2].experience.as_mut().ok_or("metadata")?.boost = ExperienceBoostV2::Other,
+            2 => {
+                pack.species[1]
+                    .experience
+                    .as_mut()
+                    .ok_or("metadata")?
+                    .source_form = ExperienceSourceFormV2::Form(1)
+            }
+            3 => {
+                pack.species[1]
+                    .experience
+                    .as_mut()
+                    .ok_or("metadata")?
+                    .source_form_count = 1
+            }
+            4 => {
+                pack.species[1]
+                    .experience
+                    .as_mut()
+                    .ok_or("metadata")?
+                    .source_form_key = None
+            }
+            5 => {
+                pack.species[2].experience.as_mut().ok_or("metadata")?.boost =
+                    ExperienceBoostV2::Other
+            }
             6 => {
                 let value = pack.species[0].experience.as_mut().ok_or("metadata")?;
                 value.source_sprite_key = "mega".to_owned();
                 value.boost = ExperienceBoostV2::Mega;
             }
-            _ => { pack.species.pop(); }
+            _ => {
+                pack.species.pop();
+            }
         }
-        assert_eq!(validate_metadata_pack(&mut pack), Err(ProgressionContentV2Error::ExperienceMetadata), "case {case}");
+        assert_eq!(
+            validate_metadata_pack(&mut pack),
+            Err(ProgressionContentV2Error::ExperienceMetadata),
+            "case {case}"
+        );
     }
     let mut pack = mapped_pack()?;
     pack.species[2].form = 3;
-    assert_eq!(validate_metadata_pack(&mut pack), Err(ProgressionContentV2Error::ExperienceMetadata));
+    assert_eq!(
+        validate_metadata_pack(&mut pack),
+        Err(ProgressionContentV2Error::ExperienceMetadata)
+    );
     Ok(())
 }
 
 #[test]
-fn experience_classes_are_closed_and_every_metadata_field_is_hashed() -> Result<(), Box<dyn Error>> {
+fn experience_classes_are_closed_and_every_metadata_field_is_hashed() -> Result<(), Box<dyn Error>>
+{
     for (sprite, expected) in [
         ("mega", ExperienceBoostV2::Mega),
         ("mega-x", ExperienceBoostV2::MegaX),
@@ -259,13 +318,19 @@ fn experience_classes_are_closed_and_every_metadata_field_is_hashed() -> Result<
         ("base_exp", serde_json::json!(1.5)),
         ("base_exp", serde_json::json!(9_007_199_254_740_992_u64)),
         ("source_form_count", serde_json::json!(65536)),
-        ("source_form", serde_json::json!({"kind": "FORM", "index": 0, "extra": true})),
+        (
+            "source_form",
+            serde_json::json!({"kind": "FORM", "index": 0, "extra": true}),
+        ),
         ("source_form", serde_json::json!({"kind": "OTHER"})),
         ("unknown", serde_json::json!(true)),
     ] {
         let mut invalid_value = value.clone();
         invalid_value[field] = invalid;
-        assert!(serde_json::from_value::<SpeciesExperienceMetadataV2>(invalid_value).is_err(), "{field}");
+        assert!(
+            serde_json::from_value::<SpeciesExperienceMetadataV2>(invalid_value).is_err(),
+            "{field}"
+        );
     }
     Ok(())
 }

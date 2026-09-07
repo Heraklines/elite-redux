@@ -114,13 +114,19 @@ fn compile_small(
 }
 
 #[test]
-fn experience_export_fields_compile_without_changing_historical_rows() -> Result<(), Box<dyn Error>> {
+fn experience_export_fields_compile_without_changing_historical_rows() -> Result<(), Box<dyn Error>>
+{
     use er_progression::content_v2::{ExperienceBoostV2, ExperienceSourceFormV2};
-    use er_types::battle_ids::{MoveId, SpeciesId};
     use er_types::SafeU53;
+    use er_types::battle_ids::{MoveId, SpeciesId};
 
     let historical = compile_small(&small_definitions(false))?;
-    assert!(historical.species.iter().all(|row| row.experience.is_none()));
+    assert!(
+        historical
+            .species
+            .iter()
+            .all(|row| row.experience.is_none())
+    );
     assert!(!serde_json::to_string(&historical)?.contains("experience\""));
     let current = compile_small(&small_definitions(true))?;
     assert_ne!(current.content_hash, historical.content_hash);
@@ -130,9 +136,26 @@ fn experience_export_fields_compile_without_changing_historical_rows() -> Result
     }
     without_metadata.content_hash = without_metadata.recompute_hash()?;
     assert_eq!(without_metadata, historical);
-    assert_eq!(serde_json::to_vec(&without_metadata)?, serde_json::to_vec(&historical)?);
-    assert_eq!(current.species.iter().map(|row| row.form).collect::<Vec<_>>(), [0, 1, 2]);
-    assert_eq!(current.species[0].experience.as_ref().ok_or("species metadata")?.base_exp, SafeU53::new(70)?);
+    assert_eq!(
+        serde_json::to_vec(&without_metadata)?,
+        serde_json::to_vec(&historical)?
+    );
+    assert_eq!(
+        current
+            .species
+            .iter()
+            .map(|row| row.form)
+            .collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    assert_eq!(
+        current.species[0]
+            .experience
+            .as_ref()
+            .ok_or("species metadata")?
+            .base_exp,
+        SafeU53::new(70)?
+    );
     let prepared = current.prepare(
         &BTreeSet::from([SpeciesId::try_from_u64(1)?]),
         &BTreeSet::from([MoveId::try_from_u64(22)?]),
@@ -157,7 +180,10 @@ fn malformed_experience_export_fails_without_reinterpreting_form_rows() {
             2 => value["species"][2]["experience"]["boost"] = serde_json::json!("MEGA_Z"),
             3 => value["species"][1]["experience"]["source_form_key"] = serde_json::json!("forged"),
             4 => value["species"][1]["experience"] = serde_json::Value::Null,
-            5 => value["species"][1]["experience"]["base_exp"] = serde_json::json!(9_007_199_254_740_992_u64),
+            5 => {
+                value["species"][1]["experience"]["base_exp"] =
+                    serde_json::json!(9_007_199_254_740_992_u64)
+            }
             _ => value["species"][1]["experience"]["source_form_count"] = serde_json::json!(0),
         }
         assert!(compile_small(&value).is_err(), "case {case}");
