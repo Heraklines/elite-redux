@@ -1,4 +1,4 @@
-name: M9E Natural Cooperative Entry Focused Diagnostic
+name: M9E Cooperative Integration Entry Adapter Diagnostic
 on:
   push:
     branches: [codex/m9e-coop-entry-focused-20260906]
@@ -39,20 +39,20 @@ jobs:
       - name: Install pinned Rust tooling remotely
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
       - name: Actual CLI and process Worker setup with native browser-host parity
-        run: python3 scripts/ci/m9e_coop_entry_diagnostic.py
+        run: python3 scripts/ci/m9e_coop_entry_adapter_diagnostic.py
       - name: Compact focused result
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-coop-entry-summary-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-coop-entry-focused/compact/
+          name: m9e-coop-entry-adapter-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-coop-entry-adapter/compact/
           if-no-files-found: error
           retention-days: 14
       - name: Complete remote diagnostics
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-coop-entry-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-coop-entry-focused/diagnostics/
+          name: m9e-coop-entry-adapter-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-coop-entry-adapter/diagnostics/
           if-no-files-found: error
           retention-days: 14

@@ -1,0 +1,87 @@
+name: M9E Natural Cooperative RTC Focused Diagnostic
+on:
+  push:
+    branches: [codex/m9e-coop-rtc-focused-20260906]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-coop-rtc-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Restore dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Restore browser release Wasm build
+        uses: actions/cache@v5
+        with:
+          path: rust/target/wasm32-unknown-unknown/release
+          key: m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Restore pinned Wasm tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/bin/wasm2es6js
+          key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
+      - name: Restore Chromium download
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: m9e-focused-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install pinned Rust tooling remotely
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - name: Two actual Workers and RTC from independent Title setup
+        run: python3 scripts/ci/m9e_coop_rtc_diagnostic.py
+      - name: Compact focused result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-coop-rtc-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-coop-rtc-focused/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-coop-rtc-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/m9e-coop-rtc-focused/diagnostics/
+            test-results/rust-browser/
+          if-no-files-found: error
+          retention-days: 14

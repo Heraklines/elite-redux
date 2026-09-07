@@ -29,6 +29,8 @@ NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "coop_helper": "scripts/ci/m9e_coop_startup.py",
+    "coop_selftests": "scripts/ci/test_m9e_coop_startup.py",
     "harness": "scripts/ci/m9e_feedback.py",
     "phases": "scripts/ci/m9e_phases.py",
     "owner_helper": "scripts/ci/m9e_current_proposal.py",
@@ -39,6 +41,12 @@ IDENTITY_FILES = {
     "workflow": ".github/workflows/m9e-focused-feedback.yml",
     "lock": "rust/Cargo.lock",
     "content": "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
+    "rule_helper": "scripts/ci/m9e_rulechange.py",
+    "rule_source": "rust/crates/er-kernel/src/game_kernel_v7.rs",
+    "rule_test": "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs",
+    "rule_workspace": "rust/Cargo.toml",
+    "rule_worker_manifest": "rust/crates/er-kernel-worker/Cargo.toml",
+    "rule_toolchain": "rust/rust-toolchain.toml",
 }
 WASM_IDS = {"wasm_replays_v7_raw_inputs_eventwise", "wasm_replays_v7_held_timers_eventwise"}
 BROWSER_IDS = {"natural V7 browser startup reaches the real battle command",
@@ -102,7 +110,8 @@ LANE_B_TARGETS = {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
 # Whole long-running targets use a third existing GitHub Actions job. Each
 # target keeps its original profile, complete IDs and 600-second execution cap.
 LANE_C_TARGETS = {("er-cli", "m9e_current_batch"), ("er-lab", "current_kernel_supervisor_v2"),
-                  ("er-kernel", "m9e_material_retention_v7")}
+                  ("er-kernel", "m9e_material_retention_v7"), ("er-cli", "m9e_current_rulechange_reload"),
+                  STATE_QUERY_TARGET}
 STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
                           STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 
@@ -394,7 +403,7 @@ def validate_state_query_inventory(plan, inventory):
         raise RuntimeError("current state query process inventory, binding or lane ownership disagrees")
     for target, ids in STATE_QUERY_IDENTITIES.items():
         rows = [item for item in selected if (item["crate"], item["target"]) == target]
-        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "a"
+        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "c"
         if (len(rows) != 1 or rows[0]["ids"] != ids or rows[0]["historical_excluded_ids"]
                 or plan.get("required_native_test_ids", {}).get(":".join(target)) != ids
                 or plan.get("required_native_targets", {}).get("er-cli", []).count(target[1]) != 1
@@ -497,10 +506,27 @@ def validate_native(proof, expected_identity):
             or type(worker.get("bytes")) is not int or worker["bytes"] <= 0
             or not re.fullmatch(r"[0-9a-f]{64}", worker.get("sha256", ""))):
         raise RuntimeError("native worker artifact evidence is invalid")
+    from m9e_rulechange import RULE_TARGET, RULE_TEST, validate_rule_evidence
+    rule_key = "er-cli:" + RULE_TARGET
+    rule_selected = rule_key in by_target
+    if bool(plan.get("rule_worker")) != rule_selected:
+        raise RuntimeError("selected rulechange target has no required variant policy")
+    if rule_selected:
+        if (not plan.get("requires_worker_executable") or rule_key not in required
+                or by_target[rule_key] != [RULE_TEST] or actual.get(rule_key) != 1
+                or plan.get("required_native_test_ids", {}).get(rule_key) != [RULE_TEST]
+                or ["er-cli", RULE_TARGET] not in assignment["c"]):
+            raise RuntimeError("rulechange witness is missing exact identities or C ownership")
+        if lane == "c":
+            validate_rule_evidence(proof.get("rule_worker"), plan["rule_worker"], expected_identity, worker)
+    if "rule_worker" in proof and (lane != "c" or not rule_selected):
+        raise RuntimeError("rule evidence is outside the selected C-owned witness")
 
 
     import m9e_current_cost as cost
     cost.validate_lane(proof, ROOT, partition)
+    import m9e_coop_startup as coop
+    coop.validate_lane(proof, ROOT, partition)
 
 
 def export_native(feedback, summary):
@@ -528,13 +554,15 @@ def export_native(feedback, summary):
              "native_timer_parity_digest": summary.get("native_timer_parity_digest"), "cli": None}
     if "current_cost_probe" in summary:
         proof["current_cost_probe"] = summary["current_cost_probe"]
+    if "current_coop_entry" in summary:
+        proof["current_coop_entry"] = summary["current_coop_entry"]
     worker = summary.get("worker_executable")
     proof["worker"] = None
     if worker is not None:
         if file_hash(Path(worker["path"])) != worker["sha256"] or Path(worker["path"]).stat().st_size != worker["bytes"]:
             raise RuntimeError("native worker artifact changed after execution")
         proof["worker"] = {key: value for key, value in worker.items() if key != "path"}
-    for key in ("timer_mutant", "replica_mutant", "ledger_mutant"):
+    for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "rule_worker"):
         if key in summary:
             proof[key] = summary[key]
     transfer = Path(os.environ["M9E_PHASE_DIR"])
@@ -854,6 +882,10 @@ def validate_platform(proof, native, native_hash):
             or proof.get("plan_sha256") != native["plan_sha256"]):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
+    import m9e_coop_startup as coop
+    coop.validate_platform(proof, native, ROOT)
+    if "plan" in proof and proof["plan"] != plan:
+        raise RuntimeError("platform duplicated plan differs from its bound native plan")
     from m9e_current_proposal import validate_obligations
     validate_obligations(plan, native["inventory"], native["identity"]["product_sha"])
     if plan.get("requires_browser_worker"):
@@ -936,6 +968,21 @@ def validate_platform(proof, native, native_hash):
                 raise RuntimeError("platform current repro bridge causal evidence is inconsistent")
 
 
+def reference_platform_plan(proof, native, native_hash):
+    """Keep the exact same-run native plan by hash, without a second full copy.
+
+    validate_platform consumes the already verified native plan for every
+    obligation. Both artifact and plan hashes remain in the platform proof;
+    no test, asset, identity, timing or size bound is discarded.
+    """
+    if proof.get("plan") != native["plan"]:
+        raise RuntimeError("platform producer must bind its complete native plan before publication")
+    validate_platform(proof, native, native_hash)
+    result = {key: value for key, value in proof.items() if key != "plan"}
+    validate_platform(result, native, native_hash)
+    return result
+
+
 def platform(feedback):
     source = Path(os.environ["M9E_PHASE_DIR"])
     native_hash = os.environ["M9E_NATIVE_MANIFEST_SHA256"]
@@ -959,14 +1006,18 @@ def platform(feedback):
                       "qualification": "unfinished", "product_sha": expected["product_sha"], "active_phase": "browser"})
         # browser_checks rehashes this exact relocated binding before the bridge.
         feedback.browser_checks(summary)
+    if native["plan"].get("requires_current_coop_startup"):
+        import m9e_coop_startup as coop
+        summary["current_coop_rtc"] = coop.execute_platform(feedback, expected, native["plan"]["current_coop_startup_binding"])
     summary["status"] = "passed"
-    validate_platform(summary, native, native_hash)
+    summary = reference_platform_plan(summary, native, native_hash)
     proof_hash = write_bounded(source / "platform/platform.json", summary)
     output("platform_manifest_sha256", proof_hash)
     return summary
 
 
 def aggregate(feedback):
+    import m9e_coop_startup as coop
     if any(os.environ.get(key) != "success" for key in ("M9E_NATIVE_A_RESULT", "M9E_NATIVE_B_RESULT", "M9E_NATIVE_C_RESULT", "M9E_PLATFORM_RESULT")):
         raise RuntimeError("required native/platform job is absent, failed, skipped or cancelled")
     directory = Path(os.environ["M9E_PHASE_DIR"])
@@ -1009,7 +1060,9 @@ def aggregate(feedback):
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
-            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native}}
+            **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native},
+            **{key: third[key] for key in ("rule_worker",) if key in third},
+            **coop.aggregate_reference(native, result, native_hash, os.environ["M9E_PLATFORM_MANIFEST_SHA256"])}
 
 
 def compact_rtc_evidence(compact, full_hash):
@@ -1064,11 +1117,11 @@ def main():
         # bounded proofs, not a duplicate archive of native diagnostics.
         full_hash = write_bounded(feedback.FULL / "phase-summary.json", summary)
         compact = {key: summary[key] for key in (
-            "phase", "status", "qualification", "product_sha", "identity", "tests",
+            "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup",
             "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
             "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "platform_manifest_sha256",
             "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
-            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in summary}
+            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
         compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
         if "first_failure" in summary:
             compact["first_failure"] = summary["first_failure"]
@@ -1084,6 +1137,8 @@ def main():
         retirement.compact(compact, full_hash, encoded)
         import m9e_current_cost as cost
         cost.compact(compact, full_hash, encoded)
+        import m9e_rulechange as rule
+        rule.compact(compact, full_hash, encoded)
         if len(encoded(compact)) > 16000:
             raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
         write_bounded(feedback.COMPACT / "summary.json", compact)
