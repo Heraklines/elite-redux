@@ -170,19 +170,21 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
     };
     let mut remaining = bootstrap.catalog.maximum_starter_cost;
     let mut starters = Vec::new();
-    for starter in &bootstrap.catalog.starters {
+    let mut choices = bootstrap.catalog.starters.iter().collect::<Vec<_>>();
+    choices.sort_by_key(|starter| (starter.cost, starter.pokemon_id));
+    for starter in choices {
         if starter.cost <= remaining {
             remaining -= starter.cost;
             starters.push(starter.pokemon_id);
-            if starters.len() == 3.min(bootstrap.catalog.maximum_starters) {
+            if starters.len() == 6.min(bootstrap.catalog.maximum_starters) {
                 break;
             }
         }
     }
     assert_eq!(
         starters.len(),
-        3,
-        "natural three-starter policy unavailable"
+        6,
+        "natural six-starter policy unavailable"
     );
     for starter in starters {
         navigate_down_to(&mut kernel, &format!("bootstrap/starter/{}", starter.get()))?;
