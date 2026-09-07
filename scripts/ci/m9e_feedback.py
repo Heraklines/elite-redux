@@ -198,11 +198,18 @@ PROGRESSION_TARGET = "m9e_natural_progression_v7"
 PROGRESSION_IDS = ["natural_victory_experience_recalculates_stats_preserves_damage_and_restores"]
 PROGRESSION_PATHS = ["rust/crates/er-progression/src/progression.rs",
                      "rust/crates/er-kernel/tests/" + PROGRESSION_TARGET + ".rs"]
+CHECKPOINT_TARGET = "m9e_checkpoint_healing_v7"
+CHECKPOINT_IDS = ["ordinary_wave_reward_preserves_damage_status_and_used_pp",
+                  "raw_checkpoint_reward_restores_party_and_replays_from_snapshot"]
+CHECKPOINT_PATHS = ["rust/crates/er-game/src/m9e_new_run_v6.rs",
+                    "rust/crates/er-kernel/tests/" + CHECKPOINT_TARGET + ".rs"]
 RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
                   "rust/crates/er-kernel/tests/" + REPLACEMENT_TARGET + ".rs",
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
-                  "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS]
-RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS}
+                  "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
+                  "rust/crates/er-wasm/tests/m9e_parity.rs",
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS]
+RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS}
 
 
 def select_recovery_scope(config, changed):
@@ -210,7 +217,7 @@ def select_recovery_scope(config, changed):
     if policy is not None and policy != RECOVERY_POLICY:
         raise RuntimeError("current recovery integration policy identities disagree")
     scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
-    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1])) and not scoped:
+    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1])) and not scoped:
         raise RuntimeError("natural replacement integration product delta is unmapped")
     return scoped, policy is not None
 
@@ -1432,6 +1439,13 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + PROGRESSION_TARGET: list(PROGRESSION_IDS)}
         if result["execution_scope"] is not None:
             result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [PROGRESSION_TARGET]})
+    checkpoint_required = replacement_installed and "er-kernel" in selected
+    result["requires_checkpoint_healing"] = checkpoint_required
+    if checkpoint_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": [CHECKPOINT_TARGET]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + CHECKPOINT_TARGET: list(CHECKPOINT_IDS)}
+        if result["execution_scope"] is not None:
+            result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [CHECKPOINT_TARGET]})
     if ai_commands_session:
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-game": ["m9e_new_run_v6"]})
     max_pp_required = bool(max_pp_focus) and "er-kernel" in selected and (

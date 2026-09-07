@@ -8,7 +8,11 @@
     "src/rust-browser/routes/rust-current-rtc-entry.ts",
     "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts",
     "rust/crates/er-progression/src/progression.rs",
-    "rust/crates/er-kernel/tests/m9e_natural_progression_v7.rs"
+    "rust/crates/er-kernel/tests/m9e_natural_progression_v7.rs",
+    "rust/crates/er-wasm/tests/m9e_parity.rs",
+    "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs",
+    "rust/crates/er-game/src/m9e_new_run_v6.rs",
+    "rust/crates/er-kernel/tests/m9e_checkpoint_healing_v7.rs"
   ],
   "replacement_test_ids": [
     "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
@@ -16,6 +20,10 @@
   ],
   "progression_test_ids": [
     "natural_victory_experience_recalculates_stats_preserves_damage_and_restores"
+  ],
+  "checkpoint_test_ids": [
+    "ordinary_wave_reward_preserves_damage_status_and_used_pp",
+    "raw_checkpoint_reward_restores_party_and_replays_from_snapshot"
   ]
 },
   "current_ai_command_transaction_focus": {"paths":["rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs"],"exact_test_ids":["command_cursor_rejection_preserves_ai_sequence_and_all_other_owners","complete_two_actor_preparation_commits_once_and_replays_identical_commands","later_actor_rejection_preserves_the_complete_ai_command_owner"]},
