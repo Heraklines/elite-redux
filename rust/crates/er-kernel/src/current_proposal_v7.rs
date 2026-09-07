@@ -278,6 +278,121 @@ impl CurrentProposalMaterialReceiptV1 {
     }
 }
 
+/// Generation two has its own strict wire discriminator. The V1 decoder and
+/// its exact generation-one encoding remain unchanged.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CurrentReceiptKindV2 {
+    CurrentProposalMaterialReceiptV2,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentProposalMaterialReceiptV2 {
+    pub kind: CurrentReceiptKindV2,
+    pub schema_version: u32,
+    pub proposal_hex: String,
+    pub proposal_digest: String,
+    #[serde(deserialize_with = "deserialize_current_frame_context")]
+    pub authority_context: FrameContext,
+    pub rebind_transaction_id: String,
+    pub material_hex: String,
+    pub material_digest: String,
+    pub material_fingerprint: String,
+}
+
+fn valid_rebind_transaction_digest(value: &str) -> bool {
+    // The retained handshake uses fixture_digest: raw lower-case SHA256 hex.
+    // This is a separate namespace from the blake3-v1 gameplay state digest.
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+impl CurrentProposalMaterialReceiptV2 {
+    pub fn from_admission(
+        proposal_bytes: &[u8],
+        material_bytes: &[u8],
+        authority_context: FrameContext,
+        rebind_transaction_id: String,
+    ) -> Result<Self> {
+        if proposal_bytes.len() > MAX_CURRENT_PROPOSAL_BYTES_V1
+            || material_bytes.len() > MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1
+        {
+            return Err(CurrentProposalErrorV1);
+        }
+        let receipt = Self {
+            kind: CurrentReceiptKindV2::CurrentProposalMaterialReceiptV2,
+            schema_version: 2,
+            proposal_hex: current_bytes_hex_v1(proposal_bytes),
+            proposal_digest: json_bytes_sha256_v1(proposal_bytes)?,
+            authority_context,
+            rebind_transaction_id,
+            material_hex: current_bytes_hex_v1(material_bytes),
+            material_digest: json_bytes_sha256_v1(material_bytes)?,
+            material_fingerprint: current_material_fingerprint_v1(material_bytes)?,
+        };
+        receipt.evidence()?;
+        receipt.canonical_bytes()?;
+        Ok(receipt)
+    }
+
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>> {
+        let bytes = canonical_bytes(self).map_err(|_| CurrentProposalErrorV1)?;
+        if bytes.len() > MAX_CURRENT_RECEIPT_BYTES_V1 {
+            return Err(CurrentProposalErrorV1);
+        }
+        Ok(bytes)
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
+        if bytes.is_empty() || bytes.len() > MAX_CURRENT_RECEIPT_BYTES_V1 {
+            return Err(CurrentProposalErrorV1);
+        }
+        let receipt: Self = serde_json::from_slice(bytes).map_err(|_| CurrentProposalErrorV1)?;
+        // Canonical equality rejects unknown nested historical FrameContext keys too.
+        if receipt.canonical_bytes()? != bytes {
+            return Err(CurrentProposalErrorV1);
+        }
+        receipt.evidence()?;
+        Ok(receipt)
+    }
+
+    pub fn evidence(&self) -> Result<DecodedCurrentReceiptV1> {
+        let proposal_bytes =
+            decode_current_hex_v1(&self.proposal_hex, MAX_CURRENT_PROPOSAL_BYTES_V1)?;
+        let material_bytes =
+            decode_current_hex_v1(&self.material_hex, MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1)?;
+        let proposal = decode_current_proposal_v1(&proposal_bytes)?;
+        let material =
+            GameMaterialV6::decode(&material_bytes).map_err(|_| CurrentProposalErrorV1)?;
+        let transition = material.transition();
+        let context = &proposal.proposal.context;
+        if self.schema_version != 2
+            || !valid_rebind_transaction_digest(&self.rebind_transaction_id)
+            || self.proposal_digest != json_bytes_sha256_v1(&proposal_bytes)?
+            || self.material_digest != json_bytes_sha256_v1(&material_bytes)?
+            || self.material_fingerprint != current_material_fingerprint_v1(&material_bytes)?
+            || transition.operation_id != context.operation_id
+            || transition.authority_seat != context.authority_seat
+            || transition.authority_revision != context.authority_revision
+            || transition.accepted_action.as_ref() != Some(&proposal.proposal.action)
+            || self.authority_context.sender_seat_id != context.authority_seat
+            || self.authority_context.authority_seat_id != context.authority_seat
+            || self.authority_context.connection_generation != proposal.connection_generation
+            || proposal.connection_generation.get()
+                != SafeU53::new(2).map_err(|_| CurrentProposalErrorV1)?
+            || proposal.sender_seat == context.authority_seat
+        {
+            return Err(CurrentProposalErrorV1);
+        }
+        Ok(DecodedCurrentReceiptV1 {
+            proposal,
+            proposal_bytes,
+            material,
+            material_bytes,
+        })
+    }
+}
+
 /// Stable identity only. Disconnected/Connecting and unrelated scheduler pauses
 /// must not invalidate a retained owner or its snapshot.
 pub fn validate_current_pair_v1(
@@ -375,12 +490,22 @@ pub fn validate_current_owner_snapshot_v1(
     }
     let retained = owner.retained();
     let protocol = snapshot.protocol.as_ref().ok_or(CurrentProposalErrorV1)?;
-    validate_current_pair_v1(
-        protocol,
-        retained.publication_context.sender_seat_id,
-        EndpointRole::Replica,
-        false,
-    )?;
+    if snapshot.current_coop_setup.as_ref().is_some_and(|setup| setup.rebind.is_some()) {
+        crate::game_kernel_v7::current_coop_rebind_v7::validate_open_pair(
+            snapshot, retained.publication_context.sender_seat_id, EndpointRole::Replica, false,
+        ).map_err(|_| CurrentProposalErrorV1)?;
+        if retained.publication_next_authority_revision < snapshot.current_coop_setup.as_ref()
+            .and_then(|setup| setup.rebind.as_ref()).ok_or(CurrentProposalErrorV1)?
+            .binding.frontier.next_authority_revision
+        { return Err(CurrentProposalErrorV1); }
+    } else {
+        validate_current_pair_v1(
+            protocol,
+            retained.publication_context.sender_seat_id,
+            EndpointRole::Replica,
+            false,
+        )?;
+    }
     validate_current_proposal_quiescence_v1(Some(protocol), &snapshot.scheduler)?;
     let bytes = decode_current_hex_v1(&retained.proposal_hex, MAX_CURRENT_PROPOSAL_BYTES_V1)?;
     let envelope = decode_current_proposal_v1(&bytes)?;

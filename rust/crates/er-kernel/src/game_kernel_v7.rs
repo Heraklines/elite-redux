@@ -56,7 +56,8 @@ use er_types::{
 use thiserror::Error;
 
 use crate::current_proposal_v7::{
-    CurrentProposalMaterialReceiptV1, CurrentProposalOwnerSnapshotV1, MAX_CURRENT_RECEIPT_BYTES_V1,
+    CurrentProposalMaterialReceiptV1, CurrentProposalMaterialReceiptV2, DecodedCurrentReceiptV1,
+    CurrentProposalOwnerSnapshotV1, MAX_CURRENT_RECEIPT_BYTES_V1,
     RetainedCurrentProposalV1, TerminalAbandonedCurrentProposalV1, current_bytes_hex_v1,
     decode_current_proposal_v1, json_bytes_sha256_v1, validate_current_pair_v1,
     validate_current_proposal_quiescence_v1,
@@ -489,9 +490,7 @@ impl GameKernelV7 {
     pub fn prepare_authority_ai_commands(
         &mut self,
     ) -> Result<Vec<er_types::battle_command::AcceptedBattleCommand>, GameKernelV7Error> {
-        if self.has_current_coop_rebind() {
-            return Err(GameKernelV7Error::Invalid);
-        }
+        self.require_current_rebind_gameplay()?;
         if self.role != GameKernelRoleV7::Authority {
             return Err(GameKernelV7Error::Invalid);
         }
@@ -761,9 +760,7 @@ impl GameKernelV7 {
         &mut self,
         event: RawInputEvent,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        if self.has_current_coop_rebind() {
-            return Err(GameKernelV7Error::Invalid);
-        }
+        self.require_current_rebind_gameplay()?;
         if matches!(self.lifecycle, GameKernelLifecycleV7::Bootstrap(_)) {
             let event = match event {
                 RawInputEvent::GamepadDown { button } => {
@@ -813,9 +810,7 @@ impl GameKernelV7 {
         &mut self,
         milliseconds: SafeU53,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        if self.has_current_coop_rebind() {
-            return Err(GameKernelV7Error::Invalid);
-        }
+        self.require_current_rebind_gameplay()?;
         let mut candidate = self.clone();
         let step = candidate.advance_time_transaction(milliseconds)?;
         candidate.validate()?;
@@ -945,8 +940,12 @@ impl GameKernelV7 {
             GameKernelRoleV7::Authority => EndpointRole::Authority,
             GameKernelRoleV7::Replica => EndpointRole::Replica,
         };
-        validate_current_pair_v1(protocol, self.local_seat, role, true)
-            .map_err(|_| GameKernelV7Error::Invalid)?;
+        if self.has_current_coop_rebind() {
+            current_coop_rebind_v7::validate_open_pair(&self.snapshot()?, self.local_seat, role, true)?;
+        } else {
+            validate_current_pair_v1(protocol, self.local_seat, role, true)
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+        }
         validate_current_proposal_quiescence_v1(Some(protocol), &self.scheduler)
             .map_err(|_| GameKernelV7Error::Invalid)?;
         if generation != protocol.frame_context.context.connection_generation {
@@ -961,7 +960,7 @@ impl GameKernelV7 {
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         if self.has_current_coop_rebind() {
-            return Err(GameKernelV7Error::Invalid);
+            return self.ingest_rebound_current_frame(generation, bytes);
         }
         if current_coop_setup_v7::is_setup_frame(bytes) {
             return self.ingest_coop_setup(generation, bytes);
@@ -972,7 +971,7 @@ impl GameKernelV7 {
         {
             // Existing non-one-generation sessions retain their raw admission
             // path. This is not a receipt-owner or generation-rebind witness.
-            if self.current_proposal.is_some()
+            if self.current_coop_setup.is_some() || self.current_proposal.is_some()
                 || !protocol
                     .connections
                     .iter()
@@ -1080,14 +1079,100 @@ impl GameKernelV7 {
         }
     }
 
+    fn ingest_rebound_current_frame(
+        &mut self,
+        generation: ConnectionGeneration,
+        bytes: &[u8],
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.require_current_rebind_gameplay()?;
+        self.validate_current_network_pair(generation)?;
+        if bytes.is_empty() || bytes.len() > MAX_CURRENT_RECEIPT_BYTES_V1 {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let snapshot = self.snapshot()?;
+        let transaction = current_coop_rebind_v7::open_transaction_id(&snapshot)?;
+        let floor = snapshot.current_coop_setup.as_ref().and_then(|setup| setup.rebind.as_ref())
+            .ok_or(GameKernelV7Error::Invalid)?.binding.frontier.next_authority_revision;
+        match self.role {
+            GameKernelRoleV7::Authority => {
+                let proposal = decode_current_proposal_v1(bytes).map_err(|_| GameKernelV7Error::Invalid)?;
+                if proposal.connection_generation != generation || proposal.proposal.context.authority_revision < floor {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                if let Some(reply) = self.current_coop_setup.as_ref().and_then(|setup| setup.last_reply_v2.as_ref())
+                    && reply.proposal_hex == current_bytes_hex_v1(bytes)
+                {
+                    return Ok(GameKernelStepV7 {
+                        effects: vec![GameKernelEffectV7::AuthorityMaterial {
+                            operation_id: proposal.proposal.context.operation_id,
+                            bytes: reply.canonical_bytes().map_err(|_| GameKernelV7Error::Invalid)?,
+                        }], internal_events: Vec::new(),
+                    });
+                }
+                let mut candidate = self.clone();
+                let mut step = candidate.admit_current_game_proposal(bytes)?;
+                if step.effects.is_empty() { return Ok(step); }
+                let reply = candidate.current_coop_setup.as_ref().and_then(|setup| setup.last_reply_v2.as_ref())
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                let evidence = reply.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+                if reply.rebind_transaction_id != transaction || evidence.proposal_bytes != bytes {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                let mut count = 0;
+                for effect in &mut step.effects {
+                    if let GameKernelEffectV7::AuthorityMaterial { operation_id, bytes: material } = effect {
+                        if *operation_id != proposal.proposal.context.operation_id || *material != evidence.material_bytes {
+                            return Err(GameKernelV7Error::Invalid);
+                        }
+                        *material = reply.canonical_bytes().map_err(|_| GameKernelV7Error::Invalid)?;
+                        count += 1;
+                    }
+                }
+                if count != 1 { return Err(GameKernelV7Error::Invalid); }
+                candidate.validate()?;
+                *self = candidate;
+                Ok(step)
+            }
+            GameKernelRoleV7::Replica => {
+                if let Ok(receipt) = CurrentProposalMaterialReceiptV2::decode(bytes) {
+                    let evidence = receipt.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+                    if receipt.rebind_transaction_id != transaction
+                        || evidence.material.transition().authority_revision < floor
+                    { return Err(GameKernelV7Error::Invalid); }
+                    self.apply_current_receipt_evidence(evidence, receipt.authority_context,
+                        receipt.proposal_hex, receipt.proposal_digest)
+                } else {
+                    // Actual host actions still publish unchanged inner V6
+                    // material. Only the validated generation-two ingress may
+                    // admit it, above the committed generation-one frontier.
+                    let material = GameMaterialV6::decode(bytes).map_err(|_| GameKernelV7Error::Invalid)?;
+                    if material.transition().authority_revision < floor {
+                        return Err(GameKernelV7Error::Invalid);
+                    }
+                    self.apply_current_material(bytes, false, false)
+                }
+            }
+        }
+    }
+
     fn apply_current_receipt(
         &mut self,
         receipt: CurrentProposalMaterialReceiptV1,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let evidence = receipt.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+        self.apply_current_receipt_evidence(evidence, receipt.authority_context, receipt.proposal_hex, receipt.proposal_digest)
+    }
+
+    fn apply_current_receipt_evidence(
+        &mut self,
+        evidence: DecodedCurrentReceiptV1,
+        authority_context: er_types::FrameContext,
+        proposal_hex: String,
+        proposal_digest: String,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let protocol = self.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?;
         let transition = evidence.material.transition();
-        if protocol.peer_identity.peer.as_ref() != Some(&receipt.authority_context)
+        if protocol.peer_identity.peer.as_ref() != Some(&authority_context)
             || evidence.proposal.sender_seat != self.local_seat
             || &transition.content_identity != self.content.identity()
         {
@@ -1099,10 +1184,10 @@ impl GameKernelV7 {
             .map_err(|_| GameKernelV7Error::Invalid)?;
         let mut settle = false;
         if let Some(CurrentProposalOwnerSnapshotV1::Pending { retained }) = &self.current_proposal
-            && retained.proposal_hex == receipt.proposal_hex
+            && retained.proposal_hex == proposal_hex
         {
-            if retained.proposal_digest != receipt.proposal_digest
-                || retained.authority_peer_context != receipt.authority_context
+            if retained.proposal_digest != proposal_digest
+                || retained.authority_peer_context != authority_context
                 || retained.publication_content_identity != transition.content_identity
                 || retained.publication_before_digest != transition.before_digest
                 || retained.publication_next_authority_revision != transition.authority_revision
@@ -1124,9 +1209,7 @@ impl GameKernelV7 {
         generation: ConnectionGeneration,
         connected: bool,
     ) -> Result<(), GameKernelV7Error> {
-        if self.has_current_coop_rebind() {
-            return self.current_rebind_transport_changed(generation, connected);
-        }
+        if self.has_current_coop_rebind() { return self.current_rebind_transport_changed(generation, connected); }
         let mut candidate = self.clone();
         candidate.transport_changed_transaction(generation, connected)?;
         candidate.validate()?;
@@ -1210,9 +1293,7 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        if self.has_current_coop_rebind() {
-            return Err(GameKernelV7Error::Invalid);
-        }
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         self.apply_current_material(bytes, false, false)
     }
 
@@ -1611,9 +1692,14 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        if self.has_current_coop_rebind() {
-            return Err(GameKernelV7Error::Invalid);
-        }
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
+        self.admit_current_game_proposal(bytes)
+    }
+
+    fn admit_current_game_proposal(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         if self.role != GameKernelRoleV7::Authority || bytes.is_empty() {
             return Err(GameKernelV7Error::Invalid);
         }
@@ -1709,6 +1795,7 @@ impl GameKernelV7 {
         // newly committed receipt. The raw API retains its raw returned effects.
         if let Some(owner) = staged.current_coop_setup.as_mut() {
             owner.last_reply = None;
+            owner.last_reply_v2 = None;
         }
         if let Some(index) = retirement {
             protocol
@@ -1720,6 +1807,11 @@ impl GameKernelV7 {
             staged.protocol = Some(protocol.clone());
         }
         let step = staged.apply_admitted_game_proposal(envelope, protocol, fingerprint)?;
+        let rebound_context = if staged.has_current_coop_rebind() {
+            let snapshot = staged.snapshot()?;
+            Some((snapshot.protocol.as_ref().ok_or(GameKernelV7Error::Invalid)?.frame_context.context.clone(),
+                current_coop_rebind_v7::open_transaction_id(&snapshot)?))
+        } else { None };
         if let Some(owner) = staged.current_coop_setup.as_mut()
             && owner.started.is_some()
         {
@@ -1731,14 +1823,20 @@ impl GameKernelV7 {
             if materials.next().is_some() {
                 return Err(GameKernelV7Error::Invalid);
             }
-            owner.last_reply = Some(Box::new(
+            if let Some((context, transaction)) = rebound_context {
+                owner.last_reply_v2 = Some(Box::new(CurrentProposalMaterialReceiptV2::from_admission(
+                    bytes, material, context, transaction,
+                ).map_err(|_| GameKernelV7Error::Invalid)?));
+            } else {
+                owner.last_reply = Some(Box::new(
                 CurrentProposalMaterialReceiptV1::from_admission(
                     bytes,
                     material,
                     owner.local.clone(),
                 )
                 .map_err(|_| GameKernelV7Error::Invalid)?,
-            ));
+                ));
+            }
         }
         staged.validate()?;
         *self = staged;
@@ -2373,8 +2471,9 @@ impl GameKernelV7 {
             };
             if connection_generation.get()
                 != SafeU53::new(1).map_err(|_| GameKernelV7Error::Invalid)?
+                && !self.has_current_coop_rebind()
             {
-                if self.current_proposal.is_some() {
+                if self.current_coop_setup.is_some() || self.current_proposal.is_some() {
                     return Err(GameKernelV7Error::Invalid);
                 }
                 let bytes = canonical_bytes(&envelope).map_err(|_| GameKernelV7Error::Invalid)?;

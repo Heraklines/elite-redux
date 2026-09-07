@@ -1,4 +1,4 @@
-"""Remote native equal-frontier generation rebind F; no V2 gameplay or browser claim."""
+"""Remote owned generation-two gameplay and receipt F; no CLI or browser claim."""
 import hashlib
 import json
 import os
@@ -9,7 +9,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-gen2-native-focused"
+REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-gen2-gameplay-focused"
 FULL = REPORT / "diagnostics"
 COMPACT = REPORT / "compact"
 TARGET = REPORT / "target"
@@ -27,6 +27,9 @@ TARGETS = [
       "equal_frontier_native_rebind_commits_two_atomically_without_gameplay",
       "every_rebind_phase_restores_and_retries_exact_control_without_advancing_replay",
       "malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot",
+      "open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt",
+      "open_rebind_receipt_and_owner_mutations_reject_with_complete_state_conservation",
+      "open_rebind_replaces_original_v1_reply_atomically_at_capacity_one",
       "rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners",
       "rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_pause"
     ]
@@ -375,7 +378,7 @@ RUST_SOURCES = [
   "rust/crates/er-kernel/src/game_kernel_v7.rs",
   "rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs"
 ]
-CI_SOURCES = ["scripts/ci/m9e_gen2_native_diagnostic.py", ".github/workflows/m9e-gen2-native-focused.yml"]
+CI_SOURCES = ["scripts/ci/m9e_gen2_gameplay_diagnostic.py", ".github/workflows/m9e-gen2-gameplay-focused.yml"]
 CHANGED_SOURCES = sorted(RUST_SOURCES + CI_SOURCES)
 FIXTURE_INPUTS = {
   "rust/fixtures/m9/engineering/game-content-bundle-v2.json": [
@@ -644,7 +647,7 @@ if __name__ == "__main__":
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": BASE_SHA,
-               "qualification": "47 complete native tests: five equal-frontier 1-to-2 handshake tests, 39 unchanged current compatibility tests and three receipt/public-retry tests; 18 other kernel harnesses compile-only; no unequal-frontier repair, lost-reply rebind, V2 gameplay, CLI or browser qualification"}
+               "qualification": "50 complete native tests: eight owned handshake and generation-two gameplay/receipt tests, 39 unchanged compatibility tests and three generation-one receipt/public-retry tests; 18 other kernel harnesses compile-only; no unequal-frontier repair, lost-reply rebind, CLI or browser qualification"}
     try:
         main(summary)
         summary["status"] = "passed"

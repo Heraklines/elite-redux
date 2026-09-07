@@ -1,11 +1,11 @@
-name: M9E Native Equal Frontier Rebind Diagnostic
+name: M9E Owned Generation Two Gameplay Diagnostic
 on:
   push:
-    branches: [codex/m9e-gen2-native-focused-20260907]
+    branches: [codex/m9e-gen2-gameplay-focused-20260907]
 permissions:
   contents: read
 concurrency:
-  group: m9e-gen2-native-focused-${{ github.ref }}
+  group: m9e-gen2-gameplay-focused-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   measure:
@@ -66,22 +66,22 @@ jobs:
           remaining=$((1780 - elapsed))
           test "$remaining" -gt 0
           timeout "$((remaining < 600 ? remaining : 600))" rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
-      - name: Forty-seven complete native tests and all kernel constructors
+      - name: Fifty complete native tests and all kernel constructors
         timeout-minutes: 30
-        run: python3 scripts/ci/m9e_gen2_native_diagnostic.py
+        run: python3 scripts/ci/m9e_gen2_gameplay_diagnostic.py
       - name: Compact focused result
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-gen2-native-summary-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-gen2-native-focused/compact/
+          name: m9e-gen2-gameplay-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-gen2-gameplay-focused/compact/
           if-no-files-found: error
           retention-days: 14
       - name: Complete remote diagnostics
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-gen2-native-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-gen2-native-focused/diagnostics/
+          name: m9e-gen2-gameplay-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-gen2-gameplay-focused/diagnostics/
           if-no-files-found: error
           retention-days: 14
