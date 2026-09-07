@@ -962,11 +962,149 @@ fn deliver_play_step(
     Ok((proposals, materials))
 }
 
+fn choose_combat_party(
+    kernel: &mut GameKernelV7,
+    content: &PreparedGameContentV2,
+    host: bool,
+) -> Result<OwnedChoicePublication, Box<dyn Error>> {
+    let mode = content
+        .bundle()
+        .bootstrap
+        .modes
+        .iter()
+        .find(|mode| mode.cooperative && mode.supported)
+        .ok_or("co-op mode missing")?;
+    let mut frames = Vec::new();
+    capture_press(kernel, &mut frames)?;
+    navigate(kernel, &format!("bootstrap/mode/{}", mode.mode.get()))?;
+    capture_press(kernel, &mut frames)?;
+    if mode.challenge_selection && host {
+        navigate(kernel, "bootstrap/challenge/done")?;
+        capture_press(kernel, &mut frames)?;
+    }
+    let GameKernelLifecycleSnapshotV7::Bootstrap(before) = kernel.snapshot()?.lifecycle else {
+        return Err("raw setup bypassed".into());
+    };
+    assert_eq!(before.stage, RunBootstrapStageV1::StarterSelect);
+    let budget = usize::from(before.catalog.maximum_starter_cost);
+    let capacity = 6.min(before.catalog.maximum_starters);
+    // Evaluate only the actual catalog and level-five starting moves. The
+    // previous base-stat-only choice had just five damaging PP; a party needs
+    // enough usable attacks as well as strength to reach its next checkpoint.
+    let mut choices = Vec::new();
+    for starter in &before.catalog.starters {
+        let species_id = er_types::battle_ids::SpeciesId::new(starter.species_id);
+        let species = content.battle.species(species_id)?;
+        let progression = content
+            .progression
+            .species(species_id, starter.form_index)
+            .ok_or("starter progression absent")?;
+        let mut moves = Vec::new();
+        for entry in &progression.level_moves {
+            if entry.level > 0 && entry.level <= 5 && !moves.contains(&entry.move_id) {
+                moves.push(entry.move_id);
+            }
+        }
+        let mut damaging_pp = 0_u64;
+        let mut best_attack = 0_u64;
+        for move_id in moves.into_iter().rev().take(4) {
+            let definition = content.battle.move_definition(move_id)?;
+            let er_types::battle_model::MovePower::Value(power) = definition.power else {
+                continue;
+            };
+            if power == 0 {
+                continue;
+            }
+            damaging_pp += u64::from(definition.base_pp);
+            let offense = match definition.category {
+                er_types::battle_model::MoveCategory::Physical => species.base_stats.attack,
+                er_types::battle_model::MoveCategory::Special => species.base_stats.special_attack,
+                er_types::battle_model::MoveCategory::Status => continue,
+            };
+            best_attack = best_attack.max(u64::from(power) * u64::from(offense));
+        }
+        if best_attack == 0 || damaging_pp == 0 {
+            continue;
+        }
+        let bulk = u64::from(species.base_stats.hp)
+            + u64::from(species.base_stats.defense)
+            + u64::from(species.base_stats.special_defense);
+        let score = best_attack * bulk * (20 + damaging_pp.min(120));
+        choices.push((score, starter));
+    }
+    choices.sort_by_key(|(_, starter)| starter.pokemon_id);
+    let mut plans = vec![vec![None; capacity + 1]; budget + 1];
+    plans[0][0] = Some((0_u64, Vec::new()));
+    for (score, starter) in choices {
+        let cost = usize::from(starter.cost);
+        if cost > budget {
+            continue;
+        }
+        for spent in (cost..=budget).rev() {
+            for count in (1..=capacity).rev() {
+                let Some((previous_score, previous_party)) = plans[spent - cost][count - 1].clone()
+                else {
+                    continue;
+                };
+                let candidate_score = previous_score + score;
+                if plans[spent][count]
+                    .as_ref()
+                    .is_none_or(|(best, _)| candidate_score > *best)
+                {
+                    let mut party = previous_party;
+                    party.push(starter.pokemon_id);
+                    plans[spent][count] = Some((candidate_score, party));
+                }
+            }
+        }
+    }
+    let starters = plans
+        .into_iter()
+        .flatten()
+        .flatten()
+        .max_by_key(|(score, _)| *score)
+        .ok_or("no affordable combat-ready party")?
+        .1;
+    assert!(
+        !starters.is_empty(),
+        "no legal offered starter fits the budget"
+    );
+    let selected = starters.iter().map(|id| before.catalog.starters.iter().find(|starter| starter.pokemon_id == *id).cloned().ok_or("selected starter disappeared")).collect::<Result<Vec<_>, _>>()?;
+    for starter in &selected {
+        navigate(
+            kernel,
+            &format!("bootstrap/starter/{}", starter.pokemon_id.get()),
+        )?;
+        capture_press(kernel, &mut frames)?;
+    }
+    navigate(kernel, "bootstrap/starter/confirm")?;
+    capture_press(kernel, &mut frames)?;
+    capture_press(kernel, &mut frames)?;
+    if host {
+        for _ in 0..4 {
+            if kernel.state().is_some()
+                || matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete)
+            {
+                break;
+            }
+            capture_press(kernel, &mut frames)?;
+        }
+    } else {
+        assert!(
+            matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::WaitingForPartner)
+        );
+        assert_eq!(
+            frames.len(),
+            1,
+            "confirmation itself publishes exactly one peer selection"
+        );
+    }
+    Ok((selected, frames))
+}
+
 /// Actual independent Title setup and unmodified gameplay. The transport pause
 /// deliberately retains generation one; generation-two rebind is separate work.
-#[test]
-fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect()
--> Result<(), Box<dyn Error>> {
+fn run_natural_cooperative_battles(victory_policy: bool) -> Result<(), Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
     let generation = ConnectionGeneration::new(safe(1));
@@ -974,8 +1112,9 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
     let guest_seat = SeatId::new(safe(2));
     let mut host = owned_title(content.clone(), true)?;
     let mut guest = owned_title(content.clone(), false)?;
-    let (guest_choices, frames) = choose_owned(&mut guest, &content, false)?;
-    let (host_choices, waiting) = choose_owned(&mut host, &content, true)?;
+    let choose = if victory_policy { choose_combat_party } else { choose_owned };
+    let (guest_choices, frames) = choose(&mut guest, &content, false)?;
+    let (host_choices, waiting) = choose(&mut host, &content, true)?;
     assert!(waiting.is_empty() && host.state().is_none());
     let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
     guest.ingest_network_frame(generation, &started)?;
@@ -998,6 +1137,8 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
     let mut retained_human_commands = 0;
     let mut disconnected = false;
     let mut maximum_wave = 1;
+    let mut replacements = 0;
+    let mut saw_fainted_enemy = false;
     for decision in 0..512 {
         for kernel in [&mut host, &mut guest] {
             for pending in kernel.snapshot()?.pending_presentations {
@@ -1015,6 +1156,18 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
             "natural wave skipped"
         );
         maximum_wave = wave;
+        if !victory_policy && run.outcome == er_types::RunOutcome::Defeat {
+            assert_eq!(wave, 1);
+            assert!(replacements > 0 && saw_fainted_enemy);
+            assert!(proposals >= 2 && materials >= 4 && settled >= 4);
+            assert!(retained_human_commands >= 2);
+            assert!(run.party.iter().all(|pokemon| pokemon.fainted && pokemon.hp == 0));
+            assert_eq!(host.state(), guest.state());
+            host = restored(&host, content.clone(), true)?;
+            guest = restored(&guest, content.clone(), false)?;
+            assert_eq!(host.state(), guest.state());
+            return Ok(());
+        }
         assert_eq!(
             run.outcome,
             er_types::RunOutcome::InProgress,
@@ -1022,6 +1175,7 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
             run.party
         );
         let battle = run.battle.as_ref().ok_or("natural battle absent")?;
+        saw_fainted_enemy |= battle.enemy_party.iter().any(|pokemon| pokemon.fainted);
         assert_eq!(battle.format.player_capacity, 2);
         assert_eq!(battle.format.enemy_capacity, 2);
         assert_eq!(battle.enemy_party.len(), 2);
@@ -1045,6 +1199,7 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
             continue;
         }
         if wave == 3 {
+            assert!(victory_policy, "fixed loss policy unexpectedly reached two victories");
             assert!(disconnected && proposals >= 2 && materials >= 4 && settled >= 4);
             assert!(rewards >= 2 && progression >= 2 && retained_human_commands >= 2);
             host = restored(&host, content.clone(), true)?;
@@ -1064,8 +1219,9 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
             er_types::GameControlKindV2::Reward => rewards += 1,
             er_types::GameControlKindV2::Progression | er_types::GameControlKindV2::MoveLearn
             | er_types::GameControlKindV2::Evolution => progression += 1,
+            er_types::GameControlKindV2::BattleReplacement => replacements += 1,
             er_types::GameControlKindV2::BattleCommand | er_types::GameControlKindV2::BattleTarget
-            | er_types::GameControlKindV2::BattleSwitch | er_types::GameControlKindV2::BattleReplacement => {}
+            | er_types::GameControlKindV2::BattleSwitch => {}
             other => return Err(format!("unhandled natural cooperative control {other:?} at wave={wave}, decision={decision}").into()),
         }
         let step = play_press(kernel).map_err(|error| format!("natural cooperative input wave={wave}, decision={decision}, owner={owner:?}, kind={kind:?}: {error}"))?;
@@ -1088,4 +1244,17 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
         }
     }
     Err(format!("natural cooperative decisions exhausted at wave={maximum_wave}").into())
+}
+
+/// Preserves the original fixed catalog choices that exposed guest replacement
+/// ownership and dead enemy AI bugs. Natural defeat is a complete terminal trace.
+#[test]
+fn natural_cooperative_fixed_party_replaces_guest_and_converges_to_defeat() -> Result<(), Box<dyn Error>> {
+    run_natural_cooperative_battles(false)
+}
+
+/// A separate catalog-only party policy must win twice; no retries or seed search.
+#[test]
+fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect() -> Result<(), Box<dyn Error>> {
+    run_natural_cooperative_battles(true)
 }
