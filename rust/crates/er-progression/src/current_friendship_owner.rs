@@ -489,14 +489,14 @@ impl FriendshipCompositionOwner {
         token: &FriendshipCallToken,
     ) -> Result<OwnedReceipt, CompositionError> {
         self.check_owner(token)?;
-        if let Some(completed) = &self.completed {
-            if completed.receipt.call_id == token.id {
-                return completed
-                    .reward_receipt
-                    .clone()
-                    .map(OwnedReceipt::replayed)
-                    .ok_or(CompositionError::Ownership);
-            }
+        if let Some(completed) = &self.completed
+            && completed.receipt.call_id == token.id
+        {
+            return completed
+                .reward_receipt
+                .clone()
+                .map(OwnedReceipt::replayed)
+                .ok_or(CompositionError::Ownership);
         }
         let mut pending = self
             .pending
@@ -573,10 +573,10 @@ impl FriendshipCompositionOwner {
         token: &FriendshipCallToken,
     ) -> Result<OwnedReceipt, CompositionError> {
         self.check_owner(token)?;
-        if let Some(completed) = &self.completed {
-            if completed.receipt.call_id == token.id {
-                return Ok(OwnedReceipt::replayed(completed.receipt.clone()));
-            }
+        if let Some(completed) = &self.completed
+            && completed.receipt.call_id == token.id
+        {
+            return Ok(OwnedReceipt::replayed(completed.receipt.clone()));
         }
         let mut pending = self
             .pending
