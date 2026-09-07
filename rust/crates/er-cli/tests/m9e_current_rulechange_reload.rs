@@ -340,11 +340,14 @@ impl Script {
             .options
             .len()
             + 1;
-        for _ in 0..bound {
+        // The confirm row is reachable by normal wrap-around Up navigation.
+        // Preserve each actual input and full snapshot check without traversing
+        // the entire catalog before the changed-rule checkpoint.
+        for _ in 0..bound.min(8) {
             if self.selected()? == "bootstrap/starter/confirm" {
                 break;
             }
-            self.press(PhysicalKey::ArrowDown)?;
+            self.press(PhysicalKey::ArrowUp)?;
         }
         assert_eq!(self.selected()?, "bootstrap/starter/confirm");
         for _ in 0..4 {
