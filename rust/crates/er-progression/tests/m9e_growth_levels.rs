@@ -23,11 +23,15 @@ fn current_growth_matches_pinned_javascript_for_every_u16_level() -> Result<(), 
             id: GrowthRateId::new(growth_id),
             experience_by_level: table.clone(),
         };
-        for (index, &(actual_id, level, expected)) in rows[begin..begin + per_growth].iter().enumerate() {
+        for (index, &(actual_id, level, expected)) in
+            rows[begin..begin + per_growth].iter().enumerate()
+        {
             assert_eq!(actual_id, growth_id);
             assert_eq!(usize::from(level), index + 1);
             assert_eq!(
-                current_growth_experience_for_level(&growth, level)?.get().get(),
+                current_growth_experience_for_level(&growth, level)?
+                    .get()
+                    .get(),
                 expected,
                 "pinned oracle differs at growth={growth_id}, level={level}"
             );
