@@ -1,0 +1,71 @@
+name: M9E XP Content Export Regeneration Diagnostic
+on:
+  push:
+    branches: [codex/m9e-xp-content-export-focused-20260907]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-xp-content-export-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regenerate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      GIT_TERMINAL_PROMPT: '0'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Pinned source object store without assets or submodules
+        uses: actions/checkout@v6
+        with:
+          ref: 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7
+          path: .m9e-xp-oracle-source
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.9.0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+          run_install: false
+          package_json_file: .m9e-xp-oracle-source/package.json
+      - name: Restore existing Rust dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust tooling remotely
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Two fresh source exports and conserved compiler regeneration
+        run: python3 scripts/ci/m9e_xp_content_export_diagnostic.py
+      - name: Compact regeneration result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-xp-content-export-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-xp-content-export-focused/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete bounded remote regeneration evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-xp-content-export-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-xp-content-export-focused/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
