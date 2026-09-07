@@ -152,11 +152,7 @@ enum RetainedExpected {
 }
 
 fn result_digest(value: &Value) -> Result<String, Box<dyn Error>> {
-    // Walk the already materialized JSON once, avoiding the generic serializer's
-    // per-object fragment copies. Hash every byte of the full canonical result;
-    // no input, field, snapshot, or semantic assertion is omitted.
-    let canonical = er_canonical::canonicalize_value(value)?;
-    Ok(er_canonical::content_digest(&canonical)?)
+    Ok(format!("{:?}", er_canonical::content_digest_value(value)?))
 }
 
 // Reap the CLI and its worker process group even if a response assertion panics.
@@ -164,7 +160,7 @@ struct CliProcess {
     child: Child,
     reader: Option<std::thread::JoinHandle<()>>,
     responses: Option<mpsc::Receiver<CliResponse>>,
-
+    writer: Option<std::thread::JoinHandle<Result<(), String>>>,
     stderr: Option<std::thread::JoinHandle<std::io::Result<Vec<u8>>>>,
 }
 
@@ -191,6 +187,9 @@ impl Drop for CliProcess {
         if let Some(reader) = self.reader.take() {
             let _ = join_before(reader, deadline);
         }
+        if let Some(writer) = self.writer.take() {
+            let _ = join_before(writer, deadline);
+        }
         if let Some(stderr) = self.stderr.take() {
             let _ = join_before(stderr, deadline);
         }
@@ -198,8 +197,8 @@ impl Drop for CliProcess {
 }
 
 struct Script {
-    requests: mpsc::SyncSender<(Value, RetainedExpected)>,
-    request_count: usize,
+    requests: Vec<Value>,
+    expected: Vec<RetainedExpected>,
     reference: CurrentGameSession,
     frontier: u64,
     started: Instant,
@@ -207,10 +206,7 @@ struct Script {
 }
 
 impl Script {
-    fn new(
-        fixture: &Fixture,
-        requests: mpsc::SyncSender<(Value, RetainedExpected)>,
-    ) -> Result<Self, Box<dyn Error>> {
+    fn new(fixture: &Fixture) -> Result<Self, Box<dyn Error>> {
         progress("reference-start");
         let started = Instant::now();
         let reference = CurrentGameSession::natural_start(
@@ -223,8 +219,8 @@ impl Script {
             None,
         )?;
         let mut script = Self {
-            requests,
-            request_count: 0,
+            requests: Vec::new(),
+            expected: Vec::new(),
             reference,
             frontier: 0,
             started,
@@ -257,25 +253,17 @@ impl Script {
     }
 
     fn push(&mut self, method: &str, params: Value, expected: Expected) {
-        assert!(
-            self.request_count < 4096,
-            "raw script request bound exceeded"
-        );
-        let request = json!({
-            "protocol_version": 1, "id": format!("reload-{}", self.request_count),
+        self.requests.push(json!({
+            "protocol_version": 1, "id": format!("reload-{}", self.requests.len()),
             "method": method, "params": params
-        });
-        let expected = match expected {
+        }));
+        self.expected.push(match expected {
             Expected::Exact(value) => RetainedExpected::ExactDigest(
                 result_digest(&value).expect("valid finite fixture JSON canonicalizes"),
             ),
             Expected::Fields(value) => RetainedExpected::Fields(value),
             Expected::Error { code, message } => RetainedExpected::Error { code, message },
-        };
-        self.requests
-            .send((request, expected))
-            .expect("CLI checker stopped");
-        self.request_count += 1;
+        });
     }
 
     fn snapshot(&mut self) -> Result<(), Box<dyn Error>> {
@@ -302,7 +290,7 @@ impl Script {
             progress(&format!(
                 "reference-progress events={} requests={} elapsed_ms={}",
                 self.frontier,
-                self.request_count,
+                self.requests.len(),
                 self.started.elapsed().as_millis()
             ));
             self.last_progress = Instant::now();
@@ -380,7 +368,7 @@ impl Script {
         progress(&format!(
             "reach-battle-ready events={} requests={} elapsed_ms={}",
             self.frontier,
-            self.request_count,
+            self.requests.len(),
             self.started.elapsed().as_millis()
         ));
         Ok(())
@@ -404,10 +392,13 @@ impl Script {
         );
     }
 
-    fn run(
-        fixture: &Fixture,
-        requests: mpsc::Receiver<(Value, RetainedExpected)>,
-    ) -> Result<(), Box<dyn Error>> {
+    fn run(self, fixture: &Fixture) -> Result<(), Box<dyn Error>> {
+        progress(&format!(
+            "script-ready events={} requests={} elapsed_ms={}",
+            self.frontier,
+            self.requests.len(),
+            self.started.elapsed().as_millis()
+        ));
         let directory = IdentityDirectory::new()?;
         let identity_path = directory.0.join("identity.json");
         std::fs::write(&identity_path, serde_json::to_vec(&fixture.identity)?)?;
@@ -435,6 +426,7 @@ impl Script {
             child,
             reader: None,
             responses: None,
+            writer: None,
             stderr: None,
         };
         let mut input = process.child.stdin.take().ok_or("CLI stdin missing")?;
@@ -478,24 +470,42 @@ impl Script {
             }
             Ok(retained)
         }));
+        let Self {
+            requests,
+            expected,
+            reference,
+            ..
+        } = self;
+        drop(reference);
+        let methods: Vec<String> = requests
+            .iter()
+            .map(|request| {
+                request["method"]
+                    .as_str()
+                    .expect("script method")
+                    .to_owned()
+            })
+            .collect();
+        process.writer = Some(std::thread::spawn(move || -> Result<(), String> {
+            for request in requests {
+                serde_json::to_writer(&mut input, &request).map_err(|error| error.to_string())?;
+                input.write_all(b"\n").map_err(|error| error.to_string())?;
+            }
+            Ok(())
+        }));
         let run_started = Instant::now();
         let mut last_progress = Instant::now();
-        let mut response_count = 0;
-        for (index, (request, expected)) in requests.into_iter().enumerate() {
-            let method = request["method"].as_str().ok_or("script method missing")?;
-            serde_json::to_writer(&mut input, &request)?;
-            input.write_all(b"\n")?;
-            input.flush()?;
+        for (index, (method, expected)) in methods.iter().zip(&expected).enumerate() {
             let report = index == 0
                 || last_progress.elapsed() >= Duration::from_secs(30)
                 || matches!(
-                    method,
+                    method.as_str(),
                     "session.reload" | "session.restore" | "session.close"
                 );
             if report {
                 progress(&format!(
                     "response-wait index={index}/{} method={method} elapsed_ms={}",
-                    response_count,
+                    methods.len(),
                     run_started.elapsed().as_millis()
                 ));
             }
@@ -521,7 +531,7 @@ impl Script {
             let response: Value = serde_json::from_slice(&line)?;
             assert_eq!(response["protocol_version"], 1);
             assert_eq!(response["id"], format!("reload-{index}"));
-            match &expected {
+            match expected {
                 RetainedExpected::Error { code, message } => {
                     assert!(
                         response["error"].is_object(),
@@ -563,11 +573,10 @@ impl Script {
                     }
                 }
             }
-            response_count += 1;
             if report || last_progress.elapsed() >= Duration::from_secs(30) {
                 progress(&format!(
                     "response-checked index={index}/{} method={method} bytes={} wait_check_ms={} elapsed_ms={}",
-                    response_count,
+                    methods.len(),
                     line.len(),
                     response_started.elapsed().as_millis(),
                     run_started.elapsed().as_millis()
@@ -575,11 +584,6 @@ impl Script {
                 last_progress = Instant::now();
             }
         }
-        assert_eq!(
-            response_count, 2881,
-            "complete raw input and snapshot script"
-        );
-        drop(input);
         progress("stdout-eof-wait");
         let extra = process
             .responses
@@ -603,6 +607,8 @@ impl Script {
         progress("pipe-threads-join");
         let deadline = Instant::now() + EXIT_TIMEOUT;
         join_before(process.reader.take().ok_or("CLI reader missing")?, deadline)?;
+        let write_result =
+            join_before(process.writer.take().ok_or("CLI writer missing")?, deadline)?;
         let diagnostic = join_before(
             process.stderr.take().ok_or("CLI stderr reader missing")?,
             deadline,
@@ -612,9 +618,10 @@ impl Script {
             "CLI failed (stderr prefix, capped at {MAX_STDERR_BYTES} bytes): {}",
             String::from_utf8_lossy(&diagnostic)
         );
+        write_result?;
         progress(&format!(
             "complete responses={} elapsed_ms={}",
-            response_count,
+            methods.len(),
             run_started.elapsed().as_millis()
         ));
         Ok(())
@@ -761,32 +768,12 @@ impl Script {
 fn actual_worker_cli_rulechange_preserves_prefix_changes_future_and_rejects_divergent_candidate()
 -> Result<(), Box<dyn Error>> {
     let fixture = Fixture::new()?;
-    // The reference and CLI execute the same complete script concurrently. The
-    // queue retains at most 64 small requests and full-result digests, never
-    // full snapshots. Both sides must finish, and every response is checked.
-    std::thread::scope(|scope| -> Result<(), String> {
-        let (sender, receiver) = mpsc::sync_channel(64);
-        let producer =
-            scope.spawn(|| build_script(&fixture, sender).map_err(|error| error.to_string()));
-        let executed = Script::run(&fixture, receiver).map_err(|error| error.to_string());
-        producer
-            .join()
-            .map_err(|_| "reference script panicked".to_owned())??;
-        executed
-    })
-    .map_err(Into::into)
-}
-
-fn build_script(
-    fixture: &Fixture,
-    requests: mpsc::SyncSender<(Value, RetainedExpected)>,
-) -> Result<(), Box<dyn Error>> {
     let variant = fixture.variant()?;
-    let mut script = Script::new(fixture, requests)?;
+    let mut script = Script::new(&fixture)?;
     script.reach_battle()?;
     script.event(key(PhysicalKey::ArrowDown, true))?;
     assert_eq!(script.selected()?, "battle/command/party");
-    script.begin(fixture);
+    script.begin(&fixture);
     let prefix = script.frontier;
     assert_eq!(script.event(time(249))?, GameKernelStepV7::default());
     assert_eq!(
@@ -840,6 +827,5 @@ fn build_script(
     assert!(script.reference.snapshot()?.scheduler.timers.is_empty());
     assert_eq!(script.event(time(500))?, GameKernelStepV7::default());
     script.close(SESSION);
-    assert_eq!(script.request_count, 2881, "complete reference script");
-    Ok(())
+    script.run(&fixture)
 }

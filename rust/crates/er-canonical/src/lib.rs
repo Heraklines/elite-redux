@@ -66,6 +66,13 @@ pub fn content_digest<T: Serialize>(value: &T) -> Result<String, CanonicalError>
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
+/// Hash an existing JSON value without serializing it through generic fragments.
+/// This has the same canonical bytes and digest as `content_digest` for JSON.
+pub fn content_digest_value(value: &Value) -> Result<String, CanonicalError> {
+    let canonical = canonicalize_value(value)?;
+    Ok(blake3::hash(canonical.as_bytes()).to_hex().to_string())
+}
+
 pub fn verify_fixture_digest<T: Serialize>(
     value: &T,
     expected: &str,
@@ -2910,5 +2917,39 @@ mod tests {
             other => assert!(matches!(other, Err(CanonicalError::DigestMismatch { .. }))),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod value_digest_tests {
+    use super::{content_digest, content_digest_value};
+    use serde_json::json;
+
+    #[test]
+    fn value_digest_matches_generic_canonical_digest_for_complete_json() {
+        let values = [
+            json!(null),
+            json!([false, true, 0, -1, 9_007_199_254_740_991_u64]),
+            json!({"z": [1, {"\u{e000}": "tail", "😀": "unicode", "a": "\n\\\""}], "a": {"10": 2, "2": 3}}),
+        ];
+        for value in values {
+            assert_eq!(content_digest_value(&value).unwrap(), content_digest(&value).unwrap());
+        }
+        let original = json!({"nested": {"hp": 7, "pp": [1, 2]}, "ordered": [1, 2]});
+        for changed in [
+            json!({"nested": {"hp": 8, "pp": [1, 2]}, "ordered": [1, 2]}),
+            json!({"nested": {"hp": 7, "pp": [1, 3]}, "ordered": [1, 2]}),
+            json!({"nested": {"hp": 7, "pp": [1, 2]}, "ordered": [2, 1]}),
+        ] {
+            assert_ne!(content_digest_value(&original).unwrap(), content_digest_value(&changed).unwrap());
+        }
+    }
+
+    #[test]
+    fn value_digest_rejects_the_same_unsafe_json_numbers() {
+        for value in [json!(0.5), json!(9_007_199_254_740_992_u64), json!(-9_007_199_254_740_992_i64)] {
+            assert!(content_digest(&value).is_err());
+            assert!(content_digest_value(&value).is_err());
+        }
     }
 }

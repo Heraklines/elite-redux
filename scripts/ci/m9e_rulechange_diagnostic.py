@@ -60,24 +60,31 @@ def main(summary):
     sha = os.environ["GITHUB_SHA"]
     if run(["git", "rev-parse", "HEAD"], "identity", ROOT, seconds=30, bound=16384).read_text().strip() != sha:
         raise RuntimeError("candidate checkout mismatch")
-    sources = [RULE_TEST_SOURCE, RULE_SOURCE, *RULE_INPUTS.values(), "rust/crates/er-cli/Cargo.toml",
+    sources = ["rust/crates/er-canonical/src/lib.rs", RULE_TEST_SOURCE, RULE_SOURCE, *RULE_INPUTS.values(), "rust/crates/er-cli/Cargo.toml",
                "rust/crates/er-cli/src/current_agent.rs", "rust/crates/er-cli/tests/m9e_current_reload.rs",
                "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_rulechange.py",
                "scripts/ci/m9e_rulechange_diagnostic.py", ".github/workflows/m9e-rulechange-focused.yml",
                "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"]
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
     summary["bundle_sha256"] = digest(ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json")
+    format_sources = [ROOT / RULE_TEST_SOURCE, ROOT / "rust/crates/er-canonical/src/lib.rs"]
     formatter = ["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true"]
     try:
-        run([*formatter, "--check", str(ROOT / RULE_TEST_SOURCE)], "format", seconds=60, bound=262144)
+        run([*formatter, "--check", *[str(path) for path in format_sources]], "format", seconds=60, bound=262144)
     except Exception:
-        run([*formatter, str(ROOT / RULE_TEST_SOURCE)], "format-patch-producer", seconds=60, bound=262144)
-        patch = run(["git", "diff", "--binary", "--", RULE_TEST_SOURCE], "format-patch", ROOT, seconds=30, bound=262144)
+        run([*formatter, *[str(path) for path in format_sources]], "format-patch-producer", seconds=60, bound=262144)
+        patch = run(["git", "diff", "--binary", "--", RULE_TEST_SOURCE, "rust/crates/er-canonical/src/lib.rs"], "format-patch", ROOT, seconds=30, bound=262144)
         shutil.copyfile(patch, FULL / "format.patch")
-        summary["formatted_hashes"] = {RULE_TEST_SOURCE: digest(ROOT / RULE_TEST_SOURCE)}
+        summary["formatted_hashes"] = {str(path.relative_to(ROOT)): digest(path) for path in format_sources}
         summary["format_patch_bytes"] = patch.stat().st_size
         summary["format_patch_sha256"] = digest(patch)
         raise RuntimeError("pinned formatting changes required; no game qualification")
+    checked = run(["cargo", "test", "--locked", "-p", "er-canonical", "--lib", "value_digest_tests", "--", "--test-threads=1"],
+                  "canonical-value-regressions", seconds=600, bound=262144).read_text()
+    matches = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", checked)
+    if len(matches) != 1 or matches[0][:4] != ("2", "0", "0", "0"):
+        raise RuntimeError("both canonical value equivalence/rejection regressions required")
+    summary["canonical_tests"] = {"executed": 2, "passed": 2, "failed": 0, "skipped": 0}
     compiler_output = run(["rustc", "--version"], "compiler", seconds=30, bound=16384).read_text()
     # The first rustup proxy call can emit component installation diagnostics on
     # stderr. Bind its sole compiler identity line, preserving the complete log.
