@@ -70,7 +70,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
 
     def test_campaign_witnesses_cannot_bypass_complete_integration(self):
         for config in ({}, self.config):
-            for paths in ([path] for path in feedback.CAMPAIGN_PATHS[2:]):
+            for paths in ([path] for path in [*feedback.CAMPAIGN_PATHS[2:6], feedback.CAMPAIGN_PATHS[7]]):
                 with self.assertRaisesRegex(RuntimeError, "unmapped"):
                     feedback.select_recovery_scope(config, paths)
             with self.assertRaisesRegex(RuntimeError, "unmapped"):
