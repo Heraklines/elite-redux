@@ -155,12 +155,31 @@ fn submit_strongest_move(
             menu.options
                 .iter()
                 .find(|option| {
-                    matches!(
-                        option.action,
-                        GameActionV1::Battle {
-                            action: er_types::BattleUiActionV1::SelectMove { .. }
-                        }
+                    let GameActionV1::Battle {
+                        action: er_types::BattleUiActionV1::SelectMove { move_slot, .. },
+                    } = option.action
+                    else {
+                        return false;
+                    };
+                    let Some(actor) = run.party.iter().find(|pokemon| {
+                        battle.field.slots.iter().any(|slot| {
+                            slot.slot == source_slot && slot.occupant == Some(pokemon.id)
+                        })
+                    }) else {
+                        return false;
+                    };
+                    let Some(slot) = actor.moves[usize::from(move_slot.get())] else {
+                        return false;
+                    };
+                    let Ok(definition) = content.battle.move_definition(slot.move_id) else {
+                        return false;
+                    };
+                    er_state::pokemon::calculate_max_pp(
+                        definition.base_pp,
+                        slot.pp_ups,
+                        slot.max_pp_override,
                     )
+                    .is_ok_and(|maximum| slot.pp_used < maximum)
                 })
                 .map(|option| option.option_id.clone())
         })
