@@ -5,7 +5,9 @@ use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelStepV7, GameKernelV7};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
-use er_state::m7_state::{DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics};
+use er_state::m7_state::{
+    DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
+};
 use er_types::battle_ids::WaveIndex;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::{GameActionV1, GameControlKindV2, RunOutcome, SafeU53, SeatId};
@@ -148,7 +150,8 @@ fn submit_strongest_move(
 /// One deterministic policy attempt from genuine empty Title setup. A loss,
 /// unsupported handler, capacity failure, or shortened run is not completion.
 #[test]
-fn natural_current_campaign_reaches_policy_terminal_without_state_injection() -> Result<(), Box<dyn Error>> {
+fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
+-> Result<(), Box<dyn Error>> {
     let content = content()?;
     let mut kernel = kernel(content.clone())?;
     press(&mut kernel, PhysicalKey::Space)?;
@@ -167,7 +170,11 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection() ->
             }
         }
     }
-    assert_eq!(starters.len(), 3, "natural three-starter policy unavailable");
+    assert_eq!(
+        starters.len(),
+        3,
+        "natural three-starter policy unavailable"
+    );
     for starter in starters {
         navigate_down_to(&mut kernel, &format!("bootstrap/starter/{}", starter.get()))?;
         press(&mut kernel, PhysicalKey::Space)?;
@@ -184,7 +191,10 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection() ->
             kernel.settle_presentation(pending.event_id)?;
         }
         let state = kernel.state().ok_or("current campaign state absent")?;
-        let run = state.active_run.as_ref().ok_or("current campaign run absent")?;
+        let run = state
+            .active_run
+            .as_ref()
+            .ok_or("current campaign run absent")?;
         let wave = run.wave.get().get();
         if wave > maximum_wave {
             assert_eq!(wave, maximum_wave + 1, "campaign skipped a natural wave");
@@ -192,15 +202,27 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection() ->
             println!("campaign reached wave={wave} at decision={step_index}");
         }
         if run.outcome != RunOutcome::InProgress {
-            println!("campaign terminal wave={wave} outcome={:?} decisions={step_index}", run.outcome);
+            println!(
+                "campaign terminal wave={wave} outcome={:?} decisions={step_index}",
+                run.outcome
+            );
             assert_eq!(wave, 200, "short campaign is not the full policy witness");
             assert_eq!(run.outcome, RunOutcome::Victory, "campaign did not win");
-            assert!(saw_reward && saw_progression, "campaign bypassed progression or rewards");
-            assert_eq!(kernel.current_control().map(|control| control.kind), Some(GameControlKindV2::Complete));
+            assert!(
+                saw_reward && saw_progression,
+                "campaign bypassed progression or rewards"
+            );
+            assert_eq!(
+                kernel.current_control().map(|control| control.kind),
+                Some(GameControlKindV2::Complete)
+            );
             kernel.snapshot()?.validate(&content)?;
             return Ok(());
         }
-        let kind = kernel.current_control().map(|control| control.kind).ok_or("campaign control absent")?;
+        let kind = kernel
+            .current_control()
+            .map(|control| control.kind)
+            .ok_or("campaign control absent")?;
         let action = match kind {
             GameControlKindV2::BattleMove => submit_strongest_move(&mut kernel, &content),
             GameControlKindV2::BattleCommand
@@ -216,7 +238,10 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection() ->
                 saw_reward = true;
                 press(&mut kernel, PhysicalKey::Space)
             }
-            other => return Err(format!("unhandled natural campaign control {other:?} at wave={wave}, decision={step_index}").into()),
+            other => return Err(format!(
+                "unhandled natural campaign control {other:?} at wave={wave}, decision={step_index}"
+            )
+            .into()),
         };
         action.map_err(|error| format!("natural campaign failed at wave={wave}, decision={step_index}, control={kind:?}: {error}"))?;
     }
