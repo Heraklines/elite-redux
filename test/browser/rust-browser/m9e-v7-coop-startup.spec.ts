@@ -352,7 +352,7 @@ for (const hostFirst of [true, false]) {
           const restored = exported.batch.effects[0].capsule_bytes;
           if (restored.length !== bytes.length || bytes.some((byte: number, index: number) => byte !== restored[index])) throw new Error("replay changed complete capsule bytes");
           if ((await request({ kind: "DISPOSE" })).kind !== "DISPOSED") throw new Error("replay Worker disposal not acknowledged");
-          const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2, "0")).join("");
+          const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes))), value => value.toString(16).padStart(2, "0")).join("");
           return { bytes: bytes.length, sha256: hash, live_snapshot_preserved: true, full_replay_equal: true, reexport_equal: true, disposed: true };
         } finally { worker.terminate(); bytes.fill(0); second.fill(0); }
       }, address + "/assets/" + manifest.worker)));
