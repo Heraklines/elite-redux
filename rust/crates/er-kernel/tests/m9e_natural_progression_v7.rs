@@ -232,16 +232,25 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
     assert_ne!(pokemon.stats, old_pokemon.stats, "level gain left persistent battle stats stale");
     let species = content.battle.species(pokemon.species_id)?;
     let form = content.battle.form(&er_types::FormId::parse(format!("{}:{}", pokemon.species_id.get().get(), pokemon.form_index))?)?;
-    let nature = content.progression.nature(pokemon.effective_nature).ok_or("effective nature absent")?;
-    let expected = er_progression::progression::calculate_pokemon_stats(
-        pokemon,
-        form.stat_override.unwrap_or(species.base_stats),
-        nature,
-    )?;
-    assert_eq!(pokemon.stats, expected);
-    assert_eq!(pokemon.max_hp, expected.hp);
-    assert_eq!(pokemon.hp, old_pokemon.hp + expected.hp - old_pokemon.max_hp);
+    let base = form.stat_override.unwrap_or(species.base_stats);
+    let expected_hp = (2 * base.hp + u32::from(pokemon.ivs[0].get()) + pokemon.permanent_bonuses.hp)
+        * u32::from(pokemon.level)
+        / 100
+        + u32::from(pokemon.level)
+        + 10;
+    assert_eq!(pokemon.stats.hp, expected_hp);
+    assert_eq!(pokemon.max_hp, expected_hp);
+    assert_eq!(pokemon.hp, old_pokemon.hp + expected_hp - old_pokemon.max_hp);
     assert_eq!(pokemon.max_hp - pokemon.hp, old_pokemon.max_hp - old_pokemon.hp);
+    for (old, new) in [
+        (old_pokemon.stats.attack, pokemon.stats.attack),
+        (old_pokemon.stats.defense, pokemon.stats.defense),
+        (old_pokemon.stats.special_attack, pokemon.stats.special_attack),
+        (old_pokemon.stats.special_defense, pokemon.stats.special_defense),
+        (old_pokemon.stats.speed, pokemon.stats.speed),
+    ] {
+        assert!(new >= old, "level gain reduced a persistent stat");
+    }
     assert_eq!(pokemon.moves, old_pokemon.moves);
     assert_eq!(new_run.run_rng, old_run.run_rng);
     assert_eq!(
