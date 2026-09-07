@@ -5157,6 +5157,43 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(selection["required_native_test_ids"]["er-rng:" + target], ids)
                 self.assertTrue(selection["execution_scope"] is None or target in selection["execution_scope"]["er-rng"])
 
+    def test_receipt_witnesses_remain_required_on_current_followups(self):
+        self.configure_recovery_integration_scope()
+        for paths in (list(self.feedback.AI_COMMAND_PATHS),
+                      ["rust/crates/er-game/src/m9e_runtime_v6.rs"],
+                      list(self.feedback.RECOVERY_PATHS)):
+            self.changed = paths
+            before = copy.deepcopy(self.config)
+            selection = self.feedback.plan()
+            self.assertTrue(selection["requires_coop_lost_receipt"])
+            self.assertIn("er-kernel", selection["packages"])
+            self.assertEqual(selection["required_native_targets"]["er-kernel"].count(self.feedback.COOP_RECEIPT_TARGET), 1)
+            self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.COOP_RECEIPT_TARGET], self.feedback.COOP_RECEIPT_IDS)
+            self.assertTrue(selection["execution_scope"] is None or self.feedback.COOP_RECEIPT_TARGET in selection["execution_scope"]["er-kernel"])
+            self.assertEqual(self.config, before)
+
+    def test_receipt_plan_returns_detached_required_id_lists(self):
+        self.configure_recovery_integration_scope()
+        selection = self.feedback.plan()
+        selection["required_native_test_ids"]["er-kernel:" + self.feedback.COOP_RECEIPT_TARGET].pop()
+        self.assertEqual(len(self.feedback.COOP_RECEIPT_IDS), 2)
+        self.assertEqual(self.feedback.plan()["required_native_test_ids"]["er-kernel:" + self.feedback.COOP_RECEIPT_TARGET], self.feedback.COOP_RECEIPT_IDS)
+
+    def test_receipt_discovery_rejects_missing_duplicate_extra_and_renamed_tests(self):
+        target = self.feedback.COOP_RECEIPT_TARGET
+        ids = self.feedback.COOP_RECEIPT_IDS
+        required = {"er-kernel:" + target: list(ids)}
+        good = [("er-kernel", target, list(ids))]
+        self.feedback.require_native_test_ids(required, good)
+        self.assertEqual(self.feedback.required_native_target_counts({"er-kernel": [target]}, good), {"er-kernel:" + target: 2})
+        for rows in ([], good * 2, [("er-kernel", target, ids[:1])],
+                     [("er-kernel", target, [ids[0]] * 2)],
+                     [("er-kernel", target, [*ids, "extra"])],
+                     [("er-kernel", target, [ids[0], "renamed"])]):
+            with self.assertRaisesRegex(RuntimeError, "identities/counts"):
+                self.feedback.require_native_test_ids(required, rows)
+        self.assertIsNone(self.feedback.native_target_env("er-kernel", target, None))
+
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
@@ -8732,6 +8769,22 @@ class PhaseTransferTests(unittest.TestCase):
                 digest = self.phases.write_bounded(self.root / "proof/native-e.json", proof)
                 with patch.dict(os.environ, {"M9E_NATIVE_E_MANIFEST_SHA256": digest}), self.assertRaises(RuntimeError):
                     self.phases.aggregate(None)
+
+    def test_receipt_target_belongs_only_to_ordinary_native_d(self):
+        target = ("er-kernel", "m9e_coop_lost_receipt_v7")
+        ids = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+               "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"]
+        rows = [{"crate": target[0], "target": target[1], "ids": ids, "historical_excluded_ids": []},
+                {"crate": "er-kernel", "target": "m9e_natural_coop_campaign_v7", "ids": ["campaign"], "historical_excluded_ids": []}]
+        before = copy.deepcopy(rows)
+        assignment = self.phases.partition(rows)
+        self.assertEqual(assignment["d"], [list(target)])
+        self.assertEqual(assignment["e"], [["er-kernel", "m9e_natural_coop_campaign_v7"]])
+        for lane in ("a", "b", "c"):
+            self.assertEqual(assignment[lane], [])
+        self.assertEqual(rows, before)
+        self.assertEqual(self.phases.IDENTITY_FILES["coop_receipt_test"], "rust/crates/er-kernel/tests/m9e_coop_lost_receipt_v7.rs")
+        self.assertEqual(self.phases.IDENTITY_FILES["coop_receipt_producer"], "scripts/ci/m9e_coop_lost_receipt_diagnostic.py")
 
     def test_fourth_lane_owns_complete_query_and_host_targets_without_overlap(self):
         rows = [{"crate": crate, "target": target, "ids": ["first", "second"], "historical_excluded_ids": []}

@@ -47,6 +47,10 @@ pub struct CurrentCoopSetupSnapshotV1 {
     pub choices: Option<CurrentCoopChoicesV1>,
     // One bounded reply for the entire startup, never an append-only history.
     pub started: Option<CurrentCoopFrameV1>,
+    // A new admitted guest proposal acknowledges its previous result. Keep that
+    // result until replacement, even across transport loss and ledger retirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_reply: Option<Box<CurrentProposalMaterialReceiptV1>>,
 }
 
 fn encode<T: serde::Serialize>(value: &T, maximum: usize) -> Result<Vec<u8>> {
@@ -232,6 +236,89 @@ pub(crate) fn validate_snapshot(
     if let Some(choices) = &owner.choices {
         validate_choices(choices, owner, content)?;
     }
+    if let Some(reply) = &owner.last_reply {
+        if protocol.role != EndpointRole::Authority || owner.started.is_none() {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let evidence = reply.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+        let fingerprint = content_digest(&evidence.proposal.proposal)
+            .map(|digest| format!("blake3-v1:{digest}"))
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        if !protocol
+            .proposal_admission
+            .as_ref()
+            .is_some_and(|admission| {
+                admission.fingerprints.iter().any(|record| {
+                    record.operation_id == evidence.proposal.proposal.context.operation_id
+                        && record.fingerprint == fingerprint
+                })
+            })
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        reply
+            .canonical_bytes()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        let transition = evidence.material.transition();
+        let state = match &snapshot.lifecycle {
+            GameKernelLifecycleSnapshotV7::Active(state)
+            | GameKernelLifecycleSnapshotV7::Terminal { state, .. } => state,
+            _ => return Err(GameKernelV7Error::Invalid),
+        };
+        let current_run = state
+            .active_run
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let reply_run = transition
+            .after_state
+            .active_run
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        if reply.authority_context != owner.local
+            || evidence.proposal.sender_seat != owner.peer.sender_seat_id
+            || evidence.proposal.connection_generation != owner.peer.connection_generation
+            || transition.content_identity != owner.content
+            || reply_run.run_id != current_run.run_id
+            || reply_run.seed != owner.seed
+            || reply_run.mode != current_run.mode
+            || transition.authority_revision <= safe_one()
+            || transition.authority_revision >= snapshot.material_ledger.next_authority_revision
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        transition
+            .after_state
+            .validate_with(content)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        // The independent receipt survives the bounded ledger. Any retained
+        // overlap must still identify the exact originally committed material.
+        for record in &snapshot.material_ledger.records {
+            if (record.operation_id == transition.operation_id
+                || record.authority_revision == transition.authority_revision)
+                && (record.operation_id != transition.operation_id
+                    || record.authority_revision != transition.authority_revision
+                    || record.material_fingerprint != reply.material_fingerprint
+                    || record.after_digest != transition.after_digest)
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+        }
+        let first_retained = snapshot
+            .material_ledger
+            .records
+            .first()
+            .map_or(snapshot.material_ledger.next_authority_revision, |record| {
+                record.authority_revision
+            });
+        if transition.authority_revision >= first_retained
+            && snapshot
+                .material_ledger
+                .record(&transition.operation_id)
+                .is_none()
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+    }
     match (&snapshot.lifecycle, &owner.started) {
         (GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap), None) => {
             if bootstrap.seed != owner.seed
@@ -336,6 +423,7 @@ impl GameKernelV7 {
             seed: bootstrap.seed.clone(),
             choices: None,
             started: None,
+            last_reply: None,
         }));
         candidate.validate()?;
         *self = candidate;
