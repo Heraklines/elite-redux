@@ -408,10 +408,11 @@ def validate_evidence(path):
             result[name] = value
         return result
     evidence = json.loads(path.read_bytes(), object_pairs_hook=unique)
-    expected_keys = {"schema_version", "scope", "old", "new", "directions", "same_content_snapshot_restore_and_replay_continued",
+    expected_keys = {"schema_version", "scope", "old", "new", "directions", "producer_concurrency", "same_content_snapshot_restore_and_replay_continued",
                      "foreign_checkpoint_and_capsule_rejected", "foreign_save_read_preserved_pending_request", "save_source"}
     require(set(evidence) == expected_keys and type(evidence["schema_version"]) is int and evidence["schema_version"] == 1
             and type(evidence["directions"]) is int and evidence["directions"] == 2
+            and type(evidence["producer_concurrency"]) is int and evidence["producer_concurrency"] == 2
             and evidence["scope"] == "ACTUAL_NATIVE_CURRENT_DISPATCHER_TWO_BUNDLE_COMPATIBILITY"
             and evidence["save_source"] == "GameSaveV2::new of exact public Active checkpoint; no natural Save-menu claim",
             "test evidence header differs")

@@ -755,10 +755,36 @@ fn actual_old_and_regenerated_bundles_preserve_own_artifacts_and_reject_each_oth
     assert_eq!(std::fs::metadata(&new)?.len(), 16_325_821);
     let mut old_cli = Cli::new(&old, 4)?;
     let mut new_cli = Cli::new(&new, 4)?;
-    let old_artifacts = produce(&mut old_cli, OLD_HASH, "old", began)
-        .map_err(|error| format!("old produce: {error}"))?;
-    let new_artifacts = produce(&mut new_cli, NEW_HASH, "new", began)
-        .map_err(|error| format!("new produce: {error}"))?;
+    // These two real CLI processes own separate state and content. Run both
+    // complete natural journeys concurrently, then join both before any
+    // cross-content comparison. Every input and assertion remains unchanged.
+    let (old_artifacts, new_artifacts) = std::thread::scope(|scope| -> TestResult<_> {
+        let old_worker = scope.spawn(|| {
+            produce(&mut old_cli, OLD_HASH, "old", began)
+                .map_err(|error| format!("old produce: {error}"))
+        });
+        let new_worker = scope.spawn(|| {
+            produce(&mut new_cli, NEW_HASH, "new", began)
+                .map_err(|error| format!("new produce: {error}"))
+        });
+        let old_result = old_worker
+            .join()
+            .map_err(|_| "old CLI producer thread panicked".to_owned())
+            .and_then(std::convert::identity);
+        let new_result = new_worker
+            .join()
+            .map_err(|_| "new CLI producer thread panicked".to_owned())
+            .and_then(std::convert::identity);
+        match (old_result, new_result) {
+            (Ok(old), Ok(new)) => Ok((old, new)),
+            (old, new) => Err(format!(
+                "concurrent CLI producers: old={}; new={}",
+                old.err().unwrap_or_else(|| "passed".to_owned()),
+                new.err().unwrap_or_else(|| "passed".to_owned()),
+            )
+            .into()),
+        }
+    })?;
     assert_ne!(
         digest(&old_artifacts.snapshot)?,
         digest(&new_artifacts.snapshot)?
@@ -785,7 +811,7 @@ fn actual_old_and_regenerated_bundles_preserve_own_artifacts_and_reject_each_oth
     old_cli.finish()?;
     new_cli.finish()?;
     let evidence = json!({"schema_version":1,"scope":"ACTUAL_NATIVE_CURRENT_DISPATCHER_TWO_BUNDLE_COMPATIBILITY",
-        "old":old_artifacts.facts,"new":new_artifacts.facts,"directions":2,
+        "old":old_artifacts.facts,"new":new_artifacts.facts,"directions":2,"producer_concurrency":2,
         "same_content_snapshot_restore_and_replay_continued":true,
         "foreign_checkpoint_and_capsule_rejected":true,"foreign_save_read_preserved_pending_request":true,
         "save_source":"GameSaveV2::new of exact public Active checkpoint; no natural Save-menu claim"});
