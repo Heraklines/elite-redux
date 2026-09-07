@@ -572,7 +572,7 @@ test("owned natural co-op public retry recovers a pending proposal after disconn
         if (current.evidence.presentations.length !== 0) throw new Error("host duplicate reply replayed a presentation");
       }
       const canonicalBytes = (value: any) => new TextEncoder().encode(retained.canonical(value));
-      const hash = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2, "0")).join("");
+      const hash = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes))), value => value.toString(16).padStart(2, "0")).join("");
       const pending = canonicalBytes(retained.checkpoint);
       const beforeBytes = canonicalBytes(retained.beforeRetry);
       const afterBytes = canonicalBytes(after);
