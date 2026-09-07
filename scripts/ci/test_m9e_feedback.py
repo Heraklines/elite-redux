@@ -5079,6 +5079,7 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-game")
         self.package("er-progression")
         self.package("er-wasm")
+        self.package("er-battle")
         self.package("er-canonical")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
