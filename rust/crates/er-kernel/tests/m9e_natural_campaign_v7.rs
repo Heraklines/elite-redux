@@ -201,7 +201,10 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
             }
         }
     }
-    assert!(!starters.is_empty(), "no legal offered starter fits the budget");
+    assert!(
+        !starters.is_empty(),
+        "no legal offered starter fits the budget"
+    );
     for starter in starters {
         navigate_down_to(&mut kernel, &format!("bootstrap/starter/{}", starter.get()))?;
         press(&mut kernel, PhysicalKey::Space)?;
