@@ -436,10 +436,15 @@ fn execute_switch(
     presentation: &mut Vec<BattlePresentationCueV5>,
 ) -> Result<ActionDisposition, BattleV5Error> {
     let index = usize::from(party_slot.get());
+    let owner = pokemon(run, actor)
+        .ok_or(BattleV5Error::InactiveActor(actor))?
+        .owner_seat;
     let replacement_id = match source_slot.side {
         BattleSide::Player => run
             .party
-            .get(index)
+            .iter()
+            .filter(|replacement| replacement.owner_seat == owner)
+            .nth(index)
             .filter(|replacement| {
                 !replacement.fainted
                     && replacement.id != actor
@@ -932,7 +937,22 @@ fn resolve_targets(
             .field
             .slots
             .iter()
-            .find(|entry| entry.slot.side != source.side && entry.occupant.is_some())
+            .find(|entry| {
+                entry.slot.side != source.side
+                    && entry.occupant.is_some_and(|id| {
+                        pokemon(run, id).is_some_and(|target| !target.fainted && target.hp > 0)
+                    })
+            })
+            // If all opponents fainted earlier in this turn, preserve the
+            // existing no-hit action handling for the last occupied slot.
+            .or_else(|| {
+                run.battle
+                    .as_ref()?
+                    .field
+                    .slots
+                    .iter()
+                    .find(|entry| entry.slot.side != source.side && entry.occupant.is_some())
+            })
             .map(|entry| vec![entry.slot])
             .ok_or(BattleV5Error::Target),
     }
