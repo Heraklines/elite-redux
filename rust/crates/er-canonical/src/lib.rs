@@ -2933,7 +2933,10 @@ mod value_digest_tests {
             json!({"z": [1, {"\u{e000}": "tail", "😀": "unicode", "a": "\n\\\""}], "a": {"10": 2, "2": 3}}),
         ];
         for value in values {
-            assert_eq!(content_digest_value(&value).unwrap(), content_digest(&value).unwrap());
+            assert_eq!(
+                content_digest_value(&value).unwrap(),
+                content_digest(&value).unwrap()
+            );
         }
         let original = json!({"nested": {"hp": 7, "pp": [1, 2]}, "ordered": [1, 2]});
         for changed in [
@@ -2941,13 +2944,20 @@ mod value_digest_tests {
             json!({"nested": {"hp": 7, "pp": [1, 3]}, "ordered": [1, 2]}),
             json!({"nested": {"hp": 7, "pp": [1, 2]}, "ordered": [2, 1]}),
         ] {
-            assert_ne!(content_digest_value(&original).unwrap(), content_digest_value(&changed).unwrap());
+            assert_ne!(
+                content_digest_value(&original).unwrap(),
+                content_digest_value(&changed).unwrap()
+            );
         }
     }
 
     #[test]
     fn value_digest_rejects_the_same_unsafe_json_numbers() {
-        for value in [json!(0.5), json!(9_007_199_254_740_992_u64), json!(-9_007_199_254_740_992_i64)] {
+        for value in [
+            json!(0.5),
+            json!(9_007_199_254_740_992_u64),
+            json!(-9_007_199_254_740_992_i64),
+        ] {
             assert!(content_digest(&value).is_err());
             assert!(content_digest_value(&value).is_err());
         }
