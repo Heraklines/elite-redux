@@ -5,6 +5,7 @@ from pathlib import Path
 os.environ["M9E_REPORT_DIR"] = str(Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/planner")
 import m9e_feedback as feedback
 import m9e_coop_startup as coop
+import m9e_generated_xp as generated
 from m9e_coop_preflight import BASELINE_TARGETS
 
 # Deliberate composition ancestor; latest audited checkpoint is b27ce85f/34089719925.
@@ -90,10 +91,10 @@ def main():
         raise RuntimeError("exact three test dependencies require a complete verified guard")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 42 or set(product) != set(feedback.RECOVERY_PATHS):
-        raise RuntimeError("combined product source must be exactly the forty-two reviewed paths")
-    # The fourteen focused IDs include three retained tests: +11 actual native
-    # IDs and one new target, not fourteen additional tests or regenerated data.
+    if len(product) != 47 or set(product) != set([*feedback.RECOVERY_PATHS, *generated.PATHS]):
+        raise RuntimeError("combined product source must be exactly the forty-seven reviewed paths")
+    # All fourteen focused XP IDs were newly selected: three source-existing
+    # tests had not belonged to the actual prior93-target/741-ID inventory.
     if plan.get("requires_current_xp_metadata") is not True:
         raise RuntimeError("installed XP calculation/content metadata obligation missing")
     expected_xp_counts = {"er-progression:m9e_current_experience": 5,
@@ -105,8 +106,8 @@ def main():
                 or plan["required_native_targets"].get(crate, []).count(target) != 1
                 or target not in plan["execution_scope"].get(crate, []) or crate not in plan["packages"]):
             raise RuntimeError("whole source-qualified XP target omitted or altered")
-    if (sum(map(len, plan["required_native_targets"].values())) != 52
-            or len(plan["required_native_test_ids"]) != 46):
+    if (sum(map(len, plan["required_native_targets"].values())) != 54
+            or len(plan["required_native_test_ids"]) != 48):
         raise RuntimeError("complete prior plus XP required target/identity inventory differs")
     xp_inventory = [(key.split(":")[0], key.split(":")[1], list(ids)) for key, ids in feedback.XP_TEST_IDS.items()]
     feedback.require_native_test_ids(feedback.XP_TEST_IDS, xp_inventory)
@@ -122,6 +123,24 @@ def main():
                   "sources": xp_qualified}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/xp-source-conservation.json").write_text(
         json.dumps(xp_receipt, sort_keys=True) + "\n")
+    if plan.get("requires_generated_xp_fixtures") is not True:
+        raise RuntimeError("actual generated XP fixture obligation missing")
+    generated.validate_binding(plan.get("generated_fixture_inputs"))
+    if plan["generated_fixture_inputs"] != generated.bind(feedback.ROOT, feedback.capture):
+        raise RuntimeError("generated XP fixture source changed across actual planning")
+    generated_inventory = [{"crate": key.split(":")[0], "target": key.split(":")[1],
+                            "ids": list(ids), "historical_excluded_ids": []}
+                           for key, ids in generated.PACK_IDS.items()]
+    generated.validate_native(plan, {"generated_fixture_inputs": plan["generated_fixture_inputs"],
+        "files": {"content": generated.FILES[generated.MANIFEST]["sha256"]}}, generated_inventory)
+    for key in generated.PACK_IDS:
+        crate, target = key.split(":")
+        if target not in plan["execution_scope"].get(crate, []):
+            raise RuntimeError("complete bundle/compiler fixture witness absent from execution")
+    (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/generated-fixture-source.json").write_text(
+        json.dumps({"qualification": "actual source metadata only; current runtime compatibility pending",
+                    "candidate_sha": os.environ["GITHUB_SHA"],
+                    "fixture_inputs": plan["generated_fixture_inputs"]}, sort_keys=True) + "\n")
     configured_coop = json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["current_coop_startup_focus"]
     if (configured_coop["browser_ids"] != coop.BROWSER_IDS or len(coop.BROWSER_IDS) != 3
             or coop.BROWSER_IDS[-1] != coop.PUBLIC_RETRY_ID or len(coop.RTC_SOURCES) != 34):
@@ -161,10 +180,10 @@ def main():
     if len(retained) != 1:
         raise RuntimeError("one qualified retained aggregate required")
     raw = retained[0].read_bytes()
-    if len(raw) != 57869 or hashlib.sha256(raw).hexdigest() != "b6c57b85bcd7689d9a186fea91b32076784a692bdfa68e7322c0855f70ffbae2":
+    if len(raw) != 64706 or hashlib.sha256(raw).hexdigest() != "5e00dd3ceffef9f2e49d011d2ddfcefad6f5ea161093807390f6114ad825d96d":
         raise RuntimeError("retained aggregate bytes differ")
-    projected = json.loads(raw)
-    if projected["product_sha"] != QUALIFIED_BASELINE or projected["identity"]["run_id"] != "34074237225":
+    projected = phases.read_bounded(retained[0], hashlib.sha256(raw).hexdigest())
+    if projected["product_sha"] != "9fbb9fa2a624f8341974ce27e18260a21063751f" or projected["identity"]["run_id"] != "34130111706":
         raise RuntimeError("retained aggregate identity differs")
     projected["identity"] = phases.identity(feedback)
     projected["product_sha"] = os.environ["GITHUB_SHA"]
@@ -182,11 +201,12 @@ def main():
     projected["required_native_target_counts"]["er-canonical:" + feedback.CANONICAL_TARGET] = 32
     for crate, target in feedback.CAMPAIGN_TARGETS.items():
         projected["required_native_target_counts"][crate + ":" + target] = len(feedback.CAMPAIGN_TEST_IDS[crate])
-    projected_test_count = 741 + sum(map(len, feedback.XP_TEST_IDS.values())) - 3
-    if projected_test_count != 752:
-        raise RuntimeError("retained three plus eleven added XP native identity accounting differs")
+    projected_test_count = 741 + sum(map(len, feedback.XP_TEST_IDS.values())) + sum(map(len, generated.PACK_IDS.values()))
+    if projected_test_count != 759:
+        raise RuntimeError("actual prior741 plus XP14 and complete bundle/full-content4 identity accounting differs")
     projected["tests"] = {"selected": projected_test_count, "executed": projected_test_count, "passed": projected_test_count, "failed": 0, "skipped": 0}
     projected["required_native_target_counts"].update({key: len(ids) for key, ids in feedback.XP_TEST_IDS.items()})
+    projected["required_native_target_counts"].update({key: len(ids) for key, ids in generated.PACK_IDS.items()})
     for target, ids in feedback.RNG_TEST_IDS.items():
         projected["required_native_target_counts"]["er-rng:" + target] = len(ids)
     projected["required_native_target_counts"]["er-kernel:" + feedback.COOP_CAMPAIGN_TARGET] = 1
@@ -204,9 +224,21 @@ def main():
     if len(phases.encoded(public_retry)) > 16384:
         raise RuntimeError("projected actual public retry fact shape exceeds unchanged evidence bound")
     projected["current_coop_startup"]["public_retry_evidence_sha256"] = coop.object_hash(public_retry)
+    for key in generated.PACK_IDS:
+        projected["native_target_timing_ms"][key] = 600000
     frozen = copy.deepcopy(projected)
-    digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
+    projection_path = Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/diagnostics/projected-aggregate.json"
+    digest = phases.write_bounded(projection_path, projected)
+    wire = projection_path.read_bytes()
+    decoded_digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
+    if (len(wire) > 65536 or len(phases.encoded(projected)) > 196608
+            or phases.read_bounded(projection_path, digest) != frozen
+            or digest != hashlib.sha256(wire).hexdigest()):
+        raise RuntimeError("bounded aggregate wire roundtrip discarded full evidence")
     compact = phases.compact_summary(projected, digest, {})
+    if (compact["phase_summary_sha256"] != digest
+            or compact.get("phase_summary_decoded_sha256") != decoded_digest):
+        raise RuntimeError("aggregate wire and decoded proof digest identities disagree")
     if projected != frozen or len(phases.encoded(compact)) > 16000:
         raise RuntimeError("projected compact bound or full metadata conservation failed")
     for key in ("identity", "tests", "required_native_target_counts", "current_coop_startup"):
@@ -214,9 +246,12 @@ def main():
             raise RuntimeError("projected compact discarded required identity")
     receipt = {"status": "passed", "qualification": "structural compaction projection only; no native or platform qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "compact_bytes": len(phases.encoded(compact)), "retained_sha256": hashlib.sha256(raw).hexdigest()}
+               "compact_bytes": len(phases.encoded(compact)), "aggregate_wire_bytes": len(wire),
+               "aggregate_decoded_bytes": len(phases.encoded(projected)), "wire_sha256": digest,
+               "decoded_sha256": decoded_digest, "projected_tests": projected_test_count,
+               "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: actual combined forty-two-path source scope, all79 prior targets, exact thirteen new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
+    print("Passed: actual combined forty-seven-path source scope, all79 prior targets, exact thirteen new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
 
 
 if __name__ == "__main__":

@@ -28,8 +28,15 @@ NATIVE_PROOF_LIMIT = 192 * 1024
 NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
+AGGREGATE_ENCODING = "aggregate-proof-zlib-v1"
+AGGREGATE_DECODED_LIMIT = 196608
+AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "generated_xp_helper": "scripts/ci/m9e_generated_xp.py",
+    "generated_xp_selftests": "scripts/ci/test_m9e_generated_xp.py",
+    "generated_xp_bundle_test": "rust/crates/er-content-compiler/tests/m9e_bundle.rs",
+    "generated_xp_full_content_test": "rust/crates/er-content-compiler/tests/m9e_full_content.rs",
     "xp_foundation_api": "rust/crates/er-progression/src/lib.rs",
     "xp_foundation_source": "rust/crates/er-progression/src/current_experience.rs",
     "xp_foundation_test": "rust/crates/er-progression/tests/m9e_current_experience.rs",
@@ -216,8 +223,50 @@ def file_hash(path):
     return result.hexdigest()
 
 
+def pack_aggregate_proof(value):
+    """Lossless aggregate wire envelope; native/platform encodings stay unchanged."""
+    if not isinstance(value, dict) or value.get("phase") != "aggregate":
+        return value
+    raw = encoded(value)
+    if "encoding" in value or len(raw) > AGGREGATE_DECODED_LIMIT:
+        raise RuntimeError("aggregate semantic proof exceeds its bound or nests an encoding")
+    if len(raw) <= AGGREGATE_INLINE_LIMIT:
+        return value
+    return {"encoding": AGGREGATE_ENCODING, "decoded_bytes": len(raw),
+            "data": base64.b64encode(zlib.compress(raw, level=9)).decode("ascii")}
+
+
+def unpack_aggregate_proof(value):
+    if not isinstance(value, dict) or value.get("encoding") != AGGREGATE_ENCODING:
+        return value
+    if set(value) != {"encoding", "decoded_bytes", "data"}:
+        raise RuntimeError("aggregate envelope fields are invalid")
+    size, text = value["decoded_bytes"], value["data"]
+    if (type(size) is not int or not 0 < size <= AGGREGATE_DECODED_LIMIT
+            or not isinstance(text, str) or not text or len(text) > MANIFEST_LIMIT
+            or len(encoded(value)) > MANIFEST_LIMIT):
+        raise RuntimeError("aggregate envelope bounds are invalid")
+    try:
+        compressed = base64.b64decode(text, validate=True)
+        if base64.b64encode(compressed).decode("ascii") != text:
+            raise ValueError("noncanonical base64")
+        stream = zlib.decompressobj()
+        raw = stream.decompress(compressed, size + 1)
+        if len(raw) != size or not stream.eof or stream.unused_data or stream.unconsumed_tail:
+            raise ValueError("incomplete, trailing or oversized zlib stream")
+        def invalid_constant(text):
+            raise ValueError("non-finite aggregate JSON number " + text)
+        proof = json.loads(raw, parse_constant=invalid_constant)
+        if (not isinstance(proof, dict) or proof.get("phase") != "aggregate"
+                or "encoding" in proof or encoded(proof) != raw):
+            raise ValueError("noncanonical or nested aggregate JSON")
+    except (ValueError, UnicodeError, RecursionError, binascii.Error, zlib.error) as error:
+        raise RuntimeError("aggregate envelope payload is invalid or exceeds its bound") from error
+    return proof
+
+
 def write_bounded(path, value):
-    data = encoded(pack_native_inventory(value))
+    data = encoded(pack_aggregate_proof(pack_native_inventory(value)))
     if len(data) > MANIFEST_LIMIT:
         raise RuntimeError("phase manifest exceeds 64 KiB")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,7 +283,7 @@ def read_bounded(path, expected_hash):
         raise RuntimeError("phase manifest size changed while reading")
     if sha(data) != expected_hash:
         raise RuntimeError("phase manifest digest mismatch")
-    return unpack_native_ids(json.loads(data))
+    return unpack_native_ids(unpack_aggregate_proof(json.loads(data)))
 
 
 def pack_native_ids(value):
@@ -449,6 +498,7 @@ def output(name, value):
 
 
 def identity(feedback):
+    import m9e_generated_xp as generated
     if feedback.capture(["git", "rev-parse", "HEAD"]) != os.environ["GITHUB_SHA"]:
         raise RuntimeError("phase checkout differs from candidate")
     if feedback.capture(["git", "diff", "--name-only", "HEAD", "--"]):
@@ -462,6 +512,7 @@ def identity(feedback):
                        feedback.capture(["rustc", "-vV"], feedback.RUST).splitlines()
                        if line.startswith("host: ")),
         "profile": "test", "features": "default",
+        **generated.identity_fields(feedback.ROOT, feedback.capture),
     }
 
 
@@ -524,6 +575,8 @@ def validate_native(proof, expected_identity):
     assignment = partition(inventory)
     validate_control_query_inventory(plan, inventory)
     validate_state_query_inventory(plan, inventory)
+    import m9e_generated_xp as generated
+    generated.validate_native(plan, expected_identity, inventory)
     lane = proof.get("lane")
     if lane not in assignment or proof.get("assigned_targets") != assignment[lane]:
         raise RuntimeError("native lane assignment is missing or differs from exact partition")
@@ -985,6 +1038,8 @@ def validate_platform(proof, native, native_hash):
             or proof.get("plan_sha256") != native["plan_sha256"]):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
+    import m9e_generated_xp as generated
+    generated.validate_platform(proof, native)
     import m9e_coop_startup as coop
     coop.validate_platform(proof, native, ROOT)
     if "plan" in proof and proof["plan"] != plan:
@@ -1224,6 +1279,8 @@ def compact_summary(summary, full_hash, timings):
         "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
         "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
     compact.update({"phase_summary_sha256": full_hash, "timing_ms": timings})
+    if pack_aggregate_proof(summary) is not summary:
+        compact["phase_summary_decoded_sha256"] = sha(encoded(summary))
     if "first_failure" in summary:
         compact["first_failure"] = summary["first_failure"]
     if len(encoded(compact)) > 16000:
@@ -1241,6 +1298,11 @@ def compact_summary(summary, full_hash, timings):
     import m9e_rulechange as rule
     rule.compact(compact, full_hash, encoded)
     compact_worker_evidence(compact, full_hash)
+    for key in ("browser_worker_codec", "browser_tests"):
+        if len(encoded(compact)) <= 16000:
+            break
+        if key in compact:
+            compact[key] = {"file": "phase-summary.json", "sha256": full_hash, "field": key}
     if len(encoded(compact)) > 16000:
         raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
     return compact
@@ -1259,6 +1321,9 @@ def main():
         if phase not in {"platform", "aggregate"}:
             raise RuntimeError("invalid phase entry")
         summary = platform(feedback) if phase == "platform" else aggregate(feedback)
+        if "generated_fixture_inputs" in summary.get("identity", {}):
+            import m9e_generated_xp as generated
+            generated.verify_completion(feedback.ROOT, feedback.capture, summary["identity"])
         code = 0
     except Exception as error:
         summary.update({"status": "failed", "qualification": "unfinished", "first_failure": str(error)[:4096]})
