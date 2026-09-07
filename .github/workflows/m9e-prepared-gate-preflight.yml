@@ -1,9 +1,10 @@
 name: M9E Prepared Gate Preflight
 on:
   push:
-    branches: [codex/m9e-coop-integration-preflight-20260907]
+    branches: [codex/m9e-compact-preflight-20260907]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: m9e-prepared-gate-preflight-${{ github.ref }}
   cancel-in-progress: true
@@ -14,7 +15,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '371'
+      M9E_EXPECTED_TESTS: '374'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -23,6 +24,13 @@ jobs:
           persist-credentials: false
           submodules: false
           lfs: false
+      - name: Retrieve only retained bounded aggregate metadata
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: '10001230907'
+          run-id: '34070726700'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/m9e-retained-aggregate
       - name: Verify candidate and execute only harness selftests
         shell: bash
         run: |
@@ -62,6 +70,52 @@ jobs:
           python3 scripts/ci/m9e_coop_preflight.py >> "$RUNNER_TEMP/m9e-preflight/diagnostics/workflow-validation.log" 2>&1
           plan_result=$?
           if [ "$plan_result" -ne 0 ]; then workflow_result=$plan_result; fi
+          python3 - <<'PY' > "$RUNNER_TEMP/m9e-preflight/diagnostics/retained-compaction.log" 2>&1
+          import copy, hashlib, json, os, pathlib, sys
+          from unittest.mock import patch
+          sys.path.insert(0, 'scripts/ci')
+          import m9e_phases as phases
+          paths = list((pathlib.Path(os.environ['RUNNER_TEMP']) / 'm9e-retained-aggregate').rglob('*'))
+          files = [path for path in paths if path.is_file()]
+          assert len(files) == 1 and files[0].name == 'phase-summary.json'
+          raw = files[0].read_bytes()
+          proof_hash = hashlib.sha256(raw).hexdigest()
+          assert len(raw) == 57873 and proof_hash == 'be0af9b8ed9b004f8617f1754f0879bd5726015e4092401ebea2da6c0088ac2d'
+          original = json.loads(raw)
+          frozen = copy.deepcopy(original)
+          assert original['product_sha'] == '03aa66ee48bd9140bf4066f3ecdd23d8028658aa'
+          assert str(original['identity']['run_id']) == '34070726700'
+          assert original['tests'] == {'selected': 657, 'executed': 657, 'passed': 657, 'failed': 0, 'skipped': 0}
+          reproduced = False
+          with patch.object(phases, 'compact_worker_evidence'):
+              try:
+                  phases.compact_summary(original, proof_hash, {})
+              except RuntimeError as error:
+                  assert 'compact evidence exceeds' in str(error)
+                  reproduced = True
+          assert reproduced, 'original compact overflow was not reproduced'
+          compact = phases.compact_summary(original, proof_hash, {})
+          assert original == frozen and len(phases.encoded(compact)) <= 16000
+          assert compact['worker_executables'] == {'file': 'phase-summary.json', 'sha256': proof_hash, 'field': 'worker_executables'}
+          for key in ('phase', 'status', 'qualification', 'product_sha', 'identity', 'tests', 'plan_sha256',
+                      'native_manifest_sha256', 'native_b_manifest_sha256', 'native_c_manifest_sha256',
+                      'native_d_manifest_sha256', 'platform_manifest_sha256', 'current_coop_startup'):
+              assert compact[key] == original[key], key
+          receipt = {'status': 'passed', 'qualification': 'retained-proof compactor regression only; no candidate game qualification',
+                     'candidate_sha': os.environ['GITHUB_SHA'], 'candidate_run_id': os.environ['GITHUB_RUN_ID'],
+                     'retained_sha': original['product_sha'], 'retained_run_id': original['identity']['run_id'],
+                     'retained_bytes': len(raw), 'retained_sha256': proof_hash,
+                     'compact_bytes': len(phases.encoded(compact)), 'original_overflow_reproduced': reproduced,
+                     'full_proof_unchanged': original == frozen}
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'm9e-preflight/compact'
+          (root / 'retained-compaction.json').write_text(json.dumps(receipt, sort_keys=True) + '\n')
+          print(json.dumps(receipt))
+          PY
+          compact_result=$?
+          if [ "$compact_result" -ne 0 ]; then
+            workflow_result=$compact_result
+            cat "$RUNNER_TEMP/m9e-preflight/diagnostics/retained-compaction.log" >> "$RUNNER_TEMP/m9e-preflight/diagnostics/workflow-validation.log"
+          fi
           python3 -m unittest discover -s scripts/ci -p 'test_m9e*.py' -v > "$RUNNER_TEMP/m9e-preflight/diagnostics/harness-tests.log" 2>&1
           result=$?
           set -e
@@ -92,6 +146,7 @@ jobs:
           files = {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
                    for path in sorted(pathlib.Path('scripts/ci').glob('m9e*.py'))}
           files['scripts/ci/test_m9e_coop_startup.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_coop_startup.py').read_bytes()).hexdigest()
+          files['.github/workflows/m9e-prepared-gate-preflight.yml'] = hashlib.sha256(pathlib.Path('.github/workflows/m9e-prepared-gate-preflight.yml').read_bytes()).hexdigest()
           files['scripts/ci/test_m9e_feedback.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_feedback.py').read_bytes()).hexdigest()
           files['scripts/ci/m9e-targets.json'] = hashlib.sha256(pathlib.Path('scripts/ci/m9e-targets.json').read_bytes()).hexdigest()
           files['.github/workflows/m9e-focused-feedback.yml'] = hashlib.sha256(pathlib.Path('.github/workflows/m9e-focused-feedback.yml').read_bytes()).hexdigest()
