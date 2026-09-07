@@ -1,12 +1,16 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2};
+use er_kernel::game_kernel_v7::{
+    GameKernelRoleV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2,
+};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
-use er_env::current::{CurrentExternalEvent, CurrentGameSession};
-use er_repro::current::{CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1, CurrentReproRecorderV1};
+use er_repro::current::{
+    CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1, CurrentReproRecorderV1,
+};
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
@@ -71,7 +75,9 @@ impl std::ops::Deref for CampaignRecorder {
     type Target = GameKernelV7;
 
     fn deref(&self) -> &Self::Target {
-        self.session.kernel_ref().expect("campaign session remains live")
+        self.session
+            .kernel_ref()
+            .expect("campaign session remains live")
     }
 }
 
@@ -81,11 +87,17 @@ impl CampaignRecorder {
         let result = self.session.apply(event.clone());
         let after = self.session.snapshot()?;
         let observation = self.session.observe()?;
-        let status = self.recorder.record(&before, event, result.as_ref(), &after, &observation);
+        let status = self
+            .recorder
+            .record(&before, event, result.as_ref(), &after, &observation);
         self.position += 1;
-        assert_eq!(status, CurrentCaptureStatusV1::Available {
-            base_position: self.base, final_position: self.position,
-        });
+        assert_eq!(
+            status,
+            CurrentCaptureStatusV1::Available {
+                base_position: self.base,
+                final_position: self.position,
+            }
+        );
         let step = result?;
         // The first segment ends with Space still held, proving that decoding
         // and importing a capsule preserves input state before the key-up.
@@ -99,9 +111,13 @@ impl CampaignRecorder {
         self.capture(CurrentExternalEvent::RawInput { input })
     }
 
-    fn settle_presentation(&mut self, event_id: er_types::PresentationEventId) -> Result<(), Box<dyn Error>> {
+    fn settle_presentation(
+        &mut self,
+        event_id: er_types::PresentationEventId,
+    ) -> Result<(), Box<dyn Error>> {
         self.capture(CurrentExternalEvent::PresentationOutcome {
-            event_id, outcome: KernelPresentationOutcomeV2::Settled,
+            event_id,
+            outcome: KernelPresentationOutcomeV2::Settled,
         })?;
         self.presentations += 1;
         Ok(())
@@ -123,7 +139,9 @@ impl CampaignRecorder {
         let decoded: CurrentReproCapsuleV1 = serde_json::from_slice(&encoded)?;
         assert_eq!(decoded, capsule);
         let (imported, resumed) = CurrentReproRecorderV1::from_capsule(
-            decoded.clone(), self.content.clone(), CurrentReproLimitsV1::default(),
+            decoded.clone(),
+            self.content.clone(),
+            CurrentReproLimitsV1::default(),
         )?;
         assert_eq!(imported.export()?, decoded);
         assert_eq!(resumed.snapshot()?, expected);
@@ -135,8 +153,12 @@ impl CampaignRecorder {
         self.checkpoint = expected;
         self.base = self.position;
         self.recorder = CurrentReproRecorderV1::new_at_position(
-            self.checkpoint.clone(), SeatId::new(safe(1)), GameKernelRoleV7::Authority,
-            self.content.clone(), CurrentReproLimitsV1::default(), self.position,
+            self.checkpoint.clone(),
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            self.content.clone(),
+            CurrentReproLimitsV1::default(),
+            self.position,
         )?;
         self.segments += 1;
         Ok(())
@@ -145,16 +167,33 @@ impl CampaignRecorder {
 
 fn kernel(content: Arc<PreparedGameContentV2>) -> Result<CampaignRecorder, Box<dyn Error>> {
     let session = CurrentGameSession::natural_start_with_scheduler(
-        profile()?, "m9e-natural-campaign-200-v1".to_owned(), SeatId::new(safe(1)),
-        vec!["preview-slot".to_owned()], true, content.clone(), scheduler(), None,
+        profile()?,
+        "m9e-natural-campaign-200-v1".to_owned(),
+        SeatId::new(safe(1)),
+        vec!["preview-slot".to_owned()],
+        true,
+        content.clone(),
+        scheduler(),
+        None,
     )?;
     let checkpoint = session.snapshot()?;
     let recorder = CurrentReproRecorderV1::new(
-        checkpoint.clone(), SeatId::new(safe(1)), GameKernelRoleV7::Authority,
-        content.clone(), CurrentReproLimitsV1::default(),
+        checkpoint.clone(),
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content.clone(),
+        CurrentReproLimitsV1::default(),
     )?;
-    Ok(CampaignRecorder { session, recorder, content, checkpoint,
-        base: 0, position: 0, segments: 0, presentations: 0 })
+    Ok(CampaignRecorder {
+        session,
+        recorder,
+        content,
+        checkpoint,
+        base: 0,
+        position: 0,
+        segments: 0,
+        presentations: 0,
+    })
 }
 
 fn key_down(key: PhysicalKey) -> RawInputEvent {
@@ -166,7 +205,10 @@ fn key_down(key: PhysicalKey) -> RawInputEvent {
     }
 }
 
-fn press(kernel: &mut CampaignRecorder, key: PhysicalKey) -> Result<GameKernelStepV7, Box<dyn Error>> {
+fn press(
+    kernel: &mut CampaignRecorder,
+    key: PhysicalKey,
+) -> Result<GameKernelStepV7, Box<dyn Error>> {
     let step = kernel.raw_input(key_down(key.clone()))?;
     kernel.raw_input(RawInputEvent::KeyUp { code: key })?;
     Ok(step)
@@ -473,7 +515,10 @@ fn natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200
             kernel.flush()?;
             assert_eq!(kernel.base, kernel.position);
             assert!(kernel.position > 800 && kernel.segments > 10 && kernel.presentations > 0);
-            println!("M9E_CAMPAIGN_REPLAY events={} segments={} presentations={} wave=200 outcome=Victory", kernel.position, kernel.segments, kernel.presentations);
+            println!(
+                "M9E_CAMPAIGN_REPLAY events={} segments={} presentations={} wave=200 outcome=Victory",
+                kernel.position, kernel.segments, kernel.presentations
+            );
             return Ok(());
         }
         let kind = kernel
