@@ -14,6 +14,7 @@ HELPER = "scripts/ci/m9e_coop_startup.py"
 KERNEL_TARGET = ("er-kernel", "m9e_coop_choices_v7")
 ENTRY_TARGET = ("er-cli", "m9e_current_coop_startup")
 KERNEL_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_preserve_host",
+              "constructed_cooperative_victory_preserves_each_seat_on_next_wave",
               "invalid_peer_choices_preserve_entire_state_rng_and_allocator",
               "natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution",
               "owned_startup_rejects_forged_frames_and_snapshots_atomically"]
@@ -352,7 +353,7 @@ def validate_platform(proof, native, root):
 def aggregate_reference(native, platform, native_hash, platform_hash):
     if not native["plan"].get("requires_current_coop_startup"):
         return {}
-    return {"current_coop_startup": {"status": "passed", "kernel_tests": 4, "entry_tests": 2, "rtc_tests": 2, "replay_workers": 4,
+    return {"current_coop_startup": {"status": "passed", "kernel_tests": 5, "entry_tests": 2, "rtc_tests": 2, "replay_workers": 4,
             "native_manifest_sha256": native_hash, "platform_manifest_sha256": platform_hash,
             "entry_evidence_sha256": hashlib.sha256((json.dumps(native["current_coop_entry"], sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest(),
             "rtc_evidence_sha256": hashlib.sha256((json.dumps(platform["current_coop_rtc"], sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest()}}

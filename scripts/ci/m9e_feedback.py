@@ -257,7 +257,7 @@ RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs"
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
                   "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
                   "rust/crates/er-wasm/tests/m9e_parity.rs",
-                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS]
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs"]
 RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS}
 
 
@@ -2486,9 +2486,11 @@ def main(preflight_failure=None):
         from m9e_phases import identity as phase_identity
         import m9e_current_cost as cost
         import m9e_coop_startup as coop
-        release_identity = phase_identity(sys.modules[__name__]) if (selection.get("requires_current_cost_probe") or selection.get("requires_current_coop_startup")) else None
+        import m9e_campaign_replay as campaign_replay
+        release_identity = phase_identity(sys.modules[__name__]) if (selection.get("requires_current_cost_probe") or selection.get("requires_current_coop_startup") or selection.get("requires_natural_campaign_witnesses")) else None
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             coop_target = (cwd.name, name) == coop.ENTRY_TARGET
+            replay_target = (cwd.name, name) == campaign_replay.TARGET
             rule_target = (cwd.name, name) == ("er-cli", RULE_TARGET)
             rule_context = contextlib.nullcontext((env, None))
             if rule_target:
@@ -2523,6 +2525,13 @@ def main(preflight_failure=None):
                             source_binding=selection["current_cost_source_binding"], discovered_ids=ids,
                             global_deadline=native_deadline)
                         code = 0
+                    elif replay_target:
+                        if (not selection.get("requires_natural_campaign_witnesses") or excluded_ids
+                                or "natural_campaign_replay" in summary):
+                            raise RuntimeError("campaign replay optimized override is outside its exact scope")
+                        summary["natural_campaign_replay"] = campaign_replay.execute(
+                            ROOT, FULL, release_identity, ids, native_deadline)
+                        code = 0
                     elif coop_target:
                         if (not selection.get("requires_current_coop_startup") or os.environ.get("M9E_PHASE") != "native"
                                 or os.environ.get("M9E_NATIVE_LANE") != "a" or excluded_ids or "current_coop_entry" in summary):
@@ -2545,7 +2554,10 @@ def main(preflight_failure=None):
                     raise RuntimeError(f"{name} exceeded 600 seconds; see {output.name}") from error
                 TIMINGS[f"execute-{index}"] = round((time.monotonic() - start) * 1000)
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
-                if coop_target:
+                if replay_target:
+                    actual = summary["natural_campaign_replay"]["tests"]
+                    passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
+                elif coop_target:
                     actual = summary["current_coop_entry"]["tests"]
                     passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
                 else:

@@ -8,7 +8,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
     def setUp(self):
         self.config = {"current_recovery_integration": copy.deepcopy(feedback.RECOVERY_POLICY)}
 
-    def test_exact_twenty_five_path_composition_preserves_policy(self):
+    def test_exact_twenty_six_path_composition_preserves_policy(self):
         original = copy.deepcopy(self.config)
         for paths in (feedback.RECOVERY_PATHS, list(reversed(feedback.RECOVERY_PATHS))):
             self.assertEqual(feedback.select_recovery_scope(self.config, paths), (True, True))

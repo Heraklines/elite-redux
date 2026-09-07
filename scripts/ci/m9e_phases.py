@@ -50,6 +50,9 @@ IDENTITY_FILES = {
     "recovery_selftests": "scripts/ci/test_m9e_recovery_integration.py",
     "ai_commands_test": "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs",
     "ai_commands_selftests": "scripts/ci/test_m9e_ai_commands.py",
+    "campaign_replay_helper": "scripts/ci/m9e_campaign_replay.py",
+    "campaign_replay_producer": "scripts/ci/m9e_natural_replay_diagnostic.py",
+    "campaign_replay_selftests": "scripts/ci/test_m9e_campaign_replay.py",
     "coop_helper": "scripts/ci/m9e_coop_startup.py",
     "coop_selftests": "scripts/ci/test_m9e_coop_startup.py",
     "harness": "scripts/ci/m9e_feedback.py",
@@ -589,7 +592,10 @@ def validate_native(proof, expected_identity):
     import m9e_current_cost as cost
     cost.validate_lane(proof, ROOT, partition)
     import m9e_coop_startup as coop
+    import m9e_campaign_replay as campaign_replay
     coop.validate_lane(proof, ROOT, partition)
+    import m9e_campaign_replay as campaign_replay
+    campaign_replay.validate_lane(proof, ROOT, partition)
 
 
 def export_native(feedback, summary):
@@ -617,6 +623,8 @@ def export_native(feedback, summary):
              "native_timer_parity_digest": summary.get("native_timer_parity_digest"), "cli": None}
     if "current_cost_probe" in summary:
         proof["current_cost_probe"] = summary["current_cost_probe"]
+    if "natural_campaign_replay" in summary:
+        proof["natural_campaign_replay"] = summary["natural_campaign_replay"]
     if "current_coop_entry" in summary:
         proof["current_coop_entry"] = summary["current_coop_entry"]
     worker = summary.get("worker_executable")
@@ -946,6 +954,7 @@ def validate_platform(proof, native, native_hash):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
     import m9e_coop_startup as coop
+    import m9e_campaign_replay as campaign_replay
     coop.validate_platform(proof, native, ROOT)
     if "plan" in proof and proof["plan"] != plan:
         raise RuntimeError("platform duplicated plan differs from its bound native plan")
@@ -1071,6 +1080,7 @@ def platform(feedback):
         feedback.browser_checks(summary)
     if native["plan"].get("requires_current_coop_startup"):
         import m9e_coop_startup as coop
+    import m9e_campaign_replay as campaign_replay
         summary["current_coop_rtc"] = coop.execute_platform(feedback, expected, native["plan"]["current_coop_startup_binding"])
     summary["status"] = "passed"
     summary = reference_platform_plan(summary, native, native_hash)
@@ -1081,6 +1091,7 @@ def platform(feedback):
 
 def aggregate(feedback):
     import m9e_coop_startup as coop
+    import m9e_campaign_replay as campaign_replay
     if any(os.environ.get(key) != "success" for key in ("M9E_NATIVE_A_RESULT", "M9E_NATIVE_B_RESULT", "M9E_NATIVE_C_RESULT", "M9E_NATIVE_D_RESULT", "M9E_PLATFORM_RESULT")):
         raise RuntimeError("required native/platform job is absent, failed, skipped or cancelled")
     directory = Path(os.environ["M9E_PHASE_DIR"])
@@ -1131,6 +1142,7 @@ def aggregate(feedback):
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native},
             **{key: third[key] for key in ("rule_worker",) if key in third},
+            **campaign_replay.aggregate_reference(native, native_hash),
             **coop.aggregate_reference(native, result, native_hash, os.environ["M9E_PLATFORM_MANIFEST_SHA256"])}
 
 
@@ -1168,7 +1180,7 @@ def compact_worker_evidence(compact, full_hash):
 
 def compact_summary(summary, full_hash, timings):
     compact = {key: summary[key] for key in (
-        "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup",
+        "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup", "natural_campaign_replay",
         "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
         "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "platform_manifest_sha256",
         "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",

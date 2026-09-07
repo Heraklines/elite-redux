@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '408'
+      M9E_EXPECTED_TESTS: '414'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -102,6 +102,7 @@ jobs:
           files['scripts/ci/test_m9e_recovery_integration.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_recovery_integration.py').read_bytes()).hexdigest()
           files['scripts/ci/test_m9e_ai_commands.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_ai_commands.py').read_bytes()).hexdigest()
           files['scripts/ci/test_m9e_coop_startup.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_coop_startup.py').read_bytes()).hexdigest()
+          files['scripts/ci/test_m9e_campaign_replay.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_campaign_replay.py').read_bytes()).hexdigest()
           files['scripts/ci/test_m9e_feedback.py'] = hashlib.sha256(pathlib.Path('scripts/ci/test_m9e_feedback.py').read_bytes()).hexdigest()
           files['scripts/ci/m9e-targets.json'] = hashlib.sha256(pathlib.Path('scripts/ci/m9e-targets.json').read_bytes()).hexdigest()
           files['.github/workflows/m9e-focused-feedback.yml'] = hashlib.sha256(pathlib.Path('.github/workflows/m9e-focused-feedback.yml').read_bytes()).hexdigest()
