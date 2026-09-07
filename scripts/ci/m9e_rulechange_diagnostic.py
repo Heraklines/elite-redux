@@ -79,12 +79,14 @@ def main(summary):
         summary["format_patch_bytes"] = patch.stat().st_size
         summary["format_patch_sha256"] = digest(patch)
         raise RuntimeError("pinned formatting changes required; no game qualification")
-    checked = run(["cargo", "test", "--locked", "-p", "er-canonical", "--lib", "value_digest_tests", "--", "--test-threads=1"],
+    run(["cargo", "clippy", "--locked", "-p", "er-canonical", "--all-targets", "--no-deps", "--", "-D", "warnings"],
+        "canonical-clippy", seconds=600, bound=262144)
+    checked = run(["cargo", "test", "--locked", "-p", "er-canonical", "--lib", "--", "--test-threads=1"],
                   "canonical-value-regressions", seconds=600, bound=262144).read_text()
     matches = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", checked)
     if len(matches) != 1 or matches[0][:4] != ("2", "0", "0", "0"):
-        raise RuntimeError("both canonical value equivalence/rejection regressions required")
-    summary["canonical_tests"] = {"executed": 2, "passed": 2, "failed": 0, "skipped": 0}
+        raise RuntimeError("complete canonical library including both new value regressions required")
+    summary["canonical_tests"] = {"executed": 32, "passed": 32, "failed": 0, "skipped": 0}
     compiler_output = run(["rustc", "--version"], "compiler", seconds=30, bound=16384).read_text()
     # The first rustup proxy call can emit component installation diagnostics on
     # stderr. Bind its sole compiler identity line, preserving the complete log.
