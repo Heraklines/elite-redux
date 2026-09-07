@@ -1,0 +1,74 @@
+name: M9E Natural Level Progression Focused Diagnostic
+on:
+  push:
+    branches: [codex/m9e-xp-parity-focused-20260907]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-progression-parity-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Restore existing dependency downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust tooling remotely
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Restore pinned Wasm tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/bin/wasm2es6js
+          key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
+      - name: Restore existing separate Wasm build
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/m9e-wasm-target
+          key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Actual native and Wasm raw-input and held-timer parity
+        run: python3 scripts/ci/m9e_progression_parity_diagnostic.py
+      - name: Compact focused result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-progression-parity-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-progression-parity-focused/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-progression-parity-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-progression-parity-focused/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
