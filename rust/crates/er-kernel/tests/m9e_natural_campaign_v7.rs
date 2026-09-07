@@ -167,8 +167,14 @@ fn submit_strongest_move(
         .ok_or_else(|| {
             format!(
                 "no offered move: actions={:?}; party={:?}",
-                menu.options.iter().map(|option| &option.action).collect::<Vec<_>>(),
-                run.party.iter().map(|pokemon| (pokemon.id, pokemon.species_id, pokemon.hp, pokemon.moves)).collect::<Vec<_>>()
+                menu.options
+                    .iter()
+                    .map(|option| &option.action)
+                    .collect::<Vec<_>>(),
+                run.party
+                    .iter()
+                    .map(|pokemon| (pokemon.id, pokemon.species_id, pokemon.hp, pokemon.moves))
+                    .collect::<Vec<_>>()
             )
         })?;
     navigate_down_to(kernel, target_option.as_str())?;
