@@ -261,13 +261,16 @@ COOP_RECEIPT_PATH = "rust/crates/er-kernel/tests/" + COOP_RECEIPT_TARGET + ".rs"
 RNG_PATHS = ["rust/crates/er-rng/src/battle.rs","rust/crates/er-rng/src/phaser.rs","rust/crates/er-rng/tests/m3_rng.rs","rust/crates/er-rng/tests/m9e_shifted_utf16.rs","rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json"]
 RNG_TEST_IDS = {"er_rng":["phaser::tests::hash_uses_signed_to_int32_for_final_and_intermediate_accumulators","phaser::tests::rnd_never_mutates_the_private_seed_hash_accumulator","phaser::tests::sow_resets_the_private_hash_accumulator_before_reseeding","phaser::tests::state_setter_preserves_private_seed_hash_accumulator"],"m3_rng":["audit_fingerprints_recompute_and_tampering_is_rejected","battle_cache_resumes_then_increment_turn_resows","battle_construction_uses_wave_offset_and_sixteen_closed_character_draws","battle_draw_advances_only_the_cached_substream","callsite_failures_are_atomic_and_shifted_surrogates_are_supported","callsite_identity_is_closed_and_pinned","consuming_and_nonconsuming_raw_range_paths_are_distinct","eventual_rng_vectors_are_ingested_only_after_manifest_publication","exhausted_sequence_rolls_back_an_entire_multi_draw_shuffle","frac_uses_the_corrected_0x200000_coercion_term","integer_preserves_fractional_binary64_instead_of_coercing_to_uint","integer_range_rejects_width_above_safe_u53_before_drawing","nested_scene_and_pokemon_wrappers_emit_one_logical_entry","one_sequence_is_monotonic_across_offset_and_battle_streams","pick_and_shuffle_apply_the_selected_slice_draw_rules","pick_is_one_logical_audit_and_empty_pick_is_atomic","primitive_transition_and_integer_have_exact_golden_bits","range_turn_and_offset_rejections_are_atomic","real_range_overflow_discards_its_staged_draws","sow_is_deterministic_and_uses_utf16_code_units","speed_offset_shuffle_restores_run_and_context_with_per_swap_audits","state_boundaries_reject_noncanonical_or_poisoned_forms","state_strings_and_json_preserve_full_width_bits","wrapper_fast_paths_audit_without_swapping_or_drawing"],"m9e_shifted_utf16":["shifted_utf16_battle_draws_and_initialization_match_pinned_phaser","shifted_utf16_speed_shuffle_matches_pinned_phaser_and_restores_outer_rng"]}
 
+XP_PATHS = ["rust/crates/er-progression/src/lib.rs","rust/crates/er-progression/src/current_experience.rs","rust/crates/er-progression/tests/m9e_current_experience.rs","rust/crates/er-progression/src/content_v2.rs","rust/crates/er-progression/tests/m9e_content_v2.rs","rust/crates/er-content-compiler/src/m9e_progression.rs","rust/crates/er-content-compiler/tests/m9e_progression.rs","test/kernel-fixtures/m9/export-progression-content.ts"]
+XP_TEST_IDS = {"er-progression:m9e_current_experience":["capped_addition_preserves_multi_level_gains_discards_new_excess_and_keeps_old_experience","invalid_and_overflowing_experience_inputs_leave_borrowed_source_state_unchanged","neutral_defeat_values_preserve_form_trainer_and_distribution_floor_order","neutral_distribution_retains_full_participant_denominator_and_recipient_eligibility","normal_classic_caps_cover_every_wave_and_each_decade_boundary"],"er-progression:m9e_content_v2":["experience_classes_are_closed_and_every_metadata_field_is_hashed","historical_species_bytes_and_missing_experience_remain_explicit","inconsistent_experience_cohorts_and_classifications_fail_validation","signed_special_learnset_levels_are_preserved","source_form_lookup_distinguishes_species_row_and_first_form","unknown_move_reference_fails_closed"],"er-content-compiler:m9e_progression":["complete_progression_catalog_is_source_bound_and_byte_stable","experience_export_fields_compile_without_changing_historical_rows","malformed_experience_export_fails_without_reinterpreting_form_rows"]}
+
 RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
                   "rust/crates/er-kernel/tests/" + REPLACEMENT_TARGET + ".rs",
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
                   "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
                   "rust/crates/er-wasm/tests/m9e_parity.rs",
-                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs", *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, "rust/crates/er-kernel/src/current_coop_setup_v7.rs"]
-RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS, "coop_campaign_test_ids": COOP_CAMPAIGN_IDS, "coop_receipt_test_ids": COOP_RECEIPT_IDS}
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs", *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, "rust/crates/er-kernel/src/current_coop_setup_v7.rs", *XP_PATHS]
+RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS, "coop_campaign_test_ids": COOP_CAMPAIGN_IDS, "coop_receipt_test_ids": COOP_RECEIPT_IDS, "xp_test_ids": XP_TEST_IDS}
 
 
 def select_recovery_scope(config, changed):
@@ -275,7 +278,7 @@ def select_recovery_scope(config, changed):
     if policy is not None and policy != RECOVERY_POLICY:
         raise RuntimeError("current recovery integration policy identities disagree")
     scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
-    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7], *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH)) and not scoped:
+    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7], *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, *XP_PATHS)) and not scoped:
         raise RuntimeError("natural replacement integration product delta is unmapped")
     return scoped, policy is not None
 
@@ -1120,7 +1123,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (recovery_session and path in XP_PATHS) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -1542,6 +1545,18 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + COOP_RECEIPT_TARGET: list(COOP_RECEIPT_IDS)}
         if result["execution_scope"] is not None:
             result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [COOP_RECEIPT_TARGET]})
+    # Installed foundational calculations and content metadata remain whole
+    # ordinary native targets; this does not enable runtime XP or regenerate data.
+    xp_required = replacement_installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-content-compiler"} & selected)
+    result["requires_current_xp_metadata"] = xp_required
+    if xp_required:
+        result["packages"] = sorted(set(result["packages"]) | {"er-progression", "er-content-compiler"})
+        for key, ids in XP_TEST_IDS.items():
+            crate, target = key.split(":")
+            result["required_native_targets"] = merge_targets(result["required_native_targets"], {crate: [target]})
+            result["required_native_test_ids"] = {**result["required_native_test_ids"], key: list(ids)}
+            if result["execution_scope"] is not None:
+                result["execution_scope"] = merge_targets(result["execution_scope"], {crate: [target]})
     rng_required = replacement_installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-rng"} & selected)
     result["requires_current_rng_witnesses"] = rng_required
     if rng_required:

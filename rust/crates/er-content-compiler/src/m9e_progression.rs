@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use er_progression::content_v2::{
     CaptureBallDefinitionV2, EvolutionConditionV2, EvolutionDefinitionV2, LevelMoveV2,
     PROGRESSION_CONTENT_PACK_SCHEMA_VERSION_V2, ProgressionContentPackV2,
-    SpeciesProgressionDefinitionV2,
+    SpeciesExperienceMetadataV2, SpeciesProgressionDefinitionV2,
 };
 use er_progression::{GrowthRateDefinitionV1, NatureDefinitionV1};
 use er_types::battle_ids::{MoveId, SpeciesId};
@@ -77,6 +77,8 @@ struct RawSpeciesProgressionV1 {
     species_id: u64,
     form_index: u16,
     form_key: Option<String>,
+    #[serde(default)]
+    experience: Option<SpeciesExperienceMetadataV2>,
     growth_rate: u8,
     base_friendship: u16,
     catch_rate: u16,
@@ -244,7 +246,13 @@ fn compile_species(
     if entry.evolution_moves.contains(&0) {
         return Err(ProgressionBuildErrorV1::Invalid);
     }
-    let _source_form_key = entry.form_key;
+    if entry
+        .experience
+        .as_ref()
+        .is_some_and(|metadata| metadata.source_form_key != entry.form_key)
+    {
+        return Err(ProgressionBuildErrorV1::Invalid);
+    }
     let mut level_moves = entry
         .level_moves
         .into_iter()
@@ -272,6 +280,7 @@ fn compile_species(
     Ok(SpeciesProgressionDefinitionV2 {
         species,
         form: entry.form_index,
+        experience: entry.experience,
         growth_rate: GrowthRateId::new(entry.growth_rate),
         base_friendship: entry.base_friendship,
         catch_rate: entry.catch_rate,

@@ -30,6 +30,14 @@ NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "xp_foundation_api": "rust/crates/er-progression/src/lib.rs",
+    "xp_foundation_source": "rust/crates/er-progression/src/current_experience.rs",
+    "xp_foundation_test": "rust/crates/er-progression/tests/m9e_current_experience.rs",
+    "xp_metadata_source": "rust/crates/er-progression/src/content_v2.rs",
+    "xp_metadata_test": "rust/crates/er-progression/tests/m9e_content_v2.rs",
+    "xp_compiler_source": "rust/crates/er-content-compiler/src/m9e_progression.rs",
+    "xp_compiler_test": "rust/crates/er-content-compiler/tests/m9e_progression.rs",
+    "xp_export_source": "test/kernel-fixtures/m9/export-progression-content.ts",
     "coop_receipt_test": "rust/crates/er-kernel/tests/m9e_coop_lost_receipt_v7.rs",
     "coop_receipt_producer": "scripts/ci/m9e_coop_lost_receipt_diagnostic.py",
     "rng_phaser": "rust/crates/er-rng/src/phaser.rs",
@@ -153,9 +161,11 @@ LANE_B_TARGETS = {("er-cli", "m9e_current_repro"),
 LANE_C_TARGETS = {("er-cli", "m9e_current_batch"), ("er-lab", "current_kernel_supervisor_v2"),
                   ("er-kernel", "m9e_material_retention_v7"), ("er-cli", "m9e_current_rulechange_reload"),
                  }
-LANE_D_TARGETS = {("er-kernel", "m9e_coop_lost_receipt_v7"), STATE_QUERY_TARGET, ("er-web", "m9e_host_v2"),
+LANE_D_TARGETS = {("er-kernel", "m9e_coop_lost_receipt_v7"), ("er-web", "m9e_host_v2"),
                   ("er-repro", "m9e_natural_campaign_replay"), ("er-kernel-worker", "current_process_v2"), ("er-rng", "er_rng"), ("er-rng", "m3_rng"), ("er-rng", "m9e_shifted_utf16")}
-LANE_E_TARGETS = {("er-kernel", "m9e_natural_coop_campaign_v7")}
+# Whole ordinary state-query target moved after measured D shared-deadline exhaustion.
+# Its opt0 profile, complete ID and 600-second cap remain unchanged.
+LANE_E_TARGETS = {("er-kernel", "m9e_natural_coop_campaign_v7"), STATE_QUERY_TARGET}
 STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
                           STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 

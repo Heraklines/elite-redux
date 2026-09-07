@@ -34,7 +34,15 @@
       "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json",
       "rust/crates/er-kernel/tests/m9e_natural_coop_campaign_v7.rs",
       "rust/crates/er-kernel/tests/m9e_coop_lost_receipt_v7.rs",
-      "rust/crates/er-kernel/src/current_coop_setup_v7.rs"
+      "rust/crates/er-kernel/src/current_coop_setup_v7.rs",
+      "rust/crates/er-progression/src/lib.rs",
+      "rust/crates/er-progression/src/current_experience.rs",
+      "rust/crates/er-progression/tests/m9e_current_experience.rs",
+      "rust/crates/er-progression/src/content_v2.rs",
+      "rust/crates/er-progression/tests/m9e_content_v2.rs",
+      "rust/crates/er-content-compiler/src/m9e_progression.rs",
+      "rust/crates/er-content-compiler/tests/m9e_progression.rs",
+      "test/kernel-fixtures/m9/export-progression-content.ts"
     ],
     "replacement_test_ids": [
       "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
@@ -142,7 +150,29 @@
     ],
     "coop_campaign_test_ids": [
       "natural_owned_cooperative_campaign_reaches_wave_200_victory"
-    ]
+    ],
+    "xp_test_ids": {
+      "er-progression:m9e_current_experience": [
+        "capped_addition_preserves_multi_level_gains_discards_new_excess_and_keeps_old_experience",
+        "invalid_and_overflowing_experience_inputs_leave_borrowed_source_state_unchanged",
+        "neutral_defeat_values_preserve_form_trainer_and_distribution_floor_order",
+        "neutral_distribution_retains_full_participant_denominator_and_recipient_eligibility",
+        "normal_classic_caps_cover_every_wave_and_each_decade_boundary"
+      ],
+      "er-progression:m9e_content_v2": [
+        "experience_classes_are_closed_and_every_metadata_field_is_hashed",
+        "historical_species_bytes_and_missing_experience_remain_explicit",
+        "inconsistent_experience_cohorts_and_classifications_fail_validation",
+        "signed_special_learnset_levels_are_preserved",
+        "source_form_lookup_distinguishes_species_row_and_first_form",
+        "unknown_move_reference_fails_closed"
+      ],
+      "er-content-compiler:m9e_progression": [
+        "complete_progression_catalog_is_source_bound_and_byte_stable",
+        "experience_export_fields_compile_without_changing_historical_rows",
+        "malformed_experience_export_fails_without_reinterpreting_form_rows"
+      ]
+    }
   },
   "current_ai_command_transaction_focus": {
     "paths": [
