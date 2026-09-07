@@ -58,21 +58,39 @@ def main():
                 and hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest() == OID,
                 "actual source blob differs")
         lines = raw.decode("utf-8").splitlines(keepends=True)
-        matches = [i for i, line in enumerate(lines) if re.search(r"^\s*(?:public\s+)?addStarterCandy\s*\(|^(?:export\s+)?(?:interface|type)\s+StarterDataEntry\b", line)]
-        require(1 <= len(matches) <= 3, "review exact source selector before expanding")
-        selected = set(range(min(120, len(lines))))
-        for index in matches:
-            selected.update(range(max(0, index - 16), min(len(lines), index + 110)))
-        indices = sorted(selected)
-        groups = []
-        for index in indices:
-            if not groups or index != groups[-1][-1] + 1:
-                groups.append([])
-            groups[-1].append(index)
-        excerpt = "".join(
-            f"\n// {PATH}: lines {group[0] + 1}-{group[-1] + 1}\n"
-            + "".join(f"{i + 1:05d}: {lines[i]}" for i in group) for group in groups).encode()
-        require(len(excerpt) <= 49152, "selected source excerpts exceed local routine bound")
+        if PATH.endswith(".json"):
+            decoded = json.loads(raw)
+            selected_values = {}
+            def select(value, path):
+                if re.search(r"friendship|candy", path, re.I):
+                    selected_values[path] = value
+                elif isinstance(value, dict):
+                    for key, item in value.items():
+                        select(item, path + "/" + key)
+                elif isinstance(value, list):
+                    for index, item in enumerate(value):
+                        select(item, path + "/" + str(index))
+            select(decoded, "")
+            require(1 <= len(selected_values) <= 100, "review exact tuning selector")
+            excerpt = (json.dumps(selected_values, sort_keys=True, indent=2) + "\n").encode()
+            matches, groups = [], []
+            receipt["selected_json_paths"] = sorted(selected_values)
+        else:
+            matches = [i for i, line in enumerate(lines) if re.search(
+                r"^\s*(?:public\s+|private\s+)?(?:static\s+)?(?:getRootStarterSpeciesId|getStarterDataEntry)\s*\(", line)]
+            require(len(matches) == 2, "exact two starter resolver definitions required")
+            selected = set()
+            for index in matches:
+                selected.update(range(max(0, index - 12), min(len(lines), index + 100)))
+            groups = []
+            for index in sorted(selected):
+                if not groups or index != groups[-1][-1] + 1:
+                    groups.append([])
+                groups[-1].append(index)
+            excerpt = "".join(
+                f"\n// {PATH}: lines {group[0] + 1}-{group[-1] + 1}\n"
+                + "".join(f"{i + 1:05d}: {lines[i]}" for i in group) for group in groups).encode()
+        require(len(excerpt) <= 24576, "each selected excerpt exceeds local routine bound")
         (OUT / "source-excerpt.txt").write_bytes(excerpt)
         receipt.update(status="passed", bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
                        total_lines=len(lines), matched_lines=[i + 1 for i in matches],
@@ -91,4 +109,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    base_output = OUT
+    for label, source_path, source_oid in [
+        ("starter-resolvers", "src/system/game-data.ts", "b88d78bbcf0e36c937af4fa30e45e73d7e5aea90"),
+        ("friendship-tuning", "src/data/elite-redux/er-balance-tuning.json", "04755b16e916c3e364917b67a9718cf0ee01ae6b"),
+    ]:
+        PATH, OID, OUT = source_path, source_oid, base_output / label
+        OUT.parent.mkdir(exist_ok=True)
+        main()
