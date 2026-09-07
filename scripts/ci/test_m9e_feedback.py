@@ -6188,7 +6188,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertNotIn("er-query-consumer", selection["execution_scope"])
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
-        self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+        self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
@@ -6368,7 +6368,7 @@ class FeedbackTests(unittest.TestCase):
         inventory = [{"crate": "er-cli", "target": "m9e_current_control_query",
                       "ids": list(phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []}]
         phases.validate_control_query_inventory(selection, inventory)
-        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": []})
+        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": [], "d": []})
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded", "duplicate", "missing_target"):
             bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
             if mode == "missing_flag":
@@ -6484,7 +6484,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertNotIn("er-state-query-consumer", selection["execution_scope"])
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
-        self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+        self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
@@ -6660,7 +6660,7 @@ class FeedbackTests(unittest.TestCase):
                      for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
                                          *phases.STATE_QUERY_IDENTITIES.items())]
         phases.validate_state_query_inventory(selection, inventory)
-        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["c"])
+        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["d"])
         self.assertIn(list(phases.STATE_QUERY_WORKER_TARGET), phases.partition(inventory)["b"])
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
                      "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
@@ -6809,7 +6809,7 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(selection["required_native_targets"][crate], expected)
             assignment = phases.partition([{"crate": crate, "target": target, "ids": [test], "historical_excluded_ids": []}
                                           for crate, target, test in ((*cost.TARGET, cost.TEST_ID), ("er-cli", rule.RULE_TARGET, rule.RULE_TEST))])
-            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]]})
+            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]], "d": []})
         for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml", "unmapped.json"):
             self.changed = [cost.SOURCE, rule.RULE_TEST_SOURCE, extra]
             with self.subTest(extra=extra), self.assertRaises(RuntimeError):
@@ -7826,7 +7826,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-game", "m9e_damage_query"], assignment["a"])
         self.assertIn(["er-ai", "er_ai"], assignment["a"])
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
-            ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+            ("er-cli", "m9e_current_repro"),
             ("er-cli", "m9e_current_reload")})
         self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         for key in policies:
@@ -8580,7 +8580,7 @@ class PhaseTransferTests(unittest.TestCase):
             {"crate": "er-other", "target": "m9e_host_v2", "ids": [], "historical_excluded_ids": []},
         ])
         assignment = self.phases.partition(inventory)
-        self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
+        self.assertIn(["er-web", "m9e_host_v2"], assignment["d"])
         self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         self.assertNotIn(["er-cli", "m9e_current_batch"], assignment["b"])
         self.assertIn(["er-cli", "m9e_current_reload"], assignment["b"])
@@ -8589,10 +8589,10 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
-        self.assertEqual(len(assignment["b"]), 3)
+        self.assertEqual(len(assignment["b"]), 2)
         self.assertEqual(sum(len(targets) for targets in assignment.values()), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
-        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"]),
+        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"] + assignment["d"]),
                          sorted([[item["crate"], item["target"]] for item in inventory]))
         inventory.append(copy.deepcopy(inventory[0]))
         with self.assertRaisesRegex(RuntimeError, "duplicated"):
