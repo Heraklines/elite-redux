@@ -573,12 +573,14 @@ name = "er-repro"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "er-battle",
  "er-canonical",
  "er-dev-types",
  "er-devplane",
  "er-env",
  "er-game",
  "er-kernel",
+ "er-state",
  "er-types",
  "serde",
  "serde_json",
