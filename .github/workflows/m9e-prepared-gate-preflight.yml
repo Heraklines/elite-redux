@@ -154,6 +154,31 @@ jobs:
           if binding is not None:
               proof['cli'] = {key: binding[key] for key in ('bytes', 'sha256', 'source_sha', 'target', 'profile', 'cargo_package_id', 'cargo_profile', 'manifest_path')}
               proof['cli']['file'] = 'er-cli'
+          # Source-sensitive validators must read the retained candidate, not
+          # this changed serializer. Materialize only their named source files,
+          # Cargo manifests and existing content; execute no retained programs.
+          import subprocess
+          import m9e_current_cost as cost
+          import m9e_coop_startup as coop
+          retained_sha = expected['product_sha']
+          subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', retained_sha], check=True, timeout=60,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+          retained_root = root / 'm9e-retained-native-source'
+          manifests = [str(path.relative_to(pathlib.Path.cwd())) for path in sorted(pathlib.Path.cwd().glob('rust/crates/*/Cargo.toml'))]
+          names = set([*cost.BUILD_SOURCE_PATHS, *coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER,
+                       coop.RTC_PRODUCER, cost.BUNDLE, cost.CONTENT_MANIFEST, *manifests])
+          for name in sorted(names):
+              relative = pathlib.PurePosixPath(name)
+              if relative.is_absolute() or '..' in relative.parts:
+                  raise RuntimeError('retained source path outside repository')
+              source = subprocess.run(['git', 'show', retained_sha + ':' + name], check=True, timeout=30,
+                                      stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
+              if not 0 < len(source) <= (32 << 20 if name == cost.BUNDLE else 4 << 20):
+                  raise RuntimeError('retained named source bound')
+              destination = retained_root / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_bytes(source)
+          phases.ROOT = retained_root
           phases.validate_native(proof, expected)
           indexed = phases.pack_native_ids(proof)
           ids = phases.encoded([[item['ids'], item['historical_excluded_ids']] for item in proof['inventory']])
