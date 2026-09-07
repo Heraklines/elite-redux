@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Dedicated current rebind control; it never represents a gameplay operation.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum CurrentCoopRebindEventV1 {
     Begin,
@@ -30,6 +30,33 @@ pub enum CurrentCoopRebindEventV1 {
         generation: ConnectionGeneration,
         bytes: Vec<u8>,
     },
+}
+
+// Empty struct variants reject extra map fields; serde unit variants do not.
+#[derive(Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
+enum CurrentCoopRebindWireV1 {
+    Begin {},
+    Retry {},
+    Receive {
+        generation: ConnectionGeneration,
+        bytes: Vec<u8>,
+    },
+}
+
+impl<'de> Deserialize<'de> for CurrentCoopRebindEventV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match CurrentCoopRebindWireV1::deserialize(deserializer)? {
+            CurrentCoopRebindWireV1::Begin {} => Self::Begin,
+            CurrentCoopRebindWireV1::Retry {} => Self::Retry,
+            CurrentCoopRebindWireV1::Receive { generation, bytes } => {
+                Self::Receive { generation, bytes }
+            }
+        })
+    }
 }
 
 /// Lossless adapter representation of the actual native rebind output.
