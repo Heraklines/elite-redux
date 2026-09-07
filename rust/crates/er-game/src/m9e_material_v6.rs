@@ -440,6 +440,13 @@ pub fn apply_game_material_v6_with_retention(
         .after_state
         .validate_with(content)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
+    if let Some(prior) = live.as_ref().and_then(|state| state.current_battle_participation.as_ref())
+        .and_then(|owner| owner.experience.as_ref())
+    {
+        let next = transition.after_state.current_battle_participation.as_ref()
+            .and_then(|owner| owner.experience.as_ref()).ok_or(GameMaterialV6Error::Invalid)?;
+        prior.validate_successor(next).map_err(|_| GameMaterialV6Error::Invalid)?;
+    }
     let before_digest = match live.as_ref() {
         Some(state) => game_state_digest(state)?,
         None => empty_game_state_digest()?,

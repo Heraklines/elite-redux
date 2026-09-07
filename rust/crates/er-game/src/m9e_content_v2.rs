@@ -680,6 +680,26 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
         &self.identity
     }
 
+    fn supports_current_experience_mode(&self, mode: GameModeId) -> bool {
+        self.world.mode(mode).is_some_and(|definition| definition.key == "CLASSIC"
+            && !definition.cooperative && !definition.challenge_selection && definition.supported)
+    }
+
+    fn current_experience_source_matches(
+        &self,
+        source: &er_state::current_experience_owner::CurrentExperienceSourceV1,
+    ) -> bool {
+        self.progression.experience_for_compiled_form(source.species, source.compiled_form)
+            .is_ok_and(|metadata| {
+                let source_form = match metadata.source_form {
+                    er_progression::content_v2::ExperienceSourceFormV2::Species => None,
+                    er_progression::content_v2::ExperienceSourceFormV2::Form(index) => Some(index),
+                };
+                source.source_form == source_form && source.unadjusted_base_exp == metadata.base_exp
+                    && source.source_sprite_key == metadata.source_sprite_key
+            })
+    }
+
     fn has_mode(&self, mode: GameModeId) -> bool {
         self.world.mode(mode).is_some()
     }

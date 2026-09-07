@@ -476,6 +476,9 @@ impl GameActionDispatcherV1 {
             });
         }
         let mut candidate = execution.candidate.ok_or(GameRuntimeV6Error::Invalid)?;
+        if candidate.active_run.is_none() {
+            candidate.current_battle_participation = None;
+        }
         let next_control = normalize_next_control(
             &mut candidate,
             safe_increment(context.action.authority_revision)?,
@@ -563,12 +566,22 @@ impl GameActionDispatcherV1 {
     }
 }
 
+fn has_pending_experience(state: &GameStateV6) -> bool {
+    state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+        .is_some_and(|owner| !owner.pending.is_empty())
+}
+
 fn execute_domain(
     before: Option<&GameStateV6>,
     content: &PreparedGameContentV2,
     action: &GameActionV1,
     context: &GameActionDispatchContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
+    if before.is_some_and(has_pending_experience)
+        && !matches!(action, GameActionV1::Save { action: SaveActionV1::Write { .. } })
+    {
+        return Err(GameRuntimeV6Error::Action);
+    }
     match action {
         GameActionV1::Bootstrap { action: bootstrap } => {
             execute_bootstrap(before, content, bootstrap, &context.input)
@@ -818,12 +831,61 @@ fn execute_battle(
     else {
         return Err(GameRuntimeV6Error::Invalid);
     };
-    let transition = resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
-        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    let (transition, observations) = if before.current_battle_participation.is_some() {
+        let (transition, observations) =
+            er_battle::m7_resolver::resolve_turn_v5_with_current_observations(
+                &project_v5(before),
+                commands,
+                &content.battle,
+                authority,
+            )
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        (transition, Some(observations))
+    } else {
+        (
+            resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+            None,
+        )
+    };
+    let participation = match (&before.current_battle_participation, observations) {
+        (Some(owner), Some(events)) => Some(
+            owner
+                .observe_turn(
+                    before
+                        .active_run
+                        .as_ref()
+                        .ok_or(GameRuntimeV6Error::Action)?,
+                    transition
+                        .after_state
+                        .active_run
+                        .as_ref()
+                        .ok_or(GameRuntimeV6Error::Action)?,
+                    &events,
+                )
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+        ),
+        (None, None) => None,
+        _ => return Err(GameRuntimeV6Error::Invalid),
+    };
     let outcome = transition.outcome;
     let rng_audit = transition.rng_audit;
-    let mut candidate = adopt_v5(before, transition.after_state)?;
+    let mut candidate = adopt_v5_with_participation(before, transition.after_state, participation)?;
     queue_current_player_faints(before, &mut candidate, &transition.presentation)?;
+    if has_pending_experience(&candidate) {
+        // This unresolved tail cannot run the legacy one-level grant or later battle actions.
+        let run = candidate.active_run.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+        run.control = GameControlPlanV2 {
+            schema_version: er_types::GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
+            revision: safe_increment(action_context.authority_revision)?,
+            kind: GameControlKindV2::Waiting,
+            owner_seat: None,
+            action_context: None,
+            menu: None,
+            actionable: false,
+        };
+        return Ok(DomainExecutionV1 { candidate: Some(candidate), rng_audit, ..Default::default() });
+    }
     match outcome {
         BattleOutcome::Victory => {
             let final_wave = candidate
@@ -2567,10 +2629,19 @@ fn project_v5(state: &GameStateV6) -> GameStateV5 {
 }
 
 fn adopt_v5(before: &GameStateV6, after: GameStateV5) -> Result<GameStateV6, GameRuntimeV6Error> {
+    adopt_v5_with_participation(before, after, before.current_battle_participation.clone())
+}
+
+fn adopt_v5_with_participation(
+    before: &GameStateV6,
+    after: GameStateV5,
+    participation: Option<er_state::current_battle_participation::CurrentBattleParticipationV1>,
+) -> Result<GameStateV6, GameRuntimeV6Error> {
     after
         .validate()
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let candidate = GameStateV6 {
+        current_battle_participation: participation,
         schema_version: before.schema_version,
         content_identity: before.content_identity.clone(),
         identities: before.identities.clone(),
