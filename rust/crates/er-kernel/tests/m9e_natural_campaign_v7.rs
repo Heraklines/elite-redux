@@ -151,7 +151,26 @@ fn submit_strongest_move(
         })
         .max_by_key(|(damage, _)| *damage)
         .map(|(_, option)| option)
-        .ok_or("no move option is available")?;
+        .or_else(|| {
+            menu.options
+                .iter()
+                .find(|option| {
+                    matches!(
+                        option.action,
+                        GameActionV1::Battle {
+                            action: er_types::BattleUiActionV1::SelectMove { .. }
+                        }
+                    )
+                })
+                .map(|option| option.option_id.clone())
+        })
+        .ok_or_else(|| {
+            format!(
+                "no offered move: actions={:?}; party={:?}",
+                menu.options.iter().map(|option| &option.action).collect::<Vec<_>>(),
+                run.party.iter().map(|pokemon| (pokemon.id, pokemon.species_id, pokemon.hp, pokemon.moves)).collect::<Vec<_>>()
+            )
+        })?;
     navigate_down_to(kernel, target_option.as_str())?;
     press(kernel, PhysicalKey::Space)
 }
