@@ -1,7 +1,7 @@
 name: M9E Confirmed Cooperative Choices Focused Diagnostic
 on:
   push:
-    branches: [codex/m9e-coop-campaign-preflight-20260907]
+    branches: [codex/m9e-coop-reply-campaign-focused-20260907]
 permissions:
   contents: read
 concurrency:
