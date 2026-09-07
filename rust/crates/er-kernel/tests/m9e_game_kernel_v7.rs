@@ -465,7 +465,7 @@ fn authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng() -> Resul
 }
 
 #[test]
-fn authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes()
+fn authority_ai_exhausted_max_pp_uses_struggle_without_extra_decisions_or_pp()
 -> Result<(), Box<dyn Error>> {
     let content = content()?;
     let fixture = max_pp_choice_fixture(content.clone())?;
@@ -483,18 +483,57 @@ fn authority_ai_exhausted_max_pp_rejects_raw_turn_without_state_or_rng_changes()
             pp_used,
             false,
         )?;
-        let before_choice = actual.snapshot()?;
-        assert!(actual.prepare_authority_ai_commands().is_err());
-        assert_eq!(actual.snapshot()?, before_choice);
-        press(&mut actual, PhysicalKey::Space)?;
-        let before_press = actual.snapshot()?;
-        assert_eq!(
-            actual.current_control().map(|control| control.kind),
-            Some(GameControlKindV2::BattleMove)
-        );
-        assert!(actual.raw_input(key_down(PhysicalKey::Space)).is_err());
-        assert_eq!(actual.snapshot()?, before_press);
-        assert_eq!(before_press.authority_ai, before_choice.authority_ai);
+        let before = actual.snapshot()?;
+        let mut choice = GameKernelV7::from_snapshot(
+            before.clone(),
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content.clone(),
+        )?;
+        let commands = choice.prepare_authority_ai_commands()?;
+        assert_eq!(commands.len(), 1);
+        let er_types::battle_command::AcceptedBattleCommand::ScriptedEnemy { command, .. } = &commands[0] else {
+            return Err("expected an actual Struggle battle command".into());
+        };
+        assert_eq!(command.actor, fixture.enemy_id);
+        assert!(matches!(
+            command.command,
+            er_types::battle_command::BattleCommand::Fight { move_slot, .. }
+                if move_slot.get() == 0
+        ));
+        let mut expected_choice = before.clone();
+        expected_choice.authority_ai.as_mut().ok_or("AI owner missing")?.decision_sequence += 1;
+        assert_eq!(choice.snapshot()?, expected_choice);
+        assert_eq!(actual.snapshot()?, before);
+        let mut replay = GameKernelV7::from_snapshot(
+            before.clone(),
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content.clone(),
+        )?;
+        let open = press(&mut actual, PhysicalKey::Space)?;
+        assert_eq!(open, press(&mut replay, PhysicalKey::Space)?);
+        assert_eq!(actual.snapshot()?, replay.snapshot()?);
+        assert_eq!(actual.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleMove));
+        let step = press(&mut actual, PhysicalKey::Space)?;
+        assert_eq!(step, press(&mut replay, PhysicalKey::Space)?);
+        let after = actual.snapshot()?;
+        assert_eq!(after, replay.snapshot()?);
+        assert_eq!(after.authority_ai, expected_choice.authority_ai);
+        let GameKernelLifecycleSnapshotV7::Active(before_state) = &before.lifecycle else {
+            return Err("before state missing".into());
+        };
+        let before_run = before_state.active_run.as_ref().ok_or("before run missing")?;
+        let before_battle = before_run.battle.as_ref().ok_or("before battle missing")?;
+        let run = actual.state().and_then(|state| state.active_run.as_ref()).ok_or("after run missing")?;
+        let battle = run.battle.as_ref().ok_or("after battle missing")?;
+        let enemy = battle.enemy_party.iter().find(|pokemon| pokemon.id == fixture.enemy_id).ok_or("enemy missing")?;
+        let previous = before_battle.enemy_party.iter().find(|pokemon| pokemon.id == fixture.enemy_id).ok_or("before enemy missing")?;
+        assert_eq!(enemy.moves, previous.moves);
+        assert_eq!(enemy.moves[0].ok_or("candidate missing")?.pp_used, pp_used);
+        assert!(enemy.hp > 0 && enemy.hp <= previous.hp - (previous.max_hp / 4).max(1));
+        assert!(run.party[0].hp < before_run.party[0].hp);
+        assert_ne!(battle, before_battle);
     }
     Ok(())
 }
