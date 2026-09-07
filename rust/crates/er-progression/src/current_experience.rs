@@ -5,12 +5,12 @@
 //! ability/Moody/coordinator multipliers, overrides, Mystery encounters, Daily
 //! and Sprint. Callers must establish that scope; no unknown mechanic is
 //! silently classified as neutral here. This module owns no persistent state.
-use er_types::run_ids::Experience;
 use er_types::SafeU53;
+use er_types::run_ids::Experience;
 use thiserror::Error;
 
-use crate::progression::{current_growth_experience_for_level, ProgressionError};
 use crate::GrowthRateDefinitionV1;
+use crate::progression::{ProgressionError, current_growth_experience_for_level};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExperienceForm {
@@ -108,7 +108,9 @@ pub fn neutral_defeat_award(
     if source.level == 0 || recipient.level == 0 {
         return Err(CurrentExperienceError::Input);
     }
-    if recipient.participant_count == 0 || recipient.hp == 0 || recipient.level >= cap
+    if recipient.participant_count == 0
+        || recipient.hp == 0
+        || recipient.level >= cap
         || !recipient.participated
     {
         return Ok(Experience::ZERO);
@@ -120,7 +122,9 @@ pub fn neutral_defeat_award(
     if !award.is_finite() || !(0.0..=9_007_199_254_740_991.0).contains(&award) {
         return Err(CurrentExperienceError::Overflow);
     }
-    Ok(Experience::new(SafeU53::new(award as u64).map_err(|_| CurrentExperienceError::Overflow)?))
+    Ok(Experience::new(
+        SafeU53::new(award as u64).map_err(|_| CurrentExperienceError::Overflow)?,
+    ))
 }
 
 /// Pure addExp result under the same normal Classic cap. The caller owns stats,
@@ -138,10 +142,17 @@ pub fn add_normal_classic_experience(
         return Err(CurrentExperienceError::Input);
     }
     current_growth_experience_for_level(growth, before.level)?;
-    let total = before.total.get().get().checked_add(earned.get().get())
+    let total = before
+        .total
+        .get()
+        .get()
+        .checked_add(earned.get().get())
         .and_then(|value| SafeU53::new(value).ok())
         .ok_or(CurrentExperienceError::Overflow)?;
-    let mut after = ExperiencePosition { level: before.level, total: Experience::new(total) };
+    let mut after = ExperiencePosition {
+        level: before.level,
+        total: Experience::new(total),
+    };
     while after.level < cap
         && after.total >= current_growth_experience_for_level(growth, after.level + 1)?
     {
