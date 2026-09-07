@@ -5219,17 +5219,75 @@ class FeedbackTests(unittest.TestCase):
                 self.feedback.select_recovery_scope(config, self.feedback.RECOVERY_PATHS)
         self.assertEqual(self.config, original)
 
+    def test_xp_full_composition_requires_all_three_complete_targets_without_policy_mutation(self):
+        self.configure_recovery_integration_scope()
+        original = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_current_xp_metadata"])
+        self.assertEqual(len(self.feedback.XP_PATHS), 8)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 42)
+        self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 14)
+        self.assertEqual(selection["unknown_paths"], [])
+        self.assertEqual(selection["boundary_paths"], [])
+        for key, ids in self.feedback.XP_TEST_IDS.items():
+            crate, target = key.split(":")
+            self.assertIn(crate, selection["packages"])
+            self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
+            self.assertEqual(selection["required_native_test_ids"][key], ids)
+            self.assertIn(target, selection["execution_scope"][crate])
+        self.assertEqual(self.config, original)
+        key = "er-progression:m9e_current_experience"
+        selection["required_native_test_ids"][key].pop()
+        self.assertEqual(self.feedback.plan()["required_native_test_ids"][key], self.feedback.XP_TEST_IDS[key])
+
+    def test_installed_xp_whole_targets_survive_later_current_kernel_followup(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_recovery_integration"])
+        self.assertTrue(selection["requires_current_xp_metadata"])
+        self.assertTrue(selection["requires_coop_lost_receipt"])
+        self.assertTrue(selection["requires_current_rng_witnesses"])
+        for key, ids in self.feedback.XP_TEST_IDS.items():
+            crate, target = key.split(":")
+            self.assertEqual(selection["required_native_test_ids"][key], ids)
+            self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
+            self.assertTrue(selection["execution_scope"] is None or target in selection["execution_scope"][crate])
+        self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.COOP_RECEIPT_TARGET],
+                         self.feedback.COOP_RECEIPT_IDS)
+
+    def test_xp_discovery_rejects_every_missing_renamed_and_duplicate_identity(self):
+        required = self.feedback.XP_TEST_IDS
+        discovered = [(key.split(":")[0], key.split(":")[1], list(ids)) for key, ids in required.items()]
+        self.feedback.require_native_test_ids(required, discovered)
+        for target_index, (crate, target, ids) in enumerate(discovered):
+            without_target = discovered[:target_index] + discovered[target_index + 1:]
+            with self.assertRaisesRegex(RuntimeError, "identities/counts"):
+                self.feedback.require_native_test_ids(required, without_target)
+            for index in range(len(ids)):
+                for changed_ids in (ids[:index] + ids[index + 1:],
+                                    ids[:index] + ["renamed_xp_identity"] + ids[index + 1:],
+                                    [*ids, ids[index]]):
+                    changed = list(discovered)
+                    changed[target_index] = (crate, target, changed_ids)
+                    with self.assertRaisesRegex(RuntimeError, "identities/counts"):
+                        self.feedback.require_native_test_ids(required, changed)
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
         self.package("er-game")
         self.package("er-progression")
+        self.package("er-content-compiler")
         self.package("er-repro")
         self.package("er-wasm")
         self.package("er-battle")
         self.package("er-canonical")
         self.package("er-rng")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
+        for name in self.feedback.XP_PATHS:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("bounded synthetic XP source for planner test\n")
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
             path = self.root / name
@@ -6953,7 +7011,7 @@ class FeedbackTests(unittest.TestCase):
                      for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
                                          *phases.STATE_QUERY_IDENTITIES.items())]
         phases.validate_state_query_inventory(selection, inventory)
-        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["d"])
+        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["e"])
         self.assertIn(list(phases.STATE_QUERY_WORKER_TARGET), phases.partition(inventory)["b"])
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
                      "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
@@ -7786,13 +7844,13 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         third = copy.deepcopy(self.native)
-        third["lane"] = "d"
-        third["assigned_targets"] = self.phases.partition(third["inventory"])["d"]
+        third["lane"] = "e"
+        third["assigned_targets"] = self.phases.partition(third["inventory"])["e"]
         third["completed_targets"] = list(third["assigned_targets"])
         third["tests"].update(executed=1, passed=1)
         third["native_timer_parity_digest"] = None
         self.phases.validate_native(third, self.identity)
-        for lane, original in (("a", self.native), ("b", self.other), ("d", third)):
+        for lane, original in (("a", self.native), ("b", self.other), ("e", third)):
             for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b", "worker_missing", "worker_renamed"):
                 proof = copy.deepcopy(original)
                 if mode == "missing":

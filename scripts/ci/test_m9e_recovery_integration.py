@@ -113,3 +113,44 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
             config["current_recovery_integration"]["coop_receipt_test_ids"] = ids
             with self.assertRaisesRegex(RuntimeError, "identities"):
                 feedback.select_recovery_scope(config, feedback.RECOVERY_PATHS)
+
+    def test_xp_sources_cannot_bypass_complete_reviewed_composition(self):
+        self.assertEqual(len(feedback.XP_PATHS), len(set(feedback.XP_PATHS)))
+        for config in ({}, self.config):
+            for path in feedback.XP_PATHS:
+                with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                    feedback.select_recovery_scope(config, [path])
+            for paths in (feedback.RECOVERY_PATHS[:-1],
+                          [*feedback.RECOVERY_PATHS[:-1], feedback.RECOVERY_PATHS[0]],
+                          [*feedback.RECOVERY_PATHS, "test/kernel-fixtures/m9/unreviewed.ts"]):
+                with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                    feedback.select_recovery_scope(config, paths)
+
+        legacy_pair = ["rust/crates/er-battle/src/m7_resolver.rs",
+                       "rust/crates/er-game/tests/m9e_damage_query.rs"]
+        shared = set(feedback.XP_PATHS) & set(feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS)
+        self.assertEqual(shared, {"rust/crates/er-content-compiler/src/m9e_progression.rs"})
+        for config in ({}, self.config):
+            for path in set(feedback.XP_PATHS) - shared:
+                for legacy in (legacy_pair, feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS):
+                    with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                        feedback.select_recovery_scope(config, [*legacy, path])
+            # Returning False defers validation; it never admits a recovery cut.
+            self.assertFalse(feedback.select_recovery_scope(config, [*legacy_pair, *shared])[0])
+            self.assertFalse(feedback.select_recovery_scope(config, feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS)[0])
+
+    def test_xp_policy_rejects_omitted_renamed_or_duplicated_target_identities(self):
+        for target, required in feedback.XP_TEST_IDS.items():
+            for operation in ("target", "id", "rename", "duplicate"):
+                config = copy.deepcopy(self.config)
+                maps = config["current_recovery_integration"]["xp_test_ids"]
+                if operation == "target":
+                    del maps[target]
+                elif operation == "id":
+                    maps[target].pop()
+                elif operation == "rename":
+                    maps[target][0] = "unverified_xp_identity"
+                else:
+                    maps[target].append(required[0])
+                with self.assertRaisesRegex(RuntimeError, "identities"):
+                    feedback.select_recovery_scope(config, feedback.RECOVERY_PATHS)

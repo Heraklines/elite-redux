@@ -90,8 +90,38 @@ def main():
         raise RuntimeError("exact three test dependencies require a complete verified guard")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 34 or set(product) != set(feedback.RECOVERY_PATHS):
-        raise RuntimeError("combined product source must be exactly the thirty-four reviewed paths")
+    if len(product) != 42 or set(product) != set(feedback.RECOVERY_PATHS):
+        raise RuntimeError("combined product source must be exactly the forty-two reviewed paths")
+    # The fourteen focused IDs include three retained tests: +11 actual native
+    # IDs and one new target, not fourteen additional tests or regenerated data.
+    if plan.get("requires_current_xp_metadata") is not True:
+        raise RuntimeError("installed XP calculation/content metadata obligation missing")
+    expected_xp_counts = {"er-progression:m9e_current_experience": 5,
+                           "er-progression:m9e_content_v2": 6, "er-content-compiler:m9e_progression": 3}
+    for key, count in expected_xp_counts.items():
+        crate, target = key.split(":")
+        if (len(feedback.XP_TEST_IDS[key]) != count
+                or plan["required_native_test_ids"].get(key) != feedback.XP_TEST_IDS[key]
+                or plan["required_native_targets"].get(crate, []).count(target) != 1
+                or target not in plan["execution_scope"].get(crate, []) or crate not in plan["packages"]):
+            raise RuntimeError("whole source-qualified XP target omitted or altered")
+    if (sum(map(len, plan["required_native_targets"].values())) != 52
+            or len(plan["required_native_test_ids"]) != 46):
+        raise RuntimeError("complete prior plus XP required target/identity inventory differs")
+    xp_inventory = [(key.split(":")[0], key.split(":")[1], list(ids)) for key, ids in feedback.XP_TEST_IDS.items()]
+    feedback.require_native_test_ids(feedback.XP_TEST_IDS, xp_inventory)
+    import hashlib
+    xp_qualified = {"rust/crates/er-progression/src/lib.rs":["86ddc67dbb657ee67cf319226eb8e36dc538b306","dc8e1c8cec42e138e3b27e19ba1a6aa1216c57e96d9e253f4f6b5190b4217fc7"],"rust/crates/er-progression/src/current_experience.rs":["86ddc67dbb657ee67cf319226eb8e36dc538b306","bdde28ba1326a834765223ad9558e2f067dc550fb891aebb90870be387d4192c"],"rust/crates/er-progression/tests/m9e_current_experience.rs":["86ddc67dbb657ee67cf319226eb8e36dc538b306","0c5ff471df5861b54288a71dc68b4df929f3de2479f469a64d099a6855f2a93d"],"rust/crates/er-progression/src/content_v2.rs":["aac81fe2b2d09ac891f1dbf14acf3c4daea53f52","39d14bb3d7b4760261a6c2053be68ee987b61f3e916389bfc1cb03a066b976c9"],"rust/crates/er-progression/tests/m9e_content_v2.rs":["aac81fe2b2d09ac891f1dbf14acf3c4daea53f52","955454d2fdd8f4203defa5c48d95b1bbe3674a07dc0ef6fb386acc350890d8a5"],"rust/crates/er-content-compiler/src/m9e_progression.rs":["aac81fe2b2d09ac891f1dbf14acf3c4daea53f52","2b9cf6bbcfffc3e582f5ab11c0f235f8ae29b2670d4e00be3cfd5b1869642b27"],"rust/crates/er-content-compiler/tests/m9e_progression.rs":["aac81fe2b2d09ac891f1dbf14acf3c4daea53f52","4e7c6630f7d7f8ca26b821bad432326be7d385ae5c90806389b9b72f38a14a50"],"test/kernel-fixtures/m9/export-progression-content.ts":["aac81fe2b2d09ac891f1dbf14acf3c4daea53f52","d094dd23a3b23b9afdb7b2bd49b1d9d63764a18e893bc20b1a823905f615898e"]}
+    if set(xp_qualified) != set(feedback.XP_PATHS):
+        raise RuntimeError("exact eight qualified XP product source bindings required")
+    for source_path, (_, source_hash) in xp_qualified.items():
+        if hashlib.sha256((feedback.ROOT / source_path).read_bytes()).hexdigest() != source_hash:
+            raise RuntimeError("XP source differs from its independently qualified focused candidate")
+    xp_receipt = {"qualification": "source conservation only; no exporter, regenerated data or runtime XP qualification",
+                  "candidate_sha": os.environ["GITHUB_SHA"], "focused_test_counts": {"foundation": 5, "metadata": 9},
+                  "sources": xp_qualified}
+    (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/xp-source-conservation.json").write_text(
+        json.dumps(xp_receipt, sort_keys=True) + "\n")
     configured_coop = json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["current_coop_startup_focus"]
     if (configured_coop["browser_ids"] != coop.BROWSER_IDS or len(coop.BROWSER_IDS) != 3
             or coop.BROWSER_IDS[-1] != coop.PUBLIC_RETRY_ID or len(coop.RTC_SOURCES) != 34):
@@ -117,6 +147,16 @@ def main():
     import copy
     import hashlib
     import m9e_phases as phases
+    query_and_campaign = [
+        {"crate": phases.STATE_QUERY_TARGET[0], "target": phases.STATE_QUERY_TARGET[1],
+         "ids": list(phases.STATE_QUERY_IDENTITIES[phases.STATE_QUERY_TARGET]), "historical_excluded_ids": []},
+        {"crate": "er-kernel", "target": feedback.COOP_CAMPAIGN_TARGET,
+         "ids": list(feedback.COOP_CAMPAIGN_IDS), "historical_excluded_ids": []},
+    ]
+    assigned = phases.partition(query_and_campaign)
+    if (assigned["e"] != [list(phases.STATE_QUERY_TARGET), ["er-kernel", feedback.COOP_CAMPAIGN_TARGET]]
+            or any(assigned[lane] for lane in ("a", "b", "c", "d"))):
+        raise RuntimeError("existing E must own the whole ordinary query and distinct campaign targets")
     retained = list((Path(os.environ["RUNNER_TEMP"]) / "m9e-retained-aggregate").rglob("phase-summary.json"))
     if len(retained) != 1:
         raise RuntimeError("one qualified retained aggregate required")
@@ -142,7 +182,11 @@ def main():
     projected["required_native_target_counts"]["er-canonical:" + feedback.CANONICAL_TARGET] = 32
     for crate, target in feedback.CAMPAIGN_TARGETS.items():
         projected["required_native_target_counts"][crate + ":" + target] = len(feedback.CAMPAIGN_TEST_IDS[crate])
-    projected["tests"] = {"selected": 741, "executed": 741, "passed": 741, "failed": 0, "skipped": 0}
+    projected_test_count = 741 + sum(map(len, feedback.XP_TEST_IDS.values())) - 3
+    if projected_test_count != 752:
+        raise RuntimeError("retained three plus eleven added XP native identity accounting differs")
+    projected["tests"] = {"selected": projected_test_count, "executed": projected_test_count, "passed": projected_test_count, "failed": 0, "skipped": 0}
+    projected["required_native_target_counts"].update({key: len(ids) for key, ids in feedback.XP_TEST_IDS.items()})
     for target, ids in feedback.RNG_TEST_IDS.items():
         projected["required_native_target_counts"]["er-rng:" + target] = len(ids)
     projected["required_native_target_counts"]["er-kernel:" + feedback.COOP_CAMPAIGN_TARGET] = 1
@@ -172,7 +216,7 @@ def main():
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "compact_bytes": len(phases.encoded(compact)), "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: actual combined thirty-four-path source scope, all79 prior targets, exact thirteen new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
+    print("Passed: actual combined forty-two-path source scope, all79 prior targets, exact thirteen new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
 
 
 if __name__ == "__main__":

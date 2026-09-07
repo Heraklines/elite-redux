@@ -208,7 +208,8 @@ class CoopPolicyTests(unittest.TestCase):
         assignment = phases.partition(rows)
         self.assertEqual(rows, before)
         self.assertEqual(assignment["c"], [])
-        self.assertEqual(assignment["d"], [list(phases.STATE_QUERY_TARGET)])
+        self.assertEqual(assignment["d"], [])
+        self.assertEqual(assignment["e"], [list(phases.STATE_QUERY_TARGET)])
         self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
         self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(coop.KERNEL_TARGET), list(phases.CONTROL_QUERY_TARGET)])
         self.assertEqual(len({tuple(pair) for targets in assignment.values() for pair in targets}), len(rows))
@@ -428,3 +429,31 @@ class CoopPolicyTests(unittest.TestCase):
             self.assertEqual(producer.ROOT, "unchanged")
             self.assertFalse(hasattr(producer, "FULL"))
             self.assertEqual(dict(os.environ), before)
+
+    def test_existing_fifth_lane_owns_whole_query_and_campaign_with_exact_disjoint_membership(self):
+        import m9e_phases as phases
+        import m9e_coop_campaign as campaign
+        inventory = [{"crate": crate, "target": target, "ids": list(ids), "historical_excluded_ids": []}
+                     for (crate, target), ids in ((phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS[:1]),
+                         (phases.STATE_QUERY_WORKER_TARGET, phases.STATE_QUERY_TEST_IDS[1:]),
+                         (campaign.TARGET, campaign.IDS), (("er-other", phases.STATE_QUERY_TARGET[1]), ["decoy"]))]
+        original = copy.deepcopy(inventory)
+        expected_e = {phases.STATE_QUERY_TARGET, campaign.TARGET}
+        self.assertEqual(phases.LANE_E_TARGETS, expected_e)
+        self.assertNotIn(phases.STATE_QUERY_TARGET, phases.LANE_D_TARGETS)
+        for rows in (inventory, list(reversed(inventory))):
+            assignment = phases.partition(rows)
+            self.assertEqual(set(map(tuple, assignment["e"])), expected_e)
+            self.assertEqual(assignment["d"], [])
+            self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
+            self.assertEqual(assignment["a"], [["er-other", phases.STATE_QUERY_TARGET[1]]])
+            flat = [tuple(pair) for targets in assignment.values() for pair in targets]
+            self.assertEqual(len(flat), len(set(flat)))
+            self.assertEqual(set(flat), {(row["crate"], row["target"]) for row in rows})
+        self.assertEqual(inventory, original)
+        with self.assertRaisesRegex(RuntimeError, "duplicated"):
+            phases.partition([*inventory, copy.deepcopy(inventory[0])])
+        invalid = copy.deepcopy(inventory)
+        invalid[0]["ids"].append(invalid[0]["ids"][0])
+        with self.assertRaisesRegex(RuntimeError, "duplicated"):
+            phases.partition(invalid)
