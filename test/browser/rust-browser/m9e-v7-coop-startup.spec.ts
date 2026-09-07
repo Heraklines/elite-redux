@@ -160,7 +160,7 @@ async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
         }
       };
       (globalThis as any).__naturalCoop = { peer, evidence, press, control: () => structuredClone(control), rawInputs: () => rawInputs,
-        snapshot: async () => (await peer.dispatch({ kind: "SNAPSHOT" })).response.snapshot,
+        assets, snapshot: async () => (await peer.dispatch({ kind: "SNAPSHOT" })).response.snapshot,
         retry: async () => { await peer.dispatch({ kind: "RETRY_COOP_SETUP" }); } };
     }, { entry: `${address}/assets/${manifest.entry}`,
       path: `${address}/assets/${index === 0 ? "coop-host-initialization.json" : "coop-guest-initialization.json"}`,
@@ -305,8 +305,71 @@ for (const hostFirst of [true, false]) {
       expect(peers.workers).toHaveLength(2);
       const rawInputs = await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.rawInputs())));
       for (const url of peers.workers) { expect(new URL(url).origin).toBe(address); expect(new URL(url).pathname).toBe(`/assets/${manifest.worker}`); }
+      const originalWorkers = peers.workers.length;
+      const replayEvidence = await Promise.all([peers.left, peers.right].map(page => page.evaluate(async workerPath => {
+        const owner = (globalThis as any).__naturalCoop;
+        const before = await owner.snapshot();
+        const bytes = await owner.peer.exportRepro();
+        if (!(bytes instanceof Uint8Array) || bytes.length === 0 || bytes.length > 4 << 20) throw new Error("bounded actual RTC capture required");
+        const second = await owner.peer.exportRepro();
+        if (second.length !== bytes.length || bytes.some((byte: number, index: number) => byte !== second[index])) {
+          throw new Error("read-only exports changed the recorded input stream");
+        }
+        const canonical = (value: any): string => JSON.stringify(value, (_key, item) =>
+          item != null && typeof item === "object" && !Array.isArray(item)
+            ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+        if (canonical(await owner.snapshot()) !== canonical(before)) throw new Error("export changed the live current snapshot");
+        const worker = new Worker(workerPath, { type: "module", name: "m9e-real-current-capsule-replay" });
+        let sequence = 0;
+        const request = (payload: any): Promise<any> => new Promise((resolve, reject) => {
+          const expected = sequence++;
+          const timer = setTimeout(() => { clean(); reject(new Error("actual replay Worker deadline")); }, 120_000);
+          const clean = () => { clearTimeout(timer); worker.removeEventListener("message", message); worker.removeEventListener("error", error); };
+          const error = () => { clean(); reject(new Error("actual replay Worker error")); };
+          const message = (event: MessageEvent) => {
+            clean();
+            try {
+              if (!(event.data instanceof ArrayBuffer)) {
+                const diagnostic = event.data;
+                throw new Error("actual replay Worker rejected: " + JSON.stringify({
+                  kind: diagnostic?.kind, code: diagnostic?.code, message: String(diagnostic?.message).slice(0, 512),
+                  acceptance: diagnostic?.acceptance, request_id: diagnostic?.request_id, sequence: diagnostic?.sequence,
+                  accepted_sequence: diagnostic?.accepted_sequence,
+                }));
+              }
+              if (event.data.byteLength === 0 || event.data.byteLength > 32 << 20) throw new Error("bounded replay response required");
+              const result = JSON.parse(new TextDecoder().decode(event.data));
+              if (result.version !== 2 || result.request_id !== expected + 1 || result.accepted_sequence !== expected
+                || result.response.kind === "FAULT") throw new Error("replay response correlation or acceptance differs");
+              resolve(result.response);
+            } catch (issue) { reject(issue); }
+          };
+          worker.addEventListener("message", message); worker.addEventListener("error", error);
+          const envelope = new TextEncoder().encode(canonical({ version: 2, request_id: expected + 1, sequence: expected, request: payload }));
+          if (envelope.byteLength > 16 << 20) { clean(); reject(new Error("replay request exceeds current ingress bound")); return; }
+          worker.postMessage(envelope.buffer, [envelope.buffer]);
+        });
+        try {
+          worker.postMessage({ kind: "CONFIGURE_CURRENT_WORKER_V2", assets: owner.assets });
+          const initialized = await request({ kind: "INITIALIZE", initialization: { kind: "CURRENT_REPRO_CAPSULE", capsule_bytes: Array.from(bytes) } });
+          if (initialized.kind !== "READY") throw new Error("current capsule initialization did not replay");
+          const replay = await request({ kind: "SNAPSHOT" });
+          if (replay.kind !== "SNAPSHOT" || canonical(replay.snapshot) !== canonical(before)) throw new Error("actual replay differs from complete live snapshot");
+          const exported = await request({ kind: "EXPORT_REPRO" });
+          if (exported.kind !== "EFFECTS" || exported.batch.effects.length !== 1 || exported.batch.effects[0].kind !== "CURRENT_REPRO_READY") {
+            throw new Error("replayed Worker did not retain current capture");
+          }
+          const restored = exported.batch.effects[0].capsule_bytes;
+          if (restored.length !== bytes.length || bytes.some((byte: number, index: number) => byte !== restored[index])) throw new Error("replay changed complete capsule bytes");
+          if ((await request({ kind: "DISPOSE" })).kind !== "DISPOSED") throw new Error("replay Worker disposal not acknowledged");
+          const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes))), value => value.toString(16).padStart(2, "0")).join("");
+          return { bytes: bytes.length, sha256: hash, live_snapshot_preserved: true, full_replay_equal: true, reexport_equal: true, disposed: true };
+        } finally { worker.terminate(); bytes.fill(0); second.fill(0); }
+      }, address + "/assets/" + manifest.worker)));
+      expect(peers.workers).toHaveLength(4);
+      expect(replayEvidence).toHaveLength(2);
       await info.attach("m9e-natural-coop-startup", { contentType: "application/json", body: Buffer.from(JSON.stringify({
-        source_sha: manifest.source_sha, order: hostFirst ? "host" : "guest", actual_workers: peers.workers.length,
+        source_sha: manifest.source_sha, order: hostFirst ? "host" : "guest", actual_workers: originalWorkers, replay_workers: peers.workers.length - originalWorkers, replay: replayEvidence,
         worker_sha256: manifest.assets[manifest.worker].sha256, ...manifest.cohort,
         setup_manifest_sha256: digest(setupBytes), host_choices: hostChoices.map(choice => choice.species_id),
         guest_choices: guestChoices.map(choice => choice.species_id), choices_sha256: digest(Buffer.from(sentGuest)),
