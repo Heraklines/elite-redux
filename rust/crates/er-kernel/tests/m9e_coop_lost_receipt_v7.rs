@@ -607,18 +607,30 @@ fn natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecu
                 kernel.settle_presentation(pending.event_id)?;
             }
         }
-        let run = host.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
+        let run = host
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("run absent")?;
         assert_ne!(run.outcome, er_types::RunOutcome::Defeat);
         if run.wave.get().get() == 2 {
-            assert!(recovered, "natural battle must recover a genuinely lost authority reply");
+            assert!(
+                recovered,
+                "natural battle must recover a genuinely lost authority reply"
+            );
             assert_eq!(host.state(), guest.state());
             assert!(guest.snapshot()?.current_proposal.is_none());
             return Ok(());
         }
-        let owner = host.current_control().ok_or("canonical control absent")?.owner_seat.unwrap_or(host_seat);
+        let owner = host
+            .current_control()
+            .ok_or("canonical control absent")?
+            .owner_seat
+            .unwrap_or(host_seat);
         let is_host = owner == host_seat;
         let kernel = if is_host { &mut host } else { &mut guest };
-        if kernel.current_control().ok_or("owned control absent")?.kind == er_types::GameControlKindV2::BattleMove {
+        if kernel.current_control().ok_or("owned control absent")?.kind
+            == er_types::GameControlKindV2::BattleMove
+        {
             choose_play_move(kernel, &content, owner)?;
         }
         let step = play_press(kernel)?;
@@ -632,7 +644,11 @@ fn natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecu
             assert!(!is_host);
             let response = host.ingest_network_frame(generation, &proposal)?;
             let lost_receipt = wire(&response)?;
-            assert_ne!(host.state(), guest.state(), "original material was deliberately not delivered");
+            assert_ne!(
+                host.state(),
+                guest.state(),
+                "original material was deliberately not delivered"
+            );
             assert!(guest.snapshot()?.current_proposal.is_some());
             for kernel in [&mut host, &mut guest] {
                 kernel.transport_changed(generation, false)?;
@@ -644,16 +660,40 @@ fn natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecu
             }
             let committed = host.snapshot()?;
             let retried = host.ingest_network_frame(generation, &proposal)?;
-            assert_eq!(host.snapshot()?, committed, "retry reran authority work or changed ownership");
-            assert_eq!(retried.effects.len(), 1, "lost admitted reply must remain recoverable after restore");
-            assert_eq!(wire(&retried)?, lost_receipt, "retry must return the original exact material receipt");
-            assert!(matches!(retried.effects[0], GameKernelEffectV7::AuthorityMaterial { .. }));
+            assert_eq!(
+                host.snapshot()?,
+                committed,
+                "retry reran authority work or changed ownership"
+            );
+            assert_eq!(
+                retried.effects.len(),
+                1,
+                "lost admitted reply must remain recoverable after restore"
+            );
+            assert_eq!(
+                wire(&retried)?,
+                lost_receipt,
+                "retry must return the original exact material receipt"
+            );
+            assert!(matches!(
+                retried.effects[0],
+                GameKernelEffectV7::AuthorityMaterial { .. }
+            ));
             guest.ingest_network_frame(generation, &wire(&retried)?)?;
             assert!(guest.snapshot()?.current_proposal.is_none());
             assert_eq!(host.state(), guest.state());
             let applied = guest.snapshot()?;
-            assert!(guest.ingest_network_frame(generation, &lost_receipt)?.effects.is_empty());
-            assert_eq!(guest.snapshot()?, applied, "duplicate receipt repeated guest effects");
+            assert!(
+                guest
+                    .ingest_network_frame(generation, &lost_receipt)?
+                    .effects
+                    .is_empty()
+            );
+            assert_eq!(
+                guest.snapshot()?,
+                applied,
+                "duplicate receipt repeated guest effects"
+            );
             recovered = true;
         } else {
             deliver_play_step(&mut host, &mut guest, step, is_host, false)?;
