@@ -50,7 +50,7 @@ SOURCES = [TEST_SOURCE, "rust/crates/er-game/src/m9e_material_v6.rs", "rust/crat
            "scripts/ci/m9e_parity_generated_golden_diagnostic.py", ".github/workflows/m9e-parity-generated-golden-focused.yml"]
 BASE_TREE = "e35da245a3a175235626665fd28a4f203bd1bf90"
 BASE_SOURCES = json.loads(r'''{
-  "rust/crates/er-game/src/m9e_material_v6.rs": ["755980893547e19c61418651cb7f0547e81e5d470649ec240acdd5fd9d4f85e8", 23149],
+  "rust/crates/er-game/src/m9e_material_v6.rs": ["0506f2c4d093036aef38ebcac5a0c5c05818e8c78202bccfe7a921afa853b467", 23149],
   "rust/Cargo.lock": [
     "77819112d183e14ad28244caaaadfe94956ab6b7c105a5810f0c2296346e65e9",
     32051
