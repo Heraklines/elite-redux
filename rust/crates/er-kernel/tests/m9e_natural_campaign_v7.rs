@@ -181,11 +181,7 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
             }
         }
     }
-    assert_eq!(
-        starters.len(),
-        6,
-        "natural six-starter policy unavailable"
-    );
+    assert_eq!(starters.len(), 6, "natural six-starter policy unavailable");
     for starter in starters {
         navigate_down_to(&mut kernel, &format!("bootstrap/starter/{}", starter.get()))?;
         press(&mut kernel, PhysicalKey::Space)?;
