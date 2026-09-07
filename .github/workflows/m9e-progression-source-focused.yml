@@ -1,0 +1,64 @@
+name: M9E Pinned Progression Source Excerpts
+on:
+  push:
+    branches: [codex/m9e-progression-source-20260907]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read bounded excerpts from exact pinned source blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, urllib.request
+          out = pathlib.Path(os.environ["RUNNER_TEMP"]) / "m9e-source-excerpts"
+          out.mkdir()
+          sources = [
+              ("src/battle-scene.ts", "f82f401d9e47d839413b65e8080b00feff80cb5f", ("applyPartyExp", "getMaxExpLevel")),
+              ("src/field/pokemon.ts", "7e83f96b9d428c5af206f666bb6e331a64641c9b", ("getExpValue", "addExp")),
+          ]
+          result = {"status": "passed", "qualification": "pinned source excerpts only; no gameplay qualification",
+                    "source_commit": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+                    "workflow_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"], "sources": []}
+          for name, blob, markers in sources:
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/Heraklines/elite-redux/git/blobs/" + blob,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                           "Accept": "application/vnd.github.raw+json", "User-Agent": "m9e-pinned-source-excerpt"})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  raw = response.read(2 * 1024 * 1024 + 1)
+              if not 0 < len(raw) <= 2 * 1024 * 1024:
+                  raise RuntimeError("source byte bound exceeded")
+              if hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest() != blob:
+                  raise RuntimeError("exact pinned source blob differs")
+              lines = raw.decode("utf-8").splitlines(keepends=True)
+              row = {"path": name, "blob": blob, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(), "excerpts": []}
+              for marker in markers:
+                  matches = [i for i, line in enumerate(lines) if re.match(r"^  (?:(?:public|private|protected|override|async) )*" + marker + r"\(", line)]
+                  if len(matches) != 1:
+                      raise RuntimeError("one pinned method declaration required: " + marker)
+                  begin = max(0, matches[0] - 5)
+                  end = min(len(lines), matches[0] + 220)
+                  data = "".join(lines[begin:end]).encode()
+                  if len(data) > 32768:
+                      raise RuntimeError("method excerpt exceeds 32 KiB")
+                  filename = marker + ".ts"
+                  (out / filename).write_bytes(data)
+                  row["excerpts"].append({"method": marker, "file": filename, "first_line": begin + 1, "last_line": end,
+                                          "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+                                          "scope": "bounded context window; inspect function end before treating as complete"})
+              result["sources"].append(row)
+          (out / "summary.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+          print(json.dumps({"status": result["status"], "source_commit": result["source_commit"], "run_id": result["run_id"]}))
+          PY
+      - name: Bounded named source excerpts
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-pinned-progression-source
+          path: ${{ runner.temp }}/m9e-source-excerpts/
+          if-no-files-found: error
+          retention-days: 14
