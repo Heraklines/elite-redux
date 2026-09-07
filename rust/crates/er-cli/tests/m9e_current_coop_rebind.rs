@@ -52,6 +52,21 @@ mod process;
 use process::Cli;
 
 // Exact source setup from the qualified kernel witness; runtime startup still uses real JSONL.
+fn phase(label: &str) -> TestResult {
+    static START: OnceLock<Instant> = OnceLock::new();
+    static WRITTEN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let line = format!(
+        "m9p {label} {}\n",
+        START.get_or_init(Instant::now).elapsed().as_millis()
+    );
+    let before = WRITTEN.fetch_add(line.len(), std::sync::atomic::Ordering::Relaxed);
+    if before.saturating_add(line.len()) >= 4096 {
+        return Err("bounded phase diagnostics exhausted".into());
+    }
+    std::io::stderr().lock().write_all(line.as_bytes())?;
+    Ok(())
+}
+
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("bounded fixture integer")
 }
@@ -377,14 +392,17 @@ impl Endpoint {
         Ok(wire)
     }
     fn capture(&mut self) -> TestResult<CurrentReproCapsuleV1> {
+        phase(if self.host { "H export" } else { "G export" })?;
         let value = self
             .cli
             .result("session.capsule.export", json!({"session":SESSION}))?;
         let capsule: CurrentReproCapsuleV1 = serde_json::from_value(value["capsule"].clone())?;
+        phase(if self.host { "H replay" } else { "G replay" })?;
         let replay =
             replay_current_capsule_v1(&capsule, content()?, CurrentReproLimitsV1::default())?;
         assert_eq!(replay.snapshot()?, self.checkpoint()?);
         assert_eq!(replay.observe()?, self.session.observe()?);
+        phase(if self.host { "H captured" } else { "G captured" })?;
         Ok(capsule)
     }
     fn restore_same(&mut self) -> TestResult {
@@ -430,6 +448,7 @@ fn reject_actual_control_response(
     control: CurrentCoopRebindEventV1,
 ) -> TestResult {
     let before = peer.checkpoint()?;
+    phase("admission begin")?;
     let original_capture = peer.capture()?;
     let (seat, role) = peer.session.session_context()?;
     peer.cli.result(
@@ -447,6 +466,7 @@ fn reject_actual_control_response(
         "result":{"rebind":expected,"observation":candidate.observe()?}});
     assert!(serde_json::to_vec(&success)?.len() + 1 > LINE_BOUND);
     drop(success);
+    phase("long request")?;
     let denied = peer
         .cli
         .request_id("session.coop.rebind", params.clone(), &long_id)?;
@@ -456,6 +476,7 @@ fn reject_actual_control_response(
             .as_str()
             .is_some_and(|message| message.contains("success response JSONL"))
     );
+    phase("long refused")?;
     drop(denied);
     drop(long_id);
     assert_eq!(
@@ -502,10 +523,16 @@ fn reject_actual_control_response(
 
 #[test]
 fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -> TestResult {
+    phase("start")?;
     let mut host = Endpoint::new(true)?;
+    phase("host created")?;
     let mut guest = Endpoint::new(false)?;
+    phase("guest created")?;
+    phase("guest starters")?;
     let choices = one_frame(&guest.starters()?)?;
+    phase("host starters")?;
     assert!(host.starters()?.is_empty());
+    phase("both starters")?;
     let started = one_frame(&frames(&host.ordinary(
         CurrentExternalEvent::NetworkFrame {
             generation: generation(1),
@@ -525,6 +552,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
             peer.checkpoint()?.lifecycle,
             GameKernelLifecycleSnapshotV7::Active(_)
         ));
+        phase(if peer.host { "H begin" } else { "G begin" })?;
         // Reset capture at its own genuine started checkpoint, before any rebind input.
         peer.restore_same()?;
         peer.ordinary(CurrentExternalEvent::TransportChanged {
@@ -553,7 +581,9 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
             bytes: wire.clone(),
         },
     )?;
+    phase("admission done")?;
     for index in 0usize..8 {
+        phase(&format!("receive {index}"))?;
         let peer = if index.is_multiple_of(2) {
             &mut guest
         } else {
@@ -563,6 +593,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
             generation: generation(2),
             bytes: wire,
         })?;
+        phase(&format!("received {index}"))?;
         let before = peer.checkpoint()?;
         let capsule = peer.capture()?;
         let retried = peer.rebind(CurrentCoopRebindEventV1::Retry)?;
@@ -577,6 +608,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
         }
         if index == 2 {
             // Import the complete current capsule through the actual CLI into another session.
+            phase("mid import")?;
             let imported = peer.capture()?;
             peer.cli.result(
                 "session.from_capsule",
@@ -597,6 +629,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
             );
             peer.cli
                 .result("session.close", json!({"session":"restored-midphase"}))?;
+            phase("mid done")?;
         }
     }
     for peer in [&mut host, &mut guest] {
@@ -668,6 +701,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
     }
     host.settle()?;
     guest.settle()?;
+    phase("gameplay material")?;
     let material = host.next_frame()?;
     guest.ordinary(CurrentExternalEvent::NetworkFrame {
         generation: generation(2),
@@ -675,6 +709,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
     })?;
     host.settle()?;
     guest.settle()?;
+    phase("gameplay proposal")?;
     let proposal = guest.next_frame()?;
     let reply = one_frame(&frames(&host.ordinary(
         CurrentExternalEvent::NetworkFrame {
@@ -709,6 +744,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
         host.session.kernel_ref()?.state(),
         guest.session.kernel_ref()?.state()
     );
+    phase("final capsules")?;
     host.capture()?;
     guest.capture()?;
 
@@ -740,7 +776,9 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
         );
         assert_eq!(host.checkpoint()?, before);
     }
+    phase("final ingress done")?;
     host.cli.finish()?;
     guest.cli.finish()?;
+    phase("finished")?;
     Ok(())
 }
