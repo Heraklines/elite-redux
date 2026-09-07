@@ -10,17 +10,17 @@ import time
 from m9e_current_cost import run_bounded
 
 ROOT = Path(__file__).resolve().parents[2]
-REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-coop-lost-receipt-focused"
+REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-natural-coop-campaign-focused"
 FULL = REPORT / "diagnostics"
 COMPACT = REPORT / "compact"
 TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
-RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_coop_lost_receipt_v7.rs",
+RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_natural_coop_campaign_v7.rs",
                 "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
                 "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs"]
-TEST_TARGET = "m9e_coop_lost_receipt_v7"
-TEST_IDS = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution"]
+TEST_TARGET = "m9e_natural_coop_campaign_v7"
+TEST_IDS = ["natural_owned_cooperative_campaign_reaches_wave_200_victory"]
 sequence = 0
 logs = {}
 failed_log = None
@@ -63,7 +63,7 @@ def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
             or artifact["target"].get("src_path") != str(ROOT / test_source)
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
-            or artifact["profile"].get("opt_level") != "0"
+            or artifact["profile"].get("opt_level") != "1"
             or not binary.is_absolute() or binary.is_symlink() or not binary.is_file()
             or binary.resolve() != binary or binary.parent != TARGET / "debug/deps"
             or not re.fullmatch(test_target + "-[0-9a-f]{16}", binary.name)
@@ -80,6 +80,10 @@ def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
     counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
     if counts != [(str(len(test_ids)), "0", "0", "0", "0")]:
         raise RuntimeError("exact test completion differs")
+    campaign = re.findall(r"M9E_NATURAL_COOP_CAMPAIGN wave=200 outcome=Victory decisions=(\d+) proposals=(\d+) materials=(\d+) presentations=(\d+) rewards=(\d+) progression=(\d+)", output)
+    if len(campaign) != 1:
+        raise RuntimeError("one complete natural cooperative Victory receipt required")
+    summary["natural_cooperative_campaign"] = dict(zip(("decisions", "proposals", "materials", "presentations", "rewards", "progression"), map(int, campaign[0])))
     if digest(binary) != binary_hash:
         raise RuntimeError("executed artifact changed")
     return artifact_receipt
@@ -89,14 +93,8 @@ def main(summary):
     sha = os.environ["GITHUB_SHA"]
     if run(["git", "rev-parse", "HEAD"], "identity", cwd=ROOT, seconds=30, bound=16384).read_text().strip() != sha:
         raise RuntimeError("candidate identity differs")
-    sources = [*RUST_SOURCES, "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs", "rust/crates/er-kernel/tests/m9e_natural_replacement_v7.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-progression/src/current_growth_pow.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
-               "rust/crates/er-game/src/m72_bootstrap.rs", "rust/crates/er-types/src/m72_bootstrap.rs",
-               "rust/crates/er-state/src/m9e_state_v6.rs", "rust/crates/er-state/src/m7_state.rs",
-               "rust/crates/er-rng/src/phaser.rs", "rust/crates/er-rng/src/battle.rs", "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
-               "rust/crates/er-game/Cargo.toml", "rust/crates/er-kernel/Cargo.toml",
-               "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_coop_lost_receipt_diagnostic.py",
-               ".github/workflows/m9e-coop-lost-receipt-focused.yml",
-               "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"]
+    from m9e_coop_campaign import SOURCES
+    sources = SOURCES
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
     bundle = ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json"
     summary["bundle_sha256"] = digest(bundle)
@@ -127,15 +125,16 @@ def main(summary):
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
-    summary = {"status": "failed", "qualification": "natural owned co-op lost authority reply across same-generation disconnect and snapshot restore; no generation-two or browser qualification",
+    summary = {"status": "failed", "qualification": "optimized native natural 200-wave co-op with duplicate delivery and same-generation restore; no generation-two or browser qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "18498238ae2468a2f74091d37cbd86340505b1cc"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "09f76be5daabbcda3b2d70e60e7a927837e2165f"}
     try:
         main(summary)
         if TARGET.exists():
             shutil.rmtree(TARGET)
         if TARGET.exists() or time.monotonic() > DEADLINE:
             raise RuntimeError("owned build cleanup exceeded deadline")
+        summary["owned_target_removed"] = True
         summary["status"] = "passed"
     except Exception as error:
         summary["failure"] = str(error)

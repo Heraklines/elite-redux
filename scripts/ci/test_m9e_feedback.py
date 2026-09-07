@@ -6599,7 +6599,7 @@ class FeedbackTests(unittest.TestCase):
         inventory = [{"crate": "er-cli", "target": "m9e_current_control_query",
                       "ids": list(phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []}]
         phases.validate_control_query_inventory(selection, inventory)
-        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": [], "d": []})
+        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": [], "d": [], "e": []})
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded", "duplicate", "missing_target"):
             bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
             if mode == "missing_flag":
@@ -7040,7 +7040,7 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(selection["required_native_targets"][crate], expected)
             assignment = phases.partition([{"crate": crate, "target": target, "ids": [test], "historical_excluded_ids": []}
                                           for crate, target, test in ((*cost.TARGET, cost.TEST_ID), ("er-cli", rule.RULE_TARGET, rule.RULE_TEST))])
-            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]], "d": []})
+            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]], "d": [], "e": []})
         for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml", "unmapped.json"):
             self.changed = [cost.SOURCE, rule.RULE_TEST_SOURCE, extra]
             with self.subTest(extra=extra), self.assertRaises(RuntimeError):
@@ -8672,10 +8672,21 @@ class PhaseTransferTests(unittest.TestCase):
         for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker"):
             fourth.pop(key, None)
         self.fourth_hash = self.phases.write_bounded(self.root / "proof/native-d.json", fourth)
+        fifth = copy.deepcopy(self.native if native is None else native)
+        fifth["lane"] = "e"
+        fifth["assigned_targets"] = self.phases.partition(fifth["inventory"])["e"]
+        fifth["completed_targets"] = list(fifth["assigned_targets"])
+        count = sum(len(row["ids"]) for row in fifth["inventory"] if [row["crate"], row["target"]] in fifth["assigned_targets"])
+        fifth["tests"].update(executed=count, passed=count, failed=0, skipped=0)
+        fifth["native_timer_parity_digest"] = None
+        for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker"):
+            fifth.pop(key, None)
+        self.fifth_hash = self.phases.write_bounded(self.root / "proof/native-e.json", fifth)
         return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",
                                       "M9E_NATIVE_B_RESULT": "success", "M9E_NATIVE_B_MANIFEST_SHA256": self.other_hash,
                                       "M9E_NATIVE_C_RESULT": "success", "M9E_NATIVE_C_MANIFEST_SHA256": self.third_hash,
                                       "M9E_NATIVE_D_RESULT": "success", "M9E_NATIVE_D_MANIFEST_SHA256": self.fourth_hash,
+                                      "M9E_NATIVE_E_RESULT": "success", "M9E_NATIVE_E_MANIFEST_SHA256": self.fifth_hash,
                                       "M9E_PLATFORM_RESULT": "success", "M9E_NATIVE_MANIFEST_SHA256": self.native_hash,
                                       "M9E_PLATFORM_MANIFEST_SHA256": self.platform_hash})
 
@@ -8697,6 +8708,30 @@ class PhaseTransferTests(unittest.TestCase):
         self.platform["native_manifest_sha256"] = self.native_hash
         self.platform["plan_sha256"] = self.native["plan_sha256"]
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+
+    def test_fifth_lane_is_mandatory_even_when_empty(self):
+        for status in ("", "failure", "skipped", "cancelled"):
+            with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_NATIVE_E_RESULT": status}):
+                with self.assertRaisesRegex(RuntimeError, "absent"):
+                    self.phases.aggregate(None)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            (self.root / "proof/native-e.json").unlink()
+            with self.assertRaisesRegex(RuntimeError, "manifest"):
+                self.phases.aggregate(None)
+
+    def test_fifth_lane_proof_cannot_substitute_another_run_or_owner(self):
+        for mode in ("run", "owner", "overlap"):
+            with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+                proof = self.phases.read_bounded(self.root / "proof/native-e.json", self.fifth_hash)
+                if mode == "run":
+                    proof["identity"]["run_id"] = "another"
+                elif mode == "owner":
+                    proof["lane"] = "a"
+                else:
+                    proof["assigned_targets"] = self.native["assigned_targets"]
+                digest = self.phases.write_bounded(self.root / "proof/native-e.json", proof)
+                with patch.dict(os.environ, {"M9E_NATIVE_E_MANIFEST_SHA256": digest}), self.assertRaises(RuntimeError):
+                    self.phases.aggregate(None)
 
     def test_fourth_lane_owns_complete_query_and_host_targets_without_overlap(self):
         rows = [{"crate": crate, "target": target, "ids": ["first", "second"], "historical_excluded_ids": []}
@@ -8780,7 +8815,7 @@ class PhaseTransferTests(unittest.TestCase):
             result = self.phases.aggregate(None)
         self.assertEqual(result["tests"], {"selected": 16, "executed": 16, "passed": 16, "failed": 0, "skipped": 0})
         self.assertEqual(result["native_c_manifest_sha256"], self.third_hash)
-        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d"})
+        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d", "e"})
 
     def test_third_lane_is_mandatory_even_for_an_empty_assigned_partition(self):
         for state in ("", "failure", "skipped", "cancelled"):
@@ -10967,6 +11002,9 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         fourth = copy.deepcopy(second)
         fourth["lane"] = "d"
         fourth_hash = phases.write_bounded(self.root / "proof/native-d.json", fourth)
+        fifth = copy.deepcopy(second)
+        fifth["lane"] = "e"
+        fifth_hash = phases.write_bounded(self.root / "proof/native-e.json", fifth)
         platform = {"version": 1, "phase": "platform", "status": "passed", "qualification": "pending",
                     "identity": self.identity, "native_manifest_sha256": first_hash, "plan_sha256": first["plan_sha256"]}
         platform_hash = phases.write_bounded(self.root / "platform/platform.json", platform)
@@ -10974,6 +11012,7 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
                        "M9E_NATIVE_B_MANIFEST_SHA256": second_hash, "M9E_PLATFORM_MANIFEST_SHA256": platform_hash,
                        "M9E_NATIVE_C_RESULT": "success", "M9E_NATIVE_C_MANIFEST_SHA256": third_hash,
                        "M9E_NATIVE_D_RESULT": "success", "M9E_NATIVE_D_MANIFEST_SHA256": fourth_hash,
+                       "M9E_NATIVE_E_RESULT": "success", "M9E_NATIVE_E_MANIFEST_SHA256": fifth_hash,
                        "M9E_NATIVE_A_RESULT": "success", "M9E_NATIVE_B_RESULT": "success", "M9E_PLATFORM_RESULT": "success"}
         with patch.dict(os.environ, environment), patch.object(phases, "identity", return_value=self.identity), \
                 patch.object(phases, "ROOT", self.repository), patch.object(self.cost, "read_content", return_value=self.content), \
@@ -11011,7 +11050,7 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
 class CompactWorkerEvidenceTests(unittest.TestCase):
     def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
             full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
                     "tests": {"selected": 665, "executed": 665, "passed": 665, "failed": 0, "skipped": 0},
                     key: {lane: {"sha256": lane * 64, "profile": "x" * 600} for lane in "abcd"},
@@ -11028,7 +11067,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_small_worker_details_remain_inline(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
             full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
                     key: {"d": {"sha256": "d" * 64}}}
             compact = phases.compact_summary(full, "e" * 64, {})
@@ -11038,7 +11077,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_unbounded_required_result_still_fails_closed(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
             with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
                 phases.compact_summary({"first_failure": "x" * 16001, key: {"d": "detail"}}, "e" * 64, {})
 

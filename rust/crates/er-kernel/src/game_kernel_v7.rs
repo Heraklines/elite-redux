@@ -982,6 +982,21 @@ impl GameKernelV7 {
                 if envelope.connection_generation != generation {
                     return Err(GameKernelV7Error::Invalid);
                 }
+                if let Some(reply) = self.current_coop_setup.as_ref()
+                    .and_then(|owner| owner.last_reply.as_ref())
+                    && reply.proposal_hex == current_bytes_hex_v1(bytes)
+                {
+                    // The owned reply was validated on construction/restore.
+                    // Re-emission does not admit, apply, present or advance any
+                    // state, allocator, RNG stream, timer or replay sequence.
+                    return Ok(GameKernelStepV7 {
+                        effects: vec![GameKernelEffectV7::AuthorityMaterial {
+                            operation_id: envelope.proposal.context.operation_id,
+                            bytes: reply.canonical_bytes().map_err(|_| GameKernelV7Error::Invalid)?,
+                        }],
+                        internal_events: Vec::new(),
+                    });
+                }
                 let authority_context = self
                     .protocol
                     .as_ref()
@@ -1027,6 +1042,11 @@ impl GameKernelV7 {
                         *material = receipt
                             .canonical_bytes()
                             .map_err(|_| GameKernelV7Error::Invalid)?;
+                        if let Some(owner) = candidate.current_coop_setup.as_mut()
+                            && owner.started.is_some()
+                        {
+                            owner.last_reply = Some(Box::new(receipt));
+                        }
                         matched += 1;
                     }
                 }
@@ -1628,10 +1648,48 @@ impl GameKernelV7 {
         }
         let capacity =
             usize::try_from(admission.capacity.get()).map_err(|_| GameKernelV7Error::Invalid)?;
-        if admission.disposed || admission.fingerprints.len() >= capacity {
+        if admission.disposed || capacity == 0 || admission.fingerprints.len() > capacity {
             return Err(GameKernelV7Error::Invalid);
         }
+        let retirement = if admission.fingerprints.len() == capacity {
+            // Owned current sessions have a live canonical operation/revision
+            // fence checked above. Retiring a fingerprint cannot make an old
+            // proposal actionable again. Historical sessions retain backpressure.
+            if !self
+                .current_coop_setup
+                .as_ref()
+                .is_some_and(|owner| owner.started.is_some())
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            let ledger = self.active_runtime()?.material_ledger();
+            Some(
+                admission
+                    .fingerprints
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, entry)| {
+                        ledger
+                            .record(&entry.operation_id)
+                            .map_or(SafeU53::ZERO, |record| record.authority_revision)
+                    })
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .0,
+            )
+        } else {
+            None
+        };
         let mut staged = self.clone();
+        let mut protocol = protocol;
+        if let Some(index) = retirement {
+            protocol
+                .proposal_admission
+                .as_mut()
+                .ok_or(GameKernelV7Error::Invalid)?
+                .fingerprints
+                .remove(index);
+            staged.protocol = Some(protocol.clone());
+        }
         let step = staged.apply_admitted_game_proposal(envelope, protocol, fingerprint)?;
         staged.validate()?;
         *self = staged;
