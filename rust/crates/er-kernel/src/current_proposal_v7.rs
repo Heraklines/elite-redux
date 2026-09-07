@@ -99,7 +99,7 @@ pub struct CurrentProposalMaterialReceiptV1 {
     pub material_fingerprint: String,
 }
 
-fn deserialize_current_frame_context<'de, D>(
+pub(crate) fn deserialize_current_frame_context<'de, D>(
     deserializer: D,
 ) -> std::result::Result<FrameContext, D::Error>
 where

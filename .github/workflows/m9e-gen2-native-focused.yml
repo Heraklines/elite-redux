@@ -1,0 +1,87 @@
+name: M9E Native Equal Frontier Rebind Diagnostic
+on:
+  push:
+    branches: [codex/m9e-gen2-native-focused-20260907]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-gen2-native-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      GIT_NO_LAZY_FETCH: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_TEST_OPT_LEVEL: '0'
+      CARGO_PROFILE_TEST_DEBUG_ASSERTIONS: 'true'
+      CARGO_PROFILE_TEST_OVERFLOW_CHECKS: 'true'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Start shared budget before checkout
+        timeout-minutes: 1
+        run: echo "M9E_FOCUS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        timeout-minutes: 10
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify candidate and retrieve only pinned base metadata
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          [[ "$M9E_FOCUS_STARTED_AT" =~ ^[0-9]{10}$ ]]
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          remaining=$((1780 - elapsed))
+          test "$remaining" -gt 0
+          timeout "$((remaining < 600 ? remaining : 600))" git -c protocol.version=2 fetch --no-tags --filter=blob:none --depth=1 origin 9fbb9fa2a624f8341974ce27e18260a21063751f
+          test "$(git rev-parse '9fbb9fa2a624f8341974ce27e18260a21063751f^{tree}')" = e025db5e75c65ee152821a36e31c9eb5eeb6960c
+      - name: Restore existing dependency downloads
+        timeout-minutes: 10
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust tooling remotely within shared budget
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$M9E_FOCUS_STARTED_AT" =~ ^[0-9]{10}$ ]]
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          remaining=$((1780 - elapsed))
+          test "$remaining" -gt 0
+          timeout "$((remaining < 600 ? remaining : 600))" rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+      - name: Forty-seven complete native tests and all kernel constructors
+        timeout-minutes: 30
+        run: python3 scripts/ci/m9e_gen2_native_diagnostic.py
+      - name: Compact focused result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-gen2-native-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-gen2-native-focused/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-gen2-native-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-gen2-native-focused/diagnostics/
+          if-no-files-found: error
+          retention-days: 14

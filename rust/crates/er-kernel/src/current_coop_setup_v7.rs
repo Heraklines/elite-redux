@@ -51,6 +51,8 @@ pub struct CurrentCoopSetupSnapshotV1 {
     // result until replacement, even across transport loss and ledger retirement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_reply: Option<Box<CurrentProposalMaterialReceiptV1>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rebind: Option<Box<super::current_coop_rebind_v7::CurrentCoopRebindSnapshotV1>>,
 }
 
 fn encode<T: serde::Serialize>(value: &T, maximum: usize) -> Result<Vec<u8>> {
@@ -222,6 +224,17 @@ pub(crate) fn validate_snapshot(
         .protocol
         .as_ref()
         .ok_or(GameKernelV7Error::Invalid)?;
+    let origin;
+    let protocol = if owner.rebind.is_some() {
+        super::current_coop_rebind_v7::validate_snapshot(snapshot)?;
+        origin = super::current_coop_rebind_v7::origin_protocol(protocol)?;
+        &origin
+    } else {
+        if snapshot.scheduler.pauses.iter().any(|pause| pause.reasons.iter().any(|reason| reason == super::current_coop_rebind_v7::PAUSE)) {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        protocol
+    };
     validate_current_pair_v1(protocol, owner.local.sender_seat_id, protocol.role, false)
         .map_err(|_| GameKernelV7Error::Invalid)?;
     if owner.schema_version != 1
@@ -424,6 +437,7 @@ impl GameKernelV7 {
             choices: None,
             started: None,
             last_reply: None,
+            rebind: None,
         }));
         candidate.validate()?;
         *self = candidate;
@@ -432,6 +446,7 @@ impl GameKernelV7 {
 
     /// Repeat the retained publication; no state, RNG, presentation or storage is repeated.
     pub fn retry_current_coop_setup(&self) -> Result<GameKernelStepV7> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         let owner = self
             .current_coop_setup
             .as_ref()

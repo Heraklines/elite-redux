@@ -1,5 +1,7 @@
 //! GameKernelV7: sole production owner for the direct M9-E runtime path.
 
+#[path = "current_coop_rebind_v7.rs"]
+pub mod current_coop_rebind_v7;
 #[path = "current_coop_setup_v7.rs"]
 pub mod current_coop_setup_v7;
 use current_coop_setup_v7::CurrentCoopSetupSnapshotV1;
@@ -487,6 +489,7 @@ impl GameKernelV7 {
     pub fn prepare_authority_ai_commands(
         &mut self,
     ) -> Result<Vec<er_types::battle_command::AcceptedBattleCommand>, GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         if self.role != GameKernelRoleV7::Authority {
             return Err(GameKernelV7Error::Invalid);
         }
@@ -756,6 +759,7 @@ impl GameKernelV7 {
         &mut self,
         event: RawInputEvent,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         if matches!(self.lifecycle, GameKernelLifecycleV7::Bootstrap(_)) {
             let event = match event {
                 RawInputEvent::GamepadDown { button } => {
@@ -805,6 +809,7 @@ impl GameKernelV7 {
         &mut self,
         milliseconds: SafeU53,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         let mut candidate = self.clone();
         let step = candidate.advance_time_transaction(milliseconds)?;
         candidate.validate()?;
@@ -949,6 +954,7 @@ impl GameKernelV7 {
         generation: ConnectionGeneration,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         if current_coop_setup_v7::is_setup_frame(bytes) {
             return self.ingest_coop_setup(generation, bytes);
         }
@@ -1110,6 +1116,7 @@ impl GameKernelV7 {
         generation: ConnectionGeneration,
         connected: bool,
     ) -> Result<(), GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return self.current_rebind_transport_changed(generation, connected); }
         let mut candidate = self.clone();
         candidate.transport_changed_transaction(generation, connected)?;
         candidate.validate()?;
@@ -1193,6 +1200,7 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         self.apply_current_material(bytes, false, false)
     }
 
@@ -1591,6 +1599,7 @@ impl GameKernelV7 {
         &mut self,
         bytes: &[u8],
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
         if self.role != GameKernelRoleV7::Authority || bytes.is_empty() {
             return Err(GameKernelV7Error::Invalid);
         }
