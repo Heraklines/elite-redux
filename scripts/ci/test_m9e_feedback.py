@@ -5145,6 +5145,18 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["required_native_test_ids"][crate + ":" + target], self.feedback.CAMPAIGN_TEST_IDS[crate])
             self.assertIn(target, selection["execution_scope"][crate])
 
+    def test_rng_witnesses_remain_required_after_later_ai_change(self):
+        self.configure_recovery_integration_scope()
+        for paths in (list(self.feedback.AI_COMMAND_PATHS), ["rust/crates/er-game/src/m9e_runtime_v6.rs"]):
+            self.changed = paths
+            selection = self.feedback.plan()
+            self.assertTrue(selection["requires_current_rng_witnesses"])
+            self.assertIn("er-rng", selection["packages"])
+            for target, ids in self.feedback.RNG_TEST_IDS.items():
+                self.assertEqual(selection["required_native_targets"]["er-rng"].count(target), 1)
+                self.assertEqual(selection["required_native_test_ids"]["er-rng:" + target], ids)
+                self.assertIn(target, selection["execution_scope"]["er-rng"])
+
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
@@ -5154,6 +5166,7 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-wasm")
         self.package("er-battle")
         self.package("er-canonical")
+        self.package("er-rng")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
@@ -10998,7 +11011,7 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
 class CompactWorkerEvidenceTests(unittest.TestCase):
     def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
             full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
                     "tests": {"selected": 665, "executed": 665, "passed": 665, "failed": 0, "skipped": 0},
                     key: {lane: {"sha256": lane * 64, "profile": "x" * 600} for lane in "abcd"},
@@ -11015,7 +11028,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_small_worker_details_remain_inline(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
             full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
                     key: {"d": {"sha256": "d" * 64}}}
             compact = phases.compact_summary(full, "e" * 64, {})
@@ -11025,7 +11038,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_unbounded_required_result_still_fails_closed(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
             with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
                 phases.compact_summary({"first_failure": "x" * 16001, key: {"d": "detail"}}, "e" * 64, {})
 
