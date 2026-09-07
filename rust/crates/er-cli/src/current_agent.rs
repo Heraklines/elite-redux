@@ -9,7 +9,9 @@ use er_agent_protocol::{
     AgentDispatchErrorV1, AgentDispatcherV1, AgentErrorCodeV1, AgentJsonlServerV1,
     AgentProtocolLimitsV1, AgentRequestV1, AgentResponseContextV1,
 };
-use er_env::current::{CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError,
+};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, KernelPresentationOutcomeV2};
 use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
@@ -272,9 +274,14 @@ impl CurrentDispatcher {
         if request.session != id {
             return Err(invalid("current rebind session differs"));
         }
-        match self.sessions.get_mut(&id)
-            .ok_or_else(|| backend("current session missing or closed"))? {
-            CurrentBackend::Native(session) => self.captures.get_mut(&id)
+        match self
+            .sessions
+            .get_mut(&id)
+            .ok_or_else(|| backend("current session missing or closed"))?
+        {
+            CurrentBackend::Native(session) => self
+                .captures
+                .get_mut(&id)
                 .ok_or_else(|| backend("native capture owner missing"))?
                 .apply_rebind(session, request.control, origin, context),
             CurrentBackend::Worker(_) => Err(invalid(

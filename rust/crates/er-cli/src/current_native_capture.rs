@@ -1,7 +1,9 @@
 //! Standalone native diagnostics. Capture failures never undo accepted gameplay.
 
 use er_agent_protocol::{AgentDispatchErrorV1, AgentResponseContextV1};
-use er_env::current::{CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError,
+};
 use er_repro::current::{
     CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1, CurrentReproRecorderV1,
 };
@@ -139,18 +141,27 @@ impl NativeCapture {
             }
         };
         let result = session.apply_rebind_with(control.clone(), |candidate, output| {
-            let observation = candidate.observe()
+            let observation = candidate
+                .observe()
                 .map_err(|error| ApplyError::Adapter(backend(error)))?;
-            let after = candidate.snapshot()
+            let after = candidate
+                .snapshot()
                 .map_err(|error| ApplyError::Adapter(backend(error)))?;
             let response = json!({"rebind": output, "observation": observation});
-            context.admit_inline_success(&response).map_err(ApplyError::Adapter)?;
+            context
+                .admit_inline_success(&response)
+                .map_err(ApplyError::Adapter)?;
             Ok((response, output, observation, after))
         });
         match result {
             Ok((response, output, observation, after)) => {
                 let _ = self.recorder.record_rebind_with_origin(
-                    &before, control, Ok(&output), &after, &observation, Some(origin),
+                    &before,
+                    control,
+                    Ok(&output),
+                    &after,
+                    &observation,
+                    Some(origin),
                 );
                 Ok(response)
             }
@@ -158,7 +169,12 @@ impl NativeCapture {
                 match session.observe() {
                     Ok(observation) => {
                         let _ = self.recorder.record_rebind_with_origin(
-                            &before, control, Err(&error), &before, &observation, Some(origin),
+                            &before,
+                            control,
+                            Err(&error),
+                            &before,
+                            &observation,
+                            Some(origin),
                         );
                     }
                     Err(_) => self.gap("native rebind rejection observation unavailable"),
