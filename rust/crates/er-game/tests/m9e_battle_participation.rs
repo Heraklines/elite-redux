@@ -4,14 +4,12 @@ use std::sync::{Arc, OnceLock};
 
 use er_battle::m7_resolver::{TurnAuthorityContextV1, query_simulated_move_damage_v5};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_game::m9e_material_v6::{
-    GameMaterialApplyOutcomeV6, GameMaterialV6, GamePlatformEffectV2, GameTelemetryEventV2,
-};
+use er_game::m9e_material_v6::{GameMaterialApplyOutcomeV6, GameMaterialV6, GameMaterialV6Error};
 use er_game::m9e_new_run_v6::{
     construct_natural_run_v6, construct_natural_run_v6_with_participation,
 };
 use er_game::m9e_runtime_v6::{
-    GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeV6,
+    GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeV6, GameRuntimeV6Error,
     PreparedGameTransitionV2,
 };
 use er_game::m72_bootstrap::{
@@ -336,7 +334,20 @@ fn commands(runtime: &GameRuntimeV6, switch: bool, enemy_only: bool) -> TestResu
             .and_then(|entry| entry.occupant)
             .ok_or("player")?;
         let command = if switch {
-            BattleCommand::switch(actor, PartyIndex::new(1)?)
+            let reserve = run
+                .party
+                .iter()
+                .filter(|pokemon| pokemon.owner_seat == Some(battle.authority_seat))
+                .position(|pokemon| {
+                    !pokemon.fainted
+                        && !battle
+                            .field
+                            .slots
+                            .iter()
+                            .any(|entry| entry.occupant == Some(pokemon.id))
+                })
+                .ok_or("living owner-relative reserve")?;
+            BattleCommand::switch(actor, PartyIndex::new(u8::try_from(reserve)?)?)
         } else {
             move_command(runtime, BattleSide::Player, true)?
         };
@@ -576,6 +587,28 @@ fn observed_save_snapshot_and_material_replay_preserve_ownership() -> TestResult
     let replay = turn(&mut restored, selected)?;
     assert_eq!(first.material_bytes, replay.material_bytes);
     assert_eq!(restored.state(), observed.state());
+    let mut alternate = GameRuntimeV6::from_snapshot(before.clone(), observed.content().clone())?;
+    let alternate_commands = commands(&alternate, true, false)?;
+    let conflicting = turn(&mut alternate, alternate_commands)?;
+    let first_material = GameMaterialV6::decode(&first.material_bytes)?;
+    let alternate_material = GameMaterialV6::decode(&conflicting.material_bytes)?;
+    assert_eq!(
+        alternate_material.transition().operation_id,
+        first_material.transition().operation_id
+    );
+    assert_eq!(
+        alternate_material.transition().authority_revision,
+        first_material.transition().authority_revision
+    );
+    assert_eq!(
+        alternate_material.transition().before_digest,
+        first_material.transition().before_digest
+    );
+    assert_ne!(conflicting.material_bytes, first.material_bytes);
+    assert_ne!(
+        alternate_material.transition().after_digest,
+        first_material.transition().after_digest
+    );
     let mut replica = GameRuntimeV6::from_snapshot(before, observed.content().clone())?;
     assert_eq!(
         replica.apply_material_bytes(&first.material_bytes)?,
@@ -587,22 +620,13 @@ fn observed_save_snapshot_and_material_replay_preserve_ownership() -> TestResult
     );
     assert_eq!(replica.state(), observed.state());
     let accepted = serde_json::to_vec(&replica.snapshot())?;
-    let mut conflicting = GameMaterialV6::decode(&first.material_bytes)?;
-    let GameMaterialV6::BattleTurn(transition) = &mut conflicting else {
-        return Err("real battle-turn material required".into());
-    };
-    let Some(GamePlatformEffectV2::Telemetry { event, .. }) =
-        transition.platform_effects.first_mut()
+    // Both candidates came from real dispatches at the same saved frontier.
+    let Err(GameRuntimeV6Error::Material(message)) =
+        replica.apply_material_bytes(&conflicting.material_bytes)
     else {
-        return Err("real material telemetry required".into());
+        return Err("conflicting material duplicate must be rejected".into());
     };
-    assert_eq!(*event, GameTelemetryEventV2::ActionApplied);
-    *event = GameTelemetryEventV2::RunStarted;
-    assert!(
-        replica
-            .apply_material_bytes(&conflicting.canonical_bytes()?)
-            .is_err()
-    );
+    assert_eq!(message, GameMaterialV6Error::ConflictingDuplicate.to_string());
     assert_eq!(serde_json::to_vec(&replica.snapshot())?, accepted);
     Ok(())
 }
