@@ -31,7 +31,8 @@
       "rust/crates/er-rng/src/phaser.rs",
       "rust/crates/er-rng/tests/m3_rng.rs",
       "rust/crates/er-rng/tests/m9e_shifted_utf16.rs",
-      "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json"
+      "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json",
+      "rust/crates/er-kernel/tests/m9e_natural_coop_campaign_v7.rs"
     ],
     "replacement_test_ids": [
       "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
@@ -131,7 +132,10 @@
         "shifted_utf16_battle_draws_and_initialization_match_pinned_phaser",
         "shifted_utf16_speed_shuffle_matches_pinned_phaser_and_restores_outer_rng"
       ]
-    }
+    },
+    "coop_campaign_test_ids": [
+      "natural_owned_cooperative_campaign_reaches_wave_200_victory"
+    ]
   },
   "current_ai_command_transaction_focus": {
     "paths": [
@@ -440,7 +444,11 @@
     "scripts/ci/m9e_campaign_replay.py",
     "scripts/ci/m9e_natural_replay_diagnostic.py",
     "scripts/ci/test_m9e_campaign_replay.py",
-    ".github/workflows/m9e-natural-replay-focused.yml"
+    ".github/workflows/m9e-natural-replay-focused.yml",
+    "scripts/ci/m9e_coop_campaign.py",
+    "scripts/ci/m9e_natural_coop_diagnostic.py",
+    "scripts/ci/test_m9e_coop_campaign.py",
+    ".github/workflows/m9e-natural-coop-campaign-focused.yml"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"

@@ -31,7 +31,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
         self.assertEqual(feedback.select_recovery_scope({}, feedback.AI_COMMAND_PATHS), (False, False))
 
     def test_policy_rejects_missing_reordered_or_extra_source_and_test_ids(self):
-        for key in ("paths", "replacement_test_ids", "progression_test_ids", "checkpoint_test_ids", "canonical_test_ids", "struggle_test_ids", "campaign_test_ids", "rng_test_ids"):
+        for key in ("paths", "replacement_test_ids", "progression_test_ids", "checkpoint_test_ids", "canonical_test_ids", "struggle_test_ids", "campaign_test_ids", "rng_test_ids", "coop_campaign_test_ids"):
             for operation in ("pop", "reverse", "append"):
                 changed = copy.deepcopy(self.config)
                 values = changed["current_recovery_integration"][key]
@@ -70,7 +70,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
 
     def test_campaign_witnesses_cannot_bypass_complete_integration(self):
         for config in ({}, self.config):
-            for paths in ([path] for path in [*feedback.CAMPAIGN_PATHS[2:6], feedback.CAMPAIGN_PATHS[7]]):
+            for paths in ([path] for path in [*feedback.CAMPAIGN_PATHS[2:6], feedback.CAMPAIGN_PATHS[7], feedback.COOP_CAMPAIGN_PATH]):
                 with self.assertRaisesRegex(RuntimeError, "unmapped"):
                     feedback.select_recovery_scope(config, paths)
             with self.assertRaisesRegex(RuntimeError, "unmapped"):
