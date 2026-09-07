@@ -503,9 +503,9 @@ impl GameKernelV7 {
             .filter(|slot| {
                 slot.slot.side == er_types::battle_ids::BattleSide::Player
                     && slot.occupant.is_some_and(|id| {
-                        run.party.iter().any(|pokemon| {
-                            pokemon.id == id && !pokemon.fainted && pokemon.hp > 0
-                        })
+                        run.party
+                            .iter()
+                            .any(|pokemon| pokemon.id == id && !pokemon.fainted && pokemon.hp > 0)
                     })
             })
             .map(|slot| slot.slot)
