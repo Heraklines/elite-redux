@@ -21,6 +21,8 @@ def main():
             or plan.get("current_recovery_integration") is not True
             or plan.get("requires_natural_replacement") is not True
             or plan.get("requires_natural_progression") is not True
+            or plan.get("requires_checkpoint_healing") is not True
+            or plan.get("requires_canonical_value_digest") is not True
             or plan["unknown_paths"] or plan["boundary_paths"]):
         raise RuntimeError("combined recovery source plan is not its exact qualified scope")
     previous = [*BASELINE_TARGETS, list(coop.KERNEL_TARGET), list(coop.ENTRY_TARGET), ["er-game", "m9e_new_run_v6"]]
@@ -42,10 +44,20 @@ def main():
     if (plan["required_native_targets"].get("er-kernel", []).count(feedback.PROGRESSION_TARGET) != 1
             or plan["required_native_test_ids"].get(progression) != feedback.PROGRESSION_IDS):
         raise RuntimeError("exact natural progression identity must remain mandatory")
+    checkpoint = "er-kernel:" + feedback.CHECKPOINT_TARGET
+    if (plan["required_native_targets"].get("er-kernel", []).count(feedback.CHECKPOINT_TARGET) != 1
+            or plan["required_native_test_ids"].get(checkpoint) != feedback.CHECKPOINT_IDS):
+        raise RuntimeError("both exact default checkpoint identities must remain mandatory")
+    canonical = "er-canonical:" + feedback.CANONICAL_TARGET
+    if (plan["required_native_targets"].get("er-canonical", []).count(feedback.CANONICAL_TARGET) != 1
+            or plan["required_native_test_ids"].get(canonical) != feedback.CANONICAL_IDS
+            or len(feedback.CANONICAL_IDS) != 32
+            or plan["execution_scope"].get("er-canonical") != [feedback.CANONICAL_TARGET]):
+        raise RuntimeError("the complete canonical library and both new digest tests must remain mandatory")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 8 or set(product) != set(feedback.RECOVERY_PATHS):
-        raise RuntimeError("combined product source must be exactly the eight reviewed paths")
+    if len(product) != 13 or set(product) != set(feedback.RECOVERY_PATHS):
+        raise RuntimeError("combined product source must be exactly the thirteen reviewed paths")
     inventory = [{"crate": crate, "target": target, "ids": list(ids), "historical_excluded_ids": []}
                  for (crate, target), ids in ((coop.KERNEL_TARGET, coop.KERNEL_IDS), (coop.ENTRY_TARGET, coop.ENTRY_IDS))]
     coop.validate_inventory(plan, inventory, os.environ["GITHUB_SHA"])
@@ -81,9 +93,11 @@ def main():
     projected["current_coop_startup"]["replay_workers"] = 4
     for target, ids in ((feedback.AI_COMMAND_TARGET, feedback.AI_COMMAND_IDS),
                         (feedback.REPLACEMENT_TARGET, feedback.REPLACEMENT_IDS),
-                        (feedback.PROGRESSION_TARGET, feedback.PROGRESSION_IDS)):
+                        (feedback.PROGRESSION_TARGET, feedback.PROGRESSION_IDS),
+                        (feedback.CHECKPOINT_TARGET, feedback.CHECKPOINT_IDS)):
         projected["required_native_target_counts"]["er-kernel:" + target] = len(ids)
-    projected["tests"] = {"selected": 663, "executed": 663, "passed": 663, "failed": 0, "skipped": 0}
+    projected["required_native_target_counts"]["er-canonical:" + feedback.CANONICAL_TARGET] = 32
+    projected["tests"] = {"selected": 697, "executed": 697, "passed": 697, "failed": 0, "skipped": 0}
     frozen = copy.deepcopy(projected)
     digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
     compact = phases.compact_summary(projected, digest, {})
@@ -96,7 +110,7 @@ def main():
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "compact_bytes": len(phases.encoded(compact)), "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: actual combined eight-path source scope, all79 prior targets, exact six new IDs, and retained co-op/platform/cost/rule/mutant obligations.")
+    print("Passed: actual combined thirteen-path source scope, all79 prior targets, exact eight new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
 
 
 if __name__ == "__main__":

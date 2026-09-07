@@ -5078,6 +5078,8 @@ class FeedbackTests(unittest.TestCase):
         self.configure_ai_command_transaction_scope()
         self.package("er-game")
         self.package("er-progression")
+        self.package("er-wasm")
+        self.package("er-canonical")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
@@ -5086,12 +5088,13 @@ class FeedbackTests(unittest.TestCase):
             if not path.exists():
                 path.write_text("bounded synthetic source for planner test\n")
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        rule_fixture(self.root)
         self.changed = list(self.feedback.RECOVERY_PATHS)
 
     def test_recovery_composition_keeps_all_exact_regressions_and_platform_obligations(self):
         self.configure_recovery_integration_scope()
         selection = self.feedback.plan()
-        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression",
+        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression", "requires_checkpoint_healing", "requires_canonical_value_digest",
                     "requires_ai_command_transaction", "requires_current_coop_startup",
                     "requires_browser", "requires_wasm", "requires_browser_rtc",
                     "requires_browser_worker", "requires_cli_executable", "requires_worker_executable"):
@@ -5100,7 +5103,8 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["boundary_paths"], [])
         for target, ids in ((self.feedback.AI_COMMAND_TARGET, self.feedback.AI_COMMAND_IDS),
                             (self.feedback.REPLACEMENT_TARGET, self.feedback.REPLACEMENT_IDS),
-                            (self.feedback.PROGRESSION_TARGET, self.feedback.PROGRESSION_IDS)):
+                            (self.feedback.PROGRESSION_TARGET, self.feedback.PROGRESSION_IDS),
+                            (self.feedback.CHECKPOINT_TARGET, self.feedback.CHECKPOINT_IDS)):
             self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + target], ids)
             self.assertIn(target, selection["execution_scope"]["er-kernel"])
             self.assertEqual(selection["required_native_targets"]["er-kernel"].count(target), 1)
@@ -5126,6 +5130,28 @@ class FeedbackTests(unittest.TestCase):
                          self.feedback.PROGRESSION_IDS)
         self.assertEqual(selection["required_native_targets"]["er-kernel"].count(self.feedback.PROGRESSION_TARGET), 1)
         self.assertIn(self.feedback.PROGRESSION_TARGET, selection["execution_scope"]["er-kernel"])
+
+    def test_checkpoint_remains_required_after_later_ai_change(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_recovery_integration"])
+        self.assertTrue(selection["requires_checkpoint_healing"])
+        self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.CHECKPOINT_TARGET],
+                         self.feedback.CHECKPOINT_IDS)
+        self.assertEqual(selection["required_native_targets"]["er-kernel"].count(self.feedback.CHECKPOINT_TARGET), 1)
+        self.assertIn(self.feedback.CHECKPOINT_TARGET, selection["execution_scope"]["er-kernel"])
+
+    def test_canonical_digest_library_remains_complete_after_later_ai_change(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_canonical_value_digest"])
+        self.assertEqual(selection["required_native_test_ids"]["er-canonical:" + self.feedback.CANONICAL_TARGET],
+                         self.feedback.CANONICAL_IDS)
+        self.assertEqual(len(self.feedback.CANONICAL_IDS), 32)
+        self.assertIn(self.feedback.CANONICAL_TARGET, selection["execution_scope"]["er-canonical"])
+        self.assertIn("er-canonical", selection["packages"])
 
     def configure_ai_command_transaction_scope(self):
         self.configure_ai_max_pp_scope()
@@ -10797,37 +10823,38 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             phases.write_bounded(self.root / "oversized.json", first)
 class CompactWorkerEvidenceTests(unittest.TestCase):
-    def test_four_worker_details_become_one_exact_full_proof_reference(self):
+    def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
-        full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
-                "tests": {"selected": 657, "executed": 657, "passed": 657, "failed": 0, "skipped": 0},
-                "worker_executables": {lane: {"sha256": lane * 64, "profile": "x" * 600}
-                                       for lane in "abcd"},
-                "first_failure": "x" * 14000}
-        original = copy.deepcopy(full)
-        proof_hash = phases.sha(phases.encoded(full))
-        compact = phases.compact_summary(full, proof_hash, {})
-        self.assertLessEqual(len(phases.encoded(compact)), 16000)
-        self.assertEqual(compact["worker_executables"],
-                         {"file": "phase-summary.json", "sha256": proof_hash, "field": "worker_executables"})
-        self.assertEqual(compact["tests"], full["tests"])
-        self.assertEqual(compact["qualification"], full["qualification"])
-        self.assertEqual(full, original)
+        for key in ("worker_executables", "browser_worker_assets"):
+            full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
+                    "tests": {"selected": 665, "executed": 665, "passed": 665, "failed": 0, "skipped": 0},
+                    key: {lane: {"sha256": lane * 64, "profile": "x" * 600} for lane in "abcd"},
+                    "first_failure": "x" * 14000}
+            original = copy.deepcopy(full)
+            proof_hash = phases.sha(phases.encoded(full))
+            compact = phases.compact_summary(full, proof_hash, {})
+            self.assertLessEqual(len(phases.encoded(compact)), 16000)
+            self.assertEqual(compact[key],
+                             {"file": "phase-summary.json", "sha256": proof_hash, "field": key})
+            self.assertEqual(compact["tests"], full["tests"])
+            self.assertEqual(compact["qualification"], full["qualification"])
+            self.assertEqual(full, original)
 
     def test_small_worker_details_remain_inline(self):
         import m9e_phases as phases
-        full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
-                "worker_executables": {"d": {"sha256": "d" * 64}}}
-        compact = phases.compact_summary(full, "e" * 64, {})
-        self.assertEqual(compact["worker_executables"], full["worker_executables"])
-        self.assertEqual(compact["status"], "failed")
-        self.assertEqual(compact["qualification"], "unfinished")
+        for key in ("worker_executables", "browser_worker_assets"):
+            full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
+                    key: {"d": {"sha256": "d" * 64}}}
+            compact = phases.compact_summary(full, "e" * 64, {})
+            self.assertEqual(compact[key], full[key])
+            self.assertEqual(compact["status"], "failed")
+            self.assertEqual(compact["qualification"], "unfinished")
 
     def test_unbounded_required_result_still_fails_closed(self):
         import m9e_phases as phases
-        with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
-            phases.compact_summary({"first_failure": "x" * 16001,
-                                    "worker_executables": {"d": "detail"}}, "e" * 64, {})
+        for key in ("worker_executables", "browser_worker_assets"):
+            with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
+                phases.compact_summary({"first_failure": "x" * 16001, key: {"d": "detail"}}, "e" * 64, {})
 
 if __name__ == "__main__":
     unittest.main()

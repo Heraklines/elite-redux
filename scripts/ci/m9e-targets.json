@@ -8,7 +8,12 @@
     "src/rust-browser/routes/rust-current-rtc-entry.ts",
     "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts",
     "rust/crates/er-progression/src/progression.rs",
-    "rust/crates/er-kernel/tests/m9e_natural_progression_v7.rs"
+    "rust/crates/er-kernel/tests/m9e_natural_progression_v7.rs",
+    "rust/crates/er-wasm/tests/m9e_parity.rs",
+    "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs",
+    "rust/crates/er-game/src/m9e_new_run_v6.rs",
+    "rust/crates/er-kernel/tests/m9e_checkpoint_healing_v7.rs",
+    "rust/crates/er-canonical/src/lib.rs"
   ],
   "replacement_test_ids": [
     "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
@@ -16,7 +21,12 @@
   ],
   "progression_test_ids": [
     "natural_victory_experience_recalculates_stats_preserves_damage_and_restores"
-  ]
+  ],
+  "checkpoint_test_ids": [
+    "ordinary_wave_reward_preserves_damage_status_and_used_pp",
+    "raw_checkpoint_reward_restores_party_and_replays_from_snapshot"
+  ],
+  "canonical_test_ids": ["tests::accepts_signed_safe_integers_and_rejects_signed_overflow","tests::canonicalizes_compact_strings_and_null_absence","tests::canonicalizes_nested_typed_signed_content_and_content_bytes","tests::canonicalizes_nested_utf16_order_and_arrays","tests::deferred_invalid_map_values_follow_duplicate_replacement","tests::deferred_unsafe_errors_follow_materialized_object_order_and_duplicates","tests::direct_serializer_matches_legacy_across_nested_shapes","tests::direct_serializer_preserves_map_keys_and_last_duplicate","tests::direct_serializer_preserves_mixed_invalid_custom_error_precedence","tests::direct_serializer_preserves_mixed_invalid_float_precedence","tests::direct_serializer_preserves_number_error_equivalence","tests::finite_float_and_string_map_keys_keep_last_write_in_both_orders","tests::finite_float_map_keys_match_legacy_exact_json_spelling","tests::fixture_digest_preserves_legacy_signed_and_fractional_json_numbers","tests::fixture_sha256_matches_javascript_index_key_order","tests::fixture_sha256_matches_payload_and_blake3_differs","tests::immediate_nonfinite_map_key_error_preempts_deferred_values","tests::rejects_float_forms_at_any_depth","tests::reports_nested_fixture_digest_mismatch","tests::stateful_second_pass_custom_errors_preempt_deferred_float","tests::stateful_second_pass_duplicate_keys_keep_last_numeric_error","tests::stateful_second_pass_float_map_keys_match_legacy","tests::stateful_second_pass_float_values_match_legacy","tests::stateful_second_pass_nested_utf16_order_chooses_first_numeric_error","tests::stateful_second_pass_sequences_choose_first_numeric_error","tests::stateful_second_pass_wide_conversion_errors_preempt_deferred_float","tests::validation_prepass_preserves_stateful_double_invocation","tests::validation_prepass_preserves_structural_map_key_error_precedence","tests::validation_prepass_preserves_wide_integer_error_precedence","tests::validation_prepass_traverses_compound_map_keys_before_later_values","value_digest_tests::value_digest_matches_generic_canonical_digest_for_complete_json","value_digest_tests::value_digest_rejects_the_same_unsafe_json_numbers"]
 },
   "current_ai_command_transaction_focus": {"paths":["rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs"],"exact_test_ids":["command_cursor_rejection_preserves_ai_sequence_and_all_other_owners","complete_two_actor_preparation_commits_once_and_replays_identical_commands","later_actor_rejection_preserves_the_complete_ai_command_owner"]},
   "current_coop_startup_focus": {"paths":["rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs","rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs","rust/crates/er-env/src/current.rs","rust/crates/er-cli/src/current_agent.rs","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/crates/er-agent-protocol/src/lib.rs","rust/crates/er-cli/Cargo.toml","rust/Cargo.lock","rust/crates/er-cli/tests/m9e_current_coop_startup.rs","rust/crates/er-cli/tests/support/m9e_coop_cli_process.rs","src/rust-browser/contracts/browser-contracts-v2.ts","src/rust-browser/routes/rust-current-rtc-entry.ts","rust/crates/er-web/examples/m9e_v7_coop_startup.rs","test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"],"exact_test_ids":{"er-kernel:m9e_coop_choices_v7":["confirmed_independent_raw_starters_form_exact_owned_party_and_preserve_host","invalid_peer_choices_preserve_entire_state_rng_and_allocator","natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution","owned_startup_rejects_forged_frames_and_snapshots_atomically"],"er-cli:m9e_current_coop_startup":["current_native_cli_owned_coop_retry_replay_matches_browser_host","current_process_worker_owned_coop_retry_replay_matches_browser_host"]},"browser_ids":["natural cooperative Title through two Workers and RTC host ready first","natural cooperative Title through two Workers and RTC guest ready first"]},

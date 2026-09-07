@@ -152,7 +152,7 @@ enum RetainedExpected {
 }
 
 fn result_digest(value: &Value) -> Result<String, Box<dyn Error>> {
-    Ok(format!("{:?}", er_canonical::content_digest(value)?))
+    Ok(format!("{:?}", er_canonical::content_digest_value(value)?))
 }
 
 // Reap the CLI and its worker process group even if a response assertion panics.

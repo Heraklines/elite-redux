@@ -198,11 +198,21 @@ PROGRESSION_TARGET = "m9e_natural_progression_v7"
 PROGRESSION_IDS = ["natural_victory_experience_recalculates_stats_preserves_damage_and_restores"]
 PROGRESSION_PATHS = ["rust/crates/er-progression/src/progression.rs",
                      "rust/crates/er-kernel/tests/" + PROGRESSION_TARGET + ".rs"]
+CHECKPOINT_TARGET = "m9e_checkpoint_healing_v7"
+CHECKPOINT_IDS = ["ordinary_wave_reward_preserves_damage_status_and_used_pp",
+                  "raw_checkpoint_reward_restores_party_and_replays_from_snapshot"]
+CHECKPOINT_PATHS = ["rust/crates/er-game/src/m9e_new_run_v6.rs",
+                    "rust/crates/er-kernel/tests/" + CHECKPOINT_TARGET + ".rs"]
+CANONICAL_TARGET = "er_canonical"
+CANONICAL_PATH = "rust/crates/er-canonical/src/lib.rs"
+CANONICAL_IDS = ["tests::accepts_signed_safe_integers_and_rejects_signed_overflow","tests::canonicalizes_compact_strings_and_null_absence","tests::canonicalizes_nested_typed_signed_content_and_content_bytes","tests::canonicalizes_nested_utf16_order_and_arrays","tests::deferred_invalid_map_values_follow_duplicate_replacement","tests::deferred_unsafe_errors_follow_materialized_object_order_and_duplicates","tests::direct_serializer_matches_legacy_across_nested_shapes","tests::direct_serializer_preserves_map_keys_and_last_duplicate","tests::direct_serializer_preserves_mixed_invalid_custom_error_precedence","tests::direct_serializer_preserves_mixed_invalid_float_precedence","tests::direct_serializer_preserves_number_error_equivalence","tests::finite_float_and_string_map_keys_keep_last_write_in_both_orders","tests::finite_float_map_keys_match_legacy_exact_json_spelling","tests::fixture_digest_preserves_legacy_signed_and_fractional_json_numbers","tests::fixture_sha256_matches_javascript_index_key_order","tests::fixture_sha256_matches_payload_and_blake3_differs","tests::immediate_nonfinite_map_key_error_preempts_deferred_values","tests::rejects_float_forms_at_any_depth","tests::reports_nested_fixture_digest_mismatch","tests::stateful_second_pass_custom_errors_preempt_deferred_float","tests::stateful_second_pass_duplicate_keys_keep_last_numeric_error","tests::stateful_second_pass_float_map_keys_match_legacy","tests::stateful_second_pass_float_values_match_legacy","tests::stateful_second_pass_nested_utf16_order_chooses_first_numeric_error","tests::stateful_second_pass_sequences_choose_first_numeric_error","tests::stateful_second_pass_wide_conversion_errors_preempt_deferred_float","tests::validation_prepass_preserves_stateful_double_invocation","tests::validation_prepass_preserves_structural_map_key_error_precedence","tests::validation_prepass_preserves_wide_integer_error_precedence","tests::validation_prepass_traverses_compound_map_keys_before_later_values","value_digest_tests::value_digest_matches_generic_canonical_digest_for_complete_json","value_digest_tests::value_digest_rejects_the_same_unsafe_json_numbers"]
 RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
                   "rust/crates/er-kernel/tests/" + REPLACEMENT_TARGET + ".rs",
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
-                  "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS]
-RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS}
+                  "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
+                  "rust/crates/er-wasm/tests/m9e_parity.rs",
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH]
+RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS}
 
 
 def select_recovery_scope(config, changed):
@@ -210,7 +220,7 @@ def select_recovery_scope(config, changed):
     if policy is not None and policy != RECOVERY_POLICY:
         raise RuntimeError("current recovery integration policy identities disagree")
     scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
-    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1])) and not scoped:
+    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1])) and not scoped:
         raise RuntimeError("natural replacement integration product delta is unmapped")
     return scoped, policy is not None
 
@@ -917,7 +927,7 @@ def plan():
     if rule_focus and rule_focus.get("paths") != [RULE_TEST_SOURCE]:
         raise RuntimeError("rulechange source policy must contain the single exact test path")
     rule_changed = RULE_TEST_SOURCE in product_changes
-    rule_session = rule_changed and (cost_rule_session or all(path == RULE_TEST_SOURCE for path in product_changes))
+    rule_session = rule_changed and (recovery_session or cost_rule_session or all(path == RULE_TEST_SOURCE for path in product_changes))
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)
@@ -1432,6 +1442,21 @@ def plan():
         result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + PROGRESSION_TARGET: list(PROGRESSION_IDS)}
         if result["execution_scope"] is not None:
             result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [PROGRESSION_TARGET]})
+    checkpoint_required = replacement_installed and "er-kernel" in selected
+    result["requires_checkpoint_healing"] = checkpoint_required
+    if checkpoint_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": [CHECKPOINT_TARGET]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + CHECKPOINT_TARGET: list(CHECKPOINT_IDS)}
+        if result["execution_scope"] is not None:
+            result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [CHECKPOINT_TARGET]})
+    canonical_required = replacement_installed and ("er-kernel" in selected or "er-canonical" in selected)
+    result["requires_canonical_value_digest"] = canonical_required
+    if canonical_required:
+        result["packages"] = sorted(set(result["packages"]) | {"er-canonical"})
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-canonical": [CANONICAL_TARGET]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-canonical:" + CANONICAL_TARGET: list(CANONICAL_IDS)}
+        if result["execution_scope"] is not None:
+            result["execution_scope"] = merge_targets(result["execution_scope"], {"er-canonical": [CANONICAL_TARGET]})
     if ai_commands_session:
         result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-game": ["m9e_new_run_v6"]})
     max_pp_required = bool(max_pp_focus) and "er-kernel" in selected and (

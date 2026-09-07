@@ -29,6 +29,10 @@ NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "canonical_source": "rust/crates/er-canonical/src/lib.rs",
+    "checkpoint_test": "rust/crates/er-kernel/tests/m9e_checkpoint_healing_v7.rs",
+    "checkpoint_source": "rust/crates/er-game/src/m9e_new_run_v6.rs",
+    "raw_parity_test": "rust/crates/er-wasm/tests/m9e_parity.rs",
     "progression_test": "rust/crates/er-kernel/tests/m9e_natural_progression_v7.rs",
     "progression_source": "rust/crates/er-progression/src/progression.rs",
     "replacement_test": "rust/crates/er-kernel/tests/m9e_natural_replacement_v7.rs",
@@ -1099,13 +1103,15 @@ def compact_storage_evidence(compact, full_hash):
 
 
 def compact_worker_evidence(compact, full_hash):
-    # Each worker still has its exact bytes, profile and hash in the full proof.
-    # Four lanes need not duplicate those details in the 16 KiB result index.
-    if "worker_executables" in compact and len(encoded(compact)) > 16000:
-        compact["worker_executables"] = {
-            "file": "phase-summary.json", "sha256": full_hash,
-            "field": "worker_executables",
-        }
+    # Native and browser worker bytes, profiles and hashes stay in the full proof.
+    # The bounded result index may refer to each exact field of that same proof.
+    for key in ("worker_executables", "browser_worker_assets"):
+        if len(encoded(compact)) <= 16000:
+            break
+        if key in compact:
+            compact[key] = {
+                "file": "phase-summary.json", "sha256": full_hash, "field": key,
+            }
 
 
 def compact_summary(summary, full_hash, timings):
