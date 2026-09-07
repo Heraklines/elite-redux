@@ -502,7 +502,11 @@ impl GameKernelV7 {
             .iter()
             .filter(|slot| {
                 slot.slot.side == er_types::battle_ids::BattleSide::Player
-                    && slot.occupant.is_some()
+                    && slot.occupant.is_some_and(|id| {
+                        run.party
+                            .iter()
+                            .any(|pokemon| pokemon.id == id && !pokemon.fainted && pokemon.hp > 0)
+                    })
             })
             .map(|slot| slot.slot)
             .collect::<Vec<_>>();
@@ -527,6 +531,9 @@ impl GameKernelV7 {
                 .iter()
                 .find(|pokemon| pokemon.id == actor_id)
                 .ok_or(GameKernelV7Error::Invalid)?;
+            if actor.fainted {
+                continue;
+            }
             let mut moves = actor
                 .moves
                 .iter()
@@ -1640,7 +1647,16 @@ impl GameKernelV7 {
         let action_context = envelope.proposal.context;
         let operation_id = action_context.operation_id.clone();
         let action = envelope.proposal.action;
-        if matches!(action, GameActionV1::Battle { .. }) {
+        // A faint replacement is already bound to its exact owned control and
+        // occurrence. It is not a living actor's command for the next turn.
+        if matches!(action, GameActionV1::Battle { .. })
+            && !matches!(
+                action,
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::SelectReplacement { .. }
+                }
+            )
+        {
             let step = self.collect_battle_action(
                 action,
                 action_context,
@@ -3297,6 +3313,7 @@ fn switch_select_control(
     let entries = run
         .party
         .iter()
+        .filter(|pokemon| pokemon.owner_seat == Some(seat))
         .enumerate()
         .filter(|(_, pokemon)| {
             pokemon.id != actor
@@ -3524,7 +3541,9 @@ fn battle_proposal_is_rooted_in_control(
             .as_ref()
             .and_then(|run| {
                 run.party
-                    .get(usize::from(party_slot.get()))
+                    .iter()
+                    .filter(|pokemon| pokemon.owner_seat == Some(sender))
+                    .nth(usize::from(party_slot.get()))
                     .map(|pokemon| (run, pokemon))
             })
             .is_some_and(|(run, pokemon)| {

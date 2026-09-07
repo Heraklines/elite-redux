@@ -108,8 +108,8 @@ def main():
     projected["identity"] = phases.identity(feedback)
     projected["product_sha"] = os.environ["GITHUB_SHA"]
     projected["current_coop_startup"]["replay_workers"] = 4
-    projected["current_coop_startup"]["kernel_tests"] = 5
-    projected["required_native_target_counts"]["er-kernel:m9e_coop_choices_v7"] = 5
+    projected["current_coop_startup"]["kernel_tests"] = 8
+    projected["required_native_target_counts"]["er-kernel:m9e_coop_choices_v7"] = 8
     for target, ids in ((feedback.AI_COMMAND_TARGET, feedback.AI_COMMAND_IDS),
                         (feedback.REPLACEMENT_TARGET, feedback.REPLACEMENT_IDS),
                         (feedback.PROGRESSION_TARGET, feedback.PROGRESSION_IDS),
@@ -119,7 +119,7 @@ def main():
     projected["required_native_target_counts"]["er-canonical:" + feedback.CANONICAL_TARGET] = 32
     for crate, target in feedback.CAMPAIGN_TARGETS.items():
         projected["required_native_target_counts"][crate + ":" + target] = len(feedback.CAMPAIGN_TEST_IDS[crate])
-    projected["tests"] = {"selected": 704, "executed": 704, "passed": 704, "failed": 0, "skipped": 0}
+    projected["tests"] = {"selected": 707, "executed": 707, "passed": 707, "failed": 0, "skipped": 0}
     frozen = copy.deepcopy(projected)
     digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
     compact = phases.compact_summary(projected, digest, {})
