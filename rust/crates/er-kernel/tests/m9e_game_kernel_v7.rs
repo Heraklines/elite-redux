@@ -492,7 +492,9 @@ fn authority_ai_exhausted_max_pp_uses_struggle_without_extra_decisions_or_pp()
         )?;
         let commands = choice.prepare_authority_ai_commands()?;
         assert_eq!(commands.len(), 1);
-        let er_types::battle_command::AcceptedBattleCommand::ScriptedEnemy { command, .. } = &commands[0] else {
+        let er_types::battle_command::AcceptedBattleCommand::ScriptedEnemy { command, .. } =
+            &commands[0]
+        else {
             return Err("expected an actual Struggle battle command".into());
         };
         assert_eq!(command.actor, fixture.enemy_id);
@@ -502,7 +504,11 @@ fn authority_ai_exhausted_max_pp_uses_struggle_without_extra_decisions_or_pp()
                 if move_slot.get() == 0
         ));
         let mut expected_choice = before.clone();
-        expected_choice.authority_ai.as_mut().ok_or("AI owner missing")?.decision_sequence += 1;
+        expected_choice
+            .authority_ai
+            .as_mut()
+            .ok_or("AI owner missing")?
+            .decision_sequence += 1;
         assert_eq!(choice.snapshot()?, expected_choice);
         assert_eq!(actual.snapshot()?, before);
         let mut replay = GameKernelV7::from_snapshot(
@@ -514,7 +520,10 @@ fn authority_ai_exhausted_max_pp_uses_struggle_without_extra_decisions_or_pp()
         let open = press(&mut actual, PhysicalKey::Space)?;
         assert_eq!(open, press(&mut replay, PhysicalKey::Space)?);
         assert_eq!(actual.snapshot()?, replay.snapshot()?);
-        assert_eq!(actual.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleMove));
+        assert_eq!(
+            actual.current_control().map(|control| control.kind),
+            Some(GameControlKindV2::BattleMove)
+        );
         let step = press(&mut actual, PhysicalKey::Space)?;
         assert_eq!(step, press(&mut replay, PhysicalKey::Space)?);
         let after = actual.snapshot()?;
@@ -523,12 +532,26 @@ fn authority_ai_exhausted_max_pp_uses_struggle_without_extra_decisions_or_pp()
         let GameKernelLifecycleSnapshotV7::Active(before_state) = &before.lifecycle else {
             return Err("before state missing".into());
         };
-        let before_run = before_state.active_run.as_ref().ok_or("before run missing")?;
+        let before_run = before_state
+            .active_run
+            .as_ref()
+            .ok_or("before run missing")?;
         let before_battle = before_run.battle.as_ref().ok_or("before battle missing")?;
-        let run = actual.state().and_then(|state| state.active_run.as_ref()).ok_or("after run missing")?;
+        let run = actual
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("after run missing")?;
         let battle = run.battle.as_ref().ok_or("after battle missing")?;
-        let enemy = battle.enemy_party.iter().find(|pokemon| pokemon.id == fixture.enemy_id).ok_or("enemy missing")?;
-        let previous = before_battle.enemy_party.iter().find(|pokemon| pokemon.id == fixture.enemy_id).ok_or("before enemy missing")?;
+        let enemy = battle
+            .enemy_party
+            .iter()
+            .find(|pokemon| pokemon.id == fixture.enemy_id)
+            .ok_or("enemy missing")?;
+        let previous = before_battle
+            .enemy_party
+            .iter()
+            .find(|pokemon| pokemon.id == fixture.enemy_id)
+            .ok_or("before enemy missing")?;
         assert_eq!(enemy.moves, previous.moves);
         assert_eq!(enemy.moves[0].ok_or("candidate missing")?.pp_used, pp_used);
         assert!(enemy.hp > 0 && enemy.hp <= previous.hp - (previous.max_hp / 4).max(1));
