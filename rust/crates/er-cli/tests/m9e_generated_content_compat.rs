@@ -163,30 +163,51 @@ struct NaturalBootstrap<'a> {
 
 impl<'a> NaturalBootstrap<'a> {
     fn new(cli: &'a mut Cli, hash: &str) -> TestResult<Self> {
-        cli.result("batch.create", json!({"batch":"bootstrap","environments":[
+        cli.result(
+            "batch.create",
+            json!({"batch":"bootstrap","environments":[
             {"environment":1,"start":start(false)}],"limits":{
-            "maximum_environments":1,"maximum_events":2,"maximum_result_bytes":4 << 20}}))?;
-        let observed = cli.result("batch.observe", json!({"batch":"bootstrap","environments":[1]}))?;
-        let rows = observed["results"].as_array().ok_or("one batch observation")?;
+            "maximum_environments":1,"maximum_events":2,"maximum_result_bytes":4 << 20}}),
+        )?;
+        let observed = cli.result(
+            "batch.observe",
+            json!({"batch":"bootstrap","environments":[1]}),
+        )?;
+        let rows = observed["results"]
+            .as_array()
+            .ok_or("one batch observation")?;
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["environment"], 1);
         let observation = rows[0]["observation"].clone();
         assert_eq!(observation["content_identity"]["bundle_hash"], hash);
         assert_eq!(observation["control"]["kind"], "TITLE");
-        Ok(Self { cli, observation, events: Vec::new(), results: 0 })
+        Ok(Self {
+            cli,
+            observation,
+            events: Vec::new(),
+            results: 0,
+        })
     }
 
     fn inputs(&mut self, inputs: &[RawInputEvent]) -> TestResult {
         assert!(!inputs.is_empty() && inputs.len() <= 2);
-        let result = self.cli.result("batch.raw_input", json!({"batch":"bootstrap","inputs":
-            inputs.iter().map(|input| json!({"environment":1,"input":input})).collect::<Vec<_>>()}))?;
+        let result = self.cli.result(
+            "batch.raw_input",
+            json!({"batch":"bootstrap","inputs":
+            inputs.iter().map(|input| json!({"environment":1,"input":input})).collect::<Vec<_>>()}),
+        )?;
         assert!(serde_json::to_vec(&result)?.len() <= 4 << 20);
-        let rows = result["results"].as_array().ok_or("ordered batch results")?;
+        let rows = result["results"]
+            .as_array()
+            .ok_or("ordered batch results")?;
         assert_eq!(rows.len(), inputs.len());
         for (ordinal, row) in rows.iter().enumerate() {
             assert_eq!(row["ordinal"], ordinal);
             assert_eq!(row["environment"], 1);
-            assert_eq!(row["observation"]["content_identity"], self.observation["content_identity"]);
+            assert_eq!(
+                row["observation"]["content_identity"],
+                self.observation["content_identity"]
+            );
             let _: GameKernelStepV7 = serde_json::from_value(row["step"].clone())?;
             self.observation = row["observation"].clone();
         }
@@ -197,27 +218,50 @@ impl<'a> NaturalBootstrap<'a> {
     }
 
     fn press(&mut self, code: PhysicalKey) -> TestResult {
-        self.inputs(&[RawInputEvent::KeyDown { code: code.clone(), printable: false,
-            browser_repeat: false, focus: InputFocus::Game }, RawInputEvent::KeyUp { code }])
+        self.inputs(&[
+            RawInputEvent::KeyDown {
+                code: code.clone(),
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+            RawInputEvent::KeyUp { code },
+        ])
     }
 
     fn select(&mut self, target: &str) -> TestResult {
-        let control: GameControlPlanV2 = serde_json::from_value(self.observation["control"].clone())?;
+        let control: GameControlPlanV2 =
+            serde_json::from_value(self.observation["control"].clone())?;
         let menu = control.menu.ok_or("actual batch menu")?;
         // The public batch API returns its actual menu. Use the same existing
         // planner as control.plan_navigation, then send every event to the CLI.
-        let plan = er_lab::plan_navigation_v1(&menu.logical_menu()?, menu.instance_id,
-            er_types::MenuOptionId::new(target)?, false, 4096)?;
-        writeln!(std::io::stderr().lock(), "M9E_COMPAT public-batch target={target} events={}", plan.events.len())?;
+        let plan = er_lab::plan_navigation_v1(
+            &menu.logical_menu()?,
+            menu.instance_id,
+            er_types::MenuOptionId::new(target)?,
+            false,
+            4096,
+        )?;
+        writeln!(
+            std::io::stderr().lock(),
+            "M9E_COMPAT public-batch target={target} events={}",
+            plan.events.len()
+        )?;
         for inputs in plan.events.chunks(2) {
             self.inputs(inputs)?;
         }
-        assert_eq!(self.observation["control"]["menu"]["selected_option_id"], target);
+        assert_eq!(
+            self.observation["control"]["menu"]["selected_option_id"],
+            target
+        );
         Ok(())
     }
 
     fn snapshot(&mut self) -> TestResult<Value> {
-        let result = self.cli.result("batch.snapshot", json!({"batch":"bootstrap","environments":[1]}))?;
+        let result = self.cli.result(
+            "batch.snapshot",
+            json!({"batch":"bootstrap","environments":[1]}),
+        )?;
         let rows = result["results"].as_array().ok_or("one batch snapshot")?;
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["environment"], 1);
@@ -227,16 +271,23 @@ impl<'a> NaturalBootstrap<'a> {
     fn into_captured_session(mut self) -> TestResult<(Value, Value)> {
         let snapshot = self.snapshot()?;
         let typed: CoreGameKernelSnapshotV7 = serde_json::from_value(snapshot.clone())?;
-        assert!(matches!(typed.lifecycle, GameKernelLifecycleSnapshotV7::Active(_)));
-        self.cli.result("session.from_snapshot", json!({"session":"source","snapshot":snapshot,
-            "owner_seat":1,"role":"AUTHORITY"}))?;
+        assert!(matches!(
+            typed.lifecycle,
+            GameKernelLifecycleSnapshotV7::Active(_)
+        ));
+        self.cli.result(
+            "session.from_snapshot",
+            json!({"session":"source","snapshot":snapshot,
+            "owner_seat":1,"role":"AUTHORITY"}),
+        )?;
         same(&checkpoint(self.cli, "source")?, &snapshot)?;
         let fresh: CurrentReproCapsuleV1 = serde_json::from_value(capsule(self.cli, "source")?)?;
         same(&serde_json::to_value(fresh.checkpoint.as_ref())?, &snapshot)?;
         assert_eq!(fresh.base_position, 0);
         assert_eq!(fresh.final_position, 0);
         assert!(fresh.attempts.is_empty());
-        self.cli.result("batch.close", json!({"batch":"bootstrap"}))?;
+        self.cli
+            .result("batch.close", json!({"batch":"bootstrap"}))?;
         let facts = json!({"scope":"ACTUAL_CLI_BATCH_NATURAL_RAW","environment":1,
             "event_count":self.events.len(),"result_count":self.results,"maximum_events_per_call":2,
             "event_stream_digest":digest(&serde_json::to_value(&self.events)?)?,
@@ -302,7 +353,12 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
     }
     let (bootstrap_snapshot, mut bootstrap_facts) = natural.into_captured_session()?;
     bootstrap_facts["selected_starter_ids"] = serde_json::to_value(&starters)?;
-    progress(label, "public-batch-handoff", began, "exact natural pre-turn snapshot; fresh native capture")?;
+    progress(
+        label,
+        "public-batch-handoff",
+        began,
+        "exact natural pre-turn snapshot; fresh native capture",
+    )?;
     settle(cli, "source")?;
     assert_eq!(
         observation(cli, "source")?["control"]["kind"],
@@ -425,7 +481,10 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
     // Replay begins at the actual exported natural pre-turn checkpoint. The
     // batch's Title journey is real CLI execution, not part of this replay tail.
     assert_eq!(typed_capsule.base_position, 0);
-    same(&serde_json::to_value(typed_capsule.checkpoint.as_ref())?, &bootstrap_snapshot)?;
+    same(
+        &serde_json::to_value(typed_capsule.checkpoint.as_ref())?,
+        &bootstrap_snapshot,
+    )?;
     assert!(!typed_capsule.attempts.is_empty());
     assert!(typed_capsule.browser_transport.is_none());
     assert!(
