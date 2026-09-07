@@ -32,7 +32,9 @@
       "rust/crates/er-rng/tests/m3_rng.rs",
       "rust/crates/er-rng/tests/m9e_shifted_utf16.rs",
       "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json",
-      "rust/crates/er-kernel/tests/m9e_natural_coop_campaign_v7.rs"
+      "rust/crates/er-kernel/tests/m9e_natural_coop_campaign_v7.rs",
+      "rust/crates/er-kernel/tests/m9e_coop_lost_receipt_v7.rs",
+      "rust/crates/er-kernel/src/current_coop_setup_v7.rs"
     ],
     "replacement_test_ids": [
       "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
@@ -133,6 +135,10 @@
         "shifted_utf16_speed_shuffle_matches_pinned_phaser_and_restores_outer_rng"
       ]
     },
+    "coop_receipt_test_ids": [
+      "natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+      "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"
+    ],
     "coop_campaign_test_ids": [
       "natural_owned_cooperative_campaign_reaches_wave_200_victory"
     ]
@@ -448,7 +454,9 @@
     "scripts/ci/m9e_coop_campaign.py",
     "scripts/ci/m9e_natural_coop_diagnostic.py",
     "scripts/ci/test_m9e_coop_campaign.py",
-    ".github/workflows/m9e-natural-coop-campaign-focused.yml"
+    ".github/workflows/m9e-natural-coop-campaign-focused.yml",
+    "scripts/ci/m9e_coop_lost_receipt_diagnostic.py",
+    ".github/workflows/m9e-coop-lost-receipt-focused.yml"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"

@@ -31,7 +31,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
         self.assertEqual(feedback.select_recovery_scope({}, feedback.AI_COMMAND_PATHS), (False, False))
 
     def test_policy_rejects_missing_reordered_or_extra_source_and_test_ids(self):
-        for key in ("paths", "replacement_test_ids", "progression_test_ids", "checkpoint_test_ids", "canonical_test_ids", "struggle_test_ids", "campaign_test_ids", "rng_test_ids", "coop_campaign_test_ids"):
+        for key in ("paths", "replacement_test_ids", "progression_test_ids", "checkpoint_test_ids", "canonical_test_ids", "struggle_test_ids", "campaign_test_ids", "rng_test_ids", "coop_campaign_test_ids", "coop_receipt_test_ids"):
             for operation in ("pop", "reverse", "append"):
                 changed = copy.deepcopy(self.config)
                 values = changed["current_recovery_integration"][key]
@@ -95,3 +95,19 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
                     ids[target].append(ids[target][0])
                 with self.assertRaisesRegex(RuntimeError, "identities"):
                     feedback.select_recovery_scope(config, feedback.RECOVERY_PATHS)
+
+    def test_receipt_witness_cannot_bypass_complete_integration(self):
+        for config in ({}, self.config):
+            for paths in ([feedback.COOP_RECEIPT_PATH], feedback.RECOVERY_PATHS[:-1],
+                          [*feedback.RECOVERY_PATHS, "rust/unrelated.rs"]):
+                with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                    feedback.select_recovery_scope(config, paths)
+
+    def test_receipt_policy_rejects_missing_duplicate_or_renamed_ids(self):
+        for ids in ([], feedback.COOP_RECEIPT_IDS[:1],
+                    [feedback.COOP_RECEIPT_IDS[0]] * 2,
+                    [feedback.COOP_RECEIPT_IDS[0], "unverified"]):
+            config = copy.deepcopy(self.config)
+            config["current_recovery_integration"]["coop_receipt_test_ids"] = ids
+            with self.assertRaisesRegex(RuntimeError, "identities"):
+                feedback.select_recovery_scope(config, feedback.RECOVERY_PATHS)

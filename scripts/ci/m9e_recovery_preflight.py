@@ -77,6 +77,11 @@ def main():
             or plan["required_native_test_ids"].get("er-kernel:" + feedback.COOP_CAMPAIGN_TARGET) != feedback.COOP_CAMPAIGN_IDS
             or feedback.COOP_CAMPAIGN_TARGET not in plan["execution_scope"].get("er-kernel", [])):
         raise RuntimeError("complete natural co-op campaign must remain mandatory")
+    if (plan.get("requires_coop_lost_receipt") is not True
+            or plan["required_native_targets"].get("er-kernel", []).count(feedback.COOP_RECEIPT_TARGET) != 1
+            or plan["required_native_test_ids"].get("er-kernel:" + feedback.COOP_RECEIPT_TARGET) != feedback.COOP_RECEIPT_IDS
+            or feedback.COOP_RECEIPT_TARGET not in plan["execution_scope"].get("er-kernel", [])):
+        raise RuntimeError("both exact lost authority reply witnesses must remain mandatory")
     guard = plan.get("current_recovery_dependency_guard")
     if (guard is None or guard.get("status") != "verified" or guard.get("baseline_sha") != QUALIFIED_BASELINE
             or guard.get("dev_dependencies") != feedback.RECOVERY_DEV_EDGES
@@ -85,8 +90,8 @@ def main():
         raise RuntimeError("exact three test dependencies require a complete verified guard")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 32 or set(product) != set(feedback.RECOVERY_PATHS):
-        raise RuntimeError("combined product source must be exactly the thirty-two reviewed paths")
+    if len(product) != 34 or set(product) != set(feedback.RECOVERY_PATHS):
+        raise RuntimeError("combined product source must be exactly the thirty-four reviewed paths")
     inventory = [{"crate": crate, "target": target, "ids": list(ids), "historical_excluded_ids": []}
                  for (crate, target), ids in ((coop.KERNEL_TARGET, coop.KERNEL_IDS), (coop.ENTRY_TARGET, coop.ENTRY_IDS))]
     coop.validate_inventory(plan, inventory, os.environ["GITHUB_SHA"])
@@ -131,10 +136,11 @@ def main():
     projected["required_native_target_counts"]["er-canonical:" + feedback.CANONICAL_TARGET] = 32
     for crate, target in feedback.CAMPAIGN_TARGETS.items():
         projected["required_native_target_counts"][crate + ":" + target] = len(feedback.CAMPAIGN_TEST_IDS[crate])
-    projected["tests"] = {"selected": 738, "executed": 738, "passed": 738, "failed": 0, "skipped": 0}
+    projected["tests"] = {"selected": 740, "executed": 740, "passed": 740, "failed": 0, "skipped": 0}
     for target, ids in feedback.RNG_TEST_IDS.items():
         projected["required_native_target_counts"]["er-rng:" + target] = len(ids)
     projected["required_native_target_counts"]["er-kernel:" + feedback.COOP_CAMPAIGN_TARGET] = 1
+    projected["required_native_target_counts"]["er-kernel:" + feedback.COOP_RECEIPT_TARGET] = 2
     projected["native_e_manifest_sha256"] = "0" * 64
     projected["natural_cooperative_campaign"] = {"status": "passed", "tests": 1, "wave": 200, "outcome": "Victory", "profile": "opt1-debug-assertions-overflow-checks", "decisions": 2188, "proposals": 258, "materials": 1675, "presentations": 3352, "rewards": 199, "progression": 950, "native_manifest_sha256": "0" * 64, "evidence_sha256": "0" * 64}
     frozen = copy.deepcopy(projected)
@@ -149,7 +155,7 @@ def main():
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "compact_bytes": len(phases.encoded(compact)), "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: actual combined thirty-two-path source scope, all79 prior targets, exact ten new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
+    print("Passed: actual combined thirty-four-path source scope, all79 prior targets, exact twelve new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
 
 
 if __name__ == "__main__":
