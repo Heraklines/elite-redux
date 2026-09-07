@@ -162,7 +162,10 @@ class CoopPolicyTests(unittest.TestCase):
                 "host_choices": [1], "guest_choices": [7, 10], "party_owners": [1, 2, 2], "raw_inputs": [1440, 1446],
                 "received": ([2, 3], [3, 3])[index], "delayed_offer_ms": (12000, 0)[index],
                 "retry_preserved_snapshots": True, "presentations": 1, "choices_bytes": 1416,
-                "started_bytes": 32318, "choices_sha256": "a" * 64, "started_sha256": "b" * 64})
+                "started_bytes": 32318, "choices_sha256": "a" * 64, "started_sha256": "b" * 64,
+                "replay_workers": 2, "replay": [
+                    {"bytes": 2000000, "sha256": seat * 64, "live_snapshot_preserved": True,
+                     "full_replay_equal": True, "reexport_equal": True, "disposed": True} for seat in ("a", "b")]})
         return {"current_coop_rtc": evidence, "browser_rtc_assets": {"manifest_sha256": "e" * 64, "manifest": rtc}}, native
 
     def test_entry_source_reference_preserves_all_validation_and_rejects_rebinding(self):
@@ -240,3 +243,39 @@ class CoopPolicyTests(unittest.TestCase):
         self.assertEqual((full / "coop-entry-producer.log").read_text(), "co-op bounded child reached\n")
         self.assertFalse((runner / "m9e-coop-entry-focused").exists())
         self.assertEqual(dict(os.environ), before)
+
+    def test_platform_requires_complete_replay_for_both_peers_and_both_orders(self):
+        proof, native = self.platform_fixture()
+        coop.validate_platform(proof, native, self.root)
+        for order in range(2):
+            for peer in range(2):
+                for field in ("live_snapshot_preserved", "full_replay_equal", "reexport_equal", "disposed"):
+                    changed = copy.deepcopy(proof)
+                    changed["current_coop_rtc"]["browser_evidence"][order]["replay"][peer][field] = False
+                    with self.assertRaisesRegex(RuntimeError, "capsule replay"):
+                        coop.validate_platform(changed, native, self.root)
+                for bad in (0, 4194305, True):
+                    changed = copy.deepcopy(proof)
+                    changed["current_coop_rtc"]["browser_evidence"][order]["replay"][peer]["bytes"] = bad
+                    with self.assertRaisesRegex(RuntimeError, "capsule replay"):
+                        coop.validate_platform(changed, native, self.root)
+            changed = copy.deepcopy(proof)
+            changed["current_coop_rtc"]["browser_evidence"][order]["replay"].pop()
+            with self.assertRaisesRegex(RuntimeError, "two fresh replay Workers"):
+                coop.validate_platform(changed, native, self.root)
+
+    def test_platform_binds_export_router_source_and_rejects_missing_capsule_hash(self):
+        proof, native = self.platform_fixture()
+        self.assertEqual(len(coop.RTC_SOURCES), 33)
+        router = "src/rust-browser/routes/browser-effects-v2.ts"
+        self.assertIn(router, coop.RTC_SOURCES)
+        changed = copy.deepcopy(proof)
+        changed["current_coop_rtc"]["source_hashes"].pop(router)
+        with self.assertRaisesRegex(RuntimeError, "source conservation"):
+            coop.validate_platform(changed, native, self.root)
+        for order in range(2):
+            for peer in range(2):
+                changed = copy.deepcopy(proof)
+                changed["current_coop_rtc"]["browser_evidence"][order]["replay"][peer].pop("sha256")
+                with self.assertRaisesRegex(RuntimeError, "capsule replay"):
+                    coop.validate_platform(changed, native, self.root)

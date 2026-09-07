@@ -1,7 +1,7 @@
 name: M9E Prepared Gate Preflight
 on:
   push:
-    branches: [codex/m9e-coop-integration-preflight-20260907]
+    branches: [codex/m9e-rtc-export-preflight-20260907]
 permissions:
   contents: read
 concurrency:
@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '371'
+      M9E_EXPECTED_TESTS: '376'
     steps:
       - uses: actions/checkout@v6
         with:
