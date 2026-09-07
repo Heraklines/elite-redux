@@ -32,7 +32,8 @@ pub struct GameStateV6 {
     pub profile: ProfileStateV1,
     pub active_run: Option<RunStateV3>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_battle_participation: Option<crate::current_battle_participation::CurrentBattleParticipationV1>,
+    pub current_battle_participation:
+        Option<crate::current_battle_participation::CurrentBattleParticipationV1>,
 }
 
 pub trait GameStateV6ContentContext {

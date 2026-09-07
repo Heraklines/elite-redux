@@ -822,20 +822,39 @@ fn execute_battle(
         return Err(GameRuntimeV6Error::Invalid);
     };
     let (transition, observations) = if before.current_battle_participation.is_some() {
-        let (transition, observations) = er_battle::m7_resolver::resolve_turn_v5_with_current_observations(
-            &project_v5(before), commands, &content.battle, authority,
-        ).map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        let (transition, observations) =
+            er_battle::m7_resolver::resolve_turn_v5_with_current_observations(
+                &project_v5(before),
+                commands,
+                &content.battle,
+                authority,
+            )
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
         (transition, Some(observations))
     } else {
-        (resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
-            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?, None)
+        (
+            resolve_turn_v5(&project_v5(before), commands, &content.battle, authority)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+            None,
+        )
     };
     let participation = match (&before.current_battle_participation, observations) {
-        (Some(owner), Some(events)) => Some(owner.observe_turn(
-            before.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?,
-            transition.after_state.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?,
-            &events,
-        ).map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?),
+        (Some(owner), Some(events)) => Some(
+            owner
+                .observe_turn(
+                    before
+                        .active_run
+                        .as_ref()
+                        .ok_or(GameRuntimeV6Error::Action)?,
+                    transition
+                        .after_state
+                        .active_run
+                        .as_ref()
+                        .ok_or(GameRuntimeV6Error::Action)?,
+                    &events,
+                )
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+        ),
         (None, None) => None,
         _ => return Err(GameRuntimeV6Error::Invalid),
     };

@@ -84,15 +84,26 @@ impl CurrentBattleParticipationV1 {
         run: &RunStateV3,
         next_occurrence: SafeU53,
     ) -> Result<Self, CurrentBattleParticipationError> {
-        let battle = run.battle.as_ref().ok_or(CurrentBattleParticipationError::Invalid)?;
+        let battle = run
+            .battle
+            .as_ref()
+            .ok_or(CurrentBattleParticipationError::Invalid)?;
         if battle.turn.get().get() != 1
             || battle.outcome != er_types::battle_model::BattleOutcome::Ongoing
             || !battle.faint_queue.is_empty()
         {
             return Err(CurrentBattleParticipationError::Unsupported);
         }
-        let mut player_roster = run.party.iter().map(|pokemon| pokemon.id).collect::<Vec<_>>();
-        let mut enemy_roster = battle.enemy_party.iter().map(|pokemon| pokemon.id).collect::<Vec<_>>();
+        let mut player_roster = run
+            .party
+            .iter()
+            .map(|pokemon| pokemon.id)
+            .collect::<Vec<_>>();
+        let mut enemy_roster = battle
+            .enemy_party
+            .iter()
+            .map(|pokemon| pokemon.id)
+            .collect::<Vec<_>>();
         player_roster.sort_unstable();
         enemy_roster.sort_unstable();
         let value = Self {
@@ -113,7 +124,10 @@ impl CurrentBattleParticipationV1 {
 
     /// Restore checks structural consistency. Only a validated resolver transaction supplies the causal trace.
     pub fn validate(&self, run: &RunStateV3) -> Result<(), CurrentBattleParticipationError> {
-        let battle = run.battle.as_ref().ok_or(CurrentBattleParticipationError::Invalid)?;
+        let battle = run
+            .battle
+            .as_ref()
+            .ok_or(CurrentBattleParticipationError::Invalid)?;
         if self.run != run.run_id
             || self.battle != battle.battle_id
             || self.wave != run.wave
@@ -131,13 +145,27 @@ impl CurrentBattleParticipationV1 {
             || battle.enemy_party.is_empty()
             || battle.enemy_party.len() > MAX_CURRENT_PARTICIPATION_ROSTER_V1
             || self.faints.len() > MAX_CURRENT_PARTICIPATION_FAINTS_V1
-            || run.party.iter().any(|pokemon| pokemon.owner_seat != Some(self.authority))
-            || battle.enemy_party.iter().any(|pokemon| pokemon.owner_seat.is_some())
+            || run
+                .party
+                .iter()
+                .any(|pokemon| pokemon.owner_seat != Some(self.authority))
+            || battle
+                .enemy_party
+                .iter()
+                .any(|pokemon| pokemon.owner_seat.is_some())
         {
             return Err(CurrentBattleParticipationError::Unsupported);
         }
-        let players = run.party.iter().map(|pokemon| pokemon.id).collect::<BTreeSet<_>>();
-        let enemies = battle.enemy_party.iter().map(|pokemon| pokemon.id).collect::<BTreeSet<_>>();
+        let players = run
+            .party
+            .iter()
+            .map(|pokemon| pokemon.id)
+            .collect::<BTreeSet<_>>();
+        let enemies = battle
+            .enemy_party
+            .iter()
+            .map(|pokemon| pokemon.id)
+            .collect::<BTreeSet<_>>();
         if !sorted_unique(&self.player_roster)
             || !sorted_unique(&self.enemy_roster)
             || self.player_roster.iter().copied().collect::<BTreeSet<_>>() != players
@@ -156,7 +184,11 @@ impl CurrentBattleParticipationV1 {
                 BattleSide::Player => (&players, Some(self.authority)),
                 BattleSide::Enemy => (&enemies, None),
             };
-            let pokemon = run.party.iter().chain(&battle.enemy_party).find(|pokemon| pokemon.id == faint.pokemon)
+            let pokemon = run
+                .party
+                .iter()
+                .chain(&battle.enemy_party)
+                .find(|pokemon| pokemon.id == faint.pokemon)
                 .ok_or(CurrentBattleParticipationError::Invalid)?;
             if !roster.contains(&faint.pokemon)
                 || faint.slot.position != 0
@@ -170,7 +202,8 @@ impl CurrentBattleParticipationV1 {
                 || !ids.insert(faint.pokemon)
                 || previous.is_some_and(|prior| {
                     prior.occurrence.get().checked_add(1) != Some(faint.occurrence.get())
-                        || (prior.resolved_turn, prior.event_ordinal) >= (faint.resolved_turn, faint.event_ordinal)
+                        || (prior.resolved_turn, prior.event_ordinal)
+                            >= (faint.resolved_turn, faint.event_ordinal)
                 })
             {
                 return Err(CurrentBattleParticipationError::Invalid);
@@ -202,7 +235,8 @@ impl CurrentBattleParticipationV1 {
                 // A later CURRENT faint-start union can reinsert the still-fielded fainted player.
                 // Its recorded membership is the explicit structural reason; this is not TS timing proof.
                 if !self.faints.iter().any(|later| {
-                    later.occurrence > completed.occurrence && later.participants.contains(participant)
+                    later.occurrence > completed.occurrence
+                        && later.participants.contains(participant)
                 }) {
                     return Err(CurrentBattleParticipationError::Invalid);
                 }
@@ -238,15 +272,25 @@ impl CurrentBattleParticipationV1 {
         if events.len() > MAX_CURRENT_PARTICIPATION_EVENTS_V1 {
             return Err(CurrentBattleParticipationError::Unsupported);
         }
-        let before_battle = before.battle.as_ref().ok_or(CurrentBattleParticipationError::Invalid)?;
-        let after_battle = after.battle.as_ref().ok_or(CurrentBattleParticipationError::Invalid)?;
+        let before_battle = before
+            .battle
+            .as_ref()
+            .ok_or(CurrentBattleParticipationError::Invalid)?;
+        let after_battle = after
+            .battle
+            .as_ref()
+            .ok_or(CurrentBattleParticipationError::Invalid)?;
         if self.next_turn.get().get().checked_add(1) != Some(after_battle.turn.get().get()) {
             return Err(CurrentBattleParticipationError::Invalid);
         }
         let mut candidate = self.clone();
         let mut field = before_battle.field.clone();
-        let mut hp = before.party.iter().chain(&before_battle.enemy_party)
-            .map(|pokemon| (pokemon.id, pokemon.hp)).collect::<BTreeMap<_, _>>();
+        let mut hp = before
+            .party
+            .iter()
+            .chain(&before_battle.enemy_party)
+            .map(|pokemon| (pokemon.id, pokemon.hp))
+            .collect::<BTreeMap<_, _>>();
         // Source TurnInit membership: active players. Switch itself does not add a participant.
         for slot in &field.slots {
             if slot.slot.side == BattleSide::Player
@@ -258,8 +302,15 @@ impl CurrentBattleParticipationV1 {
         }
         for (ordinal, event) in events.iter().enumerate() {
             match *event {
-                CurrentBattleObservationEventV1::FieldChanged { slot, before: old, after: new } => {
-                    let target = field.slots.iter_mut().find(|entry| entry.slot == slot)
+                CurrentBattleObservationEventV1::FieldChanged {
+                    slot,
+                    before: old,
+                    after: new,
+                } => {
+                    let target = field
+                        .slots
+                        .iter_mut()
+                        .find(|entry| entry.slot == slot)
                         .ok_or(CurrentBattleParticipationError::Invalid)?;
                     let roster = match slot.side {
                         BattleSide::Player => &self.player_roster,
@@ -270,8 +321,14 @@ impl CurrentBattleParticipationV1 {
                     }
                     target.occupant = new;
                 }
-                CurrentBattleObservationEventV1::HpChanged { pokemon, before: old, after: new } => {
-                    let current = hp.get_mut(&pokemon).ok_or(CurrentBattleParticipationError::Invalid)?;
+                CurrentBattleObservationEventV1::HpChanged {
+                    pokemon,
+                    before: old,
+                    after: new,
+                } => {
+                    let current = hp
+                        .get_mut(&pokemon)
+                        .ok_or(CurrentBattleParticipationError::Invalid)?;
                     if *current != old {
                         return Err(CurrentBattleParticipationError::Invalid);
                     }
@@ -280,27 +337,40 @@ impl CurrentBattleParticipationV1 {
                     }
                     *current = new;
                     if old > 0 && new == 0 {
-                        let slot = field.slots.iter().find(|entry| entry.occupant == Some(pokemon))
-                            .ok_or(CurrentBattleParticipationError::Invalid)?.slot;
+                        let slot = field
+                            .slots
+                            .iter()
+                            .find(|entry| entry.occupant == Some(pokemon))
+                            .ok_or(CurrentBattleParticipationError::Invalid)?
+                            .slot;
                         if candidate.faints.len() == MAX_CURRENT_PARTICIPATION_FAINTS_V1
-                            || candidate.faints.iter().any(|faint| faint.pokemon == pokemon)
+                            || candidate
+                                .faints
+                                .iter()
+                                .any(|faint| faint.pokemon == pokemon)
                         {
                             return Err(CurrentBattleParticipationError::Unsupported);
                         }
                         // Source Faint start includes active OR fainted player field identities.
                         // This reducer observes CURRENT mutation order, not asynchronous TS phase order.
                         for entry in &field.slots {
-                            if entry.slot.side == BattleSide::Player && let Some(id) = entry.occupant {
+                            if entry.slot.side == BattleSide::Player
+                                && let Some(id) = entry.occupant
+                            {
                                 insert_participant(&mut candidate.participants, id, self.authority);
                             }
                         }
-                        let next = candidate.next_occurrence.get().checked_add(1)
+                        let next = candidate
+                            .next_occurrence
+                            .get()
+                            .checked_add(1)
                             .and_then(|value| SafeU53::new(value).ok())
                             .ok_or(CurrentBattleParticipationError::Exhausted)?;
                         candidate.faints.push(CurrentBattleFaintObservationV1 {
                             occurrence: candidate.next_occurrence,
                             resolved_turn: self.next_turn,
-                            event_ordinal: u16::try_from(ordinal).map_err(|_| CurrentBattleParticipationError::Unsupported)?,
+                            event_ordinal: u16::try_from(ordinal)
+                                .map_err(|_| CurrentBattleParticipationError::Unsupported)?,
                             pokemon,
                             slot,
                             owner: (slot.side == BattleSide::Player).then_some(self.authority),
@@ -309,14 +379,20 @@ impl CurrentBattleParticipationV1 {
                         });
                         candidate.next_occurrence = next;
                         if slot.side == BattleSide::Player {
-                            candidate.participants.retain(|participant| participant.pokemon != pokemon);
+                            candidate
+                                .participants
+                                .retain(|participant| participant.pokemon != pokemon);
                         }
                     }
                 }
             }
         }
-        let expected_hp = after.party.iter().chain(&after_battle.enemy_party)
-            .map(|pokemon| (pokemon.id, pokemon.hp)).collect::<BTreeMap<_, _>>();
+        let expected_hp = after
+            .party
+            .iter()
+            .chain(&after_battle.enemy_party)
+            .map(|pokemon| (pokemon.id, pokemon.hp))
+            .collect::<BTreeMap<_, _>>();
         if hp != expected_hp || field != after_battle.field {
             return Err(CurrentBattleParticipationError::Invalid);
         }
@@ -330,7 +406,11 @@ fn sorted_unique<T: Ord>(values: &[T]) -> bool {
     values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
-fn insert_participant(values: &mut Vec<CurrentBattleParticipantV1>, pokemon: PokemonId, owner: SeatId) {
+fn insert_participant(
+    values: &mut Vec<CurrentBattleParticipantV1>,
+    pokemon: PokemonId,
+    owner: SeatId,
+) {
     let participant = CurrentBattleParticipantV1 { pokemon, owner };
     match values.binary_search(&participant) {
         Ok(_) => {}

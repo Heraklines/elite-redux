@@ -311,22 +311,47 @@ pub fn resolve_turn_v5_with_current_observations(
     commands: &CommandSet,
     content: &PreparedBattleContentV3,
     authority: &TurnAuthorityContextV1,
-) -> Result<(BattleTransitionV5, Vec<er_state::current_battle_participation::CurrentBattleObservationEventV1>), BattleV5Error> {
+) -> Result<
+    (
+        BattleTransitionV5,
+        Vec<er_state::current_battle_participation::CurrentBattleObservationEventV1>,
+    ),
+    BattleV5Error,
+> {
     use er_state::current_battle_participation::{
         CurrentBattleObservationEventV1, MAX_CURRENT_PARTICIPATION_EVENTS_V1,
     };
     let transition = resolve_turn_v5(before, commands, content, authority)?;
-    let events = transition.mutations.iter().filter_map(|mutation| match mutation {
-        BattleMutation::FieldChanged { slot, before, after } => Some(CurrentBattleObservationEventV1::FieldChanged {
-            slot: *slot, before: *before, after: *after,
-        }),
-        BattleMutation::HpChanged { pokemon, before, after } => Some(CurrentBattleObservationEventV1::HpChanged {
-            pokemon: *pokemon, before: *before, after: *after,
-        }),
-        _ => None,
-    }).take(MAX_CURRENT_PARTICIPATION_EVENTS_V1 + 1).collect::<Vec<_>>();
+    let events = transition
+        .mutations
+        .iter()
+        .filter_map(|mutation| match mutation {
+            BattleMutation::FieldChanged {
+                slot,
+                before,
+                after,
+            } => Some(CurrentBattleObservationEventV1::FieldChanged {
+                slot: *slot,
+                before: *before,
+                after: *after,
+            }),
+            BattleMutation::HpChanged {
+                pokemon,
+                before,
+                after,
+            } => Some(CurrentBattleObservationEventV1::HpChanged {
+                pokemon: *pokemon,
+                before: *before,
+                after: *after,
+            }),
+            _ => None,
+        })
+        .take(MAX_CURRENT_PARTICIPATION_EVENTS_V1 + 1)
+        .collect::<Vec<_>>();
     if events.len() > MAX_CURRENT_PARTICIPATION_EVENTS_V1 {
-        return Err(BattleV5Error::State("current battle observation capacity exceeded".to_owned()));
+        return Err(BattleV5Error::State(
+            "current battle observation capacity exceeded".to_owned(),
+        ));
     }
     Ok((transition, events))
 }

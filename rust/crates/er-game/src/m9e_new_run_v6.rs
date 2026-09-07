@@ -248,12 +248,17 @@ pub fn construct_natural_run_v6_with_participation(
     authority_revision: SafeU53,
 ) -> Result<GameStateV6, NaturalRunV6Error> {
     let mut state = construct_natural_run_v6(bootstrap, content, authority_revision)?;
-    let run = state.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
     state.current_battle_participation = Some(
         er_state::current_battle_participation::CurrentBattleParticipationV1::fresh(run, safe(1)?)
             .map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
     );
-    state.validate_with(content).map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    state
+        .validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     Ok(state)
 }
 /// Historical fixture expansion. Current owned setup supplies both seats' choices.
