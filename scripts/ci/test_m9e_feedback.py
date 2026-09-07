@@ -5176,7 +5176,7 @@ class FeedbackTests(unittest.TestCase):
         self.configure_recovery_integration_scope()
         selection = self.feedback.plan()
         selection["required_native_test_ids"]["er-kernel:" + self.feedback.COOP_RECEIPT_TARGET].pop()
-        self.assertEqual(len(self.feedback.COOP_RECEIPT_IDS), 2)
+        self.assertEqual(len(self.feedback.COOP_RECEIPT_IDS), 3)
         self.assertEqual(self.feedback.plan()["required_native_test_ids"]["er-kernel:" + self.feedback.COOP_RECEIPT_TARGET], self.feedback.COOP_RECEIPT_IDS)
 
     def test_receipt_discovery_rejects_missing_duplicate_extra_and_renamed_tests(self):
@@ -5185,7 +5185,7 @@ class FeedbackTests(unittest.TestCase):
         required = {"er-kernel:" + target: list(ids)}
         good = [("er-kernel", target, list(ids))]
         self.feedback.require_native_test_ids(required, good)
-        self.assertEqual(self.feedback.required_native_target_counts({"er-kernel": [target]}, good), {"er-kernel:" + target: 2})
+        self.assertEqual(self.feedback.required_native_target_counts({"er-kernel": [target]}, good), {"er-kernel:" + target: 3})
         for rows in ([], good * 2, [("er-kernel", target, ids[:1])],
                      [("er-kernel", target, [ids[0]] * 2)],
                      [("er-kernel", target, [*ids, "extra"])],
@@ -5193,6 +5193,31 @@ class FeedbackTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "identities/counts"):
                 self.feedback.require_native_test_ids(required, rows)
         self.assertIsNone(self.feedback.native_target_env("er-kernel", target, None))
+
+    def test_public_retry_is_required_by_policy_plan_and_complete_discovery(self):
+        self.configure_recovery_integration_scope()
+        original = copy.deepcopy(self.config)
+        target = self.feedback.COOP_RECEIPT_TARGET
+        legacy = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+                  "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"]
+        public_retry = "natural_cooperative_public_retry_restores_pending_publication_and_continues"
+        expected = sorted([*legacy, public_retry])
+        selection = self.feedback.plan()
+        self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + target], expected)
+        self.assertEqual(selection["required_native_targets"]["er-kernel"].count(target), 1)
+        self.assertTrue(selection["requires_coop_lost_receipt"])
+        required = {"er-kernel:" + target: expected}
+        self.feedback.require_native_test_ids(required, [("er-kernel", target, list(expected))])
+        for discovered in (legacy, *[expected[:index] + expected[index + 1:] for index in range(3)],
+                           [legacy[0], "renamed_public_retry", legacy[1]],
+                           [legacy[0], legacy[1], legacy[1]]):
+            with self.assertRaisesRegex(RuntimeError, "identities/counts"):
+                self.feedback.require_native_test_ids(required, [("er-kernel", target, discovered)])
+            config = copy.deepcopy(self.config)
+            config["current_recovery_integration"]["coop_receipt_test_ids"] = discovered
+            with self.assertRaisesRegex(RuntimeError, "identities"):
+                self.feedback.select_recovery_scope(config, self.feedback.RECOVERY_PATHS)
+        self.assertEqual(self.config, original)
 
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
@@ -8773,6 +8798,7 @@ class PhaseTransferTests(unittest.TestCase):
     def test_receipt_target_belongs_only_to_ordinary_native_d(self):
         target = ("er-kernel", "m9e_coop_lost_receipt_v7")
         ids = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+               "natural_cooperative_public_retry_restores_pending_publication_and_continues",
                "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"]
         rows = [{"crate": target[0], "target": target[1], "ids": ids, "historical_excluded_ids": []},
                 {"crate": "er-kernel", "target": "m9e_natural_coop_campaign_v7", "ids": ["campaign"], "historical_excluded_ids": []}]

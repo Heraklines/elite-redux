@@ -21,6 +21,7 @@ RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-ker
                 "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs"]
 TEST_TARGET = "m9e_coop_lost_receipt_v7"
 TEST_IDS = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+            "natural_cooperative_public_retry_restores_pending_publication_and_continues",
             "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"]
 sequence = 0
 logs = {}
@@ -131,7 +132,7 @@ if __name__ == "__main__":
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "qualification": "natural owned co-op lost authority reply across same-generation disconnect and snapshot restore; no generation-two or browser qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "18498238ae2468a2f74091d37cbd86340505b1cc"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "678de81f145304bc68767bcd0b03f435f87ee0f8"}
     try:
         main(summary)
         if TARGET.exists():

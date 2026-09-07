@@ -137,6 +137,7 @@
     },
     "coop_receipt_test_ids": [
       "natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+      "natural_cooperative_public_retry_restores_pending_publication_and_continues",
       "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"
     ],
     "coop_campaign_test_ids": [
@@ -194,7 +195,8 @@
     },
     "browser_ids": [
       "natural cooperative Title through two Workers and RTC host ready first",
-      "natural cooperative Title through two Workers and RTC guest ready first"
+      "natural cooperative Title through two Workers and RTC guest ready first",
+      "owned natural co-op public retry recovers a pending proposal after disconnected snapshot restore through six Workers"
     ]
   },
   "current_title_retirement_focus": {

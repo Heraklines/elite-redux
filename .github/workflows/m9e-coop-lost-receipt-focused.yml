@@ -1,7 +1,7 @@
 name: M9E Current Cooperative Lost Reply Diagnostic
 on:
   push:
-    branches: [codex/m9e-coop-lost-receipt-focused-20260907]
+    branches: [codex/m9e-coop-public-retry-focused-20260907]
 permissions:
   contents: read
 concurrency:

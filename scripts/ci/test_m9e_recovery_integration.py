@@ -106,7 +106,9 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
     def test_receipt_policy_rejects_missing_duplicate_or_renamed_ids(self):
         for ids in ([], feedback.COOP_RECEIPT_IDS[:1],
                     [feedback.COOP_RECEIPT_IDS[0]] * 2,
-                    [feedback.COOP_RECEIPT_IDS[0], "unverified"]):
+                    [feedback.COOP_RECEIPT_IDS[0], "unverified"],
+                    [feedback.COOP_RECEIPT_IDS[0]] * 3,
+                    [*feedback.COOP_RECEIPT_IDS[:2], "unverified"]):
             config = copy.deepcopy(self.config)
             config["current_recovery_integration"]["coop_receipt_test_ids"] = ids
             with self.assertRaisesRegex(RuntimeError, "identities"):

@@ -893,3 +893,137 @@ fn owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots(
     }
     Err("natural play did not replace the raw admitted reply".into())
 }
+
+#[test]
+fn natural_cooperative_public_retry_restores_pending_publication_and_continues()
+-> Result<(), Box<dyn Error>> {
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
+    let generation = ConnectionGeneration::new(safe(1));
+    let host_seat = SeatId::new(safe(1));
+    let mut host = owned_title(content.clone(), true)?;
+    let mut guest = owned_title(content.clone(), false)?;
+    let (_, frames) = choose_combat_party(&mut guest, &content, false)?;
+    let (_, waiting) = choose_combat_party(&mut host, &content, true)?;
+    assert!(waiting.is_empty() && host.state().is_none());
+    let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
+    guest.ingest_network_frame(generation, &started)?;
+    let mut recovered = false;
+    for _ in 0..200 {
+        for kernel in [&mut host, &mut guest] {
+            for pending in kernel.snapshot()?.pending_presentations {
+                kernel.settle_presentation(pending.event_id)?;
+            }
+        }
+        let run = host
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("run absent")?;
+        assert_ne!(run.outcome, er_types::RunOutcome::Defeat);
+        if run.wave.get().get() == 2 {
+            assert!(
+                recovered,
+                "natural battle must recover a genuinely lost authority reply"
+            );
+            assert_eq!(host.state(), guest.state());
+            assert!(guest.snapshot()?.current_proposal.is_none());
+            assert!(guest.retry_current_coop_setup()?.effects.is_empty());
+            return Ok(());
+        }
+        let owner = host
+            .current_control()
+            .ok_or("canonical control absent")?
+            .owner_seat
+            .unwrap_or(host_seat);
+        let is_host = owner == host_seat;
+        let kernel = if is_host { &mut host } else { &mut guest };
+        if kernel.current_control().ok_or("owned control absent")?.kind
+            == er_types::GameControlKindV2::BattleMove
+        {
+            choose_play_move(kernel, &content, owner)?;
+        }
+        let step = play_press(kernel)?;
+        let proposal = step.effects.iter().find_map(|effect| match effect {
+            GameKernelEffectV7::ProposalReady { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        });
+        if let Some(proposal) = proposal
+            && !recovered
+        {
+            assert!(!is_host);
+            let response = host.ingest_network_frame(generation, &proposal)?;
+            let lost_receipt = wire(&response)?;
+            assert_ne!(
+                host.state(),
+                guest.state(),
+                "original material was deliberately not delivered"
+            );
+            assert!(guest.snapshot()?.current_proposal.is_some());
+            for kernel in [&mut host, &mut guest] {
+                kernel.transport_changed(generation, false)?;
+            }
+            host = restored(&host, content.clone(), true)?;
+            guest = restored(&guest, content.clone(), false)?;
+            let disconnected = guest.snapshot()?;
+            assert!(guest.retry_current_coop_setup().is_err());
+            assert_eq!(guest.snapshot()?, disconnected);
+            for kernel in [&mut host, &mut guest] {
+                kernel.transport_changed(generation, true)?;
+            }
+            let committed = host.snapshot()?;
+            let pending_snapshot = guest.snapshot()?;
+            let publication = guest.retry_current_coop_setup()?;
+            assert_eq!(
+                publication.effects.len(),
+                1,
+                "public retry must emit the real retained gameplay proposal"
+            );
+            assert_eq!(wire(&publication)?, proposal);
+            assert_eq!(
+                guest.snapshot()?,
+                pending_snapshot,
+                "public retry mutated proposal ownership"
+            );
+            let retried = host.ingest_network_frame(generation, &wire(&publication)?)?;
+            assert_eq!(
+                host.snapshot()?,
+                committed,
+                "retry reran authority work or changed ownership"
+            );
+            assert_eq!(
+                retried.effects.len(),
+                1,
+                "lost admitted reply must remain recoverable after restore"
+            );
+            assert_eq!(
+                wire(&retried)?,
+                lost_receipt,
+                "retry must return the original exact material receipt"
+            );
+            assert!(matches!(
+                retried.effects[0],
+                GameKernelEffectV7::AuthorityMaterial { .. }
+            ));
+            guest.ingest_network_frame(generation, &wire(&retried)?)?;
+            assert!(guest.snapshot()?.current_proposal.is_none());
+            assert!(guest.retry_current_coop_setup()?.effects.is_empty());
+            assert_eq!(host.state(), guest.state());
+            let applied = guest.snapshot()?;
+            assert!(
+                guest
+                    .ingest_network_frame(generation, &lost_receipt)?
+                    .effects
+                    .is_empty()
+            );
+            assert_eq!(
+                guest.snapshot()?,
+                applied,
+                "duplicate receipt repeated guest effects"
+            );
+            recovered = true;
+        } else {
+            deliver_play_step(&mut host, &mut guest, step, is_host, false)?;
+        }
+    }
+    Err("natural cooperative recovery did not continue to the second wave".into())
+}

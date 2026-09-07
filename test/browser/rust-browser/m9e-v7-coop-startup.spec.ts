@@ -121,6 +121,16 @@ async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
           if (evidence.frames.length >= 16 || bytes.length > (4 << 20) - evidence.bytes) throw new Error("startup frame evidence exceeds bound");
           evidence.bytes += bytes.length;
           evidence.frames.push({ direction, generation, bytes: Array.from(bytes) });
+          // Opt-in witness: queue a real snapshot before a later receipt ingress.
+          // Never await from the synchronous effect observer's own operation.
+          const current = (globalThis as any).__naturalCoop;
+          if (current?.capturePending === true && current.publicationSnapshot == null
+            && direction === "sent" && bytes[0] === 123
+            && JSON.parse(new TextDecoder().decode(bytes)).schema_version === 2) {
+            current.publicationSnapshot = current.peer.dispatch({ kind: "SNAPSHOT" })
+              .then((result: any) => ({ ok: true, snapshot: result.response.snapshot }),
+                (error: unknown) => ({ ok: false, error: String(error) }));
+          }
         },
       };
       for (const invalid of ["role", "sender", "extra_peer", "generation", "ambiguous_owner"]) {
@@ -383,3 +393,230 @@ for (const hostFirst of [true, false]) {
     }
   });
 }
+test("owned natural co-op public retry recovers a pending proposal after disconnected snapshot restore through six Workers", async ({ browser }, info) => {
+  const peers = await pair(browser, false);
+  try {
+    await choices(peers.left, true); await choices(peers.right, false);
+    await delivered(peers.left, 1); await delivered(peers.right, 1);
+    for (const page of [peers.left, peers.right]) {
+      expect(await page.evaluate(async () => {
+        const state = await (globalThis as any).__naturalCoop.snapshot();
+        return { lifecycle: state.lifecycle.kind, control: state.lifecycle.value.active_run.control.kind,
+          started: state.current_coop_setup?.started != null };
+      })).toEqual({ lifecycle: "ACTIVE", control: "BATTLE_COMMAND", started: true });
+    }
+    // The actual default command opens the move menu; its selected offered move
+    // is admitted through raw keys. No material, party or winning state is edited.
+    await press(peers.left);
+    expect(await peers.left.evaluate(async () => (await (globalThis as any).__naturalCoop.snapshot())
+      .lifecycle.value.active_run.control.kind)).toBe("BATTLE_MOVE");
+    await press(peers.left); await delivered(peers.right, 2);
+    await press(peers.right);
+    expect(await peers.right.evaluate(async () => (await (globalThis as any).__naturalCoop.snapshot())
+      .lifecycle.value.active_run.control.kind)).toBe("BATTLE_MOVE");
+    await peers.right.evaluate(() => { (globalThis as any).__naturalCoop.capturePending = true; });
+    await press(peers.right);
+    await delivered(peers.left, 2); await delivered(peers.right, 3);
+    // Keep complete snapshots and wire vectors in their browser pages. The
+    // driver receives only bounded facts, never either retained snapshot owner.
+    await Promise.all([peers.left, peers.right].map((page, index) => page.evaluate(async guest => {
+      const current = (globalThis as any).__naturalCoop;
+      const canonical = (value: any): string => JSON.stringify(value, (_key, item) =>
+        item != null && typeof item === "object" && !Array.isArray(item)
+          ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+      const same = (left: any, right: any, reason: string) => {
+        if (canonical(left) !== canonical(right)) throw new Error(reason);
+      };
+      const decode = (bytes: number[]) => JSON.parse(new TextDecoder().decode(Uint8Array.from(bytes)));
+      const actual = await current.snapshot();
+      const proposal = current.evidence.frames.findLast((frame: any) => frame.direction === (guest ? "sent" : "received")
+        && decode(frame.bytes).schema_version === 2)?.bytes;
+      const receipt = current.evidence.frames.findLast((frame: any) => frame.direction === (guest ? "received" : "sent"))?.bytes;
+      if (proposal == null || receipt == null) throw new Error("actual proposal and receipt frames required");
+      const wire = decode(receipt);
+      const proposalHex = Array.from(Uint8Array.from(proposal), value => value.toString(16).padStart(2, "0")).join("");
+      if (wire.proposal_hex !== proposalHex) throw new Error("actual reply does not bind the original proposal");
+      if (wire.kind !== "CURRENT_PROPOSAL_MATERIAL_RECEIPT" || wire.schema_version !== 1
+        || proposal.length > 16 << 10 || receipt.length > 1 << 20
+        || typeof wire.material_hex !== "string" || !/^(?:[0-9a-f]{2})+$/u.test(wire.material_hex)
+        || wire.material_hex.length > (448 << 10) * 2) throw new Error("bounded actual current receipt required");
+      const inner = Uint8Array.from(wire.material_hex.match(/../gu), (byte: string) => Number.parseInt(byte, 16));
+      const material = JSON.parse(new TextDecoder().decode(inner));
+      const transition = material.value;
+      const envelope = decode(proposal);
+      const vectorDigest = async (bytes: Uint8Array) => "sha256-json-bytes-v1:" + Array.from(new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(Array.from(bytes))))),
+      value => value.toString(16).padStart(2, "0")).join("");
+      if (wire.proposal_digest !== await vectorDigest(Uint8Array.from(proposal))
+        || wire.material_digest !== await vectorDigest(inner) || transition.schema_version !== 6
+        || transition.operation_id !== envelope.proposal.context.operation_id
+        || transition.authority_revision !== envelope.proposal.context.authority_revision
+        || transition.authority_seat !== envelope.proposal.context.authority_seat) throw new Error("receipt vector digest or proposal context differs");
+      same(transition.accepted_action, envelope.proposal.action, "receipt action differs from actual proposal");
+      same(wire.authority_context, guest ? actual.protocol.peer_identity.peer : actual.protocol.frame_context.context,
+        "receipt authority context differs from actual paired endpoint");
+      const record = actual.material_ledger.records.find((entry: any) => entry.operation_id === transition.operation_id);
+      if (record == null || record.material_fingerprint !== wire.material_fingerprint
+        || record.authority_revision !== transition.authority_revision || record.after_digest !== transition.after_digest) {
+        throw new Error("actual committed receipt ledger binding differs");
+      }
+      let checkpoint = actual;
+      if (guest) {
+        const publication = await current.publicationSnapshot;
+        if (publication?.ok !== true || publication.snapshot.current_proposal?.kind !== "PENDING"
+          || publication.snapshot.current_proposal.retained.proposal_hex !== proposalHex
+          || publication.snapshot.current_proposal.retained.proposal_digest !== wire.proposal_digest
+          || actual.current_proposal != null) throw new Error("genuine pending-to-accepted guest cut required");
+        checkpoint = publication.snapshot;
+      } else {
+        same(actual.current_coop_setup.last_reply, wire, "host did not retain its actual wire receipt");
+      }
+      if (checkpoint.current_coop_setup?.started == null) throw new Error("checkpoint lost natural setup ownership");
+      (globalThis as any).__publicRetry = { canonical, same, decode, checkpoint, proposal, receipt,
+        assets: current.assets, initialRawInputs: current.rawInputs(), originalPresentations: current.evidence.presentations.slice(),
+        originalSnapshot: actual, guest, stages: [] };
+    }, index === 1)));
+    // Two fresh generations of route/Worker owners, both using protocol generation
+    // one. The intermediate real disconnect produces the final restore inputs.
+    for (const phase of ["checkpoint", "disconnected_restore"]) {
+      await Promise.all([peers.left, peers.right].map(page => page.evaluate(async ({ entry, source, workerHash, phase }) => {
+        const retained = (globalThis as any).__publicRetry;
+        const previous = (globalThis as any).__naturalCoop;
+        await previous.peer.dispose();
+        if (!previous.peer.status.disposeAcknowledged || !previous.peer.status.worker.closed) throw new Error("old Worker was not disposed");
+        const checkpoint = retained.checkpoint;
+        const protocol = checkpoint.protocol;
+        const frame = protocol.frame_context.context;
+        const evidence = { frames: [] as { direction: string; generation: number; bytes: number[] }[], bytes: 0, presentations: [] as number[] };
+        const module = await import(entry);
+        const peer = new module.CurrentDevelopmentRtcPeerV1({ assets: retained.assets, checkpoint,
+          context: { local_seat: frame.senderSeatId, role: protocol.role, protocol: null,
+            scheduler: { disposed: false, next_timer_id: 0, timers: [], pauses: [] } },
+          identity: { source_sha: source, content_sha256: retained.assets.content_sha256, worker_sha256: workerHash,
+            session_id: frame.sessionId, run_id: frame.runId, authority_seat: frame.authoritySeatId,
+            local_seat: frame.senderSeatId, session_epoch: frame.sessionEpoch, seat_map_id: frame.seatMapId,
+            membership_revision: frame.membershipRevision, peer_seat: protocol.connections[0].peer_seat, generation: 1 },
+          present: async (effect: { event_id: number }) => { evidence.presentations.push(effect.event_id); },
+          frame: (direction: string, generation: number, bytes: Uint8Array) => {
+            if (evidence.frames.length >= 16 || bytes.length > (4 << 20) - evidence.bytes) throw new Error("retry frame evidence exceeds bound");
+            evidence.bytes += bytes.length; evidence.frames.push({ direction, generation, bytes: Array.from(bytes) });
+          },
+        });
+        (globalThis as any).__naturalCoop = { peer, evidence,
+          snapshot: async () => (await peer.dispatch({ kind: "SNAPSHOT" })).response.snapshot,
+          retry: async () => { await peer.dispatch({ kind: "RETRY_COOP_SETUP" }); } };
+        await peer.initialize();
+        const before = (await peer.dispatch({ kind: "SNAPSHOT" })).response.snapshot;
+        retained.same(before, checkpoint, "fresh actual Worker did not restore the complete checkpoint");
+        let rejected = false;
+        try { await peer.dispatch({ kind: "RETRY_COOP_SETUP" }); }
+        catch (error) { rejected = error instanceof Error && error.message.includes("requires its admitted peer connection"); }
+        if (!rejected || evidence.frames.length !== 0 || evidence.presentations.length !== 0) throw new Error("unconnected retry was not fenced without effects");
+        retained.same((await peer.dispatch({ kind: "SNAPSHOT" })).response.snapshot, before, "rejected retry changed restored ownership");
+        retained.stages.push({ phase, exact_restore: true, preconnection_retry_rejected: true });
+      }, { entry: `${address}/assets/${manifest.entry}`, source: manifest.source_sha,
+        workerHash: manifest.assets[manifest.worker].sha256, phase })));
+      const offer = await peers.left.evaluate(() => (globalThis as any).__naturalCoop.peer.offer());
+      const answer = await peers.right.evaluate(offer => (globalThis as any).__naturalCoop.peer.answer(offer), offer);
+      await peers.left.evaluate(answer => (globalThis as any).__naturalCoop.peer.accept(answer), answer);
+      await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.ready())));
+      if (phase === "checkpoint") {
+        await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.closeTransport())));
+        for (const page of [peers.left, peers.right]) {
+          await expect.poll(async () => (await status(page)).disconnectedEvents, { timeout: 30_000 }).toBe(1);
+          await page.evaluate(async () => {
+            const current = (globalThis as any).__naturalCoop;
+            const retained = (globalThis as any).__publicRetry;
+            const state = await current.snapshot();
+            if (state.protocol.connections[0].state !== "DISCONNECTED"
+              || !state.scheduler.pauses.some((pause: any) => pause.time_class === "connected" && pause.reasons.includes("transport-disconnected"))) {
+              throw new Error("actual disconnected protocol/scheduler snapshot required");
+            }
+            retained.same(state.current_proposal, retained.checkpoint.current_proposal, "disconnect changed proposal ownership");
+            retained.same(state.current_coop_setup, retained.checkpoint.current_coop_setup, "disconnect changed retained reply/setup");
+            if (current.evidence.frames.length !== 0 || current.evidence.presentations.length !== 0) throw new Error("checkpoint pair replayed effects before explicit retry");
+            let rejected = false;
+            try { await current.peer.dispatch({ kind: "RETRY_COOP_SETUP" }); }
+            catch (error) { rejected = error instanceof Error && error.message.includes("requires its admitted peer connection"); }
+            if (!rejected) throw new Error("actual disconnected route admitted public retry");
+            retained.same(await current.snapshot(), state, "disconnected retry changed complete ownership");
+            retained.checkpoint = state;
+          });
+        }
+      }
+    }
+    await Promise.all([peers.left, peers.right].map(page => page.evaluate(async () => {
+      const current = (globalThis as any).__naturalCoop;
+      const retained = (globalThis as any).__publicRetry;
+      retained.beforeRetry = await current.snapshot();
+      if (current.peer.status.connectedEvents !== 1 || current.evidence.frames.length !== 0
+        || current.evidence.presentations.length !== 0) throw new Error("fresh connected pair must be quiescent before public retry");
+    })));
+    await retry(peers.right);
+    await delivered(peers.left, 1); await delivered(peers.right, 1);
+    const facts = await Promise.all([peers.left, peers.right].map(page => page.evaluate(async () => {
+      const current = (globalThis as any).__naturalCoop;
+      const retained = (globalThis as any).__publicRetry;
+      const after = await current.snapshot();
+      const sent = current.evidence.frames.filter((frame: any) => frame.direction === "sent");
+      const received = current.evidence.frames.filter((frame: any) => frame.direction === "received");
+      if (sent.length !== 1 || received.length !== 1 || current.evidence.frames.some((frame: any) => frame.generation !== 1)) throw new Error("public retry must exchange exactly one proposal and receipt");
+      retained.same(sent[0].bytes, retained.guest ? retained.proposal : retained.receipt, "retry changed original sent bytes");
+      retained.same(received[0].bytes, retained.guest ? retained.receipt : retained.proposal, "retry changed original received bytes");
+      if (retained.guest) {
+        if (retained.beforeRetry.current_proposal?.kind !== "PENDING" || after.current_proposal != null) throw new Error("public retry did not retire pending ownership");
+        retained.same(after.lifecycle, retained.originalSnapshot.lifecycle, "guest retry did not reach the original committed lifecycle");
+        retained.same(after.material_ledger, retained.originalSnapshot.material_ledger, "guest retry ledger differs from original receipt application");
+      } else {
+        retained.same(after, retained.beforeRetry, "host duplicate reply changed the complete kernel snapshot");
+        if (current.evidence.presentations.length !== 0) throw new Error("host duplicate reply replayed a presentation");
+      }
+      const canonicalBytes = (value: any) => new TextEncoder().encode(retained.canonical(value));
+      const hash = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes))), value => value.toString(16).padStart(2, "0")).join("");
+      const pending = canonicalBytes(retained.checkpoint);
+      const beforeBytes = canonicalBytes(retained.beforeRetry);
+      const afterBytes = canonicalBytes(after);
+      retained.afterRetry = after;
+      retained.afterRetryPresentations = current.evidence.presentations.slice();
+      return { role: retained.guest ? "REPLICA" : "AUTHORITY", stages: retained.stages,
+        checkpoint_bytes: pending.length, checkpoint_sha256: await hash(pending),
+        before_bytes: beforeBytes.length, before_sha256: await hash(beforeBytes), after_bytes: afterBytes.length, after_sha256: await hash(afterBytes),
+        proposal_bytes: retained.proposal.length, proposal_sha256: await hash(Uint8Array.from(retained.proposal)),
+        receipt_bytes: retained.receipt.length, receipt_sha256: await hash(Uint8Array.from(retained.receipt)),
+        sent: sent.length, received: received.length, frame_bytes: current.evidence.bytes,
+        presentations: current.evidence.presentations.length, original_presentations: retained.originalPresentations.length,
+        original_raw_inputs: retained.initialRawInputs, restored_raw_inputs: 0,
+        lifecycle_sha256: await hash(canonicalBytes(after.lifecycle)), ledger_sha256: await hash(canonicalBytes(after.material_ledger)),
+        exact_frames: true, ownership_verified: true, host_snapshot_conserved: !retained.guest };
+    })));
+    expect(facts[0].proposal_sha256).toBe(facts[1].proposal_sha256);
+    expect(facts[0].receipt_sha256).toBe(facts[1].receipt_sha256);
+    expect(facts[0].lifecycle_sha256).toBe(facts[1].lifecycle_sha256);
+    expect(facts[0].ledger_sha256).toBe(facts[1].ledger_sha256);
+    await retry(peers.right);
+    await Promise.all([peers.left, peers.right].map(page => page.evaluate(async () => {
+      const current = (globalThis as any).__naturalCoop;
+      const retained = (globalThis as any).__publicRetry;
+      retained.same(await current.snapshot(), retained.afterRetry, "settled public retry changed a complete snapshot");
+      retained.same(current.evidence.presentations, retained.afterRetryPresentations, "settled retry repeated presentations");
+      if (current.evidence.frames.length !== 2) throw new Error("settled guest retry emitted another frame");
+    })));
+    expect(peers.workers).toHaveLength(6);
+    for (const url of peers.workers) { expect(new URL(url).origin).toBe(address); expect(new URL(url).pathname).toBe(`/assets/${manifest.worker}`); }
+    await Promise.all([peers.left, peers.right].map(page => page.evaluate(async () => {
+      const peer = (globalThis as any).__naturalCoop.peer;
+      await peer.dispose();
+      if (!peer.status.disposeAcknowledged || !peer.status.worker.closed) throw new Error("final Worker disposal not acknowledged");
+    })));
+    const evidence = Buffer.from(JSON.stringify({ schema_version: 1, source_sha: manifest.source_sha,
+      worker_sha256: manifest.assets[manifest.worker].sha256, ...manifest.cohort,
+      setup_manifest_sha256: digest(setupBytes), actual_workers: 6, generation: 1,
+      recovery: "genuine_pending_and_committed_checkpoints_then_actual_disconnected_restore",
+      peers: facts, settled_retry_noop: true, disposed_workers: 6 }));
+    expect(evidence.length).toBeLessThanOrEqual(16 << 10);
+    await info.attach("m9e-natural-coop-public-retry", { contentType: "application/json", body: evidence });
+  } finally {
+    try { await Promise.allSettled([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.dispose()))); }
+    finally { await Promise.allSettled(peers.contexts.map(context => context.close())); }
+  }
+});
