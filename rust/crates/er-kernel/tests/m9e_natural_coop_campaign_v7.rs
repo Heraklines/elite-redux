@@ -581,6 +581,8 @@ fn choose_combat_party(
     Ok((selected, frames))
 }
 
+// The focused producer binds these bounded progress and completion receipts.
+#[allow(clippy::print_stdout)]
 #[test]
 fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
