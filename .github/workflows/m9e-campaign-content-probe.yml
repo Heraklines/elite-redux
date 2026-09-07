@@ -1,0 +1,62 @@
+name: M9E Campaign Content Metadata Probe
+on:
+  push:
+    branches: [codex/m9e-campaign-content-probe-20260907]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-campaign-content-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Inspect bounded selected content records remotely
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['GITHUB_SHA']
+          path = pathlib.Path('rust/fixtures/m9/engineering/game-content-bundle-v2.json')
+          raw = path.read_bytes()
+          digest = hashlib.sha256(raw).hexdigest()
+          assert digest == '640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4'
+          bundle = json.loads(raw)
+          ids = [10, 33, 39, 43, 45, 61, 64, 78, 79, 108, 110, 175, 314, 331, 580]
+          moves = [row for row in bundle['battle']['moves'] if row and row['id'] in ids]
+          assert len(moves) == len(ids)
+          result = {'status': 'passed', 'qualification': 'bounded generated-content inspection only; no game qualification',
+                    'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
+                    'bundle_sha256': digest, 'oracle_sha': bundle['oracle_sha'], 'moves': moves,
+                    'bootstrap': {key: value for key, value in bundle['bootstrap'].items()
+                                  if key not in ('content_hash', 'starters')},
+                    'starters': bundle['bootstrap']['starters'][:20],
+                    'source_hashes': {name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in (
+                        '.github/workflows/m9e-campaign-content-probe.yml',
+                        'rust/crates/er-game/src/m9e_new_run_v6.rs',
+                        'rust/crates/er-game/src/m9e_runtime_v6.rs')}}
+          encoded = (json.dumps(result, sort_keys=True, indent=2) + '\n').encode()
+          assert len(encoded) <= 65536
+          report = pathlib.Path(os.environ['RUNNER_TEMP']) / 'm9e-content-probe'
+          report.mkdir()
+          (report / 'summary.json').write_bytes(encoded)
+          print(json.dumps({'status': 'passed', 'bytes': len(encoded), 'move_ids': ids}))
+          PY
+      - name: Bounded metadata
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-campaign-content-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-content-probe/
+          if-no-files-found: error
+          retention-days: 14
