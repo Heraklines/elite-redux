@@ -1195,7 +1195,7 @@ def compact_storage_evidence(compact, full_hash):
 def compact_worker_evidence(compact, full_hash):
     # Native and browser worker bytes, profiles and hashes stay in the full proof.
     # The bounded result index may refer to each exact field of that same proof.
-    for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "worker_storage_tests", "title_storage_tests"):
+    for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
         if len(encoded(compact)) <= 16000:
             break
         if key in compact:
