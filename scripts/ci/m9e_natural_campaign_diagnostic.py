@@ -53,6 +53,7 @@ def main(summary):
                "rust/crates/er-ai/src/authority_v2.rs", "rust/crates/er-ai/src/full_surface.rs",
                "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs",
                "rust/crates/er-state/src/m9e_state_v6.rs", "rust/crates/er-state/src/m7_state.rs",
+               "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-game/src/m9e_material_v6.rs",
                "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
                "rust/crates/er-game/Cargo.toml", "rust/crates/er-kernel/Cargo.toml",
                "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_natural_campaign_diagnostic.py",
@@ -118,7 +119,7 @@ def main(summary):
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
-    summary = {"status": "failed", "qualification": "focused AI command transaction only; no integration or M9 qualification",
+    summary = {"status": "failed", "qualification": "focused natural current campaign characterization only; no replay, integration or M9 qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "98c04705f4010f4dd865ba5677451ce8599a91f3"}
     try:
