@@ -19,6 +19,8 @@ DEADLINE = time.monotonic() + 1800
 EXAMPLE = "rust/crates/er-web/examples/m9e_v7_coop_startup.rs"
 SPEC = "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"
 IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready first" for seat in ("host", "guest")]
+PUBLIC_RETRY_ID = "owned natural co-op public retry recovers a pending proposal after disconnected snapshot restore through six Workers"
+IDS.append(PUBLIC_RETRY_ID)
 SOURCES = [EXAMPLE, SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/workflows/m9e-coop-rtc-focused.yml",
            "src/rust-browser/contracts/browser-contracts-v2.ts", "src/rust-browser/contracts/browser-contracts.ts",
            "src/rust-browser/routes/rust-current-rtc-entry.ts", "src/rust-browser/adapters/current-rtc-transport.ts",
@@ -28,7 +30,8 @@ SOURCES = [EXAMPLE, SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/work
            "scripts/build-kernel-m9e-v7-web.mjs", "rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs",
            "rust/crates/er-web/src/contracts_v2.rs", "rust/crates/er-web/src/host_v2.rs",
            "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs",
-           "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs",
+           "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-kernel/src/current_proposal_v7.rs",
+           "rust/crates/er-game/src/m9e_new_run_v6.rs",
            "rust/crates/er-game/src/m72_bootstrap.rs", "rust/crates/er-env/src/current.rs",
            "rust/crates/er-repro/src/current.rs", "rust/rust-toolchain.toml", "rust/Cargo.lock", "rust/Cargo.toml",
            "rust/crates/er-web/Cargo.toml", "pnpm-lock.yaml", "package.json", ".nvmrc",
@@ -93,6 +96,125 @@ def main(summary):
     execute_prepared(summary)
 
 
+def validate_public_retry(result, summary, rtc, sha):
+    """Validate bounded source-bound browser facts, never claim snapshot reconstruction."""
+    attachments = result.get("attachments", [])
+    if (not isinstance(attachments, list) or len(attachments) != 1
+            or not isinstance(attachments[0], dict)
+            or attachments[0].get("name") != "m9e-natural-coop-public-retry"
+            or attachments[0].get("contentType") != "application/json"):
+        raise RuntimeError("sole public retry evidence required")
+    attachment = attachments[0]
+    if set(attachment) == {"name", "contentType", "body"}:
+        body = attachment["body"]
+        if not isinstance(body, str) or not 0 < len(body) <= 21848:
+            raise RuntimeError("bounded encoded public retry evidence required")
+        raw = base64.b64decode(body, validate=True)
+    elif set(attachment) == {"name", "contentType", "path"}:
+        if not isinstance(attachment["path"], str) or not 0 < len(attachment["path"]) <= 4096:
+            raise RuntimeError("bounded public retry evidence path required")
+        original = Path(attachment["path"])
+        if not original.is_absolute():
+            original = ROOT / original
+        expected_root = ROOT / "test-results/rust-browser"
+        if original.is_symlink() or expected_root.is_symlink():
+            raise RuntimeError("public retry evidence symlink forbidden")
+        path = original.resolve(strict=True)
+        if (not path.is_relative_to(expected_root.resolve(strict=True)) or not path.is_file()
+                or any(parent.is_symlink() for parent in original.parents)
+                or not 0 < path.stat().st_size <= 16384):
+            raise RuntimeError("bounded contained public retry evidence required")
+        raw = path.read_bytes()
+    else:
+        raise RuntimeError("unambiguous public retry evidence payload required")
+    if not 0 < len(raw) <= 16384:
+        raise RuntimeError("public retry evidence exceeds16KiB")
+
+    def object_without_duplicates(pairs):
+        value = {}
+        for key, child in pairs:
+            if key in value:
+                raise RuntimeError("duplicate public retry evidence key")
+            value[key] = child
+        return value
+
+    def reject_constant(_value):
+        raise RuntimeError("non-finite public retry evidence number")
+
+    value = json.loads(raw, object_pairs_hook=object_without_duplicates, parse_constant=reject_constant)
+    expected_keys = {"schema_version", "source_sha", "worker_sha256", "glue_sha256", "wasm_sha256",
+                     "content_sha256", "setup_manifest_sha256", "actual_workers", "generation", "recovery",
+                     "peers", "settled_retry_noop", "disposed_workers"}
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        raise RuntimeError("exact public retry evidence schema required")
+    if (type(value["schema_version"]) is not int or value["schema_version"] != 1
+            or type(value["actual_workers"]) is not int or value["actual_workers"] != 6
+            or type(value["disposed_workers"]) is not int or value["disposed_workers"] != 6
+            or type(value["generation"]) is not int or value["generation"] != 1
+            or value["settled_retry_noop"] is not True
+            or value["recovery"] != "genuine_pending_and_committed_checkpoints_then_actual_disconnected_restore"
+            or value["source_sha"] != sha
+            or value["worker_sha256"] != rtc["assets"][rtc["worker"]]["sha256"]
+            or value["setup_manifest_sha256"] != summary["setup_manifest_sha256"]
+            or set(rtc["cohort"]) != {"glue_sha256", "wasm_sha256", "content_sha256"}
+            or any(value[key] != expected for key, expected in rtc["cohort"].items())):
+        raise RuntimeError("public retry evidence differs from actual source/assets or six-Worker journey")
+    if not isinstance(value["peers"], list) or len(value["peers"]) != 2:
+        raise RuntimeError("two ordered public retry peer records required")
+    peer_keys = {"role", "stages", "checkpoint_bytes", "checkpoint_sha256", "before_bytes", "before_sha256",
+                 "after_bytes", "after_sha256", "proposal_bytes", "proposal_sha256", "receipt_bytes", "receipt_sha256",
+                 "sent", "received", "frame_bytes", "presentations", "original_presentations", "original_raw_inputs",
+                 "restored_raw_inputs", "lifecycle_sha256", "ledger_sha256", "exact_frames", "ownership_verified",
+                 "host_snapshot_conserved"}
+    hash_keys = {"checkpoint_sha256", "before_sha256", "after_sha256", "proposal_sha256", "receipt_sha256",
+                 "lifecycle_sha256", "ledger_sha256"}
+    count_keys = {"checkpoint_bytes", "before_bytes", "after_bytes", "proposal_bytes", "receipt_bytes", "sent",
+                  "received", "frame_bytes", "presentations", "original_presentations", "original_raw_inputs",
+                  "restored_raw_inputs"}
+    for index, peer in enumerate(value["peers"]):
+        if not isinstance(peer, dict) or set(peer) != peer_keys or peer["role"] != ("AUTHORITY", "REPLICA")[index]:
+            raise RuntimeError("exact ordered public retry peer schema required")
+        if (any(not isinstance(peer[key], str) or not re.fullmatch(r"[0-9a-f]{64}", peer[key]) for key in hash_keys)
+                or any(type(peer[key]) is not int or not 0 <= peer[key] <= 9007199254740991 for key in count_keys)):
+            raise RuntimeError("strict public retry hashes and safe integer counts required")
+        if (any(not 0 < peer[key] <= 16 << 20 for key in ("checkpoint_bytes", "before_bytes", "after_bytes"))
+                or not 0 < peer["proposal_bytes"] <= 16 << 10 or not 0 < peer["receipt_bytes"] <= 1 << 20
+                or peer["sent"] != 1 or peer["received"] != 1
+                or peer["sent"] + peer["received"] > 16
+                or peer["frame_bytes"] != peer["proposal_bytes"] + peer["receipt_bytes"]
+                or not 0 < peer["frame_bytes"] <= 4 << 20
+                or peer["original_raw_inputs"] <= 0 or peer["original_raw_inputs"] % 2 != 0
+                or peer["restored_raw_inputs"] != 0 or peer["original_presentations"] <= 0
+                or peer["presentations"] > peer["original_presentations"]
+                or peer["exact_frames"] is not True or peer["ownership_verified"] is not True
+                or peer["host_snapshot_conserved"] is not (index == 0)):
+            raise RuntimeError("public retry frame/byte/raw-input/ownership conservation differs")
+        stages = peer["stages"]
+        if not isinstance(stages, list) or len(stages) != 2:
+            raise RuntimeError("both fresh restore stages required")
+        for stage_index, stage in enumerate(stages):
+            if (not isinstance(stage, dict)
+                    or set(stage) != {"phase", "exact_restore", "preconnection_retry_rejected"}
+                    or stage["phase"] != ("checkpoint", "disconnected_restore")[stage_index]
+                    or stage["exact_restore"] is not True or stage["preconnection_retry_rejected"] is not True):
+                raise RuntimeError("public retry restore/ingress fencing evidence differs")
+        if peer["checkpoint_sha256"] == peer["before_sha256"]:
+            raise RuntimeError("real disconnected-to-connected snapshot transition required")
+        if index == 0:
+            if (peer["before_sha256"] != peer["after_sha256"] or peer["before_bytes"] != peer["after_bytes"]
+                    or peer["presentations"] != 0):
+                raise RuntimeError("authority exact snapshot and presentation conservation required")
+        elif peer["before_sha256"] == peer["after_sha256"]:
+            raise RuntimeError("replica pending receipt must actually change its retained state")
+    authority, replica = value["peers"]
+    if any(authority[key] != replica[key] for key in ("proposal_bytes", "proposal_sha256", "receipt_bytes", "receipt_sha256",
+                                                     "lifecycle_sha256", "ledger_sha256")):
+        raise RuntimeError("actual peer wire and committed lifecycle/ledger bindings differ")
+    # These hashes bind assertions made by the source-verified actual browser
+    # producer. No full snapshots or receipt bytes are attached for independent
+    # reconstruction here; do not upgrade these facts into that stronger claim.
+    return value
+
 def execute_prepared(summary, *, install_chromium=True):
     """Same assertions and actual journeys for F and same-candidate integration."""
     sha = os.environ["GITHUB_SHA"]
@@ -134,8 +256,8 @@ def execute_prepared(summary, *, install_chromium=True):
             collect(child)
     for suite in report.get("suites", []):
         collect(suite)
-    if report.get("errors") or len(specs) != 2 or [spec["title"] for spec in specs] != IDS:
-        raise RuntimeError("both exact natural browser journeys required")
+    if report.get("errors") or len(specs) != 3 or [spec["title"] for spec in specs] != IDS:
+        raise RuntimeError("all three exact natural browser journeys required")
     evidence = []
     for index, spec in enumerate(specs):
         if spec.get("file") not in (SPEC, Path(SPEC).name) or len(spec.get("tests", [])) != 1:
@@ -145,6 +267,9 @@ def execute_prepared(summary, *, install_chromium=True):
         if (test.get("projectName") != "chromium" or test.get("status") != "expected" or len(results) != 1
                 or results[0].get("status") != "passed" or results[0].get("retry") != 0):
             raise RuntimeError("no failed, skipped, flaky, retried or missing browser journey")
+        if index == 2:
+            evidence.append(validate_public_retry(results[0], summary, rtc, sha))
+            continue
         attachments = [item for item in results[0].get("attachments", []) if item.get("name") == "m9e-natural-coop-startup"]
         if len(attachments) != 1 or attachments[0].get("contentType") != "application/json":
             raise RuntimeError("sole actual startup evidence required")
@@ -181,14 +306,14 @@ def execute_prepared(summary, *, install_chromium=True):
     if any(digest(OUTPUT / path) != expected for path, expected in retained.items()):
         raise RuntimeError("actual platform inputs changed during execution")
     summary["browser_evidence"] = evidence
-    summary["tests"] = {"passed": 2, "failed": 0, "skipped": 0, "ids": IDS}
+    summary["tests"] = {"passed": 3, "failed": 0, "skipped": 0, "ids": IDS}
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "qualification": "focused natural RTC startup and complete capsule replay in fresh Workers; not integration or M9 qualification"}
+               "qualification": "focused natural RTC startup, complete capsule replay and public pending retry after disconnected restore in fresh Workers; not integration or M9 qualification"}
     try:
         main(summary)
         if time.monotonic() > DEADLINE:
