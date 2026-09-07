@@ -753,9 +753,12 @@ fn execute_battle(
         {
             return Err(GameRuntimeV6Error::Action);
         }
+        // PartyIndex is the six-slot index within the controlling seat's party.
         let replacement = run
             .party
-            .get(usize::from(party_slot.get()))
+            .iter()
+            .filter(|pokemon| pokemon.owner_seat == Some(owner))
+            .nth(usize::from(party_slot.get()))
             .filter(|pokemon| {
                 !pokemon.fainted && pokemon.hp > 0 && pokemon.owner_seat == Some(owner)
             })
@@ -2282,7 +2285,12 @@ fn install_battle_replacement_control(
         return Err(GameRuntimeV6Error::Action);
     }
     let mut options = Vec::new();
-    for (index, pokemon) in run.party.iter().enumerate() {
+    for (index, pokemon) in run
+        .party
+        .iter()
+        .filter(|pokemon| pokemon.owner_seat == Some(owner))
+        .enumerate()
+    {
         if pokemon.fainted
             || pokemon.hp == 0
             || pokemon.owner_seat != Some(owner)
