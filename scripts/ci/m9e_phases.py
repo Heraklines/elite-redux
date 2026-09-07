@@ -29,6 +29,8 @@ NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "progression_test": "rust/crates/er-kernel/tests/m9e_natural_progression_v7.rs",
+    "progression_source": "rust/crates/er-progression/src/progression.rs",
     "replacement_test": "rust/crates/er-kernel/tests/m9e_natural_replacement_v7.rs",
     "recovery_selftests": "scripts/ci/test_m9e_recovery_integration.py",
     "ai_commands_test": "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs",

@@ -5077,6 +5077,7 @@ class FeedbackTests(unittest.TestCase):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
         self.package("er-game")
+        self.package("er-progression")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
@@ -5090,7 +5091,7 @@ class FeedbackTests(unittest.TestCase):
     def test_recovery_composition_keeps_all_exact_regressions_and_platform_obligations(self):
         self.configure_recovery_integration_scope()
         selection = self.feedback.plan()
-        for key in ("current_recovery_integration", "requires_natural_replacement",
+        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression",
                     "requires_ai_command_transaction", "requires_current_coop_startup",
                     "requires_browser", "requires_wasm", "requires_browser_rtc",
                     "requires_browser_worker", "requires_cli_executable", "requires_worker_executable"):
@@ -5098,7 +5099,8 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
         for target, ids in ((self.feedback.AI_COMMAND_TARGET, self.feedback.AI_COMMAND_IDS),
-                            (self.feedback.REPLACEMENT_TARGET, self.feedback.REPLACEMENT_IDS)):
+                            (self.feedback.REPLACEMENT_TARGET, self.feedback.REPLACEMENT_IDS),
+                            (self.feedback.PROGRESSION_TARGET, self.feedback.PROGRESSION_IDS)):
             self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + target], ids)
             self.assertIn(target, selection["execution_scope"]["er-kernel"])
             self.assertEqual(selection["required_native_targets"]["er-kernel"].count(target), 1)
@@ -5113,6 +5115,17 @@ class FeedbackTests(unittest.TestCase):
         self.assertTrue(selection["requires_natural_replacement"])
         self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.REPLACEMENT_TARGET],
                          self.feedback.REPLACEMENT_IDS)
+
+    def test_progression_remains_required_after_later_ai_change(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_recovery_integration"])
+        self.assertTrue(selection["requires_natural_progression"])
+        self.assertEqual(selection["required_native_test_ids"]["er-kernel:" + self.feedback.PROGRESSION_TARGET],
+                         self.feedback.PROGRESSION_IDS)
+        self.assertEqual(selection["required_native_targets"]["er-kernel"].count(self.feedback.PROGRESSION_TARGET), 1)
+        self.assertIn(self.feedback.PROGRESSION_TARGET, selection["execution_scope"]["er-kernel"])
 
     def configure_ai_command_transaction_scope(self):
         self.configure_ai_max_pp_scope()
