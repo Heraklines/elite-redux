@@ -9,7 +9,7 @@ use er_kernel::game_kernel_v7::GameKernelV7;
 use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
-use er_kernel::snapshot::KernelSchedulerSnapshotV2;
+use er_kernel::snapshot::TimeClassPauseSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
@@ -800,13 +800,17 @@ fn rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners() 
 fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_pause() -> TestResult {
     let (host, mut guest) = pair()?;
     let mut initial = host.snapshot()?;
-    let mut scheduler = initial.scheduler.clone().into_scheduler()?;
+    let mut scheduler = er_protocol::KernelScheduler::new();
     scheduler.pause_class(
         SeatId::new(safe(1)),
         TimeClass::Connected,
         "independent-native-owner",
     )?;
-    initial.scheduler = KernelSchedulerSnapshotV2::from_scheduler(&scheduler)?;
+    // Use the public scheduler to create the unrelated owner's actual pause.
+    // Preserve every existing timer/allocator and restore through normal validation.
+    initial.scheduler.pauses.extend(scheduler.export_restorable_state().pauses.into_iter().map(|pause| TimeClassPauseSnapshotV2 {
+        endpoint: pause.endpoint, time_class: pause.time_class, reasons: pause.reasons,
+    }));
     let mut host = GameKernelV7::from_snapshot(
         initial,
         SeatId::new(safe(1)),
