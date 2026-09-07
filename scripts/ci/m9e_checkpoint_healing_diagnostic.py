@@ -79,6 +79,7 @@ def main(summary):
     if len(versions) != 1:
         raise RuntimeError("pinned compiler identity differs")
     summary["toolchain"] = versions[0]
+    run(["cargo", "clippy", "--locked", "-p", "er-game", "--all-targets", "--no-deps", "--", "-D", "warnings"], "clippy-game")
     run(["cargo", "clippy", "--locked", "-p", "er-kernel", "--test", TEST_TARGET, "--no-deps", "--", "-D", "warnings"], "clippy-test")
     build = run(["cargo", "test", "--locked", "-p", "er-kernel", "--test", TEST_TARGET,
                  "--no-run", "--message-format=json"], "build")
