@@ -109,7 +109,12 @@ jobs:
               details = {'source': summary['product_sha'], 'peer_source': expected['product_sha'],
                   'run': expected['run_id'], 'failure': summary['first_failure'], 'tests': summary['tests'],
                   'same_plan': summary['plan'] == previous['plan'],
-                  'same_inventory': summary['native_inventory'] == previous['inventory']}
+                  'same_inventory': summary['native_inventory'] == previous['inventory'],
+                  'inventory_counts': [len(summary['native_inventory']), len(previous['inventory'])],
+                  'differences': [{'a_keys': sorted(a), 'b_keys': sorted(b), 'a_target': [a.get('crate'), a.get('target')],
+                      'b_target': [b.get('crate'), b.get('target')], 'same_ids': a.get('ids') == b.get('ids'),
+                      'a_excluded': a.get('historical_excluded_ids'), 'b_excluded': b.get('historical_excluded_ids')}
+                      for a, b in zip(summary['native_inventory'], previous['inventory']) if a != b][:3]}
               raise RuntimeError('actual A failure or shared native evidence differs: ' + json.dumps(details, sort_keys=True))
           # Reconstruct export_native's metadata from its captured full summary.
           # This checks serialization only; it never promotes the failed run.

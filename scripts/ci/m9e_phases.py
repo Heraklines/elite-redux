@@ -293,7 +293,7 @@ def unpack_native_ids(value):
 
 
 def pack_native_inventory(value):
-    """Compress only ID lists when the unchanged indexed proof cannot fit.
+    """Compress ID lists, then the complete indexed proof only if still needed.
 
     Inline/v1 output stays byte-identical. Invalid or over-expanded proofs are
     not repaired by compression; write_bounded retains its wire-size failure.
@@ -317,6 +317,8 @@ def pack_native_inventory(value):
     # even with ID compression. Compress the indexed proof as one bounded
     # stream; preserve every field and the existing 192 KiB semantic limit.
     raw = encoded(indexed)
+    if len(raw) > NATIVE_PROOF_LIMIT:
+        return compressed_ids
     return {"encoding": NATIVE_COMPRESSED_PROOF_ENCODING, "decoded_bytes": len(raw),
             "data": base64.b64encode(zlib.compress(raw, level=9)).decode("ascii")}
 
