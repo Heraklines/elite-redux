@@ -16,9 +16,11 @@ use er_state::m7_state::{
 use er_types::battle_ids::WaveIndex;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::{GameActionV1, GameControlKindV2, SafeU53, SeatId};
+#[cfg(not(target_arch = "wasm32"))]
+use er_wasm::m9e_parity::replay_m9e_eventwise_native;
 use er_wasm::m9e_parity::{
     M9E_PARITY_REPORT_SCHEMA_VERSION_V1, M9EParityEventV2, M9EParityObservationV1,
-    M9EParityReportV1, M9EParityRequestV1, replay_m9e_eventwise_native,
+    M9EParityReportV1, M9EParityRequestV1,
 };
 
 const BUNDLE: &[u8] =
