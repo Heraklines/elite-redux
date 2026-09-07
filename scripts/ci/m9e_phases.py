@@ -30,6 +30,13 @@ NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "growth_pow_source": "rust/crates/er-progression/src/current_growth_pow.rs",
+    "growth_manifest": "rust/crates/er-progression/Cargo.toml",
+    "growth_test": "rust/crates/er-progression/tests/m9e_growth_levels.rs",
+    "growth_witness": "rust/crates/er-progression/tests/fixtures/m9e_growth_oracle.json",
+    "natural_campaign_test": "rust/crates/er-kernel/tests/m9e_natural_campaign_v7.rs",
+    "natural_replay_manifest": "rust/crates/er-repro/Cargo.toml",
+    "natural_replay_test": "rust/crates/er-repro/tests/m9e_natural_campaign_replay.rs",
     "struggle_test": "rust/crates/er-kernel/tests/m9e_struggle_v7.rs",
     "struggle_resolver": "rust/crates/er-battle/src/m7_resolver.rs",
     "struggle_snapshot": "rust/crates/er-kernel/src/snapshot_v7.rs",

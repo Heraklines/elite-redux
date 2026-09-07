@@ -22,6 +22,7 @@ def main():
             or plan.get("requires_natural_replacement") is not True
             or plan.get("requires_natural_progression") is not True
             or plan.get("requires_checkpoint_healing") is not True
+            or plan.get("requires_natural_campaign_witnesses") is not True
             or plan.get("requires_struggle") is not True
             or plan.get("requires_canonical_value_digest") is not True
             or plan["unknown_paths"] or plan["boundary_paths"]):
@@ -59,10 +60,21 @@ def main():
             or len(feedback.CANONICAL_IDS) != 32
             or plan["execution_scope"].get("er-canonical") != [feedback.CANONICAL_TARGET]):
         raise RuntimeError("the complete canonical library and both new digest tests must remain mandatory")
+    for crate, target in feedback.CAMPAIGN_TARGETS.items():
+        if (plan["required_native_targets"].get(crate, []).count(target) != 1
+                or plan["required_native_test_ids"].get(crate + ":" + target) != feedback.CAMPAIGN_TEST_IDS[crate]
+                or target not in plan["execution_scope"].get(crate, []) or crate not in plan["packages"]):
+            raise RuntimeError("all growth, natural 200-wave and replay witnesses must remain mandatory")
+    guard = plan.get("current_recovery_dependency_guard")
+    if (guard is None or guard.get("status") != "verified" or guard.get("baseline_sha") != QUALIFIED_BASELINE
+            or guard.get("dev_dependencies") != feedback.RECOVERY_DEV_EDGES
+            or guard.get("manifests") != [f"rust/crates/{crate}/Cargo.toml" for crate in feedback.RECOVERY_DEV_EDGES]
+            or guard.get("lock") != "rust/Cargo.lock"):
+        raise RuntimeError("exact three test dependencies require a complete verified guard")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 17 or set(product) != set(feedback.RECOVERY_PATHS):
-        raise RuntimeError("combined product source must be exactly the seventeen reviewed paths")
+    if len(product) != 25 or set(product) != set(feedback.RECOVERY_PATHS):
+        raise RuntimeError("combined product source must be exactly the twenty-five reviewed paths")
     inventory = [{"crate": crate, "target": target, "ids": list(ids), "historical_excluded_ids": []}
                  for (crate, target), ids in ((coop.KERNEL_TARGET, coop.KERNEL_IDS), (coop.ENTRY_TARGET, coop.ENTRY_IDS))]
     coop.validate_inventory(plan, inventory, os.environ["GITHUB_SHA"])
@@ -103,7 +115,9 @@ def main():
                         (feedback.STRUGGLE_TARGET, feedback.STRUGGLE_IDS)):
         projected["required_native_target_counts"]["er-kernel:" + target] = len(ids)
     projected["required_native_target_counts"]["er-canonical:" + feedback.CANONICAL_TARGET] = 32
-    projected["tests"] = {"selected": 699, "executed": 699, "passed": 699, "failed": 0, "skipped": 0}
+    for crate, target in feedback.CAMPAIGN_TARGETS.items():
+        projected["required_native_target_counts"][crate + ":" + target] = len(feedback.CAMPAIGN_TEST_IDS[crate])
+    projected["tests"] = {"selected": 703, "executed": 703, "passed": 703, "failed": 0, "skipped": 0}
     frozen = copy.deepcopy(projected)
     digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
     compact = phases.compact_summary(projected, digest, {})
@@ -116,7 +130,7 @@ def main():
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "compact_bytes": len(phases.encoded(compact)), "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: actual combined seventeen-path source scope, all79 prior targets, exact ten new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
+    print("Passed: actual combined twenty-five-path source scope, all79 prior targets, exact ten new kernel IDs and complete32-test canonical library, and retained co-op/platform/cost/rule/mutant obligations.")
 
 
 if __name__ == "__main__":

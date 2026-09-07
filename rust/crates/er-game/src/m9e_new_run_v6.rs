@@ -670,11 +670,9 @@ fn pokemon(
         .progression
         .growth_rate(progression.growth_rate)
         .ok_or(NaturalRunV6Error::Invalid)?;
-    let experience = growth
-        .experience_by_level
-        .get(usize::from(level.saturating_sub(1)))
-        .copied()
-        .ok_or(NaturalRunV6Error::Invalid)?;
+    let experience =
+        er_progression::progression::current_growth_experience_for_level(growth, level)
+            .map_err(|_| NaturalRunV6Error::Invalid)?;
     let mut ivs = [Iv::new(0).map_err(|_| NaturalRunV6Error::Invalid)?; 6];
     for iv in &mut ivs {
         let draw = rng

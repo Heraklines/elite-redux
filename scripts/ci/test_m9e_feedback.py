@@ -243,6 +243,7 @@ class FeedbackTests(unittest.TestCase):
         self.baseline_lock = None
         self.baseline_cli_manifest = None
         self.baseline_repro_manifest = None
+        self.baseline_progression_manifest = None
         self.baseline_batch_manifest = None
         self.capture_calls = []
         self.commands = []
@@ -288,6 +289,8 @@ class FeedbackTests(unittest.TestCase):
             return self.baseline_cli_manifest
         if args == ["git", "show", f"{BASE}:rust/crates/er-repro/Cargo.toml"] and self.baseline_repro_manifest is not None:
             return self.baseline_repro_manifest
+        if args == ["git", "show", f"{BASE}:rust/crates/er-progression/Cargo.toml"] and self.baseline_progression_manifest is not None:
+            return self.baseline_progression_manifest
         if args == ["git", "show", f"{BASE}:rust/crates/er-batch/Cargo.toml"] and self.baseline_batch_manifest is not None:
             return self.baseline_batch_manifest
         if args == ["rustc", "--version"]:
@@ -5073,11 +5076,81 @@ class FeedbackTests(unittest.TestCase):
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
         self.changed = list(policy["paths"])
 
+    @staticmethod
+    def recovery_lock_fixture(added):
+        rows = ['version = 4\n']
+        for name in ("er-progression", "er-repro", "er-battle", "er-state", "sha2"):
+            dependencies = (["sha2"] if name == "er-progression" else ["er-battle", "er-state"] if name == "er-repro" else []) if added else []
+            rows.append(f'[[package]]\nname = "{name}"\nversion = "0.1.0"\ndependencies = {json.dumps(dependencies)}\n')
+        return '\n'.join(rows)
+
+    def recovery_dependency_inputs(self):
+        return ({"er-progression": self.baseline_progression_manifest, "er-repro": self.baseline_repro_manifest},
+                {crate: (self.rust / f"crates/{crate}/Cargo.toml").read_text() for crate in self.feedback.RECOVERY_DEV_EDGES},
+                self.baseline_lock, (self.rust / "Cargo.lock").read_text())
+
+    def test_recovery_test_dependency_guard_accepts_only_reviewed_dev_edges(self):
+        self.configure_recovery_integration_scope()
+        before = self.recovery_dependency_inputs()
+        result = self.feedback.recovery_dependency_guard(*before)
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(result["dev_dependencies"], self.feedback.RECOVERY_DEV_EDGES)
+        self.assertEqual(before, self.recovery_dependency_inputs())
+        selection = self.feedback.plan()
+        self.assertEqual(selection["current_recovery_dependency_guard"], {**result, "baseline_sha": BASE})
+        self.assertIsNone(selection["current_coop_dependency_guard"])
+
+    def test_recovery_test_dependency_guard_rejects_manifest_neighbors(self):
+        self.configure_recovery_integration_scope()
+        original = self.recovery_dependency_inputs()
+        for crate, replacement in (("er-progression", '[dependencies]'), ("er-repro", '[dependencies]')):
+            args = copy.deepcopy(original)
+            args[1][crate] = args[1][crate].replace('[dev-dependencies]', replacement)
+            with self.assertRaisesRegex(RuntimeError, "manifest"):
+                self.feedback.recovery_dependency_guard(*args)
+        for crate in self.feedback.RECOVERY_DEV_EDGES:
+            args = copy.deepcopy(original)
+            args[1][crate] += '\n[features]\nunreviewed = []\n'
+            with self.assertRaisesRegex(RuntimeError, "manifest"):
+                self.feedback.recovery_dependency_guard(*args)
+
+    def test_recovery_test_dependency_guard_rejects_lock_neighbors(self):
+        self.configure_recovery_integration_scope()
+        original = self.recovery_dependency_inputs()
+        for replacement in (original[3].replace('version = "0.1.0"', 'version = "0.2.0"', 1),
+                            original[3].replace('["er-battle", "er-state"]', '["er-state"]'),
+                            original[3] + '\n[[package]]\nname = "unreviewed"\nversion = "1.0.0"\n'):
+            with self.assertRaisesRegex(RuntimeError, "lock"):
+                self.feedback.recovery_dependency_guard(*original[:3], replacement)
+        missing = original[2].replace('name = "sha2"', 'name = "missing"')
+        with self.assertRaisesRegex(RuntimeError, "already exist"):
+            self.feedback.recovery_dependency_guard(original[0], original[1], missing, original[3])
+
+    def test_recovery_plan_does_not_bypass_guard_for_coop_composition(self):
+        self.configure_recovery_integration_scope()
+        path = self.rust / "crates/er-repro/Cargo.toml"
+        path.write_text(path.read_text().replace('../er-state', '../er-game'))
+        with self.assertRaisesRegex(RuntimeError, "manifest"):
+            self.feedback.plan()
+
+    def test_campaign_witnesses_remain_required_after_later_ai_change(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_natural_campaign_witnesses"])
+        self.assertIsNone(selection["current_recovery_dependency_guard"])
+        for crate, target in self.feedback.CAMPAIGN_TARGETS.items():
+            self.assertIn(crate, selection["packages"])
+            self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
+            self.assertEqual(selection["required_native_test_ids"][crate + ":" + target], self.feedback.CAMPAIGN_TEST_IDS[crate])
+            self.assertIn(target, selection["execution_scope"][crate])
+
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
         self.package("er-game")
         self.package("er-progression")
+        self.package("er-repro")
         self.package("er-wasm")
         self.package("er-battle")
         self.package("er-canonical")
@@ -5090,12 +5163,18 @@ class FeedbackTests(unittest.TestCase):
                 path.write_text("bounded synthetic source for planner test\n")
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
         rule_fixture(self.root)
+        self.baseline_progression_manifest = (self.rust / "crates/er-progression/Cargo.toml").read_text()
+        self.baseline_repro_manifest = (self.rust / "crates/er-repro/Cargo.toml").read_text()
+        self.baseline_lock = self.recovery_lock_fixture(False)
+        (self.rust / "Cargo.lock").write_text(self.recovery_lock_fixture(True))
+        (self.rust / "crates/er-progression/Cargo.toml").write_text(self.baseline_progression_manifest + '\n[dev-dependencies]\nsha2.workspace = true\n')
+        (self.rust / "crates/er-repro/Cargo.toml").write_text(self.baseline_repro_manifest + '\n[dev-dependencies]\ner-battle = { path = "../er-battle" }\ner-state = { path = "../er-state" }\n')
         self.changed = list(self.feedback.RECOVERY_PATHS)
 
     def test_recovery_composition_keeps_all_exact_regressions_and_platform_obligations(self):
         self.configure_recovery_integration_scope()
         selection = self.feedback.plan()
-        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression", "requires_checkpoint_healing", "requires_canonical_value_digest", "requires_struggle",
+        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression", "requires_checkpoint_healing", "requires_canonical_value_digest", "requires_struggle", "requires_natural_campaign_witnesses",
                     "requires_ai_command_transaction", "requires_current_coop_startup",
                     "requires_browser", "requires_wasm", "requires_browser_rtc",
                     "requires_browser_worker", "requires_cli_executable", "requires_worker_executable"):
