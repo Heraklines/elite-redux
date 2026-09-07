@@ -1,7 +1,7 @@
 name: M9E Prepared Gate Preflight
 on:
   push:
-    branches: [codex/m9e-coop-public-retry-preflight-20260907]
+    branches: [codex/m9e-coop-public-retry-browser-preflight-20260907]
 permissions:
   contents: read
   actions: read
@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '432'
+      M9E_EXPECTED_TESTS: '440'
     steps:
       - uses: actions/checkout@v6
         with:

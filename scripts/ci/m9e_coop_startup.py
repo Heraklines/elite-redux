@@ -23,7 +23,8 @@ KERNEL_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_pre
               "owned_startup_rejects_forged_frames_and_snapshots_atomically"]
 ENTRY_IDS = ["current_native_cli_owned_coop_retry_replay_matches_browser_host",
              "current_process_worker_owned_coop_retry_replay_matches_browser_host"]
-BROWSER_IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready first" for seat in ("host", "guest")]
+PUBLIC_RETRY_ID = "owned natural co-op public retry recovers a pending proposal after disconnected snapshot restore through six Workers"
+BROWSER_IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready first" for seat in ("host", "guest")] + [PUBLIC_RETRY_ID]
 PRODUCT_PATHS = [
     "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs",
     "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-kernel/src/current_coop_setup_v7.rs",
@@ -254,6 +255,9 @@ def validate_lane(proof, root, partition):
 def execute_platform(feedback, identity, binding):
     """Run the qualified journeys against this platform job's existing assets."""
     import m9e_coop_rtc_diagnostic as rtc
+    if (rtc.IDS != BROWSER_IDS or len(rtc.SOURCES) != len(RTC_SOURCES)
+            or set(rtc.SOURCES) != set(RTC_SOURCES)):
+        raise RuntimeError("current co-op producer lacks the exact three browser identities or source inventory")
     rtc.ROOT = feedback.ROOT
     rtc.FULL = feedback.FULL / "coop-rtc"
     rtc.FULL.mkdir(exist_ok=False)
@@ -277,6 +281,82 @@ def execute_platform(feedback, identity, binding):
         os.environ.update(previous)
 
 
+def validate_public_retry(value, summary, rtc, sha):
+    """Validate source-bound facts; full snapshot reconstruction is not claimed."""
+    expected_keys = {"schema_version", "source_sha", "worker_sha256", "glue_sha256", "wasm_sha256",
+                     "content_sha256", "setup_manifest_sha256", "actual_workers", "generation", "recovery",
+                     "peers", "settled_retry_noop", "disposed_workers"}
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        raise RuntimeError("exact public retry evidence schema required")
+    if (type(value["schema_version"]) is not int or value["schema_version"] != 1
+            or type(value["actual_workers"]) is not int or value["actual_workers"] != 6
+            or type(value["disposed_workers"]) is not int or value["disposed_workers"] != 6
+            or type(value["generation"]) is not int or value["generation"] != 1
+            or value["settled_retry_noop"] is not True
+            or value["recovery"] != "genuine_pending_and_committed_checkpoints_then_actual_disconnected_restore"
+            or value["source_sha"] != sha
+            or value["worker_sha256"] != rtc["assets"][rtc["worker"]]["sha256"]
+            or value["setup_manifest_sha256"] != summary["setup_manifest_sha256"]
+            or set(rtc["cohort"]) != {"glue_sha256", "wasm_sha256", "content_sha256"}
+            or any(value[key] != expected for key, expected in rtc["cohort"].items())):
+        raise RuntimeError("public retry evidence differs from actual source/assets or six-Worker journey")
+    if not isinstance(value["peers"], list) or len(value["peers"]) != 2:
+        raise RuntimeError("two ordered public retry peer records required")
+    peer_keys = {"role", "stages", "checkpoint_bytes", "checkpoint_sha256", "before_bytes", "before_sha256",
+                 "after_bytes", "after_sha256", "proposal_bytes", "proposal_sha256", "receipt_bytes", "receipt_sha256",
+                 "sent", "received", "frame_bytes", "presentations", "original_presentations", "original_raw_inputs",
+                 "restored_raw_inputs", "lifecycle_sha256", "ledger_sha256", "exact_frames", "ownership_verified",
+                 "host_snapshot_conserved"}
+    hash_keys = {"checkpoint_sha256", "before_sha256", "after_sha256", "proposal_sha256", "receipt_sha256",
+                 "lifecycle_sha256", "ledger_sha256"}
+    count_keys = {"checkpoint_bytes", "before_bytes", "after_bytes", "proposal_bytes", "receipt_bytes", "sent",
+                  "received", "frame_bytes", "presentations", "original_presentations", "original_raw_inputs",
+                  "restored_raw_inputs"}
+    for index, peer in enumerate(value["peers"]):
+        if not isinstance(peer, dict) or set(peer) != peer_keys or peer["role"] != ("AUTHORITY", "REPLICA")[index]:
+            raise RuntimeError("exact ordered public retry peer schema required")
+        if (any(not isinstance(peer[key], str) or not re.fullmatch(r"[0-9a-f]{64}", peer[key]) for key in hash_keys)
+                or any(type(peer[key]) is not int or not 0 <= peer[key] <= 9007199254740991 for key in count_keys)):
+            raise RuntimeError("strict public retry hashes and safe integer counts required")
+        if (any(not 0 < peer[key] <= 16 << 20 for key in ("checkpoint_bytes", "before_bytes", "after_bytes"))
+                or not 0 < peer["proposal_bytes"] <= 16 << 10 or not 0 < peer["receipt_bytes"] <= 1 << 20
+                or peer["sent"] != 1 or peer["received"] != 1
+                or peer["sent"] + peer["received"] > 16
+                or peer["frame_bytes"] != peer["proposal_bytes"] + peer["receipt_bytes"]
+                or not 0 < peer["frame_bytes"] <= 4 << 20
+                or peer["original_raw_inputs"] <= 0 or peer["original_raw_inputs"] % 2 != 0
+                or peer["restored_raw_inputs"] != 0 or peer["original_presentations"] <= 0
+                or peer["presentations"] > peer["original_presentations"]
+                or peer["exact_frames"] is not True or peer["ownership_verified"] is not True
+                or peer["host_snapshot_conserved"] is not (index == 0)):
+            raise RuntimeError("public retry frame/byte/raw-input/ownership conservation differs")
+        stages = peer["stages"]
+        if not isinstance(stages, list) or len(stages) != 2:
+            raise RuntimeError("both fresh restore stages required")
+        for stage_index, stage in enumerate(stages):
+            if (not isinstance(stage, dict)
+                    or set(stage) != {"phase", "exact_restore", "preconnection_retry_rejected"}
+                    or stage["phase"] != ("checkpoint", "disconnected_restore")[stage_index]
+                    or stage["exact_restore"] is not True or stage["preconnection_retry_rejected"] is not True):
+                raise RuntimeError("public retry restore/ingress fencing evidence differs")
+        if peer["checkpoint_sha256"] == peer["before_sha256"]:
+            raise RuntimeError("real disconnected-to-connected snapshot transition required")
+        if index == 0:
+            if (peer["before_sha256"] != peer["after_sha256"] or peer["before_bytes"] != peer["after_bytes"]
+                    or peer["presentations"] != 0):
+                raise RuntimeError("authority exact snapshot and presentation conservation required")
+        elif peer["before_sha256"] == peer["after_sha256"]:
+            raise RuntimeError("replica pending receipt must actually change its retained state")
+    authority, replica = value["peers"]
+    if any(authority[key] != replica[key] for key in ("proposal_bytes", "proposal_sha256", "receipt_bytes", "receipt_sha256",
+                                                     "lifecycle_sha256", "ledger_sha256")):
+        raise RuntimeError("actual peer wire and committed lifecycle/ledger bindings differ")
+    # These hashes bind assertions made by the source-verified actual browser
+    # producer. No full snapshots or receipt bytes are attached for independent
+    # reconstruction here; do not upgrade these facts into that stronger claim.
+    return value
+
+
 def validate_platform(proof, native, root):
     required = native["plan"].get("requires_current_coop_startup", False)
     evidence = proof.get("current_coop_rtc")
@@ -289,7 +369,7 @@ def validate_platform(proof, native, root):
     if (not isinstance(evidence, dict) or evidence.get("status") != "passed"
             or any(evidence.get(key) != identity[target] for key, target in (
                 ("source_sha", "product_sha"), ("run_id", "run_id"), ("run_attempt", "run_attempt")))
-            or evidence.get("tests") != {"passed": 2, "failed": 0, "skipped": 0, "ids": BROWSER_IDS}):
+            or evidence.get("tests") != {"passed": 3, "failed": 0, "skipped": 0, "ids": BROWSER_IDS}):
         raise RuntimeError("current co-op platform exact completion or same-run identity differs")
     hashes = evidence.get("source_hashes", {})
     if (set(hashes) != set(RTC_SOURCES)
@@ -315,9 +395,10 @@ def validate_platform(proof, native, root):
     if evidence["setup_manifest_sha256"] != expected_setup_hash:
         raise RuntimeError("current co-op natural input manifest digest differs")
     journeys = evidence.get("browser_evidence", [])
-    if len(journeys) != 2:
-        raise RuntimeError("current co-op both real browser journeys required")
-    for index, journey in enumerate(journeys):
+    if not isinstance(journeys, list) or len(journeys) != 3:
+        raise RuntimeError("current co-op both startup journeys and public retry required")
+    validate_public_retry(journeys[2], evidence, rtc, identity["product_sha"])
+    for index, journey in enumerate(journeys[:2]):
         expected = {"source_sha": identity["product_sha"], "order": ("host", "guest")[index],
                     "actual_workers": 2, "worker_sha256": rtc["assets"][rtc["worker"]]["sha256"],
                     "setup_manifest_sha256": evidence["setup_manifest_sha256"], **rtc["cohort"],
@@ -356,7 +437,8 @@ def validate_platform(proof, native, root):
 def aggregate_reference(native, platform, native_hash, platform_hash):
     if not native["plan"].get("requires_current_coop_startup"):
         return {}
-    return {"current_coop_startup": {"status": "passed", "kernel_tests": 8, "entry_tests": 2, "rtc_tests": 2, "replay_workers": 4,
+    return {"current_coop_startup": {"status": "passed", "kernel_tests": 8, "entry_tests": 2, "rtc_tests": 3, "replay_workers": 4, "public_retry_workers": 6,
+            "public_retry_evidence_sha256": object_hash(platform["current_coop_rtc"]["browser_evidence"][2]),
             "native_manifest_sha256": native_hash, "platform_manifest_sha256": platform_hash,
             "entry_evidence_sha256": hashlib.sha256((json.dumps(native["current_coop_entry"], sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest(),
             "rtc_evidence_sha256": hashlib.sha256((json.dumps(platform["current_coop_rtc"], sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest()}}
@@ -365,4 +447,4 @@ def aggregate_reference(native, platform, native_hash, platform_hash):
 ENTRY_SOURCES = [".github/workflows/m9e-coop-entry-focused.yml","rust/Cargo.lock","rust/Cargo.toml","rust/crates/er-agent-protocol/src/lib.rs","rust/crates/er-cli/Cargo.toml","rust/crates/er-cli/src/current_agent.rs","rust/crates/er-cli/src/current_native_capture.rs","rust/crates/er-cli/src/current_worker_agent.rs","rust/crates/er-cli/tests/m9e_current_coop_startup.rs","rust/crates/er-cli/tests/support/m9e_coop_cli_process.rs","rust/crates/er-env/Cargo.toml","rust/crates/er-env/src/current.rs","rust/crates/er-game/Cargo.toml","rust/crates/er-game/src/m72_bootstrap.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel-worker/src/runtime.rs","rust/crates/er-kernel/Cargo.toml","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-repro/src/current.rs","rust/crates/er-state/src/m7_state.rs","rust/crates/er-state/src/m9e_state_v6.rs","rust/crates/er-types/src/m72_bootstrap.rs","rust/crates/er-web/Cargo.toml","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json","rust/rust-toolchain.toml","scripts/ci/m9e_coop_entry_diagnostic.py","scripts/ci/m9e_current_cost.py"]
 
 
-RTC_SOURCES = [".github/workflows/m9e-coop-rtc-focused.yml",".nvmrc","package.json","playwright.rust-browser.config.ts","pnpm-lock.yaml","rust/Cargo.lock","rust/Cargo.toml","rust/crates/er-env/src/current.rs","rust/crates/er-game/src/m72_bootstrap.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-repro/src/current.rs","rust/crates/er-web/Cargo.toml","rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs","rust/crates/er-web/examples/m9e_v7_coop_startup.rs","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/rust-toolchain.toml","scripts/build-kernel-m9e-v7-web.mjs","scripts/ci/m9e_coop_rtc_diagnostic.py","scripts/ci/m9e_current_cost.py","src/rust-browser/adapters/current-rtc-transport.ts","src/rust-browser/contracts/browser-contracts-v2.ts","src/rust-browser/contracts/browser-contracts.ts","src/rust-browser/host/current-rust-browser-host.ts","src/rust-browser/routes/browser-effects-v2.ts","src/rust-browser/routes/rust-current-rtc-entry.ts","src/rust-browser/routes/rust-current-worker-entry.ts","src/rust-browser/worker/current-rust-kernel-worker.ts","src/rust-browser/worker/rust-wasm-loader.ts","test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"]
+RTC_SOURCES = [".github/workflows/m9e-coop-rtc-focused.yml",".nvmrc","package.json","playwright.rust-browser.config.ts","pnpm-lock.yaml","rust/Cargo.lock","rust/Cargo.toml","rust/crates/er-env/src/current.rs","rust/crates/er-game/src/m72_bootstrap.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/current_proposal_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-repro/src/current.rs","rust/crates/er-web/Cargo.toml","rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs","rust/crates/er-web/examples/m9e_v7_coop_startup.rs","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/rust-toolchain.toml","scripts/build-kernel-m9e-v7-web.mjs","scripts/ci/m9e_coop_rtc_diagnostic.py","scripts/ci/m9e_current_cost.py","src/rust-browser/adapters/current-rtc-transport.ts","src/rust-browser/contracts/browser-contracts-v2.ts","src/rust-browser/contracts/browser-contracts.ts","src/rust-browser/host/current-rust-browser-host.ts","src/rust-browser/routes/browser-effects-v2.ts","src/rust-browser/routes/rust-current-rtc-entry.ts","src/rust-browser/routes/rust-current-worker-entry.ts","src/rust-browser/worker/current-rust-kernel-worker.ts","src/rust-browser/worker/rust-wasm-loader.ts","test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"]

@@ -92,6 +92,10 @@ def main():
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
     if len(product) != 34 or set(product) != set(feedback.RECOVERY_PATHS):
         raise RuntimeError("combined product source must be exactly the thirty-four reviewed paths")
+    configured_coop = json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["current_coop_startup_focus"]
+    if (configured_coop["browser_ids"] != coop.BROWSER_IDS or len(coop.BROWSER_IDS) != 3
+            or coop.BROWSER_IDS[-1] != coop.PUBLIC_RETRY_ID or len(coop.RTC_SOURCES) != 34):
+        raise RuntimeError("three exact cooperative browser journeys and complete RTC source binding required")
     inventory = [{"crate": crate, "target": target, "ids": list(ids), "historical_excluded_ids": []}
                  for (crate, target), ids in ((coop.KERNEL_TARGET, coop.KERNEL_IDS), (coop.ENTRY_TARGET, coop.ENTRY_IDS))]
     coop.validate_inventory(plan, inventory, os.environ["GITHUB_SHA"])
@@ -125,6 +129,8 @@ def main():
     projected["identity"] = phases.identity(feedback)
     projected["product_sha"] = os.environ["GITHUB_SHA"]
     projected["current_coop_startup"]["replay_workers"] = 4
+    projected["current_coop_startup"]["rtc_tests"] = 3
+    projected["current_coop_startup"]["public_retry_workers"] = 6
     projected["current_coop_startup"]["kernel_tests"] = 8
     projected["required_native_target_counts"]["er-kernel:m9e_coop_choices_v7"] = 8
     for target, ids in ((feedback.AI_COMMAND_TARGET, feedback.AI_COMMAND_IDS),
@@ -143,6 +149,17 @@ def main():
     projected["required_native_target_counts"]["er-kernel:" + feedback.COOP_RECEIPT_TARGET] = 3
     projected["native_e_manifest_sha256"] = "0" * 64
     projected["natural_cooperative_campaign"] = {"status": "passed", "tests": 1, "wave": 200, "outcome": "Victory", "profile": "opt1-debug-assertions-overflow-checks", "decisions": 2188, "proposals": 258, "materials": 1675, "presentations": 3352, "rewards": 199, "progression": 950, "native_manifest_sha256": "0" * 64, "evidence_sha256": "0" * 64}
+    # Qualified v2 fact shape is a structural projection only. No snapshots,
+    # Workers or game events execute here, and these values never enter a proof.
+    public_retry = json.loads(r'''{"actual_workers":6,"content_sha256":"640dcf079ae133fdcfb013c99109844ebbd1744cd397f705f959314c68b696e4","disposed_workers":6,"generation":1,"glue_sha256":"626ea916ae25a7e83ba1ba76094fa92fdd1b0806d702293c011f2256306ebddc","peers":[{"after_bytes":112069,"after_sha256":"2f5ea21be2eb3d2e361ed0a6ca3c3013074ac2bc3324e4523f04fe0ee4f17d15","before_bytes":112069,"before_sha256":"2f5ea21be2eb3d2e361ed0a6ca3c3013074ac2bc3324e4523f04fe0ee4f17d15","checkpoint_bytes":112148,"checkpoint_sha256":"1f020c2e8f0f5a0cb9a543a3d74d15a49c2d4c691729b8c82a5342b20501ee41","exact_frames":true,"frame_bytes":61417,"host_snapshot_conserved":true,"ledger_sha256":"b4e9dd08087ab16b007587455dde0a79d9ced884c7118000541573f88451fbe8","lifecycle_sha256":"73acf7233cda2fc1ca637ca3c24c4027a395dfd3ad980121def729935991189f","original_presentations":3,"original_raw_inputs":1444,"ownership_verified":true,"presentations":0,"proposal_bytes":314,"proposal_sha256":"8a75fc694931d558043e6d8b4e87b759813671513179b050bfb6ca6a74dae1e3","receipt_bytes":61103,"receipt_sha256":"47049fcd785a21b2d85aa207ff285ee80fda3898cc6bd368cec5f46e34b91256","received":1,"restored_raw_inputs":0,"role":"AUTHORITY","sent":1,"stages":[{"exact_restore":true,"phase":"checkpoint","preconnection_retry_rejected":true},{"exact_restore":true,"phase":"disconnected_restore","preconnection_retry_rejected":true}]},{"after_bytes":51483,"after_sha256":"c7ffbe4e9e0b12a74dcf2e44341e8f0a5d5f6462897ce1b9eb78032e879483d6","before_bytes":57204,"before_sha256":"f9719b44f7c36c311efd948fe8786ca8c4978cdd64b7276d061d41e965db3928","checkpoint_bytes":57283,"checkpoint_sha256":"a3969c481ff6e48339fc4934c83fa6b0a483b445fcb317ddfaae4a414d4aa1f8","exact_frames":true,"frame_bytes":61417,"host_snapshot_conserved":false,"ledger_sha256":"b4e9dd08087ab16b007587455dde0a79d9ced884c7118000541573f88451fbe8","lifecycle_sha256":"73acf7233cda2fc1ca637ca3c24c4027a395dfd3ad980121def729935991189f","original_presentations":3,"original_raw_inputs":1450,"ownership_verified":true,"presentations":1,"proposal_bytes":314,"proposal_sha256":"8a75fc694931d558043e6d8b4e87b759813671513179b050bfb6ca6a74dae1e3","receipt_bytes":61103,"receipt_sha256":"47049fcd785a21b2d85aa207ff285ee80fda3898cc6bd368cec5f46e34b91256","received":1,"restored_raw_inputs":0,"role":"REPLICA","sent":1,"stages":[{"exact_restore":true,"phase":"checkpoint","preconnection_retry_rejected":true},{"exact_restore":true,"phase":"disconnected_restore","preconnection_retry_rejected":true}]}],"recovery":"genuine_pending_and_committed_checkpoints_then_actual_disconnected_restore","schema_version":1,"settled_retry_noop":true,"setup_manifest_sha256":"db0a72a71dbdfeb785a38e5d254899d0a64f27dffdabf17c5caee8de8104e5ea","source_sha":"1da62ee6195673ebe7088b2b10cd5569bb12b26f","wasm_sha256":"005664a6b9cc0e9b65a0a6997fe68396b436cfeea33b7af4c57c4e0a10021388","worker_sha256":"8e43211f0fbfeea791733141a6ed0293bd00bca97041228be2f8595cd40a8674"}''')
+    public_retry["source_sha"] = os.environ["GITHUB_SHA"]
+    public_rtc = {"worker": "projection-worker", "assets": {"projection-worker": {"sha256": public_retry["worker_sha256"]}},
+                  "cohort": {key: public_retry[key] for key in ("glue_sha256", "wasm_sha256", "content_sha256")}}
+    coop.validate_public_retry(public_retry, {"setup_manifest_sha256": public_retry["setup_manifest_sha256"]},
+                               public_rtc, os.environ["GITHUB_SHA"])
+    if len(phases.encoded(public_retry)) > 16384:
+        raise RuntimeError("projected actual public retry fact shape exceeds unchanged evidence bound")
+    projected["current_coop_startup"]["public_retry_evidence_sha256"] = coop.object_hash(public_retry)
     frozen = copy.deepcopy(projected)
     digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
     compact = phases.compact_summary(projected, digest, {})
