@@ -28,7 +28,7 @@ class CampaignReplayEvidenceTests(unittest.TestCase):
                          "logs": {name: {"sha256": "c" * 64, "bytes": 1234, "elapsed_seconds": 250}
                                   for name in ("build", "execute")},
                          "campaign_replay": {"events": 7085, "segments": 3610, "presentations": 905}}
-        self.proof = {"identity": self.identity, "lane": "a", "natural_campaign_replay": self.evidence,
+        self.proof = {"identity": self.identity, "lane": "d", "natural_campaign_replay": self.evidence,
                       "plan": {"requires_natural_campaign_witnesses": True,
                                "required_native_targets": {replay.TARGET[0]: [replay.TARGET[1]]},
                                "required_native_test_ids": {":".join(replay.TARGET): replay.IDS}},
@@ -37,7 +37,7 @@ class CampaignReplayEvidenceTests(unittest.TestCase):
 
     @staticmethod
     def partition(inventory):
-        return {"a": [list(replay.TARGET)]}
+        return {"d": [list(replay.TARGET)]}
 
     def test_complete_evidence_is_conserved(self):
         original = copy.deepcopy(self.proof)
@@ -86,7 +86,7 @@ class CampaignReplayEvidenceTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 replay.validate_lane(proof, self.root, self.partition)
         with self.assertRaisesRegex(RuntimeError, "ownership"):
-            replay.validate_lane(self.proof, self.root, lambda inventory: {"a": []})
+            replay.validate_lane(self.proof, self.root, lambda inventory: {"d": []})
 
     def test_incomplete_or_over_budget_execution_is_rejected(self):
         for key, value in (("bytes", 16385), ("bytes", True), ("sha256", "bad"), ("elapsed_seconds", 601), ("elapsed_seconds", 0)):
@@ -101,9 +101,9 @@ class CampaignReplayEvidenceTests(unittest.TestCase):
                 replay.validate_evidence(evidence, self.identity, self.root)
 
     def test_override_rejects_non_owner_before_launch(self):
-        for lane, phase, ids in (("b", "native", replay.IDS), ("a", "platform", replay.IDS), ("a", "native", [])):
+        for lane, phase, ids in (("b", "native", replay.IDS), ("d", "platform", replay.IDS), ("d", "native", [])):
             with mock.patch.dict("os.environ", {"M9E_NATIVE_LANE": lane, "M9E_PHASE": phase}):
                 with mock.patch("m9e_current_cost.run_bounded") as launch:
-                    with self.assertRaisesRegex(RuntimeError, "native A"):
+                    with self.assertRaisesRegex(RuntimeError, "native D"):
                         replay.execute(self.root, self.root, self.identity, ids, 0)
                     launch.assert_not_called()

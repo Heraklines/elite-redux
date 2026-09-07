@@ -136,7 +136,8 @@ LANE_B_TARGETS = {("er-cli", "m9e_current_repro"),
 LANE_C_TARGETS = {("er-cli", "m9e_current_batch"), ("er-lab", "current_kernel_supervisor_v2"),
                   ("er-kernel", "m9e_material_retention_v7"), ("er-cli", "m9e_current_rulechange_reload"),
                  }
-LANE_D_TARGETS = {STATE_QUERY_TARGET, ("er-web", "m9e_host_v2")}
+LANE_D_TARGETS = {STATE_QUERY_TARGET, ("er-web", "m9e_host_v2"),
+                  ("er-repro", "m9e_natural_campaign_replay"), ("er-kernel-worker", "current_process_v2")}
 STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
                           STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 
@@ -1139,7 +1140,7 @@ def aggregate(feedback):
             **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native},
             **{key: third[key] for key in ("rule_worker",) if key in third},
-            **campaign_replay.aggregate_reference(native, native_hash),
+            **campaign_replay.aggregate_reference(fourth, os.environ["M9E_NATIVE_D_MANIFEST_SHA256"]),
             **coop.aggregate_reference(native, result, native_hash, os.environ["M9E_PLATFORM_MANIFEST_SHA256"])}
 
 
