@@ -252,6 +252,9 @@ def recovery_dependency_guard(before_manifests, after_manifests, before_lock, af
             "manifests": [f"rust/crates/{crate}/Cargo.toml" for crate in RECOVERY_DEV_EDGES], "lock": "rust/Cargo.lock"}
 
 
+COOP_CAMPAIGN_TARGET = "m9e_natural_coop_campaign_v7"
+COOP_CAMPAIGN_IDS = ["natural_owned_cooperative_campaign_reaches_wave_200_victory"]
+COOP_CAMPAIGN_PATH = "rust/crates/er-kernel/tests/" + COOP_CAMPAIGN_TARGET + ".rs"
 RNG_PATHS = ["rust/crates/er-rng/src/battle.rs","rust/crates/er-rng/src/phaser.rs","rust/crates/er-rng/tests/m3_rng.rs","rust/crates/er-rng/tests/m9e_shifted_utf16.rs","rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json"]
 RNG_TEST_IDS = {"er_rng":["phaser::tests::hash_uses_signed_to_int32_for_final_and_intermediate_accumulators","phaser::tests::rnd_never_mutates_the_private_seed_hash_accumulator","phaser::tests::sow_resets_the_private_hash_accumulator_before_reseeding","phaser::tests::state_setter_preserves_private_seed_hash_accumulator"],"m3_rng":["audit_fingerprints_recompute_and_tampering_is_rejected","battle_cache_resumes_then_increment_turn_resows","battle_construction_uses_wave_offset_and_sixteen_closed_character_draws","battle_draw_advances_only_the_cached_substream","callsite_failures_are_atomic_and_shifted_surrogates_are_supported","callsite_identity_is_closed_and_pinned","consuming_and_nonconsuming_raw_range_paths_are_distinct","eventual_rng_vectors_are_ingested_only_after_manifest_publication","exhausted_sequence_rolls_back_an_entire_multi_draw_shuffle","frac_uses_the_corrected_0x200000_coercion_term","integer_preserves_fractional_binary64_instead_of_coercing_to_uint","integer_range_rejects_width_above_safe_u53_before_drawing","nested_scene_and_pokemon_wrappers_emit_one_logical_entry","one_sequence_is_monotonic_across_offset_and_battle_streams","pick_and_shuffle_apply_the_selected_slice_draw_rules","pick_is_one_logical_audit_and_empty_pick_is_atomic","primitive_transition_and_integer_have_exact_golden_bits","range_turn_and_offset_rejections_are_atomic","real_range_overflow_discards_its_staged_draws","sow_is_deterministic_and_uses_utf16_code_units","speed_offset_shuffle_restores_run_and_context_with_per_swap_audits","state_boundaries_reject_noncanonical_or_poisoned_forms","state_strings_and_json_preserve_full_width_bits","wrapper_fast_paths_audit_without_swapping_or_drawing"],"m9e_shifted_utf16":["shifted_utf16_battle_draws_and_initialization_match_pinned_phaser","shifted_utf16_speed_shuffle_matches_pinned_phaser_and_restores_outer_rng"]}
 
@@ -260,8 +263,8 @@ RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs"
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
                   "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
                   "rust/crates/er-wasm/tests/m9e_parity.rs",
-                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs", *RNG_PATHS]
-RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS}
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs", *RNG_PATHS, COOP_CAMPAIGN_PATH]
+RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS, "coop_campaign_test_ids": COOP_CAMPAIGN_IDS}
 
 
 def select_recovery_scope(config, changed):
@@ -269,7 +272,7 @@ def select_recovery_scope(config, changed):
     if policy is not None and policy != RECOVERY_POLICY:
         raise RuntimeError("current recovery integration policy identities disagree")
     scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
-    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7], *RNG_PATHS)) and not scoped:
+    if any(path in changed for path in (RECOVERY_PATHS[3], PROGRESSION_PATHS[1], CHECKPOINT_PATHS[1], STRUGGLE_PATHS[3], *CAMPAIGN_PATHS[2:6], CAMPAIGN_PATHS[7], *RNG_PATHS, COOP_CAMPAIGN_PATH)) and not scoped:
         raise RuntimeError("natural replacement integration product delta is unmapped")
     return scoped, policy is not None
 
@@ -1522,6 +1525,12 @@ def plan():
             result["required_native_test_ids"] = {**result["required_native_test_ids"], crate + ":" + target: list(CAMPAIGN_TEST_IDS[crate])}
             if result["execution_scope"] is not None:
                 result["execution_scope"] = merge_targets(result["execution_scope"], {crate: [target]})
+    result["requires_natural_coop_campaign"] = campaign_required
+    if campaign_required:
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {"er-kernel": [COOP_CAMPAIGN_TARGET]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], "er-kernel:" + COOP_CAMPAIGN_TARGET: list(COOP_CAMPAIGN_IDS)}
+        if result["execution_scope"] is not None:
+            result["execution_scope"] = merge_targets(result["execution_scope"], {"er-kernel": [COOP_CAMPAIGN_TARGET]})
     rng_required = replacement_installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-rng"} & selected)
     result["requires_current_rng_witnesses"] = rng_required
     if rng_required:
@@ -2498,10 +2507,12 @@ def main(preflight_failure=None):
         import m9e_current_cost as cost
         import m9e_coop_startup as coop
         import m9e_campaign_replay as campaign_replay
+        import m9e_coop_campaign as coop_campaign
         release_identity = phase_identity(sys.modules[__name__]) if (selection.get("requires_current_cost_probe") or selection.get("requires_current_coop_startup") or selection.get("requires_natural_campaign_witnesses")) else None
         for index, binary, name, ids, cwd, excluded_ids, env in enumerated:
             coop_target = (cwd.name, name) == coop.ENTRY_TARGET
             replay_target = (cwd.name, name) == campaign_replay.TARGET
+            coop_campaign_target = (cwd.name, name) == coop_campaign.TARGET
             rule_target = (cwd.name, name) == ("er-cli", RULE_TARGET)
             rule_context = contextlib.nullcontext((env, None))
             if rule_target:
@@ -2543,6 +2554,13 @@ def main(preflight_failure=None):
                         summary["natural_campaign_replay"] = campaign_replay.execute(
                             ROOT, FULL, release_identity, ids, native_deadline)
                         code = 0
+                    elif coop_campaign_target:
+                        if (not selection.get("requires_natural_coop_campaign") or excluded_ids
+                                or "natural_cooperative_campaign" in summary):
+                            raise RuntimeError("cooperative campaign optimized override is outside its exact scope")
+                        summary["natural_cooperative_campaign"] = coop_campaign.execute(
+                            ROOT, FULL, release_identity, ids, native_deadline)
+                        code = 0
                     elif coop_target:
                         if (not selection.get("requires_current_coop_startup") or os.environ.get("M9E_PHASE") != "native"
                                 or os.environ.get("M9E_NATIVE_LANE") != "a" or excluded_ids or "current_coop_entry" in summary):
@@ -2567,6 +2585,9 @@ def main(preflight_failure=None):
                 summary.setdefault("native_target_timing_ms", {})[f"{cwd.name}:{name}"] = TIMINGS[f"execute-{index}"]
                 if replay_target:
                     actual = summary["natural_campaign_replay"]["tests"]
+                    passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
+                elif coop_campaign_target:
+                    actual = summary["natural_cooperative_campaign"]["tests"]
                     passed, failed, skipped = actual["passed"], actual["failed"], actual["skipped"]
                 elif coop_target:
                     actual = summary["current_coop_entry"]["tests"]
