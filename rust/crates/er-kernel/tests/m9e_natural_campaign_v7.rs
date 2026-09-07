@@ -199,13 +199,8 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
         if wave > maximum_wave {
             assert_eq!(wave, maximum_wave + 1, "campaign skipped a natural wave");
             maximum_wave = wave;
-            println!("campaign reached wave={wave} at decision={step_index}");
         }
         if run.outcome != RunOutcome::InProgress {
-            println!(
-                "campaign terminal wave={wave} outcome={:?} decisions={step_index}",
-                run.outcome
-            );
             assert_eq!(wave, 200, "short campaign is not the full policy witness");
             assert_eq!(run.outcome, RunOutcome::Victory, "campaign did not win");
             assert!(
