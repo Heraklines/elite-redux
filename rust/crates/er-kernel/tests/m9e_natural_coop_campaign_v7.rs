@@ -645,7 +645,9 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
             host = restored(&host, content.clone(), true)?;
             guest = restored(&guest, content.clone(), false)?;
             assert_eq!(host.state(), guest.state());
-            println!("M9E_NATURAL_COOP_CAMPAIGN wave=200 outcome=Victory decisions={decision} proposals={proposals} materials={materials} presentations={settled} rewards={rewards} progression={progression}");
+            println!(
+                "M9E_NATURAL_COOP_CAMPAIGN wave=200 outcome=Victory decisions={decision} proposals={proposals} materials={materials} presentations={settled} rewards={rewards} progression={progression} replacements={replacements} fainted_enemy={saw_fainted_enemy}"
+            );
             return Ok(());
         }
         assert_eq!(
@@ -716,4 +718,3 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
     }
     Err(format!("natural cooperative decisions exhausted at wave={maximum_wave}").into())
 }
-

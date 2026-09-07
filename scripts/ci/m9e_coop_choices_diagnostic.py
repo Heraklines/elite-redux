@@ -20,14 +20,7 @@ RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-ker
                 "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
                 "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs"]
 TEST_TARGET = "m9e_natural_coop_campaign_v7"
-TEST_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_preserve_host",
-            "constructed_cooperative_victory_preserves_each_seat_on_next_wave",
-            "invalid_peer_choices_preserve_entire_state_rng_and_allocator",
-            "natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect",
-            "natural_cooperative_fixed_party_replaces_guest_and_converges_to_defeat",
-            "natural_cooperative_switches_use_each_seats_complete_party_without_cross_owner_choices",
-            "natural_owned_startup_waits_for_both_orders_restores_and_retries_without_reexecution",
-            "owned_startup_rejects_forged_frames_and_snapshots_atomically"]
+TEST_IDS = ["natural_owned_cooperative_campaign_reaches_wave_200_victory"]
 sequence = 0
 logs = {}
 failed_log = None
