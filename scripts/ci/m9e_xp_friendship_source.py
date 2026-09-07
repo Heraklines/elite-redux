@@ -71,8 +71,9 @@ def main():
                     for index, item in enumerate(value):
                         select(item, path + "/" + str(index))
             select(decoded, "")
-            require(1 <= len(selected_values) <= 100, "review exact tuning selector")
-            excerpt = (json.dumps(selected_values, sort_keys=True, indent=2) + "\n").encode()
+            require(len(selected_values) <= 100, "review exact tuning selector")
+            excerpt = raw if len(raw) <= 24576 else (json.dumps(selected_values, sort_keys=True, indent=2) + "\n").encode()
+            receipt["complete_json_in_excerpt"] = len(raw) <= 24576
             matches, groups = [], []
             receipt["selected_json_paths"] = sorted(selected_values)
         else:
