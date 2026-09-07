@@ -29,6 +29,7 @@ NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "canonical_source": "rust/crates/er-canonical/src/lib.rs",
     "checkpoint_test": "rust/crates/er-kernel/tests/m9e_checkpoint_healing_v7.rs",
     "checkpoint_source": "rust/crates/er-game/src/m9e_new_run_v6.rs",
     "raw_parity_test": "rust/crates/er-wasm/tests/m9e_parity.rs",

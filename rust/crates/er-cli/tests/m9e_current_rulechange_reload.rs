@@ -152,11 +152,7 @@ enum RetainedExpected {
 }
 
 fn result_digest(value: &Value) -> Result<String, Box<dyn Error>> {
-    // Walk the already materialized JSON once, avoiding the generic serializer's
-    // per-object fragment copies. Hash every byte of the full canonical result;
-    // no input, field, snapshot, or semantic assertion is omitted.
-    let canonical = er_canonical::canonicalize_value(value)?;
-    Ok(er_canonical::content_digest(&canonical)?)
+    Ok(format!("{:?}", er_canonical::content_digest_value(value)?))
 }
 
 // Reap the CLI and its worker process group even if a response assertion panics.

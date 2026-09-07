@@ -5079,6 +5079,7 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-game")
         self.package("er-progression")
         self.package("er-wasm")
+        self.package("er-canonical")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
@@ -5093,7 +5094,7 @@ class FeedbackTests(unittest.TestCase):
     def test_recovery_composition_keeps_all_exact_regressions_and_platform_obligations(self):
         self.configure_recovery_integration_scope()
         selection = self.feedback.plan()
-        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression", "requires_checkpoint_healing",
+        for key in ("current_recovery_integration", "requires_natural_replacement", "requires_natural_progression", "requires_checkpoint_healing", "requires_canonical_value_digest",
                     "requires_ai_command_transaction", "requires_current_coop_startup",
                     "requires_browser", "requires_wasm", "requires_browser_rtc",
                     "requires_browser_worker", "requires_cli_executable", "requires_worker_executable"):
@@ -5140,6 +5141,17 @@ class FeedbackTests(unittest.TestCase):
                          self.feedback.CHECKPOINT_IDS)
         self.assertEqual(selection["required_native_targets"]["er-kernel"].count(self.feedback.CHECKPOINT_TARGET), 1)
         self.assertIn(self.feedback.CHECKPOINT_TARGET, selection["execution_scope"]["er-kernel"])
+
+    def test_canonical_digest_library_remains_complete_after_later_ai_change(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_canonical_value_digest"])
+        self.assertEqual(selection["required_native_test_ids"]["er-canonical:" + self.feedback.CANONICAL_TARGET],
+                         self.feedback.CANONICAL_IDS)
+        self.assertEqual(len(self.feedback.CANONICAL_IDS), 32)
+        self.assertIn(self.feedback.CANONICAL_TARGET, selection["execution_scope"]["er-canonical"])
+        self.assertIn("er-canonical", selection["packages"])
 
     def configure_ai_command_transaction_scope(self):
         self.configure_ai_max_pp_scope()
