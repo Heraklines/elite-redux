@@ -941,9 +941,12 @@ fn resolve_targets(
             // If all opponents fainted earlier in this turn, preserve the
             // existing no-hit action handling for the last occupied slot.
             .or_else(|| {
-                run.battle.as_ref()?.field.slots.iter().find(|entry| {
-                    entry.slot.side != source.side && entry.occupant.is_some()
-                })
+                run.battle
+                    .as_ref()?
+                    .field
+                    .slots
+                    .iter()
+                    .find(|entry| entry.slot.side != source.side && entry.occupant.is_some())
             })
             .map(|entry| vec![entry.slot])
             .ok_or(BattleV5Error::Target),
