@@ -78,11 +78,11 @@ def main():
             receipt["selected_json_paths"] = sorted(selected_values)
         else:
             matches = [i for i, line in enumerate(lines) if re.search(
-                r"^\s*(?:public\s+|private\s+)?(?:static\s+)?(?:applyModifier|addModifier|findModifiers|validateAchv)[^\r\n(]*\(", line)]
-            require(4 <= len(matches) <= 10, "bounded actual scene method declarations required")
+                r"applyPersistentModifierWithMoody", line)]
+            require(1 <= len(matches) <= 5, "bounded actual wrapper binding required")
             selected = set()
             for index in matches:
-                selected.update(range(max(0, index - 12), min(len(lines), index + 140)))
+                selected.update(range(max(0, index - 12), min(len(lines), index + 35)))
             groups = []
             for index in sorted(selected):
                 if not groups or index != groups[-1][-1] + 1:
