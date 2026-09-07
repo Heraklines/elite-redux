@@ -1,0 +1,29 @@
+name: M9E Pinned XP Friendship Source Inspection
+on:
+  push:
+    branches: [codex/m9e-xp-friendship-source-20260907]
+permissions:
+  contents: read
+jobs:
+  inspect-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          lfs: false
+          submodules: false
+      - name: Inspect one immutable source blob remotely
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/m9e_xp_friendship_source.py
+      - name: Bounded source excerpts and identity
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-xp-friendship-source-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-xp-friendship-source/
+          if-no-files-found: error
+          retention-days: 14
