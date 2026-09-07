@@ -734,24 +734,25 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
             .ok_or("authority admission state absent")?;
         assert_eq!(admission.capacity.get(), 64);
         assert!(admission.fingerprints.len() <= 64);
-        if proposals > 64 && !retired_rejected {
-            if let Some((_, stale)) = remembered_proposals.iter().find(|(operation, _)| {
+        if proposals > 64
+            && !retired_rejected
+            && let Some((_, stale)) = remembered_proposals.iter().find(|(operation, _)| {
                 !admission
                     .fingerprints
                     .iter()
                     .any(|entry| &entry.operation_id == operation)
-            }) {
-                assert!(host.ingest_network_frame(generation, stale).is_err());
-                assert_eq!(
-                    host.snapshot()?,
-                    snapshot,
-                    "retired proposal changed authority state"
-                );
-                host = restored(&host, content.clone(), true)?;
-                guest = restored(&guest, content.clone(), false)?;
-                assert_eq!(host.state(), guest.state());
-                retired_rejected = true;
-            }
+            })
+        {
+            assert!(host.ingest_network_frame(generation, stale).is_err());
+            assert_eq!(
+                host.snapshot()?,
+                snapshot,
+                "retired proposal changed authority state"
+            );
+            host = restored(&host, content.clone(), true)?;
+            guest = restored(&guest, content.clone(), false)?;
+            assert_eq!(host.state(), guest.state());
+            retired_rejected = true;
         }
         if let Some(battle) = host
             .state()
