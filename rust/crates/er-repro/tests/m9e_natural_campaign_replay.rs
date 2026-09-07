@@ -519,7 +519,9 @@ fn natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200
             writeln!(
                 std::io::stdout().lock(),
                 "M9E_CAMPAIGN_REPLAY events={} segments={} presentations={} wave=200 outcome=Victory",
-                kernel.position, kernel.segments, kernel.presentations
+                kernel.position,
+                kernel.segments,
+                kernel.presentations
             )?;
             return Ok(());
         }
