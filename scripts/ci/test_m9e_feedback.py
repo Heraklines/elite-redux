@@ -7844,13 +7844,13 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         third = copy.deepcopy(self.native)
-        third["lane"] = "d"
-        third["assigned_targets"] = self.phases.partition(third["inventory"])["d"]
+        third["lane"] = "e"
+        third["assigned_targets"] = self.phases.partition(third["inventory"])["e"]
         third["completed_targets"] = list(third["assigned_targets"])
         third["tests"].update(executed=1, passed=1)
         third["native_timer_parity_digest"] = None
         self.phases.validate_native(third, self.identity)
-        for lane, original in (("a", self.native), ("b", self.other), ("d", third)):
+        for lane, original in (("a", self.native), ("b", self.other), ("e", third)):
             for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b", "worker_missing", "worker_renamed"):
                 proof = copy.deepcopy(original)
                 if mode == "missing":
