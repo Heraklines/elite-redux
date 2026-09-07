@@ -1709,8 +1709,12 @@ impl GameKernelV7 {
                 return Err(GameKernelV7Error::Invalid);
             }
             owner.last_reply = Some(Box::new(
-                CurrentProposalMaterialReceiptV1::from_admission(bytes, material, owner.local.clone())
-                    .map_err(|_| GameKernelV7Error::Invalid)?,
+                CurrentProposalMaterialReceiptV1::from_admission(
+                    bytes,
+                    material,
+                    owner.local.clone(),
+                )
+                .map_err(|_| GameKernelV7Error::Invalid)?,
             ));
         }
         staged.validate()?;

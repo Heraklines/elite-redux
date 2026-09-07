@@ -244,12 +244,16 @@ pub(crate) fn validate_snapshot(
         let fingerprint = content_digest(&evidence.proposal.proposal)
             .map(|digest| format!("blake3-v1:{digest}"))
             .map_err(|_| GameKernelV7Error::Invalid)?;
-        if !protocol.proposal_admission.as_ref().is_some_and(|admission| {
-            admission.fingerprints.iter().any(|record| {
-                record.operation_id == evidence.proposal.proposal.context.operation_id
-                    && record.fingerprint == fingerprint
+        if !protocol
+            .proposal_admission
+            .as_ref()
+            .is_some_and(|admission| {
+                admission.fingerprints.iter().any(|record| {
+                    record.operation_id == evidence.proposal.proposal.context.operation_id
+                        && record.fingerprint == fingerprint
+                })
             })
-        }) {
+        {
             return Err(GameKernelV7Error::Invalid);
         }
         reply

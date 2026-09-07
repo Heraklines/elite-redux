@@ -722,11 +722,21 @@ fn owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots(
     // A test-configured one-entry admission window crosses replacement quickly.
     // Runtime state and every emitted proposal/material still come from play.
     let mut bounded = host.snapshot()?;
-    let admission = bounded.protocol.as_mut().ok_or("protocol")?
-        .proposal_admission.as_mut().ok_or("admission")?;
+    let admission = bounded
+        .protocol
+        .as_mut()
+        .ok_or("protocol")?
+        .proposal_admission
+        .as_mut()
+        .ok_or("admission")?;
     assert!(admission.fingerprints.is_empty());
     admission.capacity = safe(1);
-    host = GameKernelV7::from_snapshot(bounded, host_seat, GameKernelRoleV7::Authority, content.clone())?;
+    host = GameKernelV7::from_snapshot(
+        bounded,
+        host_seat,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
     let mut previous_proposal: Option<Vec<u8>> = None;
     for _ in 0..200 {
         for kernel in [&mut host, &mut guest] {
@@ -734,10 +744,16 @@ fn owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots(
                 kernel.settle_presentation(pending.event_id)?;
             }
         }
-        let owner = host.current_control().ok_or("control")?.owner_seat.unwrap_or(host_seat);
+        let owner = host
+            .current_control()
+            .ok_or("control")?
+            .owner_seat
+            .unwrap_or(host_seat);
         let is_host = owner == host_seat;
         let kernel = if is_host { &mut host } else { &mut guest };
-        if kernel.current_control().ok_or("control")?.kind == er_types::GameControlKindV2::BattleMove {
+        if kernel.current_control().ok_or("control")?.kind
+            == er_types::GameControlKindV2::BattleMove
+        {
             choose_play_move(kernel, &content, owner)?;
         }
         let step = play_press(kernel)?;
@@ -753,44 +769,116 @@ fn owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots(
         let raw = host.admit_game_proposal(&proposal)?;
         er_game::m9e_material_v6::GameMaterialV6::decode(&wire(&raw)?)?;
         let committed = host.snapshot()?;
-        assert_eq!(committed.protocol.as_ref().ok_or("protocol")?
-            .proposal_admission.as_ref().ok_or("admission")?.fingerprints.len(), 1);
-        let reply = committed.current_coop_setup.as_ref().ok_or("owner")?
-            .last_reply.as_ref().ok_or("retained reply")?;
+        assert_eq!(
+            committed
+                .protocol
+                .as_ref()
+                .ok_or("protocol")?
+                .proposal_admission
+                .as_ref()
+                .ok_or("admission")?
+                .fingerprints
+                .len(),
+            1
+        );
+        let reply = committed
+            .current_coop_setup
+            .as_ref()
+            .ok_or("owner")?
+            .last_reply
+            .as_ref()
+            .ok_or("retained reply")?;
         let original = reply.canonical_bytes()?;
         assert_eq!(reply.proposal_hex, current_bytes_hex_v1(&proposal));
         assert!(host.admit_game_proposal(&proposal)?.effects.is_empty());
-        assert_eq!(wire(&host.ingest_network_frame(generation, &proposal)?)?, original);
+        assert_eq!(
+            wire(&host.ingest_network_frame(generation, &proposal)?)?,
+            original
+        );
         assert_eq!(host.snapshot()?, committed);
 
         // Same real committed material, forged menu and recomputed byte digest:
         // receipt self-consistency alone must not authenticate an unadmitted input.
         let mut forged = committed.clone();
-        let forged_reply = forged.current_coop_setup.as_mut().ok_or("owner")?
-            .last_reply.as_mut().ok_or("reply")?;
+        let forged_reply = forged
+            .current_coop_setup
+            .as_mut()
+            .ok_or("owner")?
+            .last_reply
+            .as_mut()
+            .ok_or("reply")?;
         let mut altered = decode_current_proposal_v1(&proposal)?;
-        altered.proposal.context.menu_instance = er_types::battle_ids::MenuInstanceId::new(safe(9_000_000));
+        altered.proposal.context.menu_instance =
+            er_types::battle_ids::MenuInstanceId::new(safe(9_000_000));
         let altered_bytes = er_canonical::canonical_bytes(&altered)?;
         forged_reply.proposal_hex = current_bytes_hex_v1(&altered_bytes);
         forged_reply.proposal_digest = json_bytes_sha256_v1(&altered_bytes)?;
-        assert!(forged_reply.evidence().is_ok(), "mutation isolates admission identity");
-        assert!(GameKernelV7::from_snapshot(forged, host_seat, GameKernelRoleV7::Authority, content.clone()).is_err());
+        assert!(
+            forged_reply.evidence().is_ok(),
+            "mutation isolates admission identity"
+        );
+        assert!(
+            GameKernelV7::from_snapshot(
+                forged,
+                host_seat,
+                GameKernelRoleV7::Authority,
+                content.clone()
+            )
+            .is_err()
+        );
         let mut missing = committed.clone();
-        missing.protocol.as_mut().ok_or("protocol")?.proposal_admission.as_mut()
-            .ok_or("admission")?.fingerprints.clear();
-        assert!(GameKernelV7::from_snapshot(missing, host_seat, GameKernelRoleV7::Authority, content.clone()).is_err());
+        missing
+            .protocol
+            .as_mut()
+            .ok_or("protocol")?
+            .proposal_admission
+            .as_mut()
+            .ok_or("admission")?
+            .fingerprints
+            .clear();
+        assert!(
+            GameKernelV7::from_snapshot(
+                missing,
+                host_seat,
+                GameKernelRoleV7::Authority,
+                content.clone()
+            )
+            .is_err()
+        );
         let mut wrong_role = guest.snapshot()?;
-        wrong_role.current_coop_setup.as_mut().ok_or("owner")?.last_reply = Some(reply.clone());
-        assert!(GameKernelV7::from_snapshot(wrong_role, SeatId::new(safe(2)), GameKernelRoleV7::Replica, content.clone()).is_err());
-        assert!(host.ingest_network_frame(generation, &altered_bytes).is_err());
-        assert_eq!(host.snapshot()?, committed, "failed admission discarded retry owner");
+        wrong_role
+            .current_coop_setup
+            .as_mut()
+            .ok_or("owner")?
+            .last_reply = Some(reply.clone());
+        assert!(
+            GameKernelV7::from_snapshot(
+                wrong_role,
+                SeatId::new(safe(2)),
+                GameKernelRoleV7::Replica,
+                content.clone()
+            )
+            .is_err()
+        );
+        assert!(
+            host.ingest_network_frame(generation, &altered_bytes)
+                .is_err()
+        );
+        assert_eq!(
+            host.snapshot()?,
+            committed,
+            "failed admission discarded retry owner"
+        );
         host.transport_changed(generation, false)?;
         let disconnected = host.snapshot()?;
         assert!(host.ingest_network_frame(generation, &proposal).is_err());
         assert_eq!(host.snapshot()?, disconnected);
         host = restored(&host, content.clone(), true)?;
         host.transport_changed(generation, true)?;
-        assert_eq!(wire(&host.ingest_network_frame(generation, &proposal)?)?, original);
+        assert_eq!(
+            wire(&host.ingest_network_frame(generation, &proposal)?)?,
+            original
+        );
         guest.ingest_network_frame(generation, &original)?;
         assert!(guest.snapshot()?.current_proposal.is_none());
         assert_eq!(host.state(), guest.state());
