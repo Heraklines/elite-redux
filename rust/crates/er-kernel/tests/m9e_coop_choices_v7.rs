@@ -1069,7 +1069,18 @@ fn choose_combat_party(
         !starters.is_empty(),
         "no legal offered starter fits the budget"
     );
-    let selected = starters.iter().map(|id| before.catalog.starters.iter().find(|starter| starter.pokemon_id == *id).cloned().ok_or("selected starter disappeared")).collect::<Result<Vec<_>, _>>()?;
+    let selected = starters
+        .iter()
+        .map(|id| {
+            before
+                .catalog
+                .starters
+                .iter()
+                .find(|starter| starter.pokemon_id == *id)
+                .cloned()
+                .ok_or("selected starter disappeared")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     for starter in &selected {
         navigate(
             kernel,
@@ -1112,7 +1123,11 @@ fn run_natural_cooperative_battles(victory_policy: bool) -> Result<(), Box<dyn E
     let guest_seat = SeatId::new(safe(2));
     let mut host = owned_title(content.clone(), true)?;
     let mut guest = owned_title(content.clone(), false)?;
-    let choose = if victory_policy { choose_combat_party } else { choose_owned };
+    let choose = if victory_policy {
+        choose_combat_party
+    } else {
+        choose_owned
+    };
     let (guest_choices, frames) = choose(&mut guest, &content, false)?;
     let (host_choices, waiting) = choose(&mut host, &content, true)?;
     assert!(waiting.is_empty() && host.state().is_none());
@@ -1161,7 +1176,11 @@ fn run_natural_cooperative_battles(victory_policy: bool) -> Result<(), Box<dyn E
             assert!(replacements > 0 && saw_fainted_enemy);
             assert!(proposals >= 2 && materials >= 4 && settled >= 4);
             assert!(retained_human_commands >= 2);
-            assert!(run.party.iter().all(|pokemon| pokemon.fainted && pokemon.hp == 0));
+            assert!(
+                run.party
+                    .iter()
+                    .all(|pokemon| pokemon.fainted && pokemon.hp == 0)
+            );
             assert_eq!(host.state(), guest.state());
             host = restored(&host, content.clone(), true)?;
             guest = restored(&guest, content.clone(), false)?;
@@ -1199,7 +1218,10 @@ fn run_natural_cooperative_battles(victory_policy: bool) -> Result<(), Box<dyn E
             continue;
         }
         if wave == 3 {
-            assert!(victory_policy, "fixed loss policy unexpectedly reached two victories");
+            assert!(
+                victory_policy,
+                "fixed loss policy unexpectedly reached two victories"
+            );
             assert!(disconnected && proposals >= 2 && materials >= 4 && settled >= 4);
             assert!(rewards >= 2 && progression >= 2 && retained_human_commands >= 2);
             host = restored(&host, content.clone(), true)?;
@@ -1249,12 +1271,14 @@ fn run_natural_cooperative_battles(victory_policy: bool) -> Result<(), Box<dyn E
 /// Preserves the original fixed catalog choices that exposed guest replacement
 /// ownership and dead enemy AI bugs. Natural defeat is a complete terminal trace.
 #[test]
-fn natural_cooperative_fixed_party_replaces_guest_and_converges_to_defeat() -> Result<(), Box<dyn Error>> {
+fn natural_cooperative_fixed_party_replaces_guest_and_converges_to_defeat()
+-> Result<(), Box<dyn Error>> {
     run_natural_cooperative_battles(false)
 }
 
 /// A separate catalog-only party policy must win twice; no retries or seed search.
 #[test]
-fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect() -> Result<(), Box<dyn Error>> {
+fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect()
+-> Result<(), Box<dyn Error>> {
     run_natural_cooperative_battles(true)
 }
