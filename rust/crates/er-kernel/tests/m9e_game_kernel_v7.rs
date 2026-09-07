@@ -914,6 +914,14 @@ fn authority_ai_can_choose_a_legal_enemy_switch() -> Result<(), Box<dyn Error>> 
         return Err("natural run snapshot is not active".into());
     };
     let run = state.active_run.as_mut().ok_or("run missing")?;
+    // Struggle is now a legal damaging fallback. Keep this explicitly
+    // constructed target above its knockout threshold so the pinned policy
+    // can still prefer the available switch over a low-power attack.
+    for pokemon in &mut run.party {
+        pokemon.hp = 400;
+        pokemon.max_hp = 400;
+        pokemon.stats.hp = 400;
+    }
     let battle = run.battle.as_mut().ok_or("battle missing")?;
     let active_id = battle.enemy_party[0].id;
     for slot in battle.enemy_party[0].moves.iter_mut().flatten() {
