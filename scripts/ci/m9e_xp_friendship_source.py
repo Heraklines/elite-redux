@@ -78,11 +78,11 @@ def main():
             receipt["selected_json_paths"] = sorted(selected_values)
         else:
             matches = [i for i, line in enumerate(lines) if re.search(
-                r"^\s*(?:public\s+|private\s+)?(?:static\s+)?(?:getRootStarterSpeciesId|getStarterDataEntry)\s*\(", line)]
-            require(len(matches) == 2, "exact two starter resolver definitions required")
+                r"^\s*(?:public\s+|private\s+)?(?:static\s+)?(?:applyModifier|addModifier|findModifiers|validateAchv)[^\r\n(]*\(", line)]
+            require(4 <= len(matches) <= 10, "bounded actual scene method declarations required")
             selected = set()
             for index in matches:
-                selected.update(range(max(0, index - 12), min(len(lines), index + 100)))
+                selected.update(range(max(0, index - 12), min(len(lines), index + 140)))
             groups = []
             for index in sorted(selected):
                 if not groups or index != groups[-1][-1] + 1:
@@ -91,7 +91,7 @@ def main():
             excerpt = "".join(
                 f"\n// {PATH}: lines {group[0] + 1}-{group[-1] + 1}\n"
                 + "".join(f"{i + 1:05d}: {lines[i]}" for i in group) for group in groups).encode()
-        require(len(excerpt) <= 24576, "each selected excerpt exceeds local routine bound")
+        require(len(excerpt) <= 49152, "selected scene methods exceed local routine bound")
         (OUT / "source-excerpt.txt").write_bytes(excerpt)
         receipt.update(status="passed", bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
                        total_lines=len(lines), matched_lines=[i + 1 for i in matches],
@@ -112,8 +112,7 @@ def main():
 if __name__ == "__main__":
     base_output = OUT
     for label, source_path, source_oid in [
-        ("starter-resolvers", "src/system/game-data.ts", "b88d78bbcf0e36c937af4fa30e45e73d7e5aea90"),
-        ("friendship-tuning", "src/data/elite-redux/er-balance-tuning.json", "04755b16e916c3e364917b67a9718cf0ee01ae6b"),
+        ("scene-dispatch", "src/battle-scene.ts", "f82f401d9e47d839413b65e8080b00feff80cb5f"),
     ]:
         PATH, OID, OUT = source_path, source_oid, base_output / label
         OUT.parent.mkdir(exist_ok=True)
