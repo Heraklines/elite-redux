@@ -183,6 +183,7 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
     for _ in 0..4 {
         press(&mut kernel, PhysicalKey::Space)?;
     }
+    let mut recent_decisions = std::collections::VecDeque::new();
     let mut maximum_wave = 0;
     let mut saw_reward = false;
     let mut saw_progression = false;
@@ -200,8 +201,51 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
             assert_eq!(wave, maximum_wave + 1, "campaign skipped a natural wave");
             maximum_wave = wave;
         }
+        let party = run
+            .party
+            .iter()
+            .map(|pokemon| {
+                (
+                    pokemon.id,
+                    pokemon.species_id,
+                    pokemon.level,
+                    pokemon.hp,
+                    pokemon.stats,
+                    pokemon.moves,
+                )
+            })
+            .collect::<Vec<_>>();
+        let enemy = run
+            .battle
+            .as_ref()
+            .map(|battle| {
+                battle
+                    .enemy_party
+                    .iter()
+                    .map(|pokemon| {
+                        (
+                            pokemon.id,
+                            pokemon.species_id,
+                            pokemon.level,
+                            pokemon.hp,
+                            pokemon.stats,
+                            pokemon.moves,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if recent_decisions.len() == 8 {
+            recent_decisions.pop_front();
+        }
+        recent_decisions.push_back(format!(
+            "decision={step_index}; wave={wave}; party={party:?}; enemy={enemy:?}"
+        ));
         if run.outcome != RunOutcome::InProgress {
-            assert_eq!(wave, 200, "short campaign is not the full policy witness");
+            assert_eq!(
+                wave, 200,
+                "short campaign is not the full policy witness: {recent_decisions:?}"
+            );
             assert_eq!(run.outcome, RunOutcome::Victory, "campaign did not win");
             assert!(
                 saw_reward && saw_progression,
