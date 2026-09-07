@@ -164,10 +164,20 @@ impl CampaignRecorder {
             self.position,
         )?;
         self.segments += 1;
-        if self.segments % 64 == 0 {
-            let wave = self.session.kernel_ref()?.state().and_then(|state| state.active_run.as_ref())
-                .map(|run| run.wave.get().get()).unwrap_or(0);
-            writeln!(std::io::stdout().lock(), "M9E_REPLAY_PROGRESS events={} segments={} wave={wave}", self.position, self.segments)?;
+        if self.segments.is_multiple_of(64) {
+            let wave = self
+                .session
+                .kernel_ref()?
+                .state()
+                .and_then(|state| state.active_run.as_ref())
+                .map(|run| run.wave.get().get())
+                .unwrap_or(0);
+            writeln!(
+                std::io::stdout().lock(),
+                "M9E_REPLAY_PROGRESS events={} segments={} wave={wave}",
+                self.position,
+                self.segments
+            )?;
         }
         Ok(())
     }
@@ -227,7 +237,9 @@ fn navigate_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dy
     // Preserve the same starter/move choices without walking the long way
     // around the catalog or omitting any event from causal recording.
     let route = {
-        let menu = kernel.current_control().and_then(|control| control.menu.as_ref())
+        let menu = kernel
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
             .ok_or("current control has no menu")?;
         let start = menu.selected_option_id.as_str();
         let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();
@@ -257,7 +269,9 @@ fn navigate_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dy
         let mut keys = Vec::new();
         let mut cursor = option;
         while cursor != start {
-            let (parent, key) = previous.get(cursor).ok_or("offered option is not reachable")?;
+            let (parent, key) = previous
+                .get(cursor)
+                .ok_or("offered option is not reachable")?;
             keys.push(key.clone());
             cursor = parent;
         }
@@ -267,8 +281,11 @@ fn navigate_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dy
     for key in route {
         press(kernel, key)?;
     }
-    if !kernel.current_control().and_then(|control| control.menu.as_ref())
-        .is_some_and(|menu| menu.selected_option_id == option) {
+    if !kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .is_some_and(|menu| menu.selected_option_id == option)
+    {
         return Err("raw navigation did not reach its offered option".into());
     }
     Ok(())
