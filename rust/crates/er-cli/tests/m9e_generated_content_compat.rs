@@ -191,7 +191,11 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
     assert_eq!(starters.len(), 6, "natural six-starter policy unavailable");
     for starter in &starters {
         progress(label, "select-starter", began, &starter.get().to_string())?;
-        select(cli, "source", &format!("bootstrap/starter/{}", starter.get()))?;
+        select(
+            cli,
+            "source",
+            &format!("bootstrap/starter/{}", starter.get()),
+        )?;
         press(cli, "source", PhysicalKey::Space)?;
         progress(label, "starter-selected", began, &starter.get().to_string())?;
     }
@@ -622,7 +626,12 @@ fn actual_old_and_regenerated_bundles_preserve_own_artifacts_and_reject_each_oth
         progress(label, "actual-title-save-ingress", began, "begin")?;
         save_ingress(cli, own, foreign)
             .map_err(|error| format!("{label} save_ingress: {error}"))?;
-        progress(label, "compatibility-complete", began, "all assertions passed")?;
+        progress(
+            label,
+            "compatibility-complete",
+            began,
+            "all assertions passed",
+        )?;
     }
     old_cli.finish()?;
     new_cli.finish()?;
