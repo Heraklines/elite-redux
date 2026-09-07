@@ -322,6 +322,19 @@ def validate_platform(proof, native, root):
                     "delayed_offer_ms": (12000, 0)[index], "retry_preserved_snapshots": True, "presentations": 1}
         if any(journey.get(key) != value for key, value in expected.items()):
             raise RuntimeError("current co-op actual journey, party, retry or presentation differs")
+        replay = journey.get("replay")
+        if (type(journey.get("replay_workers")) is not int or journey["replay_workers"] != 2
+                or not isinstance(replay, list) or len(replay) != 2):
+            raise RuntimeError("current co-op two fresh replay Workers required")
+        for capsule in replay:
+            if (not isinstance(capsule, dict)
+                    or set(capsule) != {"bytes", "sha256", "live_snapshot_preserved",
+                                       "full_replay_equal", "reexport_equal", "disposed"}
+                    or type(capsule.get("bytes")) is not int or not 0 < capsule["bytes"] <= 4 << 20
+                    or not valid_hash(capsule.get("sha256"))
+                    or any(capsule.get(key) is not True for key in (
+                        "live_snapshot_preserved", "full_replay_equal", "reexport_equal", "disposed"))):
+                raise RuntimeError("current co-op exact capsule replay evidence differs")
         for prefix, maximum in (("choices", 16384), ("started", 448 << 10)):
             if (type(journey.get(prefix + "_bytes")) is not int or not 0 < journey[prefix + "_bytes"] <= maximum
                     or not valid_hash(journey.get(prefix + "_sha256"))):
@@ -339,7 +352,7 @@ def validate_platform(proof, native, root):
 def aggregate_reference(native, platform, native_hash, platform_hash):
     if not native["plan"].get("requires_current_coop_startup"):
         return {}
-    return {"current_coop_startup": {"status": "passed", "kernel_tests": 4, "entry_tests": 2, "rtc_tests": 2,
+    return {"current_coop_startup": {"status": "passed", "kernel_tests": 4, "entry_tests": 2, "rtc_tests": 2, "replay_workers": 4,
             "native_manifest_sha256": native_hash, "platform_manifest_sha256": platform_hash,
             "entry_evidence_sha256": hashlib.sha256((json.dumps(native["current_coop_entry"], sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest(),
             "rtc_evidence_sha256": hashlib.sha256((json.dumps(platform["current_coop_rtc"], sort_keys=True, separators=(",", ":")) + "\n").encode()).hexdigest()}}
@@ -348,4 +361,4 @@ def aggregate_reference(native, platform, native_hash, platform_hash):
 ENTRY_SOURCES = [".github/workflows/m9e-coop-entry-focused.yml","rust/Cargo.lock","rust/Cargo.toml","rust/crates/er-agent-protocol/src/lib.rs","rust/crates/er-cli/Cargo.toml","rust/crates/er-cli/src/current_agent.rs","rust/crates/er-cli/src/current_native_capture.rs","rust/crates/er-cli/src/current_worker_agent.rs","rust/crates/er-cli/tests/m9e_current_coop_startup.rs","rust/crates/er-cli/tests/support/m9e_coop_cli_process.rs","rust/crates/er-env/Cargo.toml","rust/crates/er-env/src/current.rs","rust/crates/er-game/Cargo.toml","rust/crates/er-game/src/m72_bootstrap.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel-worker/src/runtime.rs","rust/crates/er-kernel/Cargo.toml","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-repro/src/current.rs","rust/crates/er-state/src/m7_state.rs","rust/crates/er-state/src/m9e_state_v6.rs","rust/crates/er-types/src/m72_bootstrap.rs","rust/crates/er-web/Cargo.toml","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json","rust/rust-toolchain.toml","scripts/ci/m9e_coop_entry_diagnostic.py","scripts/ci/m9e_current_cost.py"]
 
 
-RTC_SOURCES = [".github/workflows/m9e-coop-rtc-focused.yml",".nvmrc","package.json","playwright.rust-browser.config.ts","pnpm-lock.yaml","rust/Cargo.lock","rust/Cargo.toml","rust/crates/er-env/src/current.rs","rust/crates/er-game/src/m72_bootstrap.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-repro/src/current.rs","rust/crates/er-web/Cargo.toml","rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs","rust/crates/er-web/examples/m9e_v7_coop_startup.rs","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/rust-toolchain.toml","scripts/build-kernel-m9e-v7-web.mjs","scripts/ci/m9e_coop_rtc_diagnostic.py","scripts/ci/m9e_current_cost.py","src/rust-browser/adapters/current-rtc-transport.ts","src/rust-browser/contracts/browser-contracts-v2.ts","src/rust-browser/contracts/browser-contracts.ts","src/rust-browser/host/current-rust-browser-host.ts","src/rust-browser/routes/rust-current-rtc-entry.ts","src/rust-browser/routes/rust-current-worker-entry.ts","src/rust-browser/worker/current-rust-kernel-worker.ts","src/rust-browser/worker/rust-wasm-loader.ts","test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"]
+RTC_SOURCES = [".github/workflows/m9e-coop-rtc-focused.yml",".nvmrc","package.json","playwright.rust-browser.config.ts","pnpm-lock.yaml","rust/Cargo.lock","rust/Cargo.toml","rust/crates/er-env/src/current.rs","rust/crates/er-game/src/m72_bootstrap.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/src/snapshot_v7.rs","rust/crates/er-repro/src/current.rs","rust/crates/er-web/Cargo.toml","rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs","rust/crates/er-web/examples/m9e_v7_coop_startup.rs","rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/rust-toolchain.toml","scripts/build-kernel-m9e-v7-web.mjs","scripts/ci/m9e_coop_rtc_diagnostic.py","scripts/ci/m9e_current_cost.py","src/rust-browser/adapters/current-rtc-transport.ts","src/rust-browser/contracts/browser-contracts-v2.ts","src/rust-browser/contracts/browser-contracts.ts","src/rust-browser/host/current-rust-browser-host.ts","src/rust-browser/routes/browser-effects-v2.ts","src/rust-browser/routes/rust-current-rtc-entry.ts","src/rust-browser/routes/rust-current-worker-entry.ts","src/rust-browser/worker/current-rust-kernel-worker.ts","src/rust-browser/worker/rust-wasm-loader.ts","test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"]

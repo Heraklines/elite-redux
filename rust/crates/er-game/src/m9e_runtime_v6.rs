@@ -739,10 +739,26 @@ fn execute_battle(
             .active_run
             .as_mut()
             .ok_or(GameRuntimeV6Error::Action)?;
+        let owner = run.control.owner_seat.ok_or(GameRuntimeV6Error::Action)?;
+        if run.control.kind != GameControlKindV2::BattleReplacement
+            || !run.control.menu.as_ref().is_some_and(|menu| {
+                menu.options.iter().any(|option| {
+                    option.enabled
+                        && option.action
+                            == (GameActionV1::Battle {
+                                action: action.clone(),
+                            })
+                })
+            })
+        {
+            return Err(GameRuntimeV6Error::Action);
+        }
         let replacement = run
             .party
             .get(usize::from(party_slot.get()))
-            .filter(|pokemon| !pokemon.fainted)
+            .filter(|pokemon| {
+                !pokemon.fainted && pokemon.hp > 0 && pokemon.owner_seat == Some(owner)
+            })
             .map(|pokemon| pokemon.id)
             .ok_or(GameRuntimeV6Error::Action)?;
         let battle = run.battle.as_mut().ok_or(GameRuntimeV6Error::Action)?;
@@ -757,7 +773,12 @@ fn execute_battle(
         let faint = battle
             .faint_queue
             .iter_mut()
-            .find(|faint| faint.id == *occurrence && faint.slot == *field)
+            .find(|faint| {
+                faint.id == *occurrence
+                    && faint.slot == *field
+                    && faint.owner_seat == Some(owner)
+                    && faint.replacement == er_types::battle_model::ReplacementProgress::Pending
+            })
             .ok_or(GameRuntimeV6Error::Action)?;
         let slot = battle
             .field
@@ -765,8 +786,22 @@ fn execute_battle(
             .iter_mut()
             .find(|slot| slot.slot == *field)
             .ok_or(GameRuntimeV6Error::Action)?;
+        if slot.occupant != Some(faint.pokemon)
+            || !run.party.iter().any(|pokemon| {
+                pokemon.id == faint.pokemon && pokemon.fainted && pokemon.owner_seat == Some(owner)
+            })
+        {
+            return Err(GameRuntimeV6Error::Action);
+        }
         slot.occupant = Some(replacement);
         faint.replacement = er_types::battle_model::ReplacementProgress::Applied;
+        install_battle_command_control(
+            &mut candidate,
+            owner,
+            action_context.authority_seat,
+            safe_increment(action_context.authority_revision)?,
+            action_context.menu_instance,
+        )?;
         return Ok(DomainExecutionV1 {
             candidate: Some(candidate),
             ..Default::default()
@@ -784,6 +819,7 @@ fn execute_battle(
     let outcome = transition.outcome;
     let rng_audit = transition.rng_audit;
     let mut candidate = adopt_v5(before, transition.after_state)?;
+    queue_current_player_faints(before, &mut candidate, &transition.presentation)?;
     match outcome {
         BattleOutcome::Victory => {
             let final_wave = candidate
@@ -2087,6 +2123,205 @@ fn execute_reward(
     }
 }
 
+/// Current V6 battles have one fixed authority epoch; authority transfer is not
+/// supported by this domain. Record actual newly fainted players in the
+/// resolver's presentation order, using the retained battle allocator.
+fn queue_current_player_faints(
+    before: &GameStateV6,
+    candidate: &mut GameStateV6,
+    presentation: &[er_battle::m7_resolver::BattlePresentationCueV5],
+) -> Result<(), GameRuntimeV6Error> {
+    let prior = before
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let prior_battle = prior.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let battle = run.battle.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+    let mut turn_occurrence = 0_u32;
+    for cue in presentation {
+        let er_battle::m7_resolver::BattlePresentationCueV5::Fainted { pokemon: id } = cue else {
+            continue;
+        };
+        let Some(pokemon) = run.party.iter().find(|pokemon| pokemon.id == *id) else {
+            continue;
+        };
+        let owner = pokemon.owner_seat.ok_or(GameRuntimeV6Error::Action)?;
+        let slot = battle
+            .field
+            .slots
+            .iter()
+            .find(|slot| {
+                slot.slot.side == er_types::battle_ids::BattleSide::Player
+                    && slot.occupant == Some(*id)
+            })
+            .ok_or(GameRuntimeV6Error::Action)?
+            .slot;
+        if !pokemon.fainted
+            || pokemon.hp != 0
+            || !prior
+                .party
+                .iter()
+                .any(|pokemon| pokemon.id == *id && !pokemon.fainted)
+            || battle.faint_queue.iter().any(|faint| {
+                faint.pokemon == *id
+                    && faint.slot == slot
+                    && matches!(
+                        faint.replacement,
+                        er_types::battle_model::ReplacementProgress::Pending
+                            | er_types::battle_model::ReplacementProgress::Selected { .. }
+                    )
+            })
+        {
+            return Err(GameRuntimeV6Error::Action);
+        }
+        let legal = run.party.iter().any(|reserve| {
+            !reserve.fainted
+                && reserve.hp > 0
+                && reserve.owner_seat == Some(owner)
+                && !battle
+                    .field
+                    .slots
+                    .iter()
+                    .any(|slot| slot.occupant == Some(reserve.id))
+        });
+        let id = battle.next_faint_occurrence;
+        let next = er_types::battle_ids::FaintOccurrenceId::new(safe_increment(id.get())?);
+        battle
+            .faint_queue
+            .push(er_types::battle_model::FaintOccurrence {
+                id,
+                source: er_types::battle_model::FaintSource {
+                    epoch: er_types::battle_ids::AuthorityEpoch::new(
+                        SafeU53::new(1).map_err(|_| GameRuntimeV6Error::Invalid)?,
+                    ),
+                    wave: prior_battle.wave,
+                    resolved_turn: prior_battle.turn,
+                    turn_occurrence,
+                },
+                slot,
+                pokemon: pokemon.id,
+                owner_seat: Some(owner),
+                replacement: if legal {
+                    er_types::battle_model::ReplacementProgress::Pending
+                } else {
+                    er_types::battle_model::ReplacementProgress::NoLegalReplacement
+                },
+            });
+        battle.next_faint_occurrence = next;
+        turn_occurrence = turn_occurrence
+            .checked_add(1)
+            .ok_or(GameRuntimeV6Error::Invalid)?;
+    }
+    Ok(())
+}
+
+fn install_battle_replacement_control(
+    candidate: &mut GameStateV6,
+    owner: er_types::SeatId,
+    authority: er_types::SeatId,
+    revision: SafeU53,
+    base_instance: MenuInstanceId,
+) -> Result<bool, GameRuntimeV6Error> {
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let battle = run.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let Some(faint) = battle.faint_queue.iter().find(|faint| {
+        faint.slot.side == er_types::battle_ids::BattleSide::Player
+            && matches!(
+                faint.replacement,
+                er_types::battle_model::ReplacementProgress::Pending
+            )
+    }) else {
+        return Ok(false);
+    };
+    if faint.owner_seat != Some(owner)
+        || !battle
+            .field
+            .slots
+            .iter()
+            .any(|slot| slot.slot == faint.slot && slot.occupant == Some(faint.pokemon))
+        || !run.party.iter().any(|pokemon| {
+            pokemon.id == faint.pokemon && pokemon.fainted && pokemon.owner_seat == Some(owner)
+        })
+    {
+        return Err(GameRuntimeV6Error::Action);
+    }
+    let mut options = Vec::new();
+    for (index, pokemon) in run.party.iter().enumerate() {
+        if pokemon.fainted
+            || pokemon.hp == 0
+            || pokemon.owner_seat != Some(owner)
+            || battle
+                .field
+                .slots
+                .iter()
+                .any(|slot| slot.occupant == Some(pokemon.id))
+        {
+            continue;
+        }
+        let party_slot = er_types::battle_ids::PartyIndex::new(
+            u8::try_from(index).map_err(|_| GameRuntimeV6Error::Invalid)?,
+        )
+        .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        options.push((
+            format!("battle/replacement/{}", pokemon.id.get().get()),
+            GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::SelectReplacement {
+                    occurrence: faint.id,
+                    field: faint.slot,
+                    party_slot,
+                },
+            },
+        ));
+    }
+    if options.is_empty() {
+        return Err(GameRuntimeV6Error::Action);
+    }
+    let current_instance = run
+        .control
+        .menu
+        .as_ref()
+        .map(|menu| menu.instance_id)
+        .or_else(|| {
+            run.control
+                .action_context
+                .as_ref()
+                .map(|context| context.menu_instance)
+        })
+        .unwrap_or(base_instance);
+    let operation = OperationId::new(format!(
+        "m9e/battle/replacement/{}/{}/{}",
+        battle.battle_id.get().get(),
+        faint.id.get().get(),
+        revision.get()
+    ))
+    .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    let mut control = generic_vertical_control_v2(
+        MenuInstanceId::new(safe_increment(current_instance.get())?),
+        revision,
+        owner,
+        operation,
+        GameControlKindV2::BattleReplacement,
+        "m9e/battle/replacement",
+        &options,
+        GameMenuCancelV2::Disabled,
+    )
+    .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    control
+        .action_context
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Invalid)?
+        .authority_seat = authority;
+    run.control = control;
+    Ok(true)
+}
+
 fn install_battle_command_control(
     candidate: &mut GameStateV6,
     owner: er_types::SeatId,
@@ -2094,6 +2329,9 @@ fn install_battle_command_control(
     revision: SafeU53,
     base_instance: MenuInstanceId,
 ) -> Result<(), GameRuntimeV6Error> {
+    if install_battle_replacement_control(candidate, owner, authority, revision, base_instance)? {
+        return Ok(());
+    }
     let run = candidate
         .active_run
         .as_mut()
