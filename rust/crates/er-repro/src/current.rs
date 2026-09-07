@@ -7,7 +7,7 @@
 use std::io::{self, Write};
 use std::sync::Arc;
 
-use er_canonical::content_digest;
+use er_canonical::content_digest_value;
 use er_env::current::{
     CurrentExternalEvent, CurrentGameObservation, CurrentGameSession, CurrentSessionError,
 };
@@ -752,7 +752,8 @@ fn restored(
 }
 
 fn snapshot_digest(snapshot: &CoreGameKernelSnapshotV7) -> Result<String, CurrentReproErrorV1> {
-    content_digest(snapshot)
+    let value = serde_json::to_value(snapshot).map_err(|_| invalid("snapshot serialization"))?;
+    content_digest_value(&value)
         .map(|digest| format!("blake3-v1:{digest}"))
         .map_err(|_| invalid("snapshot digest"))
 }

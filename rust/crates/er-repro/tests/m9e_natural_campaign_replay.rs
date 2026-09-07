@@ -136,6 +136,12 @@ impl CampaignRecorder {
         assert_eq!(capsule.attempts.len() as u64, self.position - self.base);
         assert_eq!(*capsule.checkpoint, self.checkpoint);
         let expected = self.session.snapshot()?;
+        // Independently retain the original generic digest at every frontier.
+        // This binds old capsule bytes to the optimized production hash path.
+        assert_eq!(
+            capsule.final_snapshot_digest,
+            format!("blake3-v1:{}", er_canonical::content_digest(&expected)?)
+        );
         let expected_observation = self.session.observe()?;
         let encoded = serde_json::to_vec(&capsule)?;
         assert!(encoded.len() <= CurrentReproLimitsV1::default().maximum_bytes);

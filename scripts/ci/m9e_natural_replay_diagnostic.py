@@ -17,7 +17,7 @@ TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
 RUST_SOURCES = ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-repro/tests/m9e_natural_campaign_replay.rs",
-                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-progression/src/current_growth_pow.rs"]
+                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-progression/src/current_growth_pow.rs", "rust/crates/er-repro/src/current.rs"]
 TEST_TARGET = "m9e_natural_campaign_replay"
 TEST_IDS = ["natural_current_campaign_replays_every_external_input_and_resumes_to_wave_200"]
 sequence = 0
