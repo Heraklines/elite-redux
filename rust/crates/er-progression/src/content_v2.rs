@@ -6,7 +6,7 @@ use std::sync::Arc;
 use er_canonical::content_digest;
 use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::run_ids::GrowthRateId;
-use er_types::{CatalogHash, EvolutionId, InventoryItemId, OracleSha};
+use er_types::{CatalogHash, EvolutionId, InventoryItemId, OracleSha, SafeU53};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -70,6 +70,58 @@ pub struct CaptureBallDefinitionV2 {
     pub guaranteed: bool,
 }
 
+/// The exact sprite-key classes boosted by pinned getBaseExp(), not every mega-like name.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ExperienceBoostV2 {
+    Other,
+    Mega,
+    MegaX,
+    MegaY,
+    Primal,
+    Gigantamax,
+    Eternamax,
+}
+
+impl ExperienceBoostV2 {
+    pub fn from_source_sprite_key(key: &str) -> Self {
+        match key {
+            "mega" => Self::Mega,
+            "mega-x" => Self::MegaX,
+            "mega-y" => Self::MegaY,
+            "primal" => Self::Primal,
+            "gigantamax" => Self::Gigantamax,
+            "eternamax" => Self::Eternamax,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// Original object position in [species, ...species.forms], before compiled row numbering.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "kind",
+    content = "index",
+    deny_unknown_fields
+)]
+pub enum ExperienceSourceFormV2 {
+    Species,
+    Form(u16),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpeciesExperienceMetadataV2 {
+    /// Unadjusted object.baseExp. No getBaseExp() multiplier is baked into this value.
+    pub base_exp: SafeU53,
+    pub source_form: ExperienceSourceFormV2,
+    pub source_form_count: u16,
+    pub source_form_key: Option<String>,
+    pub source_sprite_key: String,
+    pub boost: ExperienceBoostV2,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpeciesProgressionDefinitionV2 {
@@ -82,6 +134,8 @@ pub struct SpeciesProgressionDefinitionV2 {
     pub reminder_moves: Vec<MoveId>,
     pub tm_moves: Vec<MoveId>,
     pub evolutions: Vec<EvolutionId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub experience: Option<SpeciesExperienceMetadataV2>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -115,6 +169,10 @@ pub enum ProgressionContentV2Error {
     CrossReference,
     #[error("progression V2 evolution condition is malformed")]
     Condition,
+    #[error("progression V2 XP metadata has inconsistent source form mapping or classification")]
+    ExperienceMetadata,
+    #[error("progression V2 XP lookup is unsupported without complete source metadata")]
+    ExperienceUnsupported,
     #[error("progression V2 canonical hashing failed: {0}")]
     Hash(String),
 }
@@ -180,6 +238,7 @@ impl ProgressionContentPackV2 {
         {
             return Err(ProgressionContentV2Error::Closure);
         }
+        self.validate_experience_metadata()?;
         let growth_ids = self
             .growth_rates
             .iter()
@@ -221,6 +280,60 @@ impl ProgressionContentPackV2 {
                 return Err(ProgressionContentV2Error::CrossReference);
             }
             validate_condition(&evolution.condition, known_species, known_moves)?;
+        }
+        Ok(())
+    }
+
+    fn validate_experience_metadata(&self) -> Result<(), ProgressionContentV2Error> {
+        for rows in self
+            .species
+            .chunk_by(|left, right| left.species == right.species)
+        {
+            if rows.iter().all(|row| row.experience.is_none()) {
+                continue;
+            }
+            let first = rows
+                .first()
+                .and_then(|row| row.experience.as_ref())
+                .ok_or(ProgressionContentV2Error::ExperienceMetadata)?;
+            if rows.len() != usize::from(first.source_form_count) + 1 {
+                return Err(ProgressionContentV2Error::ExperienceMetadata);
+            }
+            for (index, row) in rows.iter().enumerate() {
+                let metadata = row
+                    .experience
+                    .as_ref()
+                    .ok_or(ProgressionContentV2Error::ExperienceMetadata)?;
+                let expected_source = if index == 0 {
+                    ExperienceSourceFormV2::Species
+                } else {
+                    ExperienceSourceFormV2::Form(
+                        u16::try_from(index - 1)
+                            .map_err(|_| ProgressionContentV2Error::ExperienceMetadata)?,
+                    )
+                };
+                if usize::from(row.form) != index
+                    || metadata.source_form != expected_source
+                    || metadata.source_form_count != first.source_form_count
+                    || metadata.boost
+                        != ExperienceBoostV2::from_source_sprite_key(&metadata.source_sprite_key)
+                    || (index > 0 && metadata.source_form_key.is_none())
+                {
+                    return Err(ProgressionContentV2Error::ExperienceMetadata);
+                }
+            }
+            // PokemonSpecies.getFormSpriteKey() delegates to forms[0], when present.
+            if let Some(form) = rows.get(1) {
+                let metadata = form
+                    .experience
+                    .as_ref()
+                    .ok_or(ProgressionContentV2Error::ExperienceMetadata)?;
+                if first.source_sprite_key != metadata.source_sprite_key {
+                    return Err(ProgressionContentV2Error::ExperienceMetadata);
+                }
+            } else if !first.source_sprite_key.is_empty() {
+                return Err(ProgressionContentV2Error::ExperienceMetadata);
+            }
         }
         Ok(())
     }
@@ -271,6 +384,32 @@ impl PreparedProgressionContentV2 {
         self.species
             .get(&(species, form))
             .and_then(|index| self.pack.species.get(*index))
+    }
+
+    /// Resolve the pinned ordinary Pokemon.getSpeciesForm() indexing and forms[0] fallback.
+    /// This accepts a SOURCE form index, never a compiled row. Summon overrides must first
+    /// be resolved by the caller; this metadata-only API does not resolve runtime objects.
+    pub fn experience_for_source_form(
+        &self,
+        species: SpeciesId,
+        source_form_index: u16,
+    ) -> Result<&SpeciesExperienceMetadataV2, ProgressionContentV2Error> {
+        let first = self
+            .species(species, 0)
+            .and_then(|row| row.experience.as_ref())
+            .ok_or(ProgressionContentV2Error::ExperienceUnsupported)?;
+        let row = if first.source_form_count == 0 {
+            0
+        } else if source_form_index < first.source_form_count {
+            source_form_index
+                .checked_add(1)
+                .ok_or(ProgressionContentV2Error::ExperienceMetadata)?
+        } else {
+            1
+        };
+        self.species(species, row)
+            .and_then(|definition| definition.experience.as_ref())
+            .ok_or(ProgressionContentV2Error::ExperienceUnsupported)
     }
 
     pub fn evolution(&self, id: EvolutionId) -> Option<&EvolutionDefinitionV2> {

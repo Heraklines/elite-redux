@@ -11,6 +11,7 @@ import { EFFECTIVE_STATS, Stat } from "#enums/stat";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { SpeciesId } from "#enums/species-id";
+import { SpeciesFormKey } from "#enums/species-form-key";
 import { GameManager } from "#test/framework/game-manager";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -100,30 +101,77 @@ function tmMoves(speciesId: number, form: SpeciesForm): number[] {
   return [...new Set(selected.filter(move => Number.isSafeInteger(move) && move > 0))].toSorted((a, b) => a - b);
 }
 
-function speciesDefinitions() {
-  return allSpecies
-    .filter(species => species != null && Number.isSafeInteger(species.speciesId) && species.speciesId > 0)
-    .flatMap(species => [species, ...species.forms].map((form, formIndex) => {
-      const levelMoves = form
-        .getLevelMoves()
-        .filter(([level, moveId]) => Number.isSafeInteger(level) && Number.isSafeInteger(moveId) && moveId > 0)
-        .map(([level, moveId]) => ({ level, move_id: moveId }));
-      return {
-        species_id: species.speciesId,
-        form_index: formIndex,
-        form_key: form.formKey ?? null,
-        growth_rate: species.growthRate,
-        base_friendship: species.baseFriendship,
-        catch_rate: species.catchRate,
-        level_moves: levelMoves,
-        reminder_moves: [...new Set(levelMoves.filter(entry => entry.level === RELEARN_MOVE).map(entry => entry.move_id))]
-          .toSorted((a, b) => a - b),
-        evolution_moves: [...new Set(levelMoves.filter(entry => entry.level === EVOLVE_MOVE).map(entry => entry.move_id))]
-          .toSorted((a, b) => a - b),
-        tm_moves: tmMoves(species.speciesId, form),
-      };
-    }))
-    .toSorted((left, right) => left.species_id - right.species_id || left.form_index - right.form_index);
+// Pinned PokemonSpeciesForm.getBaseExp() switches on getFormSpriteKey(), not formKey.
+function experienceBoost(spriteKey: string): string {
+  switch (spriteKey) {
+    case SpeciesFormKey.MEGA: return "MEGA";
+    case SpeciesFormKey.MEGA_X: return "MEGA_X";
+    case SpeciesFormKey.MEGA_Y: return "MEGA_Y";
+    case SpeciesFormKey.PRIMAL: return "PRIMAL";
+    case SpeciesFormKey.GIGANTAMAX: return "GIGANTAMAX";
+    case SpeciesFormKey.ETERNAMAX: return "ETERNAMAX";
+    default: return "OTHER";
+  }
+}
+
+function speciesDefinitions(probe: ReturnType<GameManager["scene"]["getPlayerParty"]>[number]) {
+  const originalSpecies = probe.species;
+  const originalFormIndex = probe.formIndex;
+  try {
+    return allSpecies
+      .filter(species => species != null && Number.isSafeInteger(species.speciesId) && species.speciesId > 0)
+      .flatMap(species => [species, ...species.forms].map((form, formIndex) => {
+        if (!Number.isSafeInteger(form.baseExp) || form.baseExp < 0 || species.forms.length > 65535) {
+          throw new Error(`unsupported XP source metadata ${species.speciesId}/${formIndex}`);
+        }
+        const sourceSpriteKey = form.getFormSpriteKey();
+        const boost = experienceBoost(sourceSpriteKey);
+        // Independent execution of the pinned method proves we exported the unadjusted value.
+        expect(form.getBaseExp()).toBe(form.baseExp * (boost === "OTHER" ? 1 : 1.5));
+        // Exercise the actual initialized Pokemon method, with summon overrides explicitly ignored.
+        probe.species = species;
+        probe.formIndex = formIndex === 0 ? 0 : formIndex - 1;
+        if (formIndex > 0) {
+          expect(probe.getSpeciesForm(true)).toBe(form);
+          expect(form).toBe(species.forms[formIndex - 1]);
+        } else {
+          expect(form).toBe(species);
+          expect(probe.getSpeciesForm(true)).toBe(species.forms[0] ?? species);
+          probe.formIndex = 65535;
+          expect(probe.getSpeciesForm(true)).toBe(species.forms[0] ?? species);
+        }
+        const levelMoves = form
+          .getLevelMoves()
+          .filter(([level, moveId]) => Number.isSafeInteger(level) && Number.isSafeInteger(moveId) && moveId > 0)
+          .map(([level, moveId]) => ({ level, move_id: moveId }));
+        return {
+          species_id: species.speciesId,
+          form_index: formIndex,
+          form_key: form.formKey ?? null,
+          experience: {
+            base_exp: form.baseExp,
+            source_form: formIndex === 0 ? { kind: "SPECIES" } : { kind: "FORM", index: formIndex - 1 },
+            source_form_count: species.forms.length,
+            source_form_key: form.formKey ?? null,
+            source_sprite_key: sourceSpriteKey,
+            boost,
+          },
+          growth_rate: species.growthRate,
+          base_friendship: species.baseFriendship,
+          catch_rate: species.catchRate,
+          level_moves: levelMoves,
+          reminder_moves: [...new Set(levelMoves.filter(entry => entry.level === RELEARN_MOVE).map(entry => entry.move_id))]
+            .toSorted((a, b) => a - b),
+          evolution_moves: [...new Set(levelMoves.filter(entry => entry.level === EVOLVE_MOVE).map(entry => entry.move_id))]
+            .toSorted((a, b) => a - b),
+          tm_moves: tmMoves(species.speciesId, form),
+        };
+      }))
+      .toSorted((left, right) => left.species_id - right.species_id || left.form_index - right.form_index);
+  } finally {
+    probe.species = originalSpecies;
+    probe.formIndex = originalFormIndex;
+  }
 }
 
 function formIndex(speciesById: Map<number, SpeciesForm>, speciesId: number, formKey: string | null): number {
@@ -192,6 +240,10 @@ test("export complete pinned progression definitions", async () => {
     .seed(SEED);
   await manager.classicMode.startBattle(SpeciesId.BULBASAUR);
 
+  const probe = manager.scene.getPlayerParty()[0];
+  if (probe == null) {
+    throw new Error("actual initialized player Pokemon is required for source form lookup proof");
+  }
   const output = {
     schema_version: 1,
     oracle_sha: ORACLE_SHA,
@@ -201,7 +253,7 @@ test("export complete pinned progression definitions", async () => {
     growth_rates: growthRates(),
     natures: natures(),
     capture_balls: captureBalls(),
-    species: speciesDefinitions(),
+    species: speciesDefinitions(probe),
     evolutions: evolutionDefinitions(),
   };
   writeFileSync(OUTPUT, `${JSON.stringify(output)}\n`, "utf8");
