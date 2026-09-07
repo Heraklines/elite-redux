@@ -274,10 +274,16 @@ RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_
 
 
 def select_recovery_scope(config, changed):
+    import m9e_generated_xp as generated
+    generated_installed = generated.enabled(config)
+    required_paths = [*RECOVERY_PATHS, *generated.PATHS] if generated_installed else RECOVERY_PATHS
+    expected_policy = {**RECOVERY_POLICY, "paths": required_paths}
     policy = config.get("current_recovery_integration")
-    if policy is not None and policy != RECOVERY_POLICY:
+    if policy is not None and policy != expected_policy:
         raise RuntimeError("current recovery integration policy identities disagree")
-    scoped = policy is not None and len(changed) == len(RECOVERY_PATHS) and set(changed) == set(RECOVERY_PATHS)
+    scoped = policy is not None and len(changed) == len(required_paths) and set(changed) == set(required_paths)
+    if any(path in generated.PATHS for path in changed) and not (generated_installed and scoped):
+        raise RuntimeError("generated XP fixture product delta is unmapped")
     # Shared compiler metadata already belongs to the exact historical lint cut.
     # Defer only that overlap to its existing policy/whole-scope checks below;
     # this does not admit the cut or exempt any XP-only source.
@@ -892,6 +898,7 @@ def plan():
                        and not any(path.startswith(prefix) for prefix in config["documentation_prefixes"])]
     import m9e_current_cost as cost
     import m9e_coop_startup as coop
+    import m9e_generated_xp as generated
     recovery_session, replacement_installed = select_recovery_scope(config, product_changes)
     coop_changes = [path for path in product_changes if path in coop.PRODUCT_PATHS] if recovery_session else product_changes
     coop_session, coop_installed = coop.select_scope(config, coop_changes, ROOT)
@@ -1132,7 +1139,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (recovery_session and path in XP_PATHS) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (recovery_session and path in [*XP_PATHS, *generated.PATHS]) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -1623,6 +1630,7 @@ def plan():
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session and not coop_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session or coop_session or ai_commands_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
+    generated.apply_plan(config, result, ROOT, capture, merge_targets)
     return result
 
 

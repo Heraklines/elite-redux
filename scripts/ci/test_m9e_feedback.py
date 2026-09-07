@@ -8337,13 +8337,18 @@ class PhaseTransferTests(unittest.TestCase):
 
     def native_with_repeated_required_ids(self):
         proof = copy.deepcopy(self.native)
-        ids = [f"case_{index:04d}_" + "full_current_state_and_effect_ownership_" * 2 for index in range(600)]
+        ids = [f"case_{index:04d}_" + "current_state_and_effect_ownership_" * 2 for index in range(600)]
         proof["inventory"][1]["ids"] = ids
         proof["plan"]["required_native_test_ids"] = {"er-repro:m9e_current_repro": list(reversed(ids))}
         proof["required_native_target_counts"]["er-repro:m9e_current_repro"] = len(ids)
         proof["tests"].update({"selected": len(ids) + 4, "executed": len(ids) + 2, "passed": len(ids) + 2})
         proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
         proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+        # Preserve this legacy600-ID permutation fixture as a v1 wire case,
+        # independently of growing phase source-identity metadata.
+        self.assertGreater(len(self.phases.encoded(proof)), self.phases.MANIFEST_LIMIT)
+        self.assertLessEqual(len(self.phases.encoded(self.phases.pack_native_ids(proof))),
+                             self.phases.MANIFEST_LIMIT - 4096)
         return proof
 
     def test_native_manifest_indices_preserve_complete_proof_and_required_order(self):
