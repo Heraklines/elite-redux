@@ -9,7 +9,7 @@ use er_kernel::game_kernel_v7::GameKernelV7;
 use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
-use er_kernel::snapshot::TimeClassPauseSnapshotV2;
+use er_kernel::snapshot::{KernelSchedulerSnapshotV2, TimeClassPauseSnapshotV2};
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
