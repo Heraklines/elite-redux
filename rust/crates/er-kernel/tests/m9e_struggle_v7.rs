@@ -129,11 +129,17 @@ fn exhausted_fixture(
         pokemon.max_hp = 400;
         pokemon.stats.hp = 400;
     }
-    let actor = if player { &mut run.party[0] } else { &mut battle.enemy_party[0] };
+    let actor = if player {
+        &mut run.party[0]
+    } else {
+        &mut battle.enemy_party[0]
+    };
     for slot in actor.moves.iter_mut().flatten() {
         let definition = content.battle.move_definition(slot.move_id)?;
         slot.pp_used = er_state::pokemon::calculate_max_pp(
-            definition.base_pp, slot.pp_ups, slot.max_pp_override,
+            definition.base_pp,
+            slot.pp_ups,
+            slot.max_pp_override,
         )?;
     }
     let GameKernelLifecycleSnapshotV7::Active(state) = snapshot.lifecycle else {
@@ -171,7 +177,10 @@ fn raw_turn_and_replay(
 ) -> Result<(), Box<dyn Error>> {
     let mut replay = restored(actual, content)?;
     for _ in 0..2 {
-        assert_eq!(press(actual, PhysicalKey::Space)?, press(&mut replay, PhysicalKey::Space)?);
+        assert_eq!(
+            press(actual, PhysicalKey::Space)?,
+            press(&mut replay, PhysicalKey::Space)?
+        );
         assert_eq!(actual.snapshot()?, replay.snapshot()?);
     }
     Ok(())
@@ -181,36 +190,80 @@ fn raw_turn_and_replay(
 fn exhausted_player_struggle_is_typeless_preserves_pp_and_replays() -> Result<(), Box<dyn Error>> {
     let (mut actual, content) = exhausted_fixture(true)?;
     let before = actual.snapshot()?;
-    let run = actual.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
+    let run = actual
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run absent")?;
     let battle = run.battle.as_ref().ok_or("battle absent")?;
-    let source = battle.field.slots.iter().find(|slot| {
-        slot.occupant == Some(run.party[0].id)
-    }).ok_or("source absent")?.slot;
-    let target = battle.field.slots.iter().find(|slot| {
-        slot.occupant == Some(battle.enemy_party[0].id)
-    }).ok_or("target absent")?.slot;
+    let source = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.occupant == Some(run.party[0].id))
+        .ok_or("source absent")?
+        .slot;
+    let target = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.occupant == Some(battle.enemy_party[0].id))
+        .ok_or("target absent")?
+        .slot;
     let move_slot = er_types::battle_ids::MoveSlotIndex::new(0)?;
     let damage = er_battle::m7_resolver::query_simulated_move_damage_v5(
-        &content.battle, run, source, move_slot, target,
+        &content.battle,
+        run,
+        source,
+        move_slot,
+        target,
     )?;
     assert!(damage > 0, "exhausted moves require Struggle damage");
     let mut ghost = run.clone();
-    ghost.battle.as_mut().ok_or("battle absent")?.enemy_party[0].types = er_types::battle_model::PokemonTyping {
-        primary: er_types::battle_model::PokemonType::Ghost, secondary: None,
-    };
-    assert_eq!(damage, er_battle::m7_resolver::query_simulated_move_damage_v5(
-        &content.battle, &ghost, source, move_slot, target,
-    )?, "Struggle must not use Normal type effectiveness");
-    assert_eq!(actual.snapshot()?, before, "damage queries changed the checkpoint");
+    ghost.battle.as_mut().ok_or("battle absent")?.enemy_party[0].types =
+        er_types::battle_model::PokemonTyping {
+            primary: er_types::battle_model::PokemonType::Ghost,
+            secondary: None,
+        };
+    assert_eq!(
+        damage,
+        er_battle::m7_resolver::query_simulated_move_damage_v5(
+            &content.battle,
+            &ghost,
+            source,
+            move_slot,
+            target,
+        )?,
+        "Struggle must not use Normal type effectiveness"
+    );
+    assert_eq!(
+        actual.snapshot()?,
+        before,
+        "damage queries changed the checkpoint"
+    );
     let before_moves = run.party[0].moves;
     let before_turn = battle.turn;
     raw_turn_and_replay(&mut actual, content)?;
-    let run = actual.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
-    assert_eq!(run.party[0].moves, before_moves, "Struggle consumed normal move PP");
-    assert!(run.party[0].hp <= 300, "Struggle did not apply max-HP recoil");
+    let run = actual
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run absent")?;
+    assert_eq!(
+        run.party[0].moves, before_moves,
+        "Struggle consumed normal move PP"
+    );
+    assert!(
+        run.party[0].hp <= 300,
+        "Struggle did not apply max-HP recoil"
+    );
     let battle = run.battle.as_ref().ok_or("battle absent")?;
-    assert!(battle.enemy_party[0].hp < 400, "Struggle did not damage the target");
-    assert!(battle.turn > before_turn, "exhaustion stalled the actual turn");
+    assert!(
+        battle.enemy_party[0].hp < 400,
+        "Struggle did not damage the target"
+    );
+    assert!(
+        battle.turn > before_turn,
+        "exhaustion stalled the actual turn"
+    );
     Ok(())
 }
 
@@ -222,16 +275,38 @@ fn exhausted_authority_ai_struggle_commits_once_and_replays() -> Result<(), Box<
     let commands = choice.prepare_authority_ai_commands()?;
     assert_eq!(commands.len(), 1, "exhausted enemy has no Struggle command");
     let mut expected = before.clone();
-    expected.authority_ai.as_mut().ok_or("AI owner absent")?.decision_sequence += 1;
-    assert_eq!(choice.snapshot()?, expected, "AI fallback changed other owners or RNG");
-    let before_moves = actual.state().and_then(|state| state.active_run.as_ref())
-        .and_then(|run| run.battle.as_ref()).ok_or("battle absent")?.enemy_party[0].moves;
+    expected
+        .authority_ai
+        .as_mut()
+        .ok_or("AI owner absent")?
+        .decision_sequence += 1;
+    assert_eq!(
+        choice.snapshot()?,
+        expected,
+        "AI fallback changed other owners or RNG"
+    );
+    let before_moves = actual
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .ok_or("battle absent")?
+        .enemy_party[0]
+        .moves;
     raw_turn_and_replay(&mut actual, content)?;
     assert_eq!(actual.snapshot()?.authority_ai, expected.authority_ai);
-    let run = actual.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
-    assert!(run.party[0].hp < 400, "AI Struggle did not damage its target");
+    let run = actual
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run absent")?;
+    assert!(
+        run.party[0].hp < 400,
+        "AI Struggle did not damage its target"
+    );
     let enemy = &run.battle.as_ref().ok_or("battle absent")?.enemy_party[0];
-    assert_eq!(enemy.moves, before_moves, "AI Struggle consumed normal move PP");
+    assert_eq!(
+        enemy.moves, before_moves,
+        "AI Struggle consumed normal move PP"
+    );
     assert!(enemy.hp <= 300, "AI Struggle did not apply max-HP recoil");
     Ok(())
 }
