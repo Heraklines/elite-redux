@@ -731,7 +731,8 @@ fn owned_startup_rejects_forged_frames_and_snapshots_atomically() -> Result<(), 
 /// Constructed victory boundary after independent real starter selections.
 /// This isolates next-wave topology; it is not a natural co-op campaign witness.
 #[test]
-fn constructed_cooperative_victory_preserves_each_seat_on_next_wave() -> Result<(), Box<dyn Error>> {
+fn constructed_cooperative_victory_preserves_each_seat_on_next_wave() -> Result<(), Box<dyn Error>>
+{
     let (content, host, _, chosen) = fixtures()?;
     let mut state = host.state().ok_or("host run missing")?.clone();
     expand_cooperative_choices_v7(&mut state, content.as_ref(), SeatId::new(safe(2)), &chosen)?;
@@ -753,22 +754,39 @@ fn constructed_cooperative_victory_preserves_each_seat_on_next_wave() -> Result<
     battle.outcome = er_types::battle_model::BattleOutcome::Victory;
     state.validate_with(content.as_ref())?;
     let before = state.clone();
-    let (next, draws) = er_game::m9e_new_run_v6::advance_to_next_encounter_v6(&state, content.as_ref())?;
-    assert_eq!(state, before, "generation mutates only its returned candidate");
-    let (repeated, repeated_draws) = er_game::m9e_new_run_v6::advance_to_next_encounter_v6(&state, content.as_ref())?;
+    let (next, draws) =
+        er_game::m9e_new_run_v6::advance_to_next_encounter_v6(&state, content.as_ref())?;
+    assert_eq!(
+        state, before,
+        "generation mutates only its returned candidate"
+    );
+    let (repeated, repeated_draws) =
+        er_game::m9e_new_run_v6::advance_to_next_encounter_v6(&state, content.as_ref())?;
     assert_eq!(next, repeated);
     assert_eq!(draws, repeated_draws);
     let run = next.active_run.as_ref().ok_or("next run missing")?;
     let battle = run.battle.as_ref().ok_or("next battle missing")?;
     assert_eq!(run.wave.get().get(), 2);
-    assert_eq!(run.party, party, "ordinary generation changes no persistent partner choice");
-    assert_eq!(battle.format, format, "next wave silently drops cooperative topology");
+    assert_eq!(
+        run.party, party,
+        "ordinary generation changes no persistent partner choice"
+    );
+    assert_eq!(
+        battle.format, format,
+        "next wave silently drops cooperative topology"
+    );
     assert_eq!(battle.enemy_party.len(), 2);
     let mut owners = Vec::new();
     for field in &battle.field.slots {
         if field.slot.side == er_types::battle_ids::BattleSide::Player {
-            let occupant = field.occupant.ok_or("living seat omitted from next field")?;
-            let pokemon = run.party.iter().find(|pokemon| pokemon.id == occupant).ok_or("next field party identity missing")?;
+            let occupant = field
+                .occupant
+                .ok_or("living seat omitted from next field")?;
+            let pokemon = run
+                .party
+                .iter()
+                .find(|pokemon| pokemon.id == occupant)
+                .ok_or("next field party identity missing")?;
             assert!(!pokemon.fainted);
             owners.push(pokemon.owner_seat.ok_or("player field owner missing")?);
         }
