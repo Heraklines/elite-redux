@@ -152,7 +152,11 @@ enum RetainedExpected {
 }
 
 fn result_digest(value: &Value) -> Result<String, Box<dyn Error>> {
-    Ok(format!("{:?}", er_canonical::content_digest(value)?))
+    // Walk the already materialized JSON once, avoiding the generic serializer's
+    // per-object fragment copies. Hash every byte of the full canonical result;
+    // no input, field, snapshot, or semantic assertion is omitted.
+    let canonical = er_canonical::canonicalize_value(value)?;
+    Ok(er_canonical::content_digest(&canonical)?)
 }
 
 // Reap the CLI and its worker process group even if a response assertion panics.
@@ -340,14 +344,11 @@ impl Script {
             .options
             .len()
             + 1;
-        // The confirm row is reachable by normal wrap-around Up navigation.
-        // Preserve each actual input and full snapshot check without traversing
-        // the entire catalog before the changed-rule checkpoint.
-        for _ in 0..bound.min(8) {
+        for _ in 0..bound {
             if self.selected()? == "bootstrap/starter/confirm" {
                 break;
             }
-            self.press(PhysicalKey::ArrowUp)?;
+            self.press(PhysicalKey::ArrowDown)?;
         }
         assert_eq!(self.selected()?, "bootstrap/starter/confirm");
         for _ in 0..4 {
