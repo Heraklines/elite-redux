@@ -1522,7 +1522,7 @@ def plan():
             result["required_native_test_ids"] = {**result["required_native_test_ids"], crate + ":" + target: list(CAMPAIGN_TEST_IDS[crate])}
             if result["execution_scope"] is not None:
                 result["execution_scope"] = merge_targets(result["execution_scope"], {crate: [target]})
-    rng_required = replacement_installed and bool({"er-kernel", "er-battle", "er-progression", "er-rng"} & selected)
+    rng_required = replacement_installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-rng"} & selected)
     result["requires_current_rng_witnesses"] = rng_required
     if rng_required:
         result["packages"] = sorted(set(result["packages"]) | {"er-rng"})
