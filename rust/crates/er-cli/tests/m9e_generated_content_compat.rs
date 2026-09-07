@@ -1,7 +1,9 @@
 //! Actual CurrentDispatcher with both independently published content bundles.
 //! Runner supplies verified files; no generated content is embedded in this test.
 use std::error::Error;
+use std::io::Write;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use er_game::m9e_material_v6::GameMaterialV6;
 use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelStepV7};
@@ -33,6 +35,34 @@ fn same(actual: &Value, expected: &Value) -> TestResult {
     // Compare complete values without dumping large snapshots into failure logs.
     assert_eq!(digest(actual)?, digest(expected)?);
     Ok(())
+}
+
+fn progress(label: &str, phase: &str, began: Instant, detail: &str) -> TestResult {
+    // A small fixed number of phase rows survives an assertion/timeout. Never
+    // emit a whole snapshot, capsule, save or prepared content body.
+    let detail = detail.chars().take(256).collect::<String>();
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COMPAT endpoint={label} phase={phase} elapsed_ms={} detail={detail:?}",
+        began.elapsed().as_millis()
+    )?;
+    Ok(())
+}
+
+fn lifecycle_detail(snapshot: &CoreGameKernelSnapshotV7) -> String {
+    match &snapshot.lifecycle {
+        GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
+            format!("Bootstrap stage={:?}", bootstrap.stage)
+        }
+        GameKernelLifecycleSnapshotV7::Active(state) => format!(
+            "Active control={:?}",
+            state.active_run.as_ref().map(|run| run.control.kind)
+        ),
+        GameKernelLifecycleSnapshotV7::Terminal { terminal, .. } => {
+            let reason = terminal.reason.chars().take(160).collect::<String>();
+            format!("Terminal reason={reason:?}")
+        }
+    }
 }
 
 fn start(existing_saves: bool) -> Value {
@@ -72,18 +102,30 @@ fn press(cli: &mut Cli, id: &str, code: PhysicalKey) -> TestResult {
 }
 
 fn select(cli: &mut Cli, id: &str, target: &str) -> TestResult {
-    let bound = observation(cli, id)?["control"]["menu"]["options"]
-        .as_array()
-        .ok_or("menu options missing")?
-        .len()
-        + 1;
-    for _ in 0..bound {
-        if observation(cli, id)?["control"]["menu"]["selected_option_id"] == target {
-            return Ok(());
-        }
-        press(cli, id, PhysicalKey::ArrowDown)?;
+    let description = cli.result("control.describe", json!({"session":id}))?;
+    let plan = cli.result(
+        "control.plan_navigation",
+        json!({"session":id,"expected_menu_instance":description["description"]["menu_instance"],
+            "expected_control_digest":description["control_digest"],"target":target,
+            "submit":false,"maximum_events":4096}),
+    )?;
+    let events: Vec<RawInputEvent> = serde_json::from_value(plan["plan"]["events"].clone())?;
+    assert!(events.len() <= 4096);
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COMPAT navigation session={id} target={target} events={}",
+        events.len()
+    )?;
+    // The existing public query only plans. Execute every planned raw event
+    // through the real dispatcher, then verify the actual public selection.
+    for input in events {
+        cli.result("session.raw_input", json!({"session":id,"input":input}))?;
     }
-    Err(format!("public menu did not contain {target}").into())
+    assert_eq!(
+        observation(cli, id)?["control"]["menu"]["selected_option_id"],
+        target
+    );
+    Ok(())
 }
 
 fn settle(cli: &mut Cli, id: &str) -> TestResult<usize> {
@@ -112,7 +154,8 @@ struct Artifacts {
     facts: Value,
 }
 
-fn produce(cli: &mut Cli, hash: &str) -> TestResult<Artifacts> {
+fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult<Artifacts> {
+    progress(label, "natural-create", began, hash)?;
     let hello = cli.result("protocol.hello", json!({}))?;
     assert_eq!(hello["backend"], "IN_PROCESS_V7");
     assert_eq!(hello["content_identity"]["bundle_hash"], hash);
@@ -121,9 +164,51 @@ fn produce(cli: &mut Cli, hash: &str) -> TestResult<Artifacts> {
         json!({"session":"source","start":start(false)}),
     )?;
     assert_eq!(observation(cli, "source")?["control"]["kind"], "TITLE");
-    for _ in 0..3 {
+    for _ in 0..2 {
         press(cli, "source", PhysicalKey::Space)?;
     }
+    let setup: CoreGameKernelSnapshotV7 = serde_json::from_value(checkpoint(cli, "source")?)?;
+    let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = setup.lifecycle else {
+        return Err(format!("{label}: natural starter setup missing").into());
+    };
+    assert!(bootstrap.selections.starters.is_empty());
+    // Same actual catalog/budget policy as m9e_checkpoint_healing_v7. A single
+    // default starter may naturally lose the first turn; select six legal
+    // starters through raw controls instead of imposing a battle outcome.
+    let mut remaining = bootstrap.catalog.maximum_starter_cost;
+    let mut starters = Vec::new();
+    let mut choices = bootstrap.catalog.starters.iter().collect::<Vec<_>>();
+    choices.sort_by_key(|starter| (starter.cost, starter.pokemon_id));
+    for starter in choices {
+        if starter.cost <= remaining {
+            remaining -= starter.cost;
+            starters.push(starter.pokemon_id);
+            if starters.len() == 6.min(bootstrap.catalog.maximum_starters) {
+                break;
+            }
+        }
+    }
+    assert_eq!(starters.len(), 6, "natural six-starter policy unavailable");
+    for starter in &starters {
+        progress(label, "select-starter", began, &starter.get().to_string())?;
+        select(cli, "source", &format!("bootstrap/starter/{}", starter.get()))?;
+        press(cli, "source", PhysicalKey::Space)?;
+        progress(label, "starter-selected", began, &starter.get().to_string())?;
+    }
+    let selected: CoreGameKernelSnapshotV7 = serde_json::from_value(checkpoint(cli, "source")?)?;
+    let GameKernelLifecycleSnapshotV7::Bootstrap(selected) = selected.lifecycle else {
+        return Err(format!("{label}: selected starter setup missing").into());
+    };
+    assert_eq!(selected.selections.starters.len(), 6);
+    let mut selected_ids = selected
+        .selections
+        .starters
+        .iter()
+        .map(|starter| starter.pokemon_id)
+        .collect::<Vec<_>>();
+    selected_ids.sort();
+    starters.sort();
+    assert_eq!(selected_ids, starters);
     select(cli, "source", "bootstrap/starter/confirm")?;
     for _ in 0..4 {
         press(cli, "source", PhysicalKey::Space)?;
@@ -134,6 +219,12 @@ fn produce(cli: &mut Cli, hash: &str) -> TestResult<Artifacts> {
         "BATTLE_COMMAND"
     );
     let before_action = checkpoint(cli, "source")?;
+    progress(
+        label,
+        "battle-command",
+        began,
+        "six selected starters; actual first battle",
+    )?;
     // Query the actual legal move leaf; submit its existing public option via
     // raw input. No action, target, winner, RNG or state is injected.
     select(cli, "source", "battle/command/fight")?;
@@ -160,6 +251,7 @@ fn produce(cli: &mut Cli, hash: &str) -> TestResult<Artifacts> {
         })
         .ok_or("public legal SelectMove option")?;
     select(cli, "source", option.option_id.as_str())?;
+    progress(label, "submit-move", began, option.option_id.as_str())?;
     let response = cli.result(
         "session.raw_input",
         json!({"session":"source","input":RawInputEvent::KeyDown {
@@ -196,6 +288,8 @@ fn produce(cli: &mut Cli, hash: &str) -> TestResult<Artifacts> {
         &cli.result("session.snapshot", json!({"session":"source"}))?,
     )?;
     let typed: CoreGameKernelSnapshotV7 = serde_json::from_value(snapshot.clone())?;
+    let lifecycle = lifecycle_detail(&typed);
+    progress(label, "settled-turn-checkpoint", began, &lifecycle)?;
     assert!(typed.pending_platform.is_empty());
     assert!(typed.pending_presentations.is_empty());
     assert!(typed.private_battle_control.is_none());
@@ -204,7 +298,7 @@ fn produce(cli: &mut Cli, hash: &str) -> TestResult<Artifacts> {
     assert!(typed.input_router.repeats.is_empty());
     assert!(typed.scheduler.timers.is_empty());
     let GameKernelLifecycleSnapshotV7::Active(state) = typed.lifecycle else {
-        return Err("natural checkpoint was not Active".into());
+        return Err(format!("{label}: natural checkpoint was not Active: {lifecycle}").into());
     };
     assert_eq!(
         serde_json::to_value(&state.content_identity)?["bundle_hash"],
@@ -493,6 +587,7 @@ fn save_ingress(cli: &mut Cli, own: &Artifacts, foreign: &Artifacts) -> TestResu
 #[test]
 fn actual_old_and_regenerated_bundles_preserve_own_artifacts_and_reject_each_other_transactionally()
 -> TestResult {
+    let began = Instant::now();
     let executable = PathBuf::from(std::env::var("ER_M9E_COMPAT_CLI")?);
     assert!(executable.is_absolute());
     assert_eq!(
@@ -507,19 +602,27 @@ fn actual_old_and_regenerated_bundles_preserve_own_artifacts_and_reject_each_oth
     assert_eq!(std::fs::metadata(&new)?.len(), 16_325_821);
     let mut old_cli = Cli::new(&old, 4)?;
     let mut new_cli = Cli::new(&new, 4)?;
-    let old_artifacts = produce(&mut old_cli, OLD_HASH)?;
-    let new_artifacts = produce(&mut new_cli, NEW_HASH)?;
+    let old_artifacts = produce(&mut old_cli, OLD_HASH, "old", began)
+        .map_err(|error| format!("old produce: {error}"))?;
+    let new_artifacts = produce(&mut new_cli, NEW_HASH, "new", began)
+        .map_err(|error| format!("new produce: {error}"))?;
     assert_ne!(
         digest(&old_artifacts.snapshot)?,
         digest(&new_artifacts.snapshot)?
     );
-    for (cli, own, foreign) in [
-        (&mut old_cli, &old_artifacts, &new_artifacts),
-        (&mut new_cli, &new_artifacts, &old_artifacts),
+    for (label, cli, own, foreign) in [
+        ("old", &mut old_cli, &old_artifacts, &new_artifacts),
+        ("new", &mut new_cli, &new_artifacts, &old_artifacts),
     ] {
-        compatible(cli, own)?;
-        incompatible(cli, own, foreign)?;
-        save_ingress(cli, own, foreign)?;
+        progress(label, "same-content-restore-replay", began, "begin")?;
+        compatible(cli, own).map_err(|error| format!("{label} compatible: {error}"))?;
+        progress(label, "foreign-checkpoint-capsule", began, "begin")?;
+        incompatible(cli, own, foreign)
+            .map_err(|error| format!("{label} incompatible: {error}"))?;
+        progress(label, "actual-title-save-ingress", began, "begin")?;
+        save_ingress(cli, own, foreign)
+            .map_err(|error| format!("{label} save_ingress: {error}"))?;
+        progress(label, "compatibility-complete", began, "all assertions passed")?;
     }
     old_cli.finish()?;
     new_cli.finish()?;
