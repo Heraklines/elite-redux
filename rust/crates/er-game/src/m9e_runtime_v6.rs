@@ -2131,9 +2131,15 @@ fn queue_current_player_faints(
     candidate: &mut GameStateV6,
     presentation: &[er_battle::m7_resolver::BattlePresentationCueV5],
 ) -> Result<(), GameRuntimeV6Error> {
-    let prior = before.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let prior = before
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
     let prior_battle = prior.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
-    let run = candidate.active_run.as_mut().ok_or(GameRuntimeV6Error::Action)?;
+    let run = candidate
+        .active_run
+        .as_mut()
+        .ok_or(GameRuntimeV6Error::Action)?;
     let battle = run.battle.as_mut().ok_or(GameRuntimeV6Error::Action)?;
     let mut turn_occurrence = 0_u32;
     for cue in presentation {
@@ -2144,34 +2150,71 @@ fn queue_current_player_faints(
             continue;
         };
         let owner = pokemon.owner_seat.ok_or(GameRuntimeV6Error::Action)?;
-        let slot = battle.field.slots.iter().find(|slot| {
-            slot.slot.side == er_types::battle_ids::BattleSide::Player && slot.occupant == Some(*id)
-        }).ok_or(GameRuntimeV6Error::Action)?.slot;
-        if !pokemon.fainted || pokemon.hp != 0
-            || !prior.party.iter().any(|pokemon| pokemon.id == *id && !pokemon.fainted)
-            || battle.faint_queue.iter().any(|faint| faint.pokemon == *id && faint.slot == slot
-                && matches!(faint.replacement, er_types::battle_model::ReplacementProgress::Pending
-                    | er_types::battle_model::ReplacementProgress::Selected { .. }))
+        let slot = battle
+            .field
+            .slots
+            .iter()
+            .find(|slot| {
+                slot.slot.side == er_types::battle_ids::BattleSide::Player
+                    && slot.occupant == Some(*id)
+            })
+            .ok_or(GameRuntimeV6Error::Action)?
+            .slot;
+        if !pokemon.fainted
+            || pokemon.hp != 0
+            || !prior
+                .party
+                .iter()
+                .any(|pokemon| pokemon.id == *id && !pokemon.fainted)
+            || battle.faint_queue.iter().any(|faint| {
+                faint.pokemon == *id
+                    && faint.slot == slot
+                    && matches!(
+                        faint.replacement,
+                        er_types::battle_model::ReplacementProgress::Pending
+                            | er_types::battle_model::ReplacementProgress::Selected { .. }
+                    )
+            })
         {
             return Err(GameRuntimeV6Error::Action);
         }
-        let legal = run.party.iter().any(|reserve| !reserve.fainted && reserve.hp > 0
-            && reserve.owner_seat == Some(owner)
-            && !battle.field.slots.iter().any(|slot| slot.occupant == Some(reserve.id)));
+        let legal = run.party.iter().any(|reserve| {
+            !reserve.fainted
+                && reserve.hp > 0
+                && reserve.owner_seat == Some(owner)
+                && !battle
+                    .field
+                    .slots
+                    .iter()
+                    .any(|slot| slot.occupant == Some(reserve.id))
+        });
         let id = battle.next_faint_occurrence;
         let next = er_types::battle_ids::FaintOccurrenceId::new(safe_increment(id.get())?);
-        battle.faint_queue.push(er_types::battle_model::FaintOccurrence {
-            id,
-            source: er_types::battle_model::FaintSource {
-                epoch: er_types::battle_ids::AuthorityEpoch::new(SafeU53::new(1).map_err(|_| GameRuntimeV6Error::Invalid)?),
-                wave: prior_battle.wave, resolved_turn: prior_battle.turn, turn_occurrence,
-            },
-            slot, pokemon: pokemon.id, owner_seat: Some(owner),
-            replacement: if legal { er_types::battle_model::ReplacementProgress::Pending }
-                else { er_types::battle_model::ReplacementProgress::NoLegalReplacement },
-        });
+        battle
+            .faint_queue
+            .push(er_types::battle_model::FaintOccurrence {
+                id,
+                source: er_types::battle_model::FaintSource {
+                    epoch: er_types::battle_ids::AuthorityEpoch::new(
+                        SafeU53::new(1).map_err(|_| GameRuntimeV6Error::Invalid)?,
+                    ),
+                    wave: prior_battle.wave,
+                    resolved_turn: prior_battle.turn,
+                    turn_occurrence,
+                },
+                slot,
+                pokemon: pokemon.id,
+                owner_seat: Some(owner),
+                replacement: if legal {
+                    er_types::battle_model::ReplacementProgress::Pending
+                } else {
+                    er_types::battle_model::ReplacementProgress::NoLegalReplacement
+                },
+            });
         battle.next_faint_occurrence = next;
-        turn_occurrence = turn_occurrence.checked_add(1).ok_or(GameRuntimeV6Error::Invalid)?;
+        turn_occurrence = turn_occurrence
+            .checked_add(1)
+            .ok_or(GameRuntimeV6Error::Invalid)?;
     }
     Ok(())
 }
