@@ -525,7 +525,10 @@ pub fn advance_to_next_encounter_v6(
         let authority = owners
             .remove(&previous.authority_seat)
             .ok_or(NaturalRunV6Error::Invalid)?;
-        let partner = owners.into_values().next().ok_or(NaturalRunV6Error::Invalid)?;
+        let partner = owners
+            .into_values()
+            .next()
+            .ok_or(NaturalRunV6Error::Invalid)?;
         vec![authority, partner]
     } else {
         vec![Some(player_id)]
