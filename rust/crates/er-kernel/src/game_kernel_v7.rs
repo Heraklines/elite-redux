@@ -1640,7 +1640,16 @@ impl GameKernelV7 {
         let action_context = envelope.proposal.context;
         let operation_id = action_context.operation_id.clone();
         let action = envelope.proposal.action;
-        if matches!(action, GameActionV1::Battle { .. }) {
+        // A faint replacement is already bound to its exact owned control and
+        // occurrence. It is not a living actor's command for the next turn.
+        if matches!(action, GameActionV1::Battle { .. })
+            && !matches!(
+                action,
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::SelectReplacement { .. }
+                }
+            )
+        {
             let step = self.collect_battle_action(
                 action,
                 action_context,

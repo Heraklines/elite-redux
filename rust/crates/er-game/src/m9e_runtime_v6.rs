@@ -2096,9 +2096,10 @@ fn execute_reward(
     if advance {
         let (mut next, rng_audit) = advance_to_next_encounter_v6(&candidate, content)
             .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        let owner = next_battle_control_owner(&next)?;
         install_battle_command_control(
             &mut next,
-            action_context.authority_seat,
+            owner,
             action_context.authority_seat,
             next_revision,
             action_context.menu_instance,
