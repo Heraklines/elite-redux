@@ -183,10 +183,18 @@ fn replacement_checkpoint() -> Result<(GameKernelV7, Arc<PreparedGameContentV2>)
         for pending in kernel.snapshot()?.pending_presentations {
             kernel.settle_presentation(pending.event_id)?;
         }
-        match kernel.current_control().map(|control| control.kind).ok_or("natural control absent")? {
+        match kernel
+            .current_control()
+            .map(|control| control.kind)
+            .ok_or("natural control absent")?
+        {
             GameControlKindV2::BattleReplacement => return Ok((kernel, content)),
-            GameControlKindV2::BattleCommand => { press(&mut kernel, PhysicalKey::Space)?; }
-            GameControlKindV2::BattleMove => { submit_strongest_move(&mut kernel, &content)?; }
+            GameControlKindV2::BattleCommand => {
+                press(&mut kernel, PhysicalKey::Space)?;
+            }
+            GameControlKindV2::BattleMove => {
+                submit_strongest_move(&mut kernel, &content)?;
+            }
             other => return Err(format!("natural replacement setup reached {other:?}").into()),
         }
     }
@@ -194,18 +202,40 @@ fn replacement_checkpoint() -> Result<(GameKernelV7, Arc<PreparedGameContentV2>)
 }
 
 #[test]
-fn natural_faint_offers_owned_reserves_restores_and_continues_raw_battle() -> Result<(), Box<dyn Error>> {
+fn natural_faint_offers_owned_reserves_restores_and_continues_raw_battle()
+-> Result<(), Box<dyn Error>> {
     let (mut kernel, content) = replacement_checkpoint()?;
     let before = kernel.snapshot()?;
-    let mut restored = GameKernelV7::from_snapshot(before.clone(), SeatId::new(safe(1)), GameKernelRoleV7::Authority, content.clone())?;
+    let mut restored = GameKernelV7::from_snapshot(
+        before.clone(),
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
     let state = kernel.state().ok_or("natural state missing")?;
     let run = state.active_run.as_ref().ok_or("natural run missing")?;
     let battle = run.battle.as_ref().ok_or("natural battle missing")?;
-    let menu = run.control.menu.as_ref().ok_or("replacement menu missing")?;
+    let menu = run
+        .control
+        .menu
+        .as_ref()
+        .ok_or("replacement menu missing")?;
     assert_eq!(run.control.owner_seat, Some(SeatId::new(safe(1))));
     assert_eq!(menu.options.len(), 2);
-    let selected = menu.options.iter().find(|option| option.option_id == menu.selected_option_id).ok_or("selected replacement absent")?;
-    let GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectReplacement { occurrence, field, party_slot } } = selected.action else {
+    let selected = menu
+        .options
+        .iter()
+        .find(|option| option.option_id == menu.selected_option_id)
+        .ok_or("selected replacement absent")?;
+    let GameActionV1::Battle {
+        action:
+            er_types::BattleUiActionV1::SelectReplacement {
+                occurrence,
+                field,
+                party_slot,
+            },
+    } = selected.action
+    else {
         return Err("actual replacement action missing".into());
     };
     let selected_id = run.party[usize::from(party_slot.get())].id;
@@ -213,58 +243,132 @@ fn natural_faint_offers_owned_reserves_restores_and_continues_raw_battle() -> Re
     let run_rng = run.run_rng.clone();
     let battle_rng = battle.battle_rng.clone();
     let turn = battle.turn;
-    assert_eq!(press(&mut kernel, PhysicalKey::Space)?, press(&mut restored, PhysicalKey::Space)?);
+    assert_eq!(
+        press(&mut kernel, PhysicalKey::Space)?,
+        press(&mut restored, PhysicalKey::Space)?
+    );
     let after = kernel.snapshot()?;
     assert_eq!(after, restored.snapshot()?);
     assert_eq!(after.authority_ai, before.authority_ai);
-    let run = kernel.state().and_then(|state| state.active_run.as_ref()).ok_or("replacement run missing")?;
+    let run = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("replacement run missing")?;
     let battle = run.battle.as_ref().ok_or("replacement battle missing")?;
     assert_eq!(run.party, party);
     assert_eq!(run.run_rng, run_rng);
     assert_eq!(battle.battle_rng, battle_rng);
     assert_eq!(battle.turn, turn);
-    assert!(battle.field.slots.iter().any(|slot| slot.slot == field && slot.occupant == Some(selected_id)));
-    assert!(battle.faint_queue.iter().any(|faint| faint.id == occurrence && faint.replacement == er_types::battle_model::ReplacementProgress::Applied));
+    assert!(
+        battle
+            .field
+            .slots
+            .iter()
+            .any(|slot| slot.slot == field && slot.occupant == Some(selected_id))
+    );
+    assert!(battle.faint_queue.iter().any(|faint| faint.id == occurrence
+        && faint.replacement == er_types::battle_model::ReplacementProgress::Applied));
     assert_eq!(run.control.kind, GameControlKindV2::BattleCommand);
     for peer in [&mut kernel, &mut restored] {
-        for pending in peer.snapshot()?.pending_presentations { peer.settle_presentation(pending.event_id)?; }
+        for pending in peer.snapshot()?.pending_presentations {
+            peer.settle_presentation(pending.event_id)?;
+        }
         press(peer, PhysicalKey::Space)?;
         submit_strongest_move(peer, &content)?;
     }
     assert_eq!(kernel.snapshot()?, restored.snapshot()?);
-    let advanced = kernel.state().and_then(|state| state.active_run.as_ref()).and_then(|run| run.battle.as_ref()).ok_or("continued battle missing")?;
-    assert!(advanced.turn > turn, "replacement could not submit a genuine next command");
+    let advanced = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .ok_or("continued battle missing")?;
+    assert!(
+        advanced.turn > turn,
+        "replacement could not submit a genuine next command"
+    );
     Ok(())
 }
 
 #[test]
-fn natural_replacement_rejects_wrong_receipt_field_and_fainted_party_choice() -> Result<(), Box<dyn Error>> {
-    use er_game::m9e_runtime_v6::{GameActionDispatchContextV1, GameActionDispatcherV1, GameDomainExecutionInputV1};
+fn natural_replacement_rejects_wrong_receipt_field_and_fainted_party_choice()
+-> Result<(), Box<dyn Error>> {
+    use er_game::m9e_runtime_v6::{
+        GameActionDispatchContextV1, GameActionDispatcherV1, GameDomainExecutionInputV1,
+    };
     let (kernel, content) = replacement_checkpoint()?;
     let snapshot = kernel.snapshot()?;
     let state = kernel.state().ok_or("replacement state missing")?;
     let run = state.active_run.as_ref().ok_or("replacement run missing")?;
-    let menu = run.control.menu.as_ref().ok_or("replacement menu missing")?;
-    let selected = menu.options.iter().find(|option| option.option_id == menu.selected_option_id).ok_or("replacement selection missing")?;
-    let GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectReplacement { occurrence, field, party_slot } } = selected.action else {
+    let menu = run
+        .control
+        .menu
+        .as_ref()
+        .ok_or("replacement menu missing")?;
+    let selected = menu
+        .options
+        .iter()
+        .find(|option| option.option_id == menu.selected_option_id)
+        .ok_or("replacement selection missing")?;
+    let GameActionV1::Battle {
+        action:
+            er_types::BattleUiActionV1::SelectReplacement {
+                occurrence,
+                field,
+                party_slot,
+            },
+    } = selected.action
+    else {
         return Err("replacement action missing".into());
     };
     let context = GameActionDispatchContextV1 {
-        action: run.control.action_context.clone().ok_or("replacement action context missing")?,
-        input: GameDomainExecutionInputV1::None, authority: true,
+        action: run
+            .control
+            .action_context
+            .clone()
+            .ok_or("replacement action context missing")?,
+        input: GameDomainExecutionInputV1::None,
+        authority: true,
     };
-    assert!(GameActionDispatcherV1::prepare(Some(state), &content, &snapshot.material_ledger, selected.action.clone(), context.clone()).is_ok());
+    assert!(
+        GameActionDispatcherV1::prepare(
+            Some(state),
+            &content,
+            &snapshot.material_ledger,
+            selected.action.clone(),
+            context.clone()
+        )
+        .is_ok()
+    );
     let mut wrong_field = field;
     wrong_field.side = er_types::battle_ids::BattleSide::Enemy;
     let bad = [
-        (er_types::battle_ids::FaintOccurrenceId::new(safe(999)), field, party_slot),
+        (
+            er_types::battle_ids::FaintOccurrenceId::new(safe(999)),
+            field,
+            party_slot,
+        ),
         (occurrence, wrong_field, party_slot),
         (occurrence, field, er_types::battle_ids::PartyIndex::new(0)?),
         (occurrence, field, er_types::battle_ids::PartyIndex::new(3)?),
     ];
     for (occurrence, field, party_slot) in bad {
-        let action = GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectReplacement { occurrence, field, party_slot } };
-        assert!(GameActionDispatcherV1::prepare(Some(state), &content, &snapshot.material_ledger, action, context.clone()).is_err());
+        let action = GameActionV1::Battle {
+            action: er_types::BattleUiActionV1::SelectReplacement {
+                occurrence,
+                field,
+                party_slot,
+            },
+        };
+        assert!(
+            GameActionDispatcherV1::prepare(
+                Some(state),
+                &content,
+                &snapshot.material_ledger,
+                action,
+                context.clone()
+            )
+            .is_err()
+        );
         assert_eq!(kernel.snapshot()?, snapshot);
     }
     Ok(())
