@@ -803,68 +803,158 @@ fn play_press(kernel: &mut GameKernelV7) -> Result<GameKernelStepV7, Box<dyn Err
         browser_repeat: false,
         focus: InputFocus::Game,
     })?;
-    let released = kernel.raw_input(RawInputEvent::KeyUp { code: PhysicalKey::Space })?;
-    assert!(released.effects.iter().all(|effect| !matches!(effect,
-        GameKernelEffectV7::ProposalReady { .. } | GameKernelEffectV7::AuthorityMaterial { .. })));
+    let released = kernel.raw_input(RawInputEvent::KeyUp {
+        code: PhysicalKey::Space,
+    })?;
+    assert!(released.effects.iter().all(|effect| !matches!(
+        effect,
+        GameKernelEffectV7::ProposalReady { .. } | GameKernelEffectV7::AuthorityMaterial { .. }
+    )));
     Ok(step)
 }
 
-fn choose_play_move(kernel: &mut GameKernelV7, content: &PreparedGameContentV2, seat: SeatId)
--> Result<(), Box<dyn Error>> {
-    let run = kernel.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
+fn choose_play_move(
+    kernel: &mut GameKernelV7,
+    content: &PreparedGameContentV2,
+    seat: SeatId,
+) -> Result<(), Box<dyn Error>> {
+    let run = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run absent")?;
     let battle = run.battle.as_ref().ok_or("battle absent")?;
-    let actor = battle.field.slots.iter().find(|slot| {
-        run.party.iter().any(|pokemon| Some(pokemon.id) == slot.occupant && pokemon.owner_seat == Some(seat))
-    }).ok_or("owned field actor absent")?.slot;
-    let target = battle.field.slots.iter().find(|slot| {
-        battle.enemy_party.iter().any(|pokemon| Some(pokemon.id) == slot.occupant && !pokemon.fainted)
-    }).ok_or("living opponent absent")?.slot;
-    let menu = kernel.current_control().and_then(|control| control.menu.as_ref()).ok_or("moves absent")?;
-    let selected = menu.options.iter().filter_map(|option| {
-        let er_types::GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectMove { move_slot, .. } } = option.action else { return None; };
-        let damage = er_battle::m7_resolver::query_simulated_move_damage_v5(&content.battle, run, actor, move_slot, target).ok()?;
-        Some((damage, option.option_id.clone()))
-    }).max_by_key(|(damage, _)| *damage).map(|(_, id)| id)
+    let actor = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| {
+            run.party.iter().any(|pokemon| {
+                Some(pokemon.id) == slot.occupant && pokemon.owner_seat == Some(seat)
+            })
+        })
+        .ok_or("owned field actor absent")?
+        .slot;
+    let target = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| {
+            battle
+                .enemy_party
+                .iter()
+                .any(|pokemon| Some(pokemon.id) == slot.occupant && !pokemon.fainted)
+        })
+        .ok_or("living opponent absent")?
+        .slot;
+    let menu = kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .ok_or("moves absent")?;
+    let selected = menu
+        .options
+        .iter()
+        .filter_map(|option| {
+            let er_types::GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::SelectMove { move_slot, .. },
+            } = option.action
+            else {
+                return None;
+            };
+            let damage = er_battle::m7_resolver::query_simulated_move_damage_v5(
+                &content.battle,
+                run,
+                actor,
+                move_slot,
+                target,
+            )
+            .ok()?;
+            Some((damage, option.option_id.clone()))
+        })
+        .max_by_key(|(damage, _)| *damage)
+        .map(|(_, id)| id)
         .ok_or("no legal damage query for offered moves")?;
     navigate(kernel, selected.as_str())
 }
 
-fn deliver_play_step(host: &mut GameKernelV7, guest: &mut GameKernelV7, step: GameKernelStepV7,
-                     from_host: bool, receipt: bool) -> Result<(usize, usize), Box<dyn Error>> {
+fn deliver_play_step(
+    host: &mut GameKernelV7,
+    guest: &mut GameKernelV7,
+    step: GameKernelStepV7,
+    from_host: bool,
+    receipt: bool,
+) -> Result<(usize, usize), Box<dyn Error>> {
     let generation = ConnectionGeneration::new(safe(1));
     let mut queue = std::collections::VecDeque::from([(step, from_host, receipt)]);
     let mut proposals = 0;
     let mut materials = 0;
     while let Some((step, from_host, receipt)) = queue.pop_front() {
-        assert!(proposals + materials < 16, "unexpected network feedback loop");
+        assert!(
+            proposals + materials < 16,
+            "unexpected network feedback loop"
+        );
         for effect in step.effects {
             match effect {
                 GameKernelEffectV7::ProposalReady { bytes, .. } => {
                     assert!(!from_host);
                     proposals += 1;
                     let response = host.ingest_network_frame(generation, &bytes)?;
-                    assert!(response.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+                    assert!(response.effects.iter().any(|effect| matches!(
+                        effect,
+                        GameKernelEffectV7::AuthorityMaterial { .. }
+                    )));
                     let committed = host.snapshot()?;
                     let retried = host.ingest_network_frame(generation, &bytes)?;
-                    assert_eq!(host.snapshot()?, committed, "duplicate proposal reran authority work");
-                    assert!(retried.effects.is_empty() || retried.effects.iter().all(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+                    assert_eq!(
+                        host.snapshot()?,
+                        committed,
+                        "duplicate proposal reran authority work"
+                    );
+                    assert!(
+                        retried.effects.is_empty()
+                            || retried.effects.iter().all(|effect| matches!(
+                                effect,
+                                GameKernelEffectV7::AuthorityMaterial { .. }
+                            ))
+                    );
                     queue.push_back((response, true, true));
                 }
                 GameKernelEffectV7::AuthorityMaterial { bytes, .. } => {
                     assert!(from_host);
                     materials += 1;
-                    let applied = if receipt { guest.ingest_network_frame(generation, &bytes)? }
-                                  else { guest.apply_authority_material(&bytes)? };
+                    let applied = if receipt {
+                        guest.ingest_network_frame(generation, &bytes)?
+                    } else {
+                        guest.apply_authority_material(&bytes)?
+                    };
                     let once = guest.snapshot()?;
-                    let duplicate = if receipt { guest.ingest_network_frame(generation, &bytes)? }
-                                    else { guest.apply_authority_material(&bytes)? };
-                    assert!(duplicate.effects.is_empty(), "duplicate material repeated effects");
-                    assert_eq!(once, guest.snapshot()?, "duplicate material changed endpoint state");
-                    assert_eq!(host.state(), guest.state(), "committed shared game diverged");
-                    assert_eq!(host.snapshot()?.pending_presentations, guest.snapshot()?.pending_presentations);
+                    let duplicate = if receipt {
+                        guest.ingest_network_frame(generation, &bytes)?
+                    } else {
+                        guest.apply_authority_material(&bytes)?
+                    };
+                    assert!(
+                        duplicate.effects.is_empty(),
+                        "duplicate material repeated effects"
+                    );
+                    assert_eq!(
+                        once,
+                        guest.snapshot()?,
+                        "duplicate material changed endpoint state"
+                    );
+                    assert_eq!(
+                        host.state(),
+                        guest.state(),
+                        "committed shared game diverged"
+                    );
+                    assert_eq!(
+                        host.snapshot()?.pending_presentations,
+                        guest.snapshot()?.pending_presentations
+                    );
                     queue.push_back((applied, false, false));
                 }
-                GameKernelEffectV7::Platform(_) => return Err("unexpected persistence during battle witness".into()),
+                GameKernelEffectV7::Platform(_) => {
+                    return Err("unexpected persistence during battle witness".into());
+                }
                 _ => {}
             }
         }
@@ -890,8 +980,16 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
     let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
     guest.ingest_network_frame(generation, &started)?;
     assert_eq!(host.state(), guest.state());
-    let initial_party = host.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?.party.clone();
-    assert_eq!(initial_party.len(), host_choices.len() + guest_choices.len());
+    let initial_party = host
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("run absent")?
+        .party
+        .clone();
+    assert_eq!(
+        initial_party.len(),
+        host_choices.len() + guest_choices.len()
+    );
     let mut proposals = 0;
     let mut materials = 0;
     let mut settled = 0;
@@ -907,18 +1005,31 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
                 settled += 1;
             }
         }
-        let run = host.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
+        let run = host
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("run absent")?;
         let wave = run.wave.get().get();
-        assert!(wave == maximum_wave || wave == maximum_wave + 1, "natural wave skipped");
+        assert!(
+            wave == maximum_wave || wave == maximum_wave + 1,
+            "natural wave skipped"
+        );
         maximum_wave = wave;
-        assert_eq!(run.outcome, er_state::m7_state::RunOutcome::InProgress,
-                   "natural cooperative policy lost before two victories: wave={wave}, decision={decision}, party={:?}", run.party);
+        assert_eq!(
+            run.outcome,
+            er_types::RunOutcome::InProgress,
+            "natural cooperative policy lost before two victories: wave={wave}, decision={decision}, party={:?}",
+            run.party
+        );
         let battle = run.battle.as_ref().ok_or("natural battle absent")?;
         assert_eq!(battle.format.player_capacity, 2);
         assert_eq!(battle.format.enemy_capacity, 2);
         assert_eq!(battle.enemy_party.len(), 2);
         for (pokemon, initial) in run.party.iter().zip(&initial_party) {
-            assert_eq!((pokemon.id, pokemon.species_id, pokemon.owner_seat), (initial.id, initial.species_id, initial.owner_seat));
+            assert_eq!(
+                (pokemon.id, pokemon.species_id, pokemon.owner_seat),
+                (initial.id, initial.species_id, initial.owner_seat)
+            );
         }
         if wave == 2 && !disconnected {
             let shared = host.state().cloned();
@@ -962,9 +1073,16 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
             .map_err(|error| format!("natural cooperative delivery wave={wave}, decision={decision}, kind={kind:?}: {error}"))?;
         proposals += new_proposals;
         materials += new_materials;
-        if let Some(battle) = host.state().and_then(|state| state.active_run.as_ref()).and_then(|run| run.battle.as_ref()) {
+        if let Some(battle) = host
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .and_then(|run| run.battle.as_ref())
+        {
             if battle.wave.get().get() == wave && battle.command_state.frontier.len() == 1 {
-                assert_eq!(battle.turn, previous_turn, "first human command prematurely resolved turn");
+                assert_eq!(
+                    battle.turn, previous_turn,
+                    "first human command prematurely resolved turn"
+                );
                 retained_human_commands += 1;
             }
         }
