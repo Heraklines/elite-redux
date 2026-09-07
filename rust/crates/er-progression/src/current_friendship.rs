@@ -261,7 +261,10 @@ pub(crate) fn prepare_friendship_head(
     };
     if original_delta <= 0.0 {
         plan.friendship = safe(before_friendship + original_delta)?.max(0.0);
-        return Ok(FriendshipHead { plan, has_tail: false });
+        return Ok(FriendshipHead {
+            plan,
+            has_tail: false,
+        });
     }
     let resolved = resolved.ok_or(CurrentFriendshipError::Input)?;
     safe(resolved.boosted_amount)?;
@@ -276,7 +279,10 @@ pub(crate) fn prepare_friendship_head(
     };
     plan.friendship = capped.min(255.0);
     if resolved.fun_debug {
-        return Ok(FriendshipHead { plan, has_tail: false });
+        return Ok(FriendshipHead {
+            plan,
+            has_tail: false,
+        });
     }
     if resolved.provenance.oracle_sha != FRIENDSHIP_ORACLE_SHA
         || resolved.provenance.resolution_sha256.len() != 64
@@ -303,7 +309,10 @@ pub(crate) fn prepare_friendship_head(
         nonnegative_integer(entry.friendship_progress as f64)?;
         safe(entry.candy_count as f64)?;
     }
-    Ok(FriendshipHead { plan, has_tail: true })
+    Ok(FriendshipHead {
+        plan,
+        has_tail: true,
+    })
 }
 
 pub(crate) fn continue_friendship_tail(
