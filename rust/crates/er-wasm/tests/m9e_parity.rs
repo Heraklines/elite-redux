@@ -380,8 +380,22 @@ fn assert_eventwise_parity_contract(
     )?;
     let mut expected_observations = Vec::new();
     let mut material_count = 0;
+    let mut canonical_control_material_count = 0;
     for (index, event) in request.events.iter().enumerate() {
-        let before_digest = game_state_digest(driver.state().ok_or("active state missing")?)?;
+        let before_snapshot = driver.snapshot()?;
+        let mut admission_before = driver.state().cloned().ok_or("active state missing")?;
+        // Material admission restores the retained canonical battle control
+        // before hashing its frontier (game_kernel_v7::collect_battle_action).
+        // Derive only that field from the actual pre-event owner; never from
+        // the returned material. The real driver and its raw report stay intact.
+        if let Some(owner) = &before_snapshot.private_battle_control {
+            admission_before
+                .active_run
+                .as_mut()
+                .ok_or("canonical admission run missing")?
+                .control = owner.canonical_control.clone();
+        }
+        let before_digest = game_state_digest(&admission_before)?;
         let step = apply_timer_event(&mut driver, event.clone())?;
         let snapshot = driver.snapshot()?;
         for effect in &step.effects {
@@ -416,6 +430,9 @@ fn assert_eventwise_parity_contract(
                     format!("blake3-v1:{}", er_canonical::content_digest(bytes)?)
                 );
                 material_count += 1;
+                if before_snapshot.private_battle_control.is_some() {
+                    canonical_control_material_count += 1;
+                }
             }
         }
         expected_observations.push(M9EParityObservationV1 {
@@ -434,6 +451,7 @@ fn assert_eventwise_parity_contract(
     }
     assert_eq!(event_count, 30);
     assert_eq!(material_count, 6);
+    assert!(canonical_control_material_count > 0);
     let expected = M9EParityReportV1 {
         schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
         content_identity_digest: er_canonical::content_digest(content.identity())?,
