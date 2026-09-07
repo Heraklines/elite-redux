@@ -982,7 +982,9 @@ impl GameKernelV7 {
                 if envelope.connection_generation != generation {
                     return Err(GameKernelV7Error::Invalid);
                 }
-                if let Some(reply) = self.current_coop_setup.as_ref()
+                if let Some(reply) = self
+                    .current_coop_setup
+                    .as_ref()
                     .and_then(|owner| owner.last_reply.as_ref())
                     && reply.proposal_hex == current_bytes_hex_v1(bytes)
                 {
@@ -992,7 +994,9 @@ impl GameKernelV7 {
                     return Ok(GameKernelStepV7 {
                         effects: vec![GameKernelEffectV7::AuthorityMaterial {
                             operation_id: envelope.proposal.context.operation_id,
-                            bytes: reply.canonical_bytes().map_err(|_| GameKernelV7Error::Invalid)?,
+                            bytes: reply
+                                .canonical_bytes()
+                                .map_err(|_| GameKernelV7Error::Invalid)?,
                         }],
                         internal_events: Vec::new(),
                     });

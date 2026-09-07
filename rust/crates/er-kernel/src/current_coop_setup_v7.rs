@@ -241,15 +241,24 @@ pub(crate) fn validate_snapshot(
             return Err(GameKernelV7Error::Invalid);
         }
         let evidence = reply.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
-        reply.canonical_bytes().map_err(|_| GameKernelV7Error::Invalid)?;
+        reply
+            .canonical_bytes()
+            .map_err(|_| GameKernelV7Error::Invalid)?;
         let transition = evidence.material.transition();
         let state = match &snapshot.lifecycle {
             GameKernelLifecycleSnapshotV7::Active(state)
             | GameKernelLifecycleSnapshotV7::Terminal { state, .. } => state,
             _ => return Err(GameKernelV7Error::Invalid),
         };
-        let current_run = state.active_run.as_ref().ok_or(GameKernelV7Error::Invalid)?;
-        let reply_run = transition.after_state.active_run.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+        let current_run = state
+            .active_run
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let reply_run = transition
+            .after_state
+            .active_run
+            .as_ref()
+            .ok_or(GameKernelV7Error::Invalid)?;
         if reply.authority_context != owner.local
             || evidence.proposal.sender_seat != owner.peer.sender_seat_id
             || evidence.proposal.connection_generation != owner.peer.connection_generation
@@ -262,7 +271,10 @@ pub(crate) fn validate_snapshot(
         {
             return Err(GameKernelV7Error::Invalid);
         }
-        transition.after_state.validate_with(content).map_err(|_| GameKernelV7Error::Invalid)?;
+        transition
+            .after_state
+            .validate_with(content)
+            .map_err(|_| GameKernelV7Error::Invalid)?;
         // The independent receipt survives the bounded ledger. Any retained
         // overlap must still identify the exact originally committed material.
         for record in &snapshot.material_ledger.records {
@@ -276,10 +288,18 @@ pub(crate) fn validate_snapshot(
                 return Err(GameKernelV7Error::Invalid);
             }
         }
-        let first_retained = snapshot.material_ledger.records.first()
-            .map_or(snapshot.material_ledger.next_authority_revision, |record| record.authority_revision);
+        let first_retained = snapshot
+            .material_ledger
+            .records
+            .first()
+            .map_or(snapshot.material_ledger.next_authority_revision, |record| {
+                record.authority_revision
+            });
         if transition.authority_revision >= first_retained
-            && snapshot.material_ledger.record(&transition.operation_id).is_none()
+            && snapshot
+                .material_ledger
+                .record(&transition.operation_id)
+                .is_none()
         {
             return Err(GameKernelV7Error::Invalid);
         }
