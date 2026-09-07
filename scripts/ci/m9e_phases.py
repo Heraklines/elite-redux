@@ -1078,10 +1078,7 @@ def platform(feedback):
     source = Path(os.environ["M9E_PHASE_DIR"])
     native_hash = os.environ["M9E_NATIVE_MANIFEST_SHA256"]
     native = read_bounded(source / "proof/native-a.json", native_hash)
-    fifth_hash = os.environ["M9E_NATIVE_E_MANIFEST_SHA256"]
-    fifth = read_bounded(directory / "proof/native-e.json", fifth_hash)
     expected = identity(feedback)
-    validate_native(fifth, expected)
     validate_native(native, expected)
     if native["lane"] != "a":
         raise RuntimeError("platform requires lane A's candidate CLI and native parity")
@@ -1198,7 +1195,7 @@ def compact_storage_evidence(compact, full_hash):
 def compact_worker_evidence(compact, full_hash):
     # Native and browser worker bytes, profiles and hashes stay in the full proof.
     # The bounded result index may refer to each exact field of that same proof.
-    for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+    for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "worker_storage_tests", "title_storage_tests"):
         if len(encoded(compact)) <= 16000:
             break
         if key in compact:

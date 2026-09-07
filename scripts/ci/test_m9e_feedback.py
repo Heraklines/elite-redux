@@ -6599,7 +6599,7 @@ class FeedbackTests(unittest.TestCase):
         inventory = [{"crate": "er-cli", "target": "m9e_current_control_query",
                       "ids": list(phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []}]
         phases.validate_control_query_inventory(selection, inventory)
-        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": [], "d": []})
+        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": [], "d": [], "e": []})
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded", "duplicate", "missing_target"):
             bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
             if mode == "missing_flag":
@@ -7040,7 +7040,7 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(selection["required_native_targets"][crate], expected)
             assignment = phases.partition([{"crate": crate, "target": target, "ids": [test], "historical_excluded_ids": []}
                                           for crate, target, test in ((*cost.TARGET, cost.TEST_ID), ("er-cli", rule.RULE_TARGET, rule.RULE_TEST))])
-            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]], "d": []})
+            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]], "d": [], "e": []})
         for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml", "unmapped.json"):
             self.changed = [cost.SOURCE, rule.RULE_TEST_SOURCE, extra]
             with self.subTest(extra=extra), self.assertRaises(RuntimeError):
@@ -8815,7 +8815,7 @@ class PhaseTransferTests(unittest.TestCase):
             result = self.phases.aggregate(None)
         self.assertEqual(result["tests"], {"selected": 16, "executed": 16, "passed": 16, "failed": 0, "skipped": 0})
         self.assertEqual(result["native_c_manifest_sha256"], self.third_hash)
-        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d"})
+        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d", "e"})
 
     def test_third_lane_is_mandatory_even_for_an_empty_assigned_partition(self):
         for state in ("", "failure", "skipped", "cancelled"):
@@ -11050,7 +11050,7 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
 class CompactWorkerEvidenceTests(unittest.TestCase):
     def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "worker_storage_tests", "title_storage_tests"):
             full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
                     "tests": {"selected": 665, "executed": 665, "passed": 665, "failed": 0, "skipped": 0},
                     key: {lane: {"sha256": lane * 64, "profile": "x" * 600} for lane in "abcd"},
@@ -11067,7 +11067,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_small_worker_details_remain_inline(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "worker_storage_tests", "title_storage_tests"):
             full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
                     key: {"d": {"sha256": "d" * 64}}}
             compact = phases.compact_summary(full, "e" * 64, {})
@@ -11077,7 +11077,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_unbounded_required_result_still_fails_closed(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "worker_storage_tests", "title_storage_tests"):
             with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
                 phases.compact_summary({"first_failure": "x" * 16001, key: {"d": "detail"}}, "e" * 64, {})
 
