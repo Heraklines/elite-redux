@@ -35,12 +35,17 @@ jobs:
           ids = [10, 33, 39, 43, 45, 61, 64, 78, 79, 108, 110, 175, 314, 331, 580]
           moves = [row for row in bundle['battle']['moves'] if row and row['id'] in ids]
           assert len(moves) == len(ids)
+          selected_species = {13, 16, 19, 21, 60, 88}
+          progression = [row for row in bundle['progression']['species']
+                         if row['species'] in selected_species and row['form'] == 0]
+          assert len(progression) == 6
+          evolutions = [row for row in bundle['progression']['evolutions'] if row['source_species'] in selected_species]
           result = {'status': 'passed', 'qualification': 'bounded generated-content inspection only; no game qualification',
                     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
                     'bundle_sha256': digest, 'oracle_sha': bundle['oracle_sha'], 'moves': moves,
                     'bootstrap': {key: value for key, value in bundle['bootstrap'].items()
                                   if key not in ('content_hash', 'starters')},
-                    'starters': bundle['bootstrap']['starters'][:20],
+                    'progression': progression, 'evolutions': evolutions,
                     'source_hashes': {name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in (
                         '.github/workflows/m9e-campaign-content-probe.yml',
                         'rust/crates/er-game/src/m9e_new_run_v6.rs',

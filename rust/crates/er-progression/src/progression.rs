@@ -473,6 +473,16 @@ fn recalculate_stats(
     Ok(())
 }
 
+/// Calculate persistent stats from the caller's resolved form and effective nature.
+/// Current and historical progression share the same IV/bonus/stat arithmetic.
+pub fn calculate_pokemon_stats(
+    pokemon: &PokemonStateV5,
+    base: SpeciesBaseStats,
+    nature: &crate::NatureDefinitionV1,
+) -> Result<BattleStats, ProgressionError> {
+    calculate_stats(pokemon, base, nature)
+}
+
 fn calculate_stats(
     pokemon: &PokemonStateV5,
     base: SpeciesBaseStats,

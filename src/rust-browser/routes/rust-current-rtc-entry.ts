@@ -83,7 +83,7 @@ export class CurrentDevelopmentRtcPeerV1 {
     this.#router = new BrowserEffectRouterV2({
       renderUi: () => {}, changePresentationScene: () => {}, requestAsset: () => {}, playAudioCue: () => {},
       recordTelemetry: () => {}, showTerminal: () => {}, handleStorageRequest: unsupported,
-      publishRepro: unsupported, publishCurrentRepro: unsupported, dispose: () => {},
+      publishRepro: unsupported, publishCurrentRepro: () => {}, dispose: () => {},
       present: async effect => {
         if (this.#settlements.length >= 16) throw new Error("current RTC deferred settlement count exceeds bound");
         const eventId = effect.event_id;
@@ -133,13 +133,25 @@ export class CurrentDevelopmentRtcPeerV1 {
   }
 
   dispatch(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
-    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
-      return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot scope"));
+    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
+      return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot/export scope"));
     }
-    if (request.kind !== "SNAPSHOT" && !this.#transport?.status.connected) {
+    if (!["SNAPSHOT", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
       return Promise.reject(new Error("current RTC gameplay requires its admitted peer connection"));
     }
     return this.#enqueue(request);
+  }
+
+  /** Return this Worker's complete current capture to the caller. Export is
+   * read-only and remains available after transport closure. No upload occurs.
+   */
+  async exportRepro(): Promise<Uint8Array> {
+    const response = await this.dispatch({ kind: "EXPORT_REPRO" });
+    if (response.response.kind !== "EFFECTS" || response.response.batch.effects.length !== 1
+      || response.response.batch.effects[0].kind !== "CURRENT_REPRO_READY") {
+      throw new Error("current RTC export did not return its sole current capsule");
+    }
+    return Uint8Array.from(response.response.batch.effects[0].capsule_bytes);
   }
 
   #enqueue(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {

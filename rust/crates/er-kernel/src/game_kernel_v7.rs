@@ -515,6 +515,8 @@ impl GameKernelV7 {
             .mode(run.mode.get().get())
             .map(|mode| mode.policy)
             .ok_or(GameKernelV7Error::Invalid)?;
+        // Commit the AI owner only after every actor command and cursor validates.
+        let mut candidate_ai = self.authority_ai.clone();
         let mut accepted = Vec::new();
         for field in battle.field.slots.iter().filter(|slot| {
             slot.slot.side == er_types::battle_ids::BattleSide::Enemy && slot.occupant.is_some()
@@ -640,8 +642,7 @@ impl GameKernelV7 {
                     ))
                 })
                 .collect::<Result<BTreeMap<_, _>, GameKernelV7Error>>()?;
-            let decision = self
-                .authority_ai
+            let decision = candidate_ai
                 .as_mut()
                 .ok_or(GameKernelV7Error::Invalid)?
                 .choose_single(true, policy, &actor_view, &contexts, None)
@@ -704,6 +705,7 @@ impl GameKernelV7 {
             .map_err(|_| GameKernelV7Error::Invalid)?;
             accepted.push(er_types::battle_command::AcceptedBattleCommand::scripted_enemy(command));
         }
+        self.authority_ai = candidate_ai;
         Ok(accepted)
     }
 
