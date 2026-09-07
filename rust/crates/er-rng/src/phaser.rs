@@ -269,6 +269,12 @@ impl PhaserRdg {
         generator
     }
 
+    /// Sows JavaScript UTF-16 code units, including unpaired surrogate units.
+    pub(crate) fn from_seed_units(seed: &[u16]) -> Self {
+        let mut generator = Self::from_seeds::<&str>(&[]);
+        generator.sow_seed_units(seed.iter().copied());
+        generator
+    }
     /// Restores the four canonical draw fields. Phaser's private `n` is excluded.
     pub fn from_state(state: &PhaserRdgState) -> Result<Self, RngError> {
         state.validate()?;
@@ -317,25 +323,27 @@ impl PhaserRdg {
         self.carry = 1;
 
         for seed in seeds {
-            let seed = seed.as_ref();
-            let s0_hash = self.hash(seed);
-            self.s0 -= s0_hash;
-            if self.s0 < 0.0 {
-                self.s0 += 1.0;
-            }
-            let s1_hash = self.hash(seed);
-            self.s1 -= s1_hash;
-            if self.s1 < 0.0 {
-                self.s1 += 1.0;
-            }
-            let s2_hash = self.hash(seed);
-            self.s2 -= s2_hash;
-            if self.s2 < 0.0 {
-                self.s2 += 1.0;
-            }
+            self.sow_seed_units(seed.as_ref().encode_utf16());
         }
     }
 
+    fn sow_seed_units(&mut self, units: impl Iterator<Item = u16> + Clone) {
+        let s0_hash = self.hash_units(units.clone());
+        self.s0 -= s0_hash;
+        if self.s0 < 0.0 {
+            self.s0 += 1.0;
+        }
+        let s1_hash = self.hash_units(units.clone());
+        self.s1 -= s1_hash;
+        if self.s1 < 0.0 {
+            self.s1 += 1.0;
+        }
+        let s2_hash = self.hash_units(units);
+        self.s2 -= s2_hash;
+        if self.s2 < 0.0 {
+            self.s2 += 1.0;
+        }
+    }
     /// Executes one exact Phaser primitive transition.
     pub fn rnd(&mut self) -> f64 {
         let state_product = PHASER_MULTIPLIER * self.s0;
@@ -498,8 +506,12 @@ impl PhaserRdg {
     }
 
     fn hash(&mut self, data: &str) -> f64 {
+        self.hash_units(data.encode_utf16())
+    }
+
+    fn hash_units(&mut self, units: impl Iterator<Item = u16>) -> f64 {
         let mut n = self.n;
-        for code_unit in data.encode_utf16() {
+        for code_unit in units {
             n += f64::from(code_unit);
             let mut h = HASH_MULTIPLIER * n;
             n = f64::from(js_to_int32(h));
@@ -516,14 +528,18 @@ impl PhaserRdg {
 
 /// Applies JavaScript `String.fromCharCode(charCodeAt(i) + shift)` by UTF-16 unit.
 pub fn shift_char_codes(value: &str, shift: i64) -> Result<String, RngError> {
-    let shifted = value
+    String::from_utf16(&shift_char_code_units(value, shift))
+        .map_err(|_| RngError::UnpairedShiftedSurrogate)
+}
+
+pub(crate) fn shift_char_code_units(value: &str, shift: i64) -> Vec<u16> {
+    value
         .encode_utf16()
         .map(|code_unit| {
             let sum = i128::from(code_unit) + i128::from(shift);
             sum.rem_euclid(65_536) as u16
         })
-        .collect::<Vec<_>>();
-    String::from_utf16(&shifted).map_err(|_| RngError::UnpairedShiftedSurrogate)
+        .collect()
 }
 
 pub(crate) fn checked_range_max(

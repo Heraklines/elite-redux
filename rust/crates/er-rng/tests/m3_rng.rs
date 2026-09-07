@@ -536,7 +536,8 @@ fn battle_construction_uses_wave_offset_and_sixteen_closed_character_draws()
 }
 
 #[test]
-fn callsite_and_shift_failures_leave_runtime_and_audit_unchanged() -> Result<(), Box<dyn Error>> {
+fn callsite_failures_are_atomic_and_shifted_surrogates_are_supported() -> Result<(), Box<dyn Error>>
+{
     let mut runtime = runtime_with_battle()?;
     let before = runtime.clone();
     assert!(matches!(
@@ -554,18 +555,26 @@ fn callsite_and_shift_failures_leave_runtime_and_audit_unchanged() -> Result<(),
         rdg: PhaserRdg::from_seed("run").state(),
     };
     let surrogate_battle = BattleRngState::new("ퟀ", turn(1)?);
-    let mut malformed = RngRuntime::from_states(run, Some(surrogate_battle))?;
-    let malformed_before = malformed.clone();
-    assert!(matches!(
-        malformed.battle_rand_seed_int(
-            safe(100)?,
-            SafeU53::ZERO,
-            RngReason::Accuracy,
-            RngCallsiteId::accuracy(),
-        ),
-        Err(RngError::UnpairedShiftedSurrogate)
-    ));
-    assert_eq!(malformed, malformed_before);
+    let mut shifted = RngRuntime::from_states(run, Some(surrogate_battle))?;
+    let outer_before = shifted.run_state();
+    // JavaScript strings retain the U+D800 code unit produced by this shift.
+    // The pinned Phaser reference suite covers all three shifted entry points.
+    let value = shifted.battle_rand_seed_int(
+        safe(100)?,
+        SafeU53::ZERO,
+        RngReason::Accuracy,
+        RngCallsiteId::accuracy(),
+    )?;
+    assert!(value.get() < 100);
+    assert_eq!(shifted.run_state(), outer_before);
+    assert!(shifted.seed_override().is_none());
+    assert!(
+        shifted
+            .battle_state()
+            .and_then(|battle| battle.saved_substream.as_ref())
+            .is_some()
+    );
+    assert_eq!(shifted.audit_entries().len(), 1);
     Ok(())
 }
 

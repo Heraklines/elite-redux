@@ -10,7 +10,7 @@ use crate::audit::{
 };
 use crate::phaser::{
     PhaserRdg, PhaserRdgState, RngError, RunRngState, checked_range_max, safe_from_usize,
-    shift_char_codes,
+    shift_char_code_units,
 };
 
 const BATTLE_SEED_ALPHABET: &[u8; 62] =
@@ -156,13 +156,13 @@ impl RngRuntime {
         let offset = u64::try_from(offset).map_err(|_| RngError::UnsafeSeedOffset)?;
         let offset = SafeU53::new(offset).map_err(|_| RngError::UnsafeSeedOffset)?;
         let shift = i64::try_from(offset.get()).map_err(|_| RngError::UnsafeSeedOffset)?;
-        let shifted_seed = shift_char_codes(wave_seed, shift)?;
+        let shifted_seed = shift_char_code_units(wave_seed, shift);
 
         let mut staged = self.clone();
         let saved_run = staged.run.clone();
         let saved_offset = staged.seed_offset.clone();
         let saved_override = staged.seed_override.clone();
-        staged.run = PhaserRdg::from_seed(&shifted_seed);
+        staged.run = PhaserRdg::from_seed_units(&shifted_seed);
         staged.seed_offset = Some(SeedOffsetContext {
             wave_seed: wave_seed.to_owned(),
             offset,
@@ -405,14 +405,14 @@ impl RngRuntime {
             .ok_or(RngError::UnsafeSeedOffset)?;
         let offset = SafeU53::new(offset).map_err(|_| RngError::UnsafeSeedOffset)?;
         let shift = i64::try_from(offset.get()).map_err(|_| RngError::UnsafeSeedOffset)?;
-        let shifted_seed = shift_char_codes(wave_seed, shift)?;
+        let shifted_seed = shift_char_code_units(wave_seed, shift);
 
         let mut staged = self.clone();
         let mut staged_values = values.to_vec();
         let saved_run = staged.run.clone();
         let saved_offset = staged.seed_offset.clone();
         let saved_override = staged.seed_override.clone();
-        staged.run = PhaserRdg::from_seed(&shifted_seed);
+        staged.run = PhaserRdg::from_seed_units(&shifted_seed);
         staged.seed_offset = Some(SeedOffsetContext {
             wave_seed: wave_seed.to_owned(),
             offset,
@@ -509,8 +509,8 @@ impl RngRuntime {
                 PhaserRdg::from_state(saved_substream)?
             } else {
                 let turn_shift = js_shift_left(u64::from(battle.turn), 6);
-                let seed = shift_char_codes(&battle.battle_seed, i64::from(turn_shift))?;
-                PhaserRdg::from_seed(&seed)
+                let seed = shift_char_code_units(&battle.battle_seed, i64::from(turn_shift));
+                PhaserRdg::from_seed_units(&seed)
             };
             let saved_override = self.seed_override.clone();
             self.seed_override = Some(battle.battle_seed.clone());
