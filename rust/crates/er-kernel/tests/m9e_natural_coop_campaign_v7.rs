@@ -365,7 +365,12 @@ fn deliver_play_step(
                 GameKernelEffectV7::ProposalReady { bytes, .. } => {
                     assert!(!from_host);
                     proposals += 1;
-                    let response = host.ingest_network_frame(generation, &bytes)?;
+                    let response = host.ingest_network_frame(generation, &bytes).map_err(|error| {
+                        let retained = host.snapshot().ok().and_then(|snapshot| snapshot.protocol)
+                            .and_then(|protocol| protocol.proposal_admission)
+                            .map(|admission| (admission.capacity.get(), admission.fingerprints.len()));
+                        format!("authority proposal admission failed with capacity/retained={retained:?}: {error}")
+                    })?;
                     assert!(response.effects.iter().any(|effect| matches!(
                         effect,
                         GameKernelEffectV7::AuthorityMaterial { .. }
