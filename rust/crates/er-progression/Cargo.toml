@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+libm = "=0.2.16"
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
 er-state = { path = "../er-state" }

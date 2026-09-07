@@ -530,6 +530,7 @@ dependencies = [
  "er-content",
  "er-state",
  "er-types",
+ "libm",
  "proptest",
  "serde",
  "serde_json",

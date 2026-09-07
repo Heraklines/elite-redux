@@ -108,12 +108,12 @@ pub fn current_growth_experience_for_level(
             .ok_or(ProgressionError::Content);
     }
     let level = f64::from(level);
-    let cube = level.powi(3);
+    let cube = libm::pow(level, 3.0);
     let raw = match growth.id.get() {
-        0 => (level.powi(4) + cube * 2000.0) / 3500.0,
+        0 => (libm::pow(level, 4.0) + cube * 2000.0) / 3500.0,
         1 => (cube * 4.0) / 5.0,
         2 => cube,
-        3 => (cube * 6.0) / 5.0 - 15.0 * level.powi(2) + 100.0 * level - 140.0,
+        3 => (cube * 6.0) / 5.0 - 15.0 * libm::pow(level, 2.0) + 100.0 * level - 140.0,
         4 => (cube * 5.0) / 4.0,
         5 => (cube * (level / 2.0 + 8.0) * 4.0) / (100.0 + level),
         _ => return Err(ProgressionError::Content),
