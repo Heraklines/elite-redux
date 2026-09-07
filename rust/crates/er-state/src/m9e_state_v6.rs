@@ -201,15 +201,13 @@ impl GameStateV6 {
             .current_battle_participation
             .as_ref()
             .and_then(|value| value.experience.as_ref())
-        {
-            if !content.supports_current_experience_mode(owner.mode)
+            && (!content.supports_current_experience_mode(owner.mode)
                 || !owner
                     .enemy_sources
                     .iter()
-                    .all(|source| content.current_experience_source_matches(source))
-            {
-                return Err(GameStateV6Error::Content);
-            }
+                    .all(|source| content.current_experience_source_matches(source)))
+        {
+            return Err(GameStateV6Error::Content);
         }
         if &self.content_identity != content.identity() {
             return Err(GameStateV6Error::Content);
