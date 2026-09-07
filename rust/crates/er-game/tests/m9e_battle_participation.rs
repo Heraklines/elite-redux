@@ -588,8 +588,10 @@ fn observed_save_snapshot_and_material_replay_preserve_ownership() -> TestResult
     assert_eq!(replica.state(), observed.state());
     let accepted = serde_json::to_vec(&replica.snapshot())?;
     let mut conflicting = GameMaterialV6::decode(&first.material_bytes)?;
-    let Some(GamePlatformEffectV2::Telemetry { event, .. }) =
-        conflicting.transition_mut().platform_effects.first_mut()
+    let GameMaterialV6::BattleTurn(transition) = &mut conflicting else {
+        return Err("real battle-turn material required".into());
+    };
+    let Some(GamePlatformEffectV2::Telemetry { event, .. }) = transition.platform_effects.first_mut()
     else {
         return Err("real material telemetry required".into());
     };
