@@ -214,7 +214,10 @@ fn checkpoint(wave: u64) -> Result<(GameKernelV7, Arc<PreparedGameContentV2>), B
         }
         press(&mut kernel, PhysicalKey::Space)?;
     }
-    assert_eq!(kernel.current_control().map(|control| control.kind), Some(GameControlKindV2::Reward));
+    assert_eq!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::Reward)
+    );
     for pending in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(pending.event_id)?;
     }
@@ -240,8 +243,14 @@ fn checkpoint(wave: u64) -> Result<(GameKernelV7, Arc<PreparedGameContentV2>), B
     let revision = safe(run.control.revision.get() + 1);
     state.validate_with(content.as_ref())?;
     let kernel = GameKernelV7::from_active(
-        state, revision, SeatId::new(safe(1)), GameKernelRoleV7::Authority,
-        content.clone(), snapshot.input_router, snapshot.scheduler, None,
+        state,
+        revision,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content.clone(),
+        snapshot.input_router,
+        snapshot.scheduler,
+        None,
     )?;
     Ok((kernel, content))
 }
@@ -253,16 +262,40 @@ fn raw_checkpoint_reward_restores_party_and_replays_from_snapshot() -> Result<()
     let snapshot = kernel.snapshot()?;
     let before = kernel.state().ok_or("state absent")?.clone();
     let mut restored = GameKernelV7::from_snapshot(
-        snapshot, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content.clone(),
+        snapshot,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content.clone(),
     )?;
-    assert_eq!(press(&mut kernel, PhysicalKey::Space)?, press(&mut restored, PhysicalKey::Space)?);
+    assert_eq!(
+        press(&mut kernel, PhysicalKey::Space)?,
+        press(&mut restored, PhysicalKey::Space)?
+    );
     assert_eq!(kernel.snapshot()?, restored.snapshot()?);
-    let run = kernel.state().ok_or("state absent")?.active_run.as_ref().ok_or("run absent")?;
+    let run = kernel
+        .state()
+        .ok_or("state absent")?
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?;
     assert_eq!(run.wave.get().get(), 11);
-    for (old, pokemon) in before.active_run.as_ref().ok_or("old run absent")?.party.iter().zip(&run.party) {
+    for (old, pokemon) in before
+        .active_run
+        .as_ref()
+        .ok_or("old run absent")?
+        .party
+        .iter()
+        .zip(&run.party)
+    {
         assert_eq!(pokemon.hp, pokemon.max_hp, "checkpoint did not restore HP");
-        assert!(!pokemon.fainted, "default checkpoint did not revive the party");
-        assert_eq!(pokemon.status.kind, er_types::battle_model::StatusKind::None);
+        assert!(
+            !pokemon.fainted,
+            "default checkpoint did not revive the party"
+        );
+        assert_eq!(
+            pokemon.status.kind,
+            er_types::battle_model::StatusKind::None
+        );
         assert_eq!(pokemon.status.toxic_turn_count, 0);
         assert_eq!(pokemon.status.sleep_turns_remaining, None);
         assert!(pokemon.moves.iter().flatten().all(|slot| slot.pp_used == 0));
@@ -270,8 +303,13 @@ fn raw_checkpoint_reward_restores_party_and_replays_from_snapshot() -> Result<()
         expected.hp = old.max_hp;
         expected.fainted = false;
         expected.status = pokemon.status;
-        for slot in expected.moves.iter_mut().flatten() { slot.pp_used = 0; }
-        assert_eq!(pokemon, &expected, "checkpoint changed unrelated persistent data");
+        for slot in expected.moves.iter_mut().flatten() {
+            slot.pp_used = 0;
+        }
+        assert_eq!(
+            pokemon, &expected,
+            "checkpoint changed unrelated persistent data"
+        );
     }
     kernel.snapshot()?.validate(content.as_ref())?;
     Ok(())
@@ -280,10 +318,22 @@ fn raw_checkpoint_reward_restores_party_and_replays_from_snapshot() -> Result<()
 #[test]
 fn ordinary_wave_reward_preserves_damage_status_and_used_pp() -> Result<(), Box<dyn Error>> {
     let (mut kernel, content) = checkpoint(9)?;
-    let before = kernel.state().ok_or("state absent")?.active_run.as_ref().ok_or("run absent")?.party.clone();
+    let before = kernel
+        .state()
+        .ok_or("state absent")?
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?
+        .party
+        .clone();
     navigate_down_to(&mut kernel, "reward/decline")?;
     press(&mut kernel, PhysicalKey::Space)?;
-    let run = kernel.state().ok_or("state absent")?.active_run.as_ref().ok_or("run absent")?;
+    let run = kernel
+        .state()
+        .ok_or("state absent")?
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?;
     assert_eq!(run.wave.get().get(), 10);
     assert_eq!(run.party, before, "ordinary wave granted a free restore");
     kernel.snapshot()?.validate(content.as_ref())?;
