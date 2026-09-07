@@ -4,6 +4,7 @@ on:
     branches: [codex/m9e-recovery-integration-preflight-20260907]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: m9e-prepared-gate-preflight-${{ github.ref }}
   cancel-in-progress: true
@@ -23,6 +24,13 @@ jobs:
           persist-credentials: false
           submodules: false
           lfs: false
+      - name: Retrieve only bounded qualified aggregate metadata
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: '10002411170'
+          run-id: '34074237225'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/m9e-retained-aggregate
       - name: Verify candidate and execute only harness selftests
         shell: bash
         run: |

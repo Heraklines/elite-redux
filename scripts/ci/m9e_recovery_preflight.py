@@ -62,6 +62,40 @@ def main():
     if not plan.get("rule_worker") or not plan.get("timer_mutant") or not plan.get("replica_mutant"):
         raise RuntimeError("previously qualified rule or mutant evidence omitted")
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/diagnostics/integration-plan.json").write_text(json.dumps(plan, sort_keys=True) + "\n")
+    # A structural projection checks the real serializer's byte bound before a
+    # costly combined run. These substituted fields are never game evidence.
+    import copy
+    import hashlib
+    import m9e_phases as phases
+    retained = list((Path(os.environ["RUNNER_TEMP"]) / "m9e-retained-aggregate").rglob("phase-summary.json"))
+    if len(retained) != 1:
+        raise RuntimeError("one qualified retained aggregate required")
+    raw = retained[0].read_bytes()
+    if len(raw) != 57869 or hashlib.sha256(raw).hexdigest() != "b6c57b85bcd7689d9a186fea91b32076784a692bdfa68e7322c0855f70ffbae2":
+        raise RuntimeError("retained aggregate bytes differ")
+    projected = json.loads(raw)
+    if projected["product_sha"] != QUALIFIED_BASELINE or projected["identity"]["run_id"] != "34074237225":
+        raise RuntimeError("retained aggregate identity differs")
+    projected["identity"] = phases.identity(feedback)
+    projected["product_sha"] = os.environ["GITHUB_SHA"]
+    projected["current_coop_startup"]["replay_workers"] = 4
+    for target, ids in ((feedback.AI_COMMAND_TARGET, feedback.AI_COMMAND_IDS),
+                        (feedback.REPLACEMENT_TARGET, feedback.REPLACEMENT_IDS),
+                        (feedback.PROGRESSION_TARGET, feedback.PROGRESSION_IDS)):
+        projected["required_native_target_counts"]["er-kernel:" + target] = len(ids)
+    projected["tests"] = {"selected": 663, "executed": 663, "passed": 663, "failed": 0, "skipped": 0}
+    frozen = copy.deepcopy(projected)
+    digest = hashlib.sha256(phases.encoded(projected)).hexdigest()
+    compact = phases.compact_summary(projected, digest, {})
+    if projected != frozen or len(phases.encoded(compact)) > 16000:
+        raise RuntimeError("projected compact bound or full metadata conservation failed")
+    for key in ("identity", "tests", "required_native_target_counts", "current_coop_startup"):
+        if compact[key] != projected[key]:
+            raise RuntimeError("projected compact discarded required identity")
+    receipt = {"status": "passed", "qualification": "structural compaction projection only; no native or platform qualification",
+               "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
+               "compact_bytes": len(phases.encoded(compact)), "retained_sha256": hashlib.sha256(raw).hexdigest()}
+    (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
     print("Passed: actual combined eight-path source scope, all79 prior targets, exact six new IDs, and retained co-op/platform/cost/rule/mutant obligations.")
 
 
