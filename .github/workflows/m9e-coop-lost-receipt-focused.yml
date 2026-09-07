@@ -39,7 +39,7 @@ jobs:
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Install pinned Rust tooling remotely
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
-      - name: Actual independent raw choices and atomic party formation
+      - name: Actual lost reply recovery and bounded receipt ownership
         run: python3 scripts/ci/m9e_coop_lost_receipt_diagnostic.py
       - name: Compact focused result
         if: always()

@@ -1046,11 +1046,6 @@ impl GameKernelV7 {
                         *material = receipt
                             .canonical_bytes()
                             .map_err(|_| GameKernelV7Error::Invalid)?;
-                        if let Some(owner) = candidate.current_coop_setup.as_mut()
-                            && owner.started.is_some()
-                        {
-                            owner.last_reply = Some(Box::new(receipt));
-                        }
                         matched += 1;
                     }
                 }
@@ -1685,6 +1680,13 @@ impl GameKernelV7 {
         };
         let mut staged = self.clone();
         let mut protocol = protocol;
+        // A successful new proposal replaces the previous retry owner. Clear
+        // only this transaction's clone, so failed admission preserves it and a
+        // capacity-one window may retire its fingerprint before installing the
+        // newly committed receipt. The raw API retains its raw returned effects.
+        if let Some(owner) = staged.current_coop_setup.as_mut() {
+            owner.last_reply = None;
+        }
         if let Some(index) = retirement {
             protocol
                 .proposal_admission
@@ -1695,6 +1697,22 @@ impl GameKernelV7 {
             staged.protocol = Some(protocol.clone());
         }
         let step = staged.apply_admitted_game_proposal(envelope, protocol, fingerprint)?;
+        if let Some(owner) = staged.current_coop_setup.as_mut()
+            && owner.started.is_some()
+        {
+            let mut materials = step.effects.iter().filter_map(|effect| match effect {
+                GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
+                _ => None,
+            });
+            let material = materials.next().ok_or(GameKernelV7Error::Invalid)?;
+            if materials.next().is_some() {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            owner.last_reply = Some(Box::new(
+                CurrentProposalMaterialReceiptV1::from_admission(bytes, material, owner.local.clone())
+                    .map_err(|_| GameKernelV7Error::Invalid)?,
+            ));
+        }
         staged.validate()?;
         *self = staged;
         Ok(step)

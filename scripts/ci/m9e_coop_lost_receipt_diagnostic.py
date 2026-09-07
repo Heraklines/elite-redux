@@ -20,7 +20,8 @@ RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-ker
                 "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
                 "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs"]
 TEST_TARGET = "m9e_coop_lost_receipt_v7"
-TEST_IDS = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution"]
+TEST_IDS = ["natural_cooperative_lost_reply_restores_retries_and_continues_without_reexecution",
+            "owned_reply_raw_admission_replaces_capacity_one_and_rejects_forged_snapshots"]
 sequence = 0
 logs = {}
 failed_log = None
@@ -94,6 +95,7 @@ def main(summary):
                "rust/crates/er-state/src/m9e_state_v6.rs", "rust/crates/er-state/src/m7_state.rs",
                "rust/crates/er-rng/src/phaser.rs", "rust/crates/er-rng/src/battle.rs", "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
                "rust/crates/er-game/Cargo.toml", "rust/crates/er-kernel/Cargo.toml",
+               "rust/crates/er-kernel/src/current_proposal_v7.rs",
                "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_coop_lost_receipt_diagnostic.py",
                ".github/workflows/m9e-coop-lost-receipt-focused.yml",
                "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"]
@@ -121,7 +123,7 @@ def main(summary):
     if (digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
-    summary["tests"] = {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}
+    summary["tests"] = {"executed": len(TEST_IDS), "passed": len(TEST_IDS), "failed": 0, "skipped": 0}
 
 
 if __name__ == "__main__":

@@ -241,6 +241,17 @@ pub(crate) fn validate_snapshot(
             return Err(GameKernelV7Error::Invalid);
         }
         let evidence = reply.evidence().map_err(|_| GameKernelV7Error::Invalid)?;
+        let fingerprint = content_digest(&evidence.proposal.proposal)
+            .map(|digest| format!("blake3-v1:{digest}"))
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+        if !protocol.proposal_admission.as_ref().is_some_and(|admission| {
+            admission.fingerprints.iter().any(|record| {
+                record.operation_id == evidence.proposal.proposal.context.operation_id
+                    && record.fingerprint == fingerprint
+            })
+        }) {
+            return Err(GameKernelV7Error::Invalid);
+        }
         reply
             .canonical_bytes()
             .map_err(|_| GameKernelV7Error::Invalid)?;
