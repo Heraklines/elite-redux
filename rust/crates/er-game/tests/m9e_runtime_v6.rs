@@ -33,6 +33,7 @@ fn prepared() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
 
 fn state(content: &PreparedGameContentV2) -> Result<GameStateV6, Box<dyn Error>> {
     Ok(GameStateV6 {
+        current_battle_participation: None,
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: content.identity().clone(),
         identities: GameIdentityAllocatorStateV1::derive(None)?,

@@ -334,3 +334,72 @@ fn experience_classes_are_closed_and_every_metadata_field_is_hashed() -> Result<
     }
     Ok(())
 }
+
+#[test]
+fn compiled_experience_bridge_never_reinterprets_species_rows() -> Result<(), Box<dyn Error>> {
+    // Hand-authored metadata fixture: proves row semantics, not the generated source export.
+    let species = SpeciesId::try_from_u64(1)?;
+    let prepared = mapped_pack()?.prepare(
+        &BTreeSet::from([species]),
+        &BTreeSet::from([MoveId::try_from_u64(22)?]),
+    )?;
+    assert_eq!(
+        prepared.experience_for_compiled_form(species, 0),
+        Err(ProgressionContentV2Error::ExperienceUnsupported)
+    );
+    for (row, source_index, base) in [(1, 0, 100), (2, 1, 200)] {
+        let value = prepared.experience_for_compiled_form(species, row)?;
+        assert_eq!(
+            value.source_form,
+            ExperienceSourceFormV2::Form(source_index)
+        );
+        assert_eq!(value.base_exp, SafeU53::new(base)?);
+    }
+    for row in [3, u16::MAX] {
+        assert_eq!(
+            prepared.experience_for_compiled_form(species, row),
+            Err(ProgressionContentV2Error::ExperienceUnsupported)
+        );
+    }
+    assert_eq!(
+        prepared.experience_for_compiled_form(SpeciesId::try_from_u64(2)?, 1),
+        Err(ProgressionContentV2Error::ExperienceUnsupported)
+    );
+    assert_eq!(
+        prepared.experience_for_compiled_form(species, 2)?.boost,
+        ExperienceBoostV2::Mega
+    );
+    Ok(())
+}
+
+#[test]
+fn compiled_experience_bridge_requires_metadata_and_exact_no_form_identity()
+-> Result<(), Box<dyn Error>> {
+    let species = SpeciesId::try_from_u64(1)?;
+    let mut source = pack()?;
+    let historical = source.clone().prepare(
+        &BTreeSet::from([species]),
+        &BTreeSet::from([MoveId::try_from_u64(22)?]),
+    )?;
+    assert_eq!(
+        historical.experience_for_compiled_form(species, 0),
+        Err(ProgressionContentV2Error::ExperienceUnsupported)
+    );
+    source.species[0].experience =
+        Some(metadata(64, ExperienceSourceFormV2::Species, 0, None, "")?);
+    validate_metadata_pack(&mut source)?;
+    let prepared = source.prepare(
+        &BTreeSet::from([species]),
+        &BTreeSet::from([MoveId::try_from_u64(22)?]),
+    )?;
+    let value = prepared.experience_for_compiled_form(species, 0)?;
+    assert_eq!(value.base_exp, SafeU53::new(64)?);
+    assert_eq!(value.source_form, ExperienceSourceFormV2::Species);
+    for row in [1, u16::MAX] {
+        assert_eq!(
+            prepared.experience_for_compiled_form(species, row),
+            Err(ProgressionContentV2Error::ExperienceUnsupported)
+        );
+    }
+    Ok(())
+}

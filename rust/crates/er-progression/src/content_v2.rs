@@ -412,6 +412,31 @@ impl PreparedProgressionContentV2 {
             .ok_or(ProgressionContentV2Error::ExperienceUnsupported)
     }
 
+    /// Resolve an actual compiled row, without the source-index fallback.
+    /// A species row with source forms is ambiguous and cannot stand for forms[0].
+    pub fn experience_for_compiled_form(
+        &self,
+        species: SpeciesId,
+        compiled_form: u16,
+    ) -> Result<&SpeciesExperienceMetadataV2, ProgressionContentV2Error> {
+        let metadata = self
+            .species(species, compiled_form)
+            .and_then(|row| row.experience.as_ref())
+            .ok_or(ProgressionContentV2Error::ExperienceUnsupported)?;
+        let matches = match metadata.source_form {
+            ExperienceSourceFormV2::Species => {
+                compiled_form == 0 && metadata.source_form_count == 0
+            }
+            ExperienceSourceFormV2::Form(index) => {
+                index < metadata.source_form_count && index.checked_add(1) == Some(compiled_form)
+            }
+        };
+        if !matches {
+            return Err(ProgressionContentV2Error::ExperienceUnsupported);
+        }
+        Ok(metadata)
+    }
+
     pub fn evolution(&self, id: EvolutionId) -> Option<&EvolutionDefinitionV2> {
         self.evolutions
             .get(&id)

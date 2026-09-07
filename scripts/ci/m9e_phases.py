@@ -33,6 +33,29 @@ AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "owned_foundation_inventory": "scripts/ci/m9e-owned-foundations-inventory.json",
+    "recovery_preflight": "scripts/ci/m9e_recovery_preflight.py",
+    "owned_foundation_0": "rust/crates/er-game/src/m9e_content_v2.rs",
+    "owned_foundation_1": "rust/crates/er-game/src/m9e_material_v6.rs",
+    "owned_foundation_2": "rust/crates/er-game/src/m9e_runtime_v6.rs",
+    "owned_foundation_3": "rust/crates/er-game/tests/m9e_battle_participation.rs",
+    "owned_foundation_4": "rust/crates/er-game/tests/m9e_content_v2.rs",
+    "owned_foundation_5": "rust/crates/er-game/tests/m9e_material_retention.rs",
+    "owned_foundation_6": "rust/crates/er-game/tests/m9e_material_v6.rs",
+    "owned_foundation_7": "rust/crates/er-game/tests/m9e_runtime_v6.rs",
+    "owned_foundation_8": "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs",
+    "owned_foundation_9": "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs",
+    "owned_foundation_10": "rust/crates/er-save/src/m9e_save_v2.rs",
+    "owned_foundation_11": "rust/crates/er-state/src/current_battle_participation.rs",
+    "owned_foundation_12": "rust/crates/er-state/src/current_experience_owner.rs",
+    "owned_foundation_13": "rust/crates/er-state/src/lib.rs",
+    "owned_foundation_14": "rust/crates/er-state/src/m9e_state_v6.rs",
+    "owned_foundation_15": "rust/crates/er-progression/src/current_friendship.rs",
+    "owned_foundation_16": "rust/crates/er-progression/tests/m9e_current_friendship.rs",
+    "owned_foundation_17": "rust/crates/er-kernel/src/current_coop_rebind_v7.rs",
+    "owned_foundation_18": "rust/crates/er-kernel/src/current_coop_setup_v7.rs",
+    "owned_foundation_19": "rust/crates/er-kernel/src/current_proposal_v7.rs",
+    "owned_foundation_20": "rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs",
     "generated_xp_helper": "scripts/ci/m9e_generated_xp.py",
     "generated_xp_selftests": "scripts/ci/test_m9e_generated_xp.py",
     "generated_xp_bundle_test": "rust/crates/er-content-compiler/tests/m9e_bundle.rs",
@@ -577,6 +600,15 @@ def validate_native(proof, expected_identity):
     validate_state_query_inventory(plan, inventory)
     import m9e_generated_xp as generated
     generated.validate_native(plan, expected_identity, inventory)
+    import m9e_feedback as feedback
+    feedback.validate_owned_foundation_inventory(plan, inventory)
+    if plan.get("requires_owned_foundations") and plan.get("current_recovery_integration"):
+        if expected_identity["files"].get("owned_foundation_inventory") != feedback.OWNED_FOUNDATION_INVENTORY_SHA256:
+            raise RuntimeError("owned foundation phase inventory source differs")
+        for path, (_, source_hash) in feedback.OWNED_FOUNDATION_SOURCES.items():
+            keys = [key for key, source in IDENTITY_FILES.items() if source == path]
+            if len(keys) != 1 or expected_identity["files"].get(keys[0]) != source_hash:
+                raise RuntimeError("owned foundation phase product source differs")
     lane = proof.get("lane")
     if lane not in assignment or proof.get("assigned_targets") != assignment[lane]:
         raise RuntimeError("native lane assignment is missing or differs from exact partition")
