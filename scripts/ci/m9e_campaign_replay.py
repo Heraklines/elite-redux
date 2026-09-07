@@ -79,18 +79,18 @@ def validate_lane(proof, root, partition):
         if (len(rows) != 1 or rows[0]["ids"] != IDS or rows[0]["historical_excluded_ids"]
                 or plan.get("required_native_targets", {}).get(TARGET[0], []).count(TARGET[1]) != 1
                 or plan.get("required_native_test_ids", {}).get(":".join(TARGET)) != IDS
-                or list(TARGET) not in partition(proof["inventory"])["a"]):
-            raise RuntimeError("campaign replay exact inventory or native A ownership differs")
-        if proof["lane"] == "a":
+                or list(TARGET) not in partition(proof["inventory"])["d"]):
+            raise RuntimeError("campaign replay exact inventory or native D ownership differs")
+        if proof["lane"] == "d":
             validate_evidence(proof.get("natural_campaign_replay"), proof["identity"], root)
-    if "natural_campaign_replay" in proof and (not required or proof["lane"] != "a"):
+    if "natural_campaign_replay" in proof and (not required or proof["lane"] != "d"):
         raise RuntimeError("unrequested or non-owning campaign replay evidence")
 
 
 def execute(root, full, identity, ids, global_deadline):
     from m9e_current_cost import run_bounded
-    if ids != IDS or os.environ.get("M9E_NATIVE_LANE") != "a" or os.environ.get("M9E_PHASE") != "native":
-        raise RuntimeError("campaign replay requires exactly-once native A execution")
+    if ids != IDS or os.environ.get("M9E_NATIVE_LANE") != "d" or os.environ.get("M9E_PHASE") != "native":
+        raise RuntimeError("campaign replay requires exactly-once native D execution")
     root, full = Path(root), Path(full)
     owned = Path(os.environ["RUNNER_TEMP"]) / "m9e-natural-replay-focused"
     if owned.exists():
