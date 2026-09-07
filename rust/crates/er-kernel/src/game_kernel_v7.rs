@@ -3078,6 +3078,7 @@ fn controls_differ_only_in_selection(left: &GameControlPlanV2, right: &GameContr
 
 pub(crate) fn validate_private_battle_control_v7(
     state: &GameStateV6,
+    content: &er_content::pack::m6_prepared::PreparedBattleContentV3,
     owner: Option<&PrivateBattleControlSnapshotV7>,
     revision: SafeU53,
 ) -> Result<(), GameKernelV7Error> {
@@ -3140,7 +3141,7 @@ pub(crate) fn validate_private_battle_control_v7(
     // canonical root and return selection always come from retained exact data.
     let mut expected = match control.kind {
         GameControlKindV2::BattleMove => {
-            move_select_control(state, owner.owner_seat, leaf_menu.instance_id, revision)?
+            move_select_control(state, content, owner.owner_seat, leaf_menu.instance_id, revision)?
         }
         GameControlKindV2::BattleSwitch => {
             switch_select_control(state, owner.owner_seat, leaf_menu.instance_id, revision)?

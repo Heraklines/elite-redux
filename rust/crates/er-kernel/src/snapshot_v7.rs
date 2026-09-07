@@ -211,6 +211,7 @@ impl CoreGameKernelSnapshotV7 {
                 validate_active_state(state, self, content)?;
                 crate::game_kernel_v7::validate_private_battle_control_v7(
                     state,
+                    &content.battle,
                     self.private_battle_control.as_ref(),
                     self.material_ledger.next_authority_revision,
                 )
