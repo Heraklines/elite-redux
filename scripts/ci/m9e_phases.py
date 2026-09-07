@@ -592,7 +592,6 @@ def validate_native(proof, expected_identity):
     import m9e_current_cost as cost
     cost.validate_lane(proof, ROOT, partition)
     import m9e_coop_startup as coop
-    import m9e_campaign_replay as campaign_replay
     coop.validate_lane(proof, ROOT, partition)
     import m9e_campaign_replay as campaign_replay
     campaign_replay.validate_lane(proof, ROOT, partition)
@@ -954,7 +953,6 @@ def validate_platform(proof, native, native_hash):
         raise RuntimeError("platform phase identity or completion mismatch")
     plan = native["plan"]
     import m9e_coop_startup as coop
-    import m9e_campaign_replay as campaign_replay
     coop.validate_platform(proof, native, ROOT)
     if "plan" in proof and proof["plan"] != plan:
         raise RuntimeError("platform duplicated plan differs from its bound native plan")
@@ -1080,7 +1078,6 @@ def platform(feedback):
         feedback.browser_checks(summary)
     if native["plan"].get("requires_current_coop_startup"):
         import m9e_coop_startup as coop
-    import m9e_campaign_replay as campaign_replay
         summary["current_coop_rtc"] = coop.execute_platform(feedback, expected, native["plan"]["current_coop_startup_binding"])
     summary["status"] = "passed"
     summary = reference_platform_plan(summary, native, native_hash)
