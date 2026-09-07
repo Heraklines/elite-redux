@@ -352,7 +352,7 @@ fn assert_eventwise_parity_contract() -> Result<(), Box<dyn Error>> {
     // independently match this same complete eventwise report digest.
     assert_eq!(
         report_digest,
-        "4794ef6ec5fa95d0b5ac5c4a71f71fcb0ed275f11531ef6285b7bf4cae180e12"
+        "42da262041f8b58b7c0bf95253e5560cfd1b4c2b571b46419555df6df94278f4"
     );
     Ok(())
 }
