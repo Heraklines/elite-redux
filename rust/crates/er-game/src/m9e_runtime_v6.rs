@@ -2594,6 +2594,7 @@ fn grant_experience_v2(
     let level = growth
         .experience_by_level
         .partition_point(|required| required.get().get() <= experience)
+        .saturating_sub(1)
         .max(1);
     let level = u16::try_from(level).map_err(|_| GameRuntimeV6Error::Invalid)?;
     let pokemon = persistent_pokemon_mut(state, pokemon_id)?;
