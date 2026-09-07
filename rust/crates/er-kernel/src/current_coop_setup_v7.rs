@@ -464,13 +464,16 @@ impl GameKernelV7 {
                     operation_id: OperationId::new(OPERATION).expect("constant operation"),
                     bytes,
                 })
-        } else if let Some(CurrentProposalOwnerSnapshotV1::Pending { retained }) = &self.current_proposal {
+        } else if let Some(CurrentProposalOwnerSnapshotV1::Pending { retained }) =
+            &self.current_proposal
+        {
             let bytes = decode_current_hex_v1(
                 &retained.proposal_hex,
                 crate::current_proposal_v7::MAX_CURRENT_PROPOSAL_BYTES_V1,
-            ).map_err(|_| GameKernelV7Error::Invalid)?;
-            let envelope = decode_current_proposal_v1(&bytes)
-                .map_err(|_| GameKernelV7Error::Invalid)?;
+            )
+            .map_err(|_| GameKernelV7Error::Invalid)?;
+            let envelope =
+                decode_current_proposal_v1(&bytes).map_err(|_| GameKernelV7Error::Invalid)?;
             Some(GameKernelEffectV7::ProposalReady {
                 operation_id: envelope.proposal.context.operation_id,
                 bytes,
