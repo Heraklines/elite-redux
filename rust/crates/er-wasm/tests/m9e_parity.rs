@@ -616,7 +616,9 @@ mod generated_cohort_diagnostic {
         if bytes.len() > 4 * 1024 * 1024 {
             return Err("diagnostic record exceeds four MiB".into());
         }
-        *total = total.checked_add(bytes.len() + 1).ok_or("trace size overflow")?;
+        *total = total
+            .checked_add(bytes.len() + 1)
+            .ok_or("trace size overflow")?;
         if *total > 64 * 1024 * 1024 {
             return Err("diagnostic trace exceeds sixty-four MiB".into());
         }
@@ -629,7 +631,10 @@ mod generated_cohort_diagnostic {
     fn capture_actual_eventwise_report_and_preimages() -> Result<(), Box<dyn Error>> {
         let directory = std::path::PathBuf::from(std::env::var("M9E_PARITY_DIAGNOSTIC_DIR")?);
         let cohort = std::env::var("M9E_PARITY_COHORT")?;
-        if !directory.is_absolute() || !directory.is_dir() || !matches!(cohort.as_str(), "old" | "new") {
+        if !directory.is_absolute()
+            || !directory.is_dir()
+            || !matches!(cohort.as_str(), "old" | "new")
+        {
             return Err("explicit owned diagnostic directory and cohort required".into());
         }
         let request = request()?;
@@ -643,13 +648,30 @@ mod generated_cohort_diagnostic {
             "c28ac3b994c687413a4d0bcae7c558f0e02dfafd5e9ec3482bbb9462f5598063"
         };
         assert_eq!(observed_digest, expected);
-        let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(request.bundle.clone()))?);
-        let initial = request.initial_snapshot.clone().ok_or("controlled initial snapshot absent")?;
-        let mut kernel = GameKernelV7::from_snapshot(initial.clone(), request.local_seat, request.role, content)?;
-        let file = std::fs::OpenOptions::new().write(true).create_new(true).open(directory.join("trace.jsonl"))?;
+        let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(
+            request.bundle.clone(),
+        ))?);
+        let initial = request
+            .initial_snapshot
+            .clone()
+            .ok_or("controlled initial snapshot absent")?;
+        let mut kernel = GameKernelV7::from_snapshot(
+            initial.clone(),
+            request.local_seat,
+            request.role,
+            content,
+        )?;
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(directory.join("trace.jsonl"))?;
         let mut writer = BufWriter::new(file);
         let mut total = 0;
-        write_bounded(&mut writer, &serde_json::json!({"kind":"initial", "snapshot":initial}), &mut total)?;
+        write_bounded(
+            &mut writer,
+            &serde_json::json!({"kind":"initial", "snapshot":initial}),
+            &mut total,
+        )?;
         assert_eq!(reference.observations.len(), request.events.len());
         for (index, event) in request.events.iter().enumerate() {
             let step = match event.clone() {
@@ -658,7 +680,9 @@ mod generated_cohort_diagnostic {
                     kernel.settle_presentation(event_id)?;
                     GameKernelStepV7::default()
                 }
-                M9EParityEventV2::AdvanceTime { milliseconds } => kernel.advance_time(milliseconds)?,
+                M9EParityEventV2::AdvanceTime { milliseconds } => {
+                    kernel.advance_time(milliseconds)?
+                }
             };
             let snapshot = kernel.snapshot()?;
             let observation = M9EParityObservationV1 {
@@ -669,29 +693,49 @@ mod generated_cohort_diagnostic {
                 mechanical_state_digest: er_canonical::content_digest(&kernel.state())?,
                 kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
                 control_kind: kernel.current_control().map(|control| control.kind),
-                wave: kernel.state().and_then(|state| state.active_run.as_ref()).map(|run| run.wave),
+                wave: kernel
+                    .state()
+                    .and_then(|state| state.active_run.as_ref())
+                    .map(|run| run.wave),
             };
             assert_eq!(observation, reference.observations[index]);
-            write_bounded(&mut writer, &serde_json::json!({
-                "kind":"event", "sequence":index+1, "event":event,
-                "effects":step.effects, "internal_events":step.internal_events,
-                "mechanical_state":kernel.state(), "kernel_snapshot":snapshot,
-                "observation":observation
-            }), &mut total)?;
+            write_bounded(
+                &mut writer,
+                &serde_json::json!({
+                    "kind":"event", "sequence":index+1, "event":event,
+                    "effects":step.effects, "internal_events":step.internal_events,
+                    "mechanical_state":kernel.state(), "kernel_snapshot":snapshot,
+                    "observation":observation
+                }),
+                &mut total,
+            )?;
         }
-        assert_eq!(er_canonical::content_digest(&kernel.snapshot()?)?, reference.final_snapshot_digest);
+        assert_eq!(
+            er_canonical::content_digest(&kernel.snapshot()?)?,
+            reference.final_snapshot_digest
+        );
         writer.flush()?;
-        let mut report_file = std::fs::OpenOptions::new().write(true).create_new(true).open(directory.join("report.json"))?;
+        let mut report_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(directory.join("report.json"))?;
         let mut report_bytes = 0;
         write_bounded(&mut report_file, &reference, &mut report_bytes)?;
         report_file.flush()?;
-        let mut receipt_file = std::fs::OpenOptions::new().write(true).create_new(true).open(directory.join("capture.json"))?;
+        let mut receipt_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(directory.join("capture.json"))?;
         let mut receipt_bytes = 0;
-        write_bounded(&mut receipt_file, &serde_json::json!({
-            "cohort":cohort, "events":reference.observations.len(), "report_digest":observed_digest,
-            "trace_bytes":total, "report_bytes":report_bytes, "actual_preimages_match_full_report":true,
-            "original_golden_changed":false, "new_wasm_qualification":false
-        }), &mut receipt_bytes)?;
+        write_bounded(
+            &mut receipt_file,
+            &serde_json::json!({
+                "cohort":cohort, "events":reference.observations.len(), "report_digest":observed_digest,
+                "trace_bytes":total, "report_bytes":report_bytes, "actual_preimages_match_full_report":true,
+                "original_golden_changed":false, "new_wasm_qualification":false
+            }),
+            &mut receipt_bytes,
+        )?;
         receipt_file.flush()?;
         Ok(())
     }
