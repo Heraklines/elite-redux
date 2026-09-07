@@ -324,7 +324,7 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         }
         let mut candidate = self.clone();
-        candidate.current_coop_setup = Some(CurrentCoopSetupSnapshotV1 {
+        candidate.current_coop_setup = Some(Box::new(CurrentCoopSetupSnapshotV1 {
             schema_version: 1,
             local: protocol.frame_context.context.clone(),
             peer: protocol
@@ -336,7 +336,7 @@ impl GameKernelV7 {
             seed: bootstrap.seed.clone(),
             choices: None,
             started: None,
-        });
+        }));
         candidate.validate()?;
         *self = candidate;
         Ok(())

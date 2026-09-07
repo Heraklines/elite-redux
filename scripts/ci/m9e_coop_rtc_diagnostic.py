@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import time
@@ -21,7 +22,8 @@ IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready firs
 SOURCES = [EXAMPLE, SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/workflows/m9e-coop-rtc-focused.yml",
            "src/rust-browser/contracts/browser-contracts-v2.ts", "src/rust-browser/contracts/browser-contracts.ts",
            "src/rust-browser/routes/rust-current-rtc-entry.ts", "src/rust-browser/adapters/current-rtc-transport.ts",
-           "src/rust-browser/routes/rust-current-worker-entry.ts", "src/rust-browser/host/current-rust-browser-host.ts",
+           "src/rust-browser/routes/rust-current-worker-entry.ts", "src/rust-browser/routes/browser-effects-v2.ts",
+           "src/rust-browser/host/current-rust-browser-host.ts",
            "src/rust-browser/worker/current-rust-kernel-worker.ts", "src/rust-browser/worker/rust-wasm-loader.ts",
            "scripts/build-kernel-m9e-v7-web.mjs", "rust/crates/er-web/examples/m9e_v7_browser_fixtures.rs",
            "rust/crates/er-web/src/contracts_v2.rs", "rust/crates/er-web/src/host_v2.rs",
@@ -88,6 +90,12 @@ def main(summary):
         raise RuntimeError("pinned Wasm CLI required")
     os.environ.update({"M9E_BUILD_CURRENT_WORKER": "1", "M9E_BUILD_CURRENT_RTC": "1"})
     run(["node", "scripts/build-kernel-m9e-v7-web.mjs", "--out-dir", str(OUTPUT)], "platform-build")
+    execute_prepared(summary)
+
+
+def execute_prepared(summary, *, install_chromium=True):
+    """Same assertions and actual journeys for F and same-candidate integration."""
+    sha = os.environ["GITHUB_SHA"]
     run(["cargo", "run", "--manifest-path", "rust/Cargo.toml", "--locked", "-p", "er-web", "--example",
          "m9e_v7_coop_startup", "--", str(OUTPUT)], "natural-inputs")
     setup = {"schema_version": 1, "source_sha": sha, "assets": {
@@ -112,7 +120,8 @@ def main(summary):
     summary["platform"] = {"manifest_sha256": digest(OUTPUT / "m9e-v7-rtc-assets.json"), "worker": rtc["worker"],
                             "assets": rtc["assets"], "cohort": rtc["cohort"], "source_sha": sha}
     retained = {path.name: digest(path) for path in OUTPUT.iterdir() if path.is_file()}
-    run(["pnpm", "exec", "playwright", "install", "--with-deps", "chromium"], "chromium")
+    if install_chromium:
+        run(["pnpm", "exec", "playwright", "install", "--with-deps", "chromium"], "chromium")
     os.environ["M9E_V7_WEB_DIR"] = str(OUTPUT)
     os.environ["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-results.json")
     run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
@@ -158,6 +167,14 @@ def main(summary):
                 or value.get("delayed_offer_ms") != (12000, 0)[index]
                 or value.get("retry_preserved_snapshots") is not True or value.get("presentations", 0) <= 0):
             raise RuntimeError("browser evidence differs from actual bound assets and journey")
+        if value.get("replay_workers") != 2 or len(value.get("replay", [])) != 2:
+            raise RuntimeError("two additional actual replay Workers required")
+        for replay in value["replay"]:
+            if (set(replay) != {"bytes", "sha256", "live_snapshot_preserved", "full_replay_equal", "reexport_equal", "disposed"}
+                    or type(replay["bytes"]) is not int or not 0 < replay["bytes"] <= 4 << 20
+                    or not isinstance(replay["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", replay["sha256"])
+                    or any(replay[key] is not True for key in ("live_snapshot_preserved", "full_replay_equal", "reexport_equal", "disposed"))):
+                raise RuntimeError("actual complete current capsule replay evidence differs")
         evidence.append(value)
     if any(digest(ROOT / path) != expected for path, expected in summary["source_hashes"].items()):
         raise RuntimeError("bound source changed during platform execution")
@@ -171,7 +188,7 @@ if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "qualification": "focused two-seat natural Title via actual Wasm Workers and RTC; not integration or M9 qualification"}
+               "qualification": "focused natural RTC startup and complete capsule replay in fresh Workers; not integration or M9 qualification"}
     try:
         main(summary)
         if time.monotonic() > DEADLINE:

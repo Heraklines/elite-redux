@@ -46,6 +46,20 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 type Line = Result<Option<Vec<u8>>, String>;
 type WriteJob = (Vec<u8>, mpsc::SyncSender<Result<(), String>>);
 type ChoicePublication = (Vec<StarterSelectionV1>, Vec<Vec<u8>>);
+fn trace(message: &str) -> TestResult {
+    let Ok(path) = std::env::var("ER_M9E_ENTRY_PROGRESS") else {
+        return Ok(());
+    };
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
+    if file.metadata()?.len() + message.len() as u64 + 1 > 16384 {
+        return Err("entry progress exceeded bound".into());
+    }
+    writeln!(file, "{message}")?;
+    Ok(())
+}
 #[path = "support/m9e_coop_cli_process.rs"]
 mod process;
 use process::Cli;
@@ -282,6 +296,12 @@ impl Endpoint {
         let initial = self.control()?;
         let bound = initial.menu.as_ref().ok_or("menu absent")?.options.len() + 1;
         for _ in 0..bound {
+            if self.browser_sequence.is_multiple_of(128) {
+                trace(&format!(
+                    "raw navigation host={} sequence={} target={target}",
+                    self.host, self.browser_sequence
+                ))?;
+            }
             let control = self.control()?;
             let menu = control.menu.as_ref().ok_or("menu disappeared")?;
             if menu.selected_option_id.as_str() == target {
@@ -443,16 +463,29 @@ fn network_frames(step: &GameKernelStepV7) -> Vec<Vec<u8>> {
         .collect()
 }
 fn exercise(worker: bool) -> TestResult {
+    let started = Instant::now();
     let bundle: GameContentBundleV2 = serde_json::from_slice(&std::fs::read(content_path())?)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?);
     let mut host = Endpoint::new(content.clone(), worker, true)?;
     let mut guest = Endpoint::new(content.clone(), worker, false)?;
+    trace(&format!(
+        "worker={worker} initialized {:?}",
+        started.elapsed()
+    ))?;
     let (host_choices, frames) = host.choose(content.as_ref())?;
+    trace(&format!(
+        "worker={worker} host chose {:?}",
+        started.elapsed()
+    ))?;
     assert!(frames.is_empty());
     assert!(
         matches!(host.checkpoint()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref setup) if setup.stage == RunBootstrapStageV1::Complete)
     );
     let (guest_choices, frames) = guest.choose(content.as_ref())?;
+    trace(&format!(
+        "worker={worker} guest chose {:?}",
+        started.elapsed()
+    ))?;
     assert_eq!(frames.len(), 1);
     let choices = &frames[0];
     let retried = guest.event(CurrentExternalEvent::RetryCoopSetup)?;
@@ -512,7 +545,15 @@ fn exercise(worker: bool) -> TestResult {
     );
     assert_eq!(guest.checkpoint()?, guest_before);
     host.replay_capture(content.clone(), !worker)?;
+    trace(&format!(
+        "worker={worker} host replayed {:?}",
+        started.elapsed()
+    ))?;
     guest.replay_capture(content, !worker)?;
+    trace(&format!(
+        "worker={worker} guest replayed {:?}",
+        started.elapsed()
+    ))?;
     host.finish()?;
     guest.finish()
 }

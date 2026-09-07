@@ -3097,3 +3097,41 @@ recordSHAfd5b7b7f1ce246a30b81d79e450cbc09e027240a46e3e0577c48d68b01fdcb0e.
 Fresh release build246.943s and probe4.132s. Both owned build directories were
 cleaned before success. This is F producer evidence, not integrated cost or Q.
 The repaired current query candidate still needs all five complete phases.
+
+Query/three-job integration9b0697cbfbf39ad96be1d288ee7ab365722db5fa/
+run34054074674 passed all five jobs:648native A616/B19/C13,74inventory,
+30requiredtargets,25exact-IDmaps,343harness, complete platform and aggregate.
+Executed metadata audit matched66cachedsources, source/plan/proof/cohort hashes,
+complete disjoint partitions, existing Title/storage/READ/PP/query/owner/RTC and
+mutant evidence. Bounded aggregate44000bytes SHA256
+31de3e39ee0348d6913f12fe09a464cdb1af7e3d86e0dbc4bbceef2e4185cbe6.
+All game execution, compilation and complete diagnostics remained remote.
+
+Integrate the frozen actual release-cost witness (30fea30a/run34052745788,
+sourceaaa5fe82ecd79baa4905902ea77fb4ba990f3b3d4202cc388c94f0f511554b36)
+and actual changed-rule Worker witness (03a59251/run34050243405,
+sourcebf1cd46d008d6a3e8a2c820dc54e7e4aac99c1f8404d66a0a8cf39a1b7eb9d8d).
+Both focused runs and their source/record/derived-tree audits passed previously.
+The cost test executes exactly once in A using the guarded fresh release build;
+the ordinary test build/listing remains part of complete global discovery.
+C owns the exact real rule-change test and its private derived Worker. Every
+Git/build/test command in that derivation shares the existing native deadline
+and bounded process-group runner. Unique logs, one-file transformation, pinned
+compiler/profile, exact execution, pool/source verification and worktree cleanup
+precede publication of a successful rule proof. A/B cannot claim the rule result;
+B/C cannot claim cost execution. Aggregate still requires all five same-run jobs.
+
+The explicit two-path product mapping retains both independent policies, all
+existing mandatory target/ID maps and platform prerequisites; extra product paths
+remain rejected. Remote preflightc52ecfc5f742a9788b59aa3405ec28337c7dee44/
+run34055306880 passed355harness/10.469s plus parsed three-job workflow validation.
+All5CI and both previously executed Rust hashes matched before copying; only
+comparison baseline then advanced to audited9b. Prior354preflight2477b911/
+run34054978880 passed. Initial355run34055197598 caught a misplaced fixture
+assertion, restored to its original cost test without removing assertions.
+
+This combined candidate still requires its own full integration run and audit.
+It does not establish allocation/RSS/IPC/throughput/edit-latency budgets or finalQ,
+natural independently selected co-op parties, complete source AI/difficulty,
+remaining lifecycle/lab/control coverage or a legitimate full-length campaign.
+M9 remains incomplete; no final tag, deployment or default activation is claimed.

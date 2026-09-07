@@ -90,7 +90,7 @@ pub struct CoreGameKernelSnapshotV7 {
     pub current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_coop_setup:
-        Option<crate::game_kernel_v7::current_coop_setup_v7::CurrentCoopSetupSnapshotV1>,
+        Option<Box<crate::game_kernel_v7::current_coop_setup_v7::CurrentCoopSetupSnapshotV1>>,
     pub authority_ai: Option<AuthorityAiSnapshotV2>,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,

@@ -103,7 +103,7 @@ def main(summary):
     if (worker_artifact.get("manifest_path") != str(ROOT / "rust/crates/er-kernel-worker/Cargo.toml")
             or worker_artifact.get("features") != [] or worker_artifact.get("profile", {}).get("test") is not False
             or worker_artifact["profile"].get("debug_assertions") is not True
-            or worker_artifact["profile"].get("opt_level") != "0"
+            or worker_artifact["profile"].get("opt_level") != "1"
             or worker_binary != TARGET / "debug/er-kernel-worker" or not worker_binary.is_file()
             or worker_binary.is_symlink() or worker_binary.resolve() != worker_binary
             or not 0 < worker_binary.stat().st_size <= 128 << 20):
@@ -128,6 +128,7 @@ def main(summary):
             or artifact["target"].get("src_path") != str(ROOT / RUST_SOURCES[1])
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
+            or artifact["profile"].get("opt_level") != "1"
             or not binary.is_absolute() or binary.is_symlink() or not binary.is_file()
             or binary.resolve() != binary or binary.parent != TARGET / "debug/deps"
             or not re.fullmatch(TEST_TARGET + "-[0-9a-f]{16}", binary.name)
@@ -143,7 +144,8 @@ def main(summary):
     if (cli_artifact.get("manifest_path") != str(ROOT / "rust/crates/er-cli/Cargo.toml")
             or cli_binary != TARGET / "debug/er-cli" or not cli_binary.is_file() or cli_binary.is_symlink()
             or cli_binary.resolve() != cli_binary or not 0 < cli_binary.stat().st_size <= 128 << 20
-            or cli_artifact.get("profile", {}).get("debug_assertions") is not True):
+            or cli_artifact.get("profile", {}).get("debug_assertions") is not True
+            or cli_artifact["profile"].get("opt_level") != "1"):
         raise RuntimeError("actual CLI executable ownership differs")
     cli_hash = digest(cli_binary)
     summary["cli_artifact"] = {"sha256": cli_hash, "bytes": cli_binary.stat().st_size, "profile": cli_artifact["profile"]}
@@ -154,6 +156,7 @@ def main(summary):
     summary["test_artifact"] = {"sha256": binary_hash, "bytes": binary.stat().st_size, "profile": artifact["profile"],
                                 "source_sha256": summary["source_hashes"][RUST_SOURCES[1]], "ids": TEST_IDS}
     executions = []
+    os.environ["ER_M9E_ENTRY_PROGRESS"] = str(FULL / "entry-progress.txt")
     for index, test_id in enumerate(TEST_IDS):
         output = run([str(binary), "--exact", test_id, "--format", "terse", "--nocapture", "--test-threads=1"],
                      f"execute-{index + 1}", cwd=ROOT / "rust/crates/er-cli", seconds=600, bound=16384).read_text()
