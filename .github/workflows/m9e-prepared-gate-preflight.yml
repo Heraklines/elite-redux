@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 5
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
-      M9E_EXPECTED_TESTS: '401'
+      M9E_EXPECTED_TESTS: '402'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -31,6 +31,20 @@ jobs:
           run-id: '34074237225'
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/m9e-retained-aggregate
+      - name: Retrieve failed A diagnostics remotely for exact metadata transport regression
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: '10005664644'
+          run-id: '34085416670'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/m9e-retained-native-a
+      - name: Retrieve same-run bounded B identity proof
+        uses: actions/download-artifact@v7
+        with:
+          artifact-ids: '10005403375'
+          run-id: '34085416670'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/m9e-retained-native-b
       - name: Verify candidate and execute only harness selftests
         shell: bash
         run: |
@@ -70,6 +84,76 @@ jobs:
           python3 scripts/ci/m9e_recovery_preflight.py >> "$RUNNER_TEMP/m9e-preflight/diagnostics/workflow-validation.log" 2>&1
           plan_result=$?
           if [ "$plan_result" -ne 0 ]; then workflow_result=$plan_result; fi
+          python3 - <<'PY' >> "$RUNNER_TEMP/m9e-preflight/diagnostics/workflow-validation.log" 2>&1
+          import copy, hashlib, json, os, pathlib, sys
+          sys.path.insert(0, 'scripts/ci')
+          import m9e_phases as phases
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          paths = list((root / 'm9e-retained-native-a').rglob('full-summary.json'))
+          peers = list((root / 'm9e-retained-native-b').rglob('native-b.json'))
+          if len(paths) != 1 or len(peers) != 1:
+              raise RuntimeError('exact same-run metadata inputs absent')
+          raw, peer = paths[0].read_bytes(), peers[0].read_bytes()
+          if len(raw) != 99753 or hashlib.sha256(raw).hexdigest() != 'a1edba8306948c50b6feb8605dee6f0bc198e931ec8bcbcb21d376402ff0dff6':
+              raise RuntimeError('actual failed A source evidence differs')
+          if len(peer) != 51095 or hashlib.sha256(peer).hexdigest() != 'f4341575ba92f9a3975f610790e14faaa5450d5e6ac3f931df2df70758de10de':
+              raise RuntimeError('same-run B identity differs')
+          summary = json.loads(raw)
+          previous = phases.unpack_native_ids(json.loads(peer))
+          expected = previous['identity']
+          if (summary['product_sha'] != 'cbcd4a8ba1b6e913a3fa41edcb03a634b00520f2'
+              or expected['product_sha'] != summary['product_sha'] or expected['run_id'] != '34085416670'
+              or summary['first_failure'] != 'phase manifest exceeds 64 KiB'
+              or summary['tests'] != {'selected': 699, 'executed': 665, 'passed': 665, 'failed': 0, 'skipped': 0}
+              or summary['plan'] != previous['plan'] or summary['native_inventory'] != previous['inventory']):
+              raise RuntimeError('actual A failure or shared native evidence differs')
+          # Reconstruct export_native's metadata from its captured full summary.
+          # This checks serialization only; it never promotes the failed run.
+          proof = {'version': 1, 'phase': 'native', 'status': 'passed', 'qualification': 'pending',
+              'identity': expected, 'plan': summary['plan'], 'plan_sha256': phases.sha(phases.encoded(summary['plan'])),
+              'tests': summary['tests'], 'selected_inventory_validated': summary['selected_inventory_validated'],
+              'selected_test_ids_sha256': summary['selected_test_ids']['sha256'],
+              'required_native_target_counts': summary['required_native_target_counts'],
+              'lane': summary['native_lane'], 'inventory': summary['native_inventory'],
+              'inventory_sha256': phases.sha(phases.encoded(summary['native_inventory'])),
+              'assigned_targets': summary['assigned_targets'], 'completed_targets': summary['completed_targets'],
+              'native_target_timing_ms': summary.get('native_target_timing_ms', {}),
+              'native_timer_parity_digest': summary.get('native_timer_parity_digest'), 'cli': None, 'worker': None}
+          for key in ('current_cost_probe', 'current_coop_entry', 'timer_mutant', 'replica_mutant', 'ledger_mutant', 'rule_worker'):
+              if key in summary:
+                  proof[key] = summary[key]
+          worker = summary.get('worker_executable')
+          if worker is not None:
+              proof['worker'] = {key: value for key, value in worker.items() if key != 'path'}
+          binding = summary.get('cli_executable')
+          if binding is not None:
+              proof['cli'] = {key: binding[key] for key in ('bytes', 'sha256', 'source_sha', 'target', 'profile', 'cargo_package_id', 'cargo_profile', 'manifest_path')}
+              proof['cli']['file'] = 'er-cli'
+          phases.validate_native(proof, expected)
+          indexed = phases.pack_native_ids(proof)
+          ids = phases.encoded([[item['ids'], item['historical_excluded_ids']] for item in proof['inventory']])
+          import base64, zlib
+          old_wire = {'encoding': phases.NATIVE_COMPRESSED_ID_ENCODING,
+              'proof': {**indexed['proof'], 'inventory': [{'crate': item['crate'], 'target': item['target']} for item in proof['inventory']]},
+              'inventory_ids': {'decoded_bytes': len(ids), 'data': base64.b64encode(zlib.compress(ids, level=9)).decode('ascii')}}
+          if len(phases.encoded(old_wire)) <= 65536:
+              raise RuntimeError('actual old transport failure was not reproduced')
+          output = root / 'm9e-preflight/diagnostics/reconstructed-native-a.json'
+          wire_hash = phases.write_bounded(output, proof)
+          restored = phases.read_bounded(output, wire_hash)
+          if restored != proof:
+              raise RuntimeError('complete native proof changed on roundtrip')
+          phases.validate_native(restored, expected)
+          receipt = {'qualification': 'metadata transport only; source run remains failed',
+              'source_sha': os.environ['GITHUB_SHA'], 'retained_run': '34085416670',
+              'old_wire_bytes': len(phases.encoded(old_wire)), 'wire_bytes': output.stat().st_size,
+              'semantic_bytes': len(phases.encoded(proof)), 'wire_sha256': wire_hash,
+              'semantic_sha256': phases.sha(phases.encoded(proof)), 'tests': proof['tests']}
+          (root / 'm9e-preflight/compact/native-proof-transport.json').write_text(json.dumps(receipt, sort_keys=True) + '\n')
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+          proof_result=$?
+          if [ "$proof_result" -ne 0 ]; then workflow_result=$proof_result; fi
           python3 -m unittest discover -s scripts/ci -p 'test_m9e*.py' -v > "$RUNNER_TEMP/m9e-preflight/diagnostics/harness-tests.log" 2>&1
           result=$?
           set -e

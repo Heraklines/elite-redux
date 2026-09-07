@@ -8301,6 +8301,18 @@ class PhaseTransferTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     self.phases.unpack_native_ids(wire)
 
+    def test_compressed_complete_native_proof_keeps_exact_inflation_limit(self):
+        proof = self.native_requiring_complete_proof_compression()
+        raw = self.phases.encoded(self.phases.pack_native_ids(proof))
+        raw += b" " * (self.phases.NATIVE_PROOF_LIMIT - len(raw))
+        wire = {"encoding": self.phases.NATIVE_COMPRESSED_PROOF_ENCODING, "decoded_bytes": len(raw),
+                "data": base64.b64encode(self.phases.zlib.compress(raw)).decode("ascii")}
+        self.assertEqual(self.phases.unpack_native_ids(wire), proof)
+        wire["decoded_bytes"] += 1
+        with patch.object(self.phases.json, "loads") as parse, self.assertRaisesRegex(RuntimeError, "bounds"):
+            self.phases.unpack_native_ids(wire)
+        parse.assert_not_called()
+
     def replace_compressed_id_bytes(self, wire, raw):
         wire["inventory_ids"] = {"decoded_bytes": len(raw),
                                  "data": base64.b64encode(self.phases.zlib.compress(raw, level=9)).decode("ascii")}
@@ -8538,7 +8550,10 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertLessEqual(len(self.phases.encoded(wire)), self.phases.MANIFEST_LIMIT)
         with self.assertRaisesRegex(RuntimeError, "bounded expansion"):
             self.phases.unpack_native_ids(wire)
-        proof["padding"] = "x" * self.phases.MANIFEST_LIMIT
+        # Incompressible deterministic metadata still cannot cross the same
+        # wire bound; repeated padding is now valid bounded v3 evidence.
+        proof["padding"] = "".join(self.phases.sha(str(index).encode()) for index in range(1600))
+        self.assertLessEqual(len(self.phases.encoded(proof)), self.phases.NATIVE_PROOF_LIMIT)
         with self.assertRaisesRegex(RuntimeError, "64 KiB"):
             self.phases.write_bounded(self.root / "compressed-still-oversized.json", proof)
 
@@ -10897,7 +10912,8 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         phases, first, _ = self.lane_proofs()
         self.assertEqual(phases.MANIFEST_LIMIT, 65536)
         self.assertEqual(phases.NATIVE_PROOF_LIMIT, 196608)
-        first["unbounded_extra"] = "x" * 65536
+        first["unbounded_extra"] = "".join(phases.sha(str(index).encode()) for index in range(1600))
+        self.assertLessEqual(len(phases.encoded(first)), phases.NATIVE_PROOF_LIMIT)
         with self.assertRaises(RuntimeError):
             phases.write_bounded(self.root / "oversized.json", first)
 class CompactWorkerEvidenceTests(unittest.TestCase):
