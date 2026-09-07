@@ -106,7 +106,11 @@ jobs:
               or summary['first_failure'] != 'phase manifest exceeds 64 KiB'
               or summary['tests'] != {'selected': 699, 'executed': 665, 'passed': 665, 'failed': 0, 'skipped': 0}
               or summary['plan'] != previous['plan'] or summary['native_inventory'] != previous['inventory']):
-              raise RuntimeError('actual A failure or shared native evidence differs')
+              details = {'source': summary['product_sha'], 'peer_source': expected['product_sha'],
+                  'run': expected['run_id'], 'failure': summary['first_failure'], 'tests': summary['tests'],
+                  'same_plan': summary['plan'] == previous['plan'],
+                  'same_inventory': summary['native_inventory'] == previous['inventory']}
+              raise RuntimeError('actual A failure or shared native evidence differs: ' + json.dumps(details, sort_keys=True))
           # Reconstruct export_native's metadata from its captured full summary.
           # This checks serialization only; it never promotes the failed run.
           proof = {'version': 1, 'phase': 'native', 'status': 'passed', 'qualification': 'pending',
