@@ -581,6 +581,7 @@ dependencies = [
  "er-env",
  "er-game",
  "er-kernel",
+ "er-protocol",
  "er-state",
  "er-types",
  "serde",
