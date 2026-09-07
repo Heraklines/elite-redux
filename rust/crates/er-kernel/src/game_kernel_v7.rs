@@ -3140,9 +3140,13 @@ pub(crate) fn validate_private_battle_control_v7(
     // Regenerate only to validate the supplied leaf's legal actor/actions; the
     // canonical root and return selection always come from retained exact data.
     let mut expected = match control.kind {
-        GameControlKindV2::BattleMove => {
-            move_select_control(state, content, owner.owner_seat, leaf_menu.instance_id, revision)?
-        }
+        GameControlKindV2::BattleMove => move_select_control(
+            state,
+            content,
+            owner.owner_seat,
+            leaf_menu.instance_id,
+            revision,
+        )?,
         GameControlKindV2::BattleSwitch => {
             switch_select_control(state, owner.owner_seat, leaf_menu.instance_id, revision)?
         }
