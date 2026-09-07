@@ -413,8 +413,8 @@ fn begin(host: &mut GameKernelV7, guest: &mut GameKernelV7) -> TestResult<Vec<u8
     frame_bytes(&host.retry_current_coop_rebind_v1()?)
 }
 fn handshake(host: &mut GameKernelV7, guest: &mut GameKernelV7, mut frame: Vec<u8>) -> TestResult {
-    for index in 0..8 {
-        let receiver = if index % 2 == 0 {
+    for index in 0usize..8 {
+        let receiver = if index.is_multiple_of(2) {
             &mut *guest
         } else {
             &mut *host
@@ -545,8 +545,8 @@ fn every_rebind_phase_restores_and_retries_exact_control_without_advancing_repla
     }
     assert_eq!(frame_bytes(&host.retry_current_coop_rebind_v1()?)?, frame);
     assert!(guest.retry_current_coop_rebind_v1()?.frames.is_empty());
-    for index in 0..8 {
-        let receiver_is_host = index % 2 != 0;
+    for index in 0usize..8 {
+        let receiver_is_host = !index.is_multiple_of(2);
         let receiver = if receiver_is_host {
             &mut host
         } else {
@@ -598,8 +598,8 @@ fn every_rebind_phase_restores_and_retries_exact_control_without_advancing_repla
     let transcript = owner(&host.snapshot()?)?.transcript.clone();
     // Old OFFER/JOIN duplicates still return their original immediate response after Open.
     // Duplicate READY returns ACK, and first/duplicate final ACK never creates another READY.
-    for index in 0..8 {
-        let receiver = if index % 2 == 0 {
+    for index in 0usize..8 {
+        let receiver = if index.is_multiple_of(2) {
             &mut guest
         } else {
             &mut host

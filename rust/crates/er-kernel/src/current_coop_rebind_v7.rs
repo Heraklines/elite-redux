@@ -175,7 +175,7 @@ impl CurrentCoopRebindSnapshotV1 {
     fn next_control(&self) -> Result<CurrentCoopRebindControlV1> {
         let index = self.transcript.len();
         let message = *messages().get(index).ok_or(GameKernelV7Error::Invalid)?;
-        let sender_authority = index % 2 == 0;
+        let sender_authority = index.is_multiple_of(2);
         if sender_authority != (self.role == EndpointRole::Authority) {
             return Err(GameKernelV7Error::Invalid);
         }
@@ -292,7 +292,7 @@ impl CurrentCoopRebindSnapshotV1 {
             return Err(GameKernelV7Error::Invalid);
         }
         for (index, frame) in self.transcript.iter().enumerate() {
-            let sender_authority = index % 2 == 0;
+            let sender_authority = index.is_multiple_of(2);
             let expected_guest = if index == 0 { None } else { guest_nonce };
             let transaction = expected_guest
                 .map(|guest| {
