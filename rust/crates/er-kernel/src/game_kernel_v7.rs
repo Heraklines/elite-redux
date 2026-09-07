@@ -1635,21 +1635,39 @@ impl GameKernelV7 {
             // Owned current sessions have a live canonical operation/revision
             // fence checked above. Retiring a fingerprint cannot make an old
             // proposal actionable again. Historical sessions retain backpressure.
-            if !self.current_coop_setup.as_ref().is_some_and(|owner| owner.started.is_some()) {
+            if !self
+                .current_coop_setup
+                .as_ref()
+                .is_some_and(|owner| owner.started.is_some())
+            {
                 return Err(GameKernelV7Error::Invalid);
             }
             let ledger = self.active_runtime()?.material_ledger();
-            Some(admission.fingerprints.iter().enumerate().min_by_key(|(_, entry)| {
-                ledger.record(&entry.operation_id).map_or(SafeU53::ZERO, |record| record.authority_revision)
-            }).ok_or(GameKernelV7Error::Invalid)?.0)
+            Some(
+                admission
+                    .fingerprints
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, entry)| {
+                        ledger
+                            .record(&entry.operation_id)
+                            .map_or(SafeU53::ZERO, |record| record.authority_revision)
+                    })
+                    .ok_or(GameKernelV7Error::Invalid)?
+                    .0,
+            )
         } else {
             None
         };
         let mut staged = self.clone();
         let mut protocol = protocol;
         if let Some(index) = retirement {
-            protocol.proposal_admission.as_mut().ok_or(GameKernelV7Error::Invalid)?
-                .fingerprints.remove(index);
+            protocol
+                .proposal_admission
+                .as_mut()
+                .ok_or(GameKernelV7Error::Invalid)?
+                .fingerprints
+                .remove(index);
             staged.protocol = Some(protocol.clone());
         }
         let step = staged.apply_admitted_game_proposal(envelope, protocol, fingerprint)?;

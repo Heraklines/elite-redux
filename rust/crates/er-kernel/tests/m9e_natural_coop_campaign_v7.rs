@@ -648,7 +648,10 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
         maximum_wave = wave;
         if run.outcome == er_types::RunOutcome::Victory {
             assert_eq!(wave, 200);
-            assert!(retired_rejected, "campaign must cross the unchanged proposal-history bound");
+            assert!(
+                retired_rejected,
+                "campaign must cross the unchanged proposal-history bound"
+            );
             assert!(disconnected && proposals >= 200 && materials >= 400 && settled >= 400);
             assert!(rewards >= 199 && progression >= 199 && retained_human_commands >= 200);
             assert_eq!(host.state(), guest.state());
@@ -710,11 +713,13 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
         let step = play_press(kernel).map_err(|error| format!("natural cooperative input wave={wave}, decision={decision}, owner={owner:?}, kind={kind:?}: {error}"))?;
         for effect in &step.effects {
             if let GameKernelEffectV7::ProposalReady { bytes, .. } = effect {
-                let envelope: er_kernel::game_kernel_v7::GameProposalEnvelopeV2 = serde_json::from_slice(bytes)?;
+                let envelope: er_kernel::game_kernel_v7::GameProposalEnvelopeV2 =
+                    serde_json::from_slice(bytes)?;
                 if remembered_proposals.len() == 65 {
                     remembered_proposals.pop_front();
                 }
-                remembered_proposals.push_back((envelope.proposal.context.operation_id, bytes.clone()));
+                remembered_proposals
+                    .push_back((envelope.proposal.context.operation_id, bytes.clone()));
             }
         }
         let (new_proposals, new_materials) = deliver_play_step(&mut host, &mut guest, step, is_host, false)
@@ -722,15 +727,26 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
         proposals += new_proposals;
         materials += new_materials;
         let snapshot = host.snapshot()?;
-        let admission = snapshot.protocol.as_ref().and_then(|protocol| protocol.proposal_admission.as_ref())
+        let admission = snapshot
+            .protocol
+            .as_ref()
+            .and_then(|protocol| protocol.proposal_admission.as_ref())
             .ok_or("authority admission state absent")?;
         assert_eq!(admission.capacity.get(), 64);
         assert!(admission.fingerprints.len() <= 64);
         if proposals > 64 && !retired_rejected {
-            if let Some((_, stale)) = remembered_proposals.iter().find(|(operation, _)|
-                !admission.fingerprints.iter().any(|entry| &entry.operation_id == operation)) {
+            if let Some((_, stale)) = remembered_proposals.iter().find(|(operation, _)| {
+                !admission
+                    .fingerprints
+                    .iter()
+                    .any(|entry| &entry.operation_id == operation)
+            }) {
                 assert!(host.ingest_network_frame(generation, stale).is_err());
-                assert_eq!(host.snapshot()?, snapshot, "retired proposal changed authority state");
+                assert_eq!(
+                    host.snapshot()?,
+                    snapshot,
+                    "retired proposal changed authority state"
+                );
                 host = restored(&host, content.clone(), true)?;
                 guest = restored(&guest, content.clone(), false)?;
                 assert_eq!(host.state(), guest.state());
