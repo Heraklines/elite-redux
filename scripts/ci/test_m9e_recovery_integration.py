@@ -8,6 +8,45 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
     def setUp(self):
         self.config = {"current_recovery_integration": copy.deepcopy(feedback.RECOVERY_POLICY)}
 
+    def test_owned_foundations_exact_generated_composition_preserves_all66_paths(self):
+        import m9e_generated_xp as generated
+        config = copy.deepcopy(self.config)
+        config[generated.POLICY_KEY] = copy.deepcopy(generated.POLICY)
+        paths = [*feedback.RECOVERY_PATHS, *generated.PATHS]
+        config["current_recovery_integration"]["paths"] = paths
+        original = copy.deepcopy(config)
+        self.assertEqual(len(paths), 66)
+        self.assertEqual(len(set(paths)), 66)
+        self.assertTrue(set(feedback.OWNED_FOUNDATION_PATHS).issubset(paths))
+        for changed in (paths, list(reversed(paths))):
+            self.assertEqual(feedback.select_recovery_scope(config, changed), (True, True))
+        self.assertEqual(config, original)
+
+    def test_owned_foundation_new_sources_reject_partial_extra_and_duplicate_scope(self):
+        for path in feedback.OWNED_FOUNDATION_PATHS:
+            for changed in ([name for name in feedback.RECOVERY_PATHS if name != path],
+                            [*feedback.RECOVERY_PATHS, path], [*feedback.RECOVERY_PATHS, "rust/unreviewed.rs"]):
+                with self.subTest(path=path, changed=len(changed)):
+                    with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                        feedback.select_recovery_scope(self.config, changed)
+
+    def test_owned_foundation_sources_cannot_hide_inside_legacy_lint_overlap(self):
+        for path in ("rust/crates/er-state/src/current_experience_owner.rs",
+                     "rust/crates/er-progression/src/current_friendship.rs",
+                     "rust/crates/er-kernel/src/current_coop_rebind_v7.rs"):
+            for legacy in (feedback.AI_COMMAND_PATHS, feedback.AI_DAMAGE_QUERY_LINT_REPAIR_PATHS):
+                with self.subTest(path=path):
+                    with self.assertRaisesRegex(RuntimeError, "unmapped"):
+                        feedback.select_recovery_scope(self.config, [*legacy, path])
+
+    def test_owned_foundation_policy_rejects_each_missing_duplicate_or_substituted_id(self):
+        for key, ids in feedback.OWNED_FOUNDATION_TEST_IDS.items():
+            for replacement in (ids[:-1], [*ids, ids[0]], ["unreviewed", *ids[1:]]):
+                config = copy.deepcopy(self.config)
+                config["current_recovery_integration"]["owned_foundation_test_ids"][key] = replacement
+                with self.assertRaisesRegex(RuntimeError, "identities"):
+                    feedback.select_recovery_scope(config, feedback.RECOVERY_PATHS)
+
     def test_exact_thirty_one_path_composition_preserves_policy(self):
         original = copy.deepcopy(self.config)
         for paths in (feedback.RECOVERY_PATHS, list(reversed(feedback.RECOVERY_PATHS))):

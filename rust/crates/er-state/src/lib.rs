@@ -4,6 +4,8 @@ pub mod battle;
 pub mod battle_v2;
 pub mod bespoke_v2;
 pub mod conditions;
+pub mod current_battle_participation;
+pub mod current_experience_owner;
 pub mod digest;
 pub mod digest_v2;
 pub mod digest_v4;

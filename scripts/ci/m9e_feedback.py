@@ -262,15 +262,135 @@ RNG_PATHS = ["rust/crates/er-rng/src/battle.rs","rust/crates/er-rng/src/phaser.r
 RNG_TEST_IDS = {"er_rng":["phaser::tests::hash_uses_signed_to_int32_for_final_and_intermediate_accumulators","phaser::tests::rnd_never_mutates_the_private_seed_hash_accumulator","phaser::tests::sow_resets_the_private_hash_accumulator_before_reseeding","phaser::tests::state_setter_preserves_private_seed_hash_accumulator"],"m3_rng":["audit_fingerprints_recompute_and_tampering_is_rejected","battle_cache_resumes_then_increment_turn_resows","battle_construction_uses_wave_offset_and_sixteen_closed_character_draws","battle_draw_advances_only_the_cached_substream","callsite_failures_are_atomic_and_shifted_surrogates_are_supported","callsite_identity_is_closed_and_pinned","consuming_and_nonconsuming_raw_range_paths_are_distinct","eventual_rng_vectors_are_ingested_only_after_manifest_publication","exhausted_sequence_rolls_back_an_entire_multi_draw_shuffle","frac_uses_the_corrected_0x200000_coercion_term","integer_preserves_fractional_binary64_instead_of_coercing_to_uint","integer_range_rejects_width_above_safe_u53_before_drawing","nested_scene_and_pokemon_wrappers_emit_one_logical_entry","one_sequence_is_monotonic_across_offset_and_battle_streams","pick_and_shuffle_apply_the_selected_slice_draw_rules","pick_is_one_logical_audit_and_empty_pick_is_atomic","primitive_transition_and_integer_have_exact_golden_bits","range_turn_and_offset_rejections_are_atomic","real_range_overflow_discards_its_staged_draws","sow_is_deterministic_and_uses_utf16_code_units","speed_offset_shuffle_restores_run_and_context_with_per_swap_audits","state_boundaries_reject_noncanonical_or_poisoned_forms","state_strings_and_json_preserve_full_width_bits","wrapper_fast_paths_audit_without_swapping_or_drawing"],"m9e_shifted_utf16":["shifted_utf16_battle_draws_and_initialization_match_pinned_phaser","shifted_utf16_speed_shuffle_matches_pinned_phaser_and_restores_outer_rng"]}
 
 XP_PATHS = ["rust/crates/er-progression/src/lib.rs","rust/crates/er-progression/src/current_experience.rs","rust/crates/er-progression/tests/m9e_current_experience.rs","rust/crates/er-progression/src/content_v2.rs","rust/crates/er-progression/tests/m9e_content_v2.rs","rust/crates/er-content-compiler/src/m9e_progression.rs","rust/crates/er-content-compiler/tests/m9e_progression.rs","test/kernel-fixtures/m9/export-progression-content.ts"]
-XP_TEST_IDS = {"er-progression:m9e_current_experience":["capped_addition_preserves_multi_level_gains_discards_new_excess_and_keeps_old_experience","invalid_and_overflowing_experience_inputs_leave_borrowed_source_state_unchanged","neutral_defeat_values_preserve_form_trainer_and_distribution_floor_order","neutral_distribution_retains_full_participant_denominator_and_recipient_eligibility","normal_classic_caps_cover_every_wave_and_each_decade_boundary"],"er-progression:m9e_content_v2":["experience_classes_are_closed_and_every_metadata_field_is_hashed","historical_species_bytes_and_missing_experience_remain_explicit","inconsistent_experience_cohorts_and_classifications_fail_validation","signed_special_learnset_levels_are_preserved","source_form_lookup_distinguishes_species_row_and_first_form","unknown_move_reference_fails_closed"],"er-content-compiler:m9e_progression":["complete_progression_catalog_is_source_bound_and_byte_stable","experience_export_fields_compile_without_changing_historical_rows","malformed_experience_export_fails_without_reinterpreting_form_rows"]}
+XP_TEST_IDS = {"er-progression:m9e_current_experience":["capped_addition_preserves_multi_level_gains_discards_new_excess_and_keeps_old_experience","invalid_and_overflowing_experience_inputs_leave_borrowed_source_state_unchanged","neutral_defeat_values_preserve_form_trainer_and_distribution_floor_order","neutral_distribution_retains_full_participant_denominator_and_recipient_eligibility","normal_classic_caps_cover_every_wave_and_each_decade_boundary"],"er-progression:m9e_content_v2":["compiled_experience_bridge_never_reinterprets_species_rows","compiled_experience_bridge_requires_metadata_and_exact_no_form_identity","experience_classes_are_closed_and_every_metadata_field_is_hashed","historical_species_bytes_and_missing_experience_remain_explicit","inconsistent_experience_cohorts_and_classifications_fail_validation","signed_special_learnset_levels_are_preserved","source_form_lookup_distinguishes_species_row_and_first_form","unknown_move_reference_fails_closed"],"er-content-compiler:m9e_progression":["complete_progression_catalog_is_source_bound_and_byte_stable","experience_export_fields_compile_without_changing_historical_rows","malformed_experience_export_fails_without_reinterpreting_form_rows"]}
+
+OWNED_FOUNDATION_PATHS = ["rust/crates/er-battle/src/m7_resolver.rs","rust/crates/er-game/src/m9e_content_v2.rs","rust/crates/er-game/src/m9e_material_v6.rs","rust/crates/er-game/src/m9e_new_run_v6.rs","rust/crates/er-game/src/m9e_runtime_v6.rs","rust/crates/er-game/tests/m9e_battle_participation.rs","rust/crates/er-game/tests/m9e_content_v2.rs","rust/crates/er-game/tests/m9e_material_retention.rs","rust/crates/er-game/tests/m9e_material_v6.rs","rust/crates/er-game/tests/m9e_runtime_v6.rs","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs","rust/crates/er-progression/src/content_v2.rs","rust/crates/er-progression/tests/m9e_content_v2.rs","rust/crates/er-save/src/m9e_save_v2.rs","rust/crates/er-state/src/current_battle_participation.rs","rust/crates/er-state/src/current_experience_owner.rs","rust/crates/er-state/src/lib.rs","rust/crates/er-state/src/m9e_state_v6.rs","rust/crates/er-progression/src/lib.rs","rust/crates/er-progression/src/current_friendship.rs","rust/crates/er-progression/tests/m9e_current_friendship.rs","rust/crates/er-kernel/src/current_coop_rebind_v7.rs","rust/crates/er-kernel/src/current_coop_setup_v7.rs","rust/crates/er-kernel/src/current_proposal_v7.rs","rust/crates/er-kernel/src/game_kernel_v7.rs","rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs"]
+OWNED_FOUNDATION_SOURCES = {"rust/crates/er-battle/src/m7_resolver.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","a5b72b5bcfb02a1c52d1cc4a05355217d098fcc4f1247b64b99131ab2db7c2f3"],"rust/crates/er-game/src/m9e_content_v2.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","e287b251a98cab8e170ac92fc4b253bc0908a2f6155929f35978680dff3fda5b"],"rust/crates/er-game/src/m9e_material_v6.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","923b991279112c390c787768a44860f1ac57174f59782e5a39387ebca836ad0f"],"rust/crates/er-game/src/m9e_new_run_v6.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","b854bdc3decbecce6d3f75eee194d1f187facf3a79c5edc2cd0fa6e2a3ac1478"],"rust/crates/er-game/src/m9e_runtime_v6.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","8b7915641190ab9de735a42c3cf2e67a95e9abad4fc9b778dc3e6180350f7ed6"],"rust/crates/er-game/tests/m9e_battle_participation.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","b2df2425e62954a034fa04c3bffa248c4aafc0a7262d778ca508b0248fef3fab"],"rust/crates/er-game/tests/m9e_content_v2.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","c7a2278f7cb8bdaa4699168bfe5ea64f76e9e00898791891cd9154c3b1d6c1b2"],"rust/crates/er-game/tests/m9e_material_retention.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","33cdf461523dbe13ca38582f73e8175d64cd62cf367682af3c1d6168aa0c38f4"],"rust/crates/er-game/tests/m9e_material_v6.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","bff3f3c6e3d4365e3ab9522d842cbd6191b03214d1f6cd6bd1438e20c467ba51"],"rust/crates/er-game/tests/m9e_runtime_v6.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","97f208d8d77d6afb99c7bee19c8d36914c700fc4c20b82fa60d1f695f4f05c34"],"rust/crates/er-kernel/tests/m9e_material_retention_v7.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","48599e1eef12df8fc3e418f5dd619c8aab96a5d37fd0096b915288781e72f7de"],"rust/crates/er-kernel/tests/m9e_snapshot_v7.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","be5f4fbe18665b09b36e5a53f10ea5d38140e200ec0604577f29affed322de1c"],"rust/crates/er-progression/src/content_v2.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","60b2aeb5bf55e05119830a50d175b254e8ceb4382ba023d658e5c13d4e91007c"],"rust/crates/er-progression/tests/m9e_content_v2.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","13b4504be2b79f0eaed637062417360f346f2abac60dc0a92fa140912f85158c"],"rust/crates/er-save/src/m9e_save_v2.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","cabb1d0de57778aa82aa77423f73e2156987296d0e2e849f38ae334026f37b5b"],"rust/crates/er-state/src/current_battle_participation.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","6951be193c1af2c0b05de1628771421e016a99af3b9faa5757ff199c2f11c3b3"],"rust/crates/er-state/src/current_experience_owner.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","4540d343837a0f7a8cf117b9bd15ea847ab38e34823e55fa94cf243c6e7c5dff"],"rust/crates/er-state/src/lib.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","6c2c6c909e7b5217acc19d80bd385be35d1247d56f32ee34eb832bc2346447f2"],"rust/crates/er-state/src/m9e_state_v6.rs":["19f4375b94bb9ad7630f37ce065293d932cbf812","ed7781bb1bf2a1c59fe96f7fe6916ee023ea3d5397ecdc06e98ef8a3e832e37e"],"rust/crates/er-progression/src/lib.rs":["db3cf367e1750e719fda89d82d8046c51d8c1bc2","fa1e0661abd328f63a1015ccf95600c5ea9b465d05ed7680097820d984a345d9"],"rust/crates/er-progression/src/current_friendship.rs":["db3cf367e1750e719fda89d82d8046c51d8c1bc2","9acb9530ced900f5b51174054e944d02b635675f155bc5187bca7e6ddb99bd03"],"rust/crates/er-progression/tests/m9e_current_friendship.rs":["db3cf367e1750e719fda89d82d8046c51d8c1bc2","939c1eb1d0dc970ef538bca013364f3d056dcfd03b6606d4285a84abe1d4f707"],"rust/crates/er-kernel/src/current_coop_rebind_v7.rs":["669566a10516291bd7510c3b4869a66028bfd85d","73f8f76e5ce3181682f519170599023ee41584dc95f1e00db47e3ca45393b086"],"rust/crates/er-kernel/src/current_coop_setup_v7.rs":["669566a10516291bd7510c3b4869a66028bfd85d","c4e8dbeef2a41d4e316d5aac6082feff132348a4e8cd8cbb0620bab1682b37b7"],"rust/crates/er-kernel/src/current_proposal_v7.rs":["669566a10516291bd7510c3b4869a66028bfd85d","98cd877c1d54e3e2a7d9f388423b14e63a2ce89fcb42514f59e6ac48fa2ffa1e"],"rust/crates/er-kernel/src/game_kernel_v7.rs":["669566a10516291bd7510c3b4869a66028bfd85d","0a8cd79f25bae24a589bd6c38682708fa8816787241c83e534f746b707ce5ae0"],"rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs":["669566a10516291bd7510c3b4869a66028bfd85d","fc20a2a6985d47144e0a4012b7488895887874df8d452d5ea0e71f3d1a7c750c"]}
+OWNED_FOUNDATION_TEST_IDS = {"er-game:m9e_battle_participation":["current_faint_membership_uses_stable_ids_and_removes_player_after_recording","historical_owner_absence_preserves_canonical_bytes","malformed_evidence_capacity_and_counter_failures_roll_back","natural_bootstrap_switch_and_ko_preserve_legacy_gameplay","natural_enemy_faint_owns_unresolved_experience_without_applying_amount","next_natural_battle_retains_occurrence_highwater","observed_save_snapshot_and_material_replay_preserve_ownership","pending_experience_counter_exhaustion_rolls_back_real_enemy_faint","pending_experience_restore_rejects_source_policy_and_frontier_forgeries","pending_experience_survives_real_save_replay_and_rejects_owner_stripping_material","pending_experience_unsettled_tail_rejects_actions_and_next_encounter"],"er-progression:m9e_current_friendship":["binary64_fusion_and_starter_cap_order_match_source_cases","boosted_caps_and_max_friendship_preserve_full_candy_progress","candy_saturation_zero_rate_egg_and_negative_requests_match_source","invalid_resolution_and_late_arithmetic_leave_inputs_unchanged","negative_and_zero_friendship_short_circuit_without_resolution","shared_fusion_progress_and_candy_roots_update_in_source_order"],"er-kernel:m9e_current_coop_rebind_v7":["equal_frontier_native_rebind_commits_two_atomically_without_gameplay","every_rebind_phase_restores_and_retries_exact_control_without_advancing_replay","malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot","open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt","open_rebind_receipt_and_owner_mutations_reject_with_complete_state_conservation","open_rebind_replaces_original_v1_reply_atomically_at_capacity_one","rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners","rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_pause"]}
+OWNED_FOUNDATION_INVENTORY = "scripts/ci/m9e-owned-foundations-inventory.json"
+OWNED_FOUNDATION_INVENTORY_SHA256 = "7c511418a35e5e1b1d2fe6875e84c0fd629ec854c06e9f657711f7ee76a1faa8"
 
 RECOVERY_PATHS = [*AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
                   "rust/crates/er-kernel/tests/" + REPLACEMENT_TARGET + ".rs",
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
                   "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
                   "rust/crates/er-wasm/tests/m9e_parity.rs",
-                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs", *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, "rust/crates/er-kernel/src/current_coop_setup_v7.rs", *XP_PATHS]
-RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS, "coop_campaign_test_ids": COOP_CAMPAIGN_IDS, "coop_receipt_test_ids": COOP_RECEIPT_IDS, "xp_test_ids": XP_TEST_IDS}
+                  "rust/crates/er-cli/tests/m9e_current_rulechange_reload.rs", *CHECKPOINT_PATHS, CANONICAL_PATH, *STRUGGLE_PATHS, *CAMPAIGN_PATHS, "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs", *RNG_PATHS, COOP_CAMPAIGN_PATH, COOP_RECEIPT_PATH, "rust/crates/er-kernel/src/current_coop_setup_v7.rs", *XP_PATHS, *["rust/crates/er-game/src/m9e_content_v2.rs","rust/crates/er-game/src/m9e_material_v6.rs","rust/crates/er-game/tests/m9e_battle_participation.rs","rust/crates/er-game/tests/m9e_content_v2.rs","rust/crates/er-game/tests/m9e_material_retention.rs","rust/crates/er-game/tests/m9e_material_v6.rs","rust/crates/er-game/tests/m9e_runtime_v6.rs","rust/crates/er-kernel/src/current_coop_rebind_v7.rs","rust/crates/er-kernel/src/current_proposal_v7.rs","rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs","rust/crates/er-progression/src/current_friendship.rs","rust/crates/er-progression/tests/m9e_current_friendship.rs","rust/crates/er-save/src/m9e_save_v2.rs","rust/crates/er-state/src/current_battle_participation.rs","rust/crates/er-state/src/current_experience_owner.rs","rust/crates/er-state/src/lib.rs","rust/crates/er-state/src/m9e_state_v6.rs"]]
+RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS, "coop_campaign_test_ids": COOP_CAMPAIGN_IDS, "coop_receipt_test_ids": COOP_RECEIPT_IDS, "xp_test_ids": XP_TEST_IDS, "owned_foundation_test_ids": OWNED_FOUNDATION_TEST_IDS}
+
+
+def apply_owned_foundation_obligations(result, installed):
+    """Installed whole targets remain required on subsequent affected cuts."""
+    from m9e_current_proposal import merge_targets
+    required = installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-state", "er-save"}
+                                 & set(result["packages"]))
+    result["requires_owned_foundations"] = required
+    result["owned_foundation_inventory_sha256"] = (
+        OWNED_FOUNDATION_INVENTORY_SHA256 if required and result.get("current_recovery_integration") else None)
+    if not required:
+        return
+    for key, ids in OWNED_FOUNDATION_TEST_IDS.items():
+        crate, target = key.split(":")
+        result["packages"] = sorted(set(result["packages"]) | {crate})
+        result["required_native_targets"] = merge_targets(result["required_native_targets"], {crate: [target]})
+        result["required_native_test_ids"] = {**result["required_native_test_ids"], key: list(ids)}
+        if result["execution_scope"] is not None:
+            result["execution_scope"] = merge_targets(result["execution_scope"], {crate: [target]})
+
+
+def owned_foundation_inventory():
+    """Read only the source-bound inventory; never fixture or execution bodies."""
+    path = Path(__file__).with_name("m9e-owned-foundations-inventory.json")
+    raw = path.read_bytes()
+    if len(raw) > 65536 or hashlib.sha256(raw).hexdigest() != OWNED_FOUNDATION_INVENTORY_SHA256:
+        raise RuntimeError("owned foundation inventory source binding differs")
+    document = json.loads(raw)
+    expected = {"schema_version": 1, "prior_tests": 759, "prior_targets": 98, "tests": 786, "targets": 101}
+    if (set(document) != {*expected, "base_sha", "prior_inventory_sha256", "additions", "inventory"}
+            or any(type(document.get(key)) is not int or document[key] != value for key, value in expected.items())
+            or document["base_sha"] != "f501695d69dd7295000134b2ecaf72e421e99f2c"):
+        raise RuntimeError("owned foundation inventory provenance differs")
+    rows = canonical_owned_inventory(document["inventory"])
+    if len(rows) != 101 or sum(len(row["ids"]) for row in rows) != 786:
+        raise RuntimeError("owned foundation inventory count differs")
+    prior = []
+    for row in rows:
+        key = row["crate"] + ":" + row["target"]
+        additions = document["additions"].get(key, [])
+        if not set(additions).issubset(row["ids"]):
+            raise RuntimeError("owned foundation additions are absent")
+        if key in OWNED_FOUNDATION_TEST_IDS:
+            if row["ids"] != sorted(OWNED_FOUNDATION_TEST_IDS[key]) or row["historical_excluded_ids"]:
+                raise RuntimeError("owned foundation new whole target differs")
+            continue
+        prior.append({**row, "ids": [name for name in row["ids"] if name not in additions]})
+    raw_prior = json.dumps(prior, sort_keys=True, separators=(",", ":")).encode()
+    if (len(prior) != 98 or sum(len(row["ids"]) for row in prior) != 759
+            or hashlib.sha256(raw_prior).hexdigest() != document["prior_inventory_sha256"]):
+        raise RuntimeError("owned foundation inventory lost prior identities or exclusions")
+    return rows
+
+
+def canonical_owned_inventory(inventory):
+    if not isinstance(inventory, list):
+        raise RuntimeError("owned foundation inventory is not an array")
+    seen = set()
+    result = []
+    for row in inventory:
+        if not isinstance(row, dict) or set(row) != {"crate", "target", "ids", "historical_excluded_ids"}:
+            raise RuntimeError("owned foundation inventory row fields differ")
+        pair = (row["crate"], row["target"])
+        if any(not isinstance(value, str) or not value for value in pair) or pair in seen:
+            raise RuntimeError("owned foundation inventory target is invalid or duplicated")
+        seen.add(pair)
+        for field in ("ids", "historical_excluded_ids"):
+            values = row[field]
+            if (not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values)
+                    or len(values) != len(set(values))):
+                raise RuntimeError("owned foundation inventory IDs are invalid or duplicated")
+        if set(row["ids"]) & set(row["historical_excluded_ids"]):
+            raise RuntimeError("owned foundation inventory execution/exclusion overlap")
+        result.append({"crate": pair[0], "target": pair[1], "ids": sorted(row["ids"]),
+                       "historical_excluded_ids": sorted(row["historical_excluded_ids"])})
+    return sorted(result, key=lambda row: (row["crate"], row["target"]))
+
+
+def validate_owned_foundation_inventory(plan, inventory):
+    required = plan.get("requires_owned_foundations", False)
+    selected = {row["crate"] + ":" + row["target"] for row in inventory}
+    if (type(required) is not bool
+            or ((selected & set(OWNED_FOUNDATION_TEST_IDS) or plan.get("current_recovery_integration")) and not required)):
+        raise RuntimeError("owned foundation selected target obligation missing")
+    if not required:
+        return
+    rows = canonical_owned_inventory(inventory)
+    by_target = {row["crate"] + ":" + row["target"]: row for row in rows}
+    for key, ids in OWNED_FOUNDATION_TEST_IDS.items():
+        crate, target = key.split(":")
+        row = by_target.get(key)
+        if (row is None or row["ids"] != sorted(ids) or row["historical_excluded_ids"]
+                or plan.get("required_native_test_ids", {}).get(key) != ids
+                or plan.get("required_native_targets", {}).get(crate, []).count(target) != 1):
+            raise RuntimeError("owned foundation whole executed target differs")
+    if plan.get("current_recovery_integration"):
+        if (plan.get("owned_foundation_inventory_sha256") != OWNED_FOUNDATION_INVENTORY_SHA256
+                or rows != owned_foundation_inventory()):
+            raise RuntimeError("owned foundation complete786/101 inventory differs")
+
+
+def validate_owned_foundation_sources(root):
+    for source_path, (_, expected_hash) in OWNED_FOUNDATION_SOURCES.items():
+        if hashlib.sha256((root / source_path).read_bytes()).hexdigest() != expected_hash:
+            raise RuntimeError("owned foundation qualified source differs: " + source_path)
+
+
+def supersede_owned_xp_sources(sources):
+    replacements = {"rust/crates/er-progression/src/lib.rs", "rust/crates/er-progression/src/content_v2.rs",
+                    "rust/crates/er-progression/tests/m9e_content_v2.rs"}
+    if set(sources) != set(XP_PATHS) or set(sources) & set(OWNED_FOUNDATION_SOURCES) != replacements:
+        raise RuntimeError("owned foundation XP source overlap differs")
+    return {path: list(OWNED_FOUNDATION_SOURCES[path] if path in replacements else value)
+            for path, value in sources.items()}
 
 
 def select_recovery_scope(config, changed):
@@ -284,6 +404,18 @@ def select_recovery_scope(config, changed):
     scoped = policy is not None and len(changed) == len(required_paths) and set(changed) == set(required_paths)
     if any(path in generated.PATHS for path in changed) and not (generated_installed and scoped):
         raise RuntimeError("generated XP fixture product delta is unmapped")
+    # Only new owned-foundation files are unconditional exclusive triggers.
+    # Shared existing files retain their earlier owner/query/retention policies.
+    owned_new = {
+        "rust/crates/er-game/tests/m9e_battle_participation.rs",
+        "rust/crates/er-state/src/current_battle_participation.rs",
+        "rust/crates/er-state/src/current_experience_owner.rs",
+        "rust/crates/er-progression/src/current_friendship.rs",
+        "rust/crates/er-progression/tests/m9e_current_friendship.rs",
+        "rust/crates/er-kernel/src/current_coop_rebind_v7.rs",
+        "rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs"}
+    if any(path in owned_new for path in changed) and not scoped:
+        raise RuntimeError("owned foundation integration product delta is unmapped")
     # Shared compiler metadata already belongs to the exact historical lint cut.
     # Defer only that overlap to its existing policy/whole-scope checks below;
     # this does not admit the cut or exempt any XP-only source.
@@ -968,7 +1100,11 @@ def plan():
     title_lint_session = title_session and any(path in TITLE_STORAGE_LINT_PATHS for path in product_changes)
     import m9e_title_storage as retirement
     retirement_session, retirement_installed = retirement.select_scope(config, product_changes, ROOT)
-    owner_session = focus_policy(config, product_changes)
+    owner_changes = [path for path in product_changes if path in OWNER_PATHS] if recovery_session else product_changes
+    owner_scope = focus_policy(config, owner_changes)
+    # Exact recovery admission already owns the complete mixed composition.
+    # Validate the retained owner policy without selecting its isolated cut.
+    owner_session = owner_scope and not recovery_session
     owner_installed = any((ROOT / path).is_file() for path in OWNER_TRIGGERS)
     owner_changed = owner_installed and any(path in OWNER_PATHS for path in product_changes)
     browser_worker_focus = config.get("current_browser_worker_focus", {})
@@ -1139,7 +1275,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (recovery_session and path in [*XP_PATHS, *generated.PATHS]) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (recovery_session and path in [*RECOVERY_PATHS, *generated.PATHS]) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass
@@ -1573,6 +1709,7 @@ def plan():
             result["required_native_test_ids"] = {**result["required_native_test_ids"], key: list(ids)}
             if result["execution_scope"] is not None:
                 result["execution_scope"] = merge_targets(result["execution_scope"], {crate: [target]})
+    apply_owned_foundation_obligations(result, replacement_installed)
     rng_required = replacement_installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-rng"} & selected)
     result["requires_current_rng_witnesses"] = rng_required
     if rng_required:
@@ -2472,6 +2609,11 @@ def main(preflight_failure=None):
             [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
         require_native_test_ids(selection.get("required_native_test_ids", {}),
                                 [(cwd.name, name, ids) for _, _, name, ids, cwd, _, _ in enumerated])
+        validate_owned_foundation_inventory(selection, [
+            {"crate": cwd.name, "target": name, "ids": ids, "historical_excluded_ids": sorted(excluded)}
+            for _, _, name, ids, cwd, excluded, _ in enumerated])
+        if selection.get("requires_owned_foundations") and selection.get("current_recovery_integration"):
+            validate_owned_foundation_sources(ROOT)
         from m9e_phases import validate_control_query_inventory
         validate_control_query_inventory(selection, [
             {"crate": cwd.name, "target": name, "ids": ids, "historical_excluded_ids": sorted(excluded)}

@@ -5225,8 +5225,8 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 42)
-        self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 14)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 61)
+        self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
         for key, ids in self.feedback.XP_TEST_IDS.items():
@@ -5272,6 +5272,36 @@ class FeedbackTests(unittest.TestCase):
                     changed[target_index] = (crate, target, changed_ids)
                     with self.assertRaisesRegex(RuntimeError, "identities/counts"):
                         self.feedback.require_native_test_ids(required, changed)
+    def test_owned_foundation_full_plan_adds_three_whole_targets_and_preserves_old_obligations(self):
+        self.configure_recovery_integration_scope()
+        original = copy.deepcopy(self.config)
+        selection = self.feedback.plan()
+        self.assertTrue(selection["requires_owned_foundations"])
+        self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [6, 8, 11])
+        for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
+            crate, target = key.split(":")
+            self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
+            self.assertEqual(selection["required_native_test_ids"][key], ids)
+            self.assertIn(target, selection["execution_scope"][crate])
+        for flag in ("requires_wasm", "requires_browser", "requires_browser_worker", "requires_browser_rtc",
+                     "requires_coop_lost_receipt", "requires_current_rng_witnesses", "requires_natural_coop_campaign"):
+            self.assertTrue(selection[flag], flag)
+        self.assertEqual(self.config, original)
+
+    def test_owned_foundation_whole_targets_remain_required_after_installed_followup(self):
+        self.configure_recovery_integration_scope()
+        self.changed = list(self.feedback.AI_COMMAND_PATHS)
+        selection = self.feedback.plan()
+        self.assertFalse(selection["current_recovery_integration"])
+        self.assertTrue(selection["requires_owned_foundations"])
+        self.assertIsNone(selection["owned_foundation_inventory_sha256"])
+        for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
+            crate, target = key.split(":")
+            self.assertEqual(selection["required_native_test_ids"][key], ids)
+            self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
+            self.assertTrue(selection["execution_scope"] is None or target in selection["execution_scope"][crate])
+
     def configure_recovery_integration_scope(self):
         import m9e_coop_startup as coop
         self.configure_ai_command_transaction_scope()
@@ -5283,6 +5313,8 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-battle")
         self.package("er-canonical")
         self.package("er-rng")
+        self.package("er-state")
+        self.package("er-save")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         for name in self.feedback.XP_PATHS:
             path = self.root / name
@@ -8337,7 +8369,7 @@ class PhaseTransferTests(unittest.TestCase):
 
     def native_with_repeated_required_ids(self):
         proof = copy.deepcopy(self.native)
-        ids = [f"case_{index:04d}_" + "current_state_and_effect_ownership_" * 2 for index in range(600)]
+        ids = [f"case_{index:04d}_" + "current_state_and_effect_owner_" * 2 for index in range(600)]
         proof["inventory"][1]["ids"] = ids
         proof["plan"]["required_native_test_ids"] = {"er-repro:m9e_current_repro": list(reversed(ids))}
         proof["required_native_target_counts"]["er-repro:m9e_current_repro"] = len(ids)
@@ -11192,8 +11224,9 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
 class CompactWorkerEvidenceTests(unittest.TestCase):
     def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
             full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
+                    "identity": {"product_sha": "a" * 40, "run_id": "1"},
                     "tests": {"selected": 665, "executed": 665, "passed": 665, "failed": 0, "skipped": 0},
                     key: {lane: {"sha256": lane * 64, "profile": "x" * 600} for lane in "abcd"},
                     "first_failure": "x" * 14000}
@@ -11204,12 +11237,13 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
             self.assertEqual(compact[key],
                              {"file": "phase-summary.json", "sha256": proof_hash, "field": key})
             self.assertEqual(compact["tests"], full["tests"])
+            self.assertEqual(compact["identity"], full["identity"])
             self.assertEqual(compact["qualification"], full["qualification"])
             self.assertEqual(full, original)
 
     def test_small_worker_details_remain_inline(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
             full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
                     key: {"d": {"sha256": "d" * 64}}}
             compact = phases.compact_summary(full, "e" * 64, {})
@@ -11219,9 +11253,126 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_unbounded_required_result_still_fails_closed(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
             with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
                 phases.compact_summary({"first_failure": "x" * 16001, key: {"d": "detail"}}, "e" * 64, {})
+
+class OwnedFoundationContractTests(unittest.TestCase):
+    def setUp(self):
+        import m9e_feedback as feedback
+        self.feedback = feedback
+        self.inventory = feedback.owned_foundation_inventory()
+        self.plan = {"packages": ["er-kernel"], "current_recovery_integration": True,
+                     "required_native_targets": {}, "required_native_test_ids": {}, "execution_scope": {}}
+        feedback.apply_owned_foundation_obligations(self.plan, True)
+
+    def test_owned_foundation_discovery_rejects_missing_duplicate_and_compile_only_targets(self):
+        self.feedback.validate_owned_foundation_inventory(self.plan, self.inventory)
+        for key in self.feedback.OWNED_FOUNDATION_TEST_IDS:
+            index = next(i for i, row in enumerate(self.inventory) if row["crate"] + ":" + row["target"] == key)
+            for rows in (self.inventory[:index] + self.inventory[index + 1:],
+                         [*self.inventory, self.inventory[index]]):
+                with self.assertRaisesRegex(RuntimeError, "owned foundation"):
+                    self.feedback.validate_owned_foundation_inventory(self.plan, rows)
+            rows = copy.deepcopy(self.inventory)
+            rows[index]["historical_excluded_ids"] = rows[index]["ids"]
+            rows[index]["ids"] = []
+            with self.assertRaisesRegex(RuntimeError, "whole executed target"):
+                self.feedback.validate_owned_foundation_inventory(self.plan, rows)
+        absent = copy.deepcopy(self.plan)
+        absent["requires_owned_foundations"] = False
+        with self.assertRaisesRegex(RuntimeError, "obligation missing"):
+            self.feedback.validate_owned_foundation_inventory(absent, self.inventory)
+
+    def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
+        self.assertEqual(len(self.inventory), 101)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 786)
+        for change in ("remove", "rename", "exclude", "extra"):
+            rows = copy.deepcopy(self.inventory)
+            old = next(row for row in rows if row["crate"] == "er-canonical")
+            if change == "remove":
+                old["ids"].pop()
+            elif change == "rename":
+                old["ids"][0] = "renamed_old_id"
+            elif change == "exclude":
+                old["historical_excluded_ids"].append(old["ids"].pop())
+            else:
+                rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
+            with self.assertRaisesRegex(RuntimeError, "complete786/101"):
+                self.feedback.validate_owned_foundation_inventory(self.plan, rows)
+
+    def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
+        import m9e_phases as phases
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 27)
+        for path in self.feedback.OWNED_FOUNDATION_PATHS:
+            self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
+        self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)
+        self.assertEqual(phases.IDENTITY_FILES["recovery_preflight"], "scripts/ci/m9e_recovery_preflight.py")
+        old = {path: [BASE, str(index) * 64] for index, path in enumerate(self.feedback.XP_PATHS)}
+        preserved = copy.deepcopy(old)
+        current = self.feedback.supersede_owned_xp_sources(old)
+        changed = [path for path in old if old[path] != current[path]]
+        self.assertEqual(set(changed), {"rust/crates/er-progression/src/lib.rs",
+                         "rust/crates/er-progression/src/content_v2.rs", "rust/crates/er-progression/tests/m9e_content_v2.rs"})
+        self.assertEqual(old, preserved)
+        self.assertEqual(sum(current[path] == old[path] for path in old), 5)
+        for path in changed:
+            self.assertEqual(current[path], self.feedback.OWNED_FOUNDATION_SOURCES[path])
+        with self.assertRaisesRegex(RuntimeError, "overlap"):
+            self.feedback.supersede_owned_xp_sources({**old, "rust/unreviewed.rs": [BASE, "a" * 64]})
+
+    def test_owned_foundation_source_conservation_rejects_any_changed_donor_before_evidence(self):
+        with tempfile.TemporaryDirectory(prefix="m9e-owned-source-test-") as directory:
+            root = Path(directory)
+            sources = {}
+            for index, path in enumerate(self.feedback.OWNED_FOUNDATION_PATHS):
+                raw = f"bounded source fixture {index}\n".encode()
+                destination = root / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(raw)
+                sources[path] = [BASE, hashlib.sha256(raw).hexdigest()]
+            with patch.object(self.feedback, "OWNED_FOUNDATION_SOURCES", sources):
+                self.feedback.validate_owned_foundation_sources(root)
+                for path in sources:
+                    destination = root / path
+                    original = destination.read_bytes()
+                    destination.write_bytes(original + b"changed")
+                    with self.assertRaisesRegex(RuntimeError, "qualified source differs"):
+                        self.feedback.validate_owned_foundation_sources(root)
+                    destination.write_bytes(original)
+
+    def test_owned_foundation_inventory_source_and_integer_provenance_are_strict(self):
+        path = HARNESS.with_name("m9e-owned-foundations-inventory.json")
+        raw = path.read_bytes()
+        with patch.object(Path, "read_bytes", return_value=raw + b" "):
+            with self.assertRaisesRegex(RuntimeError, "source binding"):
+                self.feedback.owned_foundation_inventory()
+        for key in ("schema_version", "prior_tests", "prior_targets", "tests", "targets"):
+            value = json.loads(raw)
+            value[key] = True
+            altered = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            with patch.object(Path, "read_bytes", return_value=altered), patch.object(
+                    self.feedback, "OWNED_FOUNDATION_INVENTORY_SHA256", hashlib.sha256(altered).hexdigest()):
+                with self.assertRaisesRegex(RuntimeError, "provenance"):
+                    self.feedback.owned_foundation_inventory()
+
+    def test_owned_foundation_bounded_projection_roundtrip_preserves_all_ids_and_old_controls(self):
+        import m9e_phases as phases
+        flags = {key: True for key in ("requires_wasm", "requires_browser", "requires_browser_worker",
+                  "requires_browser_rtc", "requires_cli_executable", "requires_worker_executable",
+                  "requires_current_control_query", "requires_current_state_query", "requires_current_proposal")}
+        projection = {"phase": "aggregate", "qualification": "structural projection only", "inventory": self.inventory,
+                      "identity": {"files": {key: "a" * 64 for key in phases.IDENTITY_FILES}},
+                      "plan": {**self.plan, **flags}, "retained_unknown_field": {"must_survive": [1, 2, 3]}}
+        frozen = copy.deepcopy(projection)
+        with tempfile.TemporaryDirectory(prefix="m9e-owned-projection-") as directory:
+            destination = Path(directory) / "projection.json"
+            digest = phases.write_bounded(destination, projection)
+            self.assertLessEqual(destination.stat().st_size, 65536)
+            self.assertLessEqual(len(phases.encoded(projection)), phases.AGGREGATE_DECODED_LIMIT)
+            self.assertEqual(phases.read_bounded(destination, digest), frozen)
+        self.assertEqual(projection, frozen)
+
 
 if __name__ == "__main__":
     unittest.main()

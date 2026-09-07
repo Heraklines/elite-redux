@@ -304,6 +304,57 @@ pub fn resolve_turn_v5(
     })
 }
 
+/// Run the same resolver once and expose its ordered field/HP evidence to the opt-in
+/// current owner. No TS phase scheduling or XP award semantics are implied.
+pub fn resolve_turn_v5_with_current_observations(
+    before: &GameStateV5,
+    commands: &CommandSet,
+    content: &PreparedBattleContentV3,
+    authority: &TurnAuthorityContextV1,
+) -> Result<
+    (
+        BattleTransitionV5,
+        Vec<er_state::current_battle_participation::CurrentBattleObservationEventV1>,
+    ),
+    BattleV5Error,
+> {
+    use er_state::current_battle_participation::{
+        CurrentBattleObservationEventV1, MAX_CURRENT_PARTICIPATION_EVENTS_V1,
+    };
+    let transition = resolve_turn_v5(before, commands, content, authority)?;
+    let events = transition
+        .mutations
+        .iter()
+        .filter_map(|mutation| match mutation {
+            BattleMutation::FieldChanged {
+                slot,
+                before,
+                after,
+            } => Some(CurrentBattleObservationEventV1::FieldChanged {
+                slot: *slot,
+                before: *before,
+                after: *after,
+            }),
+            BattleMutation::HpChanged {
+                pokemon,
+                before,
+                after,
+            } => Some(CurrentBattleObservationEventV1::HpChanged {
+                pokemon: *pokemon,
+                before: *before,
+                after: *after,
+            }),
+            _ => None,
+        })
+        .take(MAX_CURRENT_PARTICIPATION_EVENTS_V1 + 1)
+        .collect::<Vec<_>>();
+    if events.len() > MAX_CURRENT_PARTICIPATION_EVENTS_V1 {
+        return Err(BattleV5Error::State(
+            "current battle observation capacity exceeded".to_owned(),
+        ));
+    }
+    Ok((transition, events))
+}
 /// Resolve the command's effective move without mutating PP or consuming RNG.
 /// An exhausted selected slot falls back only when every real move is exhausted.
 pub fn effective_move_definition_v5<'a>(
