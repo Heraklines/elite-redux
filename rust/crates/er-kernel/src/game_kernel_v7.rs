@@ -3313,6 +3313,7 @@ fn switch_select_control(
     let entries = run
         .party
         .iter()
+        .filter(|pokemon| pokemon.owner_seat == Some(seat))
         .enumerate()
         .filter(|(_, pokemon)| {
             pokemon.id != actor
@@ -3540,7 +3541,9 @@ fn battle_proposal_is_rooted_in_control(
             .as_ref()
             .and_then(|run| {
                 run.party
-                    .get(usize::from(party_slot.get()))
+                    .iter()
+                    .filter(|pokemon| pokemon.owner_seat == Some(sender))
+                    .nth(usize::from(party_slot.get()))
                     .map(|pokemon| (run, pokemon))
             })
             .is_some_and(|(run, pokemon)| {

@@ -904,6 +904,7 @@ fn battle_command_offer(
     let switches = run
         .party
         .iter()
+        .filter(|candidate| candidate.owner_seat == pokemon.owner_seat)
         .enumerate()
         .filter(|(_, candidate)| {
             candidate.owner_seat == pokemon.owner_seat

@@ -436,10 +436,15 @@ fn execute_switch(
     presentation: &mut Vec<BattlePresentationCueV5>,
 ) -> Result<ActionDisposition, BattleV5Error> {
     let index = usize::from(party_slot.get());
+    let owner = pokemon(run, actor)
+        .ok_or(BattleV5Error::InactiveActor(actor))?
+        .owner_seat;
     let replacement_id = match source_slot.side {
         BattleSide::Player => run
             .party
-            .get(index)
+            .iter()
+            .filter(|replacement| replacement.owner_seat == owner)
+            .nth(index)
             .filter(|replacement| {
                 !replacement.fainted
                     && replacement.id != actor
