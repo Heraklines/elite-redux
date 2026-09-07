@@ -304,7 +304,10 @@ pub struct CurrentProposalMaterialReceiptV2 {
 fn valid_rebind_transaction_digest(value: &str) -> bool {
     // The retained handshake uses fixture_digest: raw lower-case SHA256 hex.
     // This is a separate namespace from the blake3-v1 gameplay state digest.
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 impl CurrentProposalMaterialReceiptV2 {
@@ -490,14 +493,30 @@ pub fn validate_current_owner_snapshot_v1(
     }
     let retained = owner.retained();
     let protocol = snapshot.protocol.as_ref().ok_or(CurrentProposalErrorV1)?;
-    if snapshot.current_coop_setup.as_ref().is_some_and(|setup| setup.rebind.is_some()) {
+    if snapshot
+        .current_coop_setup
+        .as_ref()
+        .is_some_and(|setup| setup.rebind.is_some())
+    {
         crate::game_kernel_v7::current_coop_rebind_v7::validate_open_pair(
-            snapshot, retained.publication_context.sender_seat_id, EndpointRole::Replica, false,
-        ).map_err(|_| CurrentProposalErrorV1)?;
-        if retained.publication_next_authority_revision < snapshot.current_coop_setup.as_ref()
-            .and_then(|setup| setup.rebind.as_ref()).ok_or(CurrentProposalErrorV1)?
-            .binding.frontier.next_authority_revision
-        { return Err(CurrentProposalErrorV1); }
+            snapshot,
+            retained.publication_context.sender_seat_id,
+            EndpointRole::Replica,
+            false,
+        )
+        .map_err(|_| CurrentProposalErrorV1)?;
+        if retained.publication_next_authority_revision
+            < snapshot
+                .current_coop_setup
+                .as_ref()
+                .and_then(|setup| setup.rebind.as_ref())
+                .ok_or(CurrentProposalErrorV1)?
+                .binding
+                .frontier
+                .next_authority_revision
+        {
+            return Err(CurrentProposalErrorV1);
+        }
     } else {
         validate_current_pair_v1(
             protocol,

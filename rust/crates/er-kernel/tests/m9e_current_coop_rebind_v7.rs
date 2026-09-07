@@ -171,7 +171,9 @@ fn owned_title(
 }
 
 fn owned_title_with_capacity(
-    content: Arc<PreparedGameContentV2>, host: bool, capacity: SafeU53,
+    content: Arc<PreparedGameContentV2>,
+    host: bool,
+    capacity: SafeU53,
 ) -> Result<GameKernelV7, Box<dyn Error>> {
     let authority = SeatId::new(safe(1));
     let replica = SeatId::new(safe(2));
@@ -182,7 +184,10 @@ fn owned_title_with_capacity(
     } else {
         replica_protocol(authority, replica, generation)?
     };
-    if let BattleProtocolRoleConfig::Authority { proposal_capacity, .. } = &mut config.role {
+    if let BattleProtocolRoleConfig::Authority {
+        proposal_capacity, ..
+    } = &mut config.role
+    {
         *proposal_capacity = capacity;
     }
     let protocol = initial_battle_protocol_snapshot_v2(&config, seat)?;
@@ -281,15 +286,28 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn content() -> TestResult<Arc<PreparedGameContentV2>> {
     static CONTENT: OnceLock<Result<Arc<PreparedGameContentV2>, String>> = OnceLock::new();
-    CONTENT.get_or_init(|| {
-        let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE).map_err(|error| error.to_string())?;
-        PreparedGameContentV2::prepare(Arc::new(bundle)).map(Arc::new).map_err(|error| error.to_string())
-    }).as_ref().cloned().map_err(|error| error.clone().into())
+    CONTENT
+        .get_or_init(|| {
+            let bundle: GameContentBundleV2 =
+                serde_json::from_slice(BUNDLE).map_err(|error| error.to_string())?;
+            PreparedGameContentV2::prepare(Arc::new(bundle))
+                .map(Arc::new)
+                .map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .cloned()
+        .map_err(|error| error.clone().into())
 }
 
 fn choose_first_natural_starter(kernel: &mut GameKernelV7, host: bool) -> TestResult<Vec<Vec<u8>>> {
     let content = content()?;
-    let mode = content.bundle().bootstrap.modes.iter().find(|mode| mode.cooperative && mode.supported).ok_or("co-op mode")?;
+    let mode = content
+        .bundle()
+        .bootstrap
+        .modes
+        .iter()
+        .find(|mode| mode.cooperative && mode.supported)
+        .ok_or("co-op mode")?;
     let mut frames = Vec::new();
     capture_press(kernel, &mut frames)?;
     navigate(kernel, &format!("bootstrap/mode/{}", mode.mode.get()))?;
@@ -298,17 +316,31 @@ fn choose_first_natural_starter(kernel: &mut GameKernelV7, host: bool) -> TestRe
         navigate(kernel, "bootstrap/challenge/done")?;
         capture_press(kernel, &mut frames)?;
     }
-    let GameKernelLifecycleSnapshotV7::Bootstrap(before) = kernel.snapshot()?.lifecycle else { return Err("natural starter stage".into()); };
+    let GameKernelLifecycleSnapshotV7::Bootstrap(before) = kernel.snapshot()?.lifecycle else {
+        return Err("natural starter stage".into());
+    };
     assert_eq!(before.stage, RunBootstrapStageV1::StarterSelect);
-    let starter = before.catalog.starters.iter().find(|starter| starter.cost <= before.catalog.maximum_starter_cost).ok_or("affordable starter")?;
-    navigate(kernel, &format!("bootstrap/starter/{}", starter.pokemon_id.get()))?;
+    let starter = before
+        .catalog
+        .starters
+        .iter()
+        .find(|starter| starter.cost <= before.catalog.maximum_starter_cost)
+        .ok_or("affordable starter")?;
+    navigate(
+        kernel,
+        &format!("bootstrap/starter/{}", starter.pokemon_id.get()),
+    )?;
     capture_press(kernel, &mut frames)?;
     navigate(kernel, "bootstrap/starter/confirm")?;
     capture_press(kernel, &mut frames)?;
     capture_press(kernel, &mut frames)?;
     if host {
         for _ in 0..4 {
-            if kernel.state().is_some() || matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete) { break; }
+            if kernel.state().is_some()
+                || matches!(kernel.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(ref bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete)
+            {
+                break;
+            }
             capture_press(kernel, &mut frames)?;
         }
     }
@@ -320,15 +352,22 @@ fn pair() -> TestResult<(GameKernelV7, GameKernelV7)> {
 }
 
 fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernelV7)> {
-    let mut host = if capacity == safe(64) { owned_title(content()?, true)? }
-        else { owned_title_with_capacity(content()?, true, capacity)? };
-    let mut guest = if capacity == safe(64) { owned_title(content()?, false)? }
-        else { owned_title_with_capacity(content()?, false, capacity)? };
+    let mut host = if capacity == safe(64) {
+        owned_title(content()?, true)?
+    } else {
+        owned_title_with_capacity(content()?, true, capacity)?
+    };
+    let mut guest = if capacity == safe(64) {
+        owned_title(content()?, false)?
+    } else {
+        owned_title_with_capacity(content()?, false, capacity)?
+    };
     let choices = choose_first_natural_starter(&mut guest, false)?;
     let waiting = choose_first_natural_starter(&mut host, true)?;
     assert_eq!(choices.len(), 1);
     assert!(waiting.is_empty());
-    let started = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(1)), &choices[0])?)?;
+    let started =
+        wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(1)), &choices[0])?)?;
     guest.ingest_network_frame(ConnectionGeneration::new(safe(1)), &started)?;
     assert!(host.state().is_some() && guest.state().is_some());
     assert_eq!(host.state(), guest.state());
@@ -338,7 +377,9 @@ fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernel
 
 fn next_game_frame(kernel: &mut GameKernelV7) -> TestResult<Vec<u8>> {
     for _ in 0..8 {
-        for pending in kernel.snapshot()?.pending_presentations { kernel.settle_presentation(pending.event_id)?; }
+        for pending in kernel.snapshot()?.pending_presentations {
+            kernel.settle_presentation(pending.event_id)?;
+        }
         let mut frames = Vec::new();
         capture_press(kernel, &mut frames)?;
         if !frames.is_empty() {
@@ -354,36 +395,86 @@ fn frame_bytes(output: &CurrentCoopRebindOutputV1) -> TestResult<Vec<u8>> {
     assert_eq!(output.frames.len(), 1);
     Ok(output.frames[0].clone())
 }
-fn owner(snapshot: &CoreGameKernelSnapshotV7) -> TestResult<&er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindSnapshotV1> {
-    snapshot.current_coop_setup.as_ref().and_then(|setup| setup.rebind.as_deref()).ok_or_else(|| "rebind owner".into())
+fn owner(
+    snapshot: &CoreGameKernelSnapshotV7,
+) -> TestResult<&er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindSnapshotV1> {
+    snapshot
+        .current_coop_setup
+        .as_ref()
+        .and_then(|setup| setup.rebind.as_deref())
+        .ok_or_else(|| "rebind owner".into())
 }
 fn begin(host: &mut GameKernelV7, guest: &mut GameKernelV7) -> TestResult<Vec<u8>> {
     for kernel in [&mut *host, &mut *guest] {
         kernel.transport_changed(ConnectionGeneration::new(safe(1)), false)?;
         assert!(kernel.begin_current_coop_rebind_v1()?.frames.is_empty());
         let staged = kernel.snapshot()?;
-        assert_eq!(staged.protocol.as_ref().ok_or("protocol")?.frame_context.context.connection_generation, ConnectionGeneration::new(safe(1)));
-        assert_eq!(kernel.begin_current_coop_rebind_v1()?.frames, Vec::<Vec<u8>>::new());
+        assert_eq!(
+            staged
+                .protocol
+                .as_ref()
+                .ok_or("protocol")?
+                .frame_context
+                .context
+                .connection_generation,
+            ConnectionGeneration::new(safe(1))
+        );
+        assert_eq!(
+            kernel.begin_current_coop_rebind_v1()?.frames,
+            Vec::<Vec<u8>>::new()
+        );
         assert_eq!(kernel.snapshot()?, staged);
         kernel.transport_changed(ConnectionGeneration::new(safe(2)), true)?;
-        assert_eq!(kernel.snapshot()?.protocol.as_ref().ok_or("protocol")?.frame_context.context.connection_generation, ConnectionGeneration::new(safe(1)));
+        assert_eq!(
+            kernel
+                .snapshot()?
+                .protocol
+                .as_ref()
+                .ok_or("protocol")?
+                .frame_context
+                .context
+                .connection_generation,
+            ConnectionGeneration::new(safe(1))
+        );
     }
     frame_bytes(&host.retry_current_coop_rebind_v1()?)
 }
 fn handshake(host: &mut GameKernelV7, guest: &mut GameKernelV7, mut frame: Vec<u8>) -> TestResult {
     for index in 0usize..8 {
-        let receiver = if index.is_multiple_of(2) { &mut *guest } else { &mut *host };
-        let output = receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &frame)?;
-        if index < 7 { frame = frame_bytes(&output)?; } else { assert!(output.frames.is_empty()); }
+        let receiver = if index.is_multiple_of(2) {
+            &mut *guest
+        } else {
+            &mut *host
+        };
+        let output =
+            receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &frame)?;
+        if index < 7 {
+            frame = frame_bytes(&output)?;
+        } else {
+            assert!(output.frames.is_empty());
+        }
     }
-    assert_eq!(owner(&host.snapshot()?)?.phase, CurrentCoopRebindPhaseV1::Open);
-    assert_eq!(owner(&guest.snapshot()?)?.phase, CurrentCoopRebindPhaseV1::Open);
+    assert_eq!(
+        owner(&host.snapshot()?)?.phase,
+        CurrentCoopRebindPhaseV1::Open
+    );
+    assert_eq!(
+        owner(&guest.snapshot()?)?.phase,
+        CurrentCoopRebindPhaseV1::Open
+    );
     Ok(())
 }
 
-fn assert_conserved(before: &CoreGameKernelSnapshotV7, after: &CoreGameKernelSnapshotV7) -> TestResult {
+fn assert_conserved(
+    before: &CoreGameKernelSnapshotV7,
+    after: &CoreGameKernelSnapshotV7,
+) -> TestResult {
     let mut normalized = after.clone();
-    normalized.current_coop_setup.as_mut().ok_or("setup")?.rebind = None;
+    normalized
+        .current_coop_setup
+        .as_mut()
+        .ok_or("setup")?
+        .rebind = None;
     normalized.protocol = before.protocol.clone();
     normalized.scheduler = before.scheduler.clone();
     normalized.replay_sequence = before.replay_sequence;
@@ -394,14 +485,29 @@ fn assert_conserved(before: &CoreGameKernelSnapshotV7, after: &CoreGameKernelSna
     let two = ConnectionGeneration::new(safe(2));
     expected.frame_context.context.connection_generation = two;
     expected.peer_identity.local.connection_generation = two;
-    expected.peer_identity.peer.as_mut().ok_or("peer")?.connection_generation = two;
-    for connection in &mut expected.connections { connection.generation = two; connection.state = er_types::TransportState::Connected; }
+    expected
+        .peer_identity
+        .peer
+        .as_mut()
+        .ok_or("peer")?
+        .connection_generation = two;
+    for connection in &mut expected.connections {
+        connection.generation = two;
+        connection.state = er_types::TransportState::Connected;
+    }
     if let Some(log) = &mut expected.authority_log {
         log.local_context.connection_generation = two;
-        for peer in &mut log.peer_bindings { peer.generation = two; }
+        for peer in &mut log.peer_bindings {
+            peer.generation = two;
+        }
     }
-    if let Some(replica) = &mut expected.authority_replica { replica.receipt_context.connection_generation = two; replica.authority_generation = two; }
-    if let Some(recovery) = &mut expected.recovery { recovery.config.local_context.connection_generation = two; }
+    if let Some(replica) = &mut expected.authority_replica {
+        replica.receipt_context.connection_generation = two;
+        replica.authority_generation = two;
+    }
+    if let Some(recovery) = &mut expected.recovery {
+        recovery.config.local_context.connection_generation = two;
+    }
     assert_eq!(&expected, after_protocol); // No generic history, admission fingerprint or config was reset.
     assert_eq!(before.scheduler, after.scheduler);
     Ok(())
@@ -415,20 +521,40 @@ fn equal_frontier_native_rebind_commits_two_atomically_without_gameplay() -> Tes
     let offer = begin(&mut host, &mut guest)?;
     for kernel in [&mut host, &mut guest] {
         let before = kernel.snapshot()?;
-        assert!(kernel.raw_input(RawInputEvent::KeyDown { code: PhysicalKey::Space, printable: false, browser_repeat: false, focus: InputFocus::Game }).is_err());
+        assert!(
+            kernel
+                .raw_input(RawInputEvent::KeyDown {
+                    code: PhysicalKey::Space,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game
+                })
+                .is_err()
+        );
         assert!(kernel.advance_time(safe(1)).is_err());
         assert_eq!(kernel.snapshot()?, before);
     }
     handshake(&mut host, &mut guest, offer)?;
     assert_conserved(&before_host, &host.snapshot()?)?;
     assert_conserved(&before_guest, &guest.snapshot()?)?;
-    assert_eq!(owner(&host.snapshot()?)?.transcript, owner(&guest.snapshot()?)?.transcript);
+    assert_eq!(
+        owner(&host.snapshot()?)?.transcript,
+        owner(&guest.snapshot()?)?.transcript
+    );
     assert!(owner(&host.snapshot()?)?.commit_replay_sequence.is_some());
     assert!(owner(&guest.snapshot()?)?.commit_replay_sequence.is_some());
     for kernel in [&mut host, &mut guest] {
         let before = kernel.snapshot()?;
-        assert!(kernel.ingest_network_frame(ConnectionGeneration::new(safe(1)), &[]).is_err());
-        assert!(kernel.ingest_network_frame(ConnectionGeneration::new(safe(2)), &[]).is_err());
+        assert!(
+            kernel
+                .ingest_network_frame(ConnectionGeneration::new(safe(1)), &[])
+                .is_err()
+        );
+        assert!(
+            kernel
+                .ingest_network_frame(ConnectionGeneration::new(safe(2)), &[])
+                .is_err()
+        );
         assert!(kernel.admit_game_proposal(&[0]).is_err());
         assert!(kernel.apply_authority_material(&[0]).is_err());
         assert!(kernel.retry_current_coop_setup().is_err());
@@ -452,13 +578,24 @@ fn every_rebind_phase_restores_and_retries_exact_control_without_advancing_repla
     assert!(guest.retry_current_coop_rebind_v1()?.frames.is_empty());
     for index in 0usize..8 {
         let receiver_is_host = !index.is_multiple_of(2);
-        let receiver = if receiver_is_host { &mut host } else { &mut guest };
+        let receiver = if receiver_is_host {
+            &mut host
+        } else {
+            &mut guest
+        };
         let before = receiver.snapshot()?;
-        let output = receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &frame)?;
+        let output =
+            receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &frame)?;
         let accepted = receiver.snapshot()?;
         let retry_output = receiver.retry_current_coop_rebind_v1()?;
-        assert_eq!(accepted.replay_sequence.get(), before.replay_sequence.get() + 1);
-        assert_eq!(receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &frame)?, output);
+        assert_eq!(
+            accepted.replay_sequence.get(),
+            before.replay_sequence.get() + 1
+        );
+        assert_eq!(
+            receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &frame)?,
+            output
+        );
         assert_eq!(receiver.snapshot()?, accepted);
         receiver.transport_changed(ConnectionGeneration::new(safe(2)), false)?;
         *receiver = restored(receiver, content()?, receiver_is_host)?;
@@ -471,19 +608,44 @@ fn every_rebind_phase_restores_and_retries_exact_control_without_advancing_repla
         let retried = receiver.snapshot()?;
         assert_eq!(receiver.retry_current_coop_rebind_v1()?, retry_output);
         assert_eq!(receiver.snapshot()?, retried);
-        assert_eq!(owner(&retried)?.commit_replay_sequence, owner(&accepted)?.commit_replay_sequence);
-        if index < 7 { frame = frame_bytes(&output)?; } else { assert!(output.frames.is_empty()); }
+        assert_eq!(
+            owner(&retried)?.commit_replay_sequence,
+            owner(&accepted)?.commit_replay_sequence
+        );
+        if index < 7 {
+            frame = frame_bytes(&output)?;
+        } else {
+            assert!(output.frames.is_empty());
+        }
     }
-    assert_eq!(owner(&host.snapshot()?)?.phase, CurrentCoopRebindPhaseV1::Open);
-    assert_eq!(owner(&guest.snapshot()?)?.phase, CurrentCoopRebindPhaseV1::Open);
+    assert_eq!(
+        owner(&host.snapshot()?)?.phase,
+        CurrentCoopRebindPhaseV1::Open
+    );
+    assert_eq!(
+        owner(&guest.snapshot()?)?.phase,
+        CurrentCoopRebindPhaseV1::Open
+    );
     let transcript = owner(&host.snapshot()?)?.transcript.clone();
     // Old OFFER/JOIN duplicates still return their original immediate response after Open.
     // Duplicate READY returns ACK, and first/duplicate final ACK never creates another READY.
     for index in 0usize..8 {
-        let receiver = if index.is_multiple_of(2) { &mut guest } else { &mut host };
+        let receiver = if index.is_multiple_of(2) {
+            &mut guest
+        } else {
+            &mut host
+        };
         let before = receiver.snapshot()?;
-        let response = receiver.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &er_canonical::canonical_bytes(&transcript[index])?)?;
-        let expected = transcript.get(index + 1).map(er_canonical::canonical_bytes).transpose()?.into_iter().collect::<Vec<_>>();
+        let response = receiver.receive_current_coop_rebind_v1(
+            ConnectionGeneration::new(safe(2)),
+            &er_canonical::canonical_bytes(&transcript[index])?,
+        )?;
+        let expected = transcript
+            .get(index + 1)
+            .map(er_canonical::canonical_bytes)
+            .transpose()?
+            .into_iter()
+            .collect::<Vec<_>>();
         assert_eq!(response.frames, expected);
         assert_eq!(receiver.snapshot()?, before);
     }
@@ -497,7 +659,15 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
     let pristine = guest.snapshot()?;
     let mut stripped = pristine.clone();
     stripped.current_coop_setup.as_mut().ok_or("setup")?.rebind = None;
-    assert!(GameKernelV7::from_snapshot(stripped, SeatId::new(safe(2)), GameKernelRoleV7::Replica, content()?).is_err());
+    assert!(
+        GameKernelV7::from_snapshot(
+            stripped,
+            SeatId::new(safe(2)),
+            GameKernelRoleV7::Replica,
+            content()?
+        )
+        .is_err()
+    );
     for case in 0..8 {
         let mut frame: CurrentCoopRebindControlV1 = serde_json::from_slice(&offer)?;
         match case {
@@ -510,28 +680,79 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
             6 => frame.guest_nonce = Some(safe(1)),
             _ => frame.transaction_id = Some("0".repeat(64)),
         }
-        assert!(guest.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &er_canonical::canonical_bytes(&frame)?).is_err(), "case {case}");
+        assert!(
+            guest
+                .receive_current_coop_rebind_v1(
+                    ConnectionGeneration::new(safe(2)),
+                    &er_canonical::canonical_bytes(&frame)?
+                )
+                .is_err(),
+            "case {case}"
+        );
         assert_eq!(guest.snapshot()?, pristine);
     }
     for generation in [0, 1, 3] {
-        assert!(guest.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(generation)), &offer).is_err());
-        assert!(guest.transport_changed(ConnectionGeneration::new(safe(generation)), true).is_err());
+        assert!(
+            guest
+                .receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(generation)), &offer)
+                .is_err()
+        );
+        assert!(
+            guest
+                .transport_changed(ConnectionGeneration::new(safe(generation)), true)
+                .is_err()
+        );
         assert_eq!(guest.snapshot()?, pristine);
     }
-    assert!(guest.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &vec![0; MAX_CURRENT_REBIND_FRAME_BYTES_V1 + 1]).is_err());
+    assert!(
+        guest
+            .receive_current_coop_rebind_v1(
+                ConnectionGeneration::new(safe(2)),
+                &vec![0; MAX_CURRENT_REBIND_FRAME_BYTES_V1 + 1]
+            )
+            .is_err()
+    );
     let mut unknown: serde_json::Value = serde_json::from_slice(&offer)?;
-    unknown.get_mut("sender").and_then(serde_json::Value::as_object_mut).ok_or("sender")?.insert("unknown_context".to_owned(), serde_json::Value::Bool(true));
-    assert!(guest.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &er_canonical::canonical_bytes(&unknown)?).is_err());
-    assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &offer).is_err());
+    unknown
+        .get_mut("sender")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("sender")?
+        .insert("unknown_context".to_owned(), serde_json::Value::Bool(true));
+    assert!(
+        guest
+            .receive_current_coop_rebind_v1(
+                ConnectionGeneration::new(safe(2)),
+                &er_canonical::canonical_bytes(&unknown)?
+            )
+            .is_err()
+    );
+    assert!(
+        guest
+            .ingest_network_frame(ConnectionGeneration::new(safe(2)), &offer)
+            .is_err()
+    );
     assert_eq!(guest.snapshot()?, pristine);
 
     let (mut ahead_host, mut behind_guest) = pair()?;
     let undelivered = next_game_frame(&mut ahead_host)?;
     assert!(!undelivered.is_empty());
-    assert!(ahead_host.snapshot()?.material_ledger.next_authority_revision > behind_guest.snapshot()?.material_ledger.next_authority_revision);
+    assert!(
+        ahead_host
+            .snapshot()?
+            .material_ledger
+            .next_authority_revision
+            > behind_guest
+                .snapshot()?
+                .material_ledger
+                .next_authority_revision
+    );
     let offer = begin(&mut ahead_host, &mut behind_guest)?;
     let before = behind_guest.snapshot()?;
-    assert!(behind_guest.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &offer).is_err());
+    assert!(
+        behind_guest
+            .receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &offer)
+            .is_err()
+    );
     assert_eq!(behind_guest.snapshot()?, before); // Actual undelivered material, not a forged frontier.
 
     let (mut pending_host, mut pending_guest) = pair()?;
@@ -556,24 +777,52 @@ fn rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners() 
     let disconnected = host.snapshot()?;
     let mut exhausted = disconnected.clone();
     exhausted.replay_sequence = safe(9_007_199_254_740_991);
-    let mut exhausted = GameKernelV7::from_snapshot(exhausted, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?)?;
+    let mut exhausted = GameKernelV7::from_snapshot(
+        exhausted,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content()?,
+    )?;
     let before = exhausted.snapshot()?;
     assert!(exhausted.begin_current_coop_rebind_v1().is_err());
     assert_eq!(exhausted.snapshot()?, before);
     let mut history = disconnected.clone();
-    history.protocol.as_mut().and_then(|protocol| protocol.authority_log.as_mut()).ok_or("log")?.capacity_refusals = safe(1);
-    let mut history = GameKernelV7::from_snapshot(history, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?)?;
+    history
+        .protocol
+        .as_mut()
+        .and_then(|protocol| protocol.authority_log.as_mut())
+        .ok_or("log")?
+        .capacity_refusals = safe(1);
+    let mut history = GameKernelV7::from_snapshot(
+        history,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content()?,
+    )?;
     let before = history.snapshot()?;
     assert!(history.begin_current_coop_rebind_v1().is_err());
     assert_eq!(history.snapshot()?, before);
     let offer = begin(&mut host, &mut guest)?;
     let mut snapshot = guest.snapshot()?;
     snapshot.replay_sequence = safe(9_007_199_254_740_991);
-    let mut exhausted = GameKernelV7::from_snapshot(snapshot, SeatId::new(safe(2)), GameKernelRoleV7::Replica, content()?)?;
+    let mut exhausted = GameKernelV7::from_snapshot(
+        snapshot,
+        SeatId::new(safe(2)),
+        GameKernelRoleV7::Replica,
+        content()?,
+    )?;
     let before = exhausted.snapshot()?;
-    assert!(exhausted.receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &offer).is_err());
+    assert!(
+        exhausted
+            .receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &offer)
+            .is_err()
+    );
     assert_eq!(exhausted.snapshot()?, before);
-    assert!(exhausted.transport_changed(ConnectionGeneration::new(safe(2)), false).is_err());
+    assert!(
+        exhausted
+            .transport_changed(ConnectionGeneration::new(safe(2)), false)
+            .is_err()
+    );
     assert_eq!(exhausted.snapshot()?, before);
     Ok(())
 }
@@ -583,12 +832,32 @@ fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_paus
     let (host, mut guest) = pair()?;
     let mut initial = host.snapshot()?;
     let mut scheduler = er_protocol::KernelScheduler::new();
-    scheduler.pause_class(SeatId::new(safe(1)), TimeClass::Connected, "independent-native-owner")?;
+    scheduler.pause_class(
+        SeatId::new(safe(1)),
+        TimeClass::Connected,
+        "independent-native-owner",
+    )?;
     // Create the unrelated owner's pause through the public scheduler while preserving existing timers and allocator.
-    initial.scheduler.pauses.extend(scheduler.export_restorable_state().pauses.into_iter().map(|pause| TimeClassPauseSnapshotV2 {
-        endpoint: pause.endpoint, time_class: pause.time_class, reasons: pause.reasons,
-    }));
-    let mut host = GameKernelV7::from_snapshot(initial, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?)?;
+    initial
+        .scheduler
+        .pauses
+        .extend(
+            scheduler
+                .export_restorable_state()
+                .pauses
+                .into_iter()
+                .map(|pause| TimeClassPauseSnapshotV2 {
+                    endpoint: pause.endpoint,
+                    time_class: pause.time_class,
+                    reasons: pause.reasons,
+                }),
+        );
+    let mut host = GameKernelV7::from_snapshot(
+        initial,
+        SeatId::new(safe(1)),
+        GameKernelRoleV7::Authority,
+        content()?,
+    )?;
     let before = host.snapshot()?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
@@ -596,20 +865,50 @@ fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_paus
     let complete = host.snapshot()?;
     for case in 0..6 {
         let mut forged = complete.clone();
-        let value = forged.current_coop_setup.as_mut().and_then(|setup| setup.rebind.as_mut()).ok_or("owner")?;
+        let value = forged
+            .current_coop_setup
+            .as_mut()
+            .and_then(|setup| setup.rebind.as_mut())
+            .ok_or("owner")?;
         match case {
             0 => value.commit_replay_sequence = None,
             1 => value.phase = CurrentCoopRebindPhaseV1::AwaitJoin,
-            2 => value.binding.frontier.next_authority_revision = safe(value.binding.frontier.next_authority_revision.get() + 1),
-            3 => value.transcript[0].authority_nonce = safe(value.transcript[0].authority_nonce.get() + 1),
-            4 => value.binding.authority_target.connection_generation = ConnectionGeneration::new(safe(3)),
+            2 => {
+                value.binding.frontier.next_authority_revision =
+                    safe(value.binding.frontier.next_authority_revision.get() + 1)
+            }
+            3 => {
+                value.transcript[0].authority_nonce =
+                    safe(value.transcript[0].authority_nonce.get() + 1)
+            }
+            4 => {
+                value.binding.authority_target.connection_generation =
+                    ConnectionGeneration::new(safe(3))
+            }
             _ => value.transcript.pop().ok_or("transcript").map(|_| ())?,
         }
-        assert!(GameKernelV7::from_snapshot(forged, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?).is_err(), "case {case}");
+        assert!(
+            GameKernelV7::from_snapshot(
+                forged,
+                SeatId::new(safe(1)),
+                GameKernelRoleV7::Authority,
+                content()?
+            )
+            .is_err(),
+            "case {case}"
+        );
     }
     let mut missing = complete.clone();
     missing.current_coop_setup.as_mut().ok_or("setup")?.rebind = None;
-    assert!(GameKernelV7::from_snapshot(missing, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?).is_err());
+    assert!(
+        GameKernelV7::from_snapshot(
+            missing,
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content()?
+        )
+        .is_err()
+    );
     assert_eq!(host.snapshot()?, complete);
     Ok(())
 }
@@ -618,7 +917,9 @@ fn settle_owned_presentations(kernel: &mut GameKernelV7) -> TestResult<usize> {
     let mut count = 0;
     for _ in 0..16 {
         let pending = kernel.snapshot()?.pending_presentations;
-        if pending.is_empty() { return Ok(count); }
+        if pending.is_empty() {
+            return Ok(count);
+        }
         for presentation in pending {
             kernel.settle_presentation(presentation.event_id)?;
             count += 1;
@@ -627,7 +928,11 @@ fn settle_owned_presentations(kernel: &mut GameKernelV7) -> TestResult<usize> {
     Err("actual presentation callbacks exceeded sixteen batches".into())
 }
 
-fn actual_guest_proposal(host: &mut GameKernelV7, guest: &mut GameKernelV7, generation: u64) -> TestResult<(Vec<u8>, Vec<u8>)> {
+fn actual_guest_proposal(
+    host: &mut GameKernelV7,
+    guest: &mut GameKernelV7,
+    generation: u64,
+) -> TestResult<(Vec<u8>, Vec<u8>)> {
     settle_owned_presentations(host)?;
     settle_owned_presentations(guest)?;
     let material = next_game_frame(host)?;
@@ -637,11 +942,24 @@ fn actual_guest_proposal(host: &mut GameKernelV7, guest: &mut GameKernelV7, gene
     settle_owned_presentations(guest)?;
     let proposal = next_game_frame(guest)?;
     let decoded = er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?;
-    assert_eq!(decoded.connection_generation, ConnectionGeneration::new(safe(generation)));
+    assert_eq!(
+        decoded.connection_generation,
+        ConnectionGeneration::new(safe(generation))
+    );
     let pending = guest.snapshot()?;
-    let retained = pending.current_proposal.as_ref().ok_or("actual pending guest proposal")?.retained();
-    assert_eq!(retained.publication_context.connection_generation, decoded.connection_generation);
-    assert_eq!(er_kernel::current_proposal_v7::decode_current_hex_v1(&retained.proposal_hex, 16_384)?, proposal);
+    let retained = pending
+        .current_proposal
+        .as_ref()
+        .ok_or("actual pending guest proposal")?
+        .retained();
+    assert_eq!(
+        retained.publication_context.connection_generation,
+        decoded.connection_generation
+    );
+    assert_eq!(
+        er_kernel::current_proposal_v7::decode_current_hex_v1(&retained.proposal_hex, 16_384)?,
+        proposal
+    );
     assert_eq!(wire(&guest.retry_current_coop_setup()?)?, proposal);
     assert_eq!(guest.snapshot()?, pending);
     Ok((material, proposal))
@@ -649,7 +967,9 @@ fn actual_guest_proposal(host: &mut GameKernelV7, guest: &mut GameKernelV7, gene
 
 #[test]
 fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() -> TestResult {
-    use er_kernel::current_proposal_v7::{CurrentProposalMaterialReceiptV1, CurrentProposalMaterialReceiptV2};
+    use er_kernel::current_proposal_v7::{
+        CurrentProposalMaterialReceiptV1, CurrentProposalMaterialReceiptV2,
+    };
     let (mut host, mut guest) = pair()?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
@@ -662,10 +982,23 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
     let decoded = CurrentProposalMaterialReceiptV2::decode(&reply)?;
     assert_eq!(decoded.evidence()?.proposal_bytes, proposal);
     assert!(CurrentProposalMaterialReceiptV1::decode(&reply).is_err());
-    assert_eq!(decoded.authority_context.connection_generation, ConnectionGeneration::new(safe(2)));
+    assert_eq!(
+        decoded.authority_context.connection_generation,
+        ConnectionGeneration::new(safe(2))
+    );
     let host_after = host.snapshot()?;
-    assert!(host_after.current_coop_setup.as_ref().ok_or("setup")?.last_reply.is_none());
-    assert_eq!(wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?, reply);
+    assert!(
+        host_after
+            .current_coop_setup
+            .as_ref()
+            .ok_or("setup")?
+            .last_reply
+            .is_none()
+    );
+    assert_eq!(
+        wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?,
+        reply
+    );
     assert_eq!(host.snapshot()?, host_after);
     for kernel in [&mut host, &mut guest] {
         kernel.transport_changed(ConnectionGeneration::new(safe(2)), false)?;
@@ -674,22 +1007,37 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
     guest = restored(&guest, content()?, false)?;
     let disconnected = guest.snapshot()?;
     assert!(guest.retry_current_coop_setup().is_err());
-    assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply).is_err());
+    assert!(
+        guest
+            .ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)
+            .is_err()
+    );
     assert_eq!(guest.snapshot()?, disconnected);
     for kernel in [&mut host, &mut guest] {
         kernel.transport_changed(ConnectionGeneration::new(safe(2)), true)?;
     }
     assert_eq!(wire(&guest.retry_current_coop_setup()?)?, proposal);
     let before_retry = host.snapshot()?;
-    assert_eq!(wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?, reply);
+    assert_eq!(
+        wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?,
+        reply
+    );
     assert_eq!(host.snapshot()?, before_retry);
     let step = guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?;
-    assert!(step.effects.iter().all(|effect| matches!(effect,
-        GameKernelEffectV7::Presentation(_) | GameKernelEffectV7::UiChanged(_)
-        | GameKernelEffectV7::Terminal(_))));
+    assert!(step.effects.iter().all(|effect| matches!(
+        effect,
+        GameKernelEffectV7::Presentation(_)
+            | GameKernelEffectV7::UiChanged(_)
+            | GameKernelEffectV7::Terminal(_)
+    )));
     assert!(guest.snapshot()?.current_proposal.is_none());
     let applied = guest.snapshot()?;
-    assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?.effects.is_empty());
+    assert!(
+        guest
+            .ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?
+            .effects
+            .is_empty()
+    );
     assert_eq!(guest.snapshot()?, applied);
     assert!(settle_owned_presentations(&mut guest)? > 0);
     settle_owned_presentations(&mut host)?;
@@ -703,23 +1051,41 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
 
 #[test]
 fn open_rebind_replaces_original_v1_reply_atomically_at_capacity_one() -> TestResult {
-    use er_kernel::current_proposal_v7::{CurrentProposalMaterialReceiptV1, CurrentProposalMaterialReceiptV2};
+    use er_kernel::current_proposal_v7::{
+        CurrentProposalMaterialReceiptV1, CurrentProposalMaterialReceiptV2,
+    };
     let (mut host, mut guest) = pair_with_capacity(safe(1))?;
     let (old_material, old_proposal) = actual_guest_proposal(&mut host, &mut guest, 1)?;
-    let old_reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(1)), &old_proposal)?)?;
+    let old_reply =
+        wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(1)), &old_proposal)?)?;
     let old_receipt = CurrentProposalMaterialReceiptV1::decode(&old_reply)?;
     guest.ingest_network_frame(ConnectionGeneration::new(safe(1)), &old_reply)?;
     settle_owned_presentations(&mut host)?;
     settle_owned_presentations(&mut guest)?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
-    assert_eq!(host.snapshot()?.current_coop_setup.as_ref().ok_or("setup")?
-        .last_reply.as_ref().ok_or("original cache")?.canonical_bytes()?, old_reply);
+    assert_eq!(
+        host.snapshot()?
+            .current_coop_setup
+            .as_ref()
+            .ok_or("setup")?
+            .last_reply
+            .as_ref()
+            .ok_or("original cache")?
+            .canonical_bytes()?,
+        old_reply
+    );
     let (_, proposal) = actual_guest_proposal(&mut host, &mut guest, 2)?;
     let before = host.snapshot()?;
     let mut forged: serde_json::Value = serde_json::from_slice(&proposal)?;
     forged["unknown"] = serde_json::json!(true);
-    assert!(host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &er_canonical::canonical_bytes(&forged)?).is_err());
+    assert!(
+        host.ingest_network_frame(
+            ConnectionGeneration::new(safe(2)),
+            &er_canonical::canonical_bytes(&forged)?
+        )
+        .is_err()
+    );
     assert_eq!(host.snapshot()?, before);
     let reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?;
     let receipt = CurrentProposalMaterialReceiptV2::decode(&reply)?;
@@ -727,22 +1093,58 @@ fn open_rebind_replaces_original_v1_reply_atomically_at_capacity_one() -> TestRe
     let after = host.snapshot()?;
     let setup = after.current_coop_setup.as_ref().ok_or("setup")?;
     assert!(setup.last_reply.is_none());
-    assert_eq!(setup.last_reply_v2.as_ref().ok_or("V2 cache")?.canonical_bytes()?, reply);
-    let fingerprints = &after.protocol.as_ref().ok_or("protocol")?.proposal_admission.as_ref().ok_or("admission")?.fingerprints;
+    assert_eq!(
+        setup
+            .last_reply_v2
+            .as_ref()
+            .ok_or("V2 cache")?
+            .canonical_bytes()?,
+        reply
+    );
+    let fingerprints = &after
+        .protocol
+        .as_ref()
+        .ok_or("protocol")?
+        .proposal_admission
+        .as_ref()
+        .ok_or("admission")?
+        .fingerprints;
     assert_eq!(fingerprints.len(), 1);
-    assert_eq!(fingerprints[0].operation_id, receipt.evidence()?.proposal.proposal.context.operation_id);
+    assert_eq!(
+        fingerprints[0].operation_id,
+        receipt.evidence()?.proposal.proposal.context.operation_id
+    );
     for generation in [1, 2] {
         let before_host = host.snapshot()?;
         let before_guest = guest.snapshot()?;
-        assert!(host.ingest_network_frame(ConnectionGeneration::new(safe(generation)), &old_proposal).is_err());
-        assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(generation)), &old_reply).is_err());
-        assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(generation)), &old_material).is_err());
+        assert!(
+            host.ingest_network_frame(ConnectionGeneration::new(safe(generation)), &old_proposal)
+                .is_err()
+        );
+        assert!(
+            guest
+                .ingest_network_frame(ConnectionGeneration::new(safe(generation)), &old_reply)
+                .is_err()
+        );
+        assert!(
+            guest
+                .ingest_network_frame(ConnectionGeneration::new(safe(generation)), &old_material)
+                .is_err()
+        );
         assert_eq!(host.snapshot()?, before_host);
         assert_eq!(guest.snapshot()?, before_guest);
     }
     let mut both = after.clone();
     both.current_coop_setup.as_mut().ok_or("setup")?.last_reply = Some(Box::new(old_receipt));
-    assert!(GameKernelV7::from_snapshot(both, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?).is_err());
+    assert!(
+        GameKernelV7::from_snapshot(
+            both,
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content()?
+        )
+        .is_err()
+    );
     guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?;
     assert!(guest.snapshot()?.current_proposal.is_none());
     assert_eq!(host.snapshot()?, after);
@@ -759,9 +1161,21 @@ fn open_rebind_receipt_and_owner_mutations_reject_with_complete_state_conservati
     let reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?;
     let receipt = CurrentProposalMaterialReceiptV2::decode(&reply)?;
     assert_eq!(receipt.rebind_transaction_id.len(), 64);
-    assert!(receipt.rebind_transaction_id.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+    assert!(
+        receipt
+            .rebind_transaction_id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
     let mut different_transaction = receipt.rebind_transaction_id.clone();
-    different_transaction.replace_range(..1, if receipt.rebind_transaction_id.starts_with('0') { "1" } else { "0" });
+    different_transaction.replace_range(
+        ..1,
+        if receipt.rebind_transaction_id.starts_with('0') {
+            "1"
+        } else {
+            "0"
+        },
+    );
     assert_ne!(different_transaction, receipt.rebind_transaction_id);
     for case in 0..9 {
         let before = guest.snapshot()?;
@@ -771,10 +1185,22 @@ fn open_rebind_receipt_and_owner_mutations_reject_with_complete_state_conservati
             1 => changed["authority_context"]["connectionGeneration"] = serde_json::json!(1),
             2 => changed["authority_context"]["unknown"] = serde_json::json!(true),
             3 => changed["rebind_transaction_id"] = serde_json::json!(&different_transaction),
-            4 => changed["material_fingerprint"] = serde_json::json!(format!("blake3-v1:{}", "0".repeat(64))),
-            5 => changed["proposal_digest"] = serde_json::json!(format!("sha256-json-bytes-v1:{}", "0".repeat(64))),
-            6 => changed["rebind_transaction_id"] = serde_json::json!(format!("blake3-v1:{}", receipt.rebind_transaction_id)),
-            7 => changed["rebind_transaction_id"] = serde_json::json!(format!("sha256:{}", receipt.rebind_transaction_id)),
+            4 => {
+                changed["material_fingerprint"] =
+                    serde_json::json!(format!("blake3-v1:{}", "0".repeat(64)))
+            }
+            5 => {
+                changed["proposal_digest"] =
+                    serde_json::json!(format!("sha256-json-bytes-v1:{}", "0".repeat(64)))
+            }
+            6 => {
+                changed["rebind_transaction_id"] =
+                    serde_json::json!(format!("blake3-v1:{}", receipt.rebind_transaction_id))
+            }
+            7 => {
+                changed["rebind_transaction_id"] =
+                    serde_json::json!(format!("sha256:{}", receipt.rebind_transaction_id))
+            }
             _ => changed["rebind_transaction_id"] = serde_json::json!("malformed-transaction"),
         }
         let bytes = er_canonical::canonical_bytes(&changed)?;
@@ -785,36 +1211,107 @@ fn open_rebind_receipt_and_owner_mutations_reject_with_complete_state_conservati
         } else if case >= 6 {
             assert!(CurrentProposalMaterialReceiptV2::decode(&bytes).is_err());
         }
-        assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &bytes).is_err(), "receipt case {case}");
+        assert!(
+            guest
+                .ingest_network_frame(ConnectionGeneration::new(safe(2)), &bytes)
+                .is_err(),
+            "receipt case {case}"
+        );
         assert_eq!(guest.snapshot()?, before);
     }
     let valid = host.snapshot()?;
     for case in 0..6 {
         let mut changed = valid.clone();
         match case {
-            0 => changed.protocol.as_mut().ok_or("protocol")?.proposal_admission.as_mut().ok_or("admission")?.fingerprints.clear(),
+            0 => changed
+                .protocol
+                .as_mut()
+                .ok_or("protocol")?
+                .proposal_admission
+                .as_mut()
+                .ok_or("admission")?
+                .fingerprints
+                .clear(),
             1 => changed.current_coop_setup.as_mut().ok_or("setup")?.rebind = None,
-            2 => changed.current_coop_setup.as_mut().ok_or("setup")?.last_reply_v2.as_mut().ok_or("cache")?.rebind_transaction_id = different_transaction.clone(),
-            3 => changed.current_coop_setup.as_mut().ok_or("setup")?.last_reply_v2.as_mut().ok_or("cache")?.authority_context.run_id = RunId::new("different-protocol-run")?,
-            4 => {
-                changed.current_coop_setup.as_mut().ok_or("setup")?.rebind.as_mut()
-                    .ok_or("rebind")?.transcript.pop().ok_or("transcript")?;
+            2 => {
+                changed
+                    .current_coop_setup
+                    .as_mut()
+                    .ok_or("setup")?
+                    .last_reply_v2
+                    .as_mut()
+                    .ok_or("cache")?
+                    .rebind_transaction_id = different_transaction.clone()
             }
-            _ => changed.current_coop_setup.as_mut().ok_or("setup")?.last_reply_v2.as_mut().ok_or("cache")?.material_hex.push_str("00"),
+            3 => {
+                changed
+                    .current_coop_setup
+                    .as_mut()
+                    .ok_or("setup")?
+                    .last_reply_v2
+                    .as_mut()
+                    .ok_or("cache")?
+                    .authority_context
+                    .run_id = RunId::new("different-protocol-run")?
+            }
+            4 => {
+                changed
+                    .current_coop_setup
+                    .as_mut()
+                    .ok_or("setup")?
+                    .rebind
+                    .as_mut()
+                    .ok_or("rebind")?
+                    .transcript
+                    .pop()
+                    .ok_or("transcript")?;
+            }
+            _ => changed
+                .current_coop_setup
+                .as_mut()
+                .ok_or("setup")?
+                .last_reply_v2
+                .as_mut()
+                .ok_or("cache")?
+                .material_hex
+                .push_str("00"),
         }
-        assert!(GameKernelV7::from_snapshot(changed, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?).is_err(), "snapshot case {case}");
+        assert!(
+            GameKernelV7::from_snapshot(
+                changed,
+                SeatId::new(safe(1)),
+                GameKernelRoleV7::Authority,
+                content()?
+            )
+            .is_err(),
+            "snapshot case {case}"
+        );
         assert_eq!(host.snapshot()?, valid);
     }
     let mut exhausted_snapshot = guest.snapshot()?;
     exhausted_snapshot.replay_sequence = safe(9_007_199_254_740_991);
-    let mut exhausted = GameKernelV7::from_snapshot(exhausted_snapshot, SeatId::new(safe(2)),
-        GameKernelRoleV7::Replica, content()?)?;
+    let mut exhausted = GameKernelV7::from_snapshot(
+        exhausted_snapshot,
+        SeatId::new(safe(2)),
+        GameKernelRoleV7::Replica,
+        content()?,
+    )?;
     let before_overflow = exhausted.snapshot()?;
-    assert!(exhausted.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply).is_err());
+    assert!(
+        exhausted
+            .ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)
+            .is_err()
+    );
     assert_eq!(exhausted.snapshot()?, before_overflow);
     let before_oversize = guest.snapshot()?;
-    assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &vec![0;
-        er_kernel::current_proposal_v7::MAX_CURRENT_RECEIPT_BYTES_V1 + 1]).is_err());
+    assert!(
+        guest
+            .ingest_network_frame(
+                ConnectionGeneration::new(safe(2)),
+                &vec![0; er_kernel::current_proposal_v7::MAX_CURRENT_RECEIPT_BYTES_V1 + 1]
+            )
+            .is_err()
+    );
     assert_eq!(guest.snapshot()?, before_oversize);
     guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?;
     assert!(guest.snapshot()?.current_proposal.is_none());
