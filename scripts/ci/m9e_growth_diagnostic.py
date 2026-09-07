@@ -87,6 +87,7 @@ def main(summary):
     oracle_script.write_text(r"""
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
 const raw = fs.readFileSync(process.argv[2], 'utf8');
 const end = raw.indexOf('export function getLevelRelExp(');
 if (end < 0) throw new Error('oracle function boundary absent');
@@ -108,16 +109,31 @@ for (let rate = 0; rate < 6; rate++) {
 const bytes = Buffer.from(JSON.stringify(rows) + '\n');
 if (rows.length !== 393210 || bytes.length >= 16 * 1024 * 1024) throw new Error('oracle corpus bound');
 fs.writeFileSync(process.argv[3], bytes, { flag: 'wx' });
+const curves = [];
+for (let rate = 0; rate < 6; rate++) {
+  const values = rows.slice(rate * 65535, (rate + 1) * 65535).map(row => row[2]);
+  const encoded = Buffer.alloc(values.length * 8);
+  for (let index = 0; index < values.length; index++) encoded.writeBigUInt64BE(BigInt(values[index]), index * 8);
+  curves.push({ rate, table: values.slice(0, 100), sha256: createHash('sha256').update(encoded).digest('hex') });
+}
+const witness = { schema: 1, source_blob: '7100a23e24cc7f5fa29742da8f95300b4fceb57a',
+  node_version: process.version, cases: rows.length, encoding: 'u64-big-endian', curves };
+fs.writeFileSync(process.argv[4], JSON.stringify(witness, null, 2) + '\n', { flag: 'wx' });
 console.log(JSON.stringify({ cases: rows.length, bytes: bytes.length }));
 """)
     oracle_path = REPORT / "growth-oracle.json"
-    oracle_result = json.loads(run(["node", str(oracle_script), str(ROOT / "src/data/exp.ts"), str(oracle_path)],
+    oracle_result = json.loads(run(["node", str(oracle_script), str(ROOT / "src/data/exp.ts"), str(oracle_path), str(COMPACT / "oracle-witness.json")],
                                   "oracle-corpus", cwd=ROOT, seconds=60, bound=16384).read_text())
     if oracle_result["cases"] != 393210 or oracle_result["bytes"] != oracle_path.stat().st_size:
         raise RuntimeError("oracle corpus receipt differs")
     summary["growth_oracle"] = {"source_blob": oracle_blob, "node_version": node_version,
                                 "cases": oracle_result["cases"], "bytes": oracle_path.stat().st_size,
                                 "sha256": digest(oracle_path)}
+    witness_path = COMPACT / "oracle-witness.json"
+    if not 0 < witness_path.stat().st_size <= 16384:
+        raise RuntimeError("bounded growth witness required")
+    summary["growth_oracle"]["witness_bytes"] = witness_path.stat().st_size
+    summary["growth_oracle"]["witness_sha256"] = digest(witness_path)
     os.environ["M9E_GROWTH_ORACLE"] = str(oracle_path)
     run(["cargo", "clippy", "--locked", "-p", "er-game", "--lib", "--no-deps", "--", "-D", "warnings"], "clippy-game")
     run(["cargo", "clippy", "--locked", "-p", "er-progression", "--test", TEST_TARGET, "--no-deps", "--", "-D", "warnings"], "clippy-test")
