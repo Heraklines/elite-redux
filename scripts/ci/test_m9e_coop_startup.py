@@ -220,3 +220,22 @@ class CoopPolicyTests(unittest.TestCase):
         native["plan"]["requires_current_coop_startup"] = False
         with self.assertRaisesRegex(RuntimeError, "unrequested"):
             coop.validate_platform(proof, native, self.root)
+
+    def test_entry_adapter_uses_the_existing_runner_cap_with_a_real_child(self):
+        import os
+        import time
+        from unittest.mock import patch
+        full = self.root / "full"
+        full.mkdir()
+        runner = self.root / "runner"
+        runner.mkdir()
+        producer = self.root / "stub-coop-producer.py"
+        producer.write_text("print('co-op bounded child reached', flush=True)\nraise SystemExit(7)\n")
+        before = dict(os.environ)
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(runner), "M9E_NATIVE_LANE": "a"}), \
+                patch.object(coop, "ENTRY_PRODUCER", producer.name):
+            with self.assertRaisesRegex(RuntimeError, "command exited 7"):
+                coop.execute_entry(self.root, full, {}, {}, coop.ENTRY_IDS, time.monotonic() + 30)
+        self.assertEqual((full / "coop-entry-producer.log").read_text(), "co-op bounded child reached\n")
+        self.assertFalse((runner / "m9e-coop-entry-focused").exists())
+        self.assertEqual(dict(os.environ), before)
