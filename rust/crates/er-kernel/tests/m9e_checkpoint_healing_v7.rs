@@ -243,7 +243,7 @@ fn checkpoint(wave: u64) -> Result<(GameKernelV7, Arc<PreparedGameContentV2>), B
             slot.pp_used = 1;
         }
     }
-    let revision = safe(run.control.revision.get() + 1);
+    let revision = snapshot.material_ledger.next_authority_revision;
     state.validate_with(content.as_ref())?;
     let kernel = GameKernelV7::from_active(
         state,
