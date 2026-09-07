@@ -1,7 +1,7 @@
-name: M9E Actual Friendship Source Oracle
+name: M9E Actual Friendship Effects Sidecar
 on:
   push:
-    branches: [codex/m9e-friendship-oracle-focused-20260907]
+    branches: [codex/m9e-friendship-effects-sidecar-focused-20260907]
 permissions:
   contents: read
 concurrency:
@@ -39,8 +39,8 @@ jobs:
           test "$elapsed" -ge 0
           remaining=$((1780 - elapsed))
           test "$remaining" -gt 0
-          timeout "$((remaining < 600 ? remaining : 600))" git -c protocol.version=2 fetch --no-tags --filter=blob:none --depth=1 origin 9fbb9fa2a624f8341974ce27e18260a21063751f
-          test "$(git rev-parse '9fbb9fa2a624f8341974ce27e18260a21063751f^{tree}')" = e025db5e75c65ee152821a36e31c9eb5eeb6960c
+          timeout "$((remaining < 600 ? remaining : 600))" git -c protocol.version=2 fetch --no-tags --filter=blob:none --depth=1 origin 7240a1f6277ac1fd51d4e121c2da7b73692c0c1b
+          test "$(git rev-parse '7240a1f6277ac1fd51d4e121c2da7b73692c0c1b^{tree}')" = 8c06c28995e036597200e6e73cc5ea447a4b1838
           elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
           test "$elapsed" -ge 0
           remaining=$((1780 - elapsed))

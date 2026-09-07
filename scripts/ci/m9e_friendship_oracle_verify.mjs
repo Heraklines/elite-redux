@@ -152,16 +152,117 @@ function validate(data) {
     actual_booster_inventory_required: true, actual_same_root_fusion_required: true, modes: "Classic; Moody null; timed events disabled",
     binary64_checked: true, exact_inputs_checked: true, changed_account_projection_checked: true };
 }
-function read(file) {
+// Literal-only projection of the 203 gated definitions in pinned source
+// 399d src/data/elite-redux/er-shiny-lab-effects.ts (whole SHA256 pinned by producer).
+// Category-local indices are intentional: preserve every decoded alias.
+const COSMETIC_CATALOG = [{"id":"aurum","index":1,"category":"palette","achievement":"FRESH_START"},{"id":"obsidian","index":2,"category":"palette","achievement":"MONO_DARK"},{"id":"amethyst","index":4,"category":"palette","achievement":"MONO_PSYCHIC"},{"id":"inferno","index":5,"category":"palette","achievement":"MONO_FIRE"},{"id":"toxic","index":6,"category":"palette","achievement":"MONO_POISON"},{"id":"verdigris","index":8,"category":"palette","achievement":"MONO_STEEL"},{"id":"spectral","index":9,"category":"palette","achievement":"MONO_GHOST"},{"id":"void","index":11,"category":"palette","achievement":"PERMADEATH"},{"id":"shadowflame","index":12,"category":"palette","achievement":"DEVILS_BARGAIN"},{"id":"synthwave","index":20,"category":"palette","achievement":"MONO_ELECTRIC"},{"id":"onyxgold","index":21,"category":"palette","achievement":"_10K_MONEY"},{"id":"acid","index":23,"category":"palette","achievement":"MONO_BUG"},{"id":"bubblegum","index":24,"category":"palette","achievement":"MONO_FAIRY"},{"id":"blood","index":25,"category":"palette","achievement":"BACK_IN_BLOOD"},{"id":"antique","index":27,"category":"palette","achievement":"RELIC_HUNTER"},{"id":"camo","index":29,"category":"palette","achievement":"DAVID_AND_GOLIATH"},{"id":"rosegold","index":31,"category":"palette","achievement":"HIGH_ROLLER"},{"id":"mono","index":32,"category":"palette","achievement":"MASTER_OF_ALL"},{"id":"prismarine","index":33,"category":"palette","achievement":"MONO_WATER"},{"id":"nebula","index":34,"category":"palette","achievement":"CATCH_LEGENDARY"},{"id":"venom","index":35,"category":"palette","achievement":"SNAKES_ON_A_PLANE"},{"id":"solarflare","index":36,"category":"palette","achievement":"GIGANTAMAX"},{"id":"royal","index":37,"category":"palette","achievement":"CLASSIC_VICTORY"},{"id":"deepsea","index":38,"category":"palette","achievement":"CATCH_SUB_LEGENDARY"},{"id":"sakura","index":39,"category":"palette","achievement":"MAX_FRIENDSHIP"},{"id":"mythril","index":40,"category":"palette","achievement":"MEGA_EVOLVE"},{"id":"cursed","index":41,"category":"palette","achievement":"PRIMAL_CASCOON"},{"id":"moonstone","index":44,"category":"palette","achievement":"LEGENDARY_DUELIST"},{"id":"duoblood","index":50,"category":"palette","achievement":"MONO_FIGHTING"},{"id":"duomint","index":51,"category":"palette","achievement":"MONO_GRASS"},{"id":"duosunset","index":52,"category":"palette","achievement":"DYNAMIC_DUO"},{"id":"pentacandy","index":57,"category":"palette","achievement":"FULL_ON_MEGA_POWER"},{"id":"pentajewel","index":58,"category":"palette","achievement":"ALL_SHINY_TIERS"},{"id":"gameboy","index":61,"category":"palette","achievement":"MONO_GEN_ONE_VICTORY"},{"id":"retro","index":62,"category":"palette","achievement":"MONO_GEN_TWO_VICTORY"},{"id":"blueprint","index":63,"category":"palette","achievement":"RANKED_AND_FILED"},{"id":"whosthat","index":64,"category":"palette","achievement":"FINAL_ANSWER"},{"id":"lavender","index":65,"category":"palette","achievement":"EVICTION_NOTICE"},{"id":"popart","index":68,"category":"palette","achievement":"STRANGER_THAN_FICTION"},{"id":"platinum","index":69,"category":"palette","achievement":"CHAMPION_MATERIAL"},{"id":"brass","index":70,"category":"palette","achievement":"HOUSE_MONEY"},{"id":"agedbronze","index":71,"category":"palette","achievement":"RAGS_TO_RICHES"},{"id":"ivory","index":72,"category":"palette","achievement":"PURE_VANILLA"},{"id":"emberash","index":73,"category":"palette","achievement":"ONE_HP_AND_A_DREAM"},{"id":"honeyamber","index":78,"category":"palette","achievement":"NUMBER_GO_UP"},{"id":"stormcloud","index":79,"category":"palette","achievement":"CHARGE_IT_TO_THE_GAME"},{"id":"cyberpunk","index":82,"category":"palette","achievement":"MONO_GEN_REDUX_VICTORY"},{"id":"matrixgreen","index":83,"category":"palette","achievement":"THE_LONGEST_TURN"},{"id":"opal","index":84,"category":"palette","achievement":"PRODIGAL_MON"},{"id":"lagoon","index":86,"category":"palette","achievement":"BIOME_TOURIST"},{"id":"eclipse","index":88,"category":"palette","achievement":"HELL_HOUSE"},{"id":"midnightoil","index":89,"category":"palette","achievement":"BLACK_FRIDAY"},{"id":"terracotta","index":90,"category":"palette","achievement":"ARE_YOU_NOT_ENTERTAINED"},{"id":"voidfire","index":94,"category":"palette","achievement":"ZERO_SUM_HERO"},{"id":"duststorm","index":96,"category":"palette","achievement":"DELVE_TOO_DEEP"},{"id":"arcticnight","index":104,"category":"palette","achievement":"HELL_AND_BACK"},{"id":"blackice","index":105,"category":"palette","achievement":"GIUDECCA"},{"id":"meadow","index":106,"category":"palette","achievement":"BIOME_TOURIST"},{"id":"complement","index":107,"category":"palette","achievement":"HOUSE_OF_MIRRORS"},{"id":"hueplus","index":108,"category":"palette","achievement":"FORM_VOLTRON"},{"id":"xenoswap","index":110,"category":"palette","achievement":"PRODIGAL_MON"},{"id":"splitroyal","index":112,"category":"palette","achievement":"MASTER_PLAN"},{"id":"noir","index":114,"category":"palette","achievement":"META_BREAKER"},{"id":"infraredfilm","index":115,"category":"palette","achievement":"OPPOSITION_RESEARCH"},{"id":"glassbody","index":119,"category":"palette","achievement":"TWO_LEGENDS_ONE_SLOT"},{"id":"phantom","index":120,"category":"palette","achievement":"IDENTITY_THEFT"},{"id":"heatmap","index":121,"category":"palette","achievement":"SETUP_PAYOFF"},{"id":"hueglide","index":122,"category":"palette","achievement":"FIVE_ALARM_STREAK"},{"id":"duoice","index":124,"category":"palette","achievement":"GREAT_EXPECTATIONS"},{"id":"duoviolet","index":126,"category":"palette","achievement":"HELL_IS_OTHER_PEOPLE"},{"id":"duogold","index":127,"category":"palette","achievement":"NO_I_IN_TEAM"},{"id":"bumblebee","index":128,"category":"palette","achievement":"ULTRA_INSTINCT"},{"id":"duosakura","index":129,"category":"palette","achievement":"LEFT_RIGHT_GOODNIGHT"},{"id":"trinebula","index":130,"category":"palette","achievement":"PARALLEL_PLAY"},{"id":"triocean","index":131,"category":"palette","achievement":"NATURAL_SELECTION_BIAS"},{"id":"triember","index":132,"category":"palette","achievement":"THREE_PIECE_COMBO"},{"id":"quadautumn","index":134,"category":"palette","achievement":"TRINITY_TEST"},{"id":"pentagalaxy","index":137,"category":"palette","achievement":"CHAMPION_MATERIAL"},{"id":"holofoil","index":2,"category":"surface","achievement":"SEE_SHINY"},{"id":"prismatic","index":3,"category":"surface","achievement":"ALL_SHINY_TIERS"},{"id":"frostbite","index":4,"category":"surface","achievement":"MONO_ICE"},{"id":"galaxy","index":7,"category":"surface","achievement":"CATCH_LEGENDARY"},{"id":"molten","index":9,"category":"surface","achievement":"MONO_FIRE"},{"id":"electric","index":10,"category":"surface","achievement":"MONO_ELECTRIC"},{"id":"dissolve","index":11,"category":"surface","achievement":"SPLICE"},{"id":"lavacracks","index":13,"category":"surface","achievement":"TRIAD_OF_HELL"},{"id":"crystalfacets","index":15,"category":"surface","achievement":"TERASTALLIZE"},{"id":"stainedglass","index":16,"category":"surface","achievement":"TERASTALLIZE"},{"id":"marble","index":17,"category":"surface","achievement":"FLAWLESS_DUEL"},{"id":"bioluminescent","index":18,"category":"surface","achievement":"MONO_BUG"},{"id":"constellation","index":19,"category":"surface","achievement":"STELLAR_TERASTALLIZE"},{"id":"aurorawings","index":20,"category":"surface","achievement":"MONO_FLYING"},{"id":"gildededges","index":21,"category":"surface","achievement":"_1M_MONEY"},{"id":"vaporwave","index":23,"category":"surface","achievement":"FASHIONISTA"},{"id":"sparkle","index":25,"category":"surface","achievement":"ALL_IN"},{"id":"lightningveins","index":26,"category":"surface","achievement":"SORRY_FOR_THE_WAIT"},{"id":"dripgold","index":27,"category":"surface","achievement":"_10M_MONEY"},{"id":"spectrumsplit","index":28,"category":"surface","achievement":"MASTER_OF_ALL"},{"id":"circuit","index":30,"category":"surface","achievement":"AUTO_COUNTER"},{"id":"scansweep","index":33,"category":"surface","achievement":"BEAM_SPAM"},{"id":"poison","index":34,"category":"surface","achievement":"MONO_POISON"},{"id":"wormhole","index":37,"category":"surface","achievement":"BREEDERS_IN_SPACE"},{"id":"shatter","index":38,"category":"surface","achievement":"SHIELD_BREAK"},{"id":"heatshimmer","index":39,"category":"surface","achievement":"CENTURY_OF_TROUBLE"},{"id":"caustics","index":40,"category":"surface","achievement":"MONO_WATER"},{"id":"pixelpulse","index":42,"category":"surface","achievement":"CCC_COMBO"},{"id":"neonwire","index":43,"category":"surface","achievement":"ONE_TURN_CLEAR"},{"id":"starmap","index":44,"category":"surface","achievement":"SHARED_TRIUMPH"},{"id":"synthscan","index":45,"category":"surface","achievement":"WEAVE_NATION_CERTIFIED"},{"id":"neonsign","index":50,"category":"surface","achievement":"NAME_RECOGNITION"},{"id":"bloom","index":53,"category":"surface","achievement":"LIFELINE_SUBSCRIPTION"},{"id":"softshade","index":54,"category":"surface","achievement":"PURE_VANILLA"},{"id":"glasswarp","index":55,"category":"surface","achievement":"TWO_LEGENDS_ONE_SLOT"},{"id":"unlined","index":56,"category":"surface","achievement":"META_BREAKER"},{"id":"sundered","index":57,"category":"surface","achievement":"FUSION_DANCE"},{"id":"livingshadow","index":58,"category":"surface","achievement":"IDENTITY_THEFT"},{"id":"firecreep","index":60,"category":"surface","achievement":"ZERO_TO_HERO"},{"id":"discoball","index":62,"category":"surface","achievement":"GOLDEN_TICKET"},{"id":"lensflare","index":63,"category":"surface","achievement":"CHECKMATE_IN_ONE"},{"id":"oldfilm","index":64,"category":"surface","achievement":"STRANGER_THAN_FICTION"},{"id":"vhs","index":65,"category":"surface","achievement":"GENERATION_GAP"},{"id":"moire","index":67,"category":"surface","achievement":"HOUSE_OF_MIRRORS"},{"id":"contours","index":68,"category":"surface","achievement":"PARALLEL_PLAY"},{"id":"coderain","index":69,"category":"surface","achievement":"THE_LONGEST_TURN"},{"id":"carbonweave","index":71,"category":"surface","achievement":"NO_SELL"},{"id":"xray","index":75,"category":"surface","achievement":"DEAD_RINGER"},{"id":"blueprintscan","index":76,"category":"surface","achievement":"TECHNICAL_DIFFICULTIES"},{"id":"stitchwork","index":77,"category":"surface","achievement":"NO_I_IN_TEAM"},{"id":"mosaictile","index":78,"category":"surface","achievement":"MUSEUM_QUALITY"},{"id":"papercut","index":79,"category":"surface","achievement":"CAP_SPACE"},{"id":"goldleaf","index":81,"category":"surface","achievement":"HOUSE_MONEY"},{"id":"astral","index":92,"category":"surface","achievement":"TRIPLE_EXORCISM"},{"id":"smolder","index":93,"category":"surface","achievement":"ONE_HP_AND_A_DREAM"},{"id":"shockwave","index":95,"category":"surface","achievement":"FORMATION_BREAKER"},{"id":"runes","index":96,"category":"surface","achievement":"IMMORTAL_OBJECT"},{"id":"staticcharge","index":97,"category":"surface","achievement":"ULTRA_INSTINCT"},{"id":"cmykprint","index":98,"category":"surface","achievement":"FOUR_MACHINES_ONE_DREAM"},{"id":"crackleglaze","index":101,"category":"surface","achievement":"GLASS_CANNON"},{"id":"kintsugi","index":102,"category":"surface","achievement":"WE_BOTH_LIVED"},{"id":"datacorrupt","index":106,"category":"surface","achievement":"CROSS_VERSION_COMPATIBILITY"},{"id":"doubleexposure","index":107,"category":"surface","achievement":"PRODIGAL_MON"},{"id":"paperburn","index":108,"category":"surface","achievement":"SEVEN_DEADLY_CHECKBOXES"},{"id":"mossgrow","index":109,"category":"surface","achievement":"STATUS_QUO"},{"id":"gemplate","index":110,"category":"surface","achievement":"FORM_VOLTRON"},{"id":"tiedye","index":111,"category":"surface","achievement":"PRESET_JET_SET"},{"id":"checkerflip","index":112,"category":"surface","achievement":"DOUBLE_OR_NOTHING"},{"id":"polkadot","index":113,"category":"surface","achievement":"LAB_RAT"},{"id":"innerstorm","index":115,"category":"surface","achievement":"SETUP_PAYOFF"},{"id":"tvbars","index":118,"category":"surface","achievement":"DEAD_CHANNEL"},{"id":"revealscan","index":119,"category":"surface","achievement":"FINAL_ANSWER"},{"id":"spotlight","index":120,"category":"surface","achievement":"LAST_MON_STANDING"},{"id":"genone","index":122,"category":"surface","achievement":"MONOCHROME_REQUIEM"},{"id":"marchingants","index":123,"category":"surface","achievement":"WAR_OF_ATTRITION"},{"id":"flame","index":2,"category":"around","achievement":"FRESH_START"},{"id":"shadowfire","index":3,"category":"around","achievement":"ENDLESS_NIGHT"},{"id":"frost","index":4,"category":"around","achievement":"MONO_ICE"},{"id":"efield","index":5,"category":"around","achievement":"MONO_ELECTRIC"},{"id":"holyrays","index":9,"category":"around","achievement":"_10000_HEAL"},{"id":"cosmos","index":10,"category":"around","achievement":"EXORCIST"},{"id":"embers","index":13,"category":"around","achievement":"FIRST_BLOOD"},{"id":"wingflame","index":16,"category":"around","achievement":"SCORCHED_EARTH"},{"id":"crown","index":18,"category":"around","achievement":"CLASSIC_VICTORY"},{"id":"underlight","index":19,"category":"around","achievement":"LIMBO"},{"id":"uprising","index":20,"category":"around","achievement":"I_JUST_GOT_HERE"},{"id":"topbeam","index":21,"category":"around","achievement":"BEAM_SPAM"},{"id":"sideaura","index":22,"category":"around","achievement":"YO"},{"id":"magiccircle","index":23,"category":"around","achievement":"MONO_PSYCHIC"},{"id":"vortex","index":24,"category":"around","achievement":"GHOST_TRIAD"},{"id":"galaxyspiral","index":25,"category":"around","achievement":"CATCH_LEGENDARY"},{"id":"sparkstorm","index":29,"category":"around","achievement":"TEMPEST"},{"id":"prismburst","index":30,"category":"around","achievement":"STELLAR_TERASTALLIZE"},{"id":"icespikes","index":31,"category":"around","achievement":"ABSOLUTE_ZERO"},{"id":"rainbowglitter","index":32,"category":"around","achievement":"SHINY_PARTY"},{"id":"luminous","index":33,"category":"around","achievement":"CENTER_STAGE"},{"id":"cursedaura","index":34,"category":"around","achievement":"INFERNO"},{"id":"goldenglow","index":35,"category":"around","achievement":"FRESH_START"},{"id":"shadowaura","index":36,"category":"around","achievement":"EXORCIST"},{"id":"rainbowoutline","index":37,"category":"around","achievement":"ALL_SHINY_TIERS"},{"id":"hearts","index":40,"category":"around","achievement":"MAX_FRIENDSHIP"},{"id":"nuclearwinter","index":44,"category":"around","achievement":"COCYTUS"},{"id":"sinistersun","index":45,"category":"around","achievement":"SEVEN_DEADLY_CHECKBOXES"},{"id":"echoes","index":47,"category":"around","achievement":"PHANTOM_FORMATION"},{"id":"triecho","index":48,"category":"around","achievement":"COCYTUS"},{"id":"meteors","index":50,"category":"around","achievement":"HELL_AND_BACK"},{"id":"stormstrikes","index":51,"category":"around","achievement":"TRINITY_TEST"},{"id":"rainbowarc","index":52,"category":"around","achievement":"GOLDEN_TICKET"},{"id":"moonrise","index":57,"category":"around","achievement":"GROUNDHOG_WEEK"},{"id":"ribbonloop","index":61,"category":"around","achievement":"FIVE_ALARM_STREAK"},{"id":"lightcage","index":68,"category":"around","achievement":"HELL_IS_OTHER_PEOPLE"},{"id":"featherfall","index":70,"category":"around","achievement":"WE_BOTH_LIVED"},{"id":"eventhorizon","index":72,"category":"around","achievement":"ZERO_SUM_HERO"},{"id":"cardstorm","index":73,"category":"around","achievement":"DOUBLE_OR_NOTHING"},{"id":"coinrain","index":74,"category":"around","achievement":"HOUSE_MONEY"},{"id":"hellsigil","index":78,"category":"around","achievement":"HELL_HOUSE"},{"id":"creepingshadow","index":82,"category":"around","achievement":"APEX_PREDATOR"},{"id":"portal","index":86,"category":"around","achievement":"READ_THE_FINE_PRINT"},{"id":"speedlines","index":87,"category":"around","achievement":"CHECKMATE_IN_ONE"},{"id":"hexdome","index":89,"category":"around","achievement":"MASTER_PLAN"},{"id":"guardianwings","index":90,"category":"around","achievement":"WE_BOTH_LIVED"},{"id":"starcircle","index":93,"category":"around","achievement":"CHAMPION_MATERIAL"},{"id":"shockpulse","index":96,"category":"around","achievement":"FORMATION_BREAKER"},{"id":"fogbank","index":97,"category":"around","achievement":"TRIPLE_EXORCISM"},{"id":"cometorbit","index":98,"category":"around","achievement":"PARALLEL_PLAY"}];
+const LEGACY_FACT = { bytes: 21428, sha256: "8182bb42b37ade8fd26bf9885b26c08d9a5c6b8ce028b6261fa369077d3e0e00" };
+const EFFECT_IDS = [...IDS.slice(0, 10), "setup_splice", ...IDS.slice(10)];
+const SEMANTIC_COUNTS = [0, 0, 0, 0, 2, 0, 1, 1, 1, 0, 2, 1, 1, 1, 1, 1];
+const effectDefinition = ({ id, index, category }) => ({ id, index, category });
+function validateEffects(data, legacy) {
+  keys(data, ["schema_version", "oracle_sha", "legacy", "scope", "recipes", "cosmetic_states", "boundaries", "scopes", "semantic_calls"], "sidecar root");
+  same(data.schema_version, 1, "sidecar schema"); same(data.oracle_sha, PIN, "sidecar source");
+  same(data.legacy, LEGACY_FACT, "immutable legacy identity");
+  same(data.scope, "synchronous action boundaries and actual call-through candy calls; no profile transaction claim", "sidecar scope");
+  same(data.recipes, ["MAX_FRIENDSHIP", "SPLICE"].map(id => ({ id, recipe: { kind: "candyTeam", perMon: 10 },
+    effects: COSMETIC_CATALOG.filter(def => def.achievement === id).map(effectDefinition) })), "actual recipe and full mapped effects");
+  assert(Array.isArray(data.cosmetic_states) && data.cosmetic_states.length > 0 && data.cosmetic_states.length <= 8, "cosmetic state bound");
+  same(new Set(data.cosmetic_states.map(row => JSON.stringify(row))).size, data.cosmetic_states.length, "deduplicated cosmetic states");
+  for (const row of data.cosmetic_states) {
+    keys(row, ["source_type", "bits", "available"], "cosmetic state");
+    if (row.source_type === "undefined") same(row.bits, null, "raw absent cosmetic bits");
+    else {
+      same(row.source_type, "object", "raw array type");
+      assert(Array.isArray(row.bits) && row.bits.length <= 64, "raw cosmetic bitset bound");
+      row.bits.forEach(byte => integer(byte, 0, 255, "raw cosmetic byte"));
+    }
+    same(row.available, COSMETIC_CATALOG.filter(def => ((row.bits?.[Math.floor(def.index / 8)] ?? 0)
+      & (1 << (def.index % 8))) !== 0).map(effectDefinition), "complete actual cosmetic decode including aliases");
+  }
+  assert(Array.isArray(data.boundaries) && data.boundaries.length > 0 && data.boundaries.length <= 32, "boundary bound");
+  same(new Set(data.boundaries.map(row => JSON.stringify(row))).size, data.boundaries.length, "deduplicated boundaries");
+  const boundary = index => { integer(index, 0, data.boundaries.length - 1, "boundary reference"); return data.boundaries[index]; };
+  for (const row of data.boundaries) {
+    keys(row, ["difficulty", "team", "unlocked", "reunlock", "reunlock_source_type", "cosmetics", "bar_shown", "bar_species_source_type"], "action boundary");
+    same([row.difficulty, row.reunlock, row.reunlock_source_type, row.bar_species_source_type], ["ace", false, "boolean", "undefined"], "resolved reward and UI context");
+    assert(Array.isArray(row.team) && row.team.length >= 1 && row.team.length <= 2, "actual team bound");
+    same(row.team, Array.from({ length: row.team.length }, (_, object) => ({ object, species: legacy.setup.source_root,
+      source_root: legacy.setup.source_root, candy_root: legacy.setup.candy_root })), "ordered distinct object identities and actual roots");
+    assert(Array.isArray(row.unlocked) && row.unlocked.length === 2, "unlock vector"); row.unlocked.forEach(value => boolean(value, "prior actual unlock"));
+    integer(row.cosmetics, 0, data.cosmetic_states.length - 1, "cosmetic state reference"); boolean(row.bar_shown, "actual bar state");
+  }
+  assert(Array.isArray(data.scopes), "scope array"); same(data.scopes.map(row => row.id), EFFECT_IDS, "all legacy scopes and actual SPLICE setup");
+  assert(Array.isArray(data.semantic_calls) && data.semantic_calls.length === 12, "exact twelve actual semantic calls");
+  let frontier = 0;
+  const usedBoundaries = new Set();
+  const usedCosmetics = new Set();
+  for (const [ordinal, scope] of data.scopes.entries()) {
+    keys(scope, ["id", "start", "before", "end", "after"], "scope");
+    same(scope.start, frontier, "no omitted semantic calls"); frontier += SEMANTIC_COUNTS[ordinal]; same(scope.end, frontier, "exact source call count per action");
+    const before = boundary(scope.before), after = boundary(scope.after);
+    usedBoundaries.add(scope.before); usedBoundaries.add(scope.after);
+    usedCosmetics.add(before.cosmetics); usedCosmetics.add(after.cosmetics);
+    same(before.team.length, ordinal <= 10 ? 2 : 1, "party at action entry");
+    same(after.team.length, ordinal < 10 ? 2 : 1, "party at action return");
+    same(before.unlocked, [ordinal > 4, ordinal > 10], "prior unlock and repeated max distinction");
+    same(after.unlocked, [ordinal >= 4, ordinal >= 10], "actual first unlock progression");
+    const legacyRow = legacy.cases.find(row => row.id === scope.id);
+    if (legacyRow) {
+      same(before.unlocked[0], legacyRow.before.max_friendship_unlocked, "legacy before unlock conserved");
+      same(after.unlocked[0], legacyRow.after.max_friendship_unlocked, "legacy after unlock conserved");
+    }
+    const oldBits = data.cosmetic_states[before.cosmetics].bits ?? [];
+    const newBits = data.cosmetic_states[after.cosmetics].bits ?? [];
+    const recipe = ordinal === 4 ? data.recipes[0] : ordinal === 10 ? data.recipes[1] : null;
+    if (!recipe) same(after.cosmetics, before.cosmetics, "no unrelated cosmetic mutation");
+    else {
+      const expected = [...oldBits];
+      for (const def of recipe.effects) {
+        const byte = Math.floor(def.index / 8);
+        while (expected.length <= byte) expected.push(0);
+        expected[byte] |= 1 << (def.index % 8);
+      }
+      same(newBits, expected, "exact observed mapped cosmetic bit mutation");
+    }
+    for (let index = scope.start; index < scope.end; index++) {
+      const call = data.semantic_calls[index];
+      keys(call, ["index", "scope", "arity", "species", "count", "from_egg", "from_egg_source_type", "show_bar", "show_bar_source_type", "returned"], "semantic call");
+      same([call.index, call.scope, call.species], [index, scope.id, legacy.setup.source_root], "correlated semantic identity");
+      boolean(call.returned, "actual semantic return");
+      const reward = ordinal === 4 || ordinal === 10;
+      const direct = ordinal >= 12;
+      const expectedCount = reward ? 15 : direct ? CANDY_INPUTS[ordinal - 12][1] : 1;
+      same(f64(call.count, "actual semantic count"), expectedCount, "actual request witness, not fabricated output");
+      same(call.arity, reward ? 3 : direct ? 4 : 2, "source request arity");
+      same([call.from_egg, call.from_egg_source_type], reward ? [true, "boolean"]
+        : direct ? [CANDY_INPUTS[ordinal - 12][2], "boolean"] : [null, "undefined"], "raw optional egg argument");
+      same([call.show_bar, call.show_bar_source_type], direct ? [true, "boolean"] : [null, "undefined"], "raw optional UI argument");
+      same(call.returned, ordinal !== 7, "saturated false return retained");
+      if (direct) same(call.returned, legacyRow.returned, "direct legacy return conserved");
+    }
+  }
+  same(frontier, 12, "complete semantic frontier");
+  same(usedBoundaries.size, data.boundaries.length, "no orphan boundary"); same(usedCosmetics.size, data.cosmetic_states.length, "no orphan cosmetic state");
+  return { semantic_calls: 12, legacy_cases: 15, setup_scopes: 1, cosmetic_catalog_rows: COSMETIC_CATALOG.length,
+    exact_legacy_bytes_required: true, source_call_arity_checked: true, cosmetic_aliases_checked: true,
+    scope: "actual source calls and observation conservation; no Rust parity or persistent profile transaction" };
+}
+function read(file, bound = 32768) {
   assert(path.isAbsolute(file) && realpathSync(file) === file, "absolute nonredirected data path");
-  const st = lstatSync(file); assert(st.isFile() && !st.isSymbolicLink() && st.size > 0 && st.size <= 32768, "data bound");
+  const st = lstatSync(file); assert(st.isFile() && !st.isSymbolicLink() && st.size > 0 && st.size <= bound, "data bound");
   const bytes = readFileSync(file); assert(bytes.length === st.size, "data changed during read");
   return { bytes, fact: { bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }, data: JSON.parse(bytes.toString("utf8")) };
 }
-assert(process.argv.length === 5, "exact verifier arguments");
-const [onePath, twoPath, output] = process.argv.slice(2);
-assert(onePath !== twoPath && output !== onePath && output !== twoPath, "distinct owned output paths");
+assert(process.argv.length === 7, "exact verifier arguments");
+const [onePath, twoPath, effectsOnePath, effectsTwoPath, output] = process.argv.slice(2);
+same(new Set(process.argv.slice(2)).size, 5, "distinct owned output paths");
 const one = read(onePath); const two = read(twoPath);
+same(one.fact, LEGACY_FACT, "first frozen legacy bytes"); same(two.fact, LEGACY_FACT, "second frozen legacy bytes");
+const effectsOne = read(effectsOnePath, 12288); const effectsTwo = read(effectsTwoPath, 12288);
+assert(effectsOne.bytes.equals(effectsTwo.bytes), "two fresh effects sidecars differ");
+const effectFacts = validateEffects(effectsOne.data, one.data);
+same(validateEffects(effectsTwo.data, two.data), effectFacts, "second effects validation");
 assert(one.bytes.equals(two.bytes), "two actual fresh exports differ");
 const facts = validate(one.data); same(validate(two.data), facts, "independent second validation");
 // Negative integrity witnesses mutate only in-memory copies of actual validated data.
@@ -187,7 +288,27 @@ for (const [name, mutate] of negatives) {
   mutate(changed);
   assert.throws(() => validate(changed), undefined, `required negative rejected: ${name}`);
 }
-const encoded = `${JSON.stringify({ schema_version: 1, status: "passed", exports: [one.fact, two.fact],
+const effectNegatives = [
+  ["changed_legacy_binding", data => { data.legacy.bytes--; }],
+  ["omitted_setup_grant", data => { data.semantic_calls.splice(5, 1); }],
+  ["wrong_semantic_scope", data => { data.semantic_calls[0].scope = "repeated_max"; }],
+  ["lost_raw_egg_argument", data => { data.semantic_calls[0].from_egg = null; }],
+  ["wrong_call_arity", data => { data.semantic_calls[0].arity = 4; }],
+  ["lost_saturated_false", data => { data.semantic_calls.find(row => row.scope === "candy_saturated").returned = true; }],
+  ["species_deduped_team", data => { data.boundaries[data.scopes[4].before].team.pop(); }],
+  ["hidden_prior_unlock", data => { data.boundaries[data.scopes[4].before].unlocked[0] = true; }],
+  ["enabled_reunlock", data => { data.boundaries[0].reunlock = true; }],
+  ["changed_reward_recipe", data => { data.recipes[0].recipe.perMon = 0; }],
+  ["missing_cosmetic_alias", data => { data.cosmetic_states[data.boundaries[data.scopes[4].after].cosmetics].available.pop(); }],
+  ["changed_cosmetic_bit", data => { const state = data.cosmetic_states[data.boundaries[data.scopes[4].after].cosmetics]; state.bits[0] ^= 1; }],
+];
+for (const [name, mutate] of effectNegatives) {
+  const changed = structuredClone(effectsOne.data); mutate(changed);
+  assert.throws(() => validateEffects(changed, one.data), undefined, `required sidecar negative rejected: ${name}`);
+}
+const encoded = `${JSON.stringify({ schema_version: 2, status: "passed", exports: [one.fact, two.fact],
+  sidecars: [effectsOne.fact, effectsTwo.fact], effects: effectFacts,
+  rejected_effect_mutations: effectNegatives.map(([name]) => name),
   ...facts, rejected_mutations: negatives.map(([name]) => name) })}\n`;
-assert(Buffer.byteLength(encoded) <= 32768 && path.isAbsolute(output), "validation output bound/path");
+assert(Buffer.byteLength(encoded) <= 8192 && path.isAbsolute(output), "validation output bound/path");
 writeFileSync(output, encoded, { encoding: "utf8", flag: "wx" });

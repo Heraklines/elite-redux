@@ -18,8 +18,8 @@ OUTPUT = FULL / "generated"
 ORACLE = REPORT / "oracle"
 STORE = ROOT / ".m9e-friendship-oracle-source"
 PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7"
-BASE = "9fbb9fa2a624f8341974ce27e18260a21063751f"
-BASE_TREE = "e025db5e75c65ee152821a36e31c9eb5eeb6960c"
+BASE = "7240a1f6277ac1fd51d4e121c2da7b73692c0c1b"
+BASE_TREE = "8c06c28995e036597200e6e73cc5ea447a4b1838"
 ASSET_COMMIT = "d5f67989d02b7082ca32e7eaddf3b9421916ff12"
 ASSET_PATH = "battle-anims/tackle.json"
 ASSET_REPOSITORY = "https://github.com/Heraklines/er-assets.git"
@@ -34,7 +34,9 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "22285aefe9c4588f5abbc9500801cbaececaef31646646d7f947975ecff9ce75"
 BOUNDED_HELPER_BYTES = 38615
-EXPORTER_SHA256 = "de9245b5fc842c432fe47a0f6db018ec10a68daba4388da8f9bd7db2a6263dc2"
+EXPORTER_SHA256 = "9e61537148a14ac103bb8427efdc9608ebc24e74a78c9235aba676a162949df8"
+OUTPUT_BOUNDS = {"export-one.json": 32768, "export-two.json": 32768,
+                 "effects-one.json": 12288, "effects-two.json": 12288, "validation.json": 8192}
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -180,8 +182,33 @@ ORACLE_PINS = {
   "src/game-mode.ts": [
     "836ff150ce901f95b4a20b5962ee55ba7e6fff0c21e9b0e619cec3228d3d9370",
     28647
+  ],
+  "src/data/elite-redux/er-achievement-rewards.ts": [
+    "28d729a2e88fe0761fe9a293a08fba5d10c1a17037af7eb362f4ca7835f026c2",
+    56578
+  ],
+  "src/system/achv.ts": [
+    "6255c52e60695bca88fab0fc91dab7a0b779d40d06bc563fd26927800e3847e5",
+    65655
+  ],
+  "src/data/elite-redux/er-shiny-lab-effects.ts": [
+    "2e693c5a5fbfd26d7ed29de8515b38efcc7cdd142c8f0424c62d301c6ca138ff",
+    71964
+  ],
+  "src/data/elite-redux/er-shiny-lab-config.ts": [
+    "8314ac781dc930a15808cebf195bc07b2fe4fdd28b5a33e811a7ab39e2ce16d2",
+    9461
+  ],
+  "src/data/elite-redux/er-run-difficulty.ts": [
+    "944ddde4b3b6fda355e2be1b0688472a0cb56dfc654042dc604d4200e8be1809",
+    6093
+  ],
+  "src/overrides.ts": [
+    "50c3f84157ecbd881534a01b989b2bf4da197b33870c0e84fd1b17847b0b0ae3",
+    17413
   ]
 }
+
 
 def require(condition, message):
     if not condition:
@@ -360,7 +387,7 @@ def main(summary):
     require(git_text(ROOT, ["rev-parse", "HEAD"], "candidate-head") == sha, "candidate identity")
     require(git_text(ROOT, ["rev-parse", BASE + "^{tree}"], "baseline-tree") == BASE_TREE, "base tree identity")
     changed = git_text(ROOT, ["diff", "--name-status", "--no-renames", BASE, sha], "exact-additions").splitlines()
-    require(changed == ["A\t" + path for path in ADDITIONS], "candidate must contain only four additive oracle paths")
+    require(changed == ["M\t" + path for path in ADDITIONS], "candidate must contain only four reviewed sidecar modifications")
     require(git_text(STORE, ["rev-parse", "HEAD"], "oracle-store-head") == PIN, "pinned object store identity")
     for name, command, expected in (("node", ["node", "--version"], "v24.9.0"),
                                     ("pnpm", ["pnpm", "--version"], "10.33.2")):
@@ -394,19 +421,26 @@ def main(summary):
     summary["fresh_process_exports"] = []
     for ordinal in ("one", "two"):
         destination = OUTPUT / f"export-{ordinal}.json"
+        sidecar = OUTPUT / f"effects-{ordinal}.json"
         report = FULL / f"vitest-{ordinal}.json"
-        require(not destination.exists() and not report.exists(), "fresh outputs required")
+        require(not destination.exists() and not sidecar.exists() and not report.exists(), "fresh outputs required")
         require(file_fact(ORACLE / INJECTED) == injected, "exporter changed before execution")
         run(["pnpm", "exec", "vitest", "run", INJECTED, "--pool=forks", "--isolate", "--no-file-parallelism",
              "--reporter=json", "--outputFile=" + str(report)], "fresh-export-" + ordinal,
-            cwd=ORACLE, extra={"M9_FRIENDSHIP_ORACLE_OUTPUT": str(destination)})
+            cwd=ORACLE, extra={"M9_FRIENDSHIP_ORACLE_OUTPUT": str(destination),
+                               "M9_FRIENDSHIP_EFFECTS_OUTPUT": str(sidecar)})
         summary["fresh_process_exports"].append({"ordinal": ordinal, "report": validate_vitest(report),
-            "export": file_fact(destination, 32768), "helper_sha256": injected["sha256"]})
+            "export": file_fact(destination, 32768), "sidecar": file_fact(sidecar, 12288),
+            "helper_sha256": injected["sha256"]})
+        require(file_fact(destination, 32768)["bytes"] == 21428 and file_fact(destination, 32768)["sha256"] ==
+                "8182bb42b37ade8fd26bf9885b26c08d9a5c6b8ce028b6261fa369077d3e0e00", "frozen legacy observation differs")
         require(inventory(ORACLE, PIN, "oracle-after-" + ordinal) == pinned, "export changed pinned source")
     require((OUTPUT / "export-one.json").read_bytes() == (OUTPUT / "export-two.json").read_bytes(),
             "two actual fresh source outputs are not byte-identical")
     run(["node", str(ROOT / VERIFIER), str(OUTPUT / "export-one.json"), str(OUTPUT / "export-two.json"),
+         str(OUTPUT / "effects-one.json"), str(OUTPUT / "effects-two.json"),
          str(OUTPUT / "validation.json")], "independent-data-verification", seconds=60, bound=65536)
+    file_fact(OUTPUT / "validation.json", 8192)
     summary["data_validation"] = json.loads((OUTPUT / "validation.json").read_bytes())
     require(summary["data_validation"].get("status") == "passed", "independent data verifier did not pass")
     require(inventory(ROOT, sha, "candidate-after", candidate=True) == candidate, "candidate changed")
@@ -415,9 +449,10 @@ def main(summary):
             "tackle asset changed")
     summary["conservation"] = {"candidate": True, "oracle_after_install": True,
                                "oracle_after_each_export": True, "injected_exporter": True, "asset": True}
-    summary["generated"] = {path.name: file_fact(path, 32768) for path in sorted(OUTPUT.iterdir())}
-    require(set(summary["generated"]) == {"export-one.json", "export-two.json", "validation.json"}, "exact output inventory")
-    require(sum(row["bytes"] for row in summary["generated"].values()) <= 3 * 32768, "aggregate generated bound")
+    require({path.name for path in OUTPUT.iterdir()} == set(OUTPUT_BOUNDS), "exact five output names")
+    summary["generated"] = {name: file_fact(OUTPUT / name, bound) for name, bound in OUTPUT_BOUNDS.items()}
+    require(set(summary["generated"]) == set(OUTPUT_BOUNDS), "exact output inventory")
+    require(sum(row["bytes"] for row in summary["generated"].values()) <= 98304, "aggregate generated bound")
     require(time.monotonic() < WORK_DEADLINE, "work deadline exceeded before reserved cleanup")
 
 
@@ -431,7 +466,7 @@ def bound_partial_outputs():
     removed = []
     for path in sorted(OUTPUT.iterdir()):
         require(path.parent == OUTPUT and path.is_file() and not path.is_symlink(), "unexpected generated output type")
-        if path.name not in {"export-one.json", "export-two.json", "validation.json"} or path.stat().st_size > 32768:
+        if path.name not in OUTPUT_BOUNDS or not 0 < path.stat().st_size <= OUTPUT_BOUNDS[path.name]:
             removed.append({"name": path.name[:128], "bytes": path.stat().st_size})
             path.unlink()
     return removed
@@ -446,7 +481,8 @@ def entry():
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "baseline": BASE, "oracle_sha": PIN,
         "scope": "two real source-method exports; controlled GameManager fixtures; no Rust parity/runtime payment",
         "status": "failed", "limits": {"per_command_seconds": 600, "shared_seconds": 1800,
-        "cleanup_reserve_seconds": 20, "data_file_bytes": 32768, "compact_metadata_bytes": 65536}}
+        "cleanup_reserve_seconds": 20, "legacy_file_bytes": 32768, "sidecar_file_bytes": 12288,
+        "validation_file_bytes": 8192, "aggregate_generated_bytes": 98304, "compact_metadata_bytes": 65536}}
     error = None
     try:
         require(all(re.fullmatch(r"[1-9][0-9]{0,19}", summary[key] or "") for key in ("run_id", "run_attempt")),

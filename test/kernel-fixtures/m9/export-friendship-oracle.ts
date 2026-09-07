@@ -1,8 +1,13 @@
 import { timedEventManager } from "#app/global-event-manager";
+import Overrides from "#app/overrides";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { getStarterValueFriendshipCap, speciesStarterCosts } from "#balance/starters";
 import { modifierTypes } from "#data/data-lists";
 import { erBalanceArr } from "#data/elite-redux/er-balance-tuning";
+import { ER_ACHIEVEMENT_REWARDS, resolveAchievementRewardTeam } from "#data/elite-redux/er-achievement-rewards";
+import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { ER_SHINY_LAB_EFFECT_DEFS, bitsetToErShinyLabAvailableSet,
+  getErShinyLabEffectsForAchv } from "#data/elite-redux/er-shiny-lab-effects";
 import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
 import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
@@ -16,6 +21,7 @@ import { getRibbonOwnerSpeciesId } from "#system/ribbons/ribbon-methods";
 import { GameManager } from "#test/framework/game-manager";
 import { getModifierType } from "#utils/modifier-utils";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
@@ -24,6 +30,7 @@ import { afterAll, expect, test, vi } from "vitest";
 // GameManager objects. It is not a gameplay-phase, browser, or persistent-profile proof.
 const ORACLE_SHA = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 const SEED = "m9-source-friendship-candy-v1";
+const LEGACY_SHA256 = "8182bb42b37ade8fd26bf9885b26c08d9a5c6b8ce028b6261fa369077d3e0e00";
 const CASE_IDS = [
   "negative_loss", "zero", "rare_cap", "above_rare_cap", "max", "repeated_max",
   "threshold", "candy_saturated", "boosted_threshold", "boosted_capped",
@@ -48,7 +55,8 @@ function f64(value: number) {
 
 test("export actual pinned friendship and candy method observations", async () => {
   const outputPath = process.env.M9_FRIENDSHIP_ORACLE_OUTPUT;
-  if (!outputPath) throw new Error("M9_FRIENDSHIP_ORACLE_OUTPUT is required");
+  const effectsPath = process.env.M9_FRIENDSHIP_EFFECTS_OUTPUT;
+  if (!outputPath || !effectsPath || outputPath === effectsPath) throw new Error("distinct legacy and effects outputs are required");
   expect(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()).toBe(ORACLE_SHA);
   game = new Phaser.Game({ type: Phaser.HEADLESS, seed: [SEED] });
   await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -135,6 +143,79 @@ test("export actual pinned friendship and candy method observations", async () =
   // Default spies call through to the actual side-effect methods. No implementation is replaced.
   const achievementSpy = vi.spyOn(scene, "validateAchv");
   const candyBarSpy = vi.spyOn(scene.candyBar, "showStarterSpeciesCandy");
+  // Installed after the original-not-mock assertion above. No implementation,
+  // receiver, arguments, return value, promise, or source dispatch is replaced.
+  const semanticCandySpy = vi.spyOn(data, "addStarterCandy");
+  const cosmeticStates: unknown[] = [];
+  const cosmeticStateKeys: string[] = [];
+  const boundaries: unknown[] = [];
+  const boundaryKeys: string[] = [];
+  const scopes: unknown[] = [];
+  const semanticCalls: unknown[] = [];
+  const achievementIds = ["MAX_FRIENDSHIP", "SPLICE"] as const;
+  const recipeContext = achievementIds.map(id => ({ id, recipe: ER_ACHIEVEMENT_REWARDS[id],
+    effects: getErShinyLabEffectsForAchv(id).map(effectId => {
+      const definition = ER_SHINY_LAB_EFFECT_DEFS.find(def => def.id === effectId);
+      if (!definition?.lockHint) throw new Error("actual achievement effect definition missing");
+      return { id: effectId, index: definition.index, category: definition.category };
+    }) }));
+  const cosmeticState = () => {
+    const raw = data.erShinyLabAvailableEffects;
+    if (raw !== undefined && (!Array.isArray(raw) || raw.length > 64
+      || raw.some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255))) throw new Error("cosmetic bitset scope");
+    const ids = [...bitsetToErShinyLabAvailableSet(raw)];
+    const definitions = ER_SHINY_LAB_EFFECT_DEFS.filter(def => def.lockHint
+      && ((raw?.[Math.floor(def.index / 8)] ?? 0) & (1 << (def.index % 8))) !== 0);
+    expect(ids).toEqual(definitions.map(def => def.id));
+    const value = { source_type: typeof raw, bits: raw === undefined ? null : [...raw],
+      available: definitions.map(def => ({ id: def.id, index: def.index, category: def.category })) };
+    const key = JSON.stringify(value);
+    const existing = cosmeticStateKeys.indexOf(key);
+    if (existing >= 0) return existing;
+    if (cosmeticStates.length >= 8) throw new Error("unexpected cosmetic state count");
+    cosmeticStateKeys.push(key); cosmeticStates.push(value);
+    return cosmeticStates.length - 1;
+  };
+  const partyIdentity = (mon: typeof probe) => {
+    const ordinal = mon === probe ? 0 : mon === donor ? 1 : -1;
+    if (ordinal < 0) throw new Error("unexpected reward-team object");
+    return { object: ordinal, species: mon.species.speciesId, source_root: mon.species.getRootSpeciesId(),
+      candy_root: data.getRootStarterSpeciesId(mon.species.speciesId) };
+  };
+  const boundary = () => {
+    const value = {
+      // An action boundary, not a replacement of the private reward dispatcher.
+      // Source pins establish the synchronous team-grant location within this action.
+      difficulty: getErDifficulty(),
+      team: resolveAchievementRewardTeam(scene.getPlayerParty(),
+        scene.currentBattle?.mysteryEncounter?.misc?.originalParty).map(partyIdentity),
+      unlocked: achievementIds.map(id => Object.hasOwn(data.achvUnlocks, achvs[id].id)),
+      reunlock: Overrides.ACHIEVEMENTS_REUNLOCK_OVERRIDE,
+      reunlock_source_type: typeof Overrides.ACHIEVEMENTS_REUNLOCK_OVERRIDE,
+      cosmetics: cosmeticState(),
+      bar_shown: scene.candyBar.shown, bar_species_source_type: typeof Reflect.get(scene.candyBar, "speciesId"),
+    };
+    const key = JSON.stringify(value);
+    const existing = boundaryKeys.indexOf(key);
+    if (existing >= 0) return existing;
+    if (boundaries.length >= 32) throw new Error("unexpected boundary count");
+    boundaryKeys.push(key); boundaries.push(value);
+    return boundaries.length - 1;
+  };
+  const beginScope = (id: string) => ({ id, start: semanticCandySpy.mock.calls.length, before: boundary() });
+  const endScope = (scope: ReturnType<typeof beginScope>) => {
+    const end = semanticCandySpy.mock.calls.length;
+    for (let index = scope.start; index < end; index++) {
+      const args = semanticCandySpy.mock.calls[index];
+      const returned = semanticCandySpy.mock.results[index];
+      if (returned.type !== "return" || typeof returned.value !== "boolean") throw new Error("semantic candy call failed");
+      if (index !== semanticCalls.length) throw new Error("semantic scope omitted or repeated a call");
+      semanticCalls.push({ index, scope: scope.id, arity: args.length, species: args[0], count: f64(args[1]),
+        from_egg: args.length > 2 ? args[2] : null, from_egg_source_type: typeof args[2],
+        show_bar: args.length > 3 ? args[3] : null, show_bar_source_type: typeof args[3], returned: returned.value });
+    }
+    scopes.push({ ...scope, end, after: boundary() });
+  };
   const observations: unknown[] = [];
   const ids: string[] = [];
 
@@ -144,7 +225,10 @@ test("export actual pinned friendship and candy method observations", async () =
     candyBarSpy.mockClear();
     const context = environment();
     const before = state();
+    const effectScope = beginScope(id);
     const result = invoke();
+    // Synchronous observation only: retain the original awaits and UI recursion.
+    endScope(effectScope);
     // Await actual headless UI promises; rejection is a failure, never swallowed.
     for (const call of candyBarSpy.mock.results) {
       if (call.type !== "return") throw new Error("actual candy bar did not return normally");
@@ -196,7 +280,9 @@ test("export actual pinned friendship and candy method observations", async () =
     const originalIdsDistinct = probe.id !== donor.id;
     expect(donor.species.getRootSpeciesId()).toBe(sourceRoot);
     expect(donor.getHeldItems()).toHaveLength(0);
+    const spliceScope = beginScope("setup_splice");
     probe.fuse(donor);
+    endScope(spliceScope);
     expect(probe.isFusion()).toBe(true);
     expect(scene.getPlayerParty()).toHaveLength(1);
     expect(scene.getPlayerParty()[0]).toBe(probe);
@@ -225,8 +311,21 @@ test("export actual pinned friendship and candy method observations", async () =
       cases: observations };
     const encoded = `${JSON.stringify(output)}\n`;
     if (Buffer.byteLength(encoded, "utf8") > 32768) throw new Error("oracle exceeds 32 KiB");
+    expect(Buffer.byteLength(encoded, "utf8")).toBe(21428);
+    expect(createHash("sha256").update(encoded).digest("hex")).toBe(LEGACY_SHA256);
+    // Counts are fail-closed witnesses of actual calls, never manufactured rows.
+    expect(semanticCandySpy.mock.calls).toHaveLength(12);
+    expect(semanticCalls).toHaveLength(12);
+    expect(scopes).toHaveLength(16);
+    const sidecar = `${JSON.stringify({ schema_version: 1, oracle_sha: ORACLE_SHA,
+      legacy: { bytes: 21428, sha256: LEGACY_SHA256 },
+      scope: "synchronous action boundaries and actual call-through candy calls; no profile transaction claim",
+      recipes: recipeContext, cosmetic_states: cosmeticStates, boundaries, scopes, semantic_calls: semanticCalls })}\n`;
+    if (Buffer.byteLength(sidecar, "utf8") > 12288) throw new Error("effects sidecar exceeds 12 KiB");
     writeFileSync(outputPath, encoded, { encoding: "utf8", flag: "wx" });
+    writeFileSync(effectsPath, sidecar, { encoding: "utf8", flag: "wx" });
   } finally {
+    semanticCandySpy.mockRestore();
     achievementSpy.mockRestore();
     candyBarSpy.mockRestore();
     await scene.candyBar.hide();
