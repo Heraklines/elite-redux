@@ -505,7 +505,7 @@ fn classify_method(method: &str) -> MethodClassV1 {
     }) {
         return MethodClassV1::Forbidden;
     }
-    const ALLOWED: [&str; 48] = [
+    const ALLOWED: [&str; 49] = [
         "session.capsule.status",
         "protocol.hello",
         "session.create",
@@ -518,6 +518,7 @@ fn classify_method(method: &str) -> MethodClassV1 {
         "session.advance_time",
         "session.network_frame",
         "session.coop.retry",
+        "session.coop.rebind",
         "session.presentation_settled",
         "session.storage_result",
         "session.transport_changed",

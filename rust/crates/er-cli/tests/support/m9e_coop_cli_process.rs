@@ -143,12 +143,12 @@ impl Cli {
         })
     }
 
-    fn request(&mut self, method: &str, params: Value) -> TestResult<Value> {
+    pub(super) fn request(&mut self, method: &str, params: Value) -> TestResult<Value> {
         self.next += 1;
         self.request_id(method, params, &format!("coop-{}", self.next))
     }
 
-    fn request_id(&mut self, method: &str, params: Value, id: &str) -> TestResult<Value> {
+    pub(super) fn request_id(&mut self, method: &str, params: Value, id: &str) -> TestResult<Value> {
         let mut bytes = serde_json::to_vec(
             &json!({"protocol_version": 1, "id": id, "method": method, "params": params}),
         )?;
