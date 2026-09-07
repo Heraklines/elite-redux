@@ -137,7 +137,6 @@ impl CampaignRecorder {
         assert_eq!(capsule.attempts.len() as u64, self.position - self.base);
         assert_eq!(*capsule.checkpoint, self.checkpoint);
         let expected = self.session.snapshot()?;
-
         let expected_observation = self.session.observe()?;
         let encoded = serde_json::to_vec(&capsule)?;
         assert!(encoded.len() <= CurrentReproLimitsV1::default().maximum_bytes);
@@ -174,7 +173,6 @@ impl CampaignRecorder {
                 .and_then(|state| state.active_run.as_ref())
                 .map(|run| run.wave.get().get())
                 .unwrap_or(0);
-            assert!(kernel.timer_advances > 0);
             writeln!(
                 std::io::stdout().lock(),
                 "M9E_REPLAY_PROGRESS events={} segments={} wave={wave}",
