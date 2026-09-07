@@ -7,13 +7,13 @@ use er_env::current::{
     CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameObservation, CurrentGameSession,
     CurrentSessionError, CurrentSessionRebindOutputV1,
 };
-use er_game::m72_bootstrap::RunBootstrapStageV1;
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m72_bootstrap::RunBootstrapStageV1;
+use er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindPhaseV1;
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7, GameKernelV7Error,
     KernelPresentationOutcomeV2,
 };
-use er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindPhaseV1;
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
@@ -31,8 +31,8 @@ use er_state::m7_state::{
 };
 use er_types::battle_ids::WaveIndex;
 use er_types::{
-    ConnectionGeneration, FrameContext, MembershipRevision, RunId, SessionId, TimeClass,
-    InputFocus, PhysicalKey, RawInputEvent, SafeU53, SeatId,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -361,16 +361,26 @@ fn generation(value: u64) -> ConnectionGeneration {
     ConnectionGeneration::new(safe(value))
 }
 
-fn reference_event(kernel: &mut GameKernelV7, event: CurrentExternalEvent) -> Result<GameKernelStepV7, GameKernelV7Error> {
+fn reference_event(
+    kernel: &mut GameKernelV7,
+    event: CurrentExternalEvent,
+) -> Result<GameKernelStepV7, GameKernelV7Error> {
     match event {
         CurrentExternalEvent::CoopRebind { .. } => Err(GameKernelV7Error::Invalid),
         CurrentExternalEvent::RetryCoopSetup => kernel.retry_current_coop_setup(),
         CurrentExternalEvent::RawInput { input } => kernel.raw_input(input),
         CurrentExternalEvent::AdvanceTime { milliseconds } => kernel.advance_time(milliseconds),
-        CurrentExternalEvent::NetworkFrame { generation, bytes } => kernel.ingest_network_frame(generation, &bytes),
+        CurrentExternalEvent::NetworkFrame { generation, bytes } => {
+            kernel.ingest_network_frame(generation, &bytes)
+        }
         CurrentExternalEvent::ProposalFrame { bytes } => kernel.admit_game_proposal(&bytes),
-        CurrentExternalEvent::AuthorityMaterial { bytes } => kernel.apply_authority_material(&bytes),
-        CurrentExternalEvent::TransportChanged { generation, connected } => {
+        CurrentExternalEvent::AuthorityMaterial { bytes } => {
+            kernel.apply_authority_material(&bytes)
+        }
+        CurrentExternalEvent::TransportChanged {
+            generation,
+            connected,
+        } => {
             kernel.transport_changed(generation, connected)?;
             Ok(GameKernelStepV7::default())
         }
@@ -378,7 +388,9 @@ fn reference_event(kernel: &mut GameKernelV7, event: CurrentExternalEvent) -> Re
             kernel.settle_presentation_outcome(event_id, outcome)?;
             Ok(GameKernelStepV7::default())
         }
-        CurrentExternalEvent::StorageResult { request_id, result } => kernel.apply_storage_result(request_id, result),
+        CurrentExternalEvent::StorageResult { request_id, result } => {
+            kernel.apply_storage_result(request_id, result)
+        }
     }
 }
 
@@ -391,11 +403,25 @@ struct Captured {
 impl Captured {
     fn new(reference: GameKernelV7, host: bool) -> TestResult<Self> {
         let seat = SeatId::new(safe(if host { 1 } else { 2 }));
-        let role = if host { GameKernelRoleV7::Authority } else { GameKernelRoleV7::Replica };
+        let role = if host {
+            GameKernelRoleV7::Authority
+        } else {
+            GameKernelRoleV7::Replica
+        };
         let snapshot = reference.snapshot()?;
         let session = CurrentGameSession::from_snapshot(snapshot.clone(), seat, role, content()?)?;
-        let recorder = CurrentReproRecorderV1::new(snapshot, seat, role, content()?, CurrentReproLimitsV1::default())?;
-        let value = Self { session, reference, recorder };
+        let recorder = CurrentReproRecorderV1::new(
+            snapshot,
+            seat,
+            role,
+            content()?,
+            CurrentReproLimitsV1::default(),
+        )?;
+        let value = Self {
+            session,
+            reference,
+            recorder,
+        };
         value.check()?;
         Ok(value)
     }
@@ -405,8 +431,12 @@ impl Captured {
         let expected = CurrentGameObservation {
             kernel_version: 7,
             content_identity: content()?.identity().clone(),
-            mechanical_digest: self.reference.state().map(er_canonical::content_digest)
-                .transpose()?.map(|digest| format!("blake3-v1:{digest}")),
+            mechanical_digest: self
+                .reference
+                .state()
+                .map(er_canonical::content_digest)
+                .transpose()?
+                .map(|digest| format!("blake3-v1:{digest}")),
             control: self.reference.current_control().cloned(),
         };
         assert_eq!(self.session.observe()?, expected);
@@ -425,24 +455,38 @@ impl Captured {
         self.check()?;
         let after = self.session.snapshot()?;
         let observation = self.session.observe()?;
-        assert!(matches!(self.recorder.record(&before, event, result.as_ref(), &after, &observation), CurrentCaptureStatusV1::Available { .. }));
+        assert!(matches!(
+            self.recorder
+                .record(&before, event, result.as_ref(), &after, &observation),
+            CurrentCaptureStatusV1::Available { .. }
+        ));
         Ok(result?)
     }
 
-    fn rebind(&mut self, control: CurrentCoopRebindEventV1) -> TestResult<Result<CurrentSessionRebindOutputV1, CurrentSessionError>> {
+    fn rebind(
+        &mut self,
+        control: CurrentCoopRebindEventV1,
+    ) -> TestResult<Result<CurrentSessionRebindOutputV1, CurrentSessionError>> {
         let before = self.session.snapshot()?;
         let mut candidate = self.reference.clone();
         let expected = match &control {
             CurrentCoopRebindEventV1::Begin => candidate.begin_current_coop_rebind_v1(),
             CurrentCoopRebindEventV1::Retry => candidate.retry_current_coop_rebind_v1(),
-            CurrentCoopRebindEventV1::Receive { generation, bytes } => candidate.receive_current_coop_rebind_v1(*generation, bytes),
+            CurrentCoopRebindEventV1::Receive { generation, bytes } => {
+                candidate.receive_current_coop_rebind_v1(*generation, bytes)
+            }
         };
         let result = self.session.apply_rebind(control.clone());
         match (&result, expected) {
             (Ok(actual), Ok(expected)) => {
                 assert_eq!(actual.generation, expected.generation);
                 assert_eq!(actual.frames, expected.frames);
-                assert_eq!(serde_json::from_slice::<CurrentSessionRebindOutputV1>(&serde_json::to_vec(actual)?)?, *actual);
+                assert_eq!(
+                    serde_json::from_slice::<CurrentSessionRebindOutputV1>(&serde_json::to_vec(
+                        actual
+                    )?)?,
+                    *actual
+                );
                 candidate.validate()?;
                 self.reference = candidate;
             }
@@ -455,7 +499,17 @@ impl Captured {
         self.check()?;
         let after = self.session.snapshot()?;
         let observation = self.session.observe()?;
-        assert!(matches!(self.recorder.record_rebind_with_origin(&before, control, result.as_ref(), &after, &observation, Some("session.coop.rebind")), CurrentCaptureStatusV1::Available { .. }));
+        assert!(matches!(
+            self.recorder.record_rebind_with_origin(
+                &before,
+                control,
+                result.as_ref(),
+                &after,
+                &observation,
+                Some("session.coop.rebind")
+            ),
+            CurrentCaptureStatusV1::Available { .. }
+        ));
         Ok(result)
     }
 
@@ -464,7 +518,8 @@ impl Captured {
         let bytes = serde_json::to_vec(&capsule)?;
         let decoded: CurrentReproCapsuleV1 = serde_json::from_slice(&bytes)?;
         assert_eq!(decoded, capsule);
-        let replayed = replay_current_capsule_v1(&decoded, content()?, CurrentReproLimitsV1::default())?;
+        let replayed =
+            replay_current_capsule_v1(&decoded, content()?, CurrentReproLimitsV1::default())?;
         assert_eq!(replayed.snapshot()?, self.session.snapshot()?);
         assert_eq!(replayed.observe()?, self.session.observe()?);
         Ok(capsule)
@@ -475,9 +530,19 @@ impl Captured {
         let capsule = self.replay()?;
         let encoded = er_canonical::canonical_bytes(&snapshot)?;
         let (seat, role) = self.session.session_context()?;
-        self.session = CurrentGameSession::from_snapshot(serde_json::from_slice(&encoded)?, seat, role, content()?)?;
-        self.reference = GameKernelV7::from_snapshot(serde_json::from_slice(&encoded)?, seat, role, content()?)?;
-        let (recorder, replayed) = CurrentReproRecorderV1::from_capsule(capsule, content()?, CurrentReproLimitsV1::default())?;
+        self.session = CurrentGameSession::from_snapshot(
+            serde_json::from_slice(&encoded)?,
+            seat,
+            role,
+            content()?,
+        )?;
+        self.reference =
+            GameKernelV7::from_snapshot(serde_json::from_slice(&encoded)?, seat, role, content()?)?;
+        let (recorder, replayed) = CurrentReproRecorderV1::from_capsule(
+            capsule,
+            content()?,
+            CurrentReproLimitsV1::default(),
+        )?;
         assert_eq!(replayed.snapshot()?, snapshot);
         self.recorder = recorder;
         self.check()?;
@@ -488,13 +553,21 @@ impl Captured {
     fn press(&mut self) -> TestResult<Vec<Vec<u8>>> {
         let mut frames = Vec::new();
         for input in [
-            RawInputEvent::KeyDown { code: PhysicalKey::Space, printable: false, browser_repeat: false, focus: InputFocus::Game },
-            RawInputEvent::KeyUp { code: PhysicalKey::Space },
+            RawInputEvent::KeyDown {
+                code: PhysicalKey::Space,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+            RawInputEvent::KeyUp {
+                code: PhysicalKey::Space,
+            },
         ] {
             let step = self.ordinary(CurrentExternalEvent::RawInput { input })?;
             for effect in step.effects {
                 match effect {
-                    GameKernelEffectV7::ProposalReady { bytes, .. } | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => frames.push(bytes),
+                    GameKernelEffectV7::ProposalReady { bytes, .. }
+                    | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => frames.push(bytes),
                     _ => {}
                 }
             }
@@ -506,9 +579,14 @@ impl Captured {
         let mut count = 0;
         for _ in 0..16 {
             let pending = self.session.snapshot()?.pending_presentations;
-            if pending.is_empty() { return Ok(count); }
+            if pending.is_empty() {
+                return Ok(count);
+            }
             for presentation in pending {
-                self.ordinary(CurrentExternalEvent::PresentationOutcome { event_id: presentation.event_id, outcome: KernelPresentationOutcomeV2::Settled })?;
+                self.ordinary(CurrentExternalEvent::PresentationOutcome {
+                    event_id: presentation.event_id,
+                    outcome: KernelPresentationOutcomeV2::Settled,
+                })?;
                 count += 1;
             }
         }
@@ -520,7 +598,9 @@ impl Captured {
             self.settle()?;
             let frames = self.press()?;
             if !frames.is_empty() {
-                let [frame] = frames.as_slice() else { return Err("one actual gameplay frame required".into()); };
+                let [frame] = frames.as_slice() else {
+                    return Err("one actual gameplay frame required".into());
+                };
                 return Ok(frame.clone());
             }
         }
@@ -535,28 +615,51 @@ fn captured_pair() -> TestResult<(Captured, Captured)> {
 
 fn control_frame(output: &CurrentSessionRebindOutputV1) -> TestResult<Vec<u8>> {
     assert_eq!(output.generation, generation(2));
-    let [bytes] = output.frames.as_slice() else { return Err("exactly one actual control frame".into()); };
+    let [bytes] = output.frames.as_slice() else {
+        return Err("exactly one actual control frame".into());
+    };
     Ok(bytes.clone())
 }
 
 fn begin_sessions(host: &mut Captured, guest: &mut Captured) -> TestResult<Vec<u8>> {
     for peer in [&mut *host, &mut *guest] {
-        peer.ordinary(CurrentExternalEvent::TransportChanged { generation: generation(1), connected: false })?;
-        assert!(peer.rebind(CurrentCoopRebindEventV1::Begin)??.frames.is_empty());
+        peer.ordinary(CurrentExternalEvent::TransportChanged {
+            generation: generation(1),
+            connected: false,
+        })?;
+        assert!(
+            peer.rebind(CurrentCoopRebindEventV1::Begin)??
+                .frames
+                .is_empty()
+        );
         let before = peer.session.snapshot()?;
         let position = peer.recorder.export()?.final_position;
-        assert!(peer.rebind(CurrentCoopRebindEventV1::Begin)??.frames.is_empty());
+        assert!(
+            peer.rebind(CurrentCoopRebindEventV1::Begin)??
+                .frames
+                .is_empty()
+        );
         assert_eq!(peer.session.snapshot()?, before);
         assert_eq!(peer.recorder.export()?.final_position, position + 1);
-        peer.ordinary(CurrentExternalEvent::TransportChanged { generation: generation(2), connected: true })?;
+        peer.ordinary(CurrentExternalEvent::TransportChanged {
+            generation: generation(2),
+            connected: true,
+        })?;
     }
     control_frame(&host.rebind(CurrentCoopRebindEventV1::Retry)??)
 }
 
 fn handshake_sessions(host: &mut Captured, guest: &mut Captured, mut bytes: Vec<u8>) -> TestResult {
     for index in 0usize..8 {
-        let peer = if index.is_multiple_of(2) { &mut *guest } else { &mut *host };
-        let output = peer.rebind(CurrentCoopRebindEventV1::Receive { generation: generation(2), bytes })??;
+        let peer = if index.is_multiple_of(2) {
+            &mut *guest
+        } else {
+            &mut *host
+        };
+        let output = peer.rebind(CurrentCoopRebindEventV1::Receive {
+            generation: generation(2),
+            bytes,
+        })??;
         if index < 7 {
             bytes = control_frame(&output)?;
         } else {
@@ -576,7 +679,11 @@ fn handshake_sessions(host: &mut Captured, guest: &mut Captured, mut bytes: Vec<
     }
     for peer in [host, guest] {
         let snapshot = peer.session.snapshot()?;
-        let owner = snapshot.current_coop_setup.as_ref().and_then(|setup| setup.rebind.as_deref()).ok_or("actual owner missing")?;
+        let owner = snapshot
+            .current_coop_setup
+            .as_ref()
+            .and_then(|setup| setup.rebind.as_deref())
+            .ok_or("actual owner missing")?;
         assert_eq!(owner.phase, CurrentCoopRebindPhaseV1::Open);
         assert_eq!(owner.transcript.len(), 8);
         peer.replay()?;
@@ -590,52 +697,123 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
     handshake_sessions(&mut host, &mut guest, offer)?;
     host.settle()?;
     guest.settle()?;
-    host.ordinary(CurrentExternalEvent::AdvanceTime { milliseconds: SafeU53::ZERO })?;
+    host.ordinary(CurrentExternalEvent::AdvanceTime {
+        milliseconds: SafeU53::ZERO,
+    })?;
     let material = host.next_frame()?;
     er_game::m9e_material_v6::GameMaterialV6::decode(&material)?;
-    guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: material })?;
+    guest.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(2),
+        bytes: material,
+    })?;
     host.settle()?;
     guest.settle()?;
     let proposal = guest.next_frame()?;
     let decoded = er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?;
     assert_eq!(decoded.connection_generation, generation(2));
     let pending = guest.session.snapshot()?;
-    assert_eq!(wire(&guest.ordinary(CurrentExternalEvent::RetryCoopSetup)?)?, proposal);
+    assert_eq!(
+        wire(&guest.ordinary(CurrentExternalEvent::RetryCoopSetup)?)?,
+        proposal
+    );
     assert_eq!(guest.session.snapshot()?, pending);
-    let reply = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: proposal.clone() })?)?;
+    let reply = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(2),
+        bytes: proposal.clone(),
+    })?)?;
     let receipt = er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV2::decode(&reply)?;
     assert_eq!(receipt.evidence()?.proposal_bytes, proposal);
-    assert_eq!(receipt.authority_context.connection_generation, generation(2));
-    assert!(er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV1::decode(&reply).is_err());
+    assert_eq!(
+        receipt.authority_context.connection_generation,
+        generation(2)
+    );
+    assert!(
+        er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV1::decode(&reply).is_err()
+    );
     let host_after = host.session.snapshot()?;
-    assert_eq!(wire(&host.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: proposal })?)?, reply);
+    assert_eq!(
+        wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+            generation: generation(2),
+            bytes: proposal
+        })?)?,
+        reply
+    );
     assert_eq!(host.session.snapshot()?, host_after);
     guest.restore_midphase()?;
-    guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: reply.clone() })?;
+    guest.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(2),
+        bytes: reply.clone(),
+    })?;
     assert!(guest.session.snapshot()?.current_proposal.is_none());
     let guest_after = guest.session.snapshot()?;
-    assert!(guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: reply })?.effects.is_empty());
+    assert!(
+        guest
+            .ordinary(CurrentExternalEvent::NetworkFrame {
+                generation: generation(2),
+                bytes: reply
+            })?
+            .effects
+            .is_empty()
+    );
     assert_eq!(guest.session.snapshot()?, guest_after);
     assert!(guest.settle()? > 0);
     host.settle()?;
-    assert_eq!(host.session.kernel_ref()?.state(), guest.session.kernel_ref()?.state());
+    assert_eq!(
+        host.session.kernel_ref()?.state(),
+        guest.session.kernel_ref()?.state()
+    );
     for peer in [&host, &guest] {
         let capsule = peer.replay()?;
         assert_eq!(capsule.schema_version, 1);
-        assert!(capsule.attempts.iter().any(|attempt| matches!(&attempt.event, CurrentExternalEvent::PresentationOutcome { .. })));
-        assert!(capsule.attempts.iter().any(|attempt| matches!(&attempt.event, CurrentExternalEvent::TransportChanged { .. })));
-        let received = capsule.attempts.iter().filter(|attempt| matches!(&attempt.event, CurrentExternalEvent::CoopRebind { control: CurrentCoopRebindEventV1::Receive { .. } })).count();
+        assert!(capsule.attempts.iter().any(|attempt| matches!(
+            &attempt.event,
+            CurrentExternalEvent::PresentationOutcome { .. }
+        )));
+        assert!(capsule.attempts.iter().any(|attempt| matches!(
+            &attempt.event,
+            CurrentExternalEvent::TransportChanged { .. }
+        )));
+        let received = capsule
+            .attempts
+            .iter()
+            .filter(|attempt| {
+                matches!(
+                    &attempt.event,
+                    CurrentExternalEvent::CoopRebind {
+                        control: CurrentCoopRebindEventV1::Receive { .. }
+                    }
+                )
+            })
+            .count();
         assert_eq!(received, 4);
-        assert!(capsule.attempts.iter().filter(|attempt| matches!(&attempt.event, CurrentExternalEvent::CoopRebind { .. })).all(|attempt| attempt.origin.as_deref() == Some("session.coop.rebind")));
-        assert!(capsule.attempts.iter().any(|attempt| matches!(&attempt.outcome, CurrentReproOutcomeV1::RebindApplied { .. })));
+        assert!(
+            capsule
+                .attempts
+                .iter()
+                .filter(|attempt| matches!(&attempt.event, CurrentExternalEvent::CoopRebind { .. }))
+                .all(|attempt| attempt.origin.as_deref() == Some("session.coop.rebind"))
+        );
+        assert!(capsule.attempts.iter().any(|attempt| matches!(
+            &attempt.outcome,
+            CurrentReproOutcomeV1::RebindApplied { .. }
+        )));
         // Existing ordinary event/outcome encodings remain the original schema.
-        let ordinary = capsule.attempts.iter().find(|attempt| !matches!(&attempt.event, CurrentExternalEvent::CoopRebind { .. })).ok_or("ordinary event missing")?;
+        let ordinary = capsule
+            .attempts
+            .iter()
+            .find(|attempt| !matches!(&attempt.event, CurrentExternalEvent::CoopRebind { .. }))
+            .ok_or("ordinary event missing")?;
         let value = serde_json::to_value(ordinary)?;
         assert_eq!(value["outcome"]["kind"], "APPLIED");
         assert!(value["outcome"].get("step").is_some());
         assert!(value["outcome"].get("output").is_none());
     }
-    assert_eq!(serde_json::to_string(&CurrentExternalEvent::AdvanceTime { milliseconds: safe(1) })?, r#"{"kind":"ADVANCE_TIME","milliseconds":1}"#);
+    assert_eq!(
+        serde_json::to_string(&CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(1)
+        })?,
+        r#"{"kind":"ADVANCE_TIME","milliseconds":1}"#
+    );
     Ok(())
 }
 
@@ -645,7 +823,9 @@ enum AdmissionError {
     ResponseBudget,
 }
 impl From<CurrentSessionError> for AdmissionError {
-    fn from(error: CurrentSessionError) -> Self { Self::Session(error) }
+    fn from(error: CurrentSessionError) -> Self {
+        Self::Session(error)
+    }
 }
 
 #[test]
@@ -655,8 +835,14 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     let before = guest.session.snapshot()?;
     let observation = guest.session.observe()?;
     for control in [
-        CurrentCoopRebindEventV1::Receive { generation: generation(1), bytes: offer.clone() },
-        CurrentCoopRebindEventV1::Receive { generation: generation(2), bytes: vec![255] },
+        CurrentCoopRebindEventV1::Receive {
+            generation: generation(1),
+            bytes: offer.clone(),
+        },
+        CurrentCoopRebindEventV1::Receive {
+            generation: generation(2),
+            bytes: vec![255],
+        },
     ] {
         let position = guest.recorder.export()?.final_position;
         assert!(guest.rebind(control)?.is_err());
@@ -665,14 +851,29 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
         assert_eq!(guest.recorder.export()?.final_position, position + 1);
     }
     let rejected = guest.replay()?;
-    assert_eq!(rejected.attempts.iter().filter(|attempt| matches!(&attempt.outcome, CurrentReproOutcomeV1::KernelRejected { .. })).count(), 2);
+    assert_eq!(
+        rejected
+            .attempts
+            .iter()
+            .filter(|attempt| matches!(
+                &attempt.outcome,
+                CurrentReproOutcomeV1::KernelRejected { .. }
+            ))
+            .count(),
+        2
+    );
     for malformed in [
         r#"{"kind":"BEGIN","unknown":true}"#,
         r#"{"kind":"RETRY","bytes":[]}"#,
         r#"{"kind":"RECEIVE","generation":2,"bytes":[],"unknown":0}"#,
         r#"{"kind":"UNKNOWN"}"#,
-    ] { assert!(serde_json::from_str::<CurrentCoopRebindEventV1>(malformed).is_err()); }
-    let control = CurrentCoopRebindEventV1::Receive { generation: generation(2), bytes: offer.clone() };
+    ] {
+        assert!(serde_json::from_str::<CurrentCoopRebindEventV1>(malformed).is_err());
+    }
+    let control = CurrentCoopRebindEventV1::Receive {
+        generation: generation(2),
+        bytes: offer.clone(),
+    };
     let admission: Result<(), AdmissionError> = guest.session.apply_rebind_with(control.clone(), |candidate, output| {
         assert_eq!(output.frames.len(), 1);
         assert_ne!(candidate.snapshot()?, before);
@@ -689,7 +890,12 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     assert_eq!(guest.session.snapshot()?, before);
     assert_eq!(guest.session.observe()?, observation);
     guest.check()?;
-    assert!(matches!(guest.recorder.invalidate_attempt("response byte admission rejected"), CurrentCaptureStatusV1::Unavailable { .. }));
+    assert!(matches!(
+        guest
+            .recorder
+            .invalidate_attempt("response byte admission rejected"),
+        CurrentCaptureStatusV1::Unavailable { .. }
+    ));
     assert!(guest.recorder.export().is_err());
     let output = guest.rebind(control)??;
     assert_eq!(output.frames.len(), 1);
@@ -700,33 +906,65 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     let before = host.session.snapshot()?;
     let observation = host.session.observe()?;
     let (seat, role) = host.session.session_context()?;
-    let origin_recorder = CurrentReproRecorderV1::new(before.clone(), seat, role, content()?, CurrentReproLimitsV1::default())?;
+    let origin_recorder = CurrentReproRecorderV1::new(
+        before.clone(),
+        seat,
+        role,
+        content()?,
+        CurrentReproLimitsV1::default(),
+    )?;
     let retry = host.session.apply_rebind(CurrentCoopRebindEventV1::Retry)?;
     assert_eq!(host.session.snapshot()?, before);
     let mut without_origin = origin_recorder.clone();
-    assert!(matches!(without_origin.record_rebind(&before, CurrentCoopRebindEventV1::Retry, Ok(&retry), &before, &observation), CurrentCaptureStatusV1::Available { .. }));
+    assert!(matches!(
+        without_origin.record_rebind(
+            &before,
+            CurrentCoopRebindEventV1::Retry,
+            Ok(&retry),
+            &before,
+            &observation
+        ),
+        CurrentCaptureStatusV1::Available { .. }
+    ));
     assert!(without_origin.export()?.attempts[0].origin.is_none());
     for length in [128, 129] {
         let mut recorder = origin_recorder.clone();
         let origin = "x".repeat(length);
-        let status = recorder.record_rebind_with_origin(&before, CurrentCoopRebindEventV1::Retry, Ok(&retry), &before, &observation, Some(&origin));
+        let status = recorder.record_rebind_with_origin(
+            &before,
+            CurrentCoopRebindEventV1::Retry,
+            Ok(&retry),
+            &before,
+            &observation,
+            Some(&origin),
+        );
         if length == 128 {
             assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
             let capsule = recorder.export()?;
             assert_eq!(capsule.attempts[0].origin.as_deref(), Some(origin.as_str()));
-            assert_eq!(replay_current_capsule_v1(&capsule, content()?, CurrentReproLimitsV1::default())?.snapshot()?, before);
+            assert_eq!(
+                replay_current_capsule_v1(&capsule, content()?, CurrentReproLimitsV1::default())?
+                    .snapshot()?,
+                before
+            );
         } else {
             assert!(matches!(status, CurrentCaptureStatusV1::Unavailable { .. }));
             assert!(recorder.export().is_err());
         }
     }
     let before = host.session.snapshot()?;
-    let misuse = CurrentExternalEvent::CoopRebind { control: CurrentCoopRebindEventV1::Retry };
+    let misuse = CurrentExternalEvent::CoopRebind {
+        control: CurrentCoopRebindEventV1::Retry,
+    };
     let outcome = host.session.apply(misuse.clone());
     assert!(outcome.is_err());
     assert_eq!(host.session.snapshot()?, before);
     let observation = host.session.observe()?;
-    assert!(matches!(host.recorder.record(&before, misuse, outcome.as_ref(), &before, &observation), CurrentCaptureStatusV1::Unavailable { .. }));
+    assert!(matches!(
+        host.recorder
+            .record(&before, misuse, outcome.as_ref(), &before, &observation),
+        CurrentCaptureStatusV1::Unavailable { .. }
+    ));
     assert!(host.recorder.export().is_err());
     host.check()?;
     Ok(())
@@ -745,7 +983,20 @@ fn deleted_reordered_or_forged_rebind_attempts_fail_replay() -> TestResult {
     let offer = begin_sessions(&mut host, &mut guest)?;
     handshake_sessions(&mut host, &mut guest, offer)?;
     let original = guest.replay()?;
-    let receives = original.attempts.iter().enumerate().filter_map(|(index, attempt)| matches!(&attempt.event, CurrentExternalEvent::CoopRebind { control: CurrentCoopRebindEventV1::Receive { .. } }).then_some(index)).collect::<Vec<_>>();
+    let receives = original
+        .attempts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, attempt)| {
+            matches!(
+                &attempt.event,
+                CurrentExternalEvent::CoopRebind {
+                    control: CurrentCoopRebindEventV1::Receive { .. }
+                }
+            )
+            .then_some(index)
+        })
+        .collect::<Vec<_>>();
     assert_eq!(receives.len(), 4);
     let limits = CurrentReproLimitsV1::default();
     let mut deleted = original.clone();
@@ -757,17 +1008,36 @@ fn deleted_reordered_or_forged_rebind_attempts_fail_replay() -> TestResult {
     renumber(&mut reordered);
     assert!(replay_current_capsule_v1(&reordered, content()?, limits).is_err());
     let mut forged = original.clone();
-    let CurrentReproOutcomeV1::RebindApplied { output, .. } = &mut forged.attempts[receives[0]].outcome else { return Err("actual typed control outcome missing".into()); };
+    let CurrentReproOutcomeV1::RebindApplied { output, .. } =
+        &mut forged.attempts[receives[0]].outcome
+    else {
+        return Err("actual typed control outcome missing".into());
+    };
     assert_eq!(output.frames.len(), 1);
-    let byte = output.frames[0].first_mut().ok_or("actual control frame empty")?;
+    let byte = output.frames[0]
+        .first_mut()
+        .ok_or("actual control frame empty")?;
     *byte ^= 1;
     assert!(replay_current_capsule_v1(&forged, content()?, limits).is_err());
     let mut wrong_kind = original.clone();
-    let CurrentReproOutcomeV1::RebindApplied { observation, snapshot_digest, .. } = wrong_kind.attempts[receives[0]].outcome.clone() else { return Err("typed control outcome missing".into()); };
-    wrong_kind.attempts[receives[0]].outcome = CurrentReproOutcomeV1::Applied { step: Box::new(GameKernelStepV7::default()), observation, snapshot_digest };
+    let CurrentReproOutcomeV1::RebindApplied {
+        observation,
+        snapshot_digest,
+        ..
+    } = wrong_kind.attempts[receives[0]].outcome.clone()
+    else {
+        return Err("typed control outcome missing".into());
+    };
+    wrong_kind.attempts[receives[0]].outcome = CurrentReproOutcomeV1::Applied {
+        step: Box::new(GameKernelStepV7::default()),
+        observation,
+        snapshot_digest,
+    };
     assert!(wrong_kind.validate(limits).is_err());
     let mut wrong_event = original.clone();
-    wrong_event.attempts[receives[0]].event = CurrentExternalEvent::AdvanceTime { milliseconds: SafeU53::ZERO };
+    wrong_event.attempts[receives[0]].event = CurrentExternalEvent::AdvanceTime {
+        milliseconds: SafeU53::ZERO,
+    };
     assert!(wrong_event.validate(limits).is_err());
     assert_eq!(guest.recorder.export()?, original);
     guest.check()?;

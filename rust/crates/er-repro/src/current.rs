@@ -436,7 +436,13 @@ impl CurrentReproRecorderV1 {
         origin: Option<&str>,
     ) -> CurrentCaptureStatusV1 {
         self.record_attempt(
-            before, event, CurrentRecordResult::Ordinary(outcome), after, observation, origin, None,
+            before,
+            event,
+            CurrentRecordResult::Ordinary(outcome),
+            after,
+            observation,
+            origin,
+            None,
         )
     }
 
@@ -796,8 +802,10 @@ pub fn replay_current_capsule_v1(
                     if CurrentReproRejectionV1::from_error(&actual) != *error {
                         return Err(divergence(attempt.position, "rebind rejection"));
                     }
-                    if session.snapshot()
-                        .map_err(|_| divergence(attempt.position, "rejected snapshot"))? != before
+                    if session
+                        .snapshot()
+                        .map_err(|_| divergence(attempt.position, "rejected snapshot"))?
+                        != before
                     {
                         return Err(divergence(attempt.position, "rejection changed state"));
                     }
