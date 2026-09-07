@@ -221,7 +221,9 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
     for starter in &bootstrap.catalog.starters {
         let species_id = er_types::battle_ids::SpeciesId::new(starter.species_id);
         let species = content.battle.species(species_id)?;
-        let progression = content.progression.species(species_id, starter.form_index)
+        let progression = content
+            .progression
+            .species(species_id, starter.form_index)
             .ok_or("starter progression absent")?;
         let mut moves = Vec::new();
         for entry in &progression.level_moves {
@@ -266,11 +268,15 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
         }
         for spent in (cost..=budget).rev() {
             for count in (1..=capacity).rev() {
-                let Some((previous_score, previous_party)) = plans[spent - cost][count - 1].clone() else {
+                let Some((previous_score, previous_party)) = plans[spent - cost][count - 1].clone()
+                else {
                     continue;
                 };
                 let candidate_score = previous_score + score;
-                if plans[spent][count].as_ref().is_none_or(|(best, _)| candidate_score > *best) {
+                if plans[spent][count]
+                    .as_ref()
+                    .is_none_or(|(best, _)| candidate_score > *best)
+                {
                     let mut party = previous_party;
                     party.push(starter.pokemon_id);
                     plans[spent][count] = Some((candidate_score, party));
@@ -278,9 +284,13 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
             }
         }
     }
-    let starters = plans.into_iter().flatten().flatten()
+    let starters = plans
+        .into_iter()
+        .flatten()
+        .flatten()
         .max_by_key(|(score, _)| *score)
-        .ok_or("no affordable combat-ready party")?.1;
+        .ok_or("no affordable combat-ready party")?
+        .1;
     assert!(
         !starters.is_empty(),
         "no legal offered starter fits the budget"
