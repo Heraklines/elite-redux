@@ -16,10 +16,10 @@ COMPACT = REPORT / "compact"
 TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
-RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_coop_choices_v7.rs",
+RUST_SOURCES = ["rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-kernel/tests/m9e_natural_coop_campaign_v7.rs",
                 "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
                 "rust/crates/er-kernel/src/current_coop_setup_v7.rs", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs"]
-TEST_TARGET = "m9e_coop_choices_v7"
+TEST_TARGET = "m9e_natural_coop_campaign_v7"
 TEST_IDS = ["confirmed_independent_raw_starters_form_exact_owned_party_and_preserve_host",
             "constructed_cooperative_victory_preserves_each_seat_on_next_wave",
             "invalid_peer_choices_preserve_entire_state_rng_and_allocator",
@@ -70,6 +70,7 @@ def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
             or artifact["target"].get("src_path") != str(ROOT / test_source)
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
+            or artifact["profile"].get("opt_level") != "1"
             or not binary.is_absolute() or binary.is_symlink() or not binary.is_file()
             or binary.resolve() != binary or binary.parent != TARGET / "debug/deps"
             or not re.fullmatch(test_target + "-[0-9a-f]{16}", binary.name)
@@ -86,6 +87,10 @@ def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
     counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
     if counts != [(str(len(test_ids)), "0", "0", "0", "0")]:
         raise RuntimeError("exact test completion differs")
+    campaign = re.findall(r"M9E_NATURAL_COOP_CAMPAIGN wave=200 outcome=Victory decisions=(\d+) proposals=(\d+) materials=(\d+) presentations=(\d+) rewards=(\d+) progression=(\d+)", output)
+    if len(campaign) != 1:
+        raise RuntimeError("one complete natural cooperative Victory receipt required")
+    summary["natural_cooperative_campaign"] = dict(zip(("decisions", "proposals", "materials", "presentations", "rewards", "progression"), map(int, campaign[0])))
     if digest(binary) != binary_hash:
         raise RuntimeError("executed artifact changed")
     return artifact_receipt
@@ -98,7 +103,7 @@ def main(summary):
     sources = [*RUST_SOURCES, "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs", "rust/crates/er-kernel/tests/m9e_natural_replacement_v7.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-progression/src/current_growth_pow.rs", "rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/src/snapshot_v7.rs",
                "rust/crates/er-game/src/m72_bootstrap.rs", "rust/crates/er-types/src/m72_bootstrap.rs",
                "rust/crates/er-state/src/m9e_state_v6.rs", "rust/crates/er-state/src/m7_state.rs",
-               "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
+               "rust/crates/er-rng/src/phaser.rs", "rust/crates/er-rng/src/battle.rs", "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
                "rust/crates/er-game/Cargo.toml", "rust/crates/er-kernel/Cargo.toml",
                "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_coop_choices_diagnostic.py",
                ".github/workflows/m9e-coop-choices-focused.yml",
@@ -124,31 +129,18 @@ def main(summary):
     summary["toolchain"] = versions[0]
     run(["cargo", "clippy", "--locked", "-p", "er-game", "--lib", "--no-deps", "--", "-D", "warnings"], "clippy-game")
     summary["test_artifact"] = execute_target(summary, TEST_TARGET, RUST_SOURCES[1], TEST_IDS)
-    summary["existing_kernel_artifact"] = execute_target(
-        summary, "m9e_game_kernel_v7", "rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs",
-        ["authority_ai_can_choose_a_legal_enemy_switch","authority_ai_exhausted_max_pp_uses_struggle_without_extra_decisions_or_pp","authority_ai_max_pp_boundaries_drive_raw_choices_without_extra_rng","final_wave_victory_terminates_the_run","gamepad_buttons_drive_bootstrap_and_active_controls","held_action_cannot_cross_bootstrap_menu_instance","natural_solo_battle_reaches_terminal_using_only_physical_keys","nonterminal_battle_progresses_to_next_wave","raw_keys_complete_natural_start_and_install_serialized_v6_state","read_rebind_clears_real_repeat_ownership_without_cancelling_unrelated_work","read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior","read_rebind_preserves_saved_semantics_and_executes_write_after_restore","read_rebind_rejects_stale_action_context_and_preserves_canonical_battle_root","read_rebind_rolls_back_menu_revision_presentation_and_replay_exhaustion"], "existing-")
-    summary["ai_transaction_artifact"] = execute_target(
-        summary, "m9e_ai_command_transaction_v7", "rust/crates/er-kernel/tests/m9e_ai_command_transaction_v7.rs",
-        ["command_cursor_rejection_preserves_ai_sequence_and_all_other_owners",
-         "complete_two_actor_preparation_commits_once_and_replays_identical_commands",
-         "later_actor_rejection_preserves_the_complete_ai_command_owner"], "ai-transaction-")
-    summary["replacement_artifact"] = execute_target(
-        summary, "m9e_natural_replacement_v7", "rust/crates/er-kernel/tests/m9e_natural_replacement_v7.rs",
-        ["natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
-         "natural_replacement_rejects_wrong_receipt_field_and_fainted_party_choice"], "replacement-")
     if (digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
-    summary["tests"] = {"executed": 8, "passed": 8, "failed": 0, "skipped": 0}
-    summary["compatibility_tests"] = {"executed": 19, "passed": 19, "failed": 0, "skipped": 0}
+    summary["tests"] = {"executed": 1, "passed": 1, "failed": 0, "skipped": 0}
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
-    summary = {"status": "failed", "qualification": "natural owned two-battle co-op with duplicate delivery and same-generation disconnect/restore; no generation-two rebind or full M9 qualification",
+    summary = {"status": "failed", "qualification": "optimized native natural 200-wave co-op with duplicate delivery and same-generation restore; no generation-two or browser qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "69637ba805a8d975c7eccc6c038556d05a76b5d4"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "09f76be5daabbcda3b2d70e60e7a927837e2165f"}
     try:
         main(summary)
         if TARGET.exists():

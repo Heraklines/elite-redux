@@ -1,7 +1,7 @@
 name: M9E Confirmed Cooperative Choices Focused Diagnostic
 on:
   push:
-    branches: [codex/m9e-coop-choices-focused-20260906]
+    branches: [codex/m9e-natural-coop-campaign-focused-20260907]
 permissions:
   contents: read
 concurrency:
@@ -17,6 +17,9 @@ jobs:
       CARGO_TERM_COLOR: never
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_TEST_OPT_LEVEL: '1'
+      CARGO_PROFILE_TEST_DEBUG_ASSERTIONS: 'true'
+      CARGO_PROFILE_TEST_OVERFLOW_CHECKS: 'true'
     steps:
       - uses: actions/checkout@v6
         with:
