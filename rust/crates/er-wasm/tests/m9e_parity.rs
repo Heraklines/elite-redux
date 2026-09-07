@@ -336,7 +336,9 @@ fn assert_eventwise_parity_contract(
 ) -> Result<String, Box<dyn Error>> {
     let request = request()?;
     let event_count = request.events.len();
-    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(request.bundle.clone()))?);
+    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(
+        request.bundle.clone(),
+    ))?);
     let golden = cohort_report_golden(
         content.identity().bundle_hash.as_str(),
         content.identity().progression_hash.as_str(),
@@ -344,15 +346,34 @@ fn assert_eventwise_parity_contract(
     )
     .ok_or("parity requires an exact independently audited content cohort")?;
     for (bundle, progression, bytes) in [
-        (PRE_METADATA_PARITY.0, GENERATED_METADATA_PARITY.1, PRE_METADATA_PARITY.2),
-        (GENERATED_METADATA_PARITY.0, PRE_METADATA_PARITY.1, GENERATED_METADATA_PARITY.2),
-        (GENERATED_METADATA_PARITY.0, GENERATED_METADATA_PARITY.1, PRE_METADATA_PARITY.2),
-        ("unknown", GENERATED_METADATA_PARITY.1, GENERATED_METADATA_PARITY.2),
+        (
+            PRE_METADATA_PARITY.0,
+            GENERATED_METADATA_PARITY.1,
+            PRE_METADATA_PARITY.2,
+        ),
+        (
+            GENERATED_METADATA_PARITY.0,
+            PRE_METADATA_PARITY.1,
+            GENERATED_METADATA_PARITY.2,
+        ),
+        (
+            GENERATED_METADATA_PARITY.0,
+            GENERATED_METADATA_PARITY.1,
+            PRE_METADATA_PARITY.2,
+        ),
+        (
+            "unknown",
+            GENERATED_METADATA_PARITY.1,
+            GENERATED_METADATA_PARITY.2,
+        ),
     ] {
         assert!(cohort_report_golden(bundle, progression, bytes).is_none());
     }
     let mut driver = GameKernelV7::from_snapshot(
-        request.initial_snapshot.clone().ok_or("controlled checkpoint missing")?,
+        request
+            .initial_snapshot
+            .clone()
+            .ok_or("controlled checkpoint missing")?,
         request.local_seat,
         request.role,
         content.clone(),
@@ -364,7 +385,11 @@ fn assert_eventwise_parity_contract(
         let step = apply_timer_event(&mut driver, event.clone())?;
         let snapshot = driver.snapshot()?;
         for effect in &step.effects {
-            if let GameKernelEffectV7::AuthorityMaterial { operation_id, bytes } = effect {
+            if let GameKernelEffectV7::AuthorityMaterial {
+                operation_id,
+                bytes,
+            } = effect
+            {
                 let material = GameMaterialV6::decode(bytes)?;
                 let transition = material.transition();
                 assert_eq!(&transition.operation_id, operation_id);
@@ -380,7 +405,9 @@ fn assert_eventwise_parity_contract(
                     assert_eq!(mutation.before_digest, before_digest);
                     assert_eq!(mutation.after_digest, after_digest);
                 }
-                let record = snapshot.material_ledger.record(operation_id)
+                let record = snapshot
+                    .material_ledger
+                    .record(operation_id)
                     .ok_or("actual material receipt missing")?;
                 assert_eq!(record.authority_revision, transition.authority_revision);
                 assert_eq!(record.after_digest, after_digest);
@@ -399,7 +426,10 @@ fn assert_eventwise_parity_contract(
             mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
             kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
             control_kind: driver.current_control().map(|control| control.kind),
-            wave: driver.state().and_then(|state| state.active_run.as_ref()).map(|run| run.wave),
+            wave: driver
+                .state()
+                .and_then(|state| state.active_run.as_ref())
+                .map(|run| run.wave),
         });
     }
     assert_eq!(event_count, 30);
@@ -477,7 +507,9 @@ fn wasm_replays_v7_raw_inputs_eventwise() -> Result<(), wasm_bindgen::JsValue> {
     let digest = assert_eventwise_parity_contract(|request| {
         let json = serde_json::to_string(&request)?;
         let report = er_wasm::m9e_parity::replay_m9e_eventwise_json(&json).map_err(|error| {
-            error.as_string().unwrap_or_else(|| "Wasm replay failed".to_owned())
+            error
+                .as_string()
+                .unwrap_or_else(|| "Wasm replay failed".to_owned())
         })?;
         Ok(serde_json::from_str(&report)?)
     })
