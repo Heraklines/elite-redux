@@ -570,18 +570,36 @@ impl GameKernelV7 {
                 .flatten()
                 .collect::<Vec<_>>();
             if moves.is_empty() {
-                let index = actor.moves.iter().position(Option::is_some).ok_or(GameKernelV7Error::Invalid)?;
+                let index = actor
+                    .moves
+                    .iter()
+                    .position(Option::is_some)
+                    .ok_or(GameKernelV7Error::Invalid)?;
                 let index = u8::try_from(index).map_err(|_| GameKernelV7Error::Invalid)?;
-                let slot = er_types::battle_ids::MoveSlotIndex::new(index).map_err(|_| GameKernelV7Error::Invalid)?;
+                let slot = er_types::battle_ids::MoveSlotIndex::new(index)
+                    .map_err(|_| GameKernelV7Error::Invalid)?;
                 let (definition, struggle) = er_battle::m7_resolver::effective_move_definition_v5(
-                    &self.content.battle, actor, slot,
-                ).map_err(|_| GameKernelV7Error::Invalid)?;
-                if !struggle { return Err(GameKernelV7Error::Invalid); }
+                    &self.content.battle,
+                    actor,
+                    slot,
+                )
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+                if !struggle {
+                    return Err(GameKernelV7Error::Invalid);
+                }
                 let er_types::battle_model::MovePower::Value(power) = definition.power else {
                     return Err(GameKernelV7Error::Invalid);
                 };
-                moves.push((definition.id, index, power, definition.priority,
-                    player_targets.iter().map(|target| target.position).collect::<Vec<_>>()));
+                moves.push((
+                    definition.id,
+                    index,
+                    power,
+                    definition.priority,
+                    player_targets
+                        .iter()
+                        .map(|target| target.position)
+                        .collect::<Vec<_>>(),
+                ));
             }
             let actor_view = AiActorViewV1 {
                 pokemon: actor.id,
@@ -634,11 +652,15 @@ impl GameKernelV7 {
                                 }
                             };
                             (
-                                if move_id.get().get() == 165 { 100 } else { type_effectiveness_percent(
-                                    self.content.as_ref(),
-                                    definition.move_type,
-                                    target,
-                                ) },
+                                if move_id.get().get() == 165 {
+                                    100
+                                } else {
+                                    type_effectiveness_percent(
+                                        self.content.as_ref(),
+                                        definition.move_type,
+                                        target,
+                                    )
+                                },
                                 accuracy,
                             )
                         } else {
@@ -3200,15 +3222,37 @@ fn move_select_control(
         seat,
     )
     .map_err(|_| GameKernelV7Error::Invalid)?;
-    let first_slot = pokemon.moves.iter().position(Option::is_some).ok_or(GameKernelV7Error::Invalid)?;
-    let entries = pokemon.moves.iter().enumerate().filter_map(|(index, slot)| {
-        slot.as_ref()?;
-        let move_slot = er_types::battle_ids::MoveSlotIndex::new(u8::try_from(index).ok()?).ok()?;
-        let (_, struggle) = er_battle::m7_resolver::effective_move_definition_v5(content, pokemon, move_slot).ok()?;
-        if struggle && index != first_slot { return None; }
-        Some((if struggle { "battle/move/struggle".to_owned() } else { format!("battle/move/{}", move_slot.get()) },
-            GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectMove { actor, move_slot } }))
-    }).collect::<Vec<_>>();
+    let first_slot = pokemon
+        .moves
+        .iter()
+        .position(Option::is_some)
+        .ok_or(GameKernelV7Error::Invalid)?;
+    let entries = pokemon
+        .moves
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| {
+            slot.as_ref()?;
+            let move_slot =
+                er_types::battle_ids::MoveSlotIndex::new(u8::try_from(index).ok()?).ok()?;
+            let (_, struggle) =
+                er_battle::m7_resolver::effective_move_definition_v5(content, pokemon, move_slot)
+                    .ok()?;
+            if struggle && index != first_slot {
+                return None;
+            }
+            Some((
+                if struggle {
+                    "battle/move/struggle".to_owned()
+                } else {
+                    format!("battle/move/{}", move_slot.get())
+                },
+                GameActionV1::Battle {
+                    action: er_types::BattleUiActionV1::SelectMove { actor, move_slot },
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
     generic_vertical_control_v2(
         instance,
         revision,
