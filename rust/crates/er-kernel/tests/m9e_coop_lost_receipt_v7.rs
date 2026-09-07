@@ -973,9 +973,17 @@ fn natural_cooperative_public_retry_restores_pending_publication_and_continues()
             let committed = host.snapshot()?;
             let pending_snapshot = guest.snapshot()?;
             let publication = guest.retry_current_coop_setup()?;
-            assert_eq!(publication.effects.len(), 1, "public retry must emit the real retained gameplay proposal");
+            assert_eq!(
+                publication.effects.len(),
+                1,
+                "public retry must emit the real retained gameplay proposal"
+            );
             assert_eq!(wire(&publication)?, proposal);
-            assert_eq!(guest.snapshot()?, pending_snapshot, "public retry mutated proposal ownership");
+            assert_eq!(
+                guest.snapshot()?,
+                pending_snapshot,
+                "public retry mutated proposal ownership"
+            );
             let retried = host.ingest_network_frame(generation, &wire(&publication)?)?;
             assert_eq!(
                 host.snapshot()?,
