@@ -334,8 +334,7 @@ pub fn effective_move_definition_v5<'a>(
             return Err(BattleV5Error::MoveSlot);
         }
     }
-    let struggle = MoveId::new(SafeU53::new(165).map_err(|_| BattleV5Error::MoveSlot)?)
-        .map_err(|_| BattleV5Error::MoveSlot)?;
+    let struggle = MoveId::new(SafeU53::new(165).map_err(|_| BattleV5Error::MoveSlot)?);
     let definition = content
         .move_definition(struggle)
         .map_err(|error| BattleV5Error::Content(error.to_string()))?;
