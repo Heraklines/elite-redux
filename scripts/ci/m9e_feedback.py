@@ -924,7 +924,7 @@ def plan():
     if rule_focus and rule_focus.get("paths") != [RULE_TEST_SOURCE]:
         raise RuntimeError("rulechange source policy must contain the single exact test path")
     rule_changed = RULE_TEST_SOURCE in product_changes
-    rule_session = rule_changed and (cost_rule_session or all(path == RULE_TEST_SOURCE for path in product_changes))
+    rule_session = rule_changed and (recovery_session or cost_rule_session or all(path == RULE_TEST_SOURCE for path in product_changes))
     cache_focus = config.get("browser_cache_focus", {})
     cache_paths = cache_focus.get("paths", [])
     cache_changed = any(path in cache_paths for path in product_changes)

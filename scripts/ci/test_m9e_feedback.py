@@ -5087,6 +5087,7 @@ class FeedbackTests(unittest.TestCase):
             if not path.exists():
                 path.write_text("bounded synthetic source for planner test\n")
         (self.root / "scripts/ci/m9e-targets.json").write_text(json.dumps(self.config))
+        rule_fixture(self.root)
         self.changed = list(self.feedback.RECOVERY_PATHS)
 
     def test_recovery_composition_keeps_all_exact_regressions_and_platform_obligations(self):
