@@ -536,7 +536,8 @@ fn battle_construction_uses_wave_offset_and_sixteen_closed_character_draws()
 }
 
 #[test]
-fn callsite_failures_are_atomic_and_shifted_surrogates_are_supported() -> Result<(), Box<dyn Error>> {
+fn callsite_failures_are_atomic_and_shifted_surrogates_are_supported() -> Result<(), Box<dyn Error>>
+{
     let mut runtime = runtime_with_battle()?;
     let before = runtime.clone();
     assert!(matches!(
@@ -567,7 +568,12 @@ fn callsite_failures_are_atomic_and_shifted_surrogates_are_supported() -> Result
     assert!(value.get() < 100);
     assert_eq!(shifted.run_state(), outer_before);
     assert!(shifted.seed_override().is_none());
-    assert!(shifted.battle_state().and_then(|battle| battle.saved_substream.as_ref()).is_some());
+    assert!(
+        shifted
+            .battle_state()
+            .and_then(|battle| battle.saved_substream.as_ref())
+            .is_some()
+    );
     assert_eq!(shifted.audit_entries().len(), 1);
     Ok(())
 }

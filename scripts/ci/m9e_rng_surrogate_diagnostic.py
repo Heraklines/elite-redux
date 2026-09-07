@@ -91,7 +91,7 @@ def main(summary):
     if run(["git", "rev-parse", "HEAD"], "identity", cwd=ROOT, seconds=30, bound=16384).read_text().strip() != sha:
         raise RuntimeError("candidate identity differs")
     sources = [*RUST_SOURCES, "rust/crates/er-rng/src/lib.rs", "rust/crates/er-rng/src/audit.rs",
-               "rust/crates/er-rng/Cargo.toml", "rust/Cargo.toml", "rust/Cargo.lock", "rust/rust-toolchain.toml",
+               "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json", "rust/crates/er-rng/Cargo.toml", "rust/Cargo.toml", "rust/Cargo.lock", "rust/rust-toolchain.toml",
                "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_rng_surrogate_diagnostic.py",
                "scripts/ci/m9e_rng_surrogate_oracle.cjs", ".github/workflows/m9e-rng-surrogate-focused.yml"]
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
@@ -134,6 +134,8 @@ def main(summary):
         raise RuntimeError("complete independent reference case inventory required")
     summary["oracle"] = {"sha256": digest(oracle), "bytes": oracle.stat().st_size, "cases": 69, "node": node, "phaser_commit": commit,
                          "reference_sha256": {name: expected for name, _, expected in references}}
+    if oracle.read_bytes() != (ROOT / "rust/crates/er-rng/tests/fixtures/m9e_shifted_utf16.json").read_bytes():
+        raise RuntimeError("committed test vectors differ from fresh pinned Phaser execution")
     summary["test_artifact"] = execute_target(summary, TEST_TARGET, RUST_SOURCES[0], TEST_IDS)
     summary["library_artifact"] = execute_target(summary, "er_rng", "rust/crates/er-rng/src/lib.rs", LIB_IDS, "library-", library=True)
     summary["m3_artifact"] = execute_target(summary, "m3_rng", "rust/crates/er-rng/tests/m3_rng.rs", M3_IDS, "m3-")

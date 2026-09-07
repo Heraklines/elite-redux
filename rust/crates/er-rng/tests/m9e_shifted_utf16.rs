@@ -10,9 +10,9 @@ fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("bounded reference value")
 }
 fn oracle() -> Result<Value, Box<dyn Error>> {
-    let bytes = std::fs::read(std::env::var("M9E_RNG_ORACLE_PATH")?)?;
+    let bytes = include_bytes!("fixtures/m9e_shifted_utf16.json");
     assert!(bytes.len() < 65_536);
-    let value: Value = serde_json::from_slice(&bytes)?;
+    let value: Value = serde_json::from_slice(bytes)?;
     assert_eq!(value["commit"], "a9965625f49cf366584f454556b039e06e8adad6");
     assert_eq!(value["schema_version"], 1);
     Ok(value)
