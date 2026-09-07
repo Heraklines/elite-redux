@@ -940,9 +940,7 @@ fn prepare_post_battle_progression(
                     .progression
                     .species(pokemon.species_id, pokemon.form_index)?;
                 let growth = content.progression.growth_rate(species.growth_rate)?;
-                let threshold = growth
-                    .experience_by_level
-                    .get(usize::from(pokemon.level))?;
+                let threshold = growth.experience_by_level.get(usize::from(pokemon.level))?;
                 let amount = threshold
                     .get()
                     .get()
