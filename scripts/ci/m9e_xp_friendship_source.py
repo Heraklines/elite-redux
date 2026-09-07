@@ -78,11 +78,11 @@ def main():
             receipt["selected_json_paths"] = sorted(selected_values)
         else:
             matches = [i for i, line in enumerate(lines) if re.search(
-                r"applyPersistentModifierWithMoody", line)]
-            require(1 <= len(matches) <= 5, "bounded actual wrapper binding required")
+                r"^export function prepareMoodyCoordinatorItemActivation", line)]
+            require(len(matches) == 1, "exact coordinator item activation definition required")
             selected = set()
             for index in matches:
-                selected.update(range(max(0, index - 12), min(len(lines), index + 35)))
+                selected.update(range(max(0, index - 5), min(len(lines), index + 100)))
             groups = []
             for index in sorted(selected):
                 if not groups or index != groups[-1][-1] + 1:
@@ -112,7 +112,7 @@ def main():
 if __name__ == "__main__":
     base_output = OUT
     for label, source_path, source_oid in [
-        ("scene-dispatch", "src/battle-scene.ts", "f82f401d9e47d839413b65e8080b00feff80cb5f"),
+        ("coordinator-items", "src/data/elite-redux/moody/moody-runtime-game-adapter.ts", "9f336d8e09e5472a7873b30deed59645783eb88b"),
     ]:
         PATH, OID, OUT = source_path, source_oid, base_output / label
         OUT.parent.mkdir(exist_ok=True)
