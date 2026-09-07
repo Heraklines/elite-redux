@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,8 +67,17 @@ def main(summary):
                "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"]
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
     summary["bundle_sha256"] = digest(ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json")
-    run(["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true", "--check", str(ROOT / RULE_TEST_SOURCE)],
-        "format", seconds=60, bound=262144)
+    formatter = ["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true"]
+    try:
+        run([*formatter, "--check", str(ROOT / RULE_TEST_SOURCE)], "format", seconds=60, bound=262144)
+    except Exception:
+        run([*formatter, str(ROOT / RULE_TEST_SOURCE)], "format-patch-producer", seconds=60, bound=262144)
+        patch = run(["git", "diff", "--binary", "--", RULE_TEST_SOURCE], "format-patch", ROOT, seconds=30, bound=262144)
+        shutil.copyfile(patch, FULL / "format.patch")
+        summary["formatted_hashes"] = {RULE_TEST_SOURCE: digest(ROOT / RULE_TEST_SOURCE)}
+        summary["format_patch_bytes"] = patch.stat().st_size
+        summary["format_patch_sha256"] = digest(patch)
+        raise RuntimeError("pinned formatting changes required; no game qualification")
     compiler_output = run(["rustc", "--version"], "compiler", seconds=30, bound=16384).read_text()
     # The first rustup proxy call can emit component installation diagnostics on
     # stderr. Bind its sole compiler identity line, preserving the complete log.
