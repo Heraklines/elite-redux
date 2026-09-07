@@ -43,6 +43,7 @@ jobs:
           result = {'status': 'passed', 'qualification': 'bounded generated-content inspection only; no game qualification',
                     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
                     'bundle_sha256': digest, 'oracle_sha': bundle['oracle_sha'], 'moves': moves,
+                    'struggle_program': [row for row in bundle['battle']['programs'] if row and row['id'] == 176],
                     'bootstrap': {key: value for key, value in bundle['bootstrap'].items()
                                   if key not in ('content_hash', 'starters')},
                     'progression': progression, 'evolutions': evolutions,
