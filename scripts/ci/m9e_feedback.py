@@ -281,6 +281,7 @@ RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_
 
 def apply_owned_foundation_obligations(result, installed):
     """Installed whole targets remain required on subsequent affected cuts."""
+    from m9e_current_proposal import merge_targets
     required = installed and bool({"er-kernel", "er-game", "er-battle", "er-progression", "er-state", "er-save"}
                                  & set(result["packages"]))
     result["requires_owned_foundations"] = required
@@ -403,9 +404,16 @@ def select_recovery_scope(config, changed):
     scoped = policy is not None and len(changed) == len(required_paths) and set(changed) == set(required_paths)
     if any(path in generated.PATHS for path in changed) and not (generated_installed and scoped):
         raise RuntimeError("generated XP fixture product delta is unmapped")
-    owned_new = set(OWNED_FOUNDATION_PATHS) - set(AI_COMMAND_PATHS) - set(XP_PATHS) - {
-        "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs",
-        "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-kernel/src/current_coop_setup_v7.rs"}
+    # Only new owned-foundation files are unconditional exclusive triggers.
+    # Shared existing files retain their earlier owner/query/retention policies.
+    owned_new = {
+        "rust/crates/er-game/tests/m9e_battle_participation.rs",
+        "rust/crates/er-state/src/current_battle_participation.rs",
+        "rust/crates/er-state/src/current_experience_owner.rs",
+        "rust/crates/er-progression/src/current_friendship.rs",
+        "rust/crates/er-progression/tests/m9e_current_friendship.rs",
+        "rust/crates/er-kernel/src/current_coop_rebind_v7.rs",
+        "rust/crates/er-kernel/tests/m9e_current_coop_rebind_v7.rs"}
     if any(path in owned_new for path in changed) and not scoped:
         raise RuntimeError("owned foundation integration product delta is unmapped")
     # Shared compiler metadata already belongs to the exact historical lint cut.
@@ -1092,7 +1100,11 @@ def plan():
     title_lint_session = title_session and any(path in TITLE_STORAGE_LINT_PATHS for path in product_changes)
     import m9e_title_storage as retirement
     retirement_session, retirement_installed = retirement.select_scope(config, product_changes, ROOT)
-    owner_session = focus_policy(config, product_changes)
+    owner_changes = [path for path in product_changes if path in OWNER_PATHS] if recovery_session else product_changes
+    owner_scope = focus_policy(config, owner_changes)
+    # Exact recovery admission already owns the complete mixed composition.
+    # Validate the retained owner policy without selecting its isolated cut.
+    owner_session = owner_scope and not recovery_session
     owner_installed = any((ROOT / path).is_file() for path in OWNER_TRIGGERS)
     owner_changed = owner_installed and any(path in OWNER_PATHS for path in product_changes)
     browser_worker_focus = config.get("current_browser_worker_focus", {})
@@ -1263,7 +1275,7 @@ def plan():
         match = re.match(r"rust/crates/([^/]+)/", path)
         if match and match[1] in packages:
             selected.add(match[1])
-        elif (recovery_session and path in [*XP_PATHS, *generated.PATHS]) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
+        elif (recovery_session and path in [*RECOVERY_PATHS, *generated.PATHS]) or (ai_commands_session and path in AI_COMMAND_PATHS) or (coop_session and path in coop.PRODUCT_PATHS) or (retirement_session and path in retirement.PRODUCT_PATHS) or (title_session and path in TITLE_STORAGE_PATHS) or (composition_session and path in composition_allowed) or path == HELPER_PATH or (owner_session and path in OWNER_PATHS) or (damage_session and path in damage_doc_paths) or (storage_session and path in storage_paths) or (rtc_session and path in rtc_allowed) or (browser_worker_session and path in browser_worker_paths) or (timer_session and path in timer_focus["paths"]) or (repro_session and path in repro_focus["paths"]) or ((native_worker_delta or cli_reload_session or menu_session or batch_session) and path == "rust/Cargo.lock") or path in config["infrastructure_paths"] or any(
             path.startswith(prefix) for prefix in config["documentation_prefixes"]
         ):
             pass

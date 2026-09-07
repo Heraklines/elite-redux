@@ -8369,7 +8369,7 @@ class PhaseTransferTests(unittest.TestCase):
 
     def native_with_repeated_required_ids(self):
         proof = copy.deepcopy(self.native)
-        ids = [f"case_{index:04d}_" + "current_state_and_effect_ownership_" * 2 for index in range(600)]
+        ids = [f"case_{index:04d}_" + "current_state_and_effect_owner_" * 2 for index in range(600)]
         proof["inventory"][1]["ids"] = ids
         proof["plan"]["required_native_test_ids"] = {"er-repro:m9e_current_repro": list(reversed(ids))}
         proof["required_native_target_counts"]["er-repro:m9e_current_repro"] = len(ids)
