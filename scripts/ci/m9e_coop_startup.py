@@ -205,7 +205,7 @@ def execute_entry(root, full, identity, binding, ids, global_deadline):
                             f"CARGO_PROFILE_{profile}_DEBUG_ASSERTIONS": "true", f"CARGO_PROFILE_{profile}_OVERFLOW_CHECKS": "true"})
     try:
         run_bounded([sys.executable, ENTRY_PRODUCER], cwd=root, environment=environment,
-                    output=full / "coop-entry-producer.log", seconds=1800,
+                    output=full / "coop-entry-producer.log", seconds=900,
                     byte_limit=65536, global_deadline=global_deadline)
         summary_path = owned / "compact/summary.json"
         if not 0 < summary_path.stat().st_size <= 16384 or (owned / "target").exists():

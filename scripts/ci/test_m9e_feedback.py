@@ -6188,7 +6188,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertNotIn("er-query-consumer", selection["execution_scope"])
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
-        self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+        self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
@@ -6368,7 +6368,7 @@ class FeedbackTests(unittest.TestCase):
         inventory = [{"crate": "er-cli", "target": "m9e_current_control_query",
                       "ids": list(phases.CONTROL_QUERY_TEST_IDS), "historical_excluded_ids": []}]
         phases.validate_control_query_inventory(selection, inventory)
-        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": []})
+        self.assertEqual(phases.partition(inventory), {"a": [["er-cli", "m9e_current_control_query"]], "b": [], "c": [], "d": []})
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded", "duplicate", "missing_target"):
             bad_plan, bad_inventory = copy.deepcopy(selection), copy.deepcopy(inventory)
             if mode == "missing_flag":
@@ -6484,7 +6484,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertNotIn("er-state-query-consumer", selection["execution_scope"])
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
-        self.assertEqual(phases.LANE_B_TARGETS, {("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+        self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
@@ -6660,7 +6660,7 @@ class FeedbackTests(unittest.TestCase):
                      for target, ids in ((phases.CONTROL_QUERY_TARGET, phases.CONTROL_QUERY_TEST_IDS),
                                          *phases.STATE_QUERY_IDENTITIES.items())]
         phases.validate_state_query_inventory(selection, inventory)
-        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["c"])
+        self.assertIn(list(phases.STATE_QUERY_TARGET), phases.partition(inventory)["d"])
         self.assertIn(list(phases.STATE_QUERY_WORKER_TARGET), phases.partition(inventory)["b"])
         for mode in ("missing_flag", "false_flag", "integer_flag", "missing_binding", "wrong_crate", "excluded",
                      "duplicate", "missing_target", "prerequisite_flag", "prerequisite_target", "prerequisite_ids",
@@ -6809,7 +6809,7 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(selection["required_native_targets"][crate], expected)
             assignment = phases.partition([{"crate": crate, "target": target, "ids": [test], "historical_excluded_ids": []}
                                           for crate, target, test in ((*cost.TARGET, cost.TEST_ID), ("er-cli", rule.RULE_TARGET, rule.RULE_TEST))])
-            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]]})
+            self.assertEqual(assignment, {"a": [list(cost.TARGET)], "b": [], "c": [["er-cli", rule.RULE_TARGET]], "d": []})
         for extra in ("rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/Cargo.lock", "rust/crates/er-cli/Cargo.toml", "unmapped.json"):
             self.changed = [cost.SOURCE, rule.RULE_TEST_SOURCE, extra]
             with self.subTest(extra=extra), self.assertRaises(RuntimeError):
@@ -7493,13 +7493,13 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         third = copy.deepcopy(self.native)
-        third["lane"] = "c"
-        third["assigned_targets"] = self.phases.partition(third["inventory"])["c"]
+        third["lane"] = "d"
+        third["assigned_targets"] = self.phases.partition(third["inventory"])["d"]
         third["completed_targets"] = list(third["assigned_targets"])
         third["tests"].update(executed=1, passed=1)
         third["native_timer_parity_digest"] = None
         self.phases.validate_native(third, self.identity)
-        for lane, original in (("a", self.native), ("b", self.other), ("c", third)):
+        for lane, original in (("a", self.native), ("b", self.other), ("d", third)):
             for mode in ("missing", "renamed", "worker", "flag", "assigned_to_b", "worker_missing", "worker_renamed"):
                 proof = copy.deepcopy(original)
                 if mode == "missing":
@@ -7826,7 +7826,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-game", "m9e_damage_query"], assignment["a"])
         self.assertIn(["er-ai", "er_ai"], assignment["a"])
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
-            ("er-web", "m9e_host_v2"), ("er-cli", "m9e_current_repro"),
+            ("er-cli", "m9e_current_repro"),
             ("er-cli", "m9e_current_reload")})
         self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         for key in policies:
@@ -8349,9 +8349,20 @@ class PhaseTransferTests(unittest.TestCase):
         if rule_evidence is not None:
             third["rule_worker"] = copy.deepcopy(rule_evidence)
         self.third_hash = self.phases.write_bounded(self.root / "proof/native-c.json", third)
+        fourth = copy.deepcopy(self.native if native is None else native)
+        fourth["lane"] = "d"
+        fourth["assigned_targets"] = self.phases.partition(fourth["inventory"])["d"]
+        fourth["completed_targets"] = list(fourth["assigned_targets"])
+        count = sum(len(row["ids"]) for row in fourth["inventory"] if [row["crate"], row["target"]] in fourth["assigned_targets"])
+        fourth["tests"].update(executed=count, passed=count, failed=0, skipped=0)
+        fourth["native_timer_parity_digest"] = None
+        for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker"):
+            fourth.pop(key, None)
+        self.fourth_hash = self.phases.write_bounded(self.root / "proof/native-d.json", fourth)
         return patch.dict(os.environ, {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_A_RESULT": "success",
                                       "M9E_NATIVE_B_RESULT": "success", "M9E_NATIVE_B_MANIFEST_SHA256": self.other_hash,
                                       "M9E_NATIVE_C_RESULT": "success", "M9E_NATIVE_C_MANIFEST_SHA256": self.third_hash,
+                                      "M9E_NATIVE_D_RESULT": "success", "M9E_NATIVE_D_MANIFEST_SHA256": self.fourth_hash,
                                       "M9E_PLATFORM_RESULT": "success", "M9E_NATIVE_MANIFEST_SHA256": self.native_hash,
                                       "M9E_PLATFORM_MANIFEST_SHA256": self.platform_hash})
 
@@ -8374,6 +8385,75 @@ class PhaseTransferTests(unittest.TestCase):
         self.platform["plan_sha256"] = self.native["plan_sha256"]
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
 
+    def test_fourth_lane_owns_complete_query_and_host_targets_without_overlap(self):
+        rows = [{"crate": crate, "target": target, "ids": ["first", "second"], "historical_excluded_ids": []}
+                for crate, target in sorted(self.phases.LANE_D_TARGETS)]
+        rows.append({"crate": "er-other", "target": "m9e_host_v2", "ids": [], "historical_excluded_ids": []})
+        before = copy.deepcopy(rows)
+        assignment = self.phases.partition(rows)
+        self.assertEqual(rows, before)
+        self.assertEqual(set(map(tuple, assignment["d"])), self.phases.LANE_D_TARGETS)
+        self.assertEqual(assignment["a"], [["er-other", "m9e_host_v2"]])
+        self.assertEqual(assignment["b"], [])
+        self.assertEqual(assignment["c"], [])
+        self.assertFalse(self.phases.LANE_D_TARGETS & (self.phases.LANE_B_TARGETS | self.phases.LANE_C_TARGETS))
+        enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
+                      for index, row in enumerate(rows)]
+        inventory, owned = self.phases.inventory_and_assignment(enumerated, "d")
+        self.assertEqual(owned, self.phases.partition(inventory)["d"])
+
+    def test_fourth_lane_is_mandatory_even_when_empty_and_rejects_missing_or_failed_phase(self):
+        for status in ("", "failure", "skipped", "cancelled"):
+            with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_NATIVE_D_RESULT": status}):
+                with self.assertRaisesRegex(RuntimeError, "absent"):
+                    self.phases.aggregate(None)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            (self.root / "proof/native-d.json").unlink()
+            with self.assertRaisesRegex(RuntimeError, "manifest"):
+                self.phases.aggregate(None)
+
+    def test_fourth_lane_actual_proof_is_bound_complete_and_cannot_claim_other_owners(self):
+        for proof in (self.native, self.other):
+            ids = ["complete_host_one", "complete_host_two"]
+            proof["inventory"].append({"crate": "er-web", "target": "m9e_host_v2", "ids": ids, "historical_excluded_ids": []})
+            proof["plan"]["required_native_targets"]["er-web"] = ["m9e_host_v2"]
+            proof["plan"].setdefault("required_native_test_ids", {})["er-web:m9e_host_v2"] = ids
+            proof["required_native_target_counts"]["er-web:m9e_host_v2"] = 2
+            proof["tests"]["selected"] += 2
+            proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
+            proof["plan_sha256"] = self.phases.sha(self.phases.encoded(proof["plan"]))
+        self.native_hash = self.phases.write_bounded(self.root / "proof/native-a.json", self.native)
+        self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
+        self.platform.update(native_manifest_sha256=self.native_hash, plan_sha256=self.native["plan_sha256"])
+        self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
+        with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+            result = self.phases.aggregate(None)
+            self.assertEqual(result["tests"]["passed"], 15)
+            self.assertEqual(result["native_d_manifest_sha256"], self.fourth_hash)
+        for mode in ("omitted", "overlap", "wrong_run", "wrong_lane", "mutant", "cost", "rule", "inventory", "plan"):
+            with self.phase_environment(), patch.object(self.phases, "identity", return_value=self.identity):
+                bad = self.phases.read_bounded(self.root / "proof/native-d.json", self.fourth_hash)
+                if mode == "omitted":
+                    bad["completed_targets"] = []
+                elif mode == "overlap":
+                    bad["assigned_targets"] += self.native["assigned_targets"]
+                    bad["completed_targets"] = list(bad["assigned_targets"])
+                elif mode == "wrong_run":
+                    bad["identity"]["run_id"] = "999"
+                elif mode == "wrong_lane":
+                    bad["lane"] = "a"
+                elif mode in ("mutant", "cost", "rule"):
+                    bad[{"mutant": "timer_mutant", "cost": "current_cost_probe", "rule": "rule_worker"}[mode]] = {"status": "passed"}
+                elif mode == "inventory":
+                    bad["inventory"][0]["ids"].append("unrelated")
+                    bad["inventory_sha256"] = self.phases.sha(self.phases.encoded(bad["inventory"]))
+                else:
+                    bad["plan"]["different_plan"] = True
+                    bad["plan_sha256"] = self.phases.sha(self.phases.encoded(bad["plan"]))
+                digest = self.phases.write_bounded(self.root / "proof/native-d.json", bad)
+                with self.subTest(mode=mode), patch.dict(os.environ, {"M9E_NATIVE_D_MANIFEST_SHA256": digest}), self.assertRaises(RuntimeError):
+                    self.phases.aggregate(None)
+
     def test_third_lane_moves_whole_targets_and_preserves_exact_disjoint_global_union(self):
         self.install_third_lane_fixture()
         inventory = self.native["inventory"]
@@ -8387,7 +8467,7 @@ class PhaseTransferTests(unittest.TestCase):
             result = self.phases.aggregate(None)
         self.assertEqual(result["tests"], {"selected": 16, "executed": 16, "passed": 16, "failed": 0, "skipped": 0})
         self.assertEqual(result["native_c_manifest_sha256"], self.third_hash)
-        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c"})
+        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d"})
 
     def test_third_lane_is_mandatory_even_for_an_empty_assigned_partition(self):
         for state in ("", "failure", "skipped", "cancelled"):
@@ -8431,14 +8511,14 @@ class PhaseTransferTests(unittest.TestCase):
                      for crate, target in sorted(self.phases.LANE_C_TARGETS)]
         inventory.append({"crate": "er-other", "target": "m9e_current_batch", "ids": [], "historical_excluded_ids": []})
         assignment = self.phases.partition(inventory)
-        self.assertEqual(len(assignment["c"]), 5)
+        self.assertEqual(len(assignment["c"]), 4)
         self.assertEqual(assignment["a"], [["er-other", "m9e_current_batch"]])
         self.assertEqual(assignment["b"], [])
         enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
                       for index, row in enumerate(inventory)]
         actual, owned = self.phases.inventory_and_assignment(enumerated, "c")
         self.assertEqual(owned, self.phases.partition(actual)["c"])
-        self.assertEqual(len(actual), 6)
+        self.assertEqual(len(actual), 5)
     def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
         for status in ("", "failure", "skipped", "cancelled"):
             with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):
@@ -8500,7 +8580,7 @@ class PhaseTransferTests(unittest.TestCase):
             {"crate": "er-other", "target": "m9e_host_v2", "ids": [], "historical_excluded_ids": []},
         ])
         assignment = self.phases.partition(inventory)
-        self.assertIn(["er-web", "m9e_host_v2"], assignment["b"])
+        self.assertIn(["er-web", "m9e_host_v2"], assignment["d"])
         self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         self.assertNotIn(["er-cli", "m9e_current_batch"], assignment["b"])
         self.assertIn(["er-cli", "m9e_current_reload"], assignment["b"])
@@ -8509,10 +8589,10 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
-        self.assertEqual(len(assignment["b"]), 3)
+        self.assertEqual(len(assignment["b"]), 2)
         self.assertEqual(sum(len(targets) for targets in assignment.values()), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
-        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"]),
+        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"] + assignment["d"]),
                          sorted([[item["crate"], item["target"]] for item in inventory]))
         inventory.append(copy.deepcopy(inventory[0]))
         with self.assertRaisesRegex(RuntimeError, "duplicated"):
@@ -10571,12 +10651,16 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         third = copy.deepcopy(second)
         third["lane"] = "c"
         third_hash = phases.write_bounded(self.root / "proof/native-c.json", third)
+        fourth = copy.deepcopy(second)
+        fourth["lane"] = "d"
+        fourth_hash = phases.write_bounded(self.root / "proof/native-d.json", fourth)
         platform = {"version": 1, "phase": "platform", "status": "passed", "qualification": "pending",
                     "identity": self.identity, "native_manifest_sha256": first_hash, "plan_sha256": first["plan_sha256"]}
         platform_hash = phases.write_bounded(self.root / "platform/platform.json", platform)
         environment = {"M9E_PHASE_DIR": str(self.root), "M9E_NATIVE_MANIFEST_SHA256": first_hash,
                        "M9E_NATIVE_B_MANIFEST_SHA256": second_hash, "M9E_PLATFORM_MANIFEST_SHA256": platform_hash,
                        "M9E_NATIVE_C_RESULT": "success", "M9E_NATIVE_C_MANIFEST_SHA256": third_hash,
+                       "M9E_NATIVE_D_RESULT": "success", "M9E_NATIVE_D_MANIFEST_SHA256": fourth_hash,
                        "M9E_NATIVE_A_RESULT": "success", "M9E_NATIVE_B_RESULT": "success", "M9E_PLATFORM_RESULT": "success"}
         with patch.dict(os.environ, environment), patch.object(phases, "identity", return_value=self.identity), \
                 patch.object(phases, "ROOT", self.repository), patch.object(self.cost, "read_content", return_value=self.content), \

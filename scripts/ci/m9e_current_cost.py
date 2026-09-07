@@ -639,7 +639,7 @@ def validate_lane(proof, repository, partition):
     binding = plan.get("current_cost_source_binding")
     if build_source_binding(repository, proof["identity"]["product_sha"]) != binding:
         fail("cost selected source binding differs from candidate")
-    if proof["lane"] in {"b", "c"}:
+    if proof["lane"] in {"b", "c", "d"}:
         if "current_cost_probe" in proof or list(TARGET) in proof["completed_targets"]:
             fail("non-A lane cannot claim release cost execution")
         return

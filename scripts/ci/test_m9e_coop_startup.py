@@ -196,7 +196,8 @@ class CoopPolicyTests(unittest.TestCase):
         before = copy.deepcopy(rows)
         assignment = phases.partition(rows)
         self.assertEqual(rows, before)
-        self.assertEqual(assignment["c"], [list(phases.STATE_QUERY_TARGET)])
+        self.assertEqual(assignment["c"], [])
+        self.assertEqual(assignment["d"], [list(phases.STATE_QUERY_TARGET)])
         self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
         self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(coop.KERNEL_TARGET), list(phases.CONTROL_QUERY_TARGET)])
         self.assertEqual(len({tuple(pair) for targets in assignment.values() for pair in targets}), len(rows))
@@ -220,3 +221,22 @@ class CoopPolicyTests(unittest.TestCase):
         native["plan"]["requires_current_coop_startup"] = False
         with self.assertRaisesRegex(RuntimeError, "unrequested"):
             coop.validate_platform(proof, native, self.root)
+
+    def test_entry_adapter_uses_the_existing_runner_cap_with_a_real_child(self):
+        import os
+        import time
+        from unittest.mock import patch
+        full = self.root / "full"
+        full.mkdir()
+        runner = self.root / "runner"
+        runner.mkdir()
+        producer = self.root / "stub-coop-producer.py"
+        producer.write_text("print('co-op bounded child reached', flush=True)\nraise SystemExit(7)\n")
+        before = dict(os.environ)
+        with patch.dict(os.environ, {"RUNNER_TEMP": str(runner), "M9E_NATIVE_LANE": "a"}), \
+                patch.object(coop, "ENTRY_PRODUCER", producer.name):
+            with self.assertRaisesRegex(RuntimeError, "command exited 7"):
+                coop.execute_entry(self.root, full, {}, {}, coop.ENTRY_IDS, time.monotonic() + 30)
+        self.assertEqual((full / "coop-entry-producer.log").read_text(), "co-op bounded child reached\n")
+        self.assertFalse((runner / "m9e-coop-entry-focused").exists())
+        self.assertEqual(dict(os.environ), before)
