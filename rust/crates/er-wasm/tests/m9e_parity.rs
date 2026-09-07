@@ -1,7 +1,10 @@
 use std::error::Error;
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::Write;
 use std::sync::Arc;
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_material_v6::{GameMaterialV6, game_state_digest};
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
 };
@@ -308,10 +311,107 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
     })
 }
 
-fn assert_eventwise_parity_contract() -> Result<(), Box<dyn Error>> {
+const PRE_METADATA_PARITY: (&str, &str, usize, &str) = (
+    "blake3-v1:9de581e0d922874eaf17b8a9c355e4d154b051b34935fad60d5779c70de68429",
+    "751643168aa2c2405d700c13b6438b10dec901d969de2c6b1048663b421b2695",
+    15_810_979,
+    "42da262041f8b58b7c0bf95253e5560cfd1b4c2b571b46419555df6df94278f4",
+);
+const GENERATED_METADATA_PARITY: (&str, &str, usize, &str) = (
+    "blake3-v1:dc4ab1ede5c52152e40f1dc5579d93841898126903b3047bf66b60efd7646493",
+    "b167ad856885c95dab4f1e9cdf1456dd4924f6c4dbc8443e12918f232215192e",
+    16_325_821,
+    "c28ac3b994c687413a4d0bcae7c558f0e02dfafd5e9ec3482bbb9462f5598063",
+);
+
+fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {
+    [PRE_METADATA_PARITY, GENERATED_METADATA_PARITY]
+        .into_iter()
+        .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))
+        .map(|cohort| cohort.3)
+}
+
+fn assert_eventwise_parity_contract(
+    replay: impl FnOnce(M9EParityRequestV1) -> Result<M9EParityReportV1, Box<dyn Error>>,
+) -> Result<String, Box<dyn Error>> {
     let request = request()?;
     let event_count = request.events.len();
-    let report = replay_m9e_eventwise_native(request)?;
+    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(request.bundle.clone()))?);
+    let golden = cohort_report_golden(
+        content.identity().bundle_hash.as_str(),
+        content.identity().progression_hash.as_str(),
+        BUNDLE.len(),
+    )
+    .ok_or("parity requires an exact independently audited content cohort")?;
+    for (bundle, progression, bytes) in [
+        (PRE_METADATA_PARITY.0, GENERATED_METADATA_PARITY.1, PRE_METADATA_PARITY.2),
+        (GENERATED_METADATA_PARITY.0, PRE_METADATA_PARITY.1, GENERATED_METADATA_PARITY.2),
+        (GENERATED_METADATA_PARITY.0, GENERATED_METADATA_PARITY.1, PRE_METADATA_PARITY.2),
+        ("unknown", GENERATED_METADATA_PARITY.1, GENERATED_METADATA_PARITY.2),
+    ] {
+        assert!(cohort_report_golden(bundle, progression, bytes).is_none());
+    }
+    let mut driver = GameKernelV7::from_snapshot(
+        request.initial_snapshot.clone().ok_or("controlled checkpoint missing")?,
+        request.local_seat,
+        request.role,
+        content.clone(),
+    )?;
+    let mut expected_observations = Vec::new();
+    let mut material_count = 0;
+    for (index, event) in request.events.iter().enumerate() {
+        let before_digest = game_state_digest(driver.state().ok_or("active state missing")?)?;
+        let step = apply_timer_event(&mut driver, event.clone())?;
+        let snapshot = driver.snapshot()?;
+        for effect in &step.effects {
+            if let GameKernelEffectV7::AuthorityMaterial { operation_id, bytes } = effect {
+                let material = GameMaterialV6::decode(bytes)?;
+                let transition = material.transition();
+                assert_eq!(&transition.operation_id, operation_id);
+                assert_eq!(&transition.content_identity, content.identity());
+                assert_eq!(transition.before_digest, before_digest);
+                assert_eq!(
+                    &transition.after_state,
+                    driver.state().ok_or("material after-state missing")?
+                );
+                let after_digest = game_state_digest(&transition.after_state)?;
+                assert_eq!(transition.after_digest, after_digest);
+                for mutation in &transition.mutations {
+                    assert_eq!(mutation.before_digest, before_digest);
+                    assert_eq!(mutation.after_digest, after_digest);
+                }
+                let record = snapshot.material_ledger.record(operation_id)
+                    .ok_or("actual material receipt missing")?;
+                assert_eq!(record.authority_revision, transition.authority_revision);
+                assert_eq!(record.after_digest, after_digest);
+                assert_eq!(
+                    record.material_fingerprint,
+                    format!("blake3-v1:{}", er_canonical::content_digest(bytes)?)
+                );
+                material_count += 1;
+            }
+        }
+        expected_observations.push(M9EParityObservationV1 {
+            sequence: safe((index + 1) as u64),
+            input_digest: er_canonical::content_digest(event)?,
+            effect_digest: er_canonical::content_digest(&step.effects)?,
+            internal_event_digest: er_canonical::content_digest(&step.internal_events)?,
+            mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
+            kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
+            control_kind: driver.current_control().map(|control| control.kind),
+            wave: driver.state().and_then(|state| state.active_run.as_ref()).map(|run| run.wave),
+        });
+    }
+    assert_eq!(event_count, 30);
+    assert_eq!(material_count, 6);
+    let expected = M9EParityReportV1 {
+        schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
+        content_identity_digest: er_canonical::content_digest(content.identity())?,
+        observations: expected_observations,
+        final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
+    };
+    let report = replay(request)?;
+    assert_eq!(report, expected);
     assert_eq!(report.observations.len(), event_count);
     assert!(
         report
@@ -351,24 +451,39 @@ fn assert_eventwise_parity_contract() -> Result<(), Box<dyn Error>> {
     // indices changes persistent XP, with the independent natural regression
     // binding the source threshold. Native run 34091578658 on 90798ca7 binds
     // this unchanged trace; Wasm must independently match its full report.
-    assert_eq!(
-        report_digest,
-        "42da262041f8b58b7c0bf95253e5560cfd1b4c2b571b46419555df6df94278f4"
-    );
-    Ok(())
+    // Audited two-cohort run 34144718100 reproduces the old full golden and
+    // exposes all 26 changed paths: only the two content identity fields and
+    // derived material/state/effect/snapshot hashes. Both raw reports and all
+    // gameplay preimages are preserved remotely. Require the exact cohort's
+    // full report here, plus independently derived observations/materials above.
+    // No report normalization or unknown-content fallback is accepted.
+    assert_eq!(report_digest, golden);
+    Ok(report_digest)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn native_replays_v7_raw_inputs_eventwise() -> Result<(), Box<dyn Error>> {
-    assert_eventwise_parity_contract()
+    let digest = assert_eventwise_parity_contract(|request| {
+        replay_m9e_eventwise_native(request).map_err(Into::into)
+    })?;
+    writeln!(std::io::stdout().lock(), "M9E_RAW_PARITY_DIGEST={digest}")?;
+    Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test::wasm_bindgen_test]
 fn wasm_replays_v7_raw_inputs_eventwise() -> Result<(), wasm_bindgen::JsValue> {
-    assert_eventwise_parity_contract()
-        .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))
+    let digest = assert_eventwise_parity_contract(|request| {
+        let json = serde_json::to_string(&request)?;
+        let report = er_wasm::m9e_parity::replay_m9e_eventwise_json(&json).map_err(|error| {
+            error.as_string().unwrap_or_else(|| "Wasm replay failed".to_owned())
+        })?;
+        Ok(serde_json::from_str(&report)?)
+    })
+    .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
+    wasm_bindgen_test::console_log!("M9E_RAW_PARITY_DIGEST={digest}");
+    Ok(())
 }
 
 fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), Box<dyn Error>> {
