@@ -226,6 +226,25 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
         .find(|pokemon| pokemon.id == task.pokemon)
         .ok_or("recipient absent")?;
     assert!(!old_pokemon.fainted);
+    let species_progression = content
+        .progression
+        .species(old_pokemon.species_id, old_pokemon.form_index)
+        .ok_or("recipient progression absent")?;
+    let growth = content
+        .progression
+        .growth_rate(species_progression.growth_rate)
+        .ok_or("recipient growth table absent")?;
+    assert_eq!(growth.experience_by_level.len(), 100);
+    // Current exported entries represent levels 1 through 100, without a level 0.
+    let expected_next_total = growth.experience_by_level[usize::from(old_pokemon.level)];
+    let er_state::m7_state::ProgressionTaskKindV2::GrantExperience(amount) = task.kind else {
+        return Err("earned task is not experience".into());
+    };
+    assert_eq!(
+        amount.get().get(),
+        expected_next_total.get().get() - old_pokemon.experience.get().get(),
+        "natural reward uses the next level's source experience threshold"
+    );
     let mut restored = GameKernelV7::from_snapshot(
         snapshot,
         SeatId::new(safe(1)),
@@ -246,6 +265,7 @@ fn natural_victory_experience_recalculates_stats_preserves_damage_and_restores()
         .iter()
         .find(|pokemon| pokemon.id == task.pokemon)
         .ok_or("recipient lost")?;
+    assert_eq!(pokemon.experience, expected_next_total);
     assert!(
         pokemon.level > old_pokemon.level,
         "natural task did not increase level"
