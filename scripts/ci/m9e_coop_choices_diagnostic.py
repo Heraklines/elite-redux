@@ -70,6 +70,8 @@ def execute_target(summary, test_target, test_source, test_ids, name_prefix=""):
             or artifact["target"].get("src_path") != str(ROOT / test_source)
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
+            or artifact["profile"].get("opt_level") != "0"
+            or artifact["profile"].get("overflow_checks") is not True
             or not binary.is_absolute() or binary.is_symlink() or not binary.is_file()
             or binary.resolve() != binary or binary.parent != TARGET / "debug/deps"
             or not re.fullmatch(test_target + "-[0-9a-f]{16}", binary.name)
@@ -103,6 +105,7 @@ def main(summary):
                "scripts/ci/m9e_current_cost.py", "scripts/ci/m9e_coop_choices_diagnostic.py",
                ".github/workflows/m9e-coop-choices-focused.yml",
                "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json"]
+    sources.extend(["rust/crates/er-kernel/tests/m9e_coop_v7.rs","rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs"])
     summary["source_hashes"] = {name: digest(ROOT / name) for name in sources}
     bundle = ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json"
     summary["bundle_sha256"] = digest(bundle)
@@ -136,19 +139,23 @@ def main(summary):
         summary, "m9e_natural_replacement_v7", "rust/crates/er-kernel/tests/m9e_natural_replacement_v7.rs",
         ["natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
          "natural_replacement_rejects_wrong_receipt_field_and_fainted_party_choice"], "replacement-")
+    summary["m9e_coop_v7_artifact"] = execute_target(summary, "m9e_coop_v7", "rust/crates/er-kernel/tests/m9e_coop_v7.rs", ["coop_waits_for_all_human_commands","natural_coop_raw_proposal_converges_and_generation_is_fenced","private_party_reopens_restore_exact_root_and_apply_canonical_material","replica_delivers_save_presentation_once_without_repeating_authority_storage"], "m9e_coop_v7-")
+    summary["m9e_current_proposal_v7_artifact"] = execute_target(summary, "m9e_current_proposal_v7", "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs", ["current_proposal_publication_receipt_and_snapshot_conserve_ownership","current_proposal_rejection_duplicate_and_terminal_are_transactional"], "m9e_current_proposal_v7-")
+    summary["m9e_material_retention_v7_artifact"] = execute_target(summary, "m9e_material_retention_v7", "rust/crates/er-kernel/tests/m9e_material_retention_v7.rs", ["v7_material_rollover_restores_pending_effects_and_continues_exact_snapshots","v7_restore_rejects_historical_gapped_evidence_and_continues_a_valid_suffix"], "m9e_material_retention_v7-")
+    summary["m9e_snapshot_v7_artifact"] = execute_target(summary, "m9e_snapshot_v7", "rust/crates/er-kernel/tests/m9e_snapshot_v7.rs", ["active_snapshot_round_trips_at_a_quiescent_boundary","quiescent_v6_snapshot_migrates_without_gameplay_side_effects","terminal_lifecycle_requires_complete_control_and_terminal_identity","typed_pending_effects_cross_validate_allocator_and_content"], "m9e_snapshot_v7-")
     if (digest(bundle) != summary["bundle_sha256"]
             or any(digest(ROOT / name) != value for name, value in summary["source_hashes"].items())):
         raise RuntimeError("actual source/content/executable changed")
     summary["tests"] = {"executed": 8, "passed": 8, "failed": 0, "skipped": 0}
-    summary["compatibility_tests"] = {"executed": 19, "passed": 19, "failed": 0, "skipped": 0}
+    summary["compatibility_tests"] = {"executed": 31, "passed": 31, "failed": 0, "skipped": 0}
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
-    summary = {"status": "failed", "qualification": "natural owned two-battle co-op with duplicate delivery and same-generation disconnect/restore; no generation-two rebind or full M9 qualification",
+    summary = {"status": "failed", "qualification": "bounded owned authority reply compatibility: unchanged 39 current co-op, admission, snapshot and retention tests; full campaign is separate",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "69637ba805a8d975c7eccc6c038556d05a76b5d4"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "18498238ae2468a2f74091d37cbd86340505b1cc"}
     try:
         main(summary)
         if TARGET.exists():
@@ -168,7 +175,7 @@ if __name__ == "__main__":
         if TARGET.exists():
             shutil.rmtree(TARGET)
     summary["logs"] = logs
-    encoded = (json.dumps(summary, sort_keys=True, indent=2) + "\n").encode()
+    encoded = (json.dumps(summary, sort_keys=True, separators=(",", ":")) + "\n").encode()
     if len(encoded) > 16384:
         raise RuntimeError("focused compact result exceeds bound")
     (COMPACT / "summary.json").write_bytes(encoded)
