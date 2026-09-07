@@ -222,7 +222,8 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
             GameControlKindV2::BattleMove => submit_strongest_move(&mut kernel, &content),
             GameControlKindV2::BattleCommand
             | GameControlKindV2::BattleTarget
-            | GameControlKindV2::BattleSwitch => press(&mut kernel, PhysicalKey::Space),
+            | GameControlKindV2::BattleSwitch
+            | GameControlKindV2::BattleReplacement => press(&mut kernel, PhysicalKey::Space),
             GameControlKindV2::Progression
             | GameControlKindV2::MoveLearn
             | GameControlKindV2::Evolution => {

@@ -16,7 +16,8 @@ COMPACT = REPORT / "compact"
 TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
-RUST_SOURCES = ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_natural_campaign_v7.rs"]
+RUST_SOURCES = ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-kernel/tests/m9e_natural_campaign_v7.rs",
+                "rust/crates/er-game/src/m9e_runtime_v6.rs"]
 TEST_TARGET = "m9e_natural_campaign_v7"
 TEST_IDS = ["natural_current_campaign_reaches_policy_terminal_without_state_injection"]
 sequence = 0
@@ -121,7 +122,7 @@ if __name__ == "__main__":
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "qualification": "focused natural current campaign characterization only; no replay, integration or M9 qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "98c04705f4010f4dd865ba5677451ce8599a91f3"}
+               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": "03aa66ee48bd9140bf4066f3ecdd23d8028658aa"}
     try:
         main(summary)
         if TARGET.exists():
