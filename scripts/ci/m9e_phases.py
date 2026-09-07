@@ -1330,7 +1330,10 @@ def compact_summary(summary, full_hash, timings):
     import m9e_rulechange as rule
     rule.compact(compact, full_hash, encoded)
     compact_worker_evidence(compact, full_hash)
-    for key in ("browser_worker_codec", "browser_tests"):
+    # These references bind exact fields of the unchanged full proof. Source
+    # identity and headline execution counts always remain inline; expanded
+    # target maps and negative-control details may use the bounded proof channel.
+    for key in ("browser_worker_codec", "browser_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
         if len(encoded(compact)) <= 16000:
             break
         if key in compact:

@@ -11224,8 +11224,9 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
 class CompactWorkerEvidenceTests(unittest.TestCase):
     def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
             full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
+                    "identity": {"product_sha": "a" * 40, "run_id": "1"},
                     "tests": {"selected": 665, "executed": 665, "passed": 665, "failed": 0, "skipped": 0},
                     key: {lane: {"sha256": lane * 64, "profile": "x" * 600} for lane in "abcd"},
                     "first_failure": "x" * 14000}
@@ -11236,12 +11237,13 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
             self.assertEqual(compact[key],
                              {"file": "phase-summary.json", "sha256": proof_hash, "field": key})
             self.assertEqual(compact["tests"], full["tests"])
+            self.assertEqual(compact["identity"], full["identity"])
             self.assertEqual(compact["qualification"], full["qualification"])
             self.assertEqual(full, original)
 
     def test_small_worker_details_remain_inline(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
             full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
                     key: {"d": {"sha256": "d" * 64}}}
             compact = phases.compact_summary(full, "e" * 64, {})
@@ -11251,7 +11253,7 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
 
     def test_unbounded_required_result_still_fails_closed(self):
         import m9e_phases as phases
-        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+        for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
             with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
                 phases.compact_summary({"first_failure": "x" * 16001, key: {"d": "detail"}}, "e" * 64, {})
 

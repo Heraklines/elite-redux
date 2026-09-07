@@ -266,9 +266,13 @@ def main():
         raise RuntimeError("aggregate wire and decoded proof digest identities disagree")
     if projected != frozen or len(phases.encoded(compact)) > 16000:
         raise RuntimeError("projected compact bound or full metadata conservation failed")
-    for key in ("identity", "tests", "required_native_target_counts", "current_coop_startup"):
+    for key in ("identity", "tests", "current_coop_startup"):
         if compact[key] != projected[key]:
             raise RuntimeError("projected compact discarded required identity")
+    for key in ("required_native_target_counts", "timer_mutant", "replica_mutant"):
+        if compact[key] != projected[key] and compact[key] != {
+                "file": "phase-summary.json", "sha256": digest, "field": key}:
+            raise RuntimeError("projected compact target/control reference differs")
     receipt = {"status": "passed", "qualification": "structural compaction projection only; no native or platform qualification",
                "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "compact_bytes": len(phases.encoded(compact)), "aggregate_wire_bytes": len(wire),
