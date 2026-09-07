@@ -257,7 +257,10 @@ impl Script {
     }
 
     fn push(&mut self, method: &str, params: Value, expected: Expected) {
-        assert!(self.request_count < 4096, "raw script request bound exceeded");
+        assert!(
+            self.request_count < 4096,
+            "raw script request bound exceeded"
+        );
         let request = json!({
             "protocol_version": 1, "id": format!("reload-{}", self.request_count),
             "method": method, "params": params
@@ -269,7 +272,9 @@ impl Script {
             Expected::Fields(value) => RetainedExpected::Fields(value),
             Expected::Error { code, message } => RetainedExpected::Error { code, message },
         };
-        self.requests.send((request, expected)).expect("CLI checker stopped");
+        self.requests
+            .send((request, expected))
+            .expect("CLI checker stopped");
         self.request_count += 1;
     }
 
@@ -570,7 +575,10 @@ impl Script {
                 last_progress = Instant::now();
             }
         }
-        assert_eq!(response_count, 2881, "complete raw input and snapshot script");
+        assert_eq!(
+            response_count, 2881,
+            "complete raw input and snapshot script"
+        );
         drop(input);
         progress("stdout-eof-wait");
         let extra = process
@@ -758,9 +766,12 @@ fn actual_worker_cli_rulechange_preserves_prefix_changes_future_and_rejects_dive
     // full snapshots. Both sides must finish, and every response is checked.
     std::thread::scope(|scope| -> Result<(), String> {
         let (sender, receiver) = mpsc::sync_channel(64);
-        let producer = scope.spawn(|| build_script(&fixture, sender).map_err(|error| error.to_string()));
+        let producer =
+            scope.spawn(|| build_script(&fixture, sender).map_err(|error| error.to_string()));
         let executed = Script::run(&fixture, receiver).map_err(|error| error.to_string());
-        producer.join().map_err(|_| "reference script panicked".to_owned())??;
+        producer
+            .join()
+            .map_err(|_| "reference script panicked".to_owned())??;
         executed
     })
     .map_err(Into::into)
