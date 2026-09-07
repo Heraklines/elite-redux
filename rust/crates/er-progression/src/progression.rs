@@ -14,6 +14,9 @@ use thiserror::Error;
 
 use crate::{EvolutionConditionV1, EvolutionDefinitionV1, PreparedProgressionContentV1};
 
+#[path = "current_growth_pow.rs"]
+mod current_growth_pow;
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum ProgressionMutationV1 {
@@ -88,6 +91,49 @@ pub enum ProgressionError {
     Evolution,
     #[error("fusion, form, or ability change is invalid")]
     FormAbility,
+}
+
+/// Total experience for the pinned current game's one-based level table.
+/// Above level 100, preserve the oracle's floating-point evaluation order and
+/// floor before storing the result as a checked, canonical safe integer.
+pub fn current_growth_experience_for_level(
+    growth: &crate::GrowthRateDefinitionV1,
+    level: u16,
+) -> Result<Experience, ProgressionError> {
+    if level == 0 || growth.id.get() > 5 || growth.experience_by_level.len() != 100 {
+        return Err(ProgressionError::Content);
+    }
+    if level <= 100 {
+        return growth
+            .experience_by_level
+            .get(usize::from(level - 1))
+            .copied()
+            .ok_or(ProgressionError::Content);
+    }
+    let cube = current_growth_pow::growth_power(level, 3);
+    let fourth = current_growth_pow::growth_power(level, 4);
+    let level = f64::from(level);
+    let raw = match growth.id.get() {
+        0 => (fourth + cube * 2000.0) / 3500.0,
+        1 => (cube * 4.0) / 5.0,
+        2 => cube,
+        3 => (cube * 6.0) / 5.0 - 15.0 * (level * level) + 100.0 * level - 140.0,
+        4 => (cube * 5.0) / 4.0,
+        5 => (cube * (level / 2.0 + 8.0) * 4.0) / (100.0 + level),
+        _ => return Err(ProgressionError::Content),
+    };
+    let value = if growth.id.get() == 2 {
+        raw
+    } else {
+        raw * 0.325 + cube * 0.675
+    }
+    .floor();
+    if !value.is_finite() || !(0.0..=9_007_199_254_740_991.0).contains(&value) {
+        return Err(ProgressionError::Overflow);
+    }
+    SafeU53::new(value as u64)
+        .map(Experience::new)
+        .map_err(|_| ProgressionError::Overflow)
 }
 
 pub fn grant_experience(
