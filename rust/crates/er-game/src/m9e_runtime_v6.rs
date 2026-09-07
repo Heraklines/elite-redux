@@ -2220,7 +2220,10 @@ fn queue_current_player_faints(
 }
 
 fn next_battle_control_owner(state: &GameStateV6) -> Result<er_types::SeatId, GameRuntimeV6Error> {
-    let run = state.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
     let battle = run.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
     if let Some(faint) = battle.faint_queue.iter().find(|faint| {
         faint.slot.side == er_types::battle_ids::BattleSide::Player
