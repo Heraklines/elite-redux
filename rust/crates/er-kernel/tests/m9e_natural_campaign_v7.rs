@@ -219,7 +219,9 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
                     pokemon.species_id.get().get(),
                     pokemon.level,
                     pokemon.hp,
-                    pokemon.moves.map(|slot| slot.map(|value| (value.move_id.get().get(), value.pp_used))),
+                    pokemon
+                        .moves
+                        .map(|slot| slot.map(|value| (value.move_id.get().get(), value.pp_used))),
                 )
             })
             .collect::<Vec<_>>();
@@ -236,7 +238,9 @@ fn natural_current_campaign_reaches_policy_terminal_without_state_injection()
                             pokemon.species_id.get().get(),
                             pokemon.level,
                             pokemon.hp,
-                            pokemon.moves.map(|slot| slot.map(|value| (value.move_id.get().get(), value.pp_used))),
+                            pokemon.moves.map(|slot| {
+                                slot.map(|value| (value.move_id.get().get(), value.pp_used))
+                            }),
                         )
                     })
                     .collect::<Vec<_>>()
