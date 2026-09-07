@@ -591,7 +591,8 @@ fn observed_save_snapshot_and_material_replay_preserve_ownership() -> TestResult
     let GameMaterialV6::BattleTurn(transition) = &mut conflicting else {
         return Err("real battle-turn material required".into());
     };
-    let Some(GamePlatformEffectV2::Telemetry { event, .. }) = transition.platform_effects.first_mut()
+    let Some(GamePlatformEffectV2::Telemetry { event, .. }) =
+        transition.platform_effects.first_mut()
     else {
         return Err("real material telemetry required".into());
     };
