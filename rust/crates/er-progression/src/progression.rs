@@ -90,6 +90,38 @@ pub enum ProgressionError {
     FormAbility,
 }
 
+/// Total experience for the pinned current game's one-based level table.
+/// Above level 100, preserve the oracle's floating-point evaluation order and
+/// floor before storing the result as a checked, canonical safe integer.
+pub fn current_growth_experience_for_level(
+    growth: &crate::GrowthRateDefinitionV1,
+    level: u16,
+) -> Result<Experience, ProgressionError> {
+    if level == 0 || growth.id.get() > 5 || growth.experience_by_level.len() != 100 {
+        return Err(ProgressionError::Content);
+    }
+    if level <= 100 {
+        return growth.experience_by_level.get(usize::from(level - 1))
+            .copied().ok_or(ProgressionError::Content);
+    }
+    let level = f64::from(level);
+    let cube = level.powi(3);
+    let raw = match growth.id.get() {
+        0 => (level.powi(4) + cube * 2000.0) / 3500.0,
+        1 => (cube * 4.0) / 5.0,
+        2 => cube,
+        3 => (cube * 6.0) / 5.0 - 15.0 * level.powi(2) + 100.0 * level - 140.0,
+        4 => (cube * 5.0) / 4.0,
+        5 => (cube * (level / 2.0 + 8.0) * 4.0) / (100.0 + level),
+        _ => return Err(ProgressionError::Content),
+    };
+    let value = if growth.id.get() == 2 { raw } else { raw * 0.325 + cube * 0.675 }.floor();
+    if !value.is_finite() || !(0.0..=9_007_199_254_740_991.0).contains(&value) {
+        return Err(ProgressionError::Overflow);
+    }
+    SafeU53::new(value as u64).map(Experience::new).map_err(|_| ProgressionError::Overflow)
+}
+
 pub fn grant_experience(
     before: &GameStateV5,
     progression: &PreparedProgressionContentV1,
