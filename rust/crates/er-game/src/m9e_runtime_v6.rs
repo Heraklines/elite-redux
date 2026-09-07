@@ -2594,11 +2594,61 @@ fn grant_experience_v2(
     let level = growth
         .experience_by_level
         .partition_point(|required| required.get().get() <= experience)
+        .saturating_sub(1)
         .max(1);
     let level = u16::try_from(level).map_err(|_| GameRuntimeV6Error::Invalid)?;
     let pokemon = persistent_pokemon_mut(state, pokemon_id)?;
     pokemon.experience = er_types::run_ids::Experience::new(safe_from_u64(experience)?);
-    pokemon.level = level;
+    if pokemon.level != level {
+        pokemon.level = level;
+        refresh_current_pokemon_stats(pokemon, content)?;
+    }
+    Ok(())
+}
+
+fn refresh_current_pokemon_stats(
+    pokemon: &mut er_state::m7_state::PokemonStateV5,
+    content: &PreparedGameContentV2,
+) -> Result<(), GameRuntimeV6Error> {
+    let species = content
+        .battle
+        .species(pokemon.species_id)
+        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    let form_id = er_types::FormId::parse(format!(
+        "{}:{}",
+        pokemon.species_id.get().get(),
+        pokemon.form_index
+    ))
+    .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    let form = content
+        .battle
+        .form(&form_id)
+        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    let nature = content
+        .progression
+        .pack()
+        .natures
+        .iter()
+        .find(|nature| nature.id == pokemon.effective_nature)
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let stats = er_progression::progression::calculate_pokemon_stats(
+        pokemon,
+        form.stat_override.unwrap_or(species.base_stats),
+        nature,
+    )
+    .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    let hp = if pokemon.fainted {
+        pokemon.hp
+    } else {
+        pokemon
+            .hp
+            .checked_add(stats.hp.saturating_sub(pokemon.max_hp))
+            .ok_or(GameRuntimeV6Error::Invalid)?
+            .min(stats.hp)
+    };
+    pokemon.stats = stats;
+    pokemon.max_hp = stats.hp;
+    pokemon.hp = hp;
     Ok(())
 }
 

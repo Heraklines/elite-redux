@@ -1092,6 +1092,46 @@ def compact_storage_evidence(compact, full_hash):
             compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
 
 
+def compact_worker_evidence(compact, full_hash):
+    # Each worker still has its exact bytes, profile and hash in the full proof.
+    # Four lanes need not duplicate those details in the 16 KiB result index.
+    if "worker_executables" in compact and len(encoded(compact)) > 16000:
+        compact["worker_executables"] = {
+            "file": "phase-summary.json", "sha256": full_hash,
+            "field": "worker_executables",
+        }
+
+
+def compact_summary(summary, full_hash, timings):
+    compact = {key: summary[key] for key in (
+        "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup",
+        "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
+        "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "platform_manifest_sha256",
+        "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
+        "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
+    compact.update({"phase_summary_sha256": full_hash, "timing_ms": timings})
+    if "first_failure" in summary:
+        compact["first_failure"] = summary["first_failure"]
+    if len(encoded(compact)) > 16000:
+        for key in ("native_target_timing_ms", "timing_ms"):
+            if key in compact:
+                compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
+    compact_rtc_evidence(compact, full_hash)
+    compact_storage_evidence(compact, full_hash)
+    import m9e_worker_storage as composition
+    composition.compact(compact, full_hash, encoded)
+    import m9e_title_storage as retirement
+    retirement.compact(compact, full_hash, encoded)
+    import m9e_current_cost as cost
+    cost.compact(compact, full_hash, encoded)
+    import m9e_rulechange as rule
+    rule.compact(compact, full_hash, encoded)
+    compact_worker_evidence(compact, full_hash)
+    if len(encoded(compact)) > 16000:
+        raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
+    return compact
+
+
 def main():
     import m9e_feedback as feedback
     feedback.FULL.mkdir(parents=True, exist_ok=True)
@@ -1123,31 +1163,7 @@ def main():
         # Keep full platform logs with their owning job. The final result links
         # bounded proofs, not a duplicate archive of native diagnostics.
         full_hash = write_bounded(feedback.FULL / "phase-summary.json", summary)
-        compact = {key: summary[key] for key in (
-            "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup",
-            "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
-            "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "platform_manifest_sha256",
-            "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
-            "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
-        compact.update({"phase_summary_sha256": full_hash, "timing_ms": feedback.TIMINGS})
-        if "first_failure" in summary:
-            compact["first_failure"] = summary["first_failure"]
-        if len(encoded(compact)) > 16000:
-            for key in ("native_target_timing_ms", "timing_ms"):
-                if key in compact:
-                    compact[key] = {"file": "phase-summary.json", "sha256": full_hash}
-        compact_rtc_evidence(compact, full_hash)
-        compact_storage_evidence(compact, full_hash)
-        import m9e_worker_storage as composition
-        composition.compact(compact, full_hash, encoded)
-        import m9e_title_storage as retirement
-        retirement.compact(compact, full_hash, encoded)
-        import m9e_current_cost as cost
-        cost.compact(compact, full_hash, encoded)
-        import m9e_rulechange as rule
-        rule.compact(compact, full_hash, encoded)
-        if len(encoded(compact)) > 16000:
-            raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
+        compact = compact_summary(summary, full_hash, feedback.TIMINGS)
         write_bounded(feedback.COMPACT / "summary.json", compact)
         print(json.dumps(compact), flush=True)
     return code

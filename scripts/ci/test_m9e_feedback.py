@@ -10694,5 +10694,38 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         first["unbounded_extra"] = "x" * 65536
         with self.assertRaises(RuntimeError):
             phases.write_bounded(self.root / "oversized.json", first)
+class CompactWorkerEvidenceTests(unittest.TestCase):
+    def test_four_worker_details_become_one_exact_full_proof_reference(self):
+        import m9e_phases as phases
+        full = {"phase": "aggregate", "status": "passed", "qualification": "passed",
+                "tests": {"selected": 657, "executed": 657, "passed": 657, "failed": 0, "skipped": 0},
+                "worker_executables": {lane: {"sha256": lane * 64, "profile": "x" * 600}
+                                       for lane in "abcd"},
+                "first_failure": "x" * 14000}
+        original = copy.deepcopy(full)
+        proof_hash = phases.sha(phases.encoded(full))
+        compact = phases.compact_summary(full, proof_hash, {})
+        self.assertLessEqual(len(phases.encoded(compact)), 16000)
+        self.assertEqual(compact["worker_executables"],
+                         {"file": "phase-summary.json", "sha256": proof_hash, "field": "worker_executables"})
+        self.assertEqual(compact["tests"], full["tests"])
+        self.assertEqual(compact["qualification"], full["qualification"])
+        self.assertEqual(full, original)
+
+    def test_small_worker_details_remain_inline(self):
+        import m9e_phases as phases
+        full = {"phase": "aggregate", "status": "failed", "qualification": "unfinished",
+                "worker_executables": {"d": {"sha256": "d" * 64}}}
+        compact = phases.compact_summary(full, "e" * 64, {})
+        self.assertEqual(compact["worker_executables"], full["worker_executables"])
+        self.assertEqual(compact["status"], "failed")
+        self.assertEqual(compact["qualification"], "unfinished")
+
+    def test_unbounded_required_result_still_fails_closed(self):
+        import m9e_phases as phases
+        with self.assertRaisesRegex(RuntimeError, "compact evidence exceeds"):
+            phases.compact_summary({"first_failure": "x" * 16001,
+                                    "worker_executables": {"d": "detail"}}, "e" * 64, {})
+
 if __name__ == "__main__":
     unittest.main()
