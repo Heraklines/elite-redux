@@ -1,11 +1,11 @@
 //! Bounded actual CLI pipes, adapted from m9e_current_native_capture at 9fbb9fa2.
+use super::TestResult;
+use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-use serde_json::{Value, json};
-use super::TestResult;
 type Line = Result<Option<Vec<u8>>, String>;
 type WriteJob = (Vec<u8>, mpsc::SyncSender<Result<(), String>>);
 const RESPONSE_BOUND: u64 = 8 << 20;
