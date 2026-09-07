@@ -230,7 +230,12 @@ pub(crate) fn validate_snapshot(
         origin = super::current_coop_rebind_v7::origin_protocol(protocol)?;
         &origin
     } else {
-        if snapshot.scheduler.pauses.iter().any(|pause| pause.reasons.iter().any(|reason| reason == super::current_coop_rebind_v7::PAUSE)) {
+        if snapshot.scheduler.pauses.iter().any(|pause| {
+            pause
+                .reasons
+                .iter()
+                .any(|reason| reason == super::current_coop_rebind_v7::PAUSE)
+        }) {
             return Err(GameKernelV7Error::Invalid);
         }
         protocol
@@ -446,7 +451,9 @@ impl GameKernelV7 {
 
     /// Repeat the retained publication; no state, RNG, presentation or storage is repeated.
     pub fn retry_current_coop_setup(&self) -> Result<GameKernelStepV7> {
-        if self.has_current_coop_rebind() { return Err(GameKernelV7Error::Invalid); }
+        if self.has_current_coop_rebind() {
+            return Err(GameKernelV7Error::Invalid);
+        }
         let owner = self
             .current_coop_setup
             .as_ref()
