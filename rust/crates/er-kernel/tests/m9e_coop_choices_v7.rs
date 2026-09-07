@@ -1077,14 +1077,14 @@ fn natural_cooperative_battles_preserve_two_seats_across_rewards_and_disconnect(
             .state()
             .and_then(|state| state.active_run.as_ref())
             .and_then(|run| run.battle.as_ref())
+            && battle.wave.get().get() == wave
+            && battle.command_state.frontier.len() == 1
         {
-            if battle.wave.get().get() == wave && battle.command_state.frontier.len() == 1 {
-                assert_eq!(
-                    battle.turn, previous_turn,
-                    "first human command prematurely resolved turn"
-                );
-                retained_human_commands += 1;
-            }
+            assert_eq!(
+                battle.turn, previous_turn,
+                "first human command prematurely resolved turn"
+            );
+            retained_human_commands += 1;
         }
     }
     Err(format!("natural cooperative decisions exhausted at wave={maximum_wave}").into())
