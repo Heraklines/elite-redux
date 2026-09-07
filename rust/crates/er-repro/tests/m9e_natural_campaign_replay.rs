@@ -284,7 +284,7 @@ fn navigate_to(kernel: &mut CampaignRecorder, option: &str) -> Result<(), Box<dy
     if !kernel
         .current_control()
         .and_then(|control| control.menu.as_ref())
-        .is_some_and(|menu| menu.selected_option_id == option)
+        .is_some_and(|menu| menu.selected_option_id.as_str() == option)
     {
         return Err("raw navigation did not reach its offered option".into());
     }
