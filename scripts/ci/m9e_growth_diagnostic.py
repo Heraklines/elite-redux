@@ -17,7 +17,7 @@ TARGET = REPORT / "target"
 os.environ["CARGO_TARGET_DIR"] = str(TARGET)
 DEADLINE = time.monotonic() + 1800
 RUST_SOURCES = ["rust/crates/er-kernel/src/game_kernel_v7.rs", "rust/crates/er-progression/tests/m9e_growth_levels.rs",
-                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-kernel/src/snapshot_v7.rs"]
+                "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-progression/src/progression.rs", "rust/crates/er-game/src/m9e_new_run_v6.rs", "rust/crates/er-battle/src/m7_resolver.rs", "rust/crates/er-kernel/src/snapshot_v7.rs", "rust/crates/er-progression/src/current_growth_pow.rs"]
 TEST_TARGET = "m9e_growth_levels"
 TEST_IDS = ["current_growth_matches_pinned_javascript_for_every_u16_level", "current_growth_rejects_zero_level_unknown_rate_and_incomplete_table"]
 sequence = 0

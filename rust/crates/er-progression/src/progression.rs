@@ -14,6 +14,9 @@ use thiserror::Error;
 
 use crate::{EvolutionConditionV1, EvolutionDefinitionV1, PreparedProgressionContentV1};
 
+#[path = "current_growth_pow.rs"]
+mod current_growth_pow;
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum ProgressionMutationV1 {
@@ -107,13 +110,14 @@ pub fn current_growth_experience_for_level(
             .copied()
             .ok_or(ProgressionError::Content);
     }
+    let cube = current_growth_pow::growth_power(level, 3);
+    let fourth = current_growth_pow::growth_power(level, 4);
     let level = f64::from(level);
-    let cube = libm::pow(level, 3.0);
     let raw = match growth.id.get() {
-        0 => (libm::pow(level, 4.0) + cube * 2000.0) / 3500.0,
+        0 => (fourth + cube * 2000.0) / 3500.0,
         1 => (cube * 4.0) / 5.0,
         2 => cube,
-        3 => (cube * 6.0) / 5.0 - 15.0 * libm::pow(level, 2.0) + 100.0 * level - 140.0,
+        3 => (cube * 6.0) / 5.0 - 15.0 * (level * level) + 100.0 * level - 140.0,
         4 => (cube * 5.0) / 4.0,
         5 => (cube * (level / 2.0 + 8.0) * 4.0) / (100.0 + level),
         _ => return Err(ProgressionError::Content),
