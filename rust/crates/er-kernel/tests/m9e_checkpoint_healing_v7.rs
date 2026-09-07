@@ -209,6 +209,9 @@ fn progression_checkpoint() -> Result<(GameKernelV7, Arc<PreparedGameContentV2>)
 fn checkpoint(wave: u64) -> Result<(GameKernelV7, Arc<PreparedGameContentV2>), Box<dyn Error>> {
     let (mut kernel, content) = progression_checkpoint()?;
     for _ in 0..32 {
+        for pending in kernel.snapshot()?.pending_presentations {
+            kernel.settle_presentation(pending.event_id)?;
+        }
         if kernel.current_control().map(|control| control.kind) == Some(GameControlKindV2::Reward) {
             break;
         }
