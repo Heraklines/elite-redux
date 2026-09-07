@@ -154,20 +154,107 @@ struct Artifacts {
     facts: Value,
 }
 
+struct NaturalBootstrap<'a> {
+    cli: &'a mut Cli,
+    observation: Value,
+    events: Vec<RawInputEvent>,
+    results: usize,
+}
+
+impl<'a> NaturalBootstrap<'a> {
+    fn new(cli: &'a mut Cli, hash: &str) -> TestResult<Self> {
+        cli.result("batch.create", json!({"batch":"bootstrap","environments":[
+            {"environment":1,"start":start(false)}],"limits":{
+            "maximum_environments":1,"maximum_events":2,"maximum_result_bytes":4 << 20}}))?;
+        let observed = cli.result("batch.observe", json!({"batch":"bootstrap","environments":[1]}))?;
+        let rows = observed["results"].as_array().ok_or("one batch observation")?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["environment"], 1);
+        let observation = rows[0]["observation"].clone();
+        assert_eq!(observation["content_identity"]["bundle_hash"], hash);
+        assert_eq!(observation["control"]["kind"], "TITLE");
+        Ok(Self { cli, observation, events: Vec::new(), results: 0 })
+    }
+
+    fn inputs(&mut self, inputs: &[RawInputEvent]) -> TestResult {
+        assert!(!inputs.is_empty() && inputs.len() <= 2);
+        let result = self.cli.result("batch.raw_input", json!({"batch":"bootstrap","inputs":
+            inputs.iter().map(|input| json!({"environment":1,"input":input})).collect::<Vec<_>>()}))?;
+        assert!(serde_json::to_vec(&result)?.len() <= 4 << 20);
+        let rows = result["results"].as_array().ok_or("ordered batch results")?;
+        assert_eq!(rows.len(), inputs.len());
+        for (ordinal, row) in rows.iter().enumerate() {
+            assert_eq!(row["ordinal"], ordinal);
+            assert_eq!(row["environment"], 1);
+            assert_eq!(row["observation"]["content_identity"], self.observation["content_identity"]);
+            let _: GameKernelStepV7 = serde_json::from_value(row["step"].clone())?;
+            self.observation = row["observation"].clone();
+        }
+        self.events.extend_from_slice(inputs);
+        self.results += rows.len();
+        assert!(self.events.len() <= 16_384);
+        Ok(())
+    }
+
+    fn press(&mut self, code: PhysicalKey) -> TestResult {
+        self.inputs(&[RawInputEvent::KeyDown { code: code.clone(), printable: false,
+            browser_repeat: false, focus: InputFocus::Game }, RawInputEvent::KeyUp { code }])
+    }
+
+    fn select(&mut self, target: &str) -> TestResult {
+        let control: GameControlPlanV2 = serde_json::from_value(self.observation["control"].clone())?;
+        let menu = control.menu.ok_or("actual batch menu")?;
+        // The public batch API returns its actual menu. Use the same existing
+        // planner as control.plan_navigation, then send every event to the CLI.
+        let plan = er_lab::plan_navigation_v1(&menu.logical_menu()?, menu.instance_id,
+            er_types::MenuOptionId::new(target)?, false, 4096)?;
+        writeln!(std::io::stderr().lock(), "M9E_COMPAT public-batch target={target} events={}", plan.events.len())?;
+        for inputs in plan.events.chunks(2) {
+            self.inputs(inputs)?;
+        }
+        assert_eq!(self.observation["control"]["menu"]["selected_option_id"], target);
+        Ok(())
+    }
+
+    fn snapshot(&mut self) -> TestResult<Value> {
+        let result = self.cli.result("batch.snapshot", json!({"batch":"bootstrap","environments":[1]}))?;
+        let rows = result["results"].as_array().ok_or("one batch snapshot")?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["environment"], 1);
+        Ok(rows[0]["snapshot"].clone())
+    }
+
+    fn into_captured_session(mut self) -> TestResult<(Value, Value)> {
+        let snapshot = self.snapshot()?;
+        let typed: CoreGameKernelSnapshotV7 = serde_json::from_value(snapshot.clone())?;
+        assert!(matches!(typed.lifecycle, GameKernelLifecycleSnapshotV7::Active(_)));
+        self.cli.result("session.from_snapshot", json!({"session":"source","snapshot":snapshot,
+            "owner_seat":1,"role":"AUTHORITY"}))?;
+        same(&checkpoint(self.cli, "source")?, &snapshot)?;
+        let fresh: CurrentReproCapsuleV1 = serde_json::from_value(capsule(self.cli, "source")?)?;
+        same(&serde_json::to_value(fresh.checkpoint.as_ref())?, &snapshot)?;
+        assert_eq!(fresh.base_position, 0);
+        assert_eq!(fresh.final_position, 0);
+        assert!(fresh.attempts.is_empty());
+        self.cli.result("batch.close", json!({"batch":"bootstrap"}))?;
+        let facts = json!({"scope":"ACTUAL_CLI_BATCH_NATURAL_RAW","environment":1,
+            "event_count":self.events.len(),"result_count":self.results,"maximum_events_per_call":2,
+            "event_stream_digest":digest(&serde_json::to_value(&self.events)?)?,
+            "snapshot_digest":digest(&snapshot)?});
+        Ok((snapshot, facts))
+    }
+}
+
 fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult<Artifacts> {
     progress(label, "natural-create", began, hash)?;
     let hello = cli.result("protocol.hello", json!({}))?;
     assert_eq!(hello["backend"], "IN_PROCESS_V7");
     assert_eq!(hello["content_identity"]["bundle_hash"], hash);
-    cli.result(
-        "session.create",
-        json!({"session":"source","start":start(false)}),
-    )?;
-    assert_eq!(observation(cli, "source")?["control"]["kind"], "TITLE");
+    let mut natural = NaturalBootstrap::new(cli, hash)?;
     for _ in 0..2 {
-        press(cli, "source", PhysicalKey::Space)?;
+        natural.press(PhysicalKey::Space)?;
     }
-    let setup: CoreGameKernelSnapshotV7 = serde_json::from_value(checkpoint(cli, "source")?)?;
+    let setup: CoreGameKernelSnapshotV7 = serde_json::from_value(natural.snapshot()?)?;
     let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = setup.lifecycle else {
         return Err(format!("{label}: natural starter setup missing").into());
     };
@@ -191,15 +278,11 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
     assert_eq!(starters.len(), 6, "natural six-starter policy unavailable");
     for starter in &starters {
         progress(label, "select-starter", began, &starter.get().to_string())?;
-        select(
-            cli,
-            "source",
-            &format!("bootstrap/starter/{}", starter.get()),
-        )?;
-        press(cli, "source", PhysicalKey::Space)?;
+        natural.select(&format!("bootstrap/starter/{}", starter.get()))?;
+        natural.press(PhysicalKey::Space)?;
         progress(label, "starter-selected", began, &starter.get().to_string())?;
     }
-    let selected: CoreGameKernelSnapshotV7 = serde_json::from_value(checkpoint(cli, "source")?)?;
+    let selected: CoreGameKernelSnapshotV7 = serde_json::from_value(natural.snapshot()?)?;
     let GameKernelLifecycleSnapshotV7::Bootstrap(selected) = selected.lifecycle else {
         return Err(format!("{label}: selected starter setup missing").into());
     };
@@ -213,10 +296,13 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
     selected_ids.sort();
     starters.sort();
     assert_eq!(selected_ids, starters);
-    select(cli, "source", "bootstrap/starter/confirm")?;
+    natural.select("bootstrap/starter/confirm")?;
     for _ in 0..4 {
-        press(cli, "source", PhysicalKey::Space)?;
+        natural.press(PhysicalKey::Space)?;
     }
+    let (bootstrap_snapshot, mut bootstrap_facts) = natural.into_captured_session()?;
+    bootstrap_facts["selected_starter_ids"] = serde_json::to_value(&starters)?;
+    progress(label, "public-batch-handoff", began, "exact natural pre-turn snapshot; fresh native capture")?;
     settle(cli, "source")?;
     assert_eq!(
         observation(cli, "source")?["control"]["kind"],
@@ -336,6 +422,10 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
         GameSaveV2::new(state.content_identity.clone(), SafeU53::new(1)?, state)?.encode()?;
     let exported = capsule(cli, "source")?;
     let typed_capsule: CurrentReproCapsuleV1 = serde_json::from_value(exported.clone())?;
+    // Replay begins at the actual exported natural pre-turn checkpoint. The
+    // batch's Title journey is real CLI execution, not part of this replay tail.
+    assert_eq!(typed_capsule.base_position, 0);
+    same(&serde_json::to_value(typed_capsule.checkpoint.as_ref())?, &bootstrap_snapshot)?;
     assert!(!typed_capsule.attempts.is_empty());
     assert!(typed_capsule.browser_transport.is_none());
     assert!(
@@ -352,7 +442,7 @@ fn produce(cli: &mut Cli, hash: &str, label: &str, began: Instant) -> TestResult
         CurrentReproOutcomeV1::Applied { step: retained, .. } if retained.as_ref() == &step)),
         "actual BattleTurn step must remain in the replay capsule"
     );
-    let facts = json!({"bundle_hash":hash,"snapshot_digest":digest(&snapshot)?,
+    let facts = json!({"bundle_hash":hash,"bootstrap":bootstrap_facts,"snapshot_digest":digest(&snapshot)?,
         "action_snapshot_digest":digest(&action)?,"capsule_digest":digest(&exported)?,
         "snapshot_bytes":serde_json::to_vec(&snapshot)?.len(),"save_bytes":save.len(),
         "save_digest":format!("blake3-v1:{}",er_canonical::content_digest(&GameSaveV2::decode(&save)?)?),

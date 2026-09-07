@@ -186,6 +186,31 @@ BASE_SOURCES = json.loads(r'''{
     "bytes": 5846,
     "sha256": "3bb274b506f4861a18f51a1e358e73f0cec9c30d890886ed9d9c0e8d1a042152",
     "git_blob": "227c9cfa5e2330dfd0fb6e70000f209b7fc4bf19"
+  },
+  "rust/crates/er-cli/src/current_batch_agent.rs": {
+    "bytes": 13855,
+    "sha256": "cef00b2ae1f4c77fe18eb998d8f4870f1e43e0d341d86dacea47f4af7b6ba1ac",
+    "git_blob": "ea497e6f6de1a1882a08d20f91565d8ae4fd8ef4"
+  },
+  "rust/crates/er-batch/src/current.rs": {
+    "bytes": 15466,
+    "sha256": "4da1902a513dd2d5f78f159266a4e067152a5b6ec0bf3f02a7de7b97a3d46491",
+    "git_blob": "7ebb3ad584322bd8e0249bc3bcae0da262e5d4cc"
+  },
+  "rust/crates/er-batch/Cargo.toml": {
+    "bytes": 526,
+    "sha256": "b30c4189c81fc515421a2fa4c5050a3f5161cfad0fad3206a9d104ce9b725ab8",
+    "git_blob": "33928c7d99cc9ab37800e6acc500625f45526c58"
+  },
+  "rust/crates/er-lab/src/navigation.rs": {
+    "bytes": 4488,
+    "sha256": "2856784f27409644913eb345c39cf1a6974940917a36afa28f2d9aa7c8d31e14",
+    "git_blob": "4fbc177f57f7a873d9324a6f425eb063e94bdb01"
+  },
+  "rust/crates/er-game/src/m72_bootstrap.rs": {
+    "bytes": 30759,
+    "sha256": "54369e34edc90a194f425e677a21e3ba7ce64dff46a4af9b688e4821a511dccc",
+    "git_blob": "f4529edb7902e6d46eda38eaa0609b9f100352b9"
   }
 }''')
 PROFILE = {"RUSTUP_TOOLCHAIN": "1.97.1", "CARGO_INCREMENTAL": "0", "CARGO_TERM_COLOR": "never",
@@ -400,7 +425,7 @@ def validate_evidence(path):
     hashes = {"snapshot_digest", "action_snapshot_digest", "capsule_digest", "save_digest"}
     for label in ("old", "new"):
         item = evidence[label]
-        require(set(item) == {*numbers, *hashes, "bundle_hash", "selected_move_option"}, "exact artifact evidence fields required")
+        require(set(item) == {*numbers, *hashes, "bundle_hash", "selected_move_option", "bootstrap"}, "exact artifact evidence fields required")
         require(item["bundle_hash"] == CONTENT[label]["bundle_hash"], "real content identity differs")
         for name, maximum in numbers.items():
             require(type(item[name]) is int and 0 <= item[name] <= maximum, "bounded integer evidence differs: " + name)
@@ -411,7 +436,30 @@ def validate_evidence(path):
                 "public legal move option differs")
         require(all(type(item[name]) is str and re.fullmatch("blake3-v1:[0-9a-f]{64}", item[name]) for name in hashes),
                 "canonical evidence digest differs")
+        bootstrap = item["bootstrap"]
+        require(type(bootstrap) is dict and set(bootstrap) == {"scope", "environment", "event_count", "result_count",
+                "maximum_events_per_call", "event_stream_digest", "snapshot_digest", "selected_starter_ids"},
+                "exact public batch bootstrap evidence required")
+        require(bootstrap["scope"] == "ACTUAL_CLI_BATCH_NATURAL_RAW"
+                and type(bootstrap["environment"]) is int and bootstrap["environment"] == 1
+                and type(bootstrap["maximum_events_per_call"]) is int and bootstrap["maximum_events_per_call"] == 2,
+                "single-environment bounded raw batch differs")
+        require(type(bootstrap["event_count"]) is int and 24 <= bootstrap["event_count"] <= 16384
+                and bootstrap["event_count"] % 2 == 0 and type(bootstrap["result_count"]) is int
+                and bootstrap["result_count"] == bootstrap["event_count"] and item["base_position"] == 0,
+                "actual ordered raw events or fresh capture frontier differs")
+        require(all(type(bootstrap[name]) is str and re.fullmatch("blake3-v1:[0-9a-f]{64}", bootstrap[name])
+                for name in ("event_stream_digest", "snapshot_digest")), "bootstrap source digest differs")
+        starters = bootstrap["selected_starter_ids"]
+        require(type(starters) is list and len(starters) == 6
+                and all(type(value) is int and 1 <= value <= 9007199254740991 for value in starters)
+                and starters == sorted(set(starters)), "actual selected starter identities differ")
     require(evidence["old"]["snapshot_digest"] != evidence["new"]["snapshot_digest"], "two actual snapshots must differ")
+    require(evidence["old"]["bootstrap"]["event_stream_digest"] == evidence["new"]["bootstrap"]["event_stream_digest"]
+            and evidence["old"]["bootstrap"]["event_count"] == evidence["new"]["bootstrap"]["event_count"]
+            and evidence["old"]["bootstrap"]["selected_starter_ids"] == evidence["new"]["bootstrap"]["selected_starter_ids"]
+            and evidence["old"]["bootstrap"]["snapshot_digest"] != evidence["new"]["bootstrap"]["snapshot_digest"],
+            "both content cohorts must execute the identical real natural raw journey")
     return {"bytes": path.stat().st_size, "sha256": digest(path), "facts": evidence}
 
 
