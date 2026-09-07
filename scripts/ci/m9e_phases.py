@@ -27,6 +27,7 @@ MANIFEST_LIMIT = 64 * 1024
 NATIVE_PROOF_LIMIT = 192 * 1024
 NATIVE_ID_ENCODING = "native-inventory-indices-v1"
 NATIVE_COMPRESSED_ID_ENCODING = "native-inventory-zlib-indices-v2"
+NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
     "struggle_test": "rust/crates/er-kernel/tests/m9e_struggle_v7.rs",
@@ -241,6 +242,8 @@ def pack_native_ids(value):
 
 
 def unpack_native_ids(value):
+    if isinstance(value, dict) and value.get("encoding") == NATIVE_COMPRESSED_PROOF_ENCODING:
+        value = unpack_compressed_native_proof(value)
     if isinstance(value, dict) and value.get("encoding") == NATIVE_COMPRESSED_ID_ENCODING:
         value = unpack_compressed_native_inventory(value)
     if not isinstance(value, dict) or "encoding" not in value:
@@ -303,11 +306,48 @@ def pack_native_inventory(value):
     proof = indexed["proof"]
     inventory = proof["inventory"]
     ids = encoded([[item["ids"], item["historical_excluded_ids"]] for item in inventory])
-    return {"encoding": NATIVE_COMPRESSED_ID_ENCODING,
+    compressed_ids = {"encoding": NATIVE_COMPRESSED_ID_ENCODING,
             "proof": {**proof, "inventory": [{"crate": item["crate"], "target": item["target"]}
                                               for item in inventory]},
             "inventory_ids": {"decoded_bytes": len(ids),
                               "data": base64.b64encode(zlib.compress(ids, level=9)).decode("ascii")}}
+    if len(encoded(compressed_ids)) <= MANIFEST_LIMIT:
+        return compressed_ids
+    # A's complete timing, co-op and cost evidence can exceed the wire bound
+    # even with ID compression. Compress the indexed proof as one bounded
+    # stream; preserve every field and the existing 192 KiB semantic limit.
+    raw = encoded(indexed)
+    return {"encoding": NATIVE_COMPRESSED_PROOF_ENCODING, "decoded_bytes": len(raw),
+            "data": base64.b64encode(zlib.compress(raw, level=9)).decode("ascii")}
+
+
+def unpack_compressed_native_proof(value):
+    if set(value) != {"encoding", "decoded_bytes", "data"}:
+        raise RuntimeError("native compressed proof wrapper fields are invalid")
+    size, text = value["decoded_bytes"], value["data"]
+    if (type(size) is not int or not 0 < size <= NATIVE_PROOF_LIMIT
+            or not isinstance(text, str) or not text or len(text) > MANIFEST_LIMIT
+            or len(encoded(value)) > MANIFEST_LIMIT):
+        raise RuntimeError("native compressed proof bounds are invalid")
+    try:
+        compressed = base64.b64decode(text, validate=True)
+        if base64.b64encode(compressed).decode("ascii") != text:
+            raise ValueError("noncanonical base64")
+        stream = zlib.decompressobj()
+        raw = stream.decompress(compressed, size + 1)
+        if len(raw) != size or not stream.eof or stream.unused_data or stream.unconsumed_tail:
+            raise ValueError("incomplete, trailing or oversized zlib stream")
+    except (ValueError, binascii.Error, zlib.error) as error:
+        raise RuntimeError("native compressed proof payload is invalid or exceeds its bound") from error
+    try:
+        indexed = json.loads(raw)
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise RuntimeError("native compressed proof JSON is invalid") from error
+    # Disallow nesting and v2 payloads. Only one bounded inflation precedes all
+    # original v1 permutation, ownership, semantic digest and expansion checks.
+    if not isinstance(indexed, dict) or indexed.get("encoding") != NATIVE_ID_ENCODING:
+        raise RuntimeError("native compressed proof must contain exactly an indexed v1 proof")
+    return indexed
 
 
 def unpack_compressed_native_inventory(value):

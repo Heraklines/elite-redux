@@ -8234,6 +8234,73 @@ class PhaseTransferTests(unittest.TestCase):
         proof["inventory_sha256"] = self.phases.sha(self.phases.encoded(proof["inventory"]))
         return proof
 
+    def native_requiring_complete_proof_compression(self):
+        proof = self.native_requiring_inventory_compression()
+        proof["complete_evidence"] = {"timing_and_source_records": "preserved-record;" * 4000}
+        self.assertLessEqual(len(self.phases.encoded(proof)), self.phases.NATIVE_PROOF_LIMIT)
+        return proof
+
+    def test_compressed_complete_native_proof_roundtrips_all_evidence(self):
+        proof = self.native_requiring_complete_proof_compression()
+        wire = self.phases.pack_native_inventory(proof)
+        self.assertEqual(wire["encoding"], self.phases.NATIVE_COMPRESSED_PROOF_ENCODING)
+        path = self.root / "complete-native.json"
+        digest = self.phases.write_bounded(path, proof)
+        self.assertLessEqual(path.stat().st_size, self.phases.MANIFEST_LIMIT)
+        self.assertEqual(self.phases.read_bounded(path, digest), proof)
+
+    def test_compressed_complete_native_proof_rejects_wrapper_and_stream_tampering(self):
+        packed = self.phases.pack_native_inventory(self.native_requiring_complete_proof_compression())
+        compressed = base64.b64decode(packed["data"])
+        for label in ("extra", "missing", "bool", "oversize", "wrong_size", "bad_base64", "padding",
+                      "truncated", "trailing", "concatenated", "bomb"):
+            with self.subTest(label=label):
+                wire = copy.deepcopy(packed)
+                if label == "extra":
+                    wire["extra"] = True
+                elif label == "missing":
+                    del wire["data"]
+                elif label == "bool":
+                    wire["decoded_bytes"] = True
+                elif label == "oversize":
+                    wire["decoded_bytes"] = self.phases.NATIVE_PROOF_LIMIT + 1
+                elif label == "wrong_size":
+                    wire["decoded_bytes"] -= 1
+                elif label == "bad_base64":
+                    wire["data"] = "!!!"
+                elif label == "padding":
+                    wire["data"] += "="
+                else:
+                    stream = {"truncated": compressed[:-1], "trailing": compressed + b"junk",
+                              "concatenated": compressed + compressed,
+                              "bomb": self.phases.zlib.compress(b"x" * (self.phases.NATIVE_PROOF_LIMIT + 1))}[label]
+                    wire["data"] = base64.b64encode(stream).decode("ascii")
+                with patch.object(self.phases.json, "loads") as parse, self.assertRaises(RuntimeError):
+                    self.phases.unpack_native_ids(wire)
+                parse.assert_not_called()
+
+    def test_compressed_complete_native_proof_preserves_all_v1_semantic_checks(self):
+        proof = self.native_requiring_complete_proof_compression()
+        indexed = self.phases.pack_native_ids(proof)
+        for label in ("nested", "v2", "not_json", "utf8", "duplicate_index", "changed_plan", "changed_id"):
+            with self.subTest(label=label):
+                inner = copy.deepcopy(indexed)
+                if label == "nested":
+                    inner = self.phases.pack_native_inventory(proof)
+                elif label == "v2":
+                    inner["encoding"] = self.phases.NATIVE_COMPRESSED_ID_ENCODING
+                elif label == "duplicate_index":
+                    inner["proof"]["plan"]["required_native_test_ids"]["er-repro:m9e_current_repro"] = [0, 0]
+                elif label == "changed_plan":
+                    inner["proof"]["plan"]["unexpected"] = True
+                elif label == "changed_id":
+                    inner["proof"]["inventory"][0]["ids"][0] = "unverified"
+                raw = b"not-json" if label == "not_json" else b"\xff" if label == "utf8" else self.phases.encoded(inner)
+                wire = {"encoding": self.phases.NATIVE_COMPRESSED_PROOF_ENCODING, "decoded_bytes": len(raw),
+                        "data": base64.b64encode(self.phases.zlib.compress(raw)).decode("ascii")}
+                with self.assertRaises(RuntimeError):
+                    self.phases.unpack_native_ids(wire)
+
     def replace_compressed_id_bytes(self, wire, raw):
         wire["inventory_ids"] = {"decoded_bytes": len(raw),
                                  "data": base64.b64encode(self.phases.zlib.compress(raw, level=9)).decode("ascii")}
