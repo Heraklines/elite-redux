@@ -37,13 +37,12 @@ def main():
     with log.open("wb") as output:
         result = subprocess.run(argv, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, timeout=450, check=False)
     raw = log.read_bytes()
-    if not 0 < len(raw) <= 256 << 10:
-        raise RuntimeError("bounded whole-harness log required")
     found = re.findall(rb"(?m)^Ran ([0-9]+) tests in ([0-9.]+)s$", raw)
     count = int(found[0][0]) if len(found) == 1 else None
     after = {str(path.relative_to(ROOT)): digest(path) for path in paths}
     elapsed = time.time() - int(os.environ["M9E_PREFLIGHT_STARTED"])
-    passed = result.returncode == 0 and count == 477 and before == after and 0 < elapsed <= 540
+    passed = (result.returncode == 0 and count == 477 and before == after
+              and 0 < elapsed <= 540 and 0 < len(raw) <= 256 << 10)
     summary = {"status": "passed" if passed else "failed", "source_sha": source,
                "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
                "tests": count, "expected_tests": 477, "returncode": result.returncode, "execution_argv": argv,

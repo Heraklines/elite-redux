@@ -608,7 +608,12 @@
     "scripts/ci/m9e_coop_lost_receipt_diagnostic.py",
     ".github/workflows/m9e-coop-lost-receipt-focused.yml",
     "scripts/ci/m9e_generated_xp.py",
-    "scripts/ci/test_m9e_generated_xp.py"
+    "scripts/ci/test_m9e_generated_xp.py",
+    ".github/workflows/m9e-browser-integration-preflight.yml",
+    "scripts/ci/m9e_browser_integration_preflight.py",
+    "scripts/ci/m9e_browser_rebind.py",
+    "scripts/ci/test_m9e_browser_rebind.py",
+    "scripts/ci/fixtures/m9e-browser-rebind-proof.json"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"
@@ -2082,7 +2087,9 @@
     "codec_test_ids": [
       "current V2 canonical payload preserves signed state values",
       "current V2 canonical payload rejects ambiguous numeric values",
-      "current V2 envelope keeps correlation IDs nonnegative"
+      "current V2 envelope keeps correlation IDs nonnegative",
+      "current V2 rebind codec preserves typed controls and exact output bytes",
+      "current V2 rebind codec rejects malformed generation frames and observation"
     ]
   },
   "timer_focus": {
