@@ -36,7 +36,6 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
 
-
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
 }
@@ -366,7 +365,14 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
     assert_eq!(after.programs.len(), 3697);
     assert_eq!(after.classifications.0.len(), 9411);
     assert_eq!(&after.programs[..3691], before.battle.programs.as_slice());
-    let expected = [(36, 1, 4), (66, 1, 4), (457, 1, 2), (528, 1, 4), (543, 1, 4), (617, 1, 2)];
+    let expected = [
+        (36, 1, 4),
+        (66, 1, 4),
+        (457, 1, 2),
+        (528, 1, 4),
+        (543, 1, 4),
+        (617, 1, 2),
+    ];
     let mut restored = serde_json::to_value(&after.classifications.0)?;
     let old_rows = serde_json::to_value(&before.battle.classifications.0)?;
     let old_rows = old_rows.as_array().ok_or("old classes")?;
@@ -377,35 +383,67 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
             assert_eq!(row["behavior_unit"], old["behavior_unit"]);
             assert_eq!(old["kind"], "BESPOKE");
             assert_eq!(row["kind"], "COMPILED");
-            let id = row["behavior_unit"]["source"]["numeric_id"].as_u64().ok_or("move")?;
-            assert!(expected.iter().any(|(expected_id, _, _)| *expected_id == id));
+            let id = row["behavior_unit"]["source"]["numeric_id"]
+                .as_u64()
+                .ok_or("move")?;
+            assert!(
+                expected
+                    .iter()
+                    .any(|(expected_id, _, _)| *expected_id == id)
+            );
             changed.push(id);
             *row = old.clone();
         }
     }
     changed.sort_unstable();
     assert_eq!(changed, expected.map(|(id, _, _)| id));
-    assert_eq!(restored, serde_json::to_value(&before.battle.classifications.0)?);
+    assert_eq!(
+        restored,
+        serde_json::to_value(&before.battle.classifications.0)?
+    );
     for (numeric_id, numerator, denominator) in expected {
-        let definition = content.battle.move_definition(MoveId::new(safe(numeric_id)))?;
+        let definition = content
+            .battle
+            .move_definition(MoveId::new(safe(numeric_id)))?;
         let mut recoil = Vec::new();
         for id in &definition.mechanic_programs {
             let program = content.battle.program(*id)?;
             for operation in &program.operations {
                 let value = serde_json::to_value(operation)?;
                 if value["kind"] == "RECOIL_FRACTION" {
-                    assert_eq!(program.source, BehaviorSourceId::Move { numeric_id: safe(numeric_id) });
-                    recoil.push((value["numerator"].as_u64().ok_or("numerator")?, value["denominator"].as_u64().ok_or("denominator")?));
+                    assert_eq!(
+                        program.source,
+                        BehaviorSourceId::Move {
+                            numeric_id: safe(numeric_id)
+                        }
+                    );
+                    recoil.push((
+                        value["numerator"].as_u64().ok_or("numerator")?,
+                        value["denominator"].as_u64().ok_or("denominator")?,
+                    ));
                 }
             }
         }
         assert_eq!(recoil, vec![(numerator, denominator)]);
     }
     for id in [38, 165, 344, 394, 413, 452, 834, 835] {
-        let source = BehaviorSourceId::Move { numeric_id: safe(id) };
+        let source = BehaviorSourceId::Move {
+            numeric_id: safe(id),
+        };
         assert_eq!(
-            after.classifications.0.iter().filter(|row| row.behavior_unit.source == source).collect::<Vec<_>>(),
-            before.battle.classifications.0.iter().filter(|row| row.behavior_unit.source == source).collect::<Vec<_>>()
+            after
+                .classifications
+                .0
+                .iter()
+                .filter(|row| row.behavior_unit.source == source)
+                .collect::<Vec<_>>(),
+            before
+                .battle
+                .classifications
+                .0
+                .iter()
+                .filter(|row| row.behavior_unit.source == source)
+                .collect::<Vec<_>>()
         );
     }
     Ok(())
@@ -419,7 +457,10 @@ fn actual_recoil_uses_capped_hp_loss_and_source_fraction() -> TestResult {
         let result = turn(&content, &state)?;
         let run = result.after_state.active_run.as_ref().ok_or("run")?;
         assert_eq!(run.party[0].hp, 0);
-        assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 100 - expected_recoil);
+        assert_eq!(
+            run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp,
+            100 - expected_recoil
+        );
         assert_eq!(state, before);
     }
     Ok(())
@@ -429,14 +470,24 @@ fn actual_recoil_uses_capped_hp_loss_and_source_fraction() -> TestResult {
 fn actual_recoil_minimum_one_and_actor_faint_are_preserved() -> TestResult {
     use er_battle::resolver::BattleMutation;
     let (content, mut state) = recoil_state(66, 400, 100)?;
-    state.active_run.as_mut().ok_or("run")?.party[0].stats.defense = 100000;
+    state.active_run.as_mut().ok_or("run")?.party[0]
+        .stats
+        .defense = 100000;
     state.validate()?;
     let result = turn(&content, &state)?;
     let run = result.after_state.active_run.as_ref().ok_or("run")?;
     assert_eq!(run.party[0].hp, 399);
     assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 99);
     let (content, state) = recoil_state(617, 17, 1)?;
-    let actor = state.active_run.as_ref().ok_or("run")?.battle.as_ref().ok_or("battle")?.enemy_party[0].id;
+    let actor = state
+        .active_run
+        .as_ref()
+        .ok_or("run")?
+        .battle
+        .as_ref()
+        .ok_or("battle")?
+        .enemy_party[0]
+        .id;
     let result = turn(&content, &state)?;
     let run = result.after_state.active_run.as_ref().ok_or("run")?;
     let pokemon = &run.battle.as_ref().ok_or("battle")?.enemy_party[0];
@@ -449,12 +500,20 @@ fn actual_recoil_minimum_one_and_actor_faint_are_preserved() -> TestResult {
 #[test]
 fn immune_recoil_neither_hurts_nor_consumes_damage_variance() -> TestResult {
     let (content, mut state) = recoil_state(66, 17, 100)?;
-    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping { primary: PokemonType::Ghost, secondary: None };
+    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
+        primary: PokemonType::Ghost,
+        secondary: None,
+    };
     let result = turn(&content, &state)?;
     let run = result.after_state.active_run.as_ref().ok_or("run")?;
     assert_eq!(run.party[0].hp, 17);
     assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 100);
-    assert!(!result.rng_audit.iter().any(|draw| draw.reason == RngReason::DamageVariance));
+    assert!(
+        !result
+            .rng_audit
+            .iter()
+            .any(|draw| draw.reason == RngReason::DamageVariance)
+    );
     Ok(())
 }
 
@@ -463,7 +522,9 @@ fn recoil_damage_queries_preserve_actual_turn_and_borrowed_state() -> TestResult
     let (content, state) = recoil_state(617, 400, 100)?;
     let baseline = turn(&content, &state)?;
     let bytes = serde_json::to_vec(&state)?;
-    for _ in 0..3 { assert!(query(&content, &state, 0)? > 0); }
+    for _ in 0..3 {
+        assert!(query(&content, &state, 0)? > 0);
+    }
     assert_eq!(serde_json::to_vec(&state)?, bytes);
     assert_eq!(turn(&content, &state)?, baseline);
     Ok(())

@@ -647,8 +647,14 @@ fn execute_move(
         hit_any = true;
     }
     apply_move_recoil_after_damage(
-        run, actor_id, definition.id, total_damage_dealt, content,
-        mutations, presentation, mechanics_evidence,
+        run,
+        actor_id,
+        definition.id,
+        total_damage_dealt,
+        content,
+        mutations,
+        presentation,
+        mechanics_evidence,
     )?;
     let after_hit = execute_hook_v2(content, &context, MechanicHookV2::AfterHit)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
@@ -763,7 +769,10 @@ fn apply_move_drain_after_damage(
         });
     }
     mechanics_evidence.extend(after_damage.operations.into_iter().filter(|evidence| {
-        !matches!(evidence.operation, MechanicOperationV2::RecoilFraction { .. })
+        !matches!(
+            evidence.operation,
+            MechanicOperationV2::RecoilFraction { .. }
+        )
     }));
     Ok(())
 }
@@ -791,20 +800,32 @@ fn apply_move_recoil_after_damage(
             .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?
     };
     for evidence in after_damage.operations {
-        let MechanicOperationV2::RecoilFraction { numerator, denominator } = evidence.operation else {
+        let MechanicOperationV2::RecoilFraction {
+            numerator,
+            denominator,
+        } = evidence.operation
+        else {
             continue;
         };
         if !evidence.condition_matched
-            || evidence.behavior_unit.source != (BehaviorSourceId::Move { numeric_id: move_id.get() })
+            || evidence.behavior_unit.source
+                != (BehaviorSourceId::Move {
+                    numeric_id: move_id.get(),
+                })
         {
             continue;
         }
-        let program = content.program(evidence.program)
+        let program = content
+            .program(evidence.program)
             .map_err(|error| BattleV5Error::Content(error.to_string()))?;
-        let binding = program.bindings.iter()
+        let binding = program
+            .bindings
+            .iter()
             .find(|binding| binding.binding_ordinal == evidence.binding_ordinal)
             .ok_or(BattleV5Error::DispatchClosure)?;
-        let selector = binding.selector_root.and_then(|root| program.selectors.0.get(root.index()));
+        let selector = binding
+            .selector_root
+            .and_then(|root| program.selectors.0.get(root.index()));
         if !matches!(selector, Some(SelectorNodeV2::Actor)) {
             return Err(BattleV5Error::UnsupportedContent);
         }
@@ -812,14 +833,25 @@ fn apply_move_recoil_after_damage(
         if !actor.fainted {
             // Pinned RecoilAttr uses cumulative actual damage, once at last hit.
             // Only binary-exact ordinary fractions enter this M9 admission.
-            let amount = total_damage_dealt.checked_mul(u64::from(numerator))
+            let amount = total_damage_dealt
+                .checked_mul(u64::from(numerator))
                 .and_then(|value| value.checked_div(u64::from(denominator)))
-                .ok_or(BattleV5Error::Overflow)?.max(1).min(u64::from(actor.hp));
+                .ok_or(BattleV5Error::Overflow)?
+                .max(1)
+                .min(u64::from(actor.hp));
             let before = actor.hp;
             actor.hp -= u32::try_from(amount).map_err(|_| BattleV5Error::Overflow)?;
             actor.fainted = actor.hp == 0;
-            mutations.push(BattleMutation::HpChanged { pokemon: actor_id, before, after: actor.hp });
-            presentation.push(BattlePresentationCueV5::HpChanged { pokemon: actor_id, before, after: actor.hp });
+            mutations.push(BattleMutation::HpChanged {
+                pokemon: actor_id,
+                before,
+                after: actor.hp,
+            });
+            presentation.push(BattlePresentationCueV5::HpChanged {
+                pokemon: actor_id,
+                before,
+                after: actor.hp,
+            });
             if actor.fainted {
                 presentation.push(BattlePresentationCueV5::Fainted { pokemon: actor_id });
             }
