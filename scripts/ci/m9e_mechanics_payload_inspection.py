@@ -32,6 +32,14 @@ for index in selected:
     assert [unit['id'] for unit in source_units] == [entry['behavior_unit'] for entry in classifications]
     rows.append({'move': move, 'programs': programs, 'classifications': classifications,
                  'source_units': [unit for unit in semantic['behavior_units'] if unit['id']['source'].get('kind') == 'MOVE' and str(unit['id']['source'].get('numeric_id')) == str(index)]})
+phase_path = root / 'oracle/src/phases/move-effect-phase.ts'
+phase_raw = phase_path.read_bytes()
+assert 0 < len(phase_raw) <= 262144
+assert hashlib.sha1(b'blob ' + str(len(phase_raw)).encode() + b'\0' + phase_raw).hexdigest() == '0655bdba9c9fcc8b868d345843ccd3eda5299b21'
+phase_lines = phase_raw.decode().splitlines()
+phase_hits = [index for index, line in enumerate(phase_lines) if 'singleHitDamageDealt' in line or 'totalDamageDealt' in line]
+assert len(phase_hits) <= 12
+phase_context = [{'line': index + 1, 'source': '\n'.join(phase_lines[max(0, index - 5):index + 7])} for index in phase_hits]
 result = {
     'status': 'observed', 'scope': 'published payload inspection only; no behavior qualification',
     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
@@ -41,6 +49,8 @@ result = {
     'semantic_sample_ids': [unit['id'] for unit in semantic['behavior_units'][:2]],
     'semantic_sha256': hashlib.sha256(semantic_raw).hexdigest(),
     'selected_ids': selected, 'rows': rows,
+    'phase_source': {'bytes': len(phase_raw), 'sha256': hashlib.sha256(phase_raw).hexdigest(), 'contexts': phase_context},
+    'drain_operands': [{'id': unit['id'], 'operands': unit['semantic']['operands']} for unit in semantic['behavior_units'] if unit['semantic']['effect'].get('attribute') == 'HitHealAttr'],
     'pack_counts': {
         'moves': sum(row is not None for row in battle['moves']),
         'programs': sum(row is not None for row in battle['programs']),
