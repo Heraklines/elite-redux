@@ -12,7 +12,7 @@ import time
 BASE = "51841a90c9c1f5599d1fc980cd4531b4c6c1c9ab"
 SOURCE = "rust/crates/er-game/tests/m9e_move_drains.rs"
 CI = [".github/workflows/m9e-static-drain-focused.yml", "scripts/ci/m9e_static_drain_diagnostic.py"]
-DELTAS = json.loads(r'''{"before":{"rust/crates/er-battle/src/m7_resolver.rs":"db8b2ed1e6152e6b4401663273ced1550cdd6fc8a6bdc0e10fe0bcd24c654e57","rust/crates/er-content-compiler/src/lib.rs":"6540d342bfa247de0b1aa34f6a580f1fe24b82c01c223207bf97952fa5b4a8f2","rust/crates/er-content-compiler/src/m9e_full_content.rs":"1ed03123f0f76d0be480836d067cab7a88e59ca6c7be7630b8ac60a16abb0808"},"after":{"rust/crates/er-battle/src/m7_resolver.rs":"123adc6260134d0fc6e574d6b43faf0176b8b421f8f5d7a178288d8eb4b0000e","rust/crates/er-content-compiler/src/lib.rs":"f12b5faa7e62d84d70d038ec82e0f3151eabd47c845e4853ffe4b5d39a316d83","rust/crates/er-content-compiler/src/m9e_full_content.rs":"6f30654dc6f188e9940d6b014959622e26228e4b3a9f655587f7ef41a8c2ff50","rust/crates/er-content-compiler/src/m9e_move_drains.rs":"faaa210ca40488a80ddd36de7fa7c5af07011f0bc2e9b7f9d1a4262a83bf9630","rust/crates/er-game/tests/m9e_move_drains.rs":"0a5699698aa5dbd4817bc283d030365710035fdb60d80d95678e668d0c2db28d"}}''')
+DELTAS = json.loads(r'''{"before":{"rust/crates/er-battle/src/m7_resolver.rs":"db8b2ed1e6152e6b4401663273ced1550cdd6fc8a6bdc0e10fe0bcd24c654e57","rust/crates/er-content-compiler/src/lib.rs":"6540d342bfa247de0b1aa34f6a580f1fe24b82c01c223207bf97952fa5b4a8f2","rust/crates/er-content-compiler/src/m9e_full_content.rs":"1ed03123f0f76d0be480836d067cab7a88e59ca6c7be7630b8ac60a16abb0808"},"after":{"rust/crates/er-battle/src/m7_resolver.rs":"123adc6260134d0fc6e574d6b43faf0176b8b421f8f5d7a178288d8eb4b0000e","rust/crates/er-content-compiler/src/lib.rs":"f12b5faa7e62d84d70d038ec82e0f3151eabd47c845e4853ffe4b5d39a316d83","rust/crates/er-content-compiler/src/m9e_full_content.rs":"6f30654dc6f188e9940d6b014959622e26228e4b3a9f655587f7ef41a8c2ff50","rust/crates/er-content-compiler/src/m9e_move_drains.rs":"faaa210ca40488a80ddd36de7fa7c5af07011f0bc2e9b7f9d1a4262a83bf9630","rust/crates/er-game/tests/m9e_move_drains.rs":"85296cdfec5fb0c89a85cf09048784e748bb943477b674c9c340e406a12b2787"}}''')
 ROOT = Path.cwd().resolve()
 RUNNER = Path(os.environ["RUNNER_TEMP"]).resolve()
 OUT = RUNNER / "m9e-static-drain"
@@ -97,6 +97,7 @@ def main():
         require(not any(path.startswith("rust/fixtures/") for path in paths), "fixture source changed")
         pins = [*DELTAS["after"], *CI, "rust/Cargo.toml", "rust/Cargo.lock", "rust/rust-toolchain.toml",
                 "rust/crates/er-game/Cargo.toml", "rust/crates/er-game/src/lib.rs",
+                "rust/crates/er-game/src/m7_content.rs", "rust/crates/er-game/src/m9e_content_v2.rs",
                 "rust/crates/er-battle/Cargo.toml", "rust/crates/er-battle/src/lib.rs",
                 "rust/crates/er-content-compiler/Cargo.toml", "rust/crates/er-content-compiler/src/bin/m9e-content.rs",
                 "rust/crates/er-content-compiler/src/m6/moves.rs", "rust/crates/er-content-compiler/src/m6/pipeline.rs",
