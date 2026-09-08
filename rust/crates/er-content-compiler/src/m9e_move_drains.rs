@@ -28,7 +28,10 @@ pub(crate) fn admit_static_move_drains(
         else {
             continue;
         };
-        if !matches!(spec.operations.as_slice(), [MechanicOperationV2::DrainFraction { .. }]) {
+        if !matches!(
+            spec.operations.as_slice(),
+            [MechanicOperationV2::DrainFraction { .. }]
+        ) {
             return Err(FullContentBuildErrorV1::Semantic(
                 "static drain admission produced a different operation".to_owned(),
             ));
@@ -48,10 +51,14 @@ pub(crate) fn admit_static_move_drains(
                 "drain admission does not match frozen classification".to_owned(),
             ));
         }
-        let next = output.programs.last().map_or(1, |value| u64::from(value.id.get()) + 1);
+        let next = output
+            .programs
+            .last()
+            .map_or(1, |value| u64::from(value.id.get()) + 1);
         let id = MechanicsProgramId::try_from_u64(next)
             .map_err(|error| FullContentBuildErrorV1::Semantic(error.to_string()))?;
-        let program = spec.build(id)
+        let program = spec
+            .build(id)
             .map_err(|error| FullContentBuildErrorV1::Semantic(error.to_string()))?;
         output.programs.push(ProgramAllocation {
             id,
@@ -69,10 +76,18 @@ pub(crate) fn admit_static_move_drains(
     for entry in &mut output.bespoke.entries {
         entry.behavior_units.retain(|unit| !admitted.contains(unit));
     }
-    output.bespoke.entries.retain(|entry| !entry.behavior_units.is_empty());
+    output
+        .bespoke
+        .entries
+        .retain(|entry| !entry.behavior_units.is_empty());
     output.report.compiled_unit_count += admitted.len();
-    output.report.bespoke_unit_count = output.report.bespoke_unit_count.checked_sub(admitted.len())
-        .ok_or_else(|| FullContentBuildErrorV1::Semantic("drain closure count underflow".to_owned()))?;
+    output.report.bespoke_unit_count = output
+        .report
+        .bespoke_unit_count
+        .checked_sub(admitted.len())
+        .ok_or_else(|| {
+            FullContentBuildErrorV1::Semantic("drain closure count underflow".to_owned())
+        })?;
     output.report.program_count = output.programs.len();
     Ok(())
 }

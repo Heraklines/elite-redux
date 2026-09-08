@@ -283,12 +283,19 @@ fn query(content: &PreparedGameContentV2, state: &GameStateV5, slot: u8) -> Test
     )?)
 }
 
-fn drain_state(move_id: u64, target_hp: u32, actor_hp: u32) -> TestResult<(Arc<PreparedGameContentV2>, GameStateV5)> {
+fn drain_state(
+    move_id: u64,
+    target_hp: u32,
+    actor_hp: u32,
+) -> TestResult<(Arc<PreparedGameContentV2>, GameStateV5)> {
     let (content, original) = fixture()?;
     let mut state = controlled_state(&content, original)?;
     let run = state.active_run.as_mut().ok_or("run")?;
     run.party[0].hp = target_hp;
-    run.party[0].types = PokemonTyping { primary: PokemonType::Normal, secondary: None };
+    run.party[0].types = PokemonTyping {
+        primary: PokemonType::Normal,
+        secondary: None,
+    };
     let actor = &mut run.battle.as_mut().ok_or("battle")?.enemy_party[0];
     actor.hp = actor_hp;
     actor.moves[0].as_mut().ok_or("move")?.move_id = MoveId::new(safe(move_id));
@@ -301,17 +308,43 @@ fn turn(content: &PreparedGameContentV2, state: &GameStateV5) -> TestResult<Batt
     let battle = run.battle.as_ref().ok_or("battle")?;
     let source = field(run, BattleSide::Enemy)?;
     let target = field(run, BattleSide::Player)?;
-    let actor = battle.field.slots.iter().find(|slot| slot.slot == source)
-        .and_then(|slot| slot.occupant).ok_or("actor")?;
+    let actor = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.slot == source)
+        .and_then(|slot| slot.occupant)
+        .ok_or("actor")?;
     let command = ScriptedEnemyBattleCommandV1::new(
-        scripted_enemy_command_operation_id(battle.battle_id, battle.wave, battle.turn, source, SafeU53::ZERO)?,
-        battle.battle_id, battle.wave, battle.turn, SafeU53::ZERO, actor, source,
-        BattleCommand::fight(actor, MoveSlotIndex::new(0)?, BattleTargetSelection::selected(vec![target])?)?,
+        scripted_enemy_command_operation_id(
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            source,
+            SafeU53::ZERO,
+        )?,
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        SafeU53::ZERO,
+        actor,
+        source,
+        BattleCommand::fight(
+            actor,
+            MoveSlotIndex::new(0)?,
+            BattleTargetSelection::selected(vec![target])?,
+        )?,
     )?;
     let commands = CommandSet::new(vec![AcceptedBattleCommand::scripted_enemy(command)])?;
-    Ok(resolve_turn_v5(state, &commands, &content.battle, &TurnAuthorityContextV1 {
-        authority_seat: battle.authority_seat, revision: safe(1),
-    })?)
+    Ok(resolve_turn_v5(
+        state,
+        &commands,
+        &content.battle,
+        &TurnAuthorityContextV1 {
+            authority_seat: battle.authority_seat,
+            revision: safe(1),
+        },
+    )?)
 }
 
 #[test]
@@ -320,16 +353,36 @@ fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs
     let (content, _) = fixture()?;
     let before: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let after = &content.bundle().battle;
-    assert_eq!(after.classifications.0.len(), before.battle.classifications.0.len());
+    assert_eq!(
+        after.classifications.0.len(),
+        before.battle.classifications.0.len()
+    );
     for (index, program) in before.battle.programs.iter().enumerate() {
         assert_eq!(after.programs[index], *program);
     }
-    let expected = [(71, 1, 2), (72, 1, 2), (138, 1, 2), (141, 1, 2), (202, 1, 2),
-                    (409, 1, 2), (532, 1, 2), (570, 1, 2), (577, 3, 4), (613, 3, 4),
-                    (733, 1, 1), (891, 1, 2), (902, 1, 2)];
-    assert_eq!(after.programs.len(), before.battle.programs.len() + expected.len());
+    let expected = [
+        (71, 1, 2),
+        (72, 1, 2),
+        (138, 1, 2),
+        (141, 1, 2),
+        (202, 1, 2),
+        (409, 1, 2),
+        (532, 1, 2),
+        (570, 1, 2),
+        (577, 3, 4),
+        (613, 3, 4),
+        (733, 1, 1),
+        (891, 1, 2),
+        (902, 1, 2),
+    ];
+    assert_eq!(
+        after.programs.len(),
+        before.battle.programs.len() + expected.len()
+    );
     for (numeric_id, numerator, denominator) in expected {
-        let definition = content.battle.move_definition(MoveId::new(safe(numeric_id)))?;
+        let definition = content
+            .battle
+            .move_definition(MoveId::new(safe(numeric_id)))?;
         let mut drains = Vec::new();
         for id in &definition.mechanic_programs {
             let program = content.battle.program(*id)?;
@@ -337,14 +390,23 @@ fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs
                 let value = serde_json::to_value(operation)?;
                 if value["kind"] == "DRAIN_FRACTION" {
                     assert_eq!(program.source, BehaviorSourceId::Move { numeric_id });
-                    drains.push((value["numerator"].as_u64().ok_or("numerator")?, value["denominator"].as_u64().ok_or("denominator")?));
+                    drains.push((
+                        value["numerator"].as_u64().ok_or("numerator")?,
+                        value["denominator"].as_u64().ok_or("denominator")?,
+                    ));
                 }
             }
         }
         assert_eq!(drains, vec![(numerator, denominator)]);
     }
     let stat_drain = content.battle.move_definition(MoveId::new(safe(668)))?;
-    assert_eq!(stat_drain.mechanic_programs, before.battle.moves[668].as_ref().ok_or("stat drain")?.mechanic_programs);
+    assert_eq!(
+        stat_drain.mechanic_programs,
+        before.battle.moves[668]
+            .as_ref()
+            .ok_or("stat drain")?
+            .mechanic_programs
+    );
     Ok(())
 }
 
@@ -356,7 +418,10 @@ fn actual_drain_uses_capped_hp_loss_and_source_fraction() -> TestResult {
         let result = turn(&content, &state)?;
         let run = result.after_state.active_run.as_ref().ok_or("run")?;
         assert_eq!(run.party[0].hp, 0);
-        assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 100 + expected_healing);
+        assert_eq!(
+            run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp,
+            100 + expected_healing
+        );
         assert_eq!(state, before);
     }
     Ok(())
@@ -365,7 +430,9 @@ fn actual_drain_uses_capped_hp_loss_and_source_fraction() -> TestResult {
 #[test]
 fn actual_drain_minimum_one_and_maximum_hp_are_preserved() -> TestResult {
     let (content, mut state) = drain_state(71, 400, 100)?;
-    state.active_run.as_mut().ok_or("run")?.party[0].stats.special_defense = 100000;
+    state.active_run.as_mut().ok_or("run")?.party[0]
+        .stats
+        .special_defense = 100000;
     state.validate()?;
     let result = turn(&content, &state)?;
     let run = result.after_state.active_run.as_ref().ok_or("run")?;
@@ -373,23 +440,45 @@ fn actual_drain_minimum_one_and_maximum_hp_are_preserved() -> TestResult {
     assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 101);
     let (content, state) = drain_state(733, 3, 399)?;
     let result = turn(&content, &state)?;
-    assert_eq!(result.after_state.active_run.as_ref().ok_or("run")?.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 400);
+    assert_eq!(
+        result
+            .after_state
+            .active_run
+            .as_ref()
+            .ok_or("run")?
+            .battle
+            .as_ref()
+            .ok_or("battle")?
+            .enemy_party[0]
+            .hp,
+        400
+    );
     Ok(())
 }
 
 #[test]
 fn immune_drain_neither_heals_nor_consumes_damage_variance() -> TestResult {
     let (content, mut state) = drain_state(409, 3, 100)?;
-    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping { primary: PokemonType::Ghost, secondary: None };
+    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
+        primary: PokemonType::Ghost,
+        secondary: None,
+    };
     let baseline = turn(&content, &state)?;
     let bytes = serde_json::to_vec(&state)?;
-    for _ in 0..3 { assert_eq!(query(&content, &state, 0)?, 0); }
+    for _ in 0..3 {
+        assert_eq!(query(&content, &state, 0)?, 0);
+    }
     assert_eq!(serde_json::to_vec(&state)?, bytes);
     assert_eq!(turn(&content, &state)?, baseline);
     let run = baseline.after_state.active_run.as_ref().ok_or("run")?;
     assert_eq!(run.party[0].hp, 3);
     assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 100);
-    assert!(!baseline.rng_audit.iter().any(|draw| draw.reason == RngReason::DamageVariance));
+    assert!(
+        !baseline
+            .rng_audit
+            .iter()
+            .any(|draw| draw.reason == RngReason::DamageVariance)
+    );
     Ok(())
 }
 
@@ -397,7 +486,15 @@ fn immune_drain_neither_heals_nor_consumes_damage_variance() -> TestResult {
 fn full_health_drain_does_not_emit_spurious_actor_hp_changes() -> TestResult {
     use er_battle::resolver::BattleMutation;
     let (content, state) = drain_state(71, 3, 400)?;
-    let actor = state.active_run.as_ref().ok_or("run")?.battle.as_ref().ok_or("battle")?.enemy_party[0].id;
+    let actor = state
+        .active_run
+        .as_ref()
+        .ok_or("run")?
+        .battle
+        .as_ref()
+        .ok_or("battle")?
+        .enemy_party[0]
+        .id;
     let result = turn(&content, &state)?;
     assert!(!result.mutations.iter().any(|mutation| matches!(mutation, BattleMutation::HpChanged { pokemon, .. } if *pokemon == actor)));
     Ok(())
