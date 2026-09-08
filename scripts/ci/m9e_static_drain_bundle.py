@@ -12,7 +12,7 @@ import time
 BASE = "31b9a9c61b4792be4727ff463608a2ab23a73319"
 SOURCE = "rust/crates/er-game/tests/m9e_move_drains.rs"
 CI = [".github/workflows/m9e-static-drain-bundle-focused.yml", "scripts/ci/m9e_static_drain_bundle.py"]
-DELTAS = json.loads(r'''{"before":{"rust/crates/er-game/tests/m9e_move_drains.rs":"8736d62f2c0b0292b72c14625d06dbe49ecc8bc1b107b4526f4da7aaff98b7ea"},"after":{"rust/crates/er-game/tests/m9e_move_drains.rs":"dad6c97a175c79da558748d7c153a6795441f9a30cff12af655ad7c0fe83ec3a"}}''')
+DELTAS = json.loads(r'''{"before":{"rust/crates/er-game/tests/m9e_move_drains.rs":"8736d62f2c0b0292b72c14625d06dbe49ecc8bc1b107b4526f4da7aaff98b7ea"},"after":{"rust/crates/er-game/tests/m9e_move_drains.rs":"8e7ee1d732057fb10908ad58dfebfb2f41e7d0254ebddd13d2d54ba5ecffb951"}}''')
 QUALIFIED_PRODUCTION = json.loads(r'''{"rust/crates/er-battle/src/m7_resolver.rs":"b95871b86145daa99b7e6e6b98c13943c7bc59a45706df3574a5f7b7bd874d9a","rust/crates/er-content-compiler/src/lib.rs":"f12b5faa7e62d84d70d038ec82e0f3151eabd47c845e4853ffe4b5d39a316d83","rust/crates/er-content-compiler/src/m9e_full_content.rs":"6f30654dc6f188e9940d6b014959622e26228e4b3a9f655587f7ef41a8c2ff50","rust/crates/er-content-compiler/src/m9e_move_drains.rs":"faaa210ca40488a80ddd36de7fa7c5af07011f0bc2e9b7f9d1a4262a83bf9630","rust/crates/er-battle/src/m6/routine_executor.rs":"6a2a63d103f4063e220294b51a06f2ec1daf8e3e5aa6e84b4db23b9b77296987"}''')
 ROOT = Path.cwd().resolve()
 RUNNER = Path(os.environ["RUNNER_TEMP"]).resolve()
@@ -228,7 +228,12 @@ def main():
         os.environ.pop("M9E_DRAIN_EXPORT")
         export_names = {"battle-content-pack-v3.json", "run-content-pack-v3.json",
                         "game-content-bundle-v2.json", "game-content-bundle-v2-manifest.json"}
-        require({path.name for path in export_directory.iterdir()} == export_names, "exact four generated exports required")
+        require({path.name for path in export_directory.iterdir()} == export_names | {"drain-baseline-metadata.json"}, "exact four generated exports and bounded baseline metadata required")
+        baseline_raw = (export_directory / "drain-baseline-metadata.json").read_bytes()
+        require(0 < len(baseline_raw) <= 16384, "small baseline metadata required")
+        baseline = json.loads(baseline_raw)
+        require(baseline["schema_version"] == 1 and baseline["program_count"] == 3679
+                and baseline["classification_count"] == 9411, "original source program and classification inventory required")
         exports = {}
         fixture_directory = ROOT / "rust/fixtures/m9/engineering"
         for name in sorted(export_names):
@@ -245,6 +250,16 @@ def main():
         require(sum(row["bytes"] for row in exports.values()) <= 64 << 20, "original generated output aggregate bound required")
         require(exports["battle-content-pack-v3.json"]["sha256"] == result["generated_content"]["battle_sha256"], "exported battle must be the freshly source-compiled pack")
         old_bundle = json.loads((fixture_directory / "game-content-bundle-v2.json").read_bytes())
+        expected_drains = {71, 72, 141, 202, 409, 532, 570, 577, 613, 733, 891, 902}
+        drain_units = [row["id"] for row in result["generated_content"]["source_units"] if row["id"]["source"]["numeric_id"] in expected_drains]
+        require(len(drain_units) == 12 and len(baseline["admitted_classifications"]) == 12
+                and baseline["battle_content_hash"] == old_bundle["battle"]["content_hash"]
+                and baseline["admitted_classifications"] == [row for row in old_bundle["battle"]["classifications"]
+                    if row["behavior_unit"] in drain_units
+                    and row["kind"] == "BESPOKE"], "actual baseline classification records required")
+        result["baseline_metadata"] = {"file": "generated/drain-baseline-metadata.json", "bytes": len(baseline_raw),
+            "sha256": sha(baseline_raw), "programs_digest": baseline["programs_digest"],
+            "classifications_digest": baseline["classifications_digest"], "admitted_classifications": len(baseline["admitted_classifications"])}
         new_bundle = json.loads((export_directory / "game-content-bundle-v2.json").read_bytes())
         expected_bundle = dict(old_bundle)
         expected_bundle.update(battle=json.loads(generated.read_bytes()), run=new_bundle["run"], content_hash=new_bundle["content_hash"])

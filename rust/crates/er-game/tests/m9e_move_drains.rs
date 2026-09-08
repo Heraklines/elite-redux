@@ -465,6 +465,24 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
         ] {
             std::fs::write(directory.join(name), bytes)?;
         }
+        let baseline = serde_json::json!({
+            "schema_version": 1,
+            "battle_content_hash": before.battle.content_hash,
+            "program_count": before.battle.programs.len(),
+            "programs_digest": er_canonical::content_digest(&before.battle.programs)?,
+            "classification_count": before.battle.classifications.0.len(),
+            "classifications_digest": er_canonical::content_digest(&before.battle.classifications.0)?,
+            "admitted_classifications": before.battle.classifications.0.iter()
+                .zip(&after.classifications.0).filter(|(old, new)| old != new)
+                .map(|(old, _)| old).collect::<Vec<_>>(),
+            "deferred_programs": [138, 668].into_iter().map(|index| {
+                (index.to_string(), before.battle.moves[index].as_ref().map(|value| value.mechanic_programs.clone()))
+            }).collect::<std::collections::BTreeMap<_, _>>()
+        });
+        std::fs::write(
+            directory.join("drain-baseline-metadata.json"),
+            serde_json::to_vec(&baseline)?,
+        )?;
     }
     Ok(())
 }
