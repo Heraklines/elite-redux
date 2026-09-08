@@ -1,0 +1,91 @@
+name: M9E Generated Cost Snapshot Evidence
+on:
+  push:
+    branches: [codex/m9e-generated-cost-snapshot-evidence-20260908]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-cost-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: old
+            source: 9fbb9fa2a624f8341974ce27e18260a21063751f
+          - cohort: current
+            source: 84a2e3baf53530da4422bb422f56f16d1466ea9e
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      GIT_NO_LAZY_FETCH: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      M9E_COST_COHORT: ${{ matrix.cohort }}
+    steps:
+      - name: Start shared budget before checkout
+        timeout-minutes: 1
+        run: echo "M9E_FOCUS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        timeout-minutes: 5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Exact original source cohort
+        uses: actions/checkout@v6
+        timeout-minutes: 5
+        with:
+          ref: ${{ matrix.source }}
+          path: cohort
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Restore existing dependency downloads
+        uses: actions/cache@v5
+        timeout-minutes: 5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cohort/rust/rust-toolchain.toml', 'cohort/rust/Cargo.lock') }}
+      - name: Install pinned Rust tooling within shared budget
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          remaining=$((M9E_FOCUS_STARTED_AT + 1780 - $(date +%s)))
+          test "$remaining" -gt 0
+          if test "$remaining" -gt 300; then remaining=300; fi
+          timeout "$remaining" rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+      - name: Reproduce whole original release cost case and retain actual active snapshot
+        run: python3 scripts/ci/m9e_cost_snapshot_evidence.py
+      - name: Compact source-bound reproduction
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-cost-snapshot-${{ matrix.cohort }}-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-snapshot/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Exact small original active snapshot
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-cost-snapshot-${{ matrix.cohort }}-packet-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-snapshot/snapshots/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete bounded diagnostics remain remote
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-cost-snapshot-${{ matrix.cohort }}-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-snapshot/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
