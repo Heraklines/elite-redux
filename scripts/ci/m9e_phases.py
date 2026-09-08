@@ -33,6 +33,7 @@ AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "owned_proposal_stack_test": "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs",
     "owned_foundation_inventory": "scripts/ci/m9e-owned-foundations-inventory.json",
     "recovery_preflight": "scripts/ci/m9e_recovery_preflight.py",
     "owned_foundation_0": "rust/crates/er-game/src/m9e_content_v2.rs",

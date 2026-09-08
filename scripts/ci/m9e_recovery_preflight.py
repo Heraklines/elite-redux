@@ -100,8 +100,8 @@ def main():
         raise RuntimeError("exact three test dependencies require a complete verified guard")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 66 or set(product) != set([*feedback.RECOVERY_PATHS, *generated.PATHS]):
-        raise RuntimeError("combined product source must be exactly the66 reviewed paths")
+    if len(product) != 67 or set(product) != set([*feedback.RECOVERY_PATHS, *generated.PATHS]):
+        raise RuntimeError("combined product source must be exactly the67 reviewed paths")
     # All fourteen focused XP IDs were newly selected: three source-existing
     # tests had not belonged to the actual prior93-target/741-ID inventory.
     if plan.get("requires_current_xp_metadata") is not True:
@@ -121,7 +121,7 @@ def main():
     owned_receipt = {"qualification": "source and planned inventory conservation only; combined execution pending",
                      "candidate_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                      "selected_tests": 786, "selected_targets": 101, "prior_preserved_tests": 759,
-                     "required_targets": 57, "required_identity_maps": 51, "composition_paths": 66,
+                     "required_targets": 57, "required_identity_maps": 51, "composition_paths": 67,
                      "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                      "sources": {**feedback.OWNED_FOUNDATION_SOURCES,
                          "rust/crates/er-wasm/tests/m9e_parity.rs": ["5ca9785d1263803f4227be939f57bdb46b4f99cb",

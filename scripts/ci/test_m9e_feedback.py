@@ -11303,7 +11303,7 @@ class OwnedFoundationContractTests(unittest.TestCase):
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 27)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 28)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)
