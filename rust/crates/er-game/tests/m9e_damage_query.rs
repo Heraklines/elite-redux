@@ -670,10 +670,7 @@ fn current_immune_turn_preserves_hp_and_skips_only_damage_variance() -> TestResu
         .collect::<Vec<_>>();
     assert_eq!(
         damage_reasons,
-        vec![
-            RngReason::Accuracy,
-            RngReason::CriticalHit
-        ]
+        vec![RngReason::Accuracy, RngReason::CriticalHit]
     );
     for draw in &baseline.rng_audit {
         draw.validate()?;
@@ -706,7 +703,8 @@ fn current_immunity_queries_preserve_zero_minimum_damage_and_typeless_struggle()
     for (slot, primary) in [(0, PokemonType::Ghost), (1, PokemonType::Dark)] {
         for secondary in [None, Some(PokemonType::Normal)] {
             let mut state = baseline.clone();
-            state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping { primary, secondary };
+            state.active_run.as_mut().ok_or("run")?.party[0].types =
+                PokemonTyping { primary, secondary };
             state.validate()?;
             let before = serde_json::to_vec(&state)?;
             assert_eq!(query(&content, &state, slot)?, 0);
@@ -717,14 +715,24 @@ fn current_immunity_queries_preserve_zero_minimum_damage_and_typeless_struggle()
     assert_eq!(query(&content, &baseline, 0)?, 46);
     let mut resisted = baseline.clone();
     let run = resisted.active_run.as_mut().ok_or("run")?;
-    run.party[0].types = PokemonTyping { primary: PokemonType::Flying, secondary: Some(PokemonType::Poison) };
+    run.party[0].types = PokemonTyping {
+        primary: PokemonType::Flying,
+        secondary: Some(PokemonType::Poison),
+    };
     run.party[0].stats.defense = 100_000;
     resisted.validate()?;
     assert_eq!(query(&content, &resisted, 0)?, 1);
     let mut exhausted = baseline.clone();
     let run = exhausted.active_run.as_mut().ok_or("run")?;
-    run.party[0].types = PokemonTyping { primary: PokemonType::Ghost, secondary: None };
-    for slot in run.battle.as_mut().ok_or("battle")?.enemy_party[0].moves.iter_mut().flatten() {
+    run.party[0].types = PokemonTyping {
+        primary: PokemonType::Ghost,
+        secondary: None,
+    };
+    for slot in run.battle.as_mut().ok_or("battle")?.enemy_party[0]
+        .moves
+        .iter_mut()
+        .flatten()
+    {
         slot.pp_used = 20;
     }
     exhausted.validate()?;

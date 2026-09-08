@@ -12,7 +12,7 @@ import time
 BASE = "2312d794e2cec0cac4d2c91872482ef2e8890ffd"
 SOURCE = "rust/crates/er-game/tests/m9e_damage_query.rs"
 CI = [".github/workflows/m9e-type-immunity-focused.yml", "scripts/ci/m9e_type_immunity_diagnostic.py"]
-DELTAS = json.loads(r'''{"before":{"rust/crates/er-battle/src/m7_resolver.rs":"a5b72b5bcfb02a1c52d1cc4a05355217d098fcc4f1247b64b99131ab2db7c2f3","rust/crates/er-game/tests/m9e_damage_query.rs":"22e5272f039342d19b0cd78faa69eb4b6cc1a0ddc6c130cd7a3c1032dd50f36f"},"after":{"rust/crates/er-battle/src/m7_resolver.rs":"db8b2ed1e6152e6b4401663273ced1550cdd6fc8a6bdc0e10fe0bcd24c654e57","rust/crates/er-game/tests/m9e_damage_query.rs":"df1f095f49dab8bc0c0c12df4c6922239ec43fa119511801e970eaedad5261eb"}}''')
+DELTAS = json.loads(r'''{"before":{"rust/crates/er-battle/src/m7_resolver.rs":"a5b72b5bcfb02a1c52d1cc4a05355217d098fcc4f1247b64b99131ab2db7c2f3","rust/crates/er-game/tests/m9e_damage_query.rs":"22e5272f039342d19b0cd78faa69eb4b6cc1a0ddc6c130cd7a3c1032dd50f36f"},"after":{"rust/crates/er-battle/src/m7_resolver.rs":"db8b2ed1e6152e6b4401663273ced1550cdd6fc8a6bdc0e10fe0bcd24c654e57","rust/crates/er-game/tests/m9e_damage_query.rs":"605d8603af9e64cd73c80e51d7e7623492c9023c2073f1d3d4b779fdd352061d"}}''')
 ROOT = Path.cwd().resolve()
 RUNNER = Path(os.environ["RUNNER_TEMP"]).resolve()
 OUT = RUNNER / "m9e-type-immunity"
