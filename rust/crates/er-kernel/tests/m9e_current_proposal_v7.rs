@@ -712,7 +712,10 @@ fn historical_owner_rejection(
     assert!(restore(collision, content).is_err());
     Ok(())
 }
-fn assert_publication_exhaustion(initial: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
+fn assert_publication_exhaustion(
+    initial: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(), Box<dyn Error>> {
     let mut exhausted_publication = initial.clone();
     exhausted_publication.replay_sequence = safe(9_007_199_254_740_991);
     let mut exhausted_publication = restore(exhausted_publication, content.clone())?;
@@ -728,7 +731,11 @@ fn assert_publication_exhaustion(initial: &CoreGameKernelSnapshotV7, content: Ar
     Ok(())
 }
 
-fn assert_pending_restore_rejections(pending: &CoreGameKernelSnapshotV7, initial: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
+fn assert_pending_restore_rejections(
+    pending: &CoreGameKernelSnapshotV7,
+    initial: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(), Box<dyn Error>> {
     historical_owner_rejection(pending, content.clone())?;
     let pending_json = serde_json::to_value(pending)?;
     for (field, value) in [
@@ -782,17 +789,30 @@ fn assert_pending_restore_rejections(pending: &CoreGameKernelSnapshotV7, initial
     Ok(())
 }
 
-fn assert_transport_exhaustion(pending: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
+fn assert_transport_exhaustion(
+    pending: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(), Box<dyn Error>> {
     let mut exhausted = pending.clone();
     exhausted.replay_sequence = safe(9_007_199_254_740_991);
     let mut exhausted = restore(exhausted, content.clone())?;
     let before = exhausted.snapshot()?;
-    assert!(exhausted.transport_changed(ConnectionGeneration::new(safe(1)), false).is_err());
+    assert!(
+        exhausted
+            .transport_changed(ConnectionGeneration::new(safe(1)), false)
+            .is_err()
+    );
     assert_eq!(exhausted.snapshot()?, before);
     Ok(())
 }
 
-fn assert_other_receipt(initial: &CoreGameKernelSnapshotV7, pending: &CoreGameKernelSnapshotV7, bytes: &[u8], original_authority: GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
+fn assert_other_receipt(
+    initial: &CoreGameKernelSnapshotV7,
+    pending: &CoreGameKernelSnapshotV7,
+    bytes: &[u8],
+    original_authority: GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(), Box<dyn Error>> {
     // Independently admitted different proposal from the SAME canonical root.
     // Its receipt applies real retention material but cannot retire our owner.
     let mut alternative = restore(initial.clone(), content.clone())?;
@@ -800,7 +820,9 @@ fn assert_other_receipt(initial: &CoreGameKernelSnapshotV7, pending: &CoreGameKe
     let other_bytes = proposal(&press(&mut alternative, PhysicalKey::Space)?)?;
     assert_ne!(other_bytes, bytes);
     let mut other_authority = original_authority;
-    let other_receipt = material(&other_authority.ingest_network_frame(ConnectionGeneration::new(safe(1)), &other_bytes)?)?;
+    let other_receipt = material(
+        &other_authority.ingest_network_frame(ConnectionGeneration::new(safe(1)), &other_bytes)?,
+    )?;
     let mut other_delivery = restore(pending.clone(), content.clone())?;
     other_delivery.ingest_network_frame(ConnectionGeneration::new(safe(1)), &other_receipt)?;
     assert_eq!(
@@ -818,7 +840,11 @@ fn assert_other_receipt(initial: &CoreGameKernelSnapshotV7, pending: &CoreGameKe
 #[test]
 fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
 -> Result<(), Box<dyn Error>> {
-    eprintln!("m9e proposal test entered; kernel={} snapshot={}", std::mem::size_of::<GameKernelV7>(), std::mem::size_of::<CoreGameKernelSnapshotV7>());
+    eprintln!(
+        "m9e proposal test entered; kernel={} snapshot={}",
+        std::mem::size_of::<GameKernelV7>(),
+        std::mem::size_of::<CoreGameKernelSnapshotV7>()
+    );
     let content = content()?;
     let generation = ConnectionGeneration::new(safe(1));
     ordinary_publication_atomicity(content.clone())?;
@@ -888,7 +914,13 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     assert!(press(&mut replica, PhysicalKey::Space).is_err());
     assert_eq!(replica.snapshot()?, disconnected);
 
-    assert_other_receipt(&initial, &pending, &bytes, original_authority, content.clone())?;
+    assert_other_receipt(
+        &initial,
+        &pending,
+        &bytes,
+        original_authority,
+        content.clone(),
+    )?;
     let admitted = authority.ingest_network_frame(generation, &bytes)?;
     let receipt_bytes = material(&admitted)?;
     let receipt = CurrentProposalMaterialReceiptV1::decode(&receipt_bytes)?;
@@ -1113,7 +1145,11 @@ fn submit_strongest_move(
 #[test]
 fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
 -> Result<(), Box<dyn Error>> {
-    eprintln!("m9e proposal test entered; kernel={} snapshot={}", std::mem::size_of::<GameKernelV7>(), std::mem::size_of::<CoreGameKernelSnapshotV7>());
+    eprintln!(
+        "m9e proposal test entered; kernel={} snapshot={}",
+        std::mem::size_of::<GameKernelV7>(),
+        std::mem::size_of::<CoreGameKernelSnapshotV7>()
+    );
     let content = content()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));

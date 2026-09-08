@@ -12,7 +12,7 @@ import time
 BASE = "fa2525cdb158a5cfd0ab2f07c9b67719fa6d2c15"
 SOURCE = "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs"
 BEFORE = "0dd6491e64bac378e947f9f0faa4e1080a421b57f1ffb8261b42ad04083da36f"
-AFTER = "935c4468489c17a29eb09a22bb7328827c8bbdc673c73b4703886567975ded7e"
+AFTER = "d5f59c98551c080dd04d847edf532a9acc5123eb45f4f3e1e5ee79682f622e06"
 CI = [".github/workflows/m9e-owned-proposal-stack-focused.yml",
       "scripts/ci/m9e_owned_proposal_stack_diagnostic.py"]
 ROOT = Path.cwd().resolve()
