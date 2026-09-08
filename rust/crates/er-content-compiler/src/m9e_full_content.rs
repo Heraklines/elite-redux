@@ -251,13 +251,14 @@ pub fn build_m9_engineering_battle_pack_v1(
             behavior_units: cluster.behavior_units,
         })
         .collect::<Vec<_>>();
-    let semantic = compile_semantics(SemanticCompileRequest {
+    let mut semantic = compile_semantics(SemanticCompileRequest {
         catalog: &catalog,
         intrinsic_rules: &intrinsic_rules,
         bespoke_assignments: &bespoke_assignments,
         options: CompilerOptions::default(),
     })
     .map_err(|error| FullContentBuildErrorV1::Semantic(error.to_string()))?;
+    crate::m9e_move_drains::admit_static_move_drains(&catalog, &mut semantic)?;
     let allocations = semantic.programs.clone();
     let mut source_programs = BTreeMap::<BehaviorSourceId, Vec<MechanicsProgramId>>::new();
     for allocation in &allocations {

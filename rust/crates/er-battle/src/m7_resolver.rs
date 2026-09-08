@@ -3,7 +3,7 @@
 use er_canonical::content_digest;
 use er_content::pack::m6_pack::MoveDefinitionV3;
 use er_content::pack::m6_prepared::PreparedBattleContentV3;
-use er_mechanics::selector_operation_v2::MechanicOperationV2;
+use er_mechanics::selector_operation_v2::{MechanicOperationV2, SelectorNodeV2};
 use er_mechanics::v2::{MechanicHookV2, MechanicQueryV2};
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
@@ -626,6 +626,15 @@ fn execute_move(
         if target.fainted {
             presentation.push(BattlePresentationCueV5::Fainted { pokemon: target_id });
         }
+        let damage_dealt = before_hp - target.hp;
+        apply_move_drain_after_damage(
+            run,
+            MoveDamageHit { actor: actor_id, move_id: definition.id, damage_dealt },
+            content,
+            mutations,
+            presentation,
+            mechanics_evidence,
+        )?;
         hit_any = true;
     }
     let after_hit = execute_hook_v2(content, &context, MechanicHookV2::AfterHit)
@@ -659,6 +668,67 @@ fn execute_move(
     } else {
         ActionDisposition::NoEffect
     })
+}
+
+struct MoveDamageHit {
+    actor: PokemonId,
+    move_id: MoveId,
+    damage_dealt: u32,
+}
+
+fn apply_move_drain_after_damage(
+    run: &mut RunStateV3,
+    hit: MoveDamageHit,
+    content: &PreparedBattleContentV3,
+    mutations: &mut Vec<BattleMutation>,
+    presentation: &mut Vec<BattlePresentationCueV5>,
+    mechanics_evidence: &mut Vec<MechanicsOperationEvidenceV2>,
+) -> Result<(), BattleV5Error> {
+    if hit.damage_dealt == 0 {
+        return Ok(());
+    }
+    let after_damage = {
+        let actor = pokemon(run, hit.actor).ok_or(BattleV5Error::InactiveActor(hit.actor))?;
+        let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
+        let sources = active_sources(actor, hit.move_id);
+        let context = mechanics_context(actor, battle, &sources);
+        execute_hook_v2(content, &context, MechanicHookV2::AfterDamage)
+            .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?
+    };
+    for evidence in &after_damage.operations {
+        if !evidence.condition_matched
+            || evidence.behavior_unit.source != (BehaviorSourceId::Move { numeric_id: hit.move_id.get() })
+        {
+            continue;
+        }
+        let MechanicOperationV2::DrainFraction { numerator, denominator } = evidence.operation else {
+            continue;
+        };
+        let program = content.program(evidence.program)
+            .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+        let binding = program.bindings.iter()
+            .find(|binding| binding.binding_ordinal == evidence.binding_ordinal)
+            .ok_or(BattleV5Error::DispatchClosure)?;
+        let selector = binding.selector_root.and_then(|root| program.selectors.0.get(root.index()));
+        if !matches!(selector, Some(SelectorNodeV2::Actor)) {
+            return Err(BattleV5Error::UnsupportedContent);
+        }
+        let actor = pokemon_mut(run, hit.actor).ok_or(BattleV5Error::InactiveActor(hit.actor))?;
+        if actor.fainted || actor.hp >= actor.max_hp {
+            continue;
+        }
+        // The pinned HitHealAttr floors the fraction of actual HP lost on this
+        // hit, with a minimum of one; overkill never increases drain healing.
+        let amount = (u64::from(hit.damage_dealt) * u64::from(numerator))
+            .checked_div(u64::from(denominator)).ok_or(BattleV5Error::Overflow)?
+            .max(1).min(u64::from(actor.max_hp - actor.hp));
+        let before = actor.hp;
+        actor.hp += u32::try_from(amount).map_err(|_| BattleV5Error::Overflow)?;
+        mutations.push(BattleMutation::HpChanged { pokemon: hit.actor, before, after: actor.hp });
+        presentation.push(BattlePresentationCueV5::HpChanged { pokemon: hit.actor, before, after: actor.hp });
+    }
+    mechanics_evidence.extend(after_damage.operations);
+    Ok(())
 }
 
 fn finalize_turn(
