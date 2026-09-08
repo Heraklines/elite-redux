@@ -51,7 +51,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - name: Qualify all thirty difficulty, battle and V7 load tests
+      - name: Qualify all thirty-eight difficulty, storage and host query tests
         run: python3 scripts/ci/m9e_run_difficulty_diagnostic.py
       - name: Compact run difficulty result
         if: always()
