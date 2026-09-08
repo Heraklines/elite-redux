@@ -1383,6 +1383,11 @@ def compact_summary(summary, full_hash, timings):
             break
         if key in compact:
             compact[key] = {"file": "phase-summary.json", "sha256": full_hash, "field": key}
+    if len(encoded(compact)) > 16000 and isinstance(compact.get("identity", {}).get("files"), dict):
+        # Keep the run/source cohort inline. Its complete source-file hashes are
+        # retained in the exact full proof, with an unambiguous field reference.
+        compact["identity"] = {**compact["identity"], "files": {
+            "file": "phase-summary.json", "sha256": full_hash, "field": "identity.files"}}
     if len(encoded(compact)) > 16000:
         raise RuntimeError("aggregate compact evidence exceeds 16 KiB; cannot claim bounded qualification")
     return compact

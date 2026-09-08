@@ -11289,7 +11289,9 @@ class CompactWorkerEvidenceTests(unittest.TestCase):
         self.assertEqual(full["tests"], {"selected": 809, "executed": 809, "passed": 809, "failed": 0, "skipped": 0})
         compact = phases.compact_summary(full, digest, {})
         self.assertLessEqual(len(phases.encoded(compact)), 16000)
-        self.assertEqual(compact["identity"], full["identity"])
+        self.assertEqual(compact["identity"]["files"],
+                         {"file": "phase-summary.json", "sha256": digest, "field": "identity.files"})
+        self.assertEqual({**compact["identity"], "files": full["identity"]["files"]}, full["identity"])
         self.assertEqual(compact["tests"], full["tests"])
         self.assertEqual(compact["qualification"], "passed")
         for field in ("native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256",
