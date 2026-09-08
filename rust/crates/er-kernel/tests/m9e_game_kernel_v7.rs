@@ -1492,6 +1492,7 @@ fn read_rebind_keeps_larger_saved_floors_and_no_active_run_behavior() -> Result<
 
     let mut no_run = fixture.saved.state;
     no_run.active_run = None;
+    no_run.current_run_difficulty = None;
     let bytes =
         GameSaveV2::new(fixture.content.identity().clone(), safe(1), no_run.clone())?.encode()?;
     let mut loader = restore_read_fixture(fixture.pending.clone(), fixture.content.clone())?;
