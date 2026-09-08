@@ -180,7 +180,7 @@ test("current V7 Workers replay owned generation two rebind and continue natural
         const initial = await snapshot(client);
         assert(initial.lifecycle.kind === "BOOTSTRAP" && initial.lifecycle.value.stage === "TITLE"
           && initial.current_coop_setup != null, "actual owned Title setup required");
-        const peer: any = { client, host: index === 0, control: initial.lifecycle.value.control,
+        const peer: any = { client, context: initialization.context, host: index === 0, control: initial.lifecycle.value.control,
           raw: 0, presentations: 0, rebinds: 0, rejected: 0 };
         peer.ordinary = async (request: any) => {
           const result = await peer.client.dispatch(request);
@@ -266,9 +266,26 @@ test("current V7 Workers replay owned generation two rebind and continue natural
       assert((await starters(host)).length === 0, "host waits for actual guest choices");
       const started = one(await host.ordinary({ kind: "NETWORK_FRAME", generation: 1, bytes: choices }));
       await guest.ordinary({ kind: "NETWORK_FRAME", generation: 1, bytes: started });
+      const handoffSnapshots: string[] = [];
       for (const peer of peers) {
         const actual = await snapshot(peer.client);
         assert(actual.lifecycle.kind === "ACTIVE", "natural game must start before rebind");
+        // The real Title journey precedes this bounded rebind capture. Restore its
+        // exact reached state in a fresh Worker, retaining every subsequent control.
+        const replacement = create();
+        const initialized = await replacement.dispatch({ kind: "INITIALIZE", initialization: {
+          kind: "SNAPSHOT", snapshot: actual, context: { ...peer.context,
+            scheduler: actual.scheduler, protocol: actual.protocol } } });
+        assert(initialized.response.kind === "READY", "actual battle checkpoint must initialize");
+        equal(await snapshot(replacement), actual, "battle handoff changed complete snapshot");
+        const fresh = (await capsule(replacement)).value;
+        equal(fresh.checkpoint, actual, "rebind capture checkpoint must be the real reached battle");
+        assert(fresh.base_position === 0 && fresh.final_position === 0 && fresh.attempts.length === 0,
+          "fresh rebind capture must begin before any control");
+        handoffSnapshots.push(await digest(actual));
+        await peer.client.dispose(); disposed++;
+        assert(peer.client.status.closed && peer.client.status.pending === 0, "startup Worker disposal incomplete");
+        peer.client = replacement;
         await peer.ordinary({ kind: "TRANSPORT_CHANGED", generation: 1, connected: false });
         assert((await peer.rebind({ kind: "BEGIN" })).frames.length === 0, "disconnected begin emits no wire");
         peer.generation = 2;
@@ -369,6 +386,7 @@ test("current V7 Workers replay owned generation two rebind and continue natural
       for (const peer of peers) { await peer.client.dispose(); disposed++;
         assert(peer.client.status.closed && peer.client.status.pending === 0, "real Worker disposal incomplete"); }
       return { actual_workers: clients.length, disposed_workers: disposed, generation: 2, transcript_controls: 8,
+        startup_handoff_snapshots: handoffSnapshots, startup_handoff_verified: true,
         raw_inputs: peers.map(peer => peer.raw), presentations: peers.map(peer => peer.presentations),
         rebind_attempts: peers.map(peer => peer.rebinds), known_rejections: guest.rejected,
         final_snapshot_sha256: await Promise.all(final.map(digest)), capsule_sha256: replayHashes,
@@ -378,9 +396,9 @@ test("current V7 Workers replay owned generation two rebind and continue natural
     } finally { for (const client of clients) if (!client.status.closed) client.terminate("rebind witness teardown"); }
   }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(),
     initializations: ["coop-host-initialization.json", "coop-guest-initialization.json"].map(path => `${address}/m9e-assets/${path}`) });
-  expect(observed).toHaveLength(5);
-  expect(evidence.actual_workers).toBe(5);
-  expect(evidence.disposed_workers).toBe(5);
+  expect(observed).toHaveLength(7);
+  expect(evidence.actual_workers).toBe(7);
+  expect(evidence.disposed_workers).toBe(7);
   for (const count of evidence.raw_inputs) expect(count).toBeGreaterThan(0);
   for (const count of evidence.presentations) expect(count).toBeGreaterThan(0);
   const report = Buffer.from(JSON.stringify({ ...binding(observed), setup_manifest_sha256: sha(setupBytes), ...evidence }));

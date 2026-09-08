@@ -1042,13 +1042,14 @@ def validate_rebind(value, worker, source_sha, setup_hash):
     common = {"schema_version", "source_sha", "manifest_sha256", "entry_sha256", "worker_sha256", "worker_path",
               "glue_sha256", "wasm_sha256", "content_sha256", "browser_worker_protocol_version", "observed_worker_count"}
     extra = {"setup_manifest_sha256", "actual_workers", "disposed_workers", "generation", "transcript_controls",
+             "startup_handoff_snapshots", "startup_handoff_verified",
              "raw_inputs", "presentations", "rebind_attempts", "known_rejections", "final_snapshot_sha256",
              "capsule_sha256", "proposal_sha256", "receipt_sha256", "midphase_replay", "final_replay",
              "deleted_control_rejected", "duplicate_receipt_exact", "retry_snapshot_conserved"}
     if not isinstance(value, dict) or set(value) != common | extra:
         raise RuntimeError("exact full rebind attachment fields required")
     for key, expected in (("schema_version", 1), ("browser_worker_protocol_version", 2),
-                          ("observed_worker_count", 5), ("actual_workers", 5), ("disposed_workers", 5),
+                          ("observed_worker_count", 7), ("actual_workers", 7), ("disposed_workers", 7),
                           ("generation", 2), ("transcript_controls", 8), ("known_rejections", 1)):
         if type(value[key]) is not int or value[key] != expected:
             raise RuntimeError("actual rebind counts differ: " + key)
@@ -1065,14 +1066,14 @@ def validate_rebind(value, worker, source_sha, setup_hash):
         if (not isinstance(value[key], list) or len(value[key]) != 2
                 or any(type(count) is not int or not 1 <= count <= (1 << 53) - 1 for count in value[key])):
             raise RuntimeError("actual two-peer causal counters differ")
-    for key in ("final_snapshot_sha256", "capsule_sha256"):
+    for key in ("final_snapshot_sha256", "capsule_sha256", "startup_handoff_snapshots"):
         if (not isinstance(value[key], list) or len(value[key]) != 2
                 or any(not isinstance(item, str) or not re.fullmatch(r"[0-9a-f]{64}", item) for item in value[key])):
             raise RuntimeError("actual two-peer checkpoint/capsule hashes differ")
     for key in ("proposal_sha256", "receipt_sha256"):
         if not isinstance(value[key], str) or not re.fullmatch(r"[0-9a-f]{64}", value[key]):
             raise RuntimeError("actual raw wire SHA256 missing")
-    for key in ("midphase_replay", "final_replay", "deleted_control_rejected", "duplicate_receipt_exact", "retry_snapshot_conserved"):
+    for key in ("midphase_replay", "final_replay", "deleted_control_rejected", "duplicate_receipt_exact", "retry_snapshot_conserved", "startup_handoff_verified"):
         if value[key] is not True:
             raise RuntimeError("actual rebind conservation assertion missing: " + key)
 
@@ -1257,7 +1258,7 @@ def browser_platform(summary):
                 or digest(WEB / "m9e-v7-web-assets.json") != summary["web_cohort"]["manifest_sha256"]):
             raise RuntimeError("actual cohort manifest changed during browser execution")
     summary["browser_totals"] = {"executed": 3, "passed": 3, "failed": 0, "skipped": 0,
-                                "new_rebind_workers": 5, "retained_worker_case_workers": [1, 2]}
+                                "new_rebind_workers": 7, "retained_worker_case_workers": [1, 2]}
 
 
 def main(summary):
