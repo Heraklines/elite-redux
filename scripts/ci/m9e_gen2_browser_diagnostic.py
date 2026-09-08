@@ -816,6 +816,8 @@ def fixture_inputs(phase):
     return result
 
 
+# Each case owns its mutable host/session; shared OnceLock fixtures are immutable.
+# Run two cases in each whole target; targets remain sequential and all limits unchanged.
 def execute_target(summary, crate, test_target, test_source, test_ids):
     label = crate + "-" + test_target
     library = (crate, test_target) == ("er-web", "er_web")
@@ -854,10 +856,10 @@ def execute_target(summary, crate, test_target, test_source, test_ids):
                "profile": artifact["profile"], "source_sha256": summary["source_hashes"][test_source],
                "source": test_source, "features": artifact["features"], "kind": artifact["target"]["kind"], "crate_types": artifact["target"]["crate_types"],
                "manifest_path": artifact["manifest_path"], "executable": str(binary),
-               "execution_argv": [str(binary), "--format", "terse", "--nocapture", "--test-threads=1"],
+               "execution_argv": [str(binary), "--format", "terse", "--nocapture", "--test-threads=2"],
                "execution_cwd": str(ROOT / f"rust/crates/{crate}"),
                "ids": list(test_ids), "listing_bytes": listing.stat().st_size, "listing_sha256": digest(listing)}
-    output = run([str(binary), "--format", "terse", "--nocapture", "--test-threads=1"], label + "-execute",
+    output = run([str(binary), "--format", "terse", "--nocapture", "--test-threads=2"], label + "-execute",
                  cwd=ROOT / f"rust/crates/{crate}", seconds=600, bound=16384).read_text()
     counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
     if counts != [(str(len(test_ids)), "0", "0", "0", "0")]:
