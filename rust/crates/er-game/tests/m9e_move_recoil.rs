@@ -470,6 +470,10 @@ fn actual_recoil_uses_capped_hp_loss_and_source_fraction() -> TestResult {
 fn actual_recoil_minimum_one_and_actor_faint_are_preserved() -> TestResult {
     use er_battle::resolver::BattleMutation;
     let (content, mut state) = recoil_state(66, 400, 100)?;
+    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
+        primary: PokemonType::Poison,
+        secondary: None,
+    };
     state.active_run.as_mut().ok_or("run")?.party[0]
         .stats
         .defense = 100000;
