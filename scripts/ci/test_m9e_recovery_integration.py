@@ -16,7 +16,7 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
         config["current_recovery_integration"]["paths"] = paths
         original = copy.deepcopy(config)
         self.assertEqual(len(paths), 103)
-        self.assertEqual(len(set(paths)), 96)
+        self.assertEqual(len(set(paths)), 103)
         self.assertTrue(set(feedback.OWNED_FOUNDATION_PATHS).issubset(paths))
         for changed in (paths, list(reversed(paths))):
             self.assertEqual(feedback.select_recovery_scope(config, changed), (True, True))
