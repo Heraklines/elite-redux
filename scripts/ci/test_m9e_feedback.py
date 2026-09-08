@@ -5649,7 +5649,8 @@ class FeedbackTests(unittest.TestCase):
                    "authority_revision": 3, "menu_instance": 7}, "action": action}
         proposal = owner.canonical({"schema_version": 2, "connection_generation": 1, "sender_seat": 2, "proposal": command})
         state = {"schema_version": 6, "content_identity": expected["content_identity"], "identities": {}, "profile": {},
-                 "active_run": {"run_id": 42, "battle": {"turn": 1}}}
+                 "active_run": {"run_id": 42, "battle": {"turn": 1}},
+                 "current_run_difficulty": {"run_id": 42, "difficulty": "YOUNGSTER"}}
         transition = {"schema_version": 6, "domain": "BATTLE_TURN", "operation_id": "fixture/operation", "authority_seat": 1,
                       "authority_revision": 3, "content_identity": expected["content_identity"], "accepted_action": action,
                       "before_digest": "blake3-v1:" + "a" * 64, "after_digest": "blake3-v1:" + "b" * 64,
@@ -5861,6 +5862,20 @@ class FeedbackTests(unittest.TestCase):
             changed = {**context, "expected": {**context["expected"], key: value}}
             with self.assertRaises(RuntimeError):
                 owner.receipt_oracle(raw, tests["positive"], **changed)
+
+    def test_owner_receipt_rejects_invalid_difficulty_owner_before_hashing(self):
+        owner, raw, tests, context, calls, _, _, _ = self.owner_receipt_fixture()
+        for difficulty in (None, {}, {"run_id": True, "difficulty": "YOUNGSTER"},
+                           {"run_id": 41, "difficulty": "YOUNGSTER"},
+                           {"run_id": 42, "difficulty": "ELITE"},
+                           {"run_id": 42, "difficulty": "YOUNGSTER", "extra": 0}):
+            wire = json.loads(raw)
+            inner = json.loads(bytes.fromhex(wire["material_hex"]))
+            inner["value"]["after_state"]["current_run_difficulty"] = difficulty
+            wire["material_hex"] = owner.canonical(inner).hex()
+            with self.assertRaisesRegex(RuntimeError, "after state difficulty"):
+                owner.receipt_oracle(owner.canonical(wire), tests["positive"], **context)
+            self.assertEqual(calls, [])
 
     def test_owner_receipt_oracle_uses_exact_independent_preimages(self):
         owner, raw, tests, context, calls, _, _, _ = self.owner_receipt_fixture()

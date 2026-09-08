@@ -337,7 +337,12 @@ def receipt_oracle(data, positive, expected, primitive, provider, binding, helpe
             and value["authority_seat"] == expected["authority_context"]["authoritySeatId"]
             and value["accepted_action"] == command["action"], "material/proposal identity/action")
     state = value["after_state"]
-    exact(state, {"schema_version", "content_identity", "identities", "profile", "active_run"}, "after state")
+    exact(state, {"schema_version", "content_identity", "identities", "profile", "active_run",
+                  "current_run_difficulty"}, "after state")
+    difficulty = state["current_run_difficulty"]
+    exact(difficulty, {"run_id", "difficulty"}, "after state difficulty owner")
+    require(safe(difficulty["run_id"]) and difficulty["run_id"] == expected["game_run_id"]
+            and difficulty["difficulty"] == "YOUNGSTER", "after state difficulty identity")
     require(type(state["schema_version"]) is int and state["schema_version"] == 6
             and canonical(value["content_identity"]) == canonical(state["content_identity"]) == canonical(expected["content_identity"])
             and safe(state["active_run"]["run_id"]) and state["active_run"]["run_id"] == expected["game_run_id"], "content/numeric run identity")

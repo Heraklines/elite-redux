@@ -27,7 +27,7 @@ def main():
     paths = sorted({*ROOT.glob("scripts/ci/test_m9e*.py"),
                     *(ROOT / name for name in (
                         "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/m9e_browser_rebind.py",
-                        "scripts/ci/m9e_coop_startup.py",
+                        "scripts/ci/m9e_coop_startup.py", "scripts/ci/m9e_current_proposal.py",
                         "scripts/ci/m9e_friendship_inputs.py", ".github/workflows/m9e-focused-feedback.yml",
                         "scripts/ci/m9e_browser_integration_preflight.py", "scripts/ci/m9e-owned-foundations-inventory.json",
                         "scripts/ci/m9e-targets.json", "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
