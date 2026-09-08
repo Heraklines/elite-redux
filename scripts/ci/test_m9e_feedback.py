@@ -9055,7 +9055,7 @@ class PhaseTransferTests(unittest.TestCase):
                       for index, row in enumerate(inventory)]
         actual, owned = self.phases.inventory_and_assignment(enumerated, "c")
         self.assertEqual(owned, self.phases.partition(actual)["c"])
-        self.assertEqual(len(actual), 5)
+        self.assertEqual(len(actual), 6)
     def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
         for status in ("", "failure", "skipped", "cancelled"):
             with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):
