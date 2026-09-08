@@ -452,10 +452,16 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
         manifest["components"]["battle"] = serde_json::to_value(&bundle.battle.content_hash)?;
         manifest["components"]["run"] = serde_json::to_value(&bundle.run.content_hash)?;
         for (name, bytes) in [
-            ("battle-content-pack-v3.json", serde_json::to_vec(&bundle.battle)?),
+            (
+                "battle-content-pack-v3.json",
+                serde_json::to_vec(&bundle.battle)?,
+            ),
             ("run-content-pack-v3.json", serde_json::to_vec(&bundle.run)?),
             ("game-content-bundle-v2.json", serde_json::to_vec(bundle)?),
-            ("game-content-bundle-v2-manifest.json", serde_json::to_vec(&manifest)?),
+            (
+                "game-content-bundle-v2-manifest.json",
+                serde_json::to_vec(&manifest)?,
+            ),
         ] {
             std::fs::write(directory.join(name), bytes)?;
         }

@@ -12,7 +12,7 @@ import time
 BASE = "31b9a9c61b4792be4727ff463608a2ab23a73319"
 SOURCE = "rust/crates/er-game/tests/m9e_move_drains.rs"
 CI = [".github/workflows/m9e-static-drain-bundle-focused.yml", "scripts/ci/m9e_static_drain_bundle.py"]
-DELTAS = json.loads(r'''{"before":{"rust/crates/er-game/tests/m9e_move_drains.rs":"8736d62f2c0b0292b72c14625d06dbe49ecc8bc1b107b4526f4da7aaff98b7ea"},"after":{"rust/crates/er-game/tests/m9e_move_drains.rs":"cf4ad1c8a811af2b0f734aa7ec38f14cc952c52df1d97b7faa2f1d0652b577f2"}}''')
+DELTAS = json.loads(r'''{"before":{"rust/crates/er-game/tests/m9e_move_drains.rs":"8736d62f2c0b0292b72c14625d06dbe49ecc8bc1b107b4526f4da7aaff98b7ea"},"after":{"rust/crates/er-game/tests/m9e_move_drains.rs":"dad6c97a175c79da558748d7c153a6795441f9a30cff12af655ad7c0fe83ec3a"}}''')
 QUALIFIED_PRODUCTION = json.loads(r'''{"rust/crates/er-battle/src/m7_resolver.rs":"b95871b86145daa99b7e6e6b98c13943c7bc59a45706df3574a5f7b7bd874d9a","rust/crates/er-content-compiler/src/lib.rs":"f12b5faa7e62d84d70d038ec82e0f3151eabd47c845e4853ffe4b5d39a316d83","rust/crates/er-content-compiler/src/m9e_full_content.rs":"6f30654dc6f188e9940d6b014959622e26228e4b3a9f655587f7ef41a8c2ff50","rust/crates/er-content-compiler/src/m9e_move_drains.rs":"faaa210ca40488a80ddd36de7fa7c5af07011f0bc2e9b7f9d1a4262a83bf9630","rust/crates/er-battle/src/m6/routine_executor.rs":"6a2a63d103f4063e220294b51a06f2ec1daf8e3e5aa6e84b4db23b9b77296987"}''')
 ROOT = Path.cwd().resolve()
 RUNNER = Path(os.environ["RUNNER_TEMP"]).resolve()
