@@ -28,13 +28,14 @@ for index in selected:
     classifications = [entry for entry in battle['classifications']
                        if entry['behavior_unit']['source'] == {'kind': 'MOVE', 'numeric_id': index}]
     rows.append({'move': move, 'programs': programs, 'classifications': classifications,
-                 'source_units': [unit for unit in semantic['behavior_units'] if unit['id']['source'] == {'kind': 'MOVE', 'numeric_id': index}]})
+                 'source_units': [unit for unit in semantic['behavior_units'] if unit['id']['source'].get('kind') == 'MOVE' and str(unit['id']['source'].get('numeric_id')) == str(index)]})
 result = {
     'status': 'observed', 'scope': 'published payload inspection only; no behavior qualification',
     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
     'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'bundle_sha256': expected,
     'oracle_sha': battle['oracle_sha'],
     'script_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    'semantic_sample_ids': [unit['id'] for unit in semantic['behavior_units'][:2]],
     'semantic_sha256': hashlib.sha256(semantic_raw).hexdigest(),
     'selected_ids': selected, 'rows': rows,
     'pack_counts': {
