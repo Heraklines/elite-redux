@@ -208,10 +208,10 @@ class CoopPolicyTests(unittest.TestCase):
         assignment = phases.partition(rows)
         self.assertEqual(rows, before)
         self.assertEqual(assignment["c"], [])
-        self.assertEqual(assignment["d"], [])
+        self.assertEqual(assignment["d"], [list(coop.KERNEL_TARGET)])
         self.assertEqual(assignment["e"], [list(phases.STATE_QUERY_TARGET)])
-        self.assertEqual(set(map(tuple, assignment["b"])), {phases.STATE_QUERY_WORKER_TARGET, ("er-lab", "current_worker_rebind_v2")})
-        self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(coop.KERNEL_TARGET), list(phases.CONTROL_QUERY_TARGET)])
+        self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
+        self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(phases.CONTROL_QUERY_TARGET)])
         self.assertEqual(len({tuple(pair) for targets in assignment.values() for pair in targets}), len(rows))
         self.assertEqual(sum(len(row["ids"]) for row in rows), 14)
 
