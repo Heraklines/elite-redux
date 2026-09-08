@@ -91,7 +91,7 @@ def main():
             lane_counts = {lane: sum(len(row["ids"]) for row in inventory
                                      if [row["crate"], row["target"]] in targets)
                            for lane, targets in partitions.items()}
-            if lane_counts != {"a": 691, "b": 14, "c": 14, "d": 87, "e": 3}:
+            if lane_counts != {"a": 691, "b": 12, "c": 14, "d": 87, "e": 5}:
                 raise RuntimeError("exact whole-target balanced lane assignment differs")
             planner = {"lane_counts": lane_counts, "status": "passed", "tests": 809, "targets": 106, "required_targets": 62,
                        "exact_maps": 56, "owned_sources": 56,

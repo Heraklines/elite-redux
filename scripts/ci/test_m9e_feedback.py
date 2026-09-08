@@ -6581,7 +6581,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertNotIn("er-query-consumer", selection["execution_scope"])
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
-        self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
+        self.assertEqual(phases.LANE_B_TARGETS, {
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
                                                 ("er-progression", "m9e_owned_friendship"), ("er-lab", "current_worker_rebind_v2")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
@@ -6878,7 +6878,7 @@ class FeedbackTests(unittest.TestCase):
             self.assertNotIn("er-state-query-consumer", selection["execution_scope"])
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
-        self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
+        self.assertEqual(phases.LANE_B_TARGETS, {
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
                                                 ("er-progression", "m9e_owned_friendship"), ("er-lab", "current_worker_rebind_v2")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)

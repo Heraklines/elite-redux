@@ -216,7 +216,7 @@ STATE_QUERY_TARGET = ("er-cli", "m9e_current_state_query")
 STATE_QUERY_WORKER_TARGET = ("er-cli", "m9e_current_state_query_worker")
 STATE_QUERY_TEST_IDS = ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture",
                         "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"]
-LANE_B_TARGETS = {("er-lab", "current_worker_rebind_v2"), ("er-progression", "m9e_owned_friendship"), ("er-cli", "m9e_current_repro"),
+LANE_B_TARGETS = {("er-lab", "current_worker_rebind_v2"), ("er-progression", "m9e_owned_friendship"),
                   ("er-cli", "m9e_current_reload"), STATE_QUERY_WORKER_TARGET}
 # Whole long-running targets use a third existing GitHub Actions job. Each
 # target keeps its original profile, complete IDs and 600-second execution cap.
@@ -227,7 +227,7 @@ LANE_D_TARGETS = {("er-kernel", "m9e_coop_choices_v7"), ("er-kernel", "m9e_curre
                   ("er-repro", "m9e_natural_campaign_replay"), ("er-kernel-worker", "current_process_v2"), ("er-rng", "er_rng"), ("er-rng", "m3_rng"), ("er-rng", "m9e_shifted_utf16")}
 # Whole ordinary state-query target moved after measured D shared-deadline exhaustion.
 # Its opt0 profile, complete ID and 600-second cap remain unchanged.
-LANE_E_TARGETS = {("er-cli", "m9e_current_coop_rebind"), ("er-kernel", "m9e_natural_coop_campaign_v7"), STATE_QUERY_TARGET}
+LANE_E_TARGETS = {("er-cli", "m9e_current_repro"), ("er-cli", "m9e_current_coop_rebind"), ("er-kernel", "m9e_natural_coop_campaign_v7"), STATE_QUERY_TARGET}
 STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
                           STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 

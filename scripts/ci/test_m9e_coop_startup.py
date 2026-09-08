@@ -461,9 +461,13 @@ class CoopPolicyTests(unittest.TestCase):
             inventory.append({"crate": crate, "target": target,
                               "ids": list(feedback.OWNED_FOUNDATION_TEST_IDS[crate + ":" + target]),
                               "historical_excluded_ids": []})
+        inventory.append({"crate": "er-cli", "target": "m9e_current_repro",
+                          "ids": ["actual_worker_capsule_import_rejects_tampering_without_claiming_session_id",
+                                  "native_browser_capsule_replays_through_actual_cli_and_continues"],
+                          "historical_excluded_ids": []})
         original = copy.deepcopy(inventory)
         expected_e = {phases.STATE_QUERY_TARGET, campaign.TARGET,
-                      ("er-cli", "m9e_current_coop_rebind")}
+                      ("er-cli", "m9e_current_coop_rebind"), ("er-cli", "m9e_current_repro")}
         self.assertEqual(phases.LANE_E_TARGETS, expected_e)
         self.assertNotIn(phases.STATE_QUERY_TARGET, phases.LANE_D_TARGETS)
         for rows in (inventory, list(reversed(inventory))):
