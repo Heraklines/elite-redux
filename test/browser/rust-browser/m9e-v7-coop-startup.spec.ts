@@ -387,6 +387,10 @@ for (const hostFirst of [true, false]) {
         party_owners: party.map((pokemon: any) => pokemon.owner_seat), presentations: presentations[0].length,
         received: [hostFirst ? 2 : 3, 3], raw_inputs: rawInputs, delayed_offer_ms: hostFirst ? 12_000 : 0, retry_preserved_snapshots: true,
       })) });
+      await info.attach("m9e-coop-wire-choices", {
+        body: Buffer.from(sentGuest), contentType: "application/octet-stream" });
+      await info.attach("m9e-coop-wire-started", {
+        body: Buffer.from(sentHost), contentType: "application/octet-stream" });
     } finally {
       try { await Promise.allSettled([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.dispose()))); }
       finally { await Promise.allSettled(peers.contexts.map(context => context.close())); }
