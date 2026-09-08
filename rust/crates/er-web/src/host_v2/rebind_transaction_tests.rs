@@ -714,11 +714,7 @@ fn produce_generation_two_reply(host: &mut Peer, guest: &mut Peer) -> TestResult
 }
 
 #[inline(never)]
-fn receive_generation_two_reply(
-    host: &mut Peer,
-    guest: &mut Peer,
-    reply: Vec<u8>,
-) -> TestResult {
+fn receive_generation_two_reply(host: &mut Peer, guest: &mut Peer, reply: Vec<u8>) -> TestResult {
     guest.import()?;
     assert!(
         guest

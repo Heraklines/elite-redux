@@ -12,7 +12,7 @@ import time
 BASE = "8be9549a6d6606216785cc9687d7d48931245dc2"
 SOURCE = "rust/crates/er-web/src/host_v2/rebind_transaction_tests.rs"
 BEFORE = "6bf607c30a11f2307c53f2f3fea9cd9d5fd77e1013b8c9c4f21516e48ae863cb"
-AFTER = "a371a85b6430fca3e45c753fcfc3c3d8c60d9eb39b80ead1e0c6083b1af612f1"
+AFTER = "925075bdc8a4a7a18a4fb8b4ec4b61ac623eca73215e4c2818ddcf611a31ce68"
 CI = [".github/workflows/m9e-browser-stack-focused.yml",
       "scripts/ci/m9e_browser_stack_diagnostic.py"]
 ROOT = Path.cwd().resolve()
