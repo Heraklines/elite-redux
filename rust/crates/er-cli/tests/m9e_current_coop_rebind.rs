@@ -241,15 +241,25 @@ impl Endpoint {
                 "save_slots":["owned-save"],"local_is_host":host,"protocol":protocol
             }}],"limits":{"maximum_environments":1,"maximum_events":1,"maximum_result_bytes":4 << 20}}),
         )?;
-        let mut value = Self { cli, session, host, bootstrap_batch: true };
+        let mut value = Self {
+            cli,
+            session,
+            host,
+            bootstrap_batch: true,
+        };
         value.checkpoint()?;
         Ok(value)
     }
     fn checkpoint(&mut self) -> TestResult<CoreGameKernelSnapshotV7> {
         let snapshot = self.session.snapshot()?;
         if self.bootstrap_batch {
-            let result = self.cli.result("batch.snapshot", json!({"batch":"natural-startup","environments":[1]}))?;
-            let rows = result["results"].as_array().ok_or("one actual bootstrap snapshot")?;
+            let result = self.cli.result(
+                "batch.snapshot",
+                json!({"batch":"natural-startup","environments":[1]}),
+            )?;
+            let rows = result["results"]
+                .as_array()
+                .ok_or("one actual bootstrap snapshot")?;
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0]["environment"], 1);
             assert_eq!(rows[0]["snapshot"], serde_json::to_value(&snapshot)?);
@@ -268,13 +278,21 @@ impl Endpoint {
             let CurrentExternalEvent::RawInput { input } = event else {
                 return Err("only actual natural raw input belongs to bootstrap batch".into());
             };
-            let response = self.cli.result("batch.raw_input", json!({"batch":"natural-startup","inputs":[{"environment":1,"input":input}]}))?;
-            let rows = response["results"].as_array().ok_or("one ordered raw bootstrap result")?;
+            let response = self.cli.result(
+                "batch.raw_input",
+                json!({"batch":"natural-startup","inputs":[{"environment":1,"input":input}]}),
+            )?;
+            let rows = response["results"]
+                .as_array()
+                .ok_or("one ordered raw bootstrap result")?;
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0]["ordinal"], 0);
             assert_eq!(rows[0]["environment"], 1);
             assert_eq!(rows[0]["step"], serde_json::to_value(&step)?);
-            assert_eq!(rows[0]["observation"], serde_json::to_value(self.session.observe()?)?);
+            assert_eq!(
+                rows[0]["observation"],
+                serde_json::to_value(self.session.observe()?)?
+            );
             return Ok(step);
         }
         let response = self
@@ -354,16 +372,31 @@ impl Endpoint {
     fn choose(&mut self, target: &str) -> TestResult<Vec<Vec<u8>>> {
         let before = self.checkpoint()?;
         assert!(self.bootstrap_batch);
-        let observed = self.cli.result("batch.observe", json!({"batch":"natural-startup","environments":[1]}))?;
-        let rows = observed["results"].as_array().ok_or("one actual bootstrap observation")?;
+        let observed = self.cli.result(
+            "batch.observe",
+            json!({"batch":"natural-startup","environments":[1]}),
+        )?;
+        let rows = observed["results"]
+            .as_array()
+            .ok_or("one actual bootstrap observation")?;
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["environment"], 1);
-        assert_eq!(rows[0]["observation"], serde_json::to_value(self.session.observe()?)?);
-        let control: er_types::GameControlPlanV2 = serde_json::from_value(rows[0]["observation"]["control"].clone())?;
+        assert_eq!(
+            rows[0]["observation"],
+            serde_json::to_value(self.session.observe()?)?
+        );
+        let control: er_types::GameControlPlanV2 =
+            serde_json::from_value(rows[0]["observation"]["control"].clone())?;
         let menu = control.menu.ok_or("actual bootstrap menu")?;
         // The existing public planner yields every genuine raw event. The actual
         // batch returns and checks each ordered step and complete observation.
-        let plan = er_lab::plan_navigation_v1(&menu.logical_menu()?, menu.instance_id, er_types::MenuOptionId::new(target)?, true, 4096)?;
+        let plan = er_lab::plan_navigation_v1(
+            &menu.logical_menu()?,
+            menu.instance_id,
+            er_types::MenuOptionId::new(target)?,
+            true,
+            4096,
+        )?;
         assert_eq!(self.checkpoint()?, before);
         let inputs = plan.events;
         assert!(!inputs.is_empty());
@@ -423,14 +456,20 @@ impl Endpoint {
         assert!(self.bootstrap_batch);
         let snapshot = self.checkpoint()?;
         let (seat, role) = self.session.session_context()?;
-        self.cli.result("session.from_snapshot", json!({"session":SESSION,"snapshot":snapshot,"owner_seat":seat,"role":role}))?;
+        self.cli.result(
+            "session.from_snapshot",
+            json!({"session":SESSION,"snapshot":snapshot,"owner_seat":seat,"role":role}),
+        )?;
         self.bootstrap_batch = false;
         assert_eq!(self.checkpoint()?, snapshot);
-        self.cli.result("batch.close", json!({"batch":"natural-startup"}))?;
+        self.cli
+            .result("batch.close", json!({"batch":"natural-startup"}))?;
         // The Title/menu journey above is real CLI execution. Capture starts at
         // its exact returned cooperative frontier, before actual peer delivery,
         // transport changes, every typed rebind attempt and generation-two play.
-        let value = self.cli.result("session.capsule.export", json!({"session":SESSION}))?;
+        let value = self
+            .cli
+            .result("session.capsule.export", json!({"session":SESSION}))?;
         let capsule: CurrentReproCapsuleV1 = serde_json::from_value(value["capsule"].clone())?;
         assert_eq!(capsule.checkpoint.as_ref(), &snapshot);
         assert_eq!(capsule.base_position, 0);
