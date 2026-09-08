@@ -2919,4 +2919,11 @@ if __name__ == "__main__":
     with (FULL / "harness-tests.log").open("w") as stream:
         preflight = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/ci", "-p", "test_m9e*.py", "-v"],
                                    cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, env=preflight_environment())
-    sys.exit(main("feedback harness self-tests failed; see harness-tests.log" if preflight.returncode else None))
+    failure = None
+    if preflight.returncode:
+        with (FULL / "harness-tests.log").open("rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, stream.tell() - 8192))
+            tail = stream.read(8192).decode("utf-8", errors="replace")
+        failure = "feedback harness self-tests failed; bounded tail (full log remains remote):\n" + tail
+    sys.exit(main(failure))
