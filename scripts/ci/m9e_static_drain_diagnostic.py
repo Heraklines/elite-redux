@@ -32,12 +32,12 @@ def sha(data):
 
 
 def bounded_write(path, value, maximum):
-    raw = (json.dumps(value, sort_keys=True, indent=2) + "\n").encode()
+    raw = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
     require(len(raw) <= maximum, "compact result exceeds unchanged bound")
     path.write_bytes(raw)
 
 
-def run(name, argv, cwd=ROOT, maximum=8 << 20):
+def run(name, argv, cwd=ROOT, maximum=8 << 20, expected_codes=(0,)):
     remaining = DEADLINE - 20 - time.time()
     require(remaining > 0, "shared deadline exhausted before " + name)
     seconds = min(600, remaining)
@@ -59,7 +59,7 @@ def run(name, argv, cwd=ROOT, maximum=8 << 20):
     COMMANDS.append({"name": name, "argv": argv, "cwd": str(cwd.relative_to(ROOT)) or ".",
                      "limit_seconds": seconds, "elapsed_ms": int((time.monotonic() - started) * 1000),
                      "returncode": process.returncode, "log_bytes": len(raw), "log_sha256": sha(raw)})
-    require(reason is None and process.returncode == 0, reason or name + " failed")
+    require(reason is None and process.returncode in expected_codes, reason or name + " failed")
     require(time.time() <= DEADLINE, "shared deadline exhausted after " + name)
     return raw
 
@@ -221,6 +221,52 @@ def main():
             result["tests_executed"] += len(ids)
         require(result["tests_executed"] == 5, "all five whole drain tests required")
         result["tests"] = {"passed": 5, "failed": 0, "ignored": 0, "filtered": 0}
+        resolver = ROOT / "rust/crates/er-battle/src/m7_resolver.rs"
+        positive = resolver.read_bytes()
+        needle = b"actor.hp += u32::try_from(amount).map_err(|_| BattleV5Error::Overflow)?;"
+        require(positive.count(needle) == 1, "one exact drain HP update required")
+        negative = positive.replace(needle, b"actor.hp += 0 * u32::try_from(amount).map_err(|_| BattleV5Error::Overflow)?;")
+        result["negative_control"] = {
+            "mutation": "disable only the actual drain HP increment",
+            "path": str(resolver.relative_to(ROOT)),
+            "positive_source_sha256": sha(positive), "negative_source_sha256": sha(negative),
+            "expected_failed_ids": ["actual_drain_minimum_one_and_maximum_hp_are_preserved",
+                                    "actual_drain_uses_capped_hp_loss_and_source_fraction"],
+        }
+        resolver.write_bytes(negative)
+        try:
+            for mode in ("negative", "restored"):
+                if mode == "restored":
+                    resolver.write_bytes(positive)
+                build = run(mode + "-build", ["cargo", "test", "--locked", *selector, "--no-run", "--message-format=json"], ROOT / "rust")
+                stream = [json.loads(line) for line in build.splitlines() if line.startswith(b"{")]
+                require([row.get("success") for row in stream if row.get("reason") == "build-finished"] == [True], "complete control build required")
+                control_artifacts = [row for row in stream if row.get("reason") == "compiler-artifact" and row.get("executable")]
+                require(len(control_artifacts) == 1, "one actual control executable required")
+                actual = control_artifacts[0]
+                reference = result["artifacts"][0]
+                require(actual["target"] == reference["target"] and actual["profile"] == reference["profile"]
+                        and actual["manifest_path"] == reference["manifest_path"]
+                        and actual["executable"] == reference["path"] and actual["features"] == [], "control source/profile/target differs")
+                binary = Path(actual["executable"])
+                require(binary.resolve().is_relative_to(TARGET.resolve()) and 0 < binary.stat().st_size <= 128 << 20, "bounded control executable required")
+                binary_hash = sha(binary.read_bytes())
+                listing = run(mode + "-list", [str(binary), "--list", "--format", "terse"], ROOT / "rust/crates/er-game", maximum=16384)
+                require(sha(listing) == reference["listing_sha256"] and len(listing) == reference["listing_bytes"], "all five unchanged control IDs required")
+                output = run(mode + "-execute", [str(binary), "--format", "terse"], ROOT / "rust/crates/er-game", maximum=16384,
+                             expected_codes=(101,) if mode == "negative" else (0,))
+                expected = [(b"3", b"2", b"0", b"0", b"0")] if mode == "negative" else [(b"5", b"0", b"0", b"0", b"0")]
+                require(re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output) == expected, "exact whole control result required")
+                failures = sorted(value.decode() for value in re.findall(rb"^([A-Za-z][A-Za-z0-9_:]+) --- FAILED$", output, re.M))
+                require(failures == (result["negative_control"]["expected_failed_ids"] if mode == "negative" else []), "only causal healing assertions may fail")
+                require(sha(binary.read_bytes()) == binary_hash, "control executable changed during execution")
+                require((binary_hash != reference["sha256"]) if mode == "negative" else (binary_hash == reference["sha256"]), "control/restoration binary identity differs")
+                result["negative_control"][mode] = {"artifact_sha256": binary_hash, "artifact_bytes": binary.stat().st_size,
+                    "profile": actual["profile"], "source_sha256": sha(resolver.read_bytes()), "ids": reference["ids"],
+                    "failed_ids": failures, "tests_executed": 5, "output_bytes": len(output), "output_sha256": sha(output)}
+            result["negative_control"]["status"] = "passed"
+        finally:
+            resolver.write_bytes(positive)
         require(sha((ROOT / SOURCE).read_bytes()) == DELTAS["after"][SOURCE], "lint changed reviewed source")
         for path, expected in result["source_hashes"].items():
             require(sha((ROOT / path).read_bytes()) == expected,
