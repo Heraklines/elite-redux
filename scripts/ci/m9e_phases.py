@@ -223,18 +223,20 @@ LANE_B_TARGETS = {("er-lab", "current_worker_rebind_v2"), ("er-progression", "m9
 LANE_C_TARGETS = {("er-cli", "m9e_current_batch"), ("er-lab", "current_kernel_supervisor_v2"),
                   ("er-kernel", "m9e_material_retention_v7"), ("er-cli", "m9e_current_rulechange_reload"),
                  }
-LANE_D_TARGETS = {("er-kernel", "m9e_coop_choices_v7"), ("er-kernel", "m9e_current_coop_rebind_v7"), ("er-kernel", "m9e_title_storage"), ("er-repro", "m9e_current_rebind_repro"), ("er-web", "er_web"), ("er-kernel", "m9e_coop_lost_receipt_v7"), ("er-web", "m9e_host_v2"),
+LANE_D_TARGETS = {("er-kernel", "m9e_coop_choices_v7"), ("er-kernel", "m9e_current_coop_rebind_v7"), ("er-kernel", "m9e_title_storage"), ("er-repro", "m9e_current_rebind_repro"), ("er-kernel", "m9e_coop_lost_receipt_v7"), ("er-web", "m9e_host_v2"),
                   ("er-repro", "m9e_natural_campaign_replay"), ("er-kernel-worker", "current_process_v2"), ("er-rng", "er_rng"), ("er-rng", "m3_rng"), ("er-rng", "m9e_shifted_utf16")}
 # Whole ordinary state-query target moved after measured D shared-deadline exhaustion.
 # Its opt0 profile, complete ID and 600-second cap remain unchanged.
-LANE_E_TARGETS = {("er-cli", "m9e_current_repro"), ("er-cli", "m9e_current_coop_rebind"), ("er-kernel", "m9e_natural_coop_campaign_v7"), STATE_QUERY_TARGET}
+LANE_E_TARGETS = {("er-cli", "m9e_current_repro"), ("er-cli", "m9e_current_coop_rebind"), ("er-kernel", "m9e_natural_coop_campaign_v7")}
+# Whole targets moved after two measured shared-deadline failures; all caps remain unchanged.
+LANE_F_TARGETS = {("er-web", "er_web"), STATE_QUERY_TARGET}
 STATE_QUERY_IDENTITIES = {STATE_QUERY_TARGET: STATE_QUERY_TEST_IDS[:1],
                           STATE_QUERY_WORKER_TARGET: STATE_QUERY_TEST_IDS[1:]}
 
 
 def inventory_and_assignment(enumerated, lane):
-    if lane not in {"a", "b", "c", "d", "e"}:
-        raise RuntimeError("native lane must be explicit a, b, c, d or e")
+    if lane not in {"a", "b", "c", "d", "e", "f"}:
+        raise RuntimeError("native lane must be explicit a, b, c, d, e or f")
     inventory = sorted([{"crate": cwd.name, "target": name, "ids": sorted(ids),
                          "historical_excluded_ids": sorted(excluded)}
                         for _, _, name, ids, cwd, excluded, _ in enumerated],
@@ -244,7 +246,7 @@ def inventory_and_assignment(enumerated, lane):
 
 
 def partition(inventory):
-    result = {"a": [], "b": [], "c": [], "d": [], "e": []}
+    result = {"a": [], "b": [], "c": [], "d": [], "e": [], "f": []}
     seen = set()
     for item in inventory:
         if set(item) != {"crate", "target", "ids", "historical_excluded_ids"}:
@@ -258,7 +260,7 @@ def partition(inventory):
                 or any(not isinstance(value, str) or not value for value in ids + excluded)
                 or len(ids) != len(set(ids)) or len(excluded) != len(set(excluded)) or set(ids) & set(excluded)):
             raise RuntimeError("native test inventory is duplicated or malformed")
-        result["e" if pair in LANE_E_TARGETS else "d" if pair in LANE_D_TARGETS else "b" if pair in LANE_B_TARGETS else "c" if pair in LANE_C_TARGETS else "a"].append(list(pair))
+        result["f" if pair in LANE_F_TARGETS else "e" if pair in LANE_E_TARGETS else "d" if pair in LANE_D_TARGETS else "b" if pair in LANE_B_TARGETS else "c" if pair in LANE_C_TARGETS else "a"].append(list(pair))
     return result
 
 
@@ -604,7 +606,7 @@ def validate_state_query_inventory(plan, inventory):
         raise RuntimeError("current state query process inventory, binding or lane ownership disagrees")
     for target, ids in STATE_QUERY_IDENTITIES.items():
         rows = [item for item in selected if (item["crate"], item["target"]) == target]
-        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "e"
+        lane = "b" if target == STATE_QUERY_WORKER_TARGET else "f"
         if (len(rows) != 1 or rows[0]["ids"] != ids or rows[0]["historical_excluded_ids"]
                 or plan.get("required_native_test_ids", {}).get(":".join(target)) != ids
                 or plan.get("required_native_targets", {}).get("er-cli", []).count(target[1]) != 1
@@ -1247,7 +1249,7 @@ def aggregate(feedback):
     import m9e_coop_startup as coop
     import m9e_campaign_replay as campaign_replay
     import m9e_coop_campaign as coop_campaign
-    if any(os.environ.get(key) != "success" for key in ("M9E_NATIVE_A_RESULT", "M9E_NATIVE_B_RESULT", "M9E_NATIVE_C_RESULT", "M9E_NATIVE_D_RESULT", "M9E_NATIVE_E_RESULT", "M9E_PLATFORM_RESULT")):
+    if any(os.environ.get(key) != "success" for key in ("M9E_NATIVE_A_RESULT", "M9E_NATIVE_B_RESULT", "M9E_NATIVE_C_RESULT", "M9E_NATIVE_D_RESULT", "M9E_NATIVE_E_RESULT", "M9E_NATIVE_F_RESULT", "M9E_PLATFORM_RESULT")):
         raise RuntimeError("required native/platform job is absent, failed, skipped or cancelled")
     directory = Path(os.environ["M9E_PHASE_DIR"])
     native_hash = os.environ["M9E_NATIVE_MANIFEST_SHA256"]
@@ -1260,7 +1262,10 @@ def aggregate(feedback):
     fourth = read_bounded(directory / "proof/native-d.json", fourth_hash)
     fifth_hash = os.environ["M9E_NATIVE_E_MANIFEST_SHA256"]
     fifth = read_bounded(directory / "proof/native-e.json", fifth_hash)
+    sixth_hash = os.environ["M9E_NATIVE_F_MANIFEST_SHA256"]
+    sixth = read_bounded(directory / "proof/native-f.json", sixth_hash)
     expected = identity(feedback)
+    validate_native(sixth, expected)
     validate_native(fifth, expected)
     validate_native(native, expected)
     validate_native(other, expected)
@@ -1278,12 +1283,15 @@ def aggregate(feedback):
     if (fifth["lane"] != "e" or fifth["plan_sha256"] != native["plan_sha256"]
             or fifth["inventory"] != native["inventory"] or fifth["inventory_sha256"] != native["inventory_sha256"]):
         raise RuntimeError("fifth native lane has different global plan, inventory or ownership")
-    actual = native["assigned_targets"] + other["assigned_targets"] + third["assigned_targets"] + fourth["assigned_targets"] + fifth["assigned_targets"]
+    if (sixth["lane"] != "f" or sixth["plan_sha256"] != native["plan_sha256"]
+            or sixth["inventory"] != native["inventory"] or sixth["inventory_sha256"] != native["inventory_sha256"]):
+        raise RuntimeError("sixth native lane has different global plan, inventory or ownership")
+    actual = native["assigned_targets"] + other["assigned_targets"] + third["assigned_targets"] + fourth["assigned_targets"] + fifth["assigned_targets"] + sixth["assigned_targets"]
     required = [[item["crate"], item["target"]] for item in native["inventory"]]
     if sorted(actual) != sorted(required):
         raise RuntimeError("native target union is incomplete or overlapping")
     totals = {"selected": native["tests"]["selected"], **{
-        key: native["tests"][key] + other["tests"][key] + third["tests"][key] + fourth["tests"][key] + fifth["tests"][key] for key in ("executed", "passed", "failed", "skipped")}}
+        key: native["tests"][key] + other["tests"][key] + third["tests"][key] + fourth["tests"][key] + fifth["tests"][key] + sixth["tests"][key] for key in ("executed", "passed", "failed", "skipped")}}
     if not totals["selected"] == totals["executed"] == totals["passed"] or totals["failed"] or totals["skipped"]:
         raise RuntimeError("native lane union test counts disagree")
     result = read_bounded(directory / "platform/platform.json", os.environ["M9E_PLATFORM_MANIFEST_SHA256"])
@@ -1291,11 +1299,11 @@ def aggregate(feedback):
     return {"phase": "aggregate", "status": "passed", "qualification": "passed",
             "product_sha": native["identity"]["product_sha"], "identity": native["identity"],
             "native_manifest_sha256": native_hash,
-            "native_b_manifest_sha256": other_hash, "native_c_manifest_sha256": third_hash, "native_d_manifest_sha256": fourth_hash, "native_e_manifest_sha256": fifth_hash, "inventory_sha256": native["inventory_sha256"],
+            "native_b_manifest_sha256": other_hash, "native_c_manifest_sha256": third_hash, "native_d_manifest_sha256": fourth_hash, "native_e_manifest_sha256": fifth_hash, "native_f_manifest_sha256": sixth_hash, "inventory_sha256": native["inventory_sha256"],
             "plan_sha256": native["plan_sha256"], "content_manifest_hash": native["identity"]["files"]["content"],
             "cli_executable": native["cli"],
-            "worker_executables": {"a": native.get("worker"), "b": other.get("worker"), "c": third.get("worker"), "d": fourth.get("worker"), "e": fifth.get("worker")},
-            "native_target_timing_ms": {**native.get("native_target_timing_ms", {}), **other.get("native_target_timing_ms", {}), **third.get("native_target_timing_ms", {}), **fourth.get("native_target_timing_ms", {}), **fifth.get("native_target_timing_ms", {})},
+            "worker_executables": {"a": native.get("worker"), "b": other.get("worker"), "c": third.get("worker"), "d": fourth.get("worker"), "e": fifth.get("worker"), "f": sixth.get("worker")},
+            "native_target_timing_ms": {**native.get("native_target_timing_ms", {}), **other.get("native_target_timing_ms", {}), **third.get("native_target_timing_ms", {}), **fourth.get("native_target_timing_ms", {}), **fifth.get("native_target_timing_ms", {}), **sixth.get("native_target_timing_ms", {})},
             "platform_manifest_sha256": os.environ["M9E_PLATFORM_MANIFEST_SHA256"],
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
