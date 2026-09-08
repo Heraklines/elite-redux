@@ -8864,7 +8864,7 @@ class PhaseTransferTests(unittest.TestCase):
 
     def install_third_lane_fixture(self):
         for proof in (self.native, self.other):
-            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload"), self.phases.STATE_QUERY_TARGET})):
+            for index, (crate, target) in enumerate(sorted(self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload"), self.phases.STATE_QUERY_TARGET, ("er-lab", "current_worker_rebind_v2")})):
                 ids = ["complete_c_witness_" + str(index)]
                 proof["inventory"].append({"crate": crate, "target": target, "ids": ids, "historical_excluded_ids": []})
                 proof["plan"]["required_native_targets"].setdefault(crate, []).append(target)
@@ -8995,7 +8995,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.install_third_lane_fixture()
         inventory = self.native["inventory"]
         assignment = self.phases.partition(inventory)
-        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload"), self.phases.STATE_QUERY_TARGET})
+        self.assertEqual(set(map(tuple, assignment["c"])), self.phases.LANE_C_TARGETS - {("er-cli", "m9e_current_rulechange_reload"), self.phases.STATE_QUERY_TARGET, ("er-lab", "current_worker_rebind_v2")})
         self.assertFalse(self.phases.LANE_B_TARGETS & self.phases.LANE_C_TARGETS)
         flat = [tuple(pair) for targets in assignment.values() for pair in targets]
         self.assertEqual(len(flat), len(set(flat)))
@@ -9048,7 +9048,7 @@ class PhaseTransferTests(unittest.TestCase):
                      for crate, target in sorted(self.phases.LANE_C_TARGETS)]
         inventory.append({"crate": "er-other", "target": "m9e_current_batch", "ids": [], "historical_excluded_ids": []})
         assignment = self.phases.partition(inventory)
-        self.assertEqual(len(assignment["c"]), 4)
+        self.assertEqual(len(assignment["c"]), 5)
         self.assertEqual(assignment["a"], [["er-other", "m9e_current_batch"]])
         self.assertEqual(assignment["b"], [])
         enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
