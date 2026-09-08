@@ -39,9 +39,45 @@ def main():
     raw = log.read_bytes()
     found = re.findall(rb"(?m)^Ran ([0-9]+) tests in ([0-9.]+)s$", raw)
     count = int(found[0][0]) if len(found) == 1 else None
+    planner = None
+    planner_error = None
+    if result.returncode == 0 and count == 477:
+        try:
+            os.environ["M9E_REPORT_DIR"] = str(REPORT / "planner")
+            import m9e_feedback as feedback
+            import m9e_browser_rebind as rebind
+            feedback.FULL.mkdir(parents=True, exist_ok=True)
+            plan = feedback.plan()
+            inventory = feedback.owned_foundation_inventory()
+            feedback.validate_owned_foundation_inventory(plan, inventory)
+            feedback.validate_owned_foundation_sources(ROOT)
+            expected_binding = rebind.source_binding(ROOT, source)
+            if (plan.get("current_recovery_integration") is not True
+                    or plan.get("requires_owned_foundations") is not True
+                    or plan.get("requires_current_browser_rebind") is not True
+                    or plan.get("current_browser_rebind_binding") != expected_binding
+                    or plan.get("requires_browser_worker") is not True
+                    or plan.get("requires_current_coop_startup") is not True
+                    or plan["unknown_paths"] or plan["boundary_paths"]
+                    or len(inventory) != 105 or sum(len(row["ids"]) for row in inventory) != 803
+                    or sum(map(len, plan["required_native_targets"].values())) != 61
+                    or len(plan["required_native_test_ids"]) != 55
+                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 55):
+                raise RuntimeError("actual803 full source plan or Browser obligations differ")
+            for row in inventory:
+                if not ("*" in plan["execution_scope"].get(row["crate"], [])
+                        or row["target"] in plan["execution_scope"].get(row["crate"], [])):
+                    raise RuntimeError("actual whole native target omitted")
+            planner = {"status": "passed", "tests": 803, "targets": 105, "required_targets": 61,
+                       "exact_maps": 55, "owned_sources": 55,
+                       "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
+                       "browser_binding": expected_binding}
+        except Exception as error:
+            planner_error = type(error).__name__ + ": " + str(error)
+            (COMPACT / "planner-failure.txt").write_text(planner_error[:16000] + "\n")
     after = {str(path.relative_to(ROOT)): digest(path) for path in paths}
     elapsed = time.time() - int(os.environ["M9E_PREFLIGHT_STARTED"])
-    passed = (result.returncode == 0 and count == 477 and before == after
+    passed = (result.returncode == 0 and count == 477 and planner is not None and before == after
               and 0 < elapsed <= 540 and 0 < len(raw) <= 256 << 10)
     summary = {"status": "passed" if passed else "failed", "source_sha": source,
                "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
@@ -49,6 +85,7 @@ def main():
                "elapsed_seconds": round(time.monotonic() - started, 3), "including_checkout_seconds": round(elapsed, 3),
                "source_hashes": before, "source_unchanged": before == after,
                "log_bytes": len(raw), "log_sha256": hashlib.sha256(raw).hexdigest(),
+               "planner": planner, "planner_error": planner_error,
                "native_qualified": False, "browser_qualified": False, "full_integration_qualified": False}
     payload = (json.dumps(summary, sort_keys=True, separators=(",", ":")) + "\n").encode()
     if len(payload) > 16384:
