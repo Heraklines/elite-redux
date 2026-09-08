@@ -10,7 +10,7 @@ raw = path.read_bytes()
 expected = '9afce9fd3bc6e05e2159f19e8578ff64fc342b8a5974bec5f15648b0799d74d2'
 assert len(raw) == 16325821 and hashlib.sha256(raw).hexdigest() == expected
 battle = json.loads(raw)['battle']
-selected = [36, 38, 71, 72, 165, 202, 394, 409, 413, 577, 613]
+selected = [38, 71, 165, 577]
 rows = []
 for index in selected:
     move = battle['moves'][index]
@@ -19,7 +19,9 @@ for index in selected:
     for program_id in move['mechanic_programs']:
         assert type(program_id) is int
         programs.append(battle['programs'][program_id])
-    rows.append({'move': move, 'programs': programs})
+    classifications = [entry for entry in battle['classifications']
+                       if entry['behavior_unit']['source'] == {'kind': 'MOVE', 'numeric_id': index}]
+    rows.append({'move': move, 'programs': programs, 'classifications': classifications})
 result = {
     'status': 'observed', 'scope': 'published payload inspection only; no behavior qualification',
     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
@@ -27,6 +29,13 @@ result = {
     'oracle_sha': battle['oracle_sha'],
     'script_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     'selected_ids': selected, 'rows': rows,
+    'pack_counts': {
+        'moves': sum(row is not None for row in battle['moves']),
+        'programs': sum(row is not None for row in battle['programs']),
+        'nonempty_programs': sum(bool(row and row['operations']) for row in battle['programs']),
+        'classifications': len(battle['classifications']),
+        'bespoke': len(battle['bespoke']['entries']),
+    },
 }
 encoded = (json.dumps(result, separators=(',', ':')) + '\n').encode()
 assert 0 < len(encoded) <= 32768
