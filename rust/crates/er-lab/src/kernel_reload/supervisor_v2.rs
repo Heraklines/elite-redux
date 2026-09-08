@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
-    ChildKernelGenerationV2, CurrentGenerationRebindV2, CurrentGenerationStepV2, KernelEndpointErrorV2,
-    VerifiedKernelExecutableV2,
+    ChildKernelGenerationV2, CurrentGenerationRebindV2, CurrentGenerationStepV2,
+    KernelEndpointErrorV2, VerifiedKernelExecutableV2,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -289,15 +289,21 @@ impl CurrentKernelSupervisorV2 {
         control: CurrentCoopRebindEventV1,
         maximum_inline_result_bytes: usize,
     ) -> Result<CurrentRebindDispatchV2, CurrentReloadErrorV2> {
-        let position = self.frontier.checked_add(1)
+        let position = self
+            .frontier
+            .checked_add(1)
             .ok_or(CurrentReloadErrorV2::PositionExhausted)?;
-        let evidence = self.active.apply_rebind(control.clone(), maximum_inline_result_bytes)?;
+        let evidence = self
+            .active
+            .apply_rebind(control.clone(), maximum_inline_result_bytes)?;
         self.frontier = position;
         let event = CurrentExternalEvent::CoopRebind { control };
         // As with ordinary dispatch, a postcommit retention failure is an
         // explicit accepted gap and expires older tickets; never a rejection.
-        let encoded_bytes = serde_json::to_vec(&(position, &event, &evidence, maximum_inline_result_bytes))
-            .ok().map(|bytes| bytes.len());
+        let encoded_bytes =
+            serde_json::to_vec(&(position, &event, &evidence, maximum_inline_result_bytes))
+                .ok()
+                .map(|bytes| bytes.len());
         let retention = match encoded_bytes {
             Some(encoded_bytes) if encoded_bytes <= self.limits.maximum_bytes => {
                 while self.tail.len() >= self.limits.maximum_events
@@ -312,9 +318,11 @@ impl CurrentKernelSupervisorV2 {
                 }
                 self.retained_bytes += encoded_bytes;
                 self.tail.push_back(RetainedEventV2 {
-                    position, event,
+                    position,
+                    event,
                     evidence: RetainedCurrentEvidenceV2::Rebind {
-                        evidence: evidence.clone(), maximum_inline_result_bytes,
+                        evidence: evidence.clone(),
+                        maximum_inline_result_bytes,
                     },
                     encoded_bytes,
                 });
@@ -325,7 +333,11 @@ impl CurrentKernelSupervisorV2 {
                 CurrentTraceRetentionV2::Gap
             }
         };
-        Ok(CurrentRebindDispatchV2 { position, evidence, retention })
+        Ok(CurrentRebindDispatchV2 {
+            position,
+            evidence,
+            retention,
+        })
     }
 
     pub fn begin_reload(&mut self) -> Result<CurrentReloadTicketV2, CurrentReloadErrorV2> {
@@ -388,9 +400,15 @@ impl CurrentKernelSupervisorV2 {
             }
             // Quarantine: no candidate effect is exposed through the public API.
             let matches = match (&retained.event, &retained.evidence) {
-                (CurrentExternalEvent::CoopRebind { control },
-                 RetainedCurrentEvidenceV2::Rebind { evidence, maximum_inline_result_bytes }) => {
-                    candidate.apply_rebind(control.clone(), *maximum_inline_result_bytes)? == *evidence
+                (
+                    CurrentExternalEvent::CoopRebind { control },
+                    RetainedCurrentEvidenceV2::Rebind {
+                        evidence,
+                        maximum_inline_result_bytes,
+                    },
+                ) => {
+                    candidate.apply_rebind(control.clone(), *maximum_inline_result_bytes)?
+                        == *evidence
                 }
                 (CurrentExternalEvent::CoopRebind { .. }, _) => false,
                 (event, RetainedCurrentEvidenceV2::Ordinary(evidence)) => {

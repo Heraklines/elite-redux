@@ -1,29 +1,47 @@
 //! Actual subprocess rebind and typed reload-tail witnesses.
 //! Only genuine enabled natural Title snapshots are prepared in the parent test;
 //! every subsequent bootstrap input, frame, control and callback runs in Workers.
-use std::error::Error;
-use std::path::PathBuf;
-use std::sync::Arc;
-use er_env::current::{CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionRebindOutputV1};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession,
+    CurrentSessionRebindOutputV1,
+};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m72_bootstrap::RunBootstrapStageV1;
 use er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindPhaseV1;
-use er_kernel::game_kernel_v7::{GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7, KernelPresentationOutcomeV2};
+use er_kernel::game_kernel_v7::{
+    GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
+    KernelPresentationOutcomeV2,
+};
 use er_kernel::initial_battle_protocol_snapshot_v2;
 use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
-use er_kernel_worker::{KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelGenerationV1, KernelSessionIdV1, KernelWorkerInitializationV2, MAXIMUM_WORKER_FRAME_BYTES_V2};
-use er_lab::kernel_reload::{ChildKernelGenerationV2, CurrentKernelSupervisorV2, CurrentReloadErrorV2, CurrentTailLimitsV2, CurrentTraceRetentionV2, VerifiedKernelExecutableV2};
+use er_kernel_worker::{
+    KERNEL_WORKER_ABI_VERSION_V2, KernelGenerationIdentityV2, KernelGenerationV1,
+    KernelSessionIdV1, KernelWorkerInitializationV2, MAXIMUM_WORKER_FRAME_BYTES_V2,
+};
+use er_lab::kernel_reload::{
+    ChildKernelGenerationV2, CurrentKernelSupervisorV2, CurrentReloadErrorV2, CurrentTailLimitsV2,
+    CurrentTraceRetentionV2, VerifiedKernelExecutableV2,
+};
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_protocol::proposal::ProposalLeaseConfig;
 use er_protocol::recovery::RecoveryTransactionConfig;
 use er_protocol::replica::AuthorityReplicaConfig;
-use er_state::m7_state::{DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics};
+use er_state::m7_state::{
+    DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
+};
 use er_types::battle_ids::WaveIndex;
-use er_types::{ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass};
+use er_types::{
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
+};
+use std::error::Error;
+use std::path::PathBuf;
+use std::sync::Arc;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
-const BUNDLE: &[u8] = include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
+const BUNDLE: &[u8] =
+    include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("bounded fixture integer")
 }
@@ -185,23 +203,40 @@ fn artifact(content: &PreparedGameContentV2, host: bool) -> TestResult<VerifiedK
     let digest = std::env::var("ER_M9E_WORKER_EXECUTABLE_SHA256")?;
     let identity = KernelGenerationIdentityV2 {
         schema_version: 2,
-        session_id: KernelSessionIdV1(if host { "owned-worker-host" } else { "owned-worker-guest" }.to_owned()),
+        session_id: KernelSessionIdV1(
+            if host {
+                "owned-worker-host"
+            } else {
+                "owned-worker-guest"
+            }
+            .to_owned(),
+        ),
         generation: KernelGenerationV1(1),
-        artifact_sha256: digest.clone(), executable_sha256: digest,
+        artifact_sha256: digest.clone(),
+        executable_sha256: digest,
         source_git_sha: std::env::var("ER_M9E_WORKER_SOURCE_SHA")?,
         worker_abi_version: KERNEL_WORKER_ABI_VERSION_V2,
-        minimum_snapshot_schema: 7, maximum_snapshot_schema: 7,
+        minimum_snapshot_schema: 7,
+        maximum_snapshot_schema: 7,
         content_identity: content.identity().clone(),
         build_target: std::env::var("ER_M9E_WORKER_BUILD_TARGET")?,
         build_profile: std::env::var("ER_M9E_WORKER_BUILD_PROFILE")?,
     };
-    Ok(VerifiedKernelExecutableV2::verify(executable.parent().ok_or("worker parent")?, &executable, identity)?)
+    Ok(VerifiedKernelExecutableV2::verify(
+        executable.parent().ok_or("worker parent")?,
+        &executable,
+        identity,
+    )?)
 }
 
 fn next_artifact(previous: &VerifiedKernelExecutableV2) -> TestResult<VerifiedKernelExecutableV2> {
     let mut identity = previous.identity().clone();
     identity.generation = KernelGenerationV1(identity.generation.0 + 1);
-    Ok(VerifiedKernelExecutableV2::verify(previous.allowed_root(), previous.executable(), identity)?)
+    Ok(VerifiedKernelExecutableV2::verify(
+        previous.allowed_root(),
+        previous.executable(),
+        identity,
+    )?)
 }
 
 struct Peer {
@@ -212,23 +247,49 @@ struct Peer {
 }
 
 impl Peer {
-    fn new(bundle: &GameContentBundleV2, content: Arc<PreparedGameContentV2>, host: bool, limits: CurrentTailLimitsV2) -> TestResult<Self> {
+    fn new(
+        bundle: &GameContentBundleV2,
+        content: Arc<PreparedGameContentV2>,
+        host: bool,
+        limits: CurrentTailLimitsV2,
+    ) -> TestResult<Self> {
         let title = owned_title(Arc::clone(&content), host)?.snapshot()?;
-        assert!(matches!(&title.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) if bootstrap.stage == RunBootstrapStageV1::Title));
-        assert!(title.current_coop_setup.as_ref().is_some_and(|owner| owner.started.is_none()));
+        assert!(
+            matches!(&title.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) if bootstrap.stage == RunBootstrapStageV1::Title)
+        );
+        assert!(
+            title
+                .current_coop_setup
+                .as_ref()
+                .is_some_and(|owner| owner.started.is_none())
+        );
         assert!(title.current_proposal.is_none());
         let seat = SeatId::new(safe(if host { 1 } else { 2 }));
-        let role = if host { GameKernelRoleV7::Authority } else { GameKernelRoleV7::Replica };
+        let role = if host {
+            GameKernelRoleV7::Authority
+        } else {
+            GameKernelRoleV7::Replica
+        };
         let artifact = artifact(&content, host)?;
         let reference = CurrentGameSession::from_snapshot(title.clone(), seat, role, content)?;
         let mut child = ChildKernelGenerationV2::spawn(&artifact)?;
-        let observation = child.initialize(bundle.clone(), KernelWorkerInitializationV2::Snapshot {
-            snapshot_bytes: serde_json::to_vec(&title)?, local_seat: seat, role,
-        })?;
+        let observation = child.initialize(
+            bundle.clone(),
+            KernelWorkerInitializationV2::Snapshot {
+                snapshot_bytes: serde_json::to_vec(&title)?,
+                local_seat: seat,
+                role,
+            },
+        )?;
         assert_eq!(observation, reference.observe()?);
         assert_eq!(child.snapshot()?, title);
         let worker = CurrentKernelSupervisorV2::new(child, limits)?;
-        Ok(Self { worker, reference, artifact, bundle: bundle.clone() })
+        Ok(Self {
+            worker,
+            reference,
+            artifact,
+            bundle: bundle.clone(),
+        })
     }
 
     fn snapshot(&mut self) -> TestResult<CoreGameKernelSnapshotV7> {
@@ -245,9 +306,14 @@ impl Peer {
         Ok(actual.evidence.step)
     }
 
-    fn rebind(&mut self, control: CurrentCoopRebindEventV1) -> TestResult<CurrentSessionRebindOutputV1> {
+    fn rebind(
+        &mut self,
+        control: CurrentCoopRebindEventV1,
+    ) -> TestResult<CurrentSessionRebindOutputV1> {
         let expected = self.reference.apply_rebind(control.clone())?;
-        let actual = self.worker.dispatch_rebind(control, MAXIMUM_WORKER_FRAME_BYTES_V2)?;
+        let actual = self
+            .worker
+            .dispatch_rebind(control, MAXIMUM_WORKER_FRAME_BYTES_V2)?;
         assert_eq!(actual.evidence.output, expected);
         assert_eq!(actual.evidence.observation, self.reference.observe()?);
         let wire = serde_json::to_value(&actual.evidence)?;
@@ -259,10 +325,22 @@ impl Peer {
 
     fn press(&mut self, code: PhysicalKey) -> TestResult<Vec<Vec<u8>>> {
         let mut frames = Vec::new();
-        for input in [RawInputEvent::KeyDown { code: code.clone(), printable: false, browser_repeat: false, focus: InputFocus::Game }, RawInputEvent::KeyUp { code }] {
-            for effect in self.ordinary(CurrentExternalEvent::RawInput { input })?.effects {
+        for input in [
+            RawInputEvent::KeyDown {
+                code: code.clone(),
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+            RawInputEvent::KeyUp { code },
+        ] {
+            for effect in self
+                .ordinary(CurrentExternalEvent::RawInput { input })?
+                .effects
+            {
                 match effect {
-                    GameKernelEffectV7::ProposalReady { bytes, .. } | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => frames.push(bytes),
+                    GameKernelEffectV7::ProposalReady { bytes, .. }
+                    | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => frames.push(bytes),
                     _ => {}
                 }
             }
@@ -271,16 +349,39 @@ impl Peer {
     }
 
     fn navigate(&mut self, id: &str) -> TestResult {
-        let bound = self.reference.observe()?.control.ok_or("natural control")?.menu.ok_or("natural menu")?.options.len() + 1;
+        let bound = self
+            .reference
+            .observe()?
+            .control
+            .ok_or("natural control")?
+            .menu
+            .ok_or("natural menu")?
+            .options
+            .len()
+            + 1;
         for _ in 0..bound {
-            if self.reference.observe()?.control.and_then(|control| control.menu).is_some_and(|menu| menu.selected_option_id.as_str() == id) { return Ok(()); }
+            if self
+                .reference
+                .observe()?
+                .control
+                .and_then(|control| control.menu)
+                .is_some_and(|menu| menu.selected_option_id.as_str() == id)
+            {
+                return Ok(());
+            }
             assert!(self.press(PhysicalKey::ArrowDown)?.is_empty());
         }
         Err(format!("actual Worker raw option {id} unreachable").into())
     }
 
     fn choose(&mut self, content: &PreparedGameContentV2, host: bool) -> TestResult<Vec<Vec<u8>>> {
-        let mode = content.bundle().bootstrap.modes.iter().find(|mode| mode.cooperative && mode.supported).ok_or("cooperative mode")?;
+        let mode = content
+            .bundle()
+            .bootstrap
+            .modes
+            .iter()
+            .find(|mode| mode.cooperative && mode.supported)
+            .ok_or("cooperative mode")?;
         let mut frames = self.press(PhysicalKey::Space)?;
         self.navigate(&format!("bootstrap/mode/{}", mode.mode.get()))?;
         frames.extend(self.press(PhysicalKey::Space)?);
@@ -288,9 +389,16 @@ impl Peer {
             self.navigate("bootstrap/challenge/done")?;
             frames.extend(self.press(PhysicalKey::Space)?);
         }
-        let GameKernelLifecycleSnapshotV7::Bootstrap(before) = self.snapshot()?.lifecycle else { return Err("actual starter lifecycle".into()); };
+        let GameKernelLifecycleSnapshotV7::Bootstrap(before) = self.snapshot()?.lifecycle else {
+            return Err("actual starter lifecycle".into());
+        };
         assert_eq!(before.stage, RunBootstrapStageV1::StarterSelect);
-        let starter = before.catalog.starters.iter().find(|starter| starter.cost <= before.catalog.maximum_starter_cost).ok_or("affordable starter")?;
+        let starter = before
+            .catalog
+            .starters
+            .iter()
+            .find(|starter| starter.cost <= before.catalog.maximum_starter_cost)
+            .ok_or("affordable starter")?;
         self.navigate(&format!("bootstrap/starter/{}", starter.pokemon_id.get()))?;
         frames.extend(self.press(PhysicalKey::Space)?);
         self.navigate("bootstrap/starter/confirm")?;
@@ -299,7 +407,14 @@ impl Peer {
         if host {
             for _ in 0..4 {
                 let snapshot = self.snapshot()?;
-                if matches!(&snapshot.lifecycle, GameKernelLifecycleSnapshotV7::Active(_) | GameKernelLifecycleSnapshotV7::Terminal { .. }) || matches!(&snapshot.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete) { break; }
+                if matches!(
+                    &snapshot.lifecycle,
+                    GameKernelLifecycleSnapshotV7::Active(_)
+                        | GameKernelLifecycleSnapshotV7::Terminal { .. }
+                ) || matches!(&snapshot.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) if bootstrap.stage == RunBootstrapStageV1::Complete)
+                {
+                    break;
+                }
                 frames.extend(self.press(PhysicalKey::Space)?);
             }
         }
@@ -310,9 +425,14 @@ impl Peer {
         let mut count = 0;
         for _ in 0..16 {
             let pending = self.snapshot()?.pending_presentations;
-            if pending.is_empty() { return Ok(count); }
+            if pending.is_empty() {
+                return Ok(count);
+            }
             for presentation in pending {
-                self.ordinary(CurrentExternalEvent::PresentationOutcome { event_id: presentation.event_id, outcome: KernelPresentationOutcomeV2::Settled })?;
+                self.ordinary(CurrentExternalEvent::PresentationOutcome {
+                    event_id: presentation.event_id,
+                    outcome: KernelPresentationOutcomeV2::Settled,
+                })?;
                 count += 1;
             }
         }
@@ -323,7 +443,9 @@ impl Peer {
         for _ in 0..8 {
             self.settle()?;
             let frames = self.press(PhysicalKey::Space)?;
-            if let [bytes] = frames.as_slice() { return Ok(bytes.clone()); }
+            if let [bytes] = frames.as_slice() {
+                return Ok(bytes.clone());
+            }
             assert!(frames.is_empty());
         }
         Err("actual Worker gameplay frame bound".into())
@@ -331,10 +453,18 @@ impl Peer {
 }
 
 fn wire(step: &GameKernelStepV7) -> TestResult<Vec<u8>> {
-    let frames = step.effects.iter().filter_map(|effect| match effect {
-        GameKernelEffectV7::ProposalReady { bytes, .. } | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes.clone()), _ => None,
-    }).collect::<Vec<_>>();
-    let [bytes] = frames.as_slice() else { return Err("exact actual gameplay frame".into()); };
+    let frames = step
+        .effects
+        .iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::ProposalReady { bytes, .. }
+            | GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let [bytes] = frames.as_slice() else {
+        return Err("exact actual gameplay frame".into());
+    };
     Ok(bytes.clone())
 }
 
@@ -346,44 +476,93 @@ fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
     assert_ne!(host.worker.process_id(), guest.worker.process_id());
     let choices = guest.choose(&content, false)?;
     let waiting = host.choose(&content, true)?;
-    let [choice] = choices.as_slice() else { return Err("actual guest setup publication".into()); };
+    let [choice] = choices.as_slice() else {
+        return Err("actual guest setup publication".into());
+    };
     assert!(waiting.is_empty());
-    let started = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(1), bytes: choice.clone() })?)?;
-    guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(1), bytes: started })?;
-    assert!(matches!(host.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Active(_)));
-    assert!(matches!(guest.snapshot()?.lifecycle, GameKernelLifecycleSnapshotV7::Active(_)));
-    assert_eq!(host.reference.kernel_ref()?.state(), guest.reference.kernel_ref()?.state());
+    let started = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(1),
+        bytes: choice.clone(),
+    })?)?;
+    guest.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(1),
+        bytes: started,
+    })?;
+    assert!(matches!(
+        host.snapshot()?.lifecycle,
+        GameKernelLifecycleSnapshotV7::Active(_)
+    ));
+    assert!(matches!(
+        guest.snapshot()?.lifecycle,
+        GameKernelLifecycleSnapshotV7::Active(_)
+    ));
+    assert_eq!(
+        host.reference.kernel_ref()?.state(),
+        guest.reference.kernel_ref()?.state()
+    );
     assert!(guest.snapshot()?.current_proposal.is_none());
     Ok((host, guest))
 }
 
 fn control_frame(output: &CurrentSessionRebindOutputV1) -> TestResult<Vec<u8>> {
     assert_eq!(output.generation, generation(2));
-    let [bytes] = output.frames.as_slice() else { return Err("exact actual rebind frame".into()); };
+    let [bytes] = output.frames.as_slice() else {
+        return Err("exact actual rebind frame".into());
+    };
     Ok(bytes.clone())
 }
 
 fn begin(host: &mut Peer, guest: &mut Peer) -> TestResult<Vec<u8>> {
     for peer in [&mut *host, &mut *guest] {
-        peer.ordinary(CurrentExternalEvent::TransportChanged { generation: generation(1), connected: false })?;
-        assert!(peer.rebind(CurrentCoopRebindEventV1::Begin)?.frames.is_empty());
+        peer.ordinary(CurrentExternalEvent::TransportChanged {
+            generation: generation(1),
+            connected: false,
+        })?;
+        assert!(
+            peer.rebind(CurrentCoopRebindEventV1::Begin)?
+                .frames
+                .is_empty()
+        );
         let before = peer.snapshot()?;
-        assert!(peer.rebind(CurrentCoopRebindEventV1::Begin)?.frames.is_empty());
+        assert!(
+            peer.rebind(CurrentCoopRebindEventV1::Begin)?
+                .frames
+                .is_empty()
+        );
         assert_eq!(peer.snapshot()?, before);
-        peer.ordinary(CurrentExternalEvent::TransportChanged { generation: generation(2), connected: true })?;
+        peer.ordinary(CurrentExternalEvent::TransportChanged {
+            generation: generation(2),
+            connected: true,
+        })?;
     }
     control_frame(&host.rebind(CurrentCoopRebindEventV1::Retry)?)
 }
 
 fn handshake(host: &mut Peer, guest: &mut Peer, mut bytes: Vec<u8>) -> TestResult {
     for index in 0usize..8 {
-        let peer = if index.is_multiple_of(2) { &mut *guest } else { &mut *host };
-        let output = peer.rebind(CurrentCoopRebindEventV1::Receive { generation: generation(2), bytes })?;
-        bytes = if index < 7 { control_frame(&output)? } else { assert!(output.frames.is_empty()); Vec::new() };
+        let peer = if index.is_multiple_of(2) {
+            &mut *guest
+        } else {
+            &mut *host
+        };
+        let output = peer.rebind(CurrentCoopRebindEventV1::Receive {
+            generation: generation(2),
+            bytes,
+        })?;
+        bytes = if index < 7 {
+            control_frame(&output)?
+        } else {
+            assert!(output.frames.is_empty());
+            Vec::new()
+        };
     }
     for peer in [host, guest] {
         let snapshot = peer.snapshot()?;
-        let owner = snapshot.current_coop_setup.as_ref().and_then(|owner| owner.rebind.as_deref()).ok_or("retained rebind owner")?;
+        let owner = snapshot
+            .current_coop_setup
+            .as_ref()
+            .and_then(|owner| owner.rebind.as_deref())
+            .ok_or("retained rebind owner")?;
         assert_eq!(owner.phase, CurrentCoopRebindPhaseV1::Open);
         assert_eq!(owner.transcript.len(), 8);
     }
@@ -395,36 +574,87 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
     let (mut host, mut guest) = pair(CurrentTailLimitsV2::default())?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
-    host.settle()?; guest.settle()?;
-    host.ordinary(CurrentExternalEvent::AdvanceTime { milliseconds: SafeU53::ZERO })?;
+    host.settle()?;
+    guest.settle()?;
+    host.ordinary(CurrentExternalEvent::AdvanceTime {
+        milliseconds: SafeU53::ZERO,
+    })?;
     let material = host.next_frame()?;
     er_game::m9e_material_v6::GameMaterialV6::decode(&material)?;
-    guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: material })?;
-    host.settle()?; guest.settle()?;
+    guest.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(2),
+        bytes: material,
+    })?;
+    host.settle()?;
+    guest.settle()?;
     let proposal = guest.next_frame()?;
-    assert_eq!(er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?.connection_generation, generation(2));
+    assert_eq!(
+        er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?
+            .connection_generation,
+        generation(2)
+    );
     let pending = guest.snapshot()?;
-    assert_eq!(wire(&guest.ordinary(CurrentExternalEvent::RetryCoopSetup)?)?, proposal);
+    assert_eq!(
+        wire(&guest.ordinary(CurrentExternalEvent::RetryCoopSetup)?)?,
+        proposal
+    );
     assert_eq!(guest.snapshot()?, pending);
-    let receipt = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: proposal.clone() })?)?;
-    assert_eq!(er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV2::decode(&receipt)?.evidence()?.proposal_bytes, proposal);
+    let receipt = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(2),
+        bytes: proposal.clone(),
+    })?)?;
+    assert_eq!(
+        er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV2::decode(&receipt)?
+            .evidence()?
+            .proposal_bytes,
+        proposal
+    );
     let committed = host.snapshot()?;
-    assert_eq!(wire(&host.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: proposal.clone() })?)?, receipt);
+    assert_eq!(
+        wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+            generation: generation(2),
+            bytes: proposal.clone()
+        })?)?,
+        receipt
+    );
     assert_eq!(host.snapshot()?, committed);
     let before = host.snapshot()?;
     let frontier = host.worker.frontier();
-    assert!(host.worker.dispatch(CurrentExternalEvent::NetworkFrame { generation: generation(1), bytes: proposal }).is_err());
+    assert!(
+        host.worker
+            .dispatch(CurrentExternalEvent::NetworkFrame {
+                generation: generation(1),
+                bytes: proposal
+            })
+            .is_err()
+    );
     assert_eq!(host.worker.frontier(), frontier);
     assert_eq!(host.snapshot()?, before);
     assert!(!host.worker.is_fenced());
-    guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: receipt.clone() })?;
+    guest.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(2),
+        bytes: receipt.clone(),
+    })?;
     assert!(guest.snapshot()?.current_proposal.is_none());
     let committed = guest.snapshot()?;
-    assert!(guest.ordinary(CurrentExternalEvent::NetworkFrame { generation: generation(2), bytes: receipt })?.effects.is_empty());
+    assert!(
+        guest
+            .ordinary(CurrentExternalEvent::NetworkFrame {
+                generation: generation(2),
+                bytes: receipt
+            })?
+            .effects
+            .is_empty()
+    );
     assert_eq!(guest.snapshot()?, committed);
-    assert!(guest.settle()? > 0); host.settle()?;
-    assert_eq!(host.reference.kernel_ref()?.state(), guest.reference.kernel_ref()?.state());
-    host.worker.dispose()?; guest.worker.dispose()?;
+    assert!(guest.settle()? > 0);
+    host.settle()?;
+    assert_eq!(
+        host.reference.kernel_ref()?.state(),
+        guest.reference.kernel_ref()?.state()
+    );
+    host.worker.dispose()?;
+    guest.worker.dispose()?;
     Ok(())
 }
 
@@ -432,24 +662,55 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
 fn rebind_result_budget_rejection_preserves_worker_state_and_frontier() -> TestResult {
     let (mut host, mut guest) = pair(CurrentTailLimitsV2::default())?;
     let offer = begin(&mut host, &mut guest)?;
-    let control = CurrentCoopRebindEventV1::Receive { generation: generation(2), bytes: offer.clone() };
+    let control = CurrentCoopRebindEventV1::Receive {
+        generation: generation(2),
+        bytes: offer.clone(),
+    };
     let before = guest.snapshot()?;
     let frontier = guest.worker.frontier();
     for budget in [0, MAXIMUM_WORKER_FRAME_BYTES_V2 + 1, 1] {
         let health = guest.worker.health()?;
-        assert!(guest.worker.dispatch_rebind(control.clone(), budget).is_err());
+        assert!(
+            guest
+                .worker
+                .dispatch_rebind(control.clone(), budget)
+                .is_err()
+        );
         let after_health = guest.worker.health()?;
         assert_eq!(after_health.applied_events, health.applied_events);
         // The only accepted request between these health responses is the latter health request.
-        assert_eq!(after_health.accepted_sequence, health.accepted_sequence.and_then(|sequence| sequence.checked_add(1)));
+        assert_eq!(
+            after_health.accepted_sequence,
+            health
+                .accepted_sequence
+                .and_then(|sequence| sequence.checked_add(1))
+        );
         assert_eq!(guest.worker.frontier(), frontier);
         assert_eq!(guest.snapshot()?, before);
         assert!(!guest.worker.is_fenced());
     }
-    assert!(guest.worker.dispatch(CurrentExternalEvent::CoopRebind { control: control.clone() }).is_err());
+    assert!(
+        guest
+            .worker
+            .dispatch(CurrentExternalEvent::CoopRebind {
+                control: control.clone()
+            })
+            .is_err()
+    );
     assert_eq!(guest.worker.frontier(), frontier);
     assert_eq!(guest.snapshot()?, before);
-    assert!(guest.worker.dispatch_rebind(CurrentCoopRebindEventV1::Receive { generation: generation(1), bytes: offer }, MAXIMUM_WORKER_FRAME_BYTES_V2).is_err());
+    assert!(
+        guest
+            .worker
+            .dispatch_rebind(
+                CurrentCoopRebindEventV1::Receive {
+                    generation: generation(1),
+                    bytes: offer
+                },
+                MAXIMUM_WORKER_FRAME_BYTES_V2
+            )
+            .is_err()
+    );
     assert_eq!(guest.worker.frontier(), frontier);
     assert_eq!(guest.snapshot()?, before);
     let output = guest.rebind(control)?;
@@ -458,7 +719,8 @@ fn rebind_result_budget_rejection_preserves_worker_state_and_frontier() -> TestR
     let admitted = guest.snapshot()?;
     assert_eq!(guest.rebind(CurrentCoopRebindEventV1::Retry)?, output);
     assert_eq!(guest.snapshot()?, admitted);
-    host.worker.dispose()?; guest.worker.dispose()?;
+    host.worker.dispose()?;
+    guest.worker.dispose()?;
     Ok(())
 }
 
@@ -467,11 +729,16 @@ fn midphase_rebind_tail_reloads_and_explicit_gaps_expire_old_tickets() -> TestRe
     let (mut host, mut guest) = pair(CurrentTailLimitsV2::default())?;
     let offer = begin(&mut host, &mut guest)?;
     let ticket = guest.worker.begin_reload()?;
-    let output = guest.rebind(CurrentCoopRebindEventV1::Receive { generation: generation(2), bytes: offer })?;
+    let output = guest.rebind(CurrentCoopRebindEventV1::Receive {
+        generation: generation(2),
+        bytes: offer,
+    })?;
     let before = guest.snapshot()?;
     let frontier = guest.worker.frontier();
     let next = next_artifact(&guest.artifact)?;
-    let prepared = guest.worker.prepare_reload(ticket, &next, guest.bundle.clone())?;
+    let prepared = guest
+        .worker
+        .prepare_reload(ticket, &next, guest.bundle.clone())?;
     assert_eq!(prepared.replayed_events(), 1);
     assert_ne!(prepared.process_id(), guest.worker.process_id());
     assert_eq!(guest.snapshot()?, before);
@@ -484,21 +751,51 @@ fn midphase_rebind_tail_reloads_and_explicit_gaps_expire_old_tickets() -> TestRe
     let current = guest.worker.begin_reload()?;
     let mut candidate_identity = next.identity().clone();
     candidate_identity.generation = KernelGenerationV1(candidate_identity.generation.0 + 1);
-    let third = VerifiedKernelExecutableV2::verify(next.allowed_root(), next.executable(), candidate_identity)?;
-    let prepared = guest.worker.prepare_reload(current, &third, guest.bundle.clone())?;
+    let third = VerifiedKernelExecutableV2::verify(
+        next.allowed_root(),
+        next.executable(),
+        candidate_identity,
+    )?;
+    let prepared = guest
+        .worker
+        .prepare_reload(current, &third, guest.bundle.clone())?;
     guest.rebind(CurrentCoopRebindEventV1::Retry)?;
-    assert!(matches!(guest.worker.commit_reload(prepared), Err(CurrentReloadErrorV2::StalePrepared)));
+    assert!(matches!(
+        guest.worker.commit_reload(prepared),
+        Err(CurrentReloadErrorV2::StalePrepared)
+    ));
     assert_eq!(guest.snapshot()?, before);
     // Reuse the genuine midphase snapshot unchanged, with a separately bounded tail.
     let mut child = ChildKernelGenerationV2::spawn(&third)?;
-    child.initialize(guest.bundle.clone(), KernelWorkerInitializationV2::Snapshot { snapshot_bytes: serde_json::to_vec(&before)?, local_seat: SeatId::new(safe(2)), role: GameKernelRoleV7::Replica })?;
-    let mut bounded = CurrentKernelSupervisorV2::new(child, CurrentTailLimitsV2 { maximum_events: 1, maximum_bytes: 1 })?;
+    child.initialize(
+        guest.bundle.clone(),
+        KernelWorkerInitializationV2::Snapshot {
+            snapshot_bytes: serde_json::to_vec(&before)?,
+            local_seat: SeatId::new(safe(2)),
+            role: GameKernelRoleV7::Replica,
+        },
+    )?;
+    let mut bounded = CurrentKernelSupervisorV2::new(
+        child,
+        CurrentTailLimitsV2 {
+            maximum_events: 1,
+            maximum_bytes: 1,
+        },
+    )?;
     let ticket = bounded.begin_reload()?;
-    let result = bounded.dispatch_rebind(CurrentCoopRebindEventV1::Retry, MAXIMUM_WORKER_FRAME_BYTES_V2)?;
+    let result = bounded.dispatch_rebind(
+        CurrentCoopRebindEventV1::Retry,
+        MAXIMUM_WORKER_FRAME_BYTES_V2,
+    )?;
     assert_eq!(result.evidence.output, output);
     assert_eq!(result.retention, CurrentTraceRetentionV2::Gap);
     assert_eq!(bounded.snapshot()?, before);
-    assert!(matches!(bounded.prepare_reload(ticket, &next_artifact(&third)?, guest.bundle.clone()), Err(CurrentReloadErrorV2::TicketExpired { .. })));
-    bounded.dispose()?; host.worker.dispose()?; guest.worker.dispose()?;
+    assert!(matches!(
+        bounded.prepare_reload(ticket, &next_artifact(&third)?, guest.bundle.clone()),
+        Err(CurrentReloadErrorV2::TicketExpired { .. })
+    ));
+    bounded.dispose()?;
+    host.worker.dispose()?;
+    guest.worker.dispose()?;
     Ok(())
 }

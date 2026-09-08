@@ -20,7 +20,10 @@ use er_kernel_worker::{
 use er_types::SeatId;
 
 use super::artifact_v2::VerifiedKernelExecutableV2;
-use super::types_v2::{CurrentGenerationRebindV2, CurrentGenerationStepV2, KernelEndpointErrorV2, KernelWorkerDeadlinesV2};
+use super::types_v2::{
+    CurrentGenerationRebindV2, CurrentGenerationStepV2, KernelEndpointErrorV2,
+    KernelWorkerDeadlinesV2,
+};
 
 /// One current session in one worker process. Calls are serialized by `&mut self`.
 /// A typed fault permits a corrected request at the same accepted frontier.
@@ -232,11 +235,16 @@ impl ChildKernelGenerationV2 {
         maximum_inline_result_bytes: usize,
     ) -> Result<CurrentGenerationRebindV2, KernelEndpointErrorV2> {
         match self.request(KernelWorkerRequestV2::ApplyRebind {
-            control, maximum_inline_result_bytes,
+            control,
+            maximum_inline_result_bytes,
         })? {
-            KernelWorkerResponseV2::RebindEffects { output, observation } => {
-                Ok(CurrentGenerationRebindV2 { output, observation: *observation })
-            }
+            KernelWorkerResponseV2::RebindEffects {
+                output,
+                observation,
+            } => Ok(CurrentGenerationRebindV2 {
+                output,
+                observation: *observation,
+            }),
             _ => Err(self.invalid_response("rebind response kind")),
         }
     }
@@ -420,11 +428,19 @@ impl ChildKernelGenerationV2 {
                 KernelWorkerResponseV2::Effects { observation, .. },
             ) => observation,
             (
-                KernelWorkerRequestV2::ApplyRebind { maximum_inline_result_bytes, .. },
-                KernelWorkerResponseV2::RebindEffects { output, observation },
+                KernelWorkerRequestV2::ApplyRebind {
+                    maximum_inline_result_bytes,
+                    ..
+                },
+                KernelWorkerResponseV2::RebindEffects {
+                    output,
+                    observation,
+                },
             ) => {
                 let result = serde_json::json!({"rebind": output, "observation": observation});
-                if !serde_json::to_vec(&result).is_ok_and(|bytes| bytes.len() <= *maximum_inline_result_bytes) {
+                if !serde_json::to_vec(&result)
+                    .is_ok_and(|bytes| bytes.len() <= *maximum_inline_result_bytes)
+                {
                     return false;
                 }
                 observation

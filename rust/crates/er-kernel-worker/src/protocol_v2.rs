@@ -1,6 +1,9 @@
 //! Current V7 worker ABI. V1 remains a separately selected historical protocol.
 
-use er_env::current::{CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameObservation, CurrentSessionRebindOutputV1};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameObservation,
+    CurrentSessionRebindOutputV1,
+};
 use er_game::m9e_content_v2::GameContentBundleV2;
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
@@ -347,7 +350,11 @@ impl KernelWorkerRequestEnvelopeV2 {
         {
             return Err(KernelWorkerProtocolErrorV2::Fingerprint);
         }
-        if let KernelWorkerRequestV2::ApplyRebind { maximum_inline_result_bytes, .. } = &self.request {
+        if let KernelWorkerRequestV2::ApplyRebind {
+            maximum_inline_result_bytes,
+            ..
+        } = &self.request
+        {
             validate_success_response_bytes_v2(*maximum_inline_result_bytes)?;
         }
         let bytes = serde_json::to_vec(self)
