@@ -625,7 +625,9 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
     let choices = std::thread::scope(|scope| -> TestResult<Vec<u8>> {
         let guest_start = scope.spawn(|| guest.starters().map_err(|error| error.to_string()));
         let host_start = host.starters();
-        let guest_start = guest_start.join().map_err(|_| "guest starter thread panicked")?;
+        let guest_start = guest_start
+            .join()
+            .map_err(|_| "guest starter thread panicked")?;
         assert!(host_start?.is_empty());
         one_frame(&guest_start?)
     })?;
