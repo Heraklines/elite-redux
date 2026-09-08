@@ -1,0 +1,68 @@
+name: M9E Difficulty Parity Preimages
+on:
+  push:
+    branches: [codex/m9e-difficulty-parity-focused-20260908]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-difficulty-parity-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_DEV_OPT_LEVEL: '0'
+      CARGO_PROFILE_DEV_DEBUG_ASSERTIONS: 'true'
+      CARGO_PROFILE_DEV_OVERFLOW_CHECKS: 'true'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_TEST_OPT_LEVEL: '0'
+      CARGO_PROFILE_TEST_DEBUG_ASSERTIONS: 'true'
+      CARGO_PROFILE_TEST_OVERFLOW_CHECKS: 'true'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Start shared deadline before checkout
+        run: echo "M9E_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 4bb63a076b3a3662313be26668d59a445238fef1
+          path: baseline
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Capture both complete native parity targets without changing goldens
+        run: python3 scripts/ci/m9e_difficulty_parity.py
+      - name: Bounded diagnostic result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-difficulty-parity-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-difficulty-parity/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Actual remote preimages and build logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-difficulty-parity-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-difficulty-parity/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
