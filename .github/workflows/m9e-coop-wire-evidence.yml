@@ -1,0 +1,96 @@
+name: M9E Generated Coop Wire Evidence
+on:
+  push:
+    branches: [codex/m9e-generated-coop-wire-evidence-20260908]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: m9e-coop-wire-evidence-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      GIT_NO_LAZY_FETCH: '1'
+    steps:
+      - name: Start shared budget before checkout
+        timeout-minutes: 1
+        run: echo "M9E_FOCUS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        timeout-minutes: 5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Exact candidate identity
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: pnpm/action-setup@v5
+        timeout-minutes: 5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        timeout-minutes: 5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Restore Chromium download
+        uses: actions/cache@v5
+        timeout-minutes: 5
+        with:
+          path: ~/.cache/ms-playwright
+          key: m9e-focused-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Retrieve exact previously audited old browser cohort remotely
+        uses: actions/download-artifact@v7
+        timeout-minutes: 5
+        with:
+          github-token: ${{ github.token }}
+          repository: Heraklines/elite-redux
+          run-id: 34130111706
+          artifact-ids: 10023303085
+          path: ${{ runner.temp }}/m9e-coop-wire-evidence/inputs/old
+          merge-multiple: true
+      - name: Retrieve exact successful current full-run browser cohort remotely
+        uses: actions/download-artifact@v7
+        timeout-minutes: 5
+        with:
+          github-token: ${{ github.token }}
+          repository: Heraklines/elite-redux
+          run-id: 34183846131
+          artifact-ids: 10040887981
+          path: ${{ runner.temp }}/m9e-coop-wire-evidence/inputs/current
+          merge-multiple: true
+      - name: Six original browser cases and eight source-bound packet attachments
+        timeout-minutes: 30
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/m9e_coop_wire_evidence.py
+      - name: Compact evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-coop-wire-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-coop-wire-evidence/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Exact packet evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-coop-wire-packets-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-coop-wire-evidence/packets/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remote browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-coop-wire-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-coop-wire-evidence/diagnostics/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "spec": "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts",
+  "spec_sha256": "c6d2ef1026b4b61acdf3f71e35dea511d9d576d404e4c64c1adb23b8faa49ae8",
+  "cohorts": [
+    {
+      "name": "old",
+      "source_sha": "9fbb9fa2a624f8341974ce27e18260a21063751f",
+      "run_id": 34130111706,
+      "artifact_id": 10023303085,
+      "archive_bytes": 5402609,
+      "platform_proof_sha256": "fb25445797775f0915f103b44c63ec88ae9a7fb80baa72bfca964b4d2780a575",
+      "manifests": {
+        "m9e-v7-rtc-assets.json": "4e0cbd5d6cb35266f1c6d7d6902ec97baa0fcbdd20e228d17a4a6f4f0d82f197",
+        "m9e-v7-web-assets.json": "c07bb7c7a678e9a39c251685455ff2af3fe2dab43fe07f63c8b4519d38e35e87",
+        "m9e-v7-coop-startup-assets.json": "44a1aa9aa5fe8d0963fb5d689a5aae41d74a9edaa333ec9e96c5b6a45c4b8ca1"
+      },
+      "cases": [
+        {
+          "order": "host",
+          "choices_bytes": 1416,
+          "choices_sha256": "ee88f6c370783b7983f9f4a9e80f284d06fc4aa2f9d5de666c08377412e7b86c",
+          "started_bytes": 32318,
+          "started_sha256": "91cafd39c77580fec5a6e6f838a1323f9ee2524ea4ba95c260b1e949beccad76"
+        },
+        {
+          "order": "guest",
+          "choices_bytes": 1416,
+          "choices_sha256": "ee88f6c370783b7983f9f4a9e80f284d06fc4aa2f9d5de666c08377412e7b86c",
+          "started_bytes": 32318,
+          "started_sha256": "91cafd39c77580fec5a6e6f838a1323f9ee2524ea4ba95c260b1e949beccad76"
+        }
+      ]
+    },
+    {
+      "name": "current",
+      "source_sha": "84a2e3baf53530da4422bb422f56f16d1466ea9e",
+      "run_id": 34183846131,
+      "artifact_id": 10040887981,
+      "archive_bytes": 5647538,
+      "platform_proof_sha256": "d319ec34a90127f12bcce1ddcb3a7e195f615d854075155362fdaa60d8c5683b",
+      "manifests": {
+        "m9e-v7-rtc-assets.json": "e5eab1a3693102b7c87f5d281af95ea766ba3d602b99f61bfc31f02f250fee43",
+        "m9e-v7-web-assets.json": "5bdc27dac26a72d53b7fa55c53a41f89a327809e87f42468f5d6d1a9bb365c7c",
+        "m9e-v7-coop-startup-assets.json": "2e224d2dabd8a48a57790e24c5cbdba3857cd69ec3701118e5636352360df935"
+      },
+      "cases": [
+        {
+          "order": "host",
+          "choices_bytes": 1416,
+          "choices_sha256": "e4959cd6f082178f8725f78dc1a3cd4ae1cfe1a89197b7cc0a212531e61ccbd5",
+          "started_bytes": 32318,
+          "started_sha256": "a9f14539f8455cd376e4faf0df83a806ad418be2d2573051d245a20cc1956450"
+        },
+        {
+          "order": "guest",
+          "choices_bytes": 1416,
+          "choices_sha256": "e4959cd6f082178f8725f78dc1a3cd4ae1cfe1a89197b7cc0a212531e61ccbd5",
+          "started_bytes": 32318,
+          "started_sha256": "a9f14539f8455cd376e4faf0df83a806ad418be2d2573051d245a20cc1956450"
+        }
+      ]
+    }
+  ],
+  "source_pins": {
+    "scripts/ci/m9e_current_cost.py": {
+      "bytes": 38615,
+      "sha256": "22285aefe9c4588f5abbc9500801cbaececaef31646646d7f947975ecff9ce75"
+    },
+    "pnpm-lock.yaml": {
+      "bytes": 145307,
+      "sha256": "dcbcaf6df44509c71b28becffdd70b33a7410a0873f5b1297ede84150a6effff"
+    },
+    "package.json": {
+      "bytes": 6588,
+      "sha256": "b29655956a73f24aaff59781b9352f937598123900589d055abf1a10fd12f903"
+    },
+    ".nvmrc": {
+      "bytes": 7,
+      "sha256": "ca60797658d7260e78179fff372eda677f04040820d398ccbebb2934e85dc16f"
+    },
+    "playwright.rust-browser.config.ts": {
+      "bytes": 742,
+      "sha256": "27e17af1a4ae26ec6c4a705891f8448fa0616875ce1643fcb1a7c2595a27e68e"
+    }
+  }
+}
