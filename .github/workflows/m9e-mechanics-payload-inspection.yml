@@ -1,0 +1,51 @@
+name: M9E Mechanics Payload Inspection
+on:
+  push:
+    branches: [codex/m9e-recoil-source-inspection-20260908]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7
+          path: oracle
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact parser in isolated remote directory
+        timeout-minutes: 3
+        run: npm install --prefix "$RUNNER_TEMP/m9e-parser" --ignore-scripts --no-audit --no-fund typescript@6.0.3
+      - name: Reproduce frozen source catalogs remotely
+        timeout-minutes: 3
+        env:
+          M5_TYPESCRIPT_ROOT: ${{ runner.temp }}/m9e-parser
+          M6_TYPESCRIPT_ROOT: ${{ runner.temp }}/m9e-parser
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m5-source-catalog.mjs --oracle-root "$GITHUB_WORKSPACE/oracle" --oracle-sha 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7 --output "$RUNNER_TEMP/m9e-raw.json"
+          node scripts/export-kernel-m6-semantic-catalog.mjs --oracle-root "$GITHUB_WORKSPACE/oracle" --oracle-sha 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7 --raw-catalog "$RUNNER_TEMP/m9e-raw.json" --output-root "$RUNNER_TEMP/m9e-semantic"
+      - name: Inspect exact published payloads against reproduced units
+        run: python3 scripts/ci/m9e_mechanics_payload_inspection.py
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9e-mechanics-payload-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-mechanics-inspection/summary.json
+          if-no-files-found: error
+          retention-days: 14
