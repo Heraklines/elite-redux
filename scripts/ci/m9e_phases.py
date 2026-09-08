@@ -216,7 +216,7 @@ STATE_QUERY_TARGET = ("er-cli", "m9e_current_state_query")
 STATE_QUERY_WORKER_TARGET = ("er-cli", "m9e_current_state_query_worker")
 STATE_QUERY_TEST_IDS = ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture",
                         "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"]
-IDENTITY_FILES.update({"difficulty_source_0":"rust/crates/er-game/tests/m9e_run_difficulty.rs","difficulty_source_1":"rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs","difficulty_source_2":"rust/crates/er-kernel/tests/m9e_title_storage.rs"})
+IDENTITY_FILES.update({"difficulty_source_0":"rust/crates/er-game/tests/m9e_run_difficulty.rs","difficulty_source_1":"rust/crates/er-kernel/tests/m9e_game_kernel_v7.rs","difficulty_source_2":"rust/crates/er-kernel/tests/m9e_title_storage.rs","difficulty_source_3":"rust/crates/er-cli/tests/support/m9e_current_state_query.rs"})
 
 LANE_B_TARGETS = {("er-lab", "current_worker_rebind_v2"), ("er-progression", "m9e_owned_friendship"),
                   ("er-cli", "m9e_current_reload"), STATE_QUERY_WORKER_TARGET}

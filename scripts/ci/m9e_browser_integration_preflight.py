@@ -95,7 +95,7 @@ def main():
             if lane_counts != {"a": 696, "b": 12, "c": 14, "d": 78, "e": 4, "f": 10}:
                 raise RuntimeError("exact whole-target balanced lane assignment differs")
             planner = {"lane_counts": lane_counts, "status": "passed", "tests": 814, "targets": 107, "required_targets": 63,
-                       "exact_maps": 56, "owned_sources": 56,
+                       "exact_maps": 57, "owned_sources": 60,
                        "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                        "browser_binding": expected_binding}
         except Exception as error:
@@ -118,7 +118,9 @@ def main():
         raise RuntimeError("bounded summary required")
     (COMPACT / "summary.json").write_bytes(payload)
     if not passed:
-        (COMPACT / "failure.txt").write_bytes(raw[-60000:])
+        (COMPACT / "failure.txt").write_bytes(b"\n".join(
+            line if len(line) <= 1200 else b"[Long diagnostic line omitted; full log retained remotely]"
+            for line in raw.splitlines())[-60000:])
     print(json.dumps({key: summary[key] for key in ("status", "source_sha", "tests", "expected_tests", "elapsed_seconds")}))
     return 0 if passed else 1
 
