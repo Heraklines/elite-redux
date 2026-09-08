@@ -15,6 +15,7 @@ pub mod m9;
 pub mod m9e_ai;
 pub mod m9e_bundle;
 pub mod m9e_full_content;
+mod m9e_move_drains;
 pub mod m9e_presentation;
 pub mod m9e_progression;
 pub mod m9e_scenario;

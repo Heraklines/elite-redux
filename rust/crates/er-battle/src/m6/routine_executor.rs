@@ -161,6 +161,21 @@ pub fn execute_hook_v2(
     stage_hook(bindings, context, hook)
 }
 
+/// Current M9 after-damage dispatch accepts only the actor selector. Legacy M6
+/// entry points retain their original rejection of all selector bindings.
+pub(crate) fn execute_after_damage_actor_hook_v2(
+    content: &PreparedBattleContentV3,
+    context: &MechanicsContextV2<'_>,
+) -> Result<MechanicsTransitionV2, MechanicsErrorV2> {
+    let hook = MechanicHookV2::AfterDamage;
+    let mut bindings = Vec::with_capacity(content.hook_sources(hook).len());
+    for reference in content.hook_sources(hook) {
+        let (program, binding) = content.resolve_binding(*reference)?;
+        bindings.push(BindingRef { program, binding });
+    }
+    stage_hook_with_actor_selector(bindings, context, hook, true)
+}
+
 /// Temporary scan-based trigger reference used only by the G23 parity proof.
 #[doc(hidden)]
 pub fn execute_hook_v2_direct_reference(
@@ -262,6 +277,15 @@ fn stage_hook(
     context: &MechanicsContextV2<'_>,
     hook: MechanicHookV2,
 ) -> Result<MechanicsTransitionV2, MechanicsErrorV2> {
+    stage_hook_with_actor_selector(bindings, context, hook, false)
+}
+
+fn stage_hook_with_actor_selector(
+    bindings: Vec<BindingRef<'_>>,
+    context: &MechanicsContextV2<'_>,
+    hook: MechanicHookV2,
+    allow_actor_selector: bool,
+) -> Result<MechanicsTransitionV2, MechanicsErrorV2> {
     let mut operations = Vec::new();
     for source in bindings {
         if !context.source_is_active(&source.program.source) {
@@ -269,7 +293,13 @@ fn stage_hook(
         }
         let condition_matched =
             evaluate_condition(source.program, source.binding.condition_root, context)?;
-        if source.binding.selector_root.is_some() {
+        if let Some(root) = source.binding.selector_root
+            && (!allow_actor_selector
+                || !matches!(
+                    source.program.selectors.0.get(root.index()),
+                    Some(er_mechanics::selector_operation_v2::SelectorNodeV2::Actor)
+                ))
+        {
             return Err(MechanicsErrorV2::UnsupportedSelector);
         }
         for (offset, operation) in operation_range(source.program, source.binding)?
