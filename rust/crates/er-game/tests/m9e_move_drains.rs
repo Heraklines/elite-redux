@@ -60,7 +60,12 @@ fn profile() -> Result<ProfileStateV1, Box<dyn Error>> {
 }
 
 fn build_fixture() -> TestResult<(Arc<PreparedGameContentV2>, GameStateV6)> {
-    let mut bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let bundle_bytes = std::env::var("M9E_DRAIN_BUNDLE")
+        .ok()
+        .map(std::fs::read)
+        .transpose()?;
+    let mut bundle: GameContentBundleV2 =
+        serde_json::from_slice(bundle_bytes.as_deref().unwrap_or(BUNDLE))?;
     // The focused remote producer supplies its freshly compiled, source-bound
     // battle pack. The published bundle remains the default integration input.
     if let Ok(path) = std::env::var("M9E_DRAIN_BATTLE_PACK") {
@@ -435,6 +440,25 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
                 .ok_or("deferred drain")?
                 .mechanic_programs
         );
+    }
+    if let Ok(directory) = std::env::var("M9E_DRAIN_EXPORT") {
+        let directory = std::path::Path::new(&directory);
+        std::fs::create_dir(directory)?;
+        let bundle = content.bundle();
+        let mut manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
+            "../../../fixtures/m9/engineering/game-content-bundle-v2-manifest.json"
+        ))?;
+        manifest["content_hash"] = serde_json::to_value(&bundle.content_hash)?;
+        manifest["components"]["battle"] = serde_json::to_value(&bundle.battle.content_hash)?;
+        manifest["components"]["run"] = serde_json::to_value(&bundle.run.content_hash)?;
+        for (name, bytes) in [
+            ("battle-content-pack-v3.json", serde_json::to_vec(&bundle.battle)?),
+            ("run-content-pack-v3.json", serde_json::to_vec(&bundle.run)?),
+            ("game-content-bundle-v2.json", serde_json::to_vec(bundle)?),
+            ("game-content-bundle-v2-manifest.json", serde_json::to_vec(&manifest)?),
+        ] {
+            std::fs::write(directory.join(name), bytes)?;
+        }
     }
     Ok(())
 }
