@@ -7692,7 +7692,7 @@ class PhaseTransferTests(unittest.TestCase):
                                "cargo_profile": {"test": False}, "manifest_path": "rust/crates/er-cli/Cargo.toml"}}
         self.native["plan_sha256"] = self.phases.sha(self.phases.encoded(self.native["plan"]))
         self.native["inventory"] = [
-            {"crate": "er-cli", "target": "m9e_current_repro", "ids": ["cli_one", "cli_two"], "historical_excluded_ids": []},
+            {"crate": "er-cli", "target": "m9e_current_reload", "ids": ["cli_one", "cli_two"], "historical_excluded_ids": []},
             {"crate": "er-repro", "target": "m9e_current_repro", "ids": [f"core_{index}" for index in range(9)], "historical_excluded_ids": []},
             {"crate": "er-wasm", "target": "m9e_parity", "ids": ["native_raw", "native_timer"], "historical_excluded_ids": []},
         ]
@@ -8221,8 +8221,8 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-game", "m9e_damage_query"], assignment["a"])
         self.assertIn(["er-ai", "er_ai"], assignment["a"])
         self.assertEqual({tuple(pair) for pair in assignment["b"]}, {
-            ("er-cli", "m9e_current_repro"),
             ("er-cli", "m9e_current_reload")})
+        self.assertIn(["er-cli", "m9e_current_repro"], assignment["e"])
         self.assertIn(["er-cli", "m9e_current_batch"], assignment["c"])
         for key in policies:
             for damage in ("missing", "restoration", "wrong_test"):
@@ -9110,7 +9110,7 @@ class PhaseTransferTests(unittest.TestCase):
         inventory.extend([
             {"crate": "er-web", "target": "m9e_host_v2", "ids": ["host"], "historical_excluded_ids": []},
             {"crate": "er-cli", "target": "m9e_current_batch", "ids": ["batch"], "historical_excluded_ids": []},
-            {"crate": "er-cli", "target": "m9e_current_reload", "ids": ["reload"], "historical_excluded_ids": []},
+            {"crate": "er-cli", "target": "m9e_current_repro", "ids": ["repro"], "historical_excluded_ids": []},
             {"crate": "er-other", "target": "m9e_current_reload", "ids": ["unrelated"], "historical_excluded_ids": []},
             {"crate": "er-kernel", "target": "m9e_timers_v7", "ids": ["timer"], "historical_excluded_ids": []},
             {"crate": "er-kernel", "target": "m9e_coop_v7", "ids": ["replica"], "historical_excluded_ids": []},
@@ -9126,10 +9126,11 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertIn(["er-kernel", "m9e_timers_v7"], assignment["a"])
         self.assertIn(["er-kernel", "m9e_coop_v7"], assignment["a"])
         self.assertIn(["er-other", "m9e_host_v2"], assignment["a"])
-        self.assertEqual(len(assignment["b"]), 2)
+        self.assertEqual(len(assignment["b"]), 1)
+        self.assertEqual(assignment["e"], [["er-cli", "m9e_current_repro"]])
         self.assertEqual(sum(len(targets) for targets in assignment.values()), len(inventory))
         self.assertFalse(set(map(tuple, assignment["a"])) & set(map(tuple, assignment["b"])))
-        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"] + assignment["d"]),
+        self.assertEqual(sorted(assignment["a"] + assignment["b"] + assignment["c"] + assignment["d"] + assignment["e"]),
                          sorted([[item["crate"], item["target"]] for item in inventory]))
         inventory.append(copy.deepcopy(inventory[0]))
         with self.assertRaisesRegex(RuntimeError, "duplicated"):
@@ -9137,8 +9138,7 @@ class PhaseTransferTests(unittest.TestCase):
 
     def test_native_partition_rejects_omission_overlap_and_unexecuted_target(self):
         complete = copy.deepcopy(self.other)
-        complete["inventory"].append({"crate": "er-cli", "target": "m9e_current_reload",
-                                      "ids": ["reload"], "historical_excluded_ids": []})
+        complete["inventory"][0]["ids"].append("reload")
         complete["inventory_sha256"] = self.phases.sha(self.phases.encoded(complete["inventory"]))
         complete["assigned_targets"] = self.phases.partition(complete["inventory"])["b"]
         complete["completed_targets"] = copy.deepcopy(complete["assigned_targets"])
