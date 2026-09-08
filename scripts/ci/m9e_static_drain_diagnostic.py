@@ -189,7 +189,7 @@ def main():
         raw = run("proposal-build", ["cargo", "test", "--locked", *selector, "--no-run", "--message-format=json"], ROOT / "rust")
         rows = [json.loads(line) for line in raw.splitlines() if line.startswith(b"{")]
         require([row.get("success") for row in rows if row.get("reason") == "build-finished"] == [True], "complete successful Cargo artifact stream required")
-        targets = json.loads(r'''{"m9e_move_drains":["actual_drain_minimum_one_and_maximum_hp_are_preserved","actual_drain_uses_capped_hp_loss_and_source_fraction","full_health_drain_does_not_emit_spurious_actor_hp_changes","immune_drain_neither_heals_nor_consumes_damage_variance","source_compiler_admits_thirteen_static_drains_and_preserves_original_programs"]}''')
+        targets = json.loads(r'''{"m9e_move_drains":["actual_drain_minimum_one_and_maximum_hp_are_preserved","actual_drain_uses_capped_hp_loss_and_source_fraction","full_health_drain_does_not_emit_spurious_actor_hp_changes","immune_drain_neither_heals_nor_consumes_damage_variance","source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units"]}''')
         artifacts = [row for row in rows if row.get("reason") == "compiler-artifact" and row.get("executable")]
         require(len(artifacts) == 1 and {row["target"]["name"] for row in artifacts} == set(targets), "one exact whole target executable required")
         result["artifacts"] = []
