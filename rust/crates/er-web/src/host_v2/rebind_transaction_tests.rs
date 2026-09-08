@@ -459,7 +459,9 @@ fn build_pair() -> TestResult<(Peer, Peer)> {
     let choice = std::thread::scope(|scope| -> TestResult<Vec<u8>> {
         let guest_start = scope.spawn(|| guest.choose(false).map_err(|error| error.to_string()));
         let host_start = host.choose(true);
-        let guest_start = guest_start.join().map_err(|_| "guest startup thread panicked")?;
+        let guest_start = guest_start
+            .join()
+            .map_err(|_| "guest startup thread panicked")?;
         assert!(host_start?.is_empty());
         one_frame(&guest_start?)
     })?;
