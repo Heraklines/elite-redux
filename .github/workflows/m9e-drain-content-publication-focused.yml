@@ -1,0 +1,37 @@
+name: M9E Verified Drain Generated Source Branch Publication
+on:
+  push:
+    branches: [codex/m9e-drain-content-publication-focused-20260908]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: m9e-drain-content-publication-focused
+  cancel-in-progress: false
+jobs:
+  publish-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      GIT_TERMINAL_PROMPT: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Validate audited remote artifacts and create only the named source branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/m9e_drain_content_publication.py
+      - name: Bounded publication receipt
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-drain-content-publication-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-drain-content-publication/compact/
+          if-no-files-found: error
+          retention-days: 14
