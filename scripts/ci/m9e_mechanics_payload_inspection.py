@@ -50,6 +50,11 @@ result = {
     'semantic_sha256': hashlib.sha256(semantic_raw).hexdigest(),
     'selected_ids': selected, 'rows': rows,
     'phase_source': {'bytes': len(phase_raw), 'sha256': hashlib.sha256(phase_raw).hexdigest(), 'contexts': phase_context},
+    'drain_existing': [{'id': unit['id'], 'resolution': unit['semantic']['resolution'],
+        'classification': next(row for row in battle['classifications'] if row['behavior_unit'] == unit['id']),
+        'programs': [battle['programs'][identifier] for identifier in battle['moves'][unit['id']['source']['numeric_id']]['mechanic_programs']
+                     if any(operation['kind'] == 'DRAIN_FRACTION' for operation in battle['programs'][identifier]['operations'])]}
+        for unit in semantic['behavior_units'] if unit['semantic']['effect'].get('attribute') == 'HitHealAttr'],
     'drain_operands': [{'id': unit['id'], 'operands': unit['semantic']['operands']} for unit in semantic['behavior_units'] if unit['semantic']['effect'].get('attribute') == 'HitHealAttr'],
     'pack_counts': {
         'moves': sum(row is not None for row in battle['moves']),
