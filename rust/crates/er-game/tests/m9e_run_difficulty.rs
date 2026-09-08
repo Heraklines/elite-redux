@@ -1,16 +1,25 @@
 //! Actual completed bootstrap choices retained across canonical runtime boundaries.
-use std::error::Error;
-use std::sync::{Arc, OnceLock};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_material_v6::{GameMaterialApplyOutcomeV6, GameMaterialV6, game_state_digest};
 use er_game::m9e_new_run_v6::construct_natural_run_v6;
-use er_game::m9e_runtime_v6::{GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeV6};
-use er_game::m72_bootstrap::{BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapMachineV1, RunBootstrapStageV1};
+use er_game::m9e_runtime_v6::{
+    GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeV6,
+};
+use er_game::m72_bootstrap::{
+    BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapMachineV1, RunBootstrapStageV1,
+};
 use er_save::m9e_save_v2::GameSaveV2;
-use er_state::m7_state::{DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics};
+use er_state::m7_state::{
+    DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
+};
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_ids::{MenuInstanceId, PokemonId, WaveIndex};
-use er_types::{BootstrapActionV1, GameActionContextV1, GameActionV1, OperationId, RunDifficultyV1, SafeU53, SaveActionV1, SeatId, StarterSelectionV1};
+use er_types::{
+    BootstrapActionV1, GameActionContextV1, GameActionV1, OperationId, RunDifficultyV1, SafeU53,
+    SaveActionV1, SeatId, StarterSelectionV1,
+};
+use std::error::Error;
+use std::sync::{Arc, OnceLock};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
@@ -35,7 +44,10 @@ fn content() -> TestResult<Arc<PreparedGameContentV2>> {
         .map_err(|error| error.clone().into())
 }
 
-fn bootstrap(content: &PreparedGameContentV2, difficulty: RunDifficultyV1) -> TestResult<RunBootstrapMachineV1> {
+fn bootstrap(
+    content: &PreparedGameContentV2,
+    difficulty: RunDifficultyV1,
+) -> TestResult<RunBootstrapMachineV1> {
     let owner = SeatId::new(safe(1)?);
     let profile = ProfileStateV1 {
         schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
@@ -142,7 +154,10 @@ fn bootstrap(content: &PreparedGameContentV2, difficulty: RunDifficultyV1) -> Te
     Ok(bootstrap)
 }
 
-fn context(revision: u64, input: GameDomainExecutionInputV1) -> TestResult<GameActionDispatchContextV1> {
+fn context(
+    revision: u64,
+    input: GameDomainExecutionInputV1,
+) -> TestResult<GameActionDispatchContextV1> {
     Ok(GameActionDispatchContextV1 {
         action: GameActionContextV1 {
             operation_id: OperationId::new(format!("difficulty/{revision}"))?,
@@ -158,31 +173,53 @@ fn context(revision: u64, input: GameDomainExecutionInputV1) -> TestResult<GameA
 #[test]
 fn natural_choices_survive_material_save_restore_and_continued_dispatch() -> TestResult {
     let content = content()?;
-    for difficulty in [RunDifficultyV1::Youngster, RunDifficultyV1::Ace, RunDifficultyV1::Elite, RunDifficultyV1::Hell] {
+    for difficulty in [
+        RunDifficultyV1::Youngster,
+        RunDifficultyV1::Ace,
+        RunDifficultyV1::Elite,
+        RunDifficultyV1::Hell,
+    ] {
         let setup = bootstrap(&content, difficulty)?;
         let candidate = construct_natural_run_v6(&setup, &content, safe(1)?)?;
         let owner = candidate.current_run_difficulty.ok_or("difficulty owner")?;
         assert_eq!(owner.difficulty, difficulty);
-        assert_eq!(owner.run_id, candidate.active_run.as_ref().ok_or("run")?.run_id);
+        assert_eq!(
+            owner.run_id,
+            candidate.active_run.as_ref().ok_or("run")?.run_id
+        );
         let mut authority = GameRuntimeV6::new(None, content.clone(), safe(1)?)?;
         let first = authority.execute(
-            GameActionV1::Bootstrap { action: BootstrapActionV1::Confirm },
+            GameActionV1::Bootstrap {
+                action: BootstrapActionV1::Confirm,
+            },
             context(1, GameDomainExecutionInputV1::BootstrapCandidate(candidate))?,
         )?;
         let mut replica = GameRuntimeV6::new(None, content.clone(), safe(1)?)?;
-        assert_eq!(replica.apply_material_bytes(&first.material_bytes)?, GameMaterialApplyOutcomeV6::Applied);
+        assert_eq!(
+            replica.apply_material_bytes(&first.material_bytes)?,
+            GameMaterialApplyOutcomeV6::Applied
+        );
         assert_eq!(replica.state(), authority.state());
-        let save = GameSaveV2::new(content.identity().clone(), safe(1)?, first.candidate.clone())?;
+        let save = GameSaveV2::new(
+            content.identity().clone(),
+            safe(1)?,
+            first.candidate.clone(),
+        )?;
         let encoded = save.encode()?;
         let loaded = GameSaveV2::decode(&encoded)?;
         assert_eq!(loaded.encode()?, encoded);
         assert_eq!(loaded.state.current_run_difficulty, Some(owner));
         let mut restored = GameRuntimeV6::from_snapshot(
-            serde_json::from_slice(&serde_json::to_vec(&authority.snapshot())?)?, content.clone(),
+            serde_json::from_slice(&serde_json::to_vec(&authority.snapshot())?)?,
+            content.clone(),
         )?;
         for runtime in [&mut authority, &mut restored] {
             let saved = runtime.execute(
-                GameActionV1::Save { action: SaveActionV1::Write { slot: "difficulty".to_owned() } },
+                GameActionV1::Save {
+                    action: SaveActionV1::Write {
+                        slot: "difficulty".to_owned(),
+                    },
+                },
                 context(2, GameDomainExecutionInputV1::SaveGeneration(safe(2)?))?,
             )?;
             assert_eq!(saved.candidate.current_run_difficulty, Some(owner));
@@ -202,7 +239,8 @@ fn malformed_completed_selection_and_wrong_run_ownership_are_rejected() -> TestR
     assert!(construct_natural_run_v6(&setup, &content, safe(1)?).is_err());
     setup.selections.difficulty = Some(RunDifficultyV1::Elite);
     let mut state = construct_natural_run_v6(&setup, &content, safe(1)?)?;
-    state.current_run_difficulty.as_mut().ok_or("owner")?.run_id = er_types::run_ids::GameRunId::new(safe(99)?);
+    state.current_run_difficulty.as_mut().ok_or("owner")?.run_id =
+        er_types::run_ids::GameRunId::new(safe(99)?);
     assert!(state.validate().is_err());
     let mut state = construct_natural_run_v6(&setup, &content, safe(1)?)?;
     state.active_run = None;
@@ -213,9 +251,18 @@ fn malformed_completed_selection_and_wrong_run_ownership_are_rejected() -> TestR
 #[test]
 fn historical_absence_remains_unknown_and_canonical_on_save_restore() -> TestResult {
     let content = content()?;
-    let natural = construct_natural_run_v6(&bootstrap(&content, RunDifficultyV1::Elite)?, &content, safe(1)?)?;
+    let natural = construct_natural_run_v6(
+        &bootstrap(&content, RunDifficultyV1::Elite)?,
+        &content,
+        safe(1)?,
+    )?;
     let mut old = serde_json::to_value(&natural)?;
-    assert!(old.as_object_mut().ok_or("object")?.remove("current_run_difficulty").is_some());
+    assert!(
+        old.as_object_mut()
+            .ok_or("object")?
+            .remove("current_run_difficulty")
+            .is_some()
+    );
     let state: GameStateV6 = serde_json::from_value(old.clone())?;
     state.validate_with(content.as_ref())?;
     assert!(state.current_run_difficulty.is_none());
@@ -231,20 +278,38 @@ fn historical_absence_remains_unknown_and_canonical_on_save_restore() -> TestRes
 #[test]
 fn same_run_material_cannot_change_erase_or_invent_difficulty() -> TestResult {
     let content = content()?;
-    let natural = construct_natural_run_v6(&bootstrap(&content, RunDifficultyV1::Elite)?, &content, safe(1)?)?;
+    let natural = construct_natural_run_v6(
+        &bootstrap(&content, RunDifficultyV1::Elite)?,
+        &content,
+        safe(1)?,
+    )?;
     let owner = natural.current_run_difficulty.ok_or("owner")?;
     for historical in [false, true] {
         let mut state = natural.clone();
-        if historical { state.current_run_difficulty = None; }
+        if historical {
+            state.current_run_difficulty = None;
+        }
         let mut authority = GameRuntimeV6::new(Some(state), content.clone(), safe(2)?)?;
         let before = authority.snapshot();
         let saved = authority.execute(
-            GameActionV1::Save { action: SaveActionV1::Write { slot: "difficulty".to_owned() } },
+            GameActionV1::Save {
+                action: SaveActionV1::Write {
+                    slot: "difficulty".to_owned(),
+                },
+            },
             context(2, GameDomainExecutionInputV1::SaveGeneration(safe(2)?))?,
         )?;
         let material = GameMaterialV6::decode(&saved.material_bytes)?;
-        let replacements = if historical { vec![Some(owner)] } else {
-            vec![None, Some(er_state::m9e_state_v6::CurrentRunDifficultyV1 { difficulty: RunDifficultyV1::Hell, ..owner })]
+        let replacements = if historical {
+            vec![Some(owner)]
+        } else {
+            vec![
+                None,
+                Some(er_state::m9e_state_v6::CurrentRunDifficultyV1 {
+                    difficulty: RunDifficultyV1::Hell,
+                    ..owner
+                }),
+            ]
         };
         for replacement in replacements {
             let mut transition = material.transition().clone();
@@ -253,9 +318,16 @@ fn same_run_material_cannot_change_erase_or_invent_difficulty() -> TestResult {
             let forged = GameMaterialV6::GameAction(transition);
             forged.validate()?;
             let mut replica = GameRuntimeV6::from_snapshot(before.clone(), content.clone())?;
-            assert!(replica.apply_material_bytes(&forged.canonical_bytes()?).is_err());
+            assert!(
+                replica
+                    .apply_material_bytes(&forged.canonical_bytes()?)
+                    .is_err()
+            );
             assert_eq!(replica.snapshot(), before);
-            assert_eq!(replica.apply_material_bytes(&saved.material_bytes)?, GameMaterialApplyOutcomeV6::Applied);
+            assert_eq!(
+                replica.apply_material_bytes(&saved.material_bytes)?,
+                GameMaterialApplyOutcomeV6::Applied
+            );
             assert_eq!(replica.state(), authority.state());
         }
     }

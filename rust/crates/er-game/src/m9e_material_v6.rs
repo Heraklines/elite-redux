@@ -459,7 +459,11 @@ pub fn apply_game_material_v6_with_retention(
     // replace or invent it, including when the prior save has unknown difficulty.
     if let Some(prior) = live.as_ref()
         && let Some(run) = prior.active_run.as_ref()
-        && transition.after_state.active_run.as_ref().map(|next| next.run_id)
+        && transition
+            .after_state
+            .active_run
+            .as_ref()
+            .map(|next| next.run_id)
             == Some(run.run_id)
         && transition.after_state.current_run_difficulty != prior.current_run_difficulty
     {
