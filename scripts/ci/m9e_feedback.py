@@ -1774,11 +1774,11 @@ def plan():
     # to broad native success or bypass the timer and replica mutant gate.
     batch_changed = any(path.startswith("rust/crates/er-batch/") or path in batch_focus.get("trigger_paths", [])
                         for path in product_changes)
-    if title_changed and not title_session:
+    if title_changed and not (title_session or recovery_session):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     if ai_snapshot_changed and not ai_snapshot_session:
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
-    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not state_query_session) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session and not coop_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session or coop_session or ai_commands_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
+    if unknown or boundaries or (rule_changed and not rule_session) or (state_query_changed and not (state_query_session or recovery_session)) or (query_changed and not query_session) or (composition_changed and not composition_session and not retirement_session and not coop_session) or (not (owner_session or read_session or title_session or retirement_session or max_pp_session or coop_session or ai_commands_session) and ((storage_changed and not storage_session and not composition_session) or (damage_changed and not damage_session) or (browser_worker_changed and not browser_worker_session and not rtc_session) or (retention_changed and not retention_session) or (capture_changed and not capture_session) or (cache_changed and not cache_session) or (validation_changed and not validation_session) or (batch_changed and not batch_session) or (shared and not timer_session and not repro_session and not menu_session and not batch_session and not capture_session))):
         raise RuntimeError("planning requires additional mapping: " + json.dumps(result))
     generated.apply_plan(config, result, ROOT, capture, merge_targets)
     return result
