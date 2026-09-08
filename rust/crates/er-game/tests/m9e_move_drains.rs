@@ -36,6 +36,9 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
 
+// Exact pre-drain baseline exported and independently audited at 22e7ad4c6.
+const DRAIN_BASELINE: &str = r#"{"admitted_classifications":[{"behavior_unit":{"ordinal":0,"provenance_hash":"328f89dfb7c2608d6d3ee5b15332abaee1054d3b8a140f3535c1913763ba5dae","source":{"kind":"MOVE","numeric_id":71},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"74e57c63cce3b52e06c1b4e0b6198c92843fc6e172485189fd94466203cfe0aa","source":{"kind":"MOVE","numeric_id":72},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"d897d1b1179bd5d396e2a4da408a8aa4d41e9f514ffbb73f942c37c28c4daa0f","source":{"kind":"MOVE","numeric_id":141},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"6475dec43b01468439283d0371bed98157ba66e22796233779ccad9ca2be5afa","source":{"kind":"MOVE","numeric_id":202},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"d81fb09a1a26c62c5429170fc19b0c415f55753639249b96313d5e5a3e88e32f","source":{"kind":"MOVE","numeric_id":409},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"8ca49da916bcac2c0d786147bd3f8c1a9753775b3c8b21438280243d29ac557f","source":{"kind":"MOVE","numeric_id":532},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"07b44367a0c7044eb47ab4bdc55dfd489afbe82710fe0a8bdd80e5e21c04d363","source":{"kind":"MOVE","numeric_id":570},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"76ceaae68a8c5692d86097625b85bebb04b15c993b8deefd1b89266d34356194","source":{"kind":"MOVE","numeric_id":577},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"6bc4800d1c7d0f6686c9550bf7e7bb086bda97e3d7d288d72523cd71d79e70b6","source":{"kind":"MOVE","numeric_id":613},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"f01c54d8c035d2187bbc7ee0f672094ade184134fdb055dfd148ac264b47b386","source":{"kind":"MOVE","numeric_id":733},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"dc5da60400a26c57f2152ec3cb38da93319383f48b1dc692c46577d1edcd886e","source":{"kind":"MOVE","numeric_id":891},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":3,"provenance_hash":"2285c336a3c2a1509ffa48d1d992a60537ede6a292a462754aa99eb731b2ea2a","source":{"kind":"MOVE","numeric_id":902},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null}],"battle_content_hash":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","classification_count":9411,"classifications_digest":"f31c8c228f131f6a46145687709f1e2f7bd49289727ce807ef01e72b4fee7732","deferred_programs":{"138":[146],"668":[696]},"program_count":3679,"programs_digest":"586747b5c70e0e2ed586f9d8882c32980b489b828dcf08d09d065b32b4e4457f","schema_version":1}"#;
+
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
 }
@@ -359,15 +362,16 @@ fn turn(content: &PreparedGameContentV2, state: &GameStateV5) -> TestResult<Batt
 fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units() -> TestResult {
     use er_types::BehaviorSourceId;
     let (content, _) = fixture()?;
-    let before: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let baseline: serde_json::Value = serde_json::from_str(DRAIN_BASELINE)?;
     let after = &content.bundle().battle;
+    assert_eq!(baseline["schema_version"], 1);
+    assert_eq!(baseline["program_count"], 3679);
+    assert_eq!(baseline["classification_count"], 9411);
+    assert_eq!(after.classifications.0.len(), 9411);
     assert_eq!(
-        after.classifications.0.len(),
-        before.battle.classifications.0.len()
+        er_canonical::content_digest(&after.programs[..3679].to_vec())?,
+        baseline["programs_digest"].as_str().ok_or("baseline program digest")?
     );
-    for (index, program) in before.battle.programs.iter().enumerate() {
-        assert_eq!(after.programs[index], *program);
-    }
     let expected = [
         (71, 1, 2),
         (72, 1, 2),
@@ -382,28 +386,30 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
         (891, 1, 2),
         (902, 1, 2),
     ];
-    assert_eq!(
-        after.programs.len(),
-        before.battle.programs.len() + expected.len()
-    );
-    let changed = before
-        .battle
-        .classifications
-        .0
-        .iter()
-        .zip(&after.classifications.0)
-        .filter(|(before, after)| before != after)
-        .collect::<Vec<_>>();
-    assert_eq!(changed.len(), expected.len());
-    for (old, new) in changed {
-        assert_eq!(old.behavior_unit, new.behavior_unit);
-        assert_eq!(old.kind, er_types::BehaviorClassificationKindV2::Bespoke);
-        assert_eq!(new.kind, er_types::BehaviorClassificationKindV2::Compiled);
-        let BehaviorSourceId::Move { numeric_id } = new.behavior_unit.source else {
-            return Err("non-move classification changed".into());
-        };
-        assert!(expected.iter().any(|(id, _, _)| safe(*id) == numeric_id));
+    assert_eq!(after.programs.len(), 3679 + expected.len());
+    let old_classes = baseline["admitted_classifications"].as_array().ok_or("baseline classifications")?;
+    assert_eq!(old_classes.len(), expected.len());
+    let mut restored = serde_json::to_value(&after.classifications.0)?;
+    let rows = restored.as_array_mut().ok_or("classification array")?;
+    let mut admitted = Vec::new();
+    for old in old_classes {
+        assert_eq!(old["kind"], "BESPOKE");
+        let matches = rows.iter_mut().filter(|row| row["behavior_unit"] == old["behavior_unit"]).collect::<Vec<_>>();
+        assert_eq!(matches.len(), 1);
+        let row = matches.into_iter().next().ok_or("compiled classification")?;
+        assert_eq!(row["kind"], "COMPILED");
+        assert_eq!(row["behavior_unit"]["source"]["kind"], "MOVE");
+        let id = row["behavior_unit"]["source"]["numeric_id"].as_u64().ok_or("move source")?;
+        assert!(expected.iter().any(|(expected_id, _, _)| *expected_id == id));
+        admitted.push(id);
+        *row = old.clone();
     }
+    admitted.sort_unstable();
+    assert_eq!(admitted, expected.map(|(id, _, _)| id));
+    assert_eq!(
+        er_canonical::content_digest(&restored)?,
+        baseline["classifications_digest"].as_str().ok_or("baseline classification digest")?
+    );
     for (numeric_id, numerator, denominator) in expected {
         let definition = content
             .battle
@@ -434,11 +440,8 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
     for index in [138, 668] {
         let deferred = content.battle.move_definition(MoveId::new(safe(index)))?;
         assert_eq!(
-            deferred.mechanic_programs,
-            before.battle.moves[index as usize]
-                .as_ref()
-                .ok_or("deferred drain")?
-                .mechanic_programs
+            serde_json::to_value(&deferred.mechanic_programs)?,
+            baseline["deferred_programs"][index.to_string()]
         );
     }
     if let Ok(directory) = std::env::var("M9E_DRAIN_EXPORT") {
@@ -465,20 +468,6 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
         ] {
             std::fs::write(directory.join(name), bytes)?;
         }
-        let baseline = serde_json::json!({
-            "schema_version": 1,
-            "battle_content_hash": before.battle.content_hash,
-            "program_count": before.battle.programs.len(),
-            "programs_digest": er_canonical::content_digest(&before.battle.programs)?,
-            "classification_count": before.battle.classifications.0.len(),
-            "classifications_digest": er_canonical::content_digest(&before.battle.classifications.0)?,
-            "admitted_classifications": before.battle.classifications.0.iter()
-                .zip(&after.classifications.0).filter(|(old, new)| old != new)
-                .map(|(old, _)| old).collect::<Vec<_>>(),
-            "deferred_programs": ([138, 668].into_iter().map(|index| {
-                (index.to_string(), before.battle.moves[index].as_ref().map(|value| value.mechanic_programs.clone()))
-            }).collect::<std::collections::BTreeMap<_, _>>())
-        });
         std::fs::write(
             directory.join("drain-baseline-metadata.json"),
             serde_json::to_vec(&baseline)?,

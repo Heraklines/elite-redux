@@ -1,7 +1,7 @@
 name: M9E Static Drain Bundle Export
 on:
   push:
-    branches: [codex/m9e-static-drain-bundle-focused-20260908]
+    branches: [codex/m9e-drain-durable-baseline-focused-20260908]
 permissions:
   contents: read
 concurrency:
@@ -43,7 +43,7 @@ jobs:
           test "$elapsed" -ge 0
           remaining=$((1780 - elapsed))
           test "$remaining" -gt 0
-          timeout "$((remaining < 600 ? remaining : 600))" git fetch --no-tags --depth=1 origin 31b9a9c61b4792be4727ff463608a2ab23a73319
+          timeout "$((remaining < 600 ? remaining : 600))" git fetch --no-tags --depth=1 origin 22e7ad4c6ae5f318b898d3f133a1703d1c097697
       - name: Restore existing dependency downloads
         uses: actions/cache/restore@v5
         with:
