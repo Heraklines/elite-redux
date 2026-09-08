@@ -5283,7 +5283,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
-        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 6, 6, 6, 8, 9, 11])
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 4, 6, 6, 6, 8, 9, 11, 15])
         for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
             crate, target = key.split(":")
             self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
