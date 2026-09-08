@@ -625,6 +625,7 @@ BASE_SOURCES = {
   ]
 }
 PRODUCT_SOURCES = [
+  "test/browser/rust-browser/m9e-v7-worker.spec.ts",
   "rust/crates/er-repro/src/current.rs",
   "rust/crates/er-web/src/contracts_v2.rs",
   "rust/crates/er-web/src/host_v2.rs",
