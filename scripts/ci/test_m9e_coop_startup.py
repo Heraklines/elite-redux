@@ -437,8 +437,14 @@ class CoopPolicyTests(unittest.TestCase):
                      for (crate, target), ids in ((phases.STATE_QUERY_TARGET, phases.STATE_QUERY_TEST_IDS[:1]),
                          (phases.STATE_QUERY_WORKER_TARGET, phases.STATE_QUERY_TEST_IDS[1:]),
                          (campaign.TARGET, campaign.IDS), (("er-other", phases.STATE_QUERY_TARGET[1]), ["decoy"]))]
+        import m9e_feedback as feedback
+        for crate, target in (("er-cli", "m9e_current_coop_rebind"), ("er-lab", "current_worker_rebind_v2")):
+            inventory.append({"crate": crate, "target": target,
+                              "ids": list(feedback.OWNED_FOUNDATION_TEST_IDS[crate + ":" + target]),
+                              "historical_excluded_ids": []})
         original = copy.deepcopy(inventory)
-        expected_e = {phases.STATE_QUERY_TARGET, campaign.TARGET}
+        expected_e = {phases.STATE_QUERY_TARGET, campaign.TARGET,
+                      ("er-cli", "m9e_current_coop_rebind"), ("er-lab", "current_worker_rebind_v2")}
         self.assertEqual(phases.LANE_E_TARGETS, expected_e)
         self.assertNotIn(phases.STATE_QUERY_TARGET, phases.LANE_D_TARGETS)
         for rows in (inventory, list(reversed(inventory))):
