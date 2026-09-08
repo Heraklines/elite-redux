@@ -1,6 +1,7 @@
 //! Actual subprocess rebind and typed reload-tail witnesses.
 //! Only genuine enabled natural Title snapshots are prepared in the parent test;
-//! every subsequent bootstrap input, frame, control and callback runs in Workers.
+//! every bootstrap input runs in a real Worker fixture. Each case restores its exact
+//! reached snapshots in fresh Workers before any rebind, frame or callback.
 use er_env::current::{
     CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession,
     CurrentSessionRebindOutputV1,
@@ -38,7 +39,7 @@ use er_types::{
 };
 use std::error::Error;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -264,6 +265,16 @@ impl Peer {
                 .is_some_and(|owner| owner.started.is_none())
         );
         assert!(title.current_proposal.is_none());
+        Self::from_snapshot(bundle, content, host, limits, title)
+    }
+
+    fn from_snapshot(
+        bundle: &GameContentBundleV2,
+        content: Arc<PreparedGameContentV2>,
+        host: bool,
+        limits: CurrentTailLimitsV2,
+        title: CoreGameKernelSnapshotV7,
+    ) -> TestResult<Self> {
         let seat = SeatId::new(safe(if host { 1 } else { 2 }));
         let role = if host {
             GameKernelRoleV7::Authority
@@ -469,6 +480,36 @@ fn wire(step: &GameKernelStepV7) -> TestResult<Vec<u8>> {
 }
 
 fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
+    // Keep only immutable snapshots from a real two-process Title journey.
+    // No live process, supervisor frontier or rebind mutation is shared by cases.
+    static STARTUP: OnceLock<Result<(CoreGameKernelSnapshotV7, CoreGameKernelSnapshotV7), String>> =
+        OnceLock::new();
+    let snapshots = STARTUP.get_or_init(|| {
+        (|| -> TestResult<_> {
+            let (mut host, mut guest) = build_pair(CurrentTailLimitsV2::default())?;
+            let snapshots = (host.snapshot()?, guest.snapshot()?);
+            host.worker.dispose()?;
+            guest.worker.dispose()?;
+            Ok(snapshots)
+        })()
+        .map_err(|error| error.to_string())
+    });
+    let (host_snapshot, guest_snapshot) = snapshots.as_ref().map_err(Clone::clone)?;
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
+    let mut host = Peer::from_snapshot(
+        &bundle, Arc::clone(&content), true, limits, host_snapshot.clone(),
+    )?;
+    let mut guest = Peer::from_snapshot(
+        &bundle, content, false, limits, guest_snapshot.clone(),
+    )?;
+    assert_ne!(host.worker.process_id(), guest.worker.process_id());
+    assert_eq!(host.snapshot()?, *host_snapshot);
+    assert_eq!(guest.snapshot()?, *guest_snapshot);
+    Ok((host, guest))
+}
+
+fn build_pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let mut host = Peer::new(&bundle, Arc::clone(&content), true, limits)?;
