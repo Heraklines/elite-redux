@@ -67,6 +67,25 @@ class CoopPolicyTests(unittest.TestCase):
                 "required_native_test_ids": copy.deepcopy(coop.NATIVE_IDS), "required_native_targets": copy.deepcopy(coop.NATIVE_TARGETS),
                 **{key: True for key in ("requires_browser", "requires_wasm", "requires_browser_worker", "requires_browser_rtc", "requires_cli_executable", "requires_worker_executable")}}
         coop.validate_inventory(plan, inventory, self.sha)
+        import m9e_phases as phases
+        proof = {"plan": plan, "inventory": inventory, "identity": {"product_sha": self.sha}, "lane": "d"}
+        coop.validate_lane(proof, self.root, phases.partition)
+        assigned = phases.partition(inventory)
+        for target, owner in ((coop.ENTRY_TARGET, "a"), (coop.KERNEL_TARGET, "d")):
+            for wrong_lane in (lane for lane in assigned if lane != owner):
+                moved = copy.deepcopy(assigned)
+                moved[owner].remove(list(target))
+                moved[wrong_lane].append(list(target))
+                with self.assertRaisesRegex(RuntimeError, "exact native A entry and D kernel"):
+                    coop.validate_lane(proof, self.root, lambda _: moved)
+                duplicate = copy.deepcopy(assigned)
+                duplicate[wrong_lane].append(list(target))
+                with self.assertRaisesRegex(RuntimeError, "exact native A entry and D kernel"):
+                    coop.validate_lane(proof, self.root, lambda _: duplicate)
+            missing = copy.deepcopy(assigned)
+            missing[owner].remove(list(target))
+            with self.assertRaisesRegex(RuntimeError, "exact native A entry and D kernel"):
+                coop.validate_lane(proof, self.root, lambda _: missing)
         for flag in ("requires_current_coop_startup", "requires_browser_rtc", "requires_worker_executable"):
             changed = copy.deepcopy(plan)
             changed[flag] = False

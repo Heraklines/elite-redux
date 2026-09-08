@@ -244,8 +244,11 @@ def validate_lane(proof, root, partition):
         validate_inventory(proof["plan"], proof["inventory"], proof["identity"]["product_sha"])
         if source_binding(root, proof["identity"]["product_sha"]) != proof["plan"]["current_coop_startup_binding"]:
             raise RuntimeError("current co-op plan source binding differs from actual checkout")
-        if any(list(target) not in partition(proof["inventory"])["a"] for target in (ENTRY_TARGET, KERNEL_TARGET)):
-            raise RuntimeError("current co-op requires sole native A ownership")
+        assignment = partition(proof["inventory"])
+        for target, owner in ((ENTRY_TARGET, "a"), (KERNEL_TARGET, "d")):
+            owners = [lane for lane, targets in assignment.items() for item in targets if item == list(target)]
+            if owners != [owner]:
+                raise RuntimeError("current co-op requires exact native A entry and D kernel ownership")
         if proof["lane"] == "a":
             validate_entry(proof.get("current_coop_entry"), proof["identity"], proof["plan"]["current_coop_startup_binding"], root)
     if "current_coop_entry" in proof and (not required or proof["lane"] != "a"):
