@@ -99,6 +99,19 @@ class BrowserRebindEvidenceTests(unittest.TestCase):
                 rebind.validate_platform(changed, native, Path("/tmp"))
 
     def test_duplicate_json_keys_and_nonfinite_evidence_fail_closed(self):
+        import m9e_phases as phases
+        proof, _, _ = self.proof()
+        original = copy.deepcopy(proof["current_browser_rebind"])
+        compact = {"current_browser_rebind": copy.deepcopy(original), "retained": "x" * 15000}
+        self.assertGreater(len(phases.encoded(compact)), 16000)
+        phases.compact_worker_evidence(compact, "a" * 64)
+        self.assertLessEqual(len(phases.encoded(compact)), 16000)
+        self.assertEqual(compact["current_browser_rebind"], {
+            "file": "phase-summary.json", "sha256": "a" * 64, "field": "current_browser_rebind"})
+        self.assertEqual(proof["current_browser_rebind"], original)
+        small = {"current_browser_rebind": copy.deepcopy(original)}
+        phases.compact_worker_evidence(small, "a" * 64)
+        self.assertEqual(small["current_browser_rebind"], original)
         for raw in (b'{"generation":1,"generation":2}', b'{"count":NaN}', b'{"count":Infinity}'):
             with self.subTest(raw=raw), self.assertRaises(RuntimeError):
                 rebind.strict_json(raw)
