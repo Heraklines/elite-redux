@@ -590,6 +590,7 @@ fn execute_move(
     }
     let critical = critical_hits(content, &context, rng)?;
     let mut hit_any = false;
+    let mut total_damage_dealt = 0_u64;
     for target_slot in target_slots {
         let target_id = occupant(run, target_slot).ok_or(BattleV5Error::Target)?;
         let target_snapshot = pokemon(run, target_id)
@@ -628,6 +629,9 @@ fn execute_move(
             presentation.push(BattlePresentationCueV5::Fainted { pokemon: target_id });
         }
         let damage_dealt = before_hp - target.hp;
+        total_damage_dealt = total_damage_dealt
+            .checked_add(u64::from(damage_dealt))
+            .ok_or(BattleV5Error::Overflow)?;
         apply_move_drain_after_damage(
             run,
             MoveDamageHit {
@@ -642,6 +646,16 @@ fn execute_move(
         )?;
         hit_any = true;
     }
+    apply_move_recoil_after_damage(
+        run,
+        actor_id,
+        definition.id,
+        total_damage_dealt,
+        content,
+        mutations,
+        presentation,
+        mechanics_evidence,
+    )?;
     let after_hit = execute_hook_v2(content, &context, MechanicHookV2::AfterHit)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
     mechanics_evidence.extend(after_hit.operations);
@@ -754,7 +768,96 @@ fn apply_move_drain_after_damage(
             after: actor.hp,
         });
     }
-    mechanics_evidence.extend(after_damage.operations);
+    mechanics_evidence.extend(after_damage.operations.into_iter().filter(|evidence| {
+        !matches!(
+            evidence.operation,
+            MechanicOperationV2::RecoilFraction { .. }
+        )
+    }));
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_move_recoil_after_damage(
+    run: &mut RunStateV3,
+    actor_id: PokemonId,
+    move_id: MoveId,
+    total_damage_dealt: u64,
+    content: &PreparedBattleContentV3,
+    mutations: &mut Vec<BattleMutation>,
+    presentation: &mut Vec<BattlePresentationCueV5>,
+    mechanics_evidence: &mut Vec<MechanicsOperationEvidenceV2>,
+) -> Result<(), BattleV5Error> {
+    if total_damage_dealt == 0 {
+        return Ok(());
+    }
+    let after_damage = {
+        let actor = pokemon(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
+        let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
+        let sources = active_sources(actor, move_id);
+        let context = mechanics_context(actor, battle, &sources);
+        execute_after_damage_actor_hook_v2(content, &context)
+            .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?
+    };
+    for evidence in after_damage.operations {
+        let MechanicOperationV2::RecoilFraction {
+            numerator,
+            denominator,
+        } = evidence.operation
+        else {
+            continue;
+        };
+        if !evidence.condition_matched
+            || evidence.behavior_unit.source
+                != (BehaviorSourceId::Move {
+                    numeric_id: move_id.get(),
+                })
+        {
+            continue;
+        }
+        let program = content
+            .program(evidence.program)
+            .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+        let binding = program
+            .bindings
+            .iter()
+            .find(|binding| binding.binding_ordinal == evidence.binding_ordinal)
+            .ok_or(BattleV5Error::DispatchClosure)?;
+        let selector = binding
+            .selector_root
+            .and_then(|root| program.selectors.0.get(root.index()));
+        if !matches!(selector, Some(SelectorNodeV2::Actor)) {
+            return Err(BattleV5Error::UnsupportedContent);
+        }
+        let actor = pokemon_mut(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
+        if !actor.fainted {
+            // Pinned RecoilAttr uses cumulative actual damage, once at last hit.
+            // Only binary-exact ordinary fractions enter this M9 admission.
+            let amount = total_damage_dealt
+                .checked_mul(u64::from(numerator))
+                .and_then(|value| value.checked_div(u64::from(denominator)))
+                .ok_or(BattleV5Error::Overflow)?
+                .max(1)
+                .min(u64::from(actor.hp));
+            let before = actor.hp;
+            actor.hp -= u32::try_from(amount).map_err(|_| BattleV5Error::Overflow)?;
+            actor.fainted = actor.hp == 0;
+            mutations.push(BattleMutation::HpChanged {
+                pokemon: actor_id,
+                before,
+                after: actor.hp,
+            });
+            presentation.push(BattlePresentationCueV5::HpChanged {
+                pokemon: actor_id,
+                before,
+                after: actor.hp,
+            });
+            if actor.fainted {
+                presentation.push(BattlePresentationCueV5::Fainted { pokemon: actor_id });
+            }
+        }
+        mechanics_evidence.push(evidence);
+    }
     Ok(())
 }
 

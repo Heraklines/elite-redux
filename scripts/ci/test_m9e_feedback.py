@@ -5230,7 +5230,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 97)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 99)
         self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
@@ -11385,8 +11385,8 @@ class OwnedFoundationContractTests(unittest.TestCase):
             self.feedback.validate_owned_foundation_inventory(absent, self.inventory)
 
     def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
-        self.assertEqual(len(self.inventory), 108)
-        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 819)
+        self.assertEqual(len(self.inventory), 109)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 824)
         for change in ("remove", "rename", "exclude", "extra"):
             rows = copy.deepcopy(self.inventory)
             old = next(row for row in rows if row["crate"] == "er-canonical")
@@ -11398,12 +11398,12 @@ class OwnedFoundationContractTests(unittest.TestCase):
                 old["historical_excluded_ids"].append(old["ids"].pop())
             else:
                 rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
-            with self.assertRaisesRegex(RuntimeError, "complete819/108"):
+            with self.assertRaisesRegex(RuntimeError, "complete824/109"):
                 self.feedback.validate_owned_foundation_inventory(self.plan, rows)
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 66)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 68)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)

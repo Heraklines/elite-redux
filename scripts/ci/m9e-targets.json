@@ -98,6 +98,8 @@
       "rust/crates/er-game/tests/m9e_run_difficulty.rs",
       "rust/crates/er-kernel/tests/m9e_title_storage.rs",
       "rust/crates/er-content-compiler/tests/m9e_full_content.rs",
+      "rust/crates/er-content-compiler/src/m9e_move_recoil.rs",
+      "rust/crates/er-game/tests/m9e_move_recoil.rs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -338,6 +340,13 @@
         "full_health_drain_does_not_emit_spurious_actor_hp_changes",
         "immune_drain_neither_heals_nor_consumes_damage_variance",
         "source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units"
+      ],
+      "er-game:m9e_move_recoil": [
+        "actual_recoil_minimum_one_and_actor_faint_are_preserved",
+        "actual_recoil_uses_capped_hp_loss_and_source_fraction",
+        "immune_recoil_neither_hurts_nor_consumes_damage_variance",
+        "recoil_damage_queries_preserve_actual_turn_and_borrowed_state",
+        "source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units"
       ]
     }
   },
@@ -3013,7 +3022,7 @@
     "reason": "Separate controlled Active Worker/storage composition cut after qualified AI, RTC and IndexedDB adapter. Require AI50/causal native inventory, full reverse compilation including the Rust example, both controls, prior platform and exact real Worker2/3 controlled save witnesses. Later browser-required cuts retain composition when its actual route exists. No Bootstrap LIST, natural Save, production or crash recovery claim."
   },
   "current_generated_xp_fixtures": {
-    "export_source": "4395e38a8eb3e3f32951925fab8a4945bc463daa",
+    "export_source": "339af2ce53399d1f5e3aec6ff045c71292946293",
     "prior_publication": {
       "export_run": "34125184738",
       "publication_commit": "24beac2761fec35131380ba4b64fc5bd2cf4129d",
@@ -3029,13 +3038,13 @@
       },
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json": {
         "bytes": 1219,
-        "git_blob": "062fcdc9016d38a29932c1852e70379859f05c1b",
-        "sha256": "793ac4bc98a74232850f7a1c124fd876c212a18e7db0afa2c15a65e33108502f"
+        "git_blob": "326d6ec54f75cf008a73ef84e616c792b819858e",
+        "sha256": "5e7b15370e91e99beb816148471453fb318d1387ce23866a055e3e297d8908a9"
       },
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json": {
-        "bytes": 16335369,
-        "git_blob": "cabb11ce9bc146b3a615bf334d5342d7b67528da",
-        "sha256": "a42bf206c6e9a848df5774e58c1f0190f562ceefb90f4dc07e97125eaf0ae6af"
+        "bytes": 16340147,
+        "git_blob": "6bd2537b440de33974642c4565e0d275ef3b3624",
+        "sha256": "f11ed4151b9157f1f7f296c6b2801ffaed02a3c43b6a31816e5145a478175913"
       },
       "rust/fixtures/m9/engineering/progression-content-pack-v2.json": {
         "bytes": 3576205,
@@ -3048,18 +3057,18 @@
         "sha256": "64b4b759c46a897720230ffa0c87d73158d6ff69c2e18f4bdfb2d9c64408bec7"
       },
       "rust/fixtures/m9/engineering/battle-content-pack-v3.json": {
-        "bytes": 8093947,
-        "git_blob": "a3cb39b2a30a404e799e04dfaacfee910a2eae0d",
-        "sha256": "19d02806cfd82a59814a8786a00a2d0e783b064651b74271d1d2bc8a685f2b5e"
+        "bytes": 8098725,
+        "git_blob": "31754b90593cfafda833cdc093e3bac52c467680",
+        "sha256": "0d64674d1c25de70a17d15a4ccb1c8062c5b75a069dcede8b0e6b3a6b808f6d8"
       },
       "rust/fixtures/m9/engineering/run-content-pack-v3.json": {
         "bytes": 1845,
-        "git_blob": "6ca98567b96ce029c834a6e4adb1bc9880014077",
-        "sha256": "7286f3aa5e17189c46a70d9e6e46e51760efd7b577e120c0501c106e8a411004"
+        "git_blob": "bf487e1941035eeafad762f6419021a8e38866bc",
+        "sha256": "be4291d3f6dacb63706080ad531f7c83b07ea14ba4edd7e73d69faa2f8a3a2e7"
       }
     },
-    "export_run": "34261503406",
-    "publication_tree": "0f05a699f5e0d36ad2865c2529fb88b4402df992",
-    "publication_commit": "32a5c987c9767c9c6e87ff57e2bce6dced0ffb46"
+    "export_run": "34279828626",
+    "publication_tree": "6c71c8c3f0580bdadfdc1240769654b96cfe2ad7",
+    "publication_commit": "b4862e9db04455732673bf3e75478f2ef9f63e75"
   }
 }

@@ -38,6 +38,8 @@ IDENTITY_FILES = {
     "drain_full_content": "rust/crates/er-content-compiler/src/m9e_full_content.rs",
     "drain_compiler": "rust/crates/er-content-compiler/src/m9e_move_drains.rs",
     "drain_test": "rust/crates/er-game/tests/m9e_move_drains.rs",
+    "recoil_compiler": "rust/crates/er-content-compiler/src/m9e_move_recoil.rs",
+    "recoil_test": "rust/crates/er-game/tests/m9e_move_recoil.rs",
     "browser_rebind_selftests": "scripts/ci/test_m9e_browser_rebind.py",
     "browser_rebind_fixture": "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
     "browser_rebind_helper": "scripts/ci/m9e_browser_rebind.py",

@@ -1,4 +1,4 @@
-//! Source-generated static drain fractions execute through the actual turn resolver.
+//! Source-generated binary-exact ordinary recoil fractions execute through the actual turn resolver.
 //! Completed bootstrap selections and battle statistics below are controlled fixtures.
 
 use er_battle::m7_resolver::{
@@ -38,9 +38,6 @@ const RECOIL_BASELINE: &str = r#"{"admitted_classifications":[{"behavior_unit":{
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
 
-// Exact pre-drain baseline exported and independently audited at 22e7ad4c6.
-const DRAIN_BASELINE: &str = r#"{"admitted_classifications":[{"behavior_unit":{"ordinal":0,"provenance_hash":"328f89dfb7c2608d6d3ee5b15332abaee1054d3b8a140f3535c1913763ba5dae","source":{"kind":"MOVE","numeric_id":71},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"74e57c63cce3b52e06c1b4e0b6198c92843fc6e172485189fd94466203cfe0aa","source":{"kind":"MOVE","numeric_id":72},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"d897d1b1179bd5d396e2a4da408a8aa4d41e9f514ffbb73f942c37c28c4daa0f","source":{"kind":"MOVE","numeric_id":141},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"6475dec43b01468439283d0371bed98157ba66e22796233779ccad9ca2be5afa","source":{"kind":"MOVE","numeric_id":202},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"d81fb09a1a26c62c5429170fc19b0c415f55753639249b96313d5e5a3e88e32f","source":{"kind":"MOVE","numeric_id":409},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"8ca49da916bcac2c0d786147bd3f8c1a9753775b3c8b21438280243d29ac557f","source":{"kind":"MOVE","numeric_id":532},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"07b44367a0c7044eb47ab4bdc55dfd489afbe82710fe0a8bdd80e5e21c04d363","source":{"kind":"MOVE","numeric_id":570},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"76ceaae68a8c5692d86097625b85bebb04b15c993b8deefd1b89266d34356194","source":{"kind":"MOVE","numeric_id":577},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"6bc4800d1c7d0f6686c9550bf7e7bb086bda97e3d7d288d72523cd71d79e70b6","source":{"kind":"MOVE","numeric_id":613},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"f01c54d8c035d2187bbc7ee0f672094ade184134fdb055dfd148ac264b47b386","source":{"kind":"MOVE","numeric_id":733},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":0,"provenance_hash":"dc5da60400a26c57f2152ec3cb38da93319383f48b1dc692c46577d1edcd886e","source":{"kind":"MOVE","numeric_id":891},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null},{"behavior_unit":{"ordinal":3,"provenance_hash":"2285c336a3c2a1509ffa48d1d992a60537ede6a292a462754aa99eb731b2ea2a","source":{"kind":"MOVE","numeric_id":902},"unit_kind":"MOVE_ATTRIBUTE"},"bespoke":"CUSTOM_DISPATCH","kind":"BESPOKE","programs":[],"unsupported_reason":null}],"battle_content_hash":"blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201","classification_count":9411,"classifications_digest":"f31c8c228f131f6a46145687709f1e2f7bd49289727ce807ef01e72b4fee7732","deferred_programs":{"138":[146],"668":[696]},"program_count":3679,"programs_digest":"586747b5c70e0e2ed586f9d8882c32980b489b828dcf08d09d065b32b4e4457f","schema_version":1}"#;
-
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
 }
@@ -65,7 +62,7 @@ fn profile() -> Result<ProfileStateV1, Box<dyn Error>> {
 }
 
 fn build_fixture() -> TestResult<(Arc<PreparedGameContentV2>, GameStateV6)> {
-    let bundle_bytes = std::env::var("M9E_DRAIN_BUNDLE")
+    let bundle_bytes = std::env::var("M9E_RECOIL_BUNDLE")
         .ok()
         .map(std::fs::read)
         .transpose()?;
@@ -73,7 +70,7 @@ fn build_fixture() -> TestResult<(Arc<PreparedGameContentV2>, GameStateV6)> {
         serde_json::from_slice(bundle_bytes.as_deref().unwrap_or(BUNDLE))?;
     // The focused remote producer supplies its freshly compiled, source-bound
     // battle pack. The published bundle remains the default integration input.
-    if let Ok(path) = std::env::var("M9E_DRAIN_BATTLE_PACK") {
+    if let Ok(path) = std::env::var("M9E_RECOIL_BATTLE_PACK") {
         bundle.battle = serde_json::from_slice(&std::fs::read(path)?)?;
         let run = Arc::make_mut(&mut bundle.run);
         run.battle_content_hash = bundle.battle.content_hash.clone();
@@ -296,7 +293,7 @@ fn query(content: &PreparedGameContentV2, state: &GameStateV5, slot: u8) -> Test
     )?)
 }
 
-fn drain_state(
+fn recoil_state(
     move_id: u64,
     target_hp: u32,
     actor_hp: u32,
@@ -361,84 +358,38 @@ fn turn(content: &PreparedGameContentV2, state: &GameStateV5) -> TestResult<Batt
 }
 
 #[test]
-fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units() -> TestResult {
+fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> TestResult {
     use er_types::BehaviorSourceId;
     let (content, _) = fixture()?;
-    let baseline: serde_json::Value = serde_json::from_str(DRAIN_BASELINE)?;
+    let baseline: serde_json::Value = serde_json::from_str(RECOIL_BASELINE)?;
     let after = &content.bundle().battle;
     assert_eq!(baseline["schema_version"], 1);
-    assert_eq!(baseline["program_count"], 3679);
+    assert_eq!(baseline["program_count"], 3691);
     assert_eq!(baseline["classification_count"], 9411);
+    assert_eq!(after.programs.len(), 3697);
     assert_eq!(after.classifications.0.len(), 9411);
     assert_eq!(
-        er_canonical::content_digest(&after.programs[..3679].to_vec())?,
+        er_canonical::content_digest(&after.programs[..3691].to_vec())?,
         baseline["programs_digest"]
             .as_str()
             .ok_or("baseline program digest")?
     );
     let expected = [
-        (71, 1, 2),
-        (72, 1, 2),
-        (141, 1, 2),
-        (202, 1, 2),
-        (409, 1, 2),
-        (532, 1, 2),
-        (570, 1, 2),
-        (577, 3, 4),
-        (613, 3, 4),
-        (733, 1, 1),
-        (891, 1, 2),
-        (902, 1, 2),
+        (36, 1, 4),
+        (66, 1, 4),
+        (457, 1, 2),
+        (528, 1, 4),
+        (543, 1, 4),
+        (617, 1, 2),
     ];
-    assert_eq!(after.programs.len(), 3679 + expected.len() + 6);
-    let old_classes = baseline["admitted_classifications"]
-        .as_array()
-        .ok_or("baseline classifications")?;
-    assert_eq!(old_classes.len(), expected.len());
     let mut restored = serde_json::to_value(&after.classifications.0)?;
-    let recoil_baseline: serde_json::Value = serde_json::from_str(RECOIL_BASELINE)?;
-    assert_eq!(recoil_baseline["schema_version"], 1);
-    assert_eq!(recoil_baseline["program_count"], 3691);
-    assert_eq!(
-        er_canonical::content_digest(&after.programs[..3691].to_vec())?,
-        recoil_baseline["programs_digest"]
-            .as_str()
-            .ok_or("recoil prefix")?
-    );
-    let recoil_rows = recoil_baseline["admitted_classifications"]
+    let old_rows = baseline["admitted_classifications"]
         .as_array()
-        .ok_or("recoil rows")?;
-    assert_eq!(recoil_rows.len(), 6);
-    let rows = restored.as_array_mut().ok_or("classification array")?;
-    let mut recoil_ids = Vec::new();
-    for old in recoil_rows {
-        let matches = rows
-            .iter_mut()
-            .filter(|row| row["behavior_unit"] == old["behavior_unit"])
-            .collect::<Vec<_>>();
-        assert_eq!(matches.len(), 1);
-        let row = matches.into_iter().next().ok_or("compiled recoil")?;
-        assert_eq!(old["kind"], "BESPOKE");
-        assert_eq!(row["kind"], "COMPILED");
-        recoil_ids.push(
-            row["behavior_unit"]["source"]["numeric_id"]
-                .as_u64()
-                .ok_or("recoil id")?,
-        );
-        *row = old.clone();
-    }
-    recoil_ids.sort_unstable();
-    assert_eq!(recoil_ids, [36, 66, 457, 528, 543, 617]);
-    assert_eq!(
-        er_canonical::content_digest(&restored)?,
-        recoil_baseline["classifications_digest"]
-            .as_str()
-            .ok_or("original recoil classes")?
-    );
-    let rows = restored.as_array_mut().ok_or("classification array")?;
-    let mut admitted = Vec::new();
-    for old in old_classes {
-        assert_eq!(old["kind"], "BESPOKE");
+        .ok_or("old classes")?;
+    assert_eq!(old_rows.len(), expected.len());
+    let rows = restored.as_array_mut().ok_or("classes")?;
+    let mut changed = Vec::new();
+    for old in old_rows {
         let matches = rows
             .iter_mut()
             .filter(|row| row["behavior_unit"] == old["behavior_unit"])
@@ -448,104 +399,91 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
             .into_iter()
             .next()
             .ok_or("compiled classification")?;
+        assert_eq!(old["kind"], "BESPOKE");
         assert_eq!(row["kind"], "COMPILED");
-        assert_eq!(row["behavior_unit"]["source"]["kind"], "MOVE");
         let id = row["behavior_unit"]["source"]["numeric_id"]
             .as_u64()
-            .ok_or("move source")?;
+            .ok_or("move")?;
         assert!(
             expected
                 .iter()
                 .any(|(expected_id, _, _)| *expected_id == id)
         );
-        admitted.push(id);
+        changed.push(id);
         *row = old.clone();
     }
-    admitted.sort_unstable();
-    assert_eq!(admitted, expected.map(|(id, _, _)| id));
+    changed.sort_unstable();
+    assert_eq!(changed, expected.map(|(id, _, _)| id));
     assert_eq!(
         er_canonical::content_digest(&restored)?,
         baseline["classifications_digest"]
             .as_str()
-            .ok_or("baseline classification digest")?
+            .ok_or("baseline classes digest")?
     );
     for (numeric_id, numerator, denominator) in expected {
         let definition = content
             .battle
             .move_definition(MoveId::new(safe(numeric_id)))?;
-        let mut drains = Vec::new();
+        let mut recoil = Vec::new();
         for id in &definition.mechanic_programs {
             let program = content.battle.program(*id)?;
             for operation in &program.operations {
                 let value = serde_json::to_value(operation)?;
-                if value["kind"] == "DRAIN_FRACTION" {
+                if value["kind"] == "RECOIL_FRACTION" {
                     assert_eq!(
                         program.source,
                         BehaviorSourceId::Move {
                             numeric_id: safe(numeric_id)
                         }
                     );
-                    drains.push((
+                    recoil.push((
                         value["numerator"].as_u64().ok_or("numerator")?,
                         value["denominator"].as_u64().ok_or("denominator")?,
                     ));
                 }
             }
         }
-        assert_eq!(drains, vec![(numerator, denominator)]);
+        assert_eq!(recoil, vec![(numerator, denominator)]);
     }
-    // Dream Eater has a source callback condition; Strength Sap uses a stat
-    // operand and a callback. Neither is an unconditional damage drain.
-    for index in [138, 668] {
-        let deferred = content.battle.move_definition(MoveId::new(safe(index)))?;
+    for id in [38, 165, 344, 394, 413, 452, 834, 835] {
+        let source = BehaviorSourceId::Move {
+            numeric_id: safe(id),
+        };
+        let actual = after
+            .classifications
+            .0
+            .iter()
+            .filter(|row| row.behavior_unit.source == source)
+            .collect::<Vec<_>>();
+        let expected = baseline["deferred_classifications"]
+            .as_array()
+            .ok_or("deferred baseline")?
+            .iter()
+            .filter(|row| {
+                row["behavior_unit"]["source"]
+                    == serde_json::to_value(&source).expect("source serialization")
+            })
+            .cloned()
+            .collect::<Vec<_>>();
         assert_eq!(
-            serde_json::to_value(&deferred.mechanic_programs)?,
-            baseline["deferred_programs"][index.to_string()]
+            serde_json::to_value(actual)?,
+            serde_json::to_value(expected)?
         );
-    }
-    if let Ok(directory) = std::env::var("M9E_DRAIN_EXPORT") {
-        let directory = std::path::Path::new(&directory);
-        std::fs::create_dir(directory)?;
-        let bundle = content.bundle();
-        let mut manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
-            "../../../fixtures/m9/engineering/game-content-bundle-v2-manifest.json"
-        ))?;
-        manifest["content_hash"] = serde_json::to_value(&bundle.content_hash)?;
-        manifest["components"]["battle"] = serde_json::to_value(&bundle.battle.content_hash)?;
-        manifest["components"]["run"] = serde_json::to_value(&bundle.run.content_hash)?;
-        for (name, bytes) in [
-            (
-                "battle-content-pack-v3.json",
-                serde_json::to_vec(&bundle.battle)?,
-            ),
-            ("run-content-pack-v3.json", serde_json::to_vec(&bundle.run)?),
-            ("game-content-bundle-v2.json", serde_json::to_vec(bundle)?),
-            (
-                "game-content-bundle-v2-manifest.json",
-                serde_json::to_vec(&manifest)?,
-            ),
-        ] {
-            std::fs::write(directory.join(name), bytes)?;
-        }
-        std::fs::write(
-            directory.join("drain-baseline-metadata.json"),
-            serde_json::to_vec(&baseline)?,
-        )?;
     }
     Ok(())
 }
 
 #[test]
-fn actual_drain_uses_capped_hp_loss_and_source_fraction() -> TestResult {
-    for (move_id, expected_healing) in [(71, 1), (577, 2), (733, 3)] {
-        let (content, state) = drain_state(move_id, 3, 100)?;
+fn actual_recoil_uses_capped_hp_loss_and_source_fraction() -> TestResult {
+    for (move_id, expected_recoil) in [(66, 4), (617, 8)] {
+        let (content, state) = recoil_state(move_id, 17, 100)?;
         let before = state.clone();
         let result = turn(&content, &state)?;
         let run = result.after_state.active_run.as_ref().ok_or("run")?;
         assert_eq!(run.party[0].hp, 0);
         assert_eq!(
             run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp,
-            100 + expected_healing
+            100 - expected_recoil
         );
         assert_eq!(state, before);
     }
@@ -553,64 +491,22 @@ fn actual_drain_uses_capped_hp_loss_and_source_fraction() -> TestResult {
 }
 
 #[test]
-fn actual_drain_minimum_one_and_maximum_hp_are_preserved() -> TestResult {
-    let (content, mut state) = drain_state(71, 400, 100)?;
+fn actual_recoil_minimum_one_and_actor_faint_are_preserved() -> TestResult {
+    use er_battle::resolver::BattleMutation;
+    let (content, mut state) = recoil_state(66, 400, 100)?;
+    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
+        primary: PokemonType::Poison,
+        secondary: None,
+    };
     state.active_run.as_mut().ok_or("run")?.party[0]
         .stats
-        .special_defense = 100000;
+        .defense = 100000;
     state.validate()?;
     let result = turn(&content, &state)?;
     let run = result.after_state.active_run.as_ref().ok_or("run")?;
     assert_eq!(run.party[0].hp, 399);
-    assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 101);
-    let (content, state) = drain_state(733, 3, 399)?;
-    let result = turn(&content, &state)?;
-    assert_eq!(
-        result
-            .after_state
-            .active_run
-            .as_ref()
-            .ok_or("run")?
-            .battle
-            .as_ref()
-            .ok_or("battle")?
-            .enemy_party[0]
-            .hp,
-        400
-    );
-    Ok(())
-}
-
-#[test]
-fn immune_drain_neither_heals_nor_consumes_damage_variance() -> TestResult {
-    let (content, mut state) = drain_state(409, 3, 100)?;
-    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
-        primary: PokemonType::Ghost,
-        secondary: None,
-    };
-    let baseline = turn(&content, &state)?;
-    let bytes = serde_json::to_vec(&state)?;
-    for _ in 0..3 {
-        assert_eq!(query(&content, &state, 0)?, 0);
-    }
-    assert_eq!(serde_json::to_vec(&state)?, bytes);
-    assert_eq!(turn(&content, &state)?, baseline);
-    let run = baseline.after_state.active_run.as_ref().ok_or("run")?;
-    assert_eq!(run.party[0].hp, 3);
-    assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 100);
-    assert!(
-        !baseline
-            .rng_audit
-            .iter()
-            .any(|draw| draw.reason == RngReason::DamageVariance)
-    );
-    Ok(())
-}
-
-#[test]
-fn full_health_drain_does_not_emit_spurious_actor_hp_changes() -> TestResult {
-    use er_battle::resolver::BattleMutation;
-    let (content, state) = drain_state(71, 3, 400)?;
+    assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 99);
+    let (content, state) = recoil_state(617, 17, 1)?;
     let actor = state
         .active_run
         .as_ref()
@@ -621,6 +517,43 @@ fn full_health_drain_does_not_emit_spurious_actor_hp_changes() -> TestResult {
         .enemy_party[0]
         .id;
     let result = turn(&content, &state)?;
-    assert!(!result.mutations.iter().any(|mutation| matches!(mutation, BattleMutation::HpChanged { pokemon, .. } if *pokemon == actor)));
+    let run = result.after_state.active_run.as_ref().ok_or("run")?;
+    let pokemon = &run.battle.as_ref().ok_or("battle")?.enemy_party[0];
+    assert_eq!(pokemon.hp, 0);
+    assert!(pokemon.fainted);
+    assert_eq!(result.mutations.iter().filter(|mutation| matches!(mutation, BattleMutation::HpChanged { pokemon, before: 1, after: 0 } if *pokemon == actor)).count(), 1);
+    Ok(())
+}
+
+#[test]
+fn immune_recoil_neither_hurts_nor_consumes_damage_variance() -> TestResult {
+    let (content, mut state) = recoil_state(66, 17, 100)?;
+    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
+        primary: PokemonType::Ghost,
+        secondary: None,
+    };
+    let result = turn(&content, &state)?;
+    let run = result.after_state.active_run.as_ref().ok_or("run")?;
+    assert_eq!(run.party[0].hp, 17);
+    assert_eq!(run.battle.as_ref().ok_or("battle")?.enemy_party[0].hp, 100);
+    assert!(
+        !result
+            .rng_audit
+            .iter()
+            .any(|draw| draw.reason == RngReason::DamageVariance)
+    );
+    Ok(())
+}
+
+#[test]
+fn recoil_damage_queries_preserve_actual_turn_and_borrowed_state() -> TestResult {
+    let (content, state) = recoil_state(617, 400, 100)?;
+    let baseline = turn(&content, &state)?;
+    let bytes = serde_json::to_vec(&state)?;
+    for _ in 0..3 {
+        assert!(query(&content, &state, 0)? > 0);
+    }
+    assert_eq!(serde_json::to_vec(&state)?, bytes);
+    assert_eq!(turn(&content, &state)?, baseline);
     Ok(())
 }

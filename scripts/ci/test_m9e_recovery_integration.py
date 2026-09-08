@@ -8,15 +8,15 @@ class RecoveryIntegrationPolicyTests(unittest.TestCase):
     def setUp(self):
         self.config = {"current_recovery_integration": copy.deepcopy(feedback.RECOVERY_POLICY)}
 
-    def test_owned_foundations_exact_generated_composition_preserves_all66_paths(self):
+    def test_owned_foundations_exact_generated_composition_preserves_all68_paths(self):
         import m9e_generated_xp as generated
         config = copy.deepcopy(self.config)
         config[generated.POLICY_KEY] = copy.deepcopy(generated.POLICY)
         paths = [*feedback.RECOVERY_PATHS, *generated.PATHS]
         config["current_recovery_integration"]["paths"] = paths
         original = copy.deepcopy(config)
-        self.assertEqual(len(paths), 104)
-        self.assertEqual(len(set(paths)), 104)
+        self.assertEqual(len(paths), 106)
+        self.assertEqual(len(set(paths)), 106)
         self.assertTrue(set(feedback.OWNED_FOUNDATION_PATHS).issubset(paths))
         for changed in (paths, list(reversed(paths))):
             self.assertEqual(feedback.select_recovery_scope(config, changed), (True, True))

@@ -333,11 +333,19 @@ const DRAIN_METADATA_PARITY: (&str, &str, usize, &str) = (
     "658cd9b848fb230ddd21df241162a97f47d98a37420a06126bf88edbb6380c89",
 );
 
+const RECOIL_METADATA_PARITY: (&str, &str, usize, &str) = (
+    "blake3-v1:e0f6c983166996dff2c0ee4ba3fcf88a262d0b89477f1d02c2c4a19298be4a8c",
+    "b167ad856885c95dab4f1e9cdf1456dd4924f6c4dbc8443e12918f232215192e",
+    16_340_147,
+    "288686469e4022f1a2c64cf9bfd5f074acc7ee39545dca878af536224a458017",
+);
+
 fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {
     [
         PRE_METADATA_PARITY,
         GENERATED_METADATA_PARITY,
         DRAIN_METADATA_PARITY,
+        RECOIL_METADATA_PARITY,
     ]
     .into_iter()
     .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))

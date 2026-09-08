@@ -78,11 +78,11 @@ def main():
                     or plan.get("requires_browser_worker") is not True
                     or plan.get("requires_current_coop_startup") is not True
                     or plan["unknown_paths"] or plan["boundary_paths"]
-                    or len(inventory) != 108 or sum(len(row["ids"]) for row in inventory) != 819
-                    or sum(map(len, plan["required_native_targets"].values())) != 64
-                    or len(plan["required_native_test_ids"]) != 58
-                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 66):
-                raise RuntimeError("actual819 full source plan or Browser obligations differ")
+                    or len(inventory) != 109 or sum(len(row["ids"]) for row in inventory) != 824
+                    or sum(map(len, plan["required_native_targets"].values())) != 65
+                    or len(plan["required_native_test_ids"]) != 59
+                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 68):
+                raise RuntimeError("actual824 full source plan or Browser obligations differ")
             for row in inventory:
                 if not ("*" in plan["execution_scope"].get(row["crate"], [])
                         or row["target"] in plan["execution_scope"].get(row["crate"], [])):
@@ -94,8 +94,8 @@ def main():
                            for lane, targets in partitions.items()}
             if lane_counts != {"a": 701, "b": 12, "c": 14, "d": 78, "e": 4, "f": 10}:
                 raise RuntimeError("exact whole-target balanced lane assignment differs")
-            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 819, "targets": 108, "required_targets": 64,
-                       "exact_maps": 58, "owned_sources": 66,
+            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 824, "targets": 109, "required_targets": 65,
+                       "exact_maps": 59, "owned_sources": 68,
                        "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                        "browser_binding": expected_binding}
         except Exception as error:
