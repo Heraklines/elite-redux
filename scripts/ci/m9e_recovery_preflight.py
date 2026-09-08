@@ -280,7 +280,7 @@ def main():
                "decoded_sha256": decoded_digest, "projected_tests": projected_test_count,
                "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: exact66-path source composition, all759 prior IDs/exclusions and27 additions across101 targets, qualified28 product sources, and retained co-op/platform/cost/rule/mutant obligations. No native/platform qualification.")
+    print("Passed: exact67-path source composition, all759 prior IDs/exclusions and27 additions across101 targets, qualified29 product sources, and retained co-op/platform/cost/rule/mutant obligations. No native/platform qualification.")
 
 
 if __name__ == "__main__":
