@@ -1,0 +1,306 @@
+{
+  "cohorts": [
+    {
+      "name": "old",
+      "source_sha": "ce47447f26eef093866f3424aa1377b64bde2ae3",
+      "run_id": "34261392923",
+      "baseline_native_proof_sha256": "441ec9e9649d7b1cf2d18783d33333d6069ac6ee68ab8c8eecae69867f552dc2",
+      "source_hashes": {
+        ".github/workflows/m9e-focused-feedback.yml": "fc3541dfcda38c9a849ac3f489a73a1f497c53d57ea8d59bd1c9c2fa8e94bd32",
+        "rust/Cargo.lock": "9e7f2e2a96e9b191015b567c4bb1bd7f3457b0dbebc563394e354f5f132c65dc",
+        "rust/Cargo.toml": "fdefad8953caa82922a4f3e86560d3543f9d1ef69edada7bc1dcc16ae3a5ade9",
+        "rust/crates/er-env/src/current.rs": "44f79c9ec052de14e977c97588fdf2fe30cc04e7fc94fad524a5622ef8d3e574",
+        "rust/crates/er-game/src/m9e_content_v2.rs": "e287b251a98cab8e170ac92fc4b253bc0908a2f6155929f35978680dff3fda5b",
+        "rust/crates/er-game/src/m9e_material_v6.rs": "7ebefdf8fd78878154564554a1d566b02246578a6d22198e9540a7a0f6add835",
+        "rust/crates/er-game/src/m9e_new_run_v6.rs": "0dbd2ace8ff9e6d4b064b0279bfc90bbb587051e37782a8837760de1de63ec44",
+        "rust/crates/er-game/src/m9e_runtime_v6.rs": "b910e8a9a708942ea4df944106204817f9664dae83c320fa7eb962a00a1e6327",
+        "rust/crates/er-kernel/src/game_kernel_v7.rs": "0a8cd79f25bae24a589bd6c38682708fa8816787241c83e534f746b707ce5ae0",
+        "rust/crates/er-repro/Cargo.toml": "9f45b6e0afbebc66d9d6a4da787c26d1d3ad50b986d0708c207cf238eac6aa19",
+        "rust/crates/er-repro/src/current.rs": "f10b89069fb1b77df738490e5336e1ebd5f342f35afd7bcf1e1eba69e3359c74",
+        "rust/crates/er-repro/tests/m9e_current_cost_probe.rs": "aaa5fe82ecd79baa4905902ea77fb4ba990f3b3d4202cc388c94f0f511554b36",
+        "rust/crates/er-state/src/m9e_state_v6.rs": "6e0937529780f4cb50c65122173a68820c4823bdfb9569ff8b46583cf9d8e9fb",
+        "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json": "63bf9531e080c09ea47b12b328af0a09abe7333e5c0d228dd45fa666f239bb2e",
+        "rust/rust-toolchain.toml": "0241de2190a0c1959d4ad182dfa6943b7ab9bd577dc8ef9b0fe7502d191835ec",
+        "scripts/ci/m9e_current_cost.py": "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8",
+        "scripts/ci/m9e_feedback.py": "953fb69174cb24fac2f17ffcee49cc48a95ad21286ca7f066f860d3d3575871d",
+        "scripts/ci/m9e_phases.py": "1e7cbba3c84f922b271dd66b6bc1a02b34d010427d6e9d3eaad200fa6dcff2d2",
+        "scripts/ci/m9e-targets.json": "fc2d157ae3f80ecc5be1463adaeb4c56ae21d5f5f487714f021d40e68e118402",
+        "scripts/ci/test_m9e_feedback.py": "23c9a248d908977762bec67cc75efa16e27814036be39970583592547a1b9c19"
+      },
+      "cargo_manifests": {
+        "count": 35,
+        "sha256": "a8db11057f02cbdc85958de332a5d8f6d865260217a5f709bbb283220c757718"
+      },
+      "content": {
+        "bundle": {
+          "bytes": 16325821,
+          "sha256": "9afce9fd3bc6e05e2159f19e8578ff64fc342b8a5974bec5f15648b0799d74d2"
+        },
+        "identity": {
+          "ai_hash": "3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9",
+          "battle_hash": "blake3-v3:b53078e1088c3c3f645fa1d209fb6bb72ef17bd9411d6bddc2c08c447d794201",
+          "bootstrap_hash": "e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a",
+          "bundle_hash": "blake3-v1:dc4ab1ede5c52152e40f1dc5579d93841898126903b3047bf66b60efd7646493",
+          "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+          "presentation_hash": "6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0",
+          "progression_hash": "b167ad856885c95dab4f1e9cdf1456dd4924f6c4dbc8443e12918f232215192e",
+          "run_hash": "879bcaacfe07349ed23edb2298fb55c19c55ae9422b57167655677f68bf22428",
+          "scenario_hash": "e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8",
+          "semantic_catalog_hash": "a878c7487924a10f8508787ec560829efd72c5c5f101f022ad93c5358ec1ced0",
+          "world_hash": "c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"
+        },
+        "manifest": {
+          "bytes": 1219,
+          "sha256": "63bf9531e080c09ea47b12b328af0a09abe7333e5c0d228dd45fa666f239bb2e"
+        }
+      },
+      "active": {
+        "checkpoint": "active",
+        "event": {
+          "input": {
+            "data": {
+              "browser_repeat": false,
+              "code": {
+                "kind": "ARROW_DOWN"
+              },
+              "focus": "GAME",
+              "printable": false
+            },
+            "kind": "KEY_DOWN"
+          },
+          "kind": "RAW_INPUT"
+        },
+        "event_effects": 1,
+        "menu_options": 2,
+        "observation_json_bytes": 2050,
+        "phases": [
+          {
+            "median_ns": 3286,
+            "min_ns": 3135,
+            "phase": "fork"
+          },
+          {
+            "median_ns": 117090,
+            "min_ns": 113463,
+            "phase": "snapshot"
+          },
+          {
+            "median_ns": 125054,
+            "min_ns": 124183,
+            "phase": "validate"
+          },
+          {
+            "median_ns": 93966,
+            "min_ns": 90179,
+            "phase": "observe"
+          },
+          {
+            "median_ns": 94808,
+            "min_ns": 94807,
+            "phase": "canonical_encode_snapshot"
+          },
+          {
+            "median_ns": 96191,
+            "min_ns": 94667,
+            "phase": "canonical_digest_snapshot"
+          },
+          {
+            "median_ns": 2525,
+            "min_ns": 2515,
+            "phase": "blake3_preencoded_snapshot"
+          },
+          {
+            "median_ns": 283371,
+            "min_ns": 282710,
+            "phase": "apply_effectful_raw_input"
+          },
+          {
+            "median_ns": 1578028,
+            "min_ns": 1574211,
+            "phase": "recorder_append"
+          }
+        ],
+        "recorder_capsule_bytes": 12969,
+        "recorder_maximum_bytes": 16777216,
+        "recorder_maximum_events": 4096,
+        "snapshot_canonical_bytes": 8416,
+        "snapshot_digest": "bd728b02afaa1862241f61a88ec833364d29da61fc4392d45331d046e213e93d"
+      },
+      "checkpoints": [
+        {
+          "checkpoint": "title",
+          "snapshot_digest": "9e7b9834bb4b1ea0e9d078b1d3e2ddb1352aba2de831aae9b7da7adf83b61996",
+          "snapshot_canonical_bytes": 68327
+        },
+        {
+          "checkpoint": "mode",
+          "snapshot_digest": "c9e4373e6ff335ae0485ee2a6d9f823f6e24219a38f1770ba04fd7974eee9bb0",
+          "snapshot_canonical_bytes": 71145
+        },
+        {
+          "checkpoint": "starter",
+          "snapshot_digest": "9dd00a7668a85f1311a873259c2b919e3bb9936dd93a2029d9a8eb196b2a0f56",
+          "snapshot_canonical_bytes": 400368
+        },
+        {
+          "checkpoint": "active",
+          "snapshot_digest": "bd728b02afaa1862241f61a88ec833364d29da61fc4392d45331d046e213e93d",
+          "snapshot_canonical_bytes": 8416
+        }
+      ],
+      "baseline_source_sha": "84a2e3baf53530da4422bb422f56f16d1466ea9e",
+      "baseline_run_id": "34183846131"
+    },
+    {
+      "name": "new",
+      "source_sha": "3b4ce13303bbfb05f2038931a5298bc090f1374c",
+      "run_id": "34263626196",
+      "baseline_native_proof_sha256": "441ec9e9649d7b1cf2d18783d33333d6069ac6ee68ab8c8eecae69867f552dc2",
+      "source_hashes": {
+        ".github/workflows/m9e-focused-feedback.yml": "fc3541dfcda38c9a849ac3f489a73a1f497c53d57ea8d59bd1c9c2fa8e94bd32",
+        "rust/Cargo.lock": "9e7f2e2a96e9b191015b567c4bb1bd7f3457b0dbebc563394e354f5f132c65dc",
+        "rust/Cargo.toml": "fdefad8953caa82922a4f3e86560d3543f9d1ef69edada7bc1dcc16ae3a5ade9",
+        "rust/crates/er-env/src/current.rs": "44f79c9ec052de14e977c97588fdf2fe30cc04e7fc94fad524a5622ef8d3e574",
+        "rust/crates/er-game/src/m9e_content_v2.rs": "e287b251a98cab8e170ac92fc4b253bc0908a2f6155929f35978680dff3fda5b",
+        "rust/crates/er-game/src/m9e_material_v6.rs": "7ebefdf8fd78878154564554a1d566b02246578a6d22198e9540a7a0f6add835",
+        "rust/crates/er-game/src/m9e_new_run_v6.rs": "0dbd2ace8ff9e6d4b064b0279bfc90bbb587051e37782a8837760de1de63ec44",
+        "rust/crates/er-game/src/m9e_runtime_v6.rs": "b910e8a9a708942ea4df944106204817f9664dae83c320fa7eb962a00a1e6327",
+        "rust/crates/er-kernel/src/game_kernel_v7.rs": "0a8cd79f25bae24a589bd6c38682708fa8816787241c83e534f746b707ce5ae0",
+        "rust/crates/er-repro/Cargo.toml": "9f45b6e0afbebc66d9d6a4da787c26d1d3ad50b986d0708c207cf238eac6aa19",
+        "rust/crates/er-repro/src/current.rs": "f10b89069fb1b77df738490e5336e1ebd5f342f35afd7bcf1e1eba69e3359c74",
+        "rust/crates/er-repro/tests/m9e_current_cost_probe.rs": "aaa5fe82ecd79baa4905902ea77fb4ba990f3b3d4202cc388c94f0f511554b36",
+        "rust/crates/er-state/src/m9e_state_v6.rs": "6e0937529780f4cb50c65122173a68820c4823bdfb9569ff8b46583cf9d8e9fb",
+        "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json": "793ac4bc98a74232850f7a1c124fd876c212a18e7db0afa2c15a65e33108502f",
+        "rust/rust-toolchain.toml": "0241de2190a0c1959d4ad182dfa6943b7ab9bd577dc8ef9b0fe7502d191835ec",
+        "scripts/ci/m9e_current_cost.py": "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8",
+        "scripts/ci/m9e_feedback.py": "953fb69174cb24fac2f17ffcee49cc48a95ad21286ca7f066f860d3d3575871d",
+        "scripts/ci/m9e_phases.py": "1e7cbba3c84f922b271dd66b6bc1a02b34d010427d6e9d3eaad200fa6dcff2d2",
+        "scripts/ci/m9e-targets.json": "fc2d157ae3f80ecc5be1463adaeb4c56ae21d5f5f487714f021d40e68e118402",
+        "scripts/ci/test_m9e_feedback.py": "23c9a248d908977762bec67cc75efa16e27814036be39970583592547a1b9c19"
+      },
+      "cargo_manifests": {
+        "count": 35,
+        "sha256": "a8db11057f02cbdc85958de332a5d8f6d865260217a5f709bbb283220c757718"
+      },
+      "content": {
+        "bundle": {
+          "bytes": 16335369,
+          "sha256": "a42bf206c6e9a848df5774e58c1f0190f562ceefb90f4dc07e97125eaf0ae6af"
+        },
+        "identity": {
+          "ai_hash": "3229a33fcf2f88c4272efb9e21f376f579357d79a9d77451892394dd3ebfbaf9",
+          "battle_hash": "blake3-v3:9ba06bd06f2f7ef2718f8165d9438e8b2f4810b4dc3ec09443eed6fc8e29fd45",
+          "bootstrap_hash": "e61066de38fac8e31586ccab8e25d3dd39d36244cb02f655840a6133473db47a",
+          "bundle_hash": "blake3-v1:4e11aa7e6ef4f5c0bc39e4a29ab0b28a512f5cdefa4e5bdd2fc9aab20e2c815a",
+          "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+          "presentation_hash": "6b06dd16f77709e8bb5863f58a2b460b686069fa353981bbc62ed54f2c54ecc0",
+          "progression_hash": "b167ad856885c95dab4f1e9cdf1456dd4924f6c4dbc8443e12918f232215192e",
+          "run_hash": "3b0b6c65cac3a48bccfabea9135fb52304854bffed2e484bb87ed6b7e9e9c547",
+          "scenario_hash": "e45bfe0c126dd4b1c3f69ce153def8aa99efe0f1e835ddcbcafa98b689a68fb8",
+          "semantic_catalog_hash": "a878c7487924a10f8508787ec560829efd72c5c5f101f022ad93c5358ec1ced0",
+          "world_hash": "c87d890c9f1658e0526b49d35ae003165ade1f5a0156227a6722b77841786a64"
+        },
+        "manifest": {
+          "bytes": 1219,
+          "sha256": "793ac4bc98a74232850f7a1c124fd876c212a18e7db0afa2c15a65e33108502f"
+        }
+      },
+      "active": {
+        "checkpoint": "active",
+        "event": {
+          "input": {
+            "data": {
+              "browser_repeat": false,
+              "code": {
+                "kind": "ARROW_DOWN"
+              },
+              "focus": "GAME",
+              "printable": false
+            },
+            "kind": "KEY_DOWN"
+          },
+          "kind": "RAW_INPUT"
+        },
+        "event_effects": 1,
+        "menu_options": 2,
+        "observation_json_bytes": 2050,
+        "phases": [
+          {
+            "median_ns": 3286,
+            "min_ns": 3135,
+            "phase": "fork"
+          },
+          {
+            "median_ns": 117090,
+            "min_ns": 113463,
+            "phase": "snapshot"
+          },
+          {
+            "median_ns": 125054,
+            "min_ns": 124183,
+            "phase": "validate"
+          },
+          {
+            "median_ns": 93966,
+            "min_ns": 90179,
+            "phase": "observe"
+          },
+          {
+            "median_ns": 94808,
+            "min_ns": 94807,
+            "phase": "canonical_encode_snapshot"
+          },
+          {
+            "median_ns": 96191,
+            "min_ns": 94667,
+            "phase": "canonical_digest_snapshot"
+          },
+          {
+            "median_ns": 2525,
+            "min_ns": 2515,
+            "phase": "blake3_preencoded_snapshot"
+          },
+          {
+            "median_ns": 283371,
+            "min_ns": 282710,
+            "phase": "apply_effectful_raw_input"
+          },
+          {
+            "median_ns": 1578028,
+            "min_ns": 1574211,
+            "phase": "recorder_append"
+          }
+        ],
+        "recorder_capsule_bytes": 12969,
+        "recorder_maximum_bytes": 16777216,
+        "recorder_maximum_events": 4096,
+        "snapshot_canonical_bytes": 8416,
+        "snapshot_digest": "bd728b02afaa1862241f61a88ec833364d29da61fc4392d45331d046e213e93d"
+      },
+      "checkpoints": [
+        {
+          "checkpoint": "title",
+          "snapshot_digest": "9e7b9834bb4b1ea0e9d078b1d3e2ddb1352aba2de831aae9b7da7adf83b61996",
+          "snapshot_canonical_bytes": 68327
+        },
+        {
+          "checkpoint": "mode",
+          "snapshot_digest": "c9e4373e6ff335ae0485ee2a6d9f823f6e24219a38f1770ba04fd7974eee9bb0",
+          "snapshot_canonical_bytes": 71145
+        },
+        {
+          "checkpoint": "starter",
+          "snapshot_digest": "9dd00a7668a85f1311a873259c2b919e3bb9936dd93a2029d9a8eb196b2a0f56",
+          "snapshot_canonical_bytes": 400368
+        },
+        {
+          "checkpoint": "active",
+          "snapshot_digest": "bd728b02afaa1862241f61a88ec833364d29da61fc4392d45331d046e213e93d",
+          "snapshot_canonical_bytes": 8416
+        }
+      ],
+      "baseline_source_sha": "84a2e3baf53530da4422bb422f56f16d1466ea9e",
+      "baseline_run_id": "34183846131"
+    }
+  ]
+}
