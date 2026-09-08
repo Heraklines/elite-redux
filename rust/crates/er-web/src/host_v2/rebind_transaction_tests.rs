@@ -397,7 +397,7 @@ impl Peer {
         assert_eq!(restored.host.session()?.snapshot()?, snapshot);
         assert_eq!(restored.host.session()?.observe()?, observation);
         let capsule = restored.export()?;
-        assert_eq!(capsule.checkpoint, snapshot);
+        assert_eq!(capsule.checkpoint.as_ref(), &snapshot);
         assert_eq!(capsule.base_position, 0);
         assert_eq!(capsule.final_position, 0);
         assert!(capsule.attempts.is_empty());
