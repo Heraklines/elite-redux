@@ -51,7 +51,7 @@ fn complete_pinned_definitions_build_one_prepared_battle_pack() -> Result<(), Bo
             + pack.field_content.positional_tags.len(),
         168
     );
-    assert_eq!(pack.programs.iter().flatten().count(), 3_678);
+    assert_eq!(pack.programs.iter().flatten().count(), 3_690);
     assert_eq!(pack.classifications.0.len(), 9_411);
     assert_eq!(pack.type_chart.entries.len(), 120);
     assert_eq!(serde_json::to_vec(&pack)?, PACK);
