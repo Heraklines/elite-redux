@@ -475,9 +475,9 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
             "admitted_classifications": before.battle.classifications.0.iter()
                 .zip(&after.classifications.0).filter(|(old, new)| old != new)
                 .map(|(old, _)| old).collect::<Vec<_>>(),
-            "deferred_programs": [138, 668].into_iter().map(|index| {
+            "deferred_programs": ([138, 668].into_iter().map(|index| {
                 (index.to_string(), before.battle.moves[index].as_ref().map(|value| value.mechanic_programs.clone()))
-            }).collect::<std::collections::BTreeMap<_, _>>()
+            }).collect::<std::collections::BTreeMap<_, _>>())
         });
         std::fs::write(
             directory.join("drain-baseline-metadata.json"),
