@@ -33,6 +33,11 @@ AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "drain_actor_executor": "rust/crates/er-battle/src/m6/routine_executor.rs",
+    "drain_compiler_library": "rust/crates/er-content-compiler/src/lib.rs",
+    "drain_full_content": "rust/crates/er-content-compiler/src/m9e_full_content.rs",
+    "drain_compiler": "rust/crates/er-content-compiler/src/m9e_move_drains.rs",
+    "drain_test": "rust/crates/er-game/tests/m9e_move_drains.rs",
     "browser_rebind_selftests": "scripts/ci/test_m9e_browser_rebind.py",
     "browser_rebind_fixture": "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
     "browser_rebind_helper": "scripts/ci/m9e_browser_rebind.py",

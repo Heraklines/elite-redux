@@ -390,7 +390,7 @@ def validate_owned_foundation_inventory(plan, inventory):
     if plan.get("current_recovery_integration"):
         if (plan.get("owned_foundation_inventory_sha256") != OWNED_FOUNDATION_INVENTORY_SHA256
                 or rows != owned_foundation_inventory()):
-            raise RuntimeError("owned foundation complete814/108 inventory differs")
+            raise RuntimeError("owned foundation complete819/108 inventory differs")
 
 
 def validate_owned_foundation_sources(root):
