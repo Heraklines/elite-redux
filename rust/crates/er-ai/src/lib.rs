@@ -2,6 +2,7 @@
 pub mod authority_v2;
 pub mod content_v2;
 pub mod full_surface;
+pub mod m9e_standard_attack_score;
 pub mod mode_profiles;
 pub mod party_snapshots;
 pub mod showdown;
