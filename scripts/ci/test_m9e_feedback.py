@@ -5281,7 +5281,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
-        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [6, 8, 11])
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 6, 6, 8, 11])
         for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
             crate, target = key.split(":")
             self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
@@ -6579,7 +6579,11 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
-                                                ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
+                                                ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
+                                                ("er-repro", "m9e_current_rebind_repro"),
+                                                ("er-cli", "m9e_current_coop_rebind"),
+                                                ("er-lab", "current_worker_rebind_v2"),
+                                                ("er-progression", "m9e_owned_friendship")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
 
@@ -6875,7 +6879,11 @@ class FeedbackTests(unittest.TestCase):
             self.assertEqual(selection["wasm_test"], "m9e_parity")
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
-                                                ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET})
+                                                ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
+                                                ("er-repro", "m9e_current_rebind_repro"),
+                                                ("er-cli", "m9e_current_coop_rebind"),
+                                                ("er-lab", "current_worker_rebind_v2"),
+                                                ("er-progression", "m9e_owned_friendship")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
 
