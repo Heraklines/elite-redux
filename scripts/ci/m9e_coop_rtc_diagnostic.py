@@ -15,7 +15,8 @@ REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-coop-rtc-focused"
 FULL = REPORT / "diagnostics"
 COMPACT = REPORT / "compact"
 OUTPUT = REPORT / "web"
-DEADLINE = time.monotonic() + 1800
+START = int(os.environ["M9E_FOCUS_STARTED_AT"])
+DEADLINE = time.monotonic() + 1780 - (time.time() - START)
 EXAMPLE = "rust/crates/er-web/examples/m9e_v7_coop_startup.rs"
 SPEC = "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"
 IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready first" for seat in ("host", "guest")]
@@ -36,6 +37,8 @@ SOURCES = [EXAMPLE, SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/work
            "rust/crates/er-repro/src/current.rs", "rust/rust-toolchain.toml", "rust/Cargo.lock", "rust/Cargo.toml",
            "rust/crates/er-web/Cargo.toml", "pnpm-lock.yaml", "package.json", ".nvmrc",
            "playwright.rust-browser.config.ts", "scripts/ci/m9e_current_cost.py"]
+SOURCES += ["rust/crates/er-state/src/m9e_state_v6.rs", "rust/crates/er-game/src/m9e_runtime_v6.rs", "rust/crates/er-game/src/m9e_material_v6.rs"]
+SOURCES.append("rust/crates/er-battle/src/m7_resolver.rs")
 logs = {}
 failed_log = None
 
@@ -68,6 +71,10 @@ def main(summary):
     sha = os.environ["GITHUB_SHA"]
     if run(["git", "rev-parse", "HEAD"], "identity", 30, 16384).read_text().strip() != sha:
         raise RuntimeError("exact candidate required")
+    changes = run(["git", "diff", "--name-only", "b329cb3f6b358bed7e32eb412ffbd87163629ccf", "HEAD"], "source-delta", 30, 16384).read_text().splitlines()
+    if sorted(changes) != sorted([SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/workflows/m9e-coop-rtc-focused.yml"]):
+        raise RuntimeError("only qualified wire observation spec and two CI files may change")
+    summary["base_sha"] = "b329cb3f6b358bed7e32eb412ffbd87163629ccf"
     summary["source_hashes"] = {path: digest(ROOT / path) for path in SOURCES}
     summary["source_tree"] = run(["git", "rev-parse", "HEAD^{tree}"], "tree", 30, 16384).read_text().strip()
     formatter = ["rustfmt", "+1.97.1", "--edition", "2024", "--config", "skip_children=true"]
@@ -284,6 +291,24 @@ def execute_prepared(summary, *, install_chromium=True):
         if len(raw) > 4096:
             raise RuntimeError("bounded browser evidence required")
         value = json.loads(raw)
+        wire_attachments = results[0].get("attachments", [])
+        if sorted(item.get("name", "") for item in wire_attachments) != [
+                "m9e-coop-wire-choices", "m9e-coop-wire-started", "m9e-natural-coop-startup"]:
+            raise RuntimeError("original startup and exactly two actual wire attachments required")
+        for kind in ("choices", "started"):
+            wire = [item for item in wire_attachments if item["name"] == "m9e-coop-wire-" + kind][0]
+            if set(wire) != {"name", "contentType", "body"} or wire["contentType"] != "application/octet-stream":
+                raise RuntimeError("unambiguous actual wire attachment required")
+            if not isinstance(wire["body"], str) or not 0 < len(wire["body"]) <= 87384:
+                raise RuntimeError("bounded encoded actual wire required")
+            wire_bytes = base64.b64decode(wire["body"], validate=True)
+            wire_hash = hashlib.sha256(wire_bytes).hexdigest()
+            if (not 0 < len(wire_bytes) <= 65536 or len(wire_bytes) != value[kind + "_bytes"]
+                    or wire_hash != value[kind + "_sha256"]):
+                raise RuntimeError("actual wire does not match live journey evidence")
+            name = "wire-" + ("host", "guest")[index] + "-" + kind + ".json"
+            (FULL / name).write_bytes(wire_bytes)
+            summary.setdefault("wire_packets", []).append({"file": name, "bytes": len(wire_bytes), "sha256": wire_hash})
         if (value.get("source_sha") != sha or value.get("order") != ("host", "guest")[index]
                 or value.get("actual_workers") != 2 or value.get("worker_sha256") != rtc["assets"][rtc["worker"]]["sha256"]
                 or value.get("setup_manifest_sha256") != summary["setup_manifest_sha256"]
@@ -329,6 +354,8 @@ if __name__ == "__main__":
         (FULL / "failure.txt").write_text(str(error) + "\nBounded tail; complete logs remain remote.\n" + tail.decode("utf-8", errors="replace"))
     finally:
         summary["logs"] = logs
+        summary["elapsed_seconds_including_checkout"] = time.time() - START
+        summary["run_attempt"] = os.environ["GITHUB_RUN_ATTEMPT"]
         raw = json.dumps(summary, sort_keys=True, separators=(",", ":")).encode() + b"\n"
         if len(raw) > 32768:
             raise RuntimeError("compact result exceeds32KiB")
