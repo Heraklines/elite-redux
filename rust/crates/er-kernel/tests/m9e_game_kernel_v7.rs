@@ -1647,7 +1647,11 @@ fn gamepad_buttons_drive_bootstrap_and_active_controls() -> Result<(), Box<dyn E
 fn read_preserves_saved_difficulty_over_other_naturally_selected_live_difficulty()
 -> Result<(), Box<dyn Error>> {
     let fixture = read_rebind_fixture()?;
-    let saved_owner = fixture.saved.state.current_run_difficulty.ok_or("saved difficulty")?;
+    let saved_owner = fixture
+        .saved
+        .state
+        .current_run_difficulty
+        .ok_or("saved difficulty")?;
     assert_eq!(saved_owner.difficulty, er_types::RunDifficultyV1::Youngster);
     let mut live = kernel(fixture.content.clone())?;
     complete_natural_start_at_difficulty(&mut live, "bootstrap/difficulty/hell")?;
@@ -1658,29 +1662,46 @@ fn read_preserves_saved_difficulty_over_other_naturally_selected_live_difficulty
     let GameKernelLifecycleSnapshotV7::Active(state) = &natural.lifecycle else {
         return Err("natural Hell run is not active".into());
     };
-    assert_eq!(state.current_run_difficulty.ok_or("live difficulty")?.difficulty, er_types::RunDifficultyV1::Hell);
+    assert_eq!(
+        state
+            .current_run_difficulty
+            .ok_or("live difficulty")?
+            .difficulty,
+        er_types::RunDifficultyV1::Hell
+    );
     let mut loader = controlled_read_save_menu(
         &natural,
         fixture.content.clone(),
-        SaveActionV1::Load { slot: "read-rebind-slot".to_owned() },
+        SaveActionV1::Load {
+            slot: "read-rebind-slot".to_owned(),
+        },
         80,
         20,
         40,
     )?;
     let request = press(&mut loader, PhysicalKey::Space)?
-        .effects.into_iter().find_map(|effect| match effect {
-            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, .. }) => Some(request),
+        .effects
+        .into_iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, .. }) => {
+                Some(request)
+            }
             _ => None,
-        }).ok_or("actual Load emitted no READ")?;
+        })
+        .ok_or("actual Load emitted no READ")?;
     accept_read(&mut loader, request, &fixture.bytes)?;
     let loaded = loader.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &loaded.lifecycle else {
         return Err("loaded run is not active".into());
     };
     assert_eq!(state.current_run_difficulty, Some(saved_owner));
-    assert_eq!(state.active_run.as_ref().ok_or("loaded run")?.run_id, saved_owner.run_id);
+    assert_eq!(
+        state.active_run.as_ref().ok_or("loaded run")?.run_id,
+        saved_owner.run_id
+    );
     let restored = restore_read_fixture(
-        serde_json::from_slice(&serde_json::to_vec(&loaded)?)?, fixture.content.clone(),
+        serde_json::from_slice(&serde_json::to_vec(&loaded)?)?,
+        fixture.content.clone(),
     )?;
     assert_eq!(restored.snapshot()?, loaded);
     Ok(())
