@@ -146,7 +146,24 @@ def main():
         rows = [json.loads(line) for line in raw.splitlines() if line.startswith(b"{")]
         require([row.get("success") for row in rows if row.get("reason") == "build-finished"] == [True], "complete successful Cargo artifact stream required")
         targets = json.loads(r'''{"m9e_full_content":["complete_bootstrap_catalog_cross_references_full_battle_and_world","complete_pinned_definitions_build_one_prepared_battle_pack","complete_pinned_world_preserves_pool_dimensions"]}''')
-        artifacts = [row for row in rows if row.get("reason") == "compiler-artifact" and row.get("executable")]
+        executables = [row for row in rows if row.get("reason") == "compiler-artifact" and row.get("executable")]
+        build_only = [row for row in executables if row["target"]["kind"] == ["bin"] and row["profile"]["test"] is False]
+        require(sorted(row["target"]["name"] for row in build_only) == sorted([
+            "er-content-compiler", "m9-content", "m9-game-content", "m9e-ai", "m9e-bootstrap", "m9e-bundle",
+            "m9e-content", "m9e-presentation", "m9e-progression", "m9e-scenario", "m9e-world"]), "exact eleven Cargo build-only binaries required")
+        result["build_only_artifacts"] = []
+        for row in build_only:
+            binary = Path(row["executable"])
+            source = Path(row["target"]["src_path"])
+            require(binary == TARGET / "debug" / row["target"]["name"] and binary.is_file() and not binary.is_symlink()
+                    and row["manifest_path"] == str(ROOT / "rust/crates/er-content-compiler/Cargo.toml")
+                    and source.is_relative_to(ROOT / "rust/crates/er-content-compiler/src")
+                    and row["profile"]["opt_level"] == "0" and row["profile"]["debug_assertions"] is True
+                    and row["profile"]["overflow_checks"] is True, "build-only binary source/profile identity differs")
+            result["build_only_artifacts"].append({"target": row["target"]["name"], "source": str(source.relative_to(ROOT)),
+                "source_sha256": sha(source.read_bytes()), "bytes": binary.stat().st_size, "sha256": sha(binary.read_bytes()), "executed": False})
+        artifacts = [row for row in executables if row["target"]["kind"] == ["test"] and row["profile"]["test"] is True]
+        require(len(executables) == len(build_only) + len(artifacts), "no unexplained executable artifacts")
         require(len(artifacts) == 1 and {row["target"]["name"] for row in artifacts} == set(targets), "one exact whole target executable required")
         result["artifacts"] = []
         for artifact in sorted(artifacts, key=lambda row: row["target"]["name"]):
