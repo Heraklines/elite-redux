@@ -334,10 +334,14 @@ const DRAIN_METADATA_PARITY: (&str, &str, usize, &str) = (
 );
 
 fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {
-    [PRE_METADATA_PARITY, GENERATED_METADATA_PARITY, DRAIN_METADATA_PARITY]
-        .into_iter()
-        .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))
-        .map(|cohort| cohort.3)
+    [
+        PRE_METADATA_PARITY,
+        GENERATED_METADATA_PARITY,
+        DRAIN_METADATA_PARITY,
+    ]
+    .into_iter()
+    .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))
+    .map(|cohort| cohort.3)
 }
 
 fn assert_eventwise_parity_contract(

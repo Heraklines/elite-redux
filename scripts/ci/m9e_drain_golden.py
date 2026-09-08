@@ -274,14 +274,14 @@ def main(summary):
         if os.environ.get(key):
             raise RuntimeError("ordinary default stack/threads and no injected compiler flags required")
     exact_test = (ROOT / TEST_SOURCE).read_bytes()
-    if len(exact_test) != 29829 or hashlib.sha256(exact_test).hexdigest() != "60df53d1e47f7bacb6dba584f4b9faab95b6cc5dac57d666d8e2043fdf8270d4":
+    if len(exact_test) != 29848 or hashlib.sha256(exact_test).hexdigest() != "872a38b8774ef72e2e16c18c085d71a8714f8d54d9a7306d3cadfb48f231e977":
         raise RuntimeError("exact audited third content cohort source required")
     addition = DRAIN_CONSTANT.encode()
     if exact_test.count(addition) != 1:
         raise RuntimeError("exact single added drain cohort required")
     original = exact_test.replace(addition, b"").replace(
-        b"[PRE_METADATA_PARITY, GENERATED_METADATA_PARITY, DRAIN_METADATA_PARITY]",
-        b"[PRE_METADATA_PARITY, GENERATED_METADATA_PARITY]")
+        "fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {\n    [\n        PRE_METADATA_PARITY,\n        GENERATED_METADATA_PARITY,\n        DRAIN_METADATA_PARITY,\n    ]\n    .into_iter()\n    .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))\n    .map(|cohort| cohort.3)\n}\n\n".encode(),
+        "fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {\n    [PRE_METADATA_PARITY, GENERATED_METADATA_PARITY]\n        .into_iter()\n        .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))\n        .map(|cohort| cohort.3)\n}\n\n".encode())
     if hashlib.sha256(original).hexdigest() != "625fdc6fd7ee0e8ef45bde564f4aa584b4edbb390ad0d1bd557509bdc7a5d750":
         raise RuntimeError("all original request, reference assertions, and prior constants must remain exact")
     os.environ.update(PROFILE)
