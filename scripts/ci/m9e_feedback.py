@@ -2923,7 +2923,7 @@ if __name__ == "__main__":
     if preflight.returncode:
         with (FULL / "harness-tests.log").open("rb") as stream:
             stream.seek(0, os.SEEK_END)
-            stream.seek(max(0, stream.tell() - 8192))
-            tail = stream.read(8192).decode("utf-8", errors="replace")
+            stream.seek(max(0, stream.tell() - 3000))
+            tail = stream.read(3000).decode("utf-8", errors="replace")
         failure = "feedback harness self-tests failed; bounded tail (full log remains remote):\n" + tail
     sys.exit(main(failure))
