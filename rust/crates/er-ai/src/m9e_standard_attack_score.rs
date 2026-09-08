@@ -13,7 +13,11 @@ pub fn standard_attack_score(damage: u32, max_hp: u32, hp: u32, accuracy: i16) -
     if damage == 0 {
         return 0.0;
     }
-    let accuracy_factor = f64::from(if accuracy <= 0 { 100 } else { accuracy.min(100) }) / 100.0;
+    let accuracy_factor = f64::from(if accuracy <= 0 {
+        100
+    } else {
+        accuracy.min(100)
+    }) / 100.0;
     let fraction = f64::from(damage) / f64::from(max_hp.max(1));
     let mut score = fraction * 75.0 * accuracy_factor;
     if damage >= hp {
