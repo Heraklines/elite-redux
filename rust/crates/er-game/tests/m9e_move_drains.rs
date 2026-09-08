@@ -399,23 +399,42 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
     let recoil_baseline: serde_json::Value = serde_json::from_str(RECOIL_BASELINE)?;
     assert_eq!(recoil_baseline["schema_version"], 1);
     assert_eq!(recoil_baseline["program_count"], 3691);
-    assert_eq!(er_canonical::content_digest(&after.programs[..3691].to_vec())?, recoil_baseline["programs_digest"].as_str().ok_or("recoil prefix")?);
-    let recoil_rows = recoil_baseline["admitted_classifications"].as_array().ok_or("recoil rows")?;
+    assert_eq!(
+        er_canonical::content_digest(&after.programs[..3691].to_vec())?,
+        recoil_baseline["programs_digest"]
+            .as_str()
+            .ok_or("recoil prefix")?
+    );
+    let recoil_rows = recoil_baseline["admitted_classifications"]
+        .as_array()
+        .ok_or("recoil rows")?;
     assert_eq!(recoil_rows.len(), 6);
     let rows = restored.as_array_mut().ok_or("classification array")?;
     let mut recoil_ids = Vec::new();
     for old in recoil_rows {
-        let matches = rows.iter_mut().filter(|row| row["behavior_unit"] == old["behavior_unit"]).collect::<Vec<_>>();
+        let matches = rows
+            .iter_mut()
+            .filter(|row| row["behavior_unit"] == old["behavior_unit"])
+            .collect::<Vec<_>>();
         assert_eq!(matches.len(), 1);
         let row = matches.into_iter().next().ok_or("compiled recoil")?;
         assert_eq!(old["kind"], "BESPOKE");
         assert_eq!(row["kind"], "COMPILED");
-        recoil_ids.push(row["behavior_unit"]["source"]["numeric_id"].as_u64().ok_or("recoil id")?);
+        recoil_ids.push(
+            row["behavior_unit"]["source"]["numeric_id"]
+                .as_u64()
+                .ok_or("recoil id")?,
+        );
         *row = old.clone();
     }
     recoil_ids.sort_unstable();
     assert_eq!(recoil_ids, [36, 66, 457, 528, 543, 617]);
-    assert_eq!(er_canonical::content_digest(&restored)?, recoil_baseline["classifications_digest"].as_str().ok_or("original recoil classes")?);
+    assert_eq!(
+        er_canonical::content_digest(&restored)?,
+        recoil_baseline["classifications_digest"]
+            .as_str()
+            .ok_or("original recoil classes")?
+    );
     let rows = restored.as_array_mut().ok_or("classification array")?;
     let mut admitted = Vec::new();
     for old in old_classes {
