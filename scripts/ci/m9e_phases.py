@@ -63,6 +63,7 @@ IDENTITY_FILES = {
     "owned_host_16": "rust/crates/er-repro/tests/m9e_current_rebind_repro.rs",
     "owned_proposal_stack_test": "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs",
     "owned_foundation_inventory": "scripts/ci/m9e-owned-foundations-inventory.json",
+    "current_damage_query": "rust/crates/er-game/tests/m9e_damage_query.rs",
     "recovery_preflight": "scripts/ci/m9e_recovery_preflight.py",
     "owned_foundation_0": "rust/crates/er-game/src/m9e_content_v2.rs",
     "owned_foundation_1": "rust/crates/er-game/src/m9e_material_v6.rs",

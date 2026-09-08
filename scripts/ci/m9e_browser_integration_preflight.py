@@ -77,11 +77,11 @@ def main():
                     or plan.get("requires_browser_worker") is not True
                     or plan.get("requires_current_coop_startup") is not True
                     or plan["unknown_paths"] or plan["boundary_paths"]
-                    or len(inventory) != 105 or sum(len(row["ids"]) for row in inventory) != 803
-                    or sum(map(len, plan["required_native_targets"].values())) != 61
-                    or len(plan["required_native_test_ids"]) != 55
-                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 55):
-                raise RuntimeError("actual803 full source plan or Browser obligations differ")
+                    or len(inventory) != 106 or sum(len(row["ids"]) for row in inventory) != 809
+                    or sum(map(len, plan["required_native_targets"].values())) != 62
+                    or len(plan["required_native_test_ids"]) != 56
+                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 56):
+                raise RuntimeError("actual809 full source plan or Browser obligations differ")
             for row in inventory:
                 if not ("*" in plan["execution_scope"].get(row["crate"], [])
                         or row["target"] in plan["execution_scope"].get(row["crate"], [])):
@@ -91,10 +91,10 @@ def main():
             lane_counts = {lane: sum(len(row["ids"]) for row in inventory
                                      if [row["crate"], row["target"]] in targets)
                            for lane, targets in partitions.items()}
-            if lane_counts != {"a": 685, "b": 14, "c": 14, "d": 87, "e": 3}:
+            if lane_counts != {"a": 691, "b": 14, "c": 14, "d": 87, "e": 3}:
                 raise RuntimeError("exact whole-target balanced lane assignment differs")
-            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 803, "targets": 105, "required_targets": 61,
-                       "exact_maps": 55, "owned_sources": 55,
+            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 809, "targets": 106, "required_targets": 62,
+                       "exact_maps": 56, "owned_sources": 56,
                        "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                        "browser_binding": expected_binding}
         except Exception as error:

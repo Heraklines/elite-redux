@@ -5283,7 +5283,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
-        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 6, 6, 8, 9, 11])
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 6, 6, 6, 8, 9, 11])
         for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
             crate, target = key.split(":")
             self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
@@ -11300,8 +11300,8 @@ class OwnedFoundationContractTests(unittest.TestCase):
             self.feedback.validate_owned_foundation_inventory(absent, self.inventory)
 
     def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
-        self.assertEqual(len(self.inventory), 105)
-        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 803)
+        self.assertEqual(len(self.inventory), 106)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 809)
         for change in ("remove", "rename", "exclude", "extra"):
             rows = copy.deepcopy(self.inventory)
             old = next(row for row in rows if row["crate"] == "er-canonical")
@@ -11313,12 +11313,12 @@ class OwnedFoundationContractTests(unittest.TestCase):
                 old["historical_excluded_ids"].append(old["ids"].pop())
             else:
                 rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
-            with self.assertRaisesRegex(RuntimeError, "complete803/105"):
+            with self.assertRaisesRegex(RuntimeError, "complete809/106"):
                 self.feedback.validate_owned_foundation_inventory(self.plan, rows)
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 55)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 56)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)

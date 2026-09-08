@@ -919,6 +919,11 @@ fn calculate_damage_with_variance(
     } else {
         type_effectiveness(content, definition.move_type, target)
     };
+    // The pinned damage calculation returns immunity before damage variance.
+    // A true zero multiplier must not become the minimum one point of damage.
+    if effectiveness.0 == 0 {
+        return Ok(0);
+    }
     damage = damage
         .checked_mul(effectiveness.0)
         .and_then(|value| value.checked_div(effectiveness.1))
