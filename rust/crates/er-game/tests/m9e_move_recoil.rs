@@ -468,9 +468,12 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
             .0
             .iter()
             .filter(|row| {
-                [38, 165, 344, 394, 413, 452, 834, 835]
-                    .iter()
-                    .any(|id| row.behavior_unit.source == BehaviorSourceId::Move { numeric_id: safe(*id) })
+                [38, 165, 344, 394, 413, 452, 834, 835].iter().any(|id| {
+                    row.behavior_unit.source
+                        == BehaviorSourceId::Move {
+                            numeric_id: safe(*id),
+                        }
+                })
             })
             .collect::<Vec<_>>();
         let metadata = serde_json::json!({

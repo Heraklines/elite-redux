@@ -12,7 +12,7 @@ import time
 BASE = "339af2ce53399d1f5e3aec6ff045c71292946293"
 SOURCE = "rust/crates/er-game/tests/m9e_move_recoil.rs"
 CI = [".github/workflows/m9e-recoil-baseline-focused.yml", "scripts/ci/m9e_recoil_baseline.py"]
-DELTAS = json.loads(r'''{"before":{"rust/crates/er-game/tests/m9e_move_recoil.rs":"34d43c19eee89efb99ac218e615613ebea64b3ace0f46c853b7caf59990bd9ea"},"after":{"rust/crates/er-game/tests/m9e_move_recoil.rs":"fce4396029cbf1ff576efc0220524fe392c636d7dd42936a80fb56d390d29102"}}''')
+DELTAS = json.loads(r'''{"before":{"rust/crates/er-game/tests/m9e_move_recoil.rs":"34d43c19eee89efb99ac218e615613ebea64b3ace0f46c853b7caf59990bd9ea"},"after":{"rust/crates/er-game/tests/m9e_move_recoil.rs":"3204bf8999a530bd8d881fca52dc6a830d8a07705e380611bc1e383cb625316a"}}''')
 ROOT = Path.cwd().resolve()
 RUNNER = Path(os.environ["RUNNER_TEMP"]).resolve()
 OUT = RUNNER / "m9e-recoil-baseline"
