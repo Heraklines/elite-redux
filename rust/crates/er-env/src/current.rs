@@ -20,9 +20,73 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Dedicated current rebind control; it never represents a gameplay operation.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
+pub enum CurrentCoopRebindEventV1 {
+    Begin,
+    Retry,
+    Receive {
+        generation: ConnectionGeneration,
+        bytes: Vec<u8>,
+    },
+}
+
+// Empty struct variants reject extra map fields; serde unit variants do not.
+#[derive(Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
+enum CurrentCoopRebindWireV1 {
+    Begin {},
+    Retry {},
+    Receive {
+        generation: ConnectionGeneration,
+        bytes: Vec<u8>,
+    },
+}
+
+impl<'de> Deserialize<'de> for CurrentCoopRebindEventV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match CurrentCoopRebindWireV1::deserialize(deserializer)? {
+            CurrentCoopRebindWireV1::Begin {} => Self::Begin,
+            CurrentCoopRebindWireV1::Retry {} => Self::Retry,
+            CurrentCoopRebindWireV1::Receive { generation, bytes } => {
+                Self::Receive { generation, bytes }
+            }
+        })
+    }
+}
+
+/// Lossless adapter representation of the actual native rebind output.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentSessionRebindOutputV1 {
+    pub generation: ConnectionGeneration,
+    pub frames: Vec<Vec<u8>>,
+}
+
+impl From<er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindOutputV1>
+    for CurrentSessionRebindOutputV1
+{
+    fn from(
+        output: er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindOutputV1,
+    ) -> Self {
+        Self {
+            generation: output.generation,
+            frames: output.frames,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum CurrentExternalEvent {
+    /// Chronological capture tag. Execute only through apply_rebind, never apply.
+    CoopRebind {
+        control: CurrentCoopRebindEventV1,
+    },
     RetryCoopSetup,
     RawInput {
         input: RawInputEvent,
@@ -280,6 +344,44 @@ impl CurrentGameSession {
         Ok(response)
     }
 
+    pub fn apply_rebind(
+        &mut self,
+        control: CurrentCoopRebindEventV1,
+    ) -> Result<CurrentSessionRebindOutputV1, CurrentSessionError> {
+        self.apply_rebind_with(control, |_, output| Ok(output))
+    }
+
+    /// Commit the actual control transaction only after response admission succeeds.
+    /// The callback must defer external frame delivery until this method succeeds.
+    pub fn apply_rebind_with<R, E>(
+        &mut self,
+        control: CurrentCoopRebindEventV1,
+        finish: impl FnOnce(&Self, CurrentSessionRebindOutputV1) -> Result<R, E>,
+    ) -> Result<R, E>
+    where
+        E: From<CurrentSessionError>,
+    {
+        let mut candidate = self.fork().map_err(E::from)?;
+        let kernel = candidate
+            .kernel
+            .as_mut()
+            .ok_or(CurrentSessionError::Disposed)
+            .map_err(E::from)?;
+        let output = match control {
+            CurrentCoopRebindEventV1::Begin => kernel.begin_current_coop_rebind_v1(),
+            CurrentCoopRebindEventV1::Retry => kernel.retry_current_coop_rebind_v1(),
+            CurrentCoopRebindEventV1::Receive { generation, bytes } => {
+                kernel.receive_current_coop_rebind_v1(generation, &bytes)
+            }
+        }
+        .map_err(CurrentSessionError::from)
+        .map_err(E::from)?;
+        candidate.validate().map_err(E::from)?;
+        let response = finish(&candidate, output.into())?;
+        self.kernel = candidate.kernel;
+        Ok(response)
+    }
+
     pub fn fork(&self) -> Result<Self, CurrentSessionError> {
         self.kernel()?;
         Ok(self.clone())
@@ -314,6 +416,7 @@ fn reduce(
     event: CurrentExternalEvent,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
     match event {
+        CurrentExternalEvent::CoopRebind { .. } => Err(GameKernelV7Error::Invalid),
         CurrentExternalEvent::RetryCoopSetup => kernel.retry_current_coop_setup(),
         CurrentExternalEvent::RawInput { input } => kernel.raw_input(input),
         CurrentExternalEvent::AdvanceTime { milliseconds } => kernel.advance_time(milliseconds),

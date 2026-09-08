@@ -1,7 +1,9 @@
 //! Standalone native diagnostics. Capture failures never undo accepted gameplay.
 
 use er_agent_protocol::{AgentDispatchErrorV1, AgentResponseContextV1};
-use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError,
+};
 use er_repro::current::{
     CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1, CurrentReproRecorderV1,
 };
@@ -122,6 +124,68 @@ impl NativeCapture {
             return Ok(unavailable);
         };
         Self::checkpoint(session, self.limits, position)
+    }
+
+    pub(crate) fn apply_rebind(
+        &mut self,
+        session: &mut CurrentGameSession,
+        control: CurrentCoopRebindEventV1,
+        origin: &str,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
+        let before = match session.snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                self.gap("native pre-rebind snapshot unavailable");
+                return Err(backend(error));
+            }
+        };
+        let result = session.apply_rebind_with(control.clone(), |candidate, output| {
+            let observation = candidate
+                .observe()
+                .map_err(|error| ApplyError::Adapter(backend(error)))?;
+            let after = candidate
+                .snapshot()
+                .map_err(|error| ApplyError::Adapter(backend(error)))?;
+            let response = json!({"rebind": output, "observation": observation});
+            context
+                .admit_inline_success(&response)
+                .map_err(ApplyError::Adapter)?;
+            Ok((response, output, observation, after))
+        });
+        match result {
+            Ok((response, output, observation, after)) => {
+                let _ = self.recorder.record_rebind_with_origin(
+                    &before,
+                    control,
+                    Ok(&output),
+                    &after,
+                    &observation,
+                    Some(origin),
+                );
+                Ok(response)
+            }
+            Err(ApplyError::Kernel(error)) => {
+                match session.observe() {
+                    Ok(observation) => {
+                        let _ = self.recorder.record_rebind_with_origin(
+                            &before,
+                            control,
+                            Err(&error),
+                            &before,
+                            &observation,
+                            Some(origin),
+                        );
+                    }
+                    Err(_) => self.gap("native rebind rejection observation unavailable"),
+                }
+                Err(backend(error))
+            }
+            Err(ApplyError::Adapter(error)) => {
+                self.gap("native rebind response preparation rejected");
+                Err(error)
+            }
+        }
     }
 
     pub(crate) fn apply(

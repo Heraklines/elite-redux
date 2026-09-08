@@ -33,6 +33,23 @@ AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "owned_host_0": "rust/crates/er-agent-protocol/src/lib.rs",
+    "owned_host_1": "rust/crates/er-cli/src/current_agent.rs",
+    "owned_host_2": "rust/crates/er-cli/src/current_native_capture.rs",
+    "owned_host_3": "rust/crates/er-cli/tests/m9e_current_coop_rebind.rs",
+    "owned_host_4": "rust/crates/er-cli/tests/support/m9e_coop_cli_process.rs",
+    "owned_host_5": "rust/crates/er-env/src/current.rs",
+    "owned_host_6": "rust/crates/er-kernel-worker/src/protocol_v2.rs",
+    "owned_host_7": "rust/crates/er-kernel-worker/src/runtime_v2.rs",
+    "owned_host_8": "rust/crates/er-lab/Cargo.toml",
+    "owned_host_9": "rust/crates/er-lab/src/kernel_reload/endpoint_v2.rs",
+    "owned_host_10": "rust/crates/er-lab/src/kernel_reload/supervisor_v2.rs",
+    "owned_host_11": "rust/crates/er-lab/src/kernel_reload/types_v2.rs",
+    "owned_host_12": "rust/crates/er-lab/tests/current_worker_rebind_v2.rs",
+    "owned_host_13": "rust/crates/er-progression/src/current_friendship_owner.rs",
+    "owned_host_14": "rust/crates/er-progression/tests/m9e_owned_friendship.rs",
+    "owned_host_15": "rust/crates/er-repro/src/current.rs",
+    "owned_host_16": "rust/crates/er-repro/tests/m9e_current_rebind_repro.rs",
     "owned_proposal_stack_test": "rust/crates/er-kernel/tests/m9e_current_proposal_v7.rs",
     "owned_foundation_inventory": "scripts/ci/m9e-owned-foundations-inventory.json",
     "recovery_preflight": "scripts/ci/m9e_recovery_preflight.py",
@@ -185,7 +202,7 @@ STATE_QUERY_TARGET = ("er-cli", "m9e_current_state_query")
 STATE_QUERY_WORKER_TARGET = ("er-cli", "m9e_current_state_query_worker")
 STATE_QUERY_TEST_IDS = ["current_state_queries_preserve_natural_and_controlled_terminal_snapshots_and_capture",
                         "worker_state_queries_bind_exact_current_snapshots_and_preserve_rejections"]
-LANE_B_TARGETS = {("er-cli", "m9e_current_repro"),
+LANE_B_TARGETS = {("er-repro", "m9e_current_rebind_repro"), ("er-cli", "m9e_current_coop_rebind"), ("er-lab", "current_worker_rebind_v2"), ("er-progression", "m9e_owned_friendship"), ("er-cli", "m9e_current_repro"),
                   ("er-cli", "m9e_current_reload"), STATE_QUERY_WORKER_TARGET}
 # Whole long-running targets use a third existing GitHub Actions job. Each
 # target keeps its original profile, complete IDs and 600-second execution cap.

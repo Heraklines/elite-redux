@@ -6,7 +6,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use er_env::current::{CurrentExternalEvent, CurrentGameObservation};
+use er_env::current::{CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameObservation};
 use er_game::m9e_content_v2::GameContentBundleV2;
 use er_kernel::game_kernel_v7::GameKernelRoleV7;
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
-    ChildKernelGenerationV2, CurrentGenerationStepV2, KernelEndpointErrorV2,
-    VerifiedKernelExecutableV2,
+    ChildKernelGenerationV2, CurrentGenerationRebindV2, CurrentGenerationStepV2,
+    KernelEndpointErrorV2, VerifiedKernelExecutableV2,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +51,14 @@ pub struct CurrentDispatchV2 {
     /// Logical external-event position, independent of worker IPC sequence.
     pub position: u64,
     pub evidence: CurrentGenerationStepV2,
+    pub retention: CurrentTraceRetentionV2,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentRebindDispatchV2 {
+    pub position: u64,
+    pub evidence: CurrentGenerationRebindV2,
     pub retention: CurrentTraceRetentionV2,
 }
 
@@ -135,10 +143,19 @@ pub enum CurrentReloadErrorV2 {
 }
 
 #[derive(Debug)]
+enum RetainedCurrentEvidenceV2 {
+    Ordinary(CurrentGenerationStepV2),
+    Rebind {
+        evidence: CurrentGenerationRebindV2,
+        maximum_inline_result_bytes: usize,
+    },
+}
+
+#[derive(Debug)]
 struct RetainedEventV2 {
     position: u64,
     event: CurrentExternalEvent,
-    evidence: CurrentGenerationStepV2,
+    evidence: RetainedCurrentEvidenceV2,
     encoded_bytes: usize,
 }
 
@@ -247,7 +264,7 @@ impl CurrentKernelSupervisorV2 {
                 self.tail.push_back(RetainedEventV2 {
                     position,
                     event,
-                    evidence: evidence.clone(),
+                    evidence: RetainedCurrentEvidenceV2::Ordinary(evidence.clone()),
                     encoded_bytes,
                 });
                 CurrentTraceRetentionV2::Retained
@@ -258,6 +275,65 @@ impl CurrentKernelSupervisorV2 {
             }
         };
         Ok(CurrentDispatchV2 {
+            position,
+            evidence,
+            retention,
+        })
+    }
+
+    /// Preserve dedicated rebind output in the process replay tail. The caller
+    /// must derive its inline-result budget before dispatch, and publish frames
+    /// only after this accepted result returns.
+    pub fn dispatch_rebind(
+        &mut self,
+        control: CurrentCoopRebindEventV1,
+        maximum_inline_result_bytes: usize,
+    ) -> Result<CurrentRebindDispatchV2, CurrentReloadErrorV2> {
+        let position = self
+            .frontier
+            .checked_add(1)
+            .ok_or(CurrentReloadErrorV2::PositionExhausted)?;
+        let evidence = self
+            .active
+            .apply_rebind(control.clone(), maximum_inline_result_bytes)?;
+        self.frontier = position;
+        let event = CurrentExternalEvent::CoopRebind { control };
+        // As with ordinary dispatch, a postcommit retention failure is an
+        // explicit accepted gap and expires older tickets; never a rejection.
+        let encoded_bytes =
+            serde_json::to_vec(&(position, &event, &evidence, maximum_inline_result_bytes))
+                .ok()
+                .map(|bytes| bytes.len());
+        let retention = match encoded_bytes {
+            Some(encoded_bytes) if encoded_bytes <= self.limits.maximum_bytes => {
+                while self.tail.len() >= self.limits.maximum_events
+                    || self.retained_bytes + encoded_bytes > self.limits.maximum_bytes
+                {
+                    if let Some(evicted) = self.tail.pop_front() {
+                        self.retained_bytes -= evicted.encoded_bytes;
+                        self.oldest_frontier = evicted.position;
+                    } else {
+                        break;
+                    }
+                }
+                self.retained_bytes += encoded_bytes;
+                self.tail.push_back(RetainedEventV2 {
+                    position,
+                    event,
+                    evidence: RetainedCurrentEvidenceV2::Rebind {
+                        evidence: evidence.clone(),
+                        maximum_inline_result_bytes,
+                    },
+                    encoded_bytes,
+                });
+                CurrentTraceRetentionV2::Retained
+            }
+            _ => {
+                self.clear_tail();
+                CurrentTraceRetentionV2::Gap
+            }
+        };
+        Ok(CurrentRebindDispatchV2 {
             position,
             evidence,
             retention,
@@ -323,7 +399,24 @@ impl CurrentKernelSupervisorV2 {
                 });
             }
             // Quarantine: no candidate effect is exposed through the public API.
-            if candidate.apply(retained.event.clone())? != retained.evidence {
+            let matches = match (&retained.event, &retained.evidence) {
+                (
+                    CurrentExternalEvent::CoopRebind { control },
+                    RetainedCurrentEvidenceV2::Rebind {
+                        evidence,
+                        maximum_inline_result_bytes,
+                    },
+                ) => {
+                    candidate.apply_rebind(control.clone(), *maximum_inline_result_bytes)?
+                        == *evidence
+                }
+                (CurrentExternalEvent::CoopRebind { .. }, _) => false,
+                (event, RetainedCurrentEvidenceV2::Ordinary(evidence)) => {
+                    candidate.apply(event.clone())? == *evidence
+                }
+                (_, RetainedCurrentEvidenceV2::Rebind { .. }) => false,
+            };
+            if !matches {
                 return Err(CurrentReloadErrorV2::Divergence {
                     position: retained.position,
                     kind: "ordered effects or observation",

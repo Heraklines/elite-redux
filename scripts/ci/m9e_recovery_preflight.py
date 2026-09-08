@@ -40,7 +40,7 @@ def main():
     for row in owned_inventory:
         scope = plan["execution_scope"].get(row["crate"], [])
         if row["crate"] not in plan["packages"] or not ("*" in scope or row["target"] in scope):
-            raise RuntimeError("complete786 inventory has an unselected target: " + row["crate"] + ":" + row["target"])
+            raise RuntimeError("complete799 inventory has an unselected target: " + row["crate"] + ":" + row["target"])
     feedback.validate_owned_foundation_sources(feedback.ROOT)
     if feedback.digest(feedback.ROOT / "rust/crates/er-wasm/tests/m9e_parity.rs") != "95c09508d4ac63e3a401d2abd1a14725de8d85b1d5405f4de9d0e1999032ee6c":
         raise RuntimeError("reviewed generated-cohort parity source differs")
@@ -97,11 +97,11 @@ def main():
             or guard.get("dev_dependencies") != feedback.RECOVERY_DEV_EDGES
             or guard.get("manifests") != [f"rust/crates/{crate}/Cargo.toml" for crate in feedback.RECOVERY_DEV_EDGES]
             or guard.get("lock") != "rust/Cargo.lock"):
-        raise RuntimeError("exact three test dependencies require a complete verified guard")
+        raise RuntimeError("exact five test dependencies require a complete verified guard")
     product = [path for path in plan["changed_paths"] if path not in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["infrastructure_paths"]
                and not any(path.startswith(prefix) for prefix in json.loads((feedback.ROOT / "scripts/ci/m9e-targets.json").read_bytes())["documentation_prefixes"])]
-    if len(product) != 67 or set(product) != set([*feedback.RECOVERY_PATHS, *generated.PATHS]):
-        raise RuntimeError("combined product source must be exactly the67 reviewed paths")
+    if len(product) != 84 or set(product) != set([*feedback.RECOVERY_PATHS, *generated.PATHS]):
+        raise RuntimeError("combined product source must be exactly the84 reviewed paths")
     # All fourteen focused XP IDs were newly selected: three source-existing
     # tests had not belonged to the actual prior93-target/741-ID inventory.
     if plan.get("requires_current_xp_metadata") is not True:
@@ -115,13 +115,13 @@ def main():
                 or plan["required_native_targets"].get(crate, []).count(target) != 1
                 or target not in plan["execution_scope"].get(crate, []) or crate not in plan["packages"]):
             raise RuntimeError("whole source-qualified XP target omitted or altered")
-    if (sum(map(len, plan["required_native_targets"].values())) != 57
-            or len(plan["required_native_test_ids"]) != 51):
+    if (sum(map(len, plan["required_native_targets"].values())) != 61
+            or len(plan["required_native_test_ids"]) != 55):
         raise RuntimeError("complete prior plus XP required target/identity inventory differs")
     owned_receipt = {"qualification": "source and planned inventory conservation only; combined execution pending",
                      "candidate_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-                     "selected_tests": 786, "selected_targets": 101, "prior_preserved_tests": 759,
-                     "required_targets": 57, "required_identity_maps": 51, "composition_paths": 67,
+                     "selected_tests": 799, "selected_targets": 105, "prior_preserved_tests": 759,
+                     "required_targets": 61, "required_identity_maps": 55, "composition_paths": 84,
                      "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                      "sources": {**feedback.OWNED_FOUNDATION_SOURCES,
                          "rust/crates/er-wasm/tests/m9e_parity.rs": ["5ca9785d1263803f4227be939f57bdb46b4f99cb",
@@ -224,7 +224,7 @@ def main():
     for crate, target in feedback.CAMPAIGN_TARGETS.items():
         projected["required_native_target_counts"][crate + ":" + target] = len(feedback.CAMPAIGN_TEST_IDS[crate])
     projected_test_count = sum(len(row["ids"]) for row in owned_inventory)
-    if projected_test_count != 786 or len(owned_inventory) != 101:
+    if projected_test_count != 799 or len(owned_inventory) != 105:
         raise RuntimeError("actual prior759 plus27 owned foundation identity accounting differs")
     projected["tests"] = {"selected": projected_test_count, "executed": projected_test_count, "passed": projected_test_count, "failed": 0, "skipped": 0}
     projected["required_native_target_counts"].update({key: len(ids) for key, ids in feedback.XP_TEST_IDS.items()})
@@ -280,7 +280,7 @@ def main():
                "decoded_sha256": decoded_digest, "projected_tests": projected_test_count,
                "retained_sha256": hashlib.sha256(raw).hexdigest()}
     (Path(os.environ["RUNNER_TEMP"]) / "m9e-preflight/compact/compaction-projection.json").write_text(json.dumps(receipt, sort_keys=True) + "\n")
-    print("Passed: exact67-path source composition, all759 prior IDs/exclusions and27 additions across101 targets, qualified29 product sources, and retained co-op/platform/cost/rule/mutant obligations. No native/platform qualification.")
+    print("Passed: exact84-path source composition, all759 prior IDs/exclusions and40 additions across105 targets, qualified48 product sources, and retained co-op/platform/cost/rule/mutant obligations. No native/platform qualification.")
 
 
 if __name__ == "__main__":

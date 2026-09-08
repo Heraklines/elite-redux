@@ -1,6 +1,9 @@
 //! Current V7 worker ABI. V1 remains a separately selected historical protocol.
 
-use er_env::current::{CurrentExternalEvent, CurrentGameObservation};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameObservation,
+    CurrentSessionRebindOutputV1,
+};
 use er_game::m9e_content_v2::GameContentBundleV2;
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
@@ -141,6 +144,12 @@ pub enum KernelWorkerRequestV2 {
     /// Reuses the current event schema, including its existing nested-field serde behavior.
     /// This ABI does not tighten that shared event type's unknown-field handling.
     Apply(CurrentExternalEvent),
+    /// Dedicated control transaction. The result budget applies to the exact
+    /// {rebind, observation} subobject before the worker commits the candidate.
+    ApplyRebind {
+        control: CurrentCoopRebindEventV1,
+        maximum_inline_result_bytes: usize,
+    },
     Observe,
     Snapshot,
     ExportRepro,
@@ -211,6 +220,10 @@ pub enum KernelWorkerResponseV2 {
     },
     Effects {
         step: GameKernelStepV7,
+        observation: Box<CurrentGameObservation>,
+    },
+    RebindEffects {
+        output: CurrentSessionRebindOutputV1,
         observation: Box<CurrentGameObservation>,
     },
     Observation(Box<CurrentGameObservation>),
@@ -336,6 +349,13 @@ impl KernelWorkerRequestEnvelopeV2 {
             != request_fingerprint(identity, self.request_id, self.sequence, &self.request)?
         {
             return Err(KernelWorkerProtocolErrorV2::Fingerprint);
+        }
+        if let KernelWorkerRequestV2::ApplyRebind {
+            maximum_inline_result_bytes,
+            ..
+        } = &self.request
+        {
+            validate_success_response_bytes_v2(*maximum_inline_result_bytes)?;
         }
         let bytes = serde_json::to_vec(self)
             .map_err(|error| KernelWorkerProtocolErrorV2::Serialization(error.to_string()))?;

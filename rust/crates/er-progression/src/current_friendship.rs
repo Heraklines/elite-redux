@@ -212,6 +212,43 @@ pub fn plan_resolved_friendship(
     accounts: &[ExistingStarterAccount],
     resolved: Option<&ResolvedPositiveFriendship>,
 ) -> Result<FriendshipPlan, CurrentFriendshipError> {
+    let FriendshipHead { mut plan, has_tail } =
+        prepare_friendship_head(before_friendship, original_delta, accounts, resolved)?;
+    if !has_tail {
+        return Ok(plan);
+    }
+    let resolved = resolved.ok_or(CurrentFriendshipError::Input)?;
+    if plan.friendship >= 255.0 {
+        plan.intents
+            .push(FriendshipIntent::ValidateMaxFriendshipAchievement);
+        plan.intents
+            .push(FriendshipIntent::AwardFriendshipRibbonToSpeciesLine {
+                original_species: resolved.pokemon_species,
+            });
+    }
+    continue_friendship_tail(plan, resolved, None)
+}
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FriendshipHead {
+    pub(crate) plan: FriendshipPlan,
+    pub(crate) has_tail: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FriendshipCandyCall {
+    pub(crate) species: u32,
+    pub(crate) root: u32,
+    pub(crate) requested_count: i64,
+    pub(crate) before_candy: i64,
+    pub(crate) result: StarterCandyResult,
+}
+
+pub(crate) fn prepare_friendship_head(
+    before_friendship: f64,
+    original_delta: f64,
+    accounts: &[ExistingStarterAccount],
+    resolved: Option<&ResolvedPositiveFriendship>,
+) -> Result<FriendshipHead, CurrentFriendshipError> {
     safe(before_friendship)?;
     safe(original_delta)?;
     if !(0.0..=255.0).contains(&before_friendship) || accounts.len() > 4 {
@@ -224,7 +261,10 @@ pub fn plan_resolved_friendship(
     };
     if original_delta <= 0.0 {
         plan.friendship = safe(before_friendship + original_delta)?.max(0.0);
-        return Ok(plan);
+        return Ok(FriendshipHead {
+            plan,
+            has_tail: false,
+        });
     }
     let resolved = resolved.ok_or(CurrentFriendshipError::Input)?;
     safe(resolved.boosted_amount)?;
@@ -239,7 +279,10 @@ pub fn plan_resolved_friendship(
     };
     plan.friendship = capped.min(255.0);
     if resolved.fun_debug {
-        return Ok(plan);
+        return Ok(FriendshipHead {
+            plan,
+            has_tail: false,
+        });
     }
     if resolved.provenance.oracle_sha != FRIENDSHIP_ORACLE_SHA
         || resolved.provenance.resolution_sha256.len() != 64
@@ -266,14 +309,17 @@ pub fn plan_resolved_friendship(
         nonnegative_integer(entry.friendship_progress as f64)?;
         safe(entry.candy_count as f64)?;
     }
-    if plan.friendship >= 255.0 {
-        plan.intents
-            .push(FriendshipIntent::ValidateMaxFriendshipAchievement);
-        plan.intents
-            .push(FriendshipIntent::AwardFriendshipRibbonToSpeciesLine {
-                original_species: resolved.pokemon_species,
-            });
-    }
+    Ok(FriendshipHead {
+        plan,
+        has_tail: true,
+    })
+}
+
+pub(crate) fn continue_friendship_tail(
+    mut plan: FriendshipPlan,
+    resolved: &ResolvedPositiveFriendship,
+    mut observed: Option<&mut Vec<FriendshipCandyCall>>,
+) -> Result<FriendshipPlan, CurrentFriendshipError> {
     let mut multiplier = match resolved.mode {
         ResolvedFriendshipMode::Classic { candy_multiplier } => candy_multiplier,
         ResolvedFriendshipMode::NonClassic => 1.0,
@@ -309,6 +355,15 @@ pub fn plan_resolved_friendship(
                 false,
                 resolved.total_candy_rate,
             )?;
+            if let Some(calls) = observed.as_deref_mut() {
+                calls.push(FriendshipCandyCall {
+                    species: starter.source_root,
+                    root: starter.candy_account_root,
+                    requested_count: count as i64,
+                    before_candy,
+                    result: candy,
+                });
+            }
             if let Some(scaled_count) = candy.candy_bar_count {
                 plan.intents.push(FriendshipIntent::ShowStarterCandy {
                     root: starter.candy_account_root,

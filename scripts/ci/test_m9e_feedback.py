@@ -243,6 +243,7 @@ class FeedbackTests(unittest.TestCase):
         self.baseline_lock = None
         self.baseline_cli_manifest = None
         self.baseline_repro_manifest = None
+        self.baseline_lab_manifest = None
         self.baseline_progression_manifest = None
         self.baseline_batch_manifest = None
         self.capture_calls = []
@@ -289,6 +290,8 @@ class FeedbackTests(unittest.TestCase):
             return self.baseline_cli_manifest
         if args == ["git", "show", f"{BASE}:rust/crates/er-repro/Cargo.toml"] and self.baseline_repro_manifest is not None:
             return self.baseline_repro_manifest
+        if args == ["git", "show", f"{BASE}:rust/crates/er-lab/Cargo.toml"] and self.baseline_lab_manifest is not None:
+            return self.baseline_lab_manifest
         if args == ["git", "show", f"{BASE}:rust/crates/er-progression/Cargo.toml"] and self.baseline_progression_manifest is not None:
             return self.baseline_progression_manifest
         if args == ["git", "show", f"{BASE}:rust/crates/er-batch/Cargo.toml"] and self.baseline_batch_manifest is not None:
@@ -5079,13 +5082,13 @@ class FeedbackTests(unittest.TestCase):
     @staticmethod
     def recovery_lock_fixture(added):
         rows = ['version = 4\n']
-        for name in ("er-progression", "er-repro", "er-battle", "er-state", "sha2"):
-            dependencies = (["sha2"] if name == "er-progression" else ["er-battle", "er-state"] if name == "er-repro" else []) if added else []
+        for name in ("er-progression", "er-repro", "er-lab", "er-battle", "er-state", "er-protocol", "sha2"):
+            dependencies = ({"er-progression": ["sha2"], "er-repro": ["er-battle", "er-protocol", "er-state"], "er-lab": ["er-protocol"]}.get(name, [])) if added else []
             rows.append(f'[[package]]\nname = "{name}"\nversion = "0.1.0"\ndependencies = {json.dumps(dependencies)}\n')
         return '\n'.join(rows)
 
     def recovery_dependency_inputs(self):
-        return ({"er-progression": self.baseline_progression_manifest, "er-repro": self.baseline_repro_manifest},
+        return ({"er-progression": self.baseline_progression_manifest, "er-repro": self.baseline_repro_manifest, "er-lab": self.baseline_lab_manifest},
                 {crate: (self.rust / f"crates/{crate}/Cargo.toml").read_text() for crate in self.feedback.RECOVERY_DEV_EDGES},
                 self.baseline_lock, (self.rust / "Cargo.lock").read_text())
 
@@ -5118,7 +5121,7 @@ class FeedbackTests(unittest.TestCase):
         self.configure_recovery_integration_scope()
         original = self.recovery_dependency_inputs()
         for replacement in (original[3].replace('version = "0.1.0"', 'version = "0.2.0"', 1),
-                            original[3].replace('["er-battle", "er-state"]', '["er-state"]'),
+                            original[3].replace('["er-battle", "er-protocol", "er-state"]', '["er-protocol", "er-state"]'),
                             original[3] + '\n[[package]]\nname = "unreviewed"\nversion = "1.0.0"\n'):
             with self.assertRaisesRegex(RuntimeError, "lock"):
                 self.feedback.recovery_dependency_guard(*original[:3], replacement)
@@ -5225,7 +5228,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 62)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 79)
         self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
@@ -5315,6 +5318,8 @@ class FeedbackTests(unittest.TestCase):
         self.package("er-rng")
         self.package("er-state")
         self.package("er-save")
+        self.package("er-lab")
+        self.package("er-protocol")
         self.config["current_recovery_integration"] = copy.deepcopy(self.feedback.RECOVERY_POLICY)
         for name in self.feedback.XP_PATHS:
             path = self.root / name
@@ -5330,10 +5335,12 @@ class FeedbackTests(unittest.TestCase):
         rule_fixture(self.root)
         self.baseline_progression_manifest = (self.rust / "crates/er-progression/Cargo.toml").read_text()
         self.baseline_repro_manifest = (self.rust / "crates/er-repro/Cargo.toml").read_text()
+        self.baseline_lab_manifest = (self.rust / "crates/er-lab/Cargo.toml").read_text()
         self.baseline_lock = self.recovery_lock_fixture(False)
         (self.rust / "Cargo.lock").write_text(self.recovery_lock_fixture(True))
         (self.rust / "crates/er-progression/Cargo.toml").write_text(self.baseline_progression_manifest + '\n[dev-dependencies]\nsha2.workspace = true\n')
-        (self.rust / "crates/er-repro/Cargo.toml").write_text(self.baseline_repro_manifest + '\n[dev-dependencies]\ner-battle = { path = "../er-battle" }\ner-state = { path = "../er-state" }\n')
+        (self.rust / "crates/er-repro/Cargo.toml").write_text(self.baseline_repro_manifest + '\n[dev-dependencies]\ner-battle = { path = "../er-battle" }\ner-protocol = { path = "../er-protocol" }\ner-state = { path = "../er-state" }\n')
+        (self.rust / "crates/er-lab/Cargo.toml").write_text(self.baseline_lab_manifest + '\n[dev-dependencies]\ner-protocol = { path = "../er-protocol" }\n')
         self.changed = list(self.feedback.RECOVERY_PATHS)
 
     def test_recovery_composition_keeps_all_exact_regressions_and_platform_obligations(self):
@@ -11285,8 +11292,8 @@ class OwnedFoundationContractTests(unittest.TestCase):
             self.feedback.validate_owned_foundation_inventory(absent, self.inventory)
 
     def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
-        self.assertEqual(len(self.inventory), 101)
-        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 786)
+        self.assertEqual(len(self.inventory), 105)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 799)
         for change in ("remove", "rename", "exclude", "extra"):
             rows = copy.deepcopy(self.inventory)
             old = next(row for row in rows if row["crate"] == "er-canonical")
@@ -11298,12 +11305,12 @@ class OwnedFoundationContractTests(unittest.TestCase):
                 old["historical_excluded_ids"].append(old["ids"].pop())
             else:
                 rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
-            with self.assertRaisesRegex(RuntimeError, "complete786/101"):
+            with self.assertRaisesRegex(RuntimeError, "complete799/105"):
                 self.feedback.validate_owned_foundation_inventory(self.plan, rows)
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 28)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 47)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)

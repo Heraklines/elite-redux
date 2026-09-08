@@ -9,7 +9,9 @@ use er_agent_protocol::{
     AgentDispatchErrorV1, AgentDispatcherV1, AgentErrorCodeV1, AgentJsonlServerV1,
     AgentProtocolLimitsV1, AgentRequestV1, AgentResponseContextV1,
 };
-use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError,
+};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, KernelPresentationOutcomeV2};
 use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
@@ -89,6 +91,13 @@ struct CurrentStateRequest {
     session: String,
     query: Value,
     maximum_bytes: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CurrentRebindRequest {
+    session: String,
+    control: CurrentCoopRebindEventV1,
 }
 
 #[derive(Debug)]
@@ -253,6 +262,34 @@ impl CurrentDispatcher {
         }
     }
 
+    fn apply_rebind(
+        &mut self,
+        params: &Value,
+        origin: &str,
+        context: AgentResponseContextV1<'_>,
+    ) -> Result<Value, AgentDispatchErrorV1> {
+        let request: CurrentRebindRequest =
+            serde_json::from_value(params.clone()).map_err(invalid_error)?;
+        let id = self.session_id(params)?.to_owned();
+        if request.session != id {
+            return Err(invalid("current rebind session differs"));
+        }
+        match self
+            .sessions
+            .get_mut(&id)
+            .ok_or_else(|| backend("current session missing or closed"))?
+        {
+            CurrentBackend::Native(session) => self
+                .captures
+                .get_mut(&id)
+                .ok_or_else(|| backend("native capture owner missing"))?
+                .apply_rebind(session, request.control, origin, context),
+            CurrentBackend::Worker(_) => Err(invalid(
+                "current cooperative rebind requires the in-process backend",
+            )),
+        }
+    }
+
     fn ingress_gap(&mut self, method: Option<&str>, params: Option<&Value>, reason: &str) {
         if method.is_some_and(|method| {
             method.starts_with("batch.")
@@ -382,6 +419,7 @@ impl AgentDispatcherV1 for CurrentDispatcher {
                 | "session.advance_time"
                 | "session.network_frame"
                 | "session.coop.retry"
+                | "session.coop.rebind"
                 | "session.transport_changed"
                 | "session.presentation_settled"
                 | "session.storage_result"
@@ -627,6 +665,7 @@ impl CurrentDispatcher {
                 method, context,
             ),
             "session.coop.retry" => self.apply(params, CurrentExternalEvent::RetryCoopSetup, method, context),
+            "session.coop.rebind" => self.apply_rebind(params, method, context),
             "session.network_frame" => self.apply(
                 params,
                 CurrentExternalEvent::NetworkFrame {

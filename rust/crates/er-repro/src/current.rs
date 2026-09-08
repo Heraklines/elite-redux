@@ -9,7 +9,8 @@ use std::sync::Arc;
 
 use er_canonical::content_digest;
 use er_env::current::{
-    CurrentExternalEvent, CurrentGameObservation, CurrentGameSession, CurrentSessionError,
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameObservation, CurrentGameSession,
+    CurrentSessionError, CurrentSessionRebindOutputV1,
 };
 use er_game::m9e_content_v2::PreparedGameContentV2;
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelStepV7};
@@ -86,6 +87,11 @@ impl CurrentReproRejectionV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum CurrentReproOutcomeV1 {
+    RebindApplied {
+        output: Box<CurrentSessionRebindOutputV1>,
+        observation: Box<CurrentGameObservation>,
+        snapshot_digest: String,
+    },
     Applied {
         step: Box<GameKernelStepV7>,
         observation: Box<CurrentGameObservation>,
@@ -102,6 +108,11 @@ impl CurrentReproOutcomeV1 {
     fn evidence(&self) -> (&CurrentGameObservation, &str) {
         match self {
             Self::Applied {
+                observation,
+                snapshot_digest,
+                ..
+            }
+            | Self::RebindApplied {
                 observation,
                 snapshot_digest,
                 ..
@@ -197,6 +208,16 @@ impl CurrentReproCapsuleV1 {
             {
                 return Err(divergence(position, "origin bound"));
             }
+            let rebind = matches!(&attempt.event, CurrentExternalEvent::CoopRebind { .. });
+            match &attempt.outcome {
+                CurrentReproOutcomeV1::RebindApplied { .. } if !rebind => {
+                    return Err(divergence(position, "event/outcome kind"));
+                }
+                CurrentReproOutcomeV1::Applied { .. } if rebind => {
+                    return Err(divergence(position, "event/outcome kind"));
+                }
+                _ => {}
+            }
             if let CurrentReproOutcomeV1::KernelRejected { error, .. } = &attempt.outcome
                 && error.message.len() > MAXIMUM_ERROR_BYTES
             {
@@ -252,6 +273,28 @@ pub enum CurrentReproErrorV1 {
     Divergence { position: u64, field: &'static str },
     #[error("current capture unavailable at attempt {position}: {reason}")]
     Unavailable { position: u64, reason: String },
+}
+
+enum CurrentRecordResult<'a> {
+    Ordinary(Result<&'a GameKernelStepV7, &'a CurrentSessionError>),
+    Rebind(Result<&'a CurrentSessionRebindOutputV1, &'a CurrentSessionError>),
+}
+
+impl CurrentRecordResult<'_> {
+    fn is_ok(&self) -> bool {
+        match self {
+            Self::Ordinary(result) => result.is_ok(),
+            Self::Rebind(result) => result.is_ok(),
+        }
+    }
+
+    fn fits(&self, maximum: usize) -> bool {
+        match self {
+            Self::Ordinary(Ok(step)) => fits(step, maximum),
+            Self::Rebind(Ok(output)) => fits(output, maximum),
+            Self::Ordinary(Err(_)) | Self::Rebind(Err(_)) => true,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -392,7 +435,15 @@ impl CurrentReproRecorderV1 {
         observation: &CurrentGameObservation,
         origin: Option<&str>,
     ) -> CurrentCaptureStatusV1 {
-        self.record_attempt(before, event, outcome, after, observation, origin, None)
+        self.record_attempt(
+            before,
+            event,
+            CurrentRecordResult::Ordinary(outcome),
+            after,
+            observation,
+            origin,
+            None,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -410,7 +461,7 @@ impl CurrentReproRecorderV1 {
         self.record_attempt(
             before,
             event,
-            outcome,
+            CurrentRecordResult::Ordinary(outcome),
             after,
             observation,
             origin,
@@ -421,12 +472,47 @@ impl CurrentReproRecorderV1 {
         )
     }
 
+    /// Record a dedicated native control attempt, including an actual kernel rejection.
+    /// Adapter response rejection must instead call invalidate_attempt after rollback.
+    pub fn record_rebind(
+        &mut self,
+        before: &CoreGameKernelSnapshotV7,
+        control: CurrentCoopRebindEventV1,
+        outcome: Result<&CurrentSessionRebindOutputV1, &CurrentSessionError>,
+        after: &CoreGameKernelSnapshotV7,
+        observation: &CurrentGameObservation,
+    ) -> CurrentCaptureStatusV1 {
+        self.record_rebind_with_origin(before, control, outcome, after, observation, None)
+    }
+
+    /// Preserve the adapter method origin under the existing 128-byte bound.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_rebind_with_origin(
+        &mut self,
+        before: &CoreGameKernelSnapshotV7,
+        control: CurrentCoopRebindEventV1,
+        outcome: Result<&CurrentSessionRebindOutputV1, &CurrentSessionError>,
+        after: &CoreGameKernelSnapshotV7,
+        observation: &CurrentGameObservation,
+        origin: Option<&str>,
+    ) -> CurrentCaptureStatusV1 {
+        self.record_attempt(
+            before,
+            CurrentExternalEvent::CoopRebind { control },
+            CurrentRecordResult::Rebind(outcome),
+            after,
+            observation,
+            origin,
+            None,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn record_attempt(
         &mut self,
         before: &CoreGameKernelSnapshotV7,
         event: CurrentExternalEvent,
-        outcome: Result<&GameKernelStepV7, &CurrentSessionError>,
+        outcome: CurrentRecordResult<'_>,
         after: &CoreGameKernelSnapshotV7,
         observation: &CurrentGameObservation,
         origin: Option<&str>,
@@ -499,12 +585,17 @@ impl CurrentReproRecorderV1 {
         &mut self,
         before: &CoreGameKernelSnapshotV7,
         event: CurrentExternalEvent,
-        outcome: Result<&GameKernelStepV7, &CurrentSessionError>,
+        outcome: CurrentRecordResult<'_>,
         after: &CoreGameKernelSnapshotV7,
         observation: &CurrentGameObservation,
         origin: Option<&str>,
         browser_transport: Option<CurrentReproBrowserTransitionV1>,
     ) -> Result<(CurrentReproCapsuleV1, usize), CurrentReproErrorV1> {
+        if matches!(&event, CurrentExternalEvent::CoopRebind { .. })
+            != matches!(&outcome, CurrentRecordResult::Rebind(_))
+        {
+            return Err(invalid("event/outcome kind"));
+        }
         if self.browser_context_required != browser_transport.is_some() {
             return Err(invalid("browser transport context missing or unexpected"));
         }
@@ -527,9 +618,7 @@ impl CurrentReproRecorderV1 {
         if !fits(before, self.limits.maximum_bytes)
             || !fits(after, self.limits.maximum_bytes)
             || !fits(&event, self.limits.maximum_bytes)
-            || outcome
-                .as_ref()
-                .is_ok_and(|step| !fits(step, self.limits.maximum_bytes))
+            || !outcome.fits(self.limits.maximum_bytes)
         {
             return Err(invalid("single attempt capture bound"));
         }
@@ -547,12 +636,17 @@ impl CurrentReproRecorderV1 {
         }
         let after_digest = snapshot_digest(after)?;
         let outcome = match outcome {
-            Ok(step) => CurrentReproOutcomeV1::Applied {
+            CurrentRecordResult::Ordinary(Ok(step)) => CurrentReproOutcomeV1::Applied {
                 step: Box::new(step.clone()),
                 observation: Box::new(observation.clone()),
                 snapshot_digest: after_digest.clone(),
             },
-            Err(error) => {
+            CurrentRecordResult::Rebind(Ok(output)) => CurrentReproOutcomeV1::RebindApplied {
+                output: Box::new(output.clone()),
+                observation: Box::new(observation.clone()),
+                snapshot_digest: after_digest.clone(),
+            },
+            CurrentRecordResult::Ordinary(Err(error)) | CurrentRecordResult::Rebind(Err(error)) => {
                 if before != after || before_observation != *observation {
                     return Err(invalid("rejection changed state"));
                 }
@@ -696,26 +790,50 @@ pub fn replay_current_capsule_v1(
         let before = session
             .snapshot()
             .map_err(|_| divergence(attempt.position, "before snapshot"))?;
-        let result = session.apply(attempt.event.clone());
-        match (&attempt.outcome, result) {
-            (CurrentReproOutcomeV1::Applied { step, .. }, Ok(actual)) => {
-                if actual != **step {
-                    return Err(divergence(attempt.position, "step"));
+        if let CurrentExternalEvent::CoopRebind { control } = &attempt.event {
+            let result = session.apply_rebind(control.clone());
+            match (&attempt.outcome, result) {
+                (CurrentReproOutcomeV1::RebindApplied { output, .. }, Ok(actual)) => {
+                    if actual != **output {
+                        return Err(divergence(attempt.position, "rebind output"));
+                    }
                 }
+                (CurrentReproOutcomeV1::KernelRejected { error, .. }, Err(actual)) => {
+                    if CurrentReproRejectionV1::from_error(&actual) != *error {
+                        return Err(divergence(attempt.position, "rebind rejection"));
+                    }
+                    if session
+                        .snapshot()
+                        .map_err(|_| divergence(attempt.position, "rejected snapshot"))?
+                        != before
+                    {
+                        return Err(divergence(attempt.position, "rejection changed state"));
+                    }
+                }
+                _ => return Err(divergence(attempt.position, "outcome")),
             }
-            (CurrentReproOutcomeV1::KernelRejected { error, .. }, Err(actual)) => {
-                if CurrentReproRejectionV1::from_error(&actual) != *error {
-                    return Err(divergence(attempt.position, "rejection"));
+        } else {
+            let result = session.apply(attempt.event.clone());
+            match (&attempt.outcome, result) {
+                (CurrentReproOutcomeV1::Applied { step, .. }, Ok(actual)) => {
+                    if actual != **step {
+                        return Err(divergence(attempt.position, "step"));
+                    }
                 }
-                if session
-                    .snapshot()
-                    .map_err(|_| divergence(attempt.position, "rejected snapshot"))?
-                    != before
-                {
-                    return Err(divergence(attempt.position, "rejection changed state"));
+                (CurrentReproOutcomeV1::KernelRejected { error, .. }, Err(actual)) => {
+                    if CurrentReproRejectionV1::from_error(&actual) != *error {
+                        return Err(divergence(attempt.position, "rejection"));
+                    }
+                    if session
+                        .snapshot()
+                        .map_err(|_| divergence(attempt.position, "rejected snapshot"))?
+                        != before
+                    {
+                        return Err(divergence(attempt.position, "rejection changed state"));
+                    }
                 }
+                _ => return Err(divergence(attempt.position, "outcome")),
             }
-            _ => return Err(divergence(attempt.position, "outcome")),
         }
         let (expected_observation, expected_digest) = attempt.outcome.evidence();
         if session

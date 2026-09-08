@@ -20,6 +20,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 er-battle = { path = "../er-battle" }
+er-protocol = { path = "../er-protocol" }
 er-state = { path = "../er-state" }
 
 [lints]
