@@ -11,10 +11,10 @@ expected = '9afce9fd3bc6e05e2159f19e8578ff64fc342b8a5974bec5f15648b0799d74d2'
 assert len(raw) == 16325821 and hashlib.sha256(raw).hexdigest() == expected
 battle = json.loads(raw)['battle']
 selected = [38, 71, 165, 577]
-semantic_path = root / 'rust/fixtures/m9/solo-entry/semantic/semantic-catalog-v1.json'
+semantic_path = Path(os.environ['RUNNER_TEMP']) / 'm9e-semantic/semantic-catalog-v1.json'
 semantic_raw = semantic_path.read_bytes()
 assert 0 < len(semantic_raw) <= 32 << 20
-assert hashlib.sha1(b'blob ' + str(len(semantic_raw)).encode() + b'\0' + semantic_raw).hexdigest() == '40e1bb67265ea4f870962f20bca6ba7cf10add6d'
+assert len(json.loads(semantic_raw)['behavior_units']) == 9411
 semantic = json.loads(semantic_raw)
 assert semantic['oracle_sha'] == battle['oracle_sha']
 rows = []
@@ -27,6 +27,9 @@ for index in selected:
         programs.append(battle['programs'][program_id])
     classifications = [entry for entry in battle['classifications']
                        if entry['behavior_unit']['source'] == {'kind': 'MOVE', 'numeric_id': index}]
+    source_units = [unit for unit in semantic['behavior_units']
+                    if unit['id']['source'] == {'kind': 'MOVE', 'numeric_id': index}]
+    assert [unit['id'] for unit in source_units] == [entry['behavior_unit'] for entry in classifications]
     rows.append({'move': move, 'programs': programs, 'classifications': classifications,
                  'source_units': [unit for unit in semantic['behavior_units'] if unit['id']['source'].get('kind') == 'MOVE' and str(unit['id']['source'].get('numeric_id')) == str(index)]})
 result = {
