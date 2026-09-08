@@ -23,6 +23,15 @@ pub struct GameIdentityAllocatorStateV1 {
     pub next_platform_request_id: SafeU53,
 }
 
+/// The actual bootstrap choice, bound to the run that owns it. Historical saves
+/// without this record retain unknown difficulty; restore never invents a default.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentRunDifficultyV1 {
+    pub run_id: GameRunId,
+    pub difficulty: er_types::RunDifficultyV1,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameStateV6 {
@@ -31,6 +40,8 @@ pub struct GameStateV6 {
     pub identities: GameIdentityAllocatorStateV1,
     pub profile: ProfileStateV1,
     pub active_run: Option<RunStateV3>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_run_difficulty: Option<CurrentRunDifficultyV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_battle_participation:
         Option<crate::current_battle_participation::CurrentBattleParticipationV1>,
@@ -163,6 +174,11 @@ impl GameStateV6 {
             return Err(GameStateV6Error::Invalid);
         }
         self.identities.validate_against(self.active_run.as_ref())?;
+        if let Some(owner) = self.current_run_difficulty
+            && self.active_run.as_ref().map(|run| run.run_id) != Some(owner.run_id)
+        {
+            return Err(GameStateV6Error::Invalid);
+        }
         let legacy = GameStateV5 {
             schema_version: crate::m7_state::GAME_STATE_SCHEMA_VERSION_V5,
             content_identity: er_types::GameContentIdentity {
@@ -255,6 +271,7 @@ impl GameStateV6 {
             profile: source.profile,
             active_run: source.active_run,
             current_battle_participation: None,
+            current_run_difficulty: None,
         };
         value.validate()?;
         Ok(value)

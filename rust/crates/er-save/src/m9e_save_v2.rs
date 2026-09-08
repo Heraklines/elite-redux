@@ -128,6 +128,7 @@ mod tests {
     fn state(content_identity: GameContentIdentityV2) -> GameStateV6 {
         GameStateV6 {
             current_battle_participation: None,
+            current_run_difficulty: None,
             schema_version: GAME_STATE_SCHEMA_VERSION_V6,
             content_identity,
             identities: GameIdentityAllocatorStateV1 {

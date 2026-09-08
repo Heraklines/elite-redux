@@ -455,6 +455,16 @@ pub fn apply_game_material_v6_with_retention(
             .validate_successor(next)
             .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
+    // Difficulty is selected once at bootstrap. Same-run material cannot erase,
+    // replace or invent it, including when the prior save has unknown difficulty.
+    if let Some(prior) = live.as_ref()
+        && let Some(run) = prior.active_run.as_ref()
+        && transition.after_state.active_run.as_ref().map(|next| next.run_id)
+            == Some(run.run_id)
+        && transition.after_state.current_run_difficulty != prior.current_run_difficulty
+    {
+        return Err(GameMaterialV6Error::Invalid);
+    }
     let before_digest = match live.as_ref() {
         Some(state) => game_state_digest(state)?,
         None => empty_game_state_digest()?,
