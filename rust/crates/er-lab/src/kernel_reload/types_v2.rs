@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use er_env::current::CurrentGameObservation;
+use er_env::current::{CurrentGameObservation, CurrentSessionRebindOutputV1};
 use er_kernel::game_kernel_v7::GameKernelStepV7;
 use er_kernel_worker::KernelWorkerFaultV2;
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,13 @@ use thiserror::Error;
 #[serde(deny_unknown_fields)]
 pub struct CurrentGenerationStepV2 {
     pub step: GameKernelStepV7,
+    pub observation: CurrentGameObservation,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentGenerationRebindV2 {
+    pub output: CurrentSessionRebindOutputV1,
     pub observation: CurrentGameObservation,
 }
 

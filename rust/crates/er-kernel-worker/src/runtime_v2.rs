@@ -242,6 +242,33 @@ impl KernelWorkerRuntimeV2 {
                 self.applied_events = next_count;
                 Ok(bytes)
             }
+            KernelWorkerRequestV2::ApplyRebind { control, maximum_inline_result_bytes } => {
+                if maximum_inline_result_bytes > self.maximum_success_response_bytes {
+                    return Err(KernelWorkerRuntimeErrorV2::ResponseTooLarge);
+                }
+                let next_count = self.applied_events.checked_add(1)
+                    .ok_or(KernelWorkerRuntimeErrorV2::Exhausted)?;
+                let identity = &self.identity;
+                let maximum_success_response_bytes = self.maximum_success_response_bytes;
+                let bytes = self.session.as_mut()
+                    .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
+                    .apply_rebind_with(control, |candidate, output| {
+                        let observation = candidate.observe()?;
+                        let result = serde_json::json!({"rebind": &output, "observation": &observation});
+                        if serde_json::to_vec(&result).map_err(serialization)?.len()
+                            > maximum_inline_result_bytes
+                        {
+                            return Err(KernelWorkerRuntimeErrorV2::ResponseTooLarge);
+                        }
+                        encode_response(identity, request_id, accepted,
+                            observation.mechanical_digest.clone(),
+                            KernelWorkerResponseV2::RebindEffects {
+                                output, observation: Box::new(observation),
+                            }, maximum_success_response_bytes)
+                    })?;
+                self.applied_events = next_count;
+                Ok(bytes)
+            }
             KernelWorkerRequestV2::Observe => {
                 let observation = self.session()?.observe()?;
                 encode_response(
