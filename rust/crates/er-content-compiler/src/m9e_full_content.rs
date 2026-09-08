@@ -259,6 +259,7 @@ pub fn build_m9_engineering_battle_pack_v1(
     })
     .map_err(|error| FullContentBuildErrorV1::Semantic(error.to_string()))?;
     crate::m9e_move_drains::admit_static_move_drains(&catalog, &mut semantic)?;
+    crate::m9e_move_recoil::admit_static_move_recoil(&catalog, &mut semantic)?;
     let allocations = semantic.programs.clone();
     let mut source_programs = BTreeMap::<BehaviorSourceId, Vec<MechanicsProgramId>>::new();
     for allocation in &allocations {
