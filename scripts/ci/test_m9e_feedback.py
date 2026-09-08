@@ -6583,7 +6583,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
-                                                ("er-progression", "m9e_owned_friendship")})
+                                                ("er-progression", "m9e_owned_friendship"), ("er-lab", "current_worker_rebind_v2")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 5)
 
@@ -6880,7 +6880,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
-                                                ("er-progression", "m9e_owned_friendship")})
+                                                ("er-progression", "m9e_owned_friendship"), ("er-lab", "current_worker_rebind_v2")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 5)
 
@@ -9048,14 +9048,14 @@ class PhaseTransferTests(unittest.TestCase):
                      for crate, target in sorted(self.phases.LANE_C_TARGETS)]
         inventory.append({"crate": "er-other", "target": "m9e_current_batch", "ids": [], "historical_excluded_ids": []})
         assignment = self.phases.partition(inventory)
-        self.assertEqual(len(assignment["c"]), 5)
+        self.assertEqual(len(assignment["c"]), 4)
         self.assertEqual(assignment["a"], [["er-other", "m9e_current_batch"]])
         self.assertEqual(assignment["b"], [])
         enumerated = [(index, "fixture", row["target"], row["ids"], Path(row["crate"]), [], None)
                       for index, row in enumerate(inventory)]
         actual, owned = self.phases.inventory_and_assignment(enumerated, "c")
         self.assertEqual(owned, self.phases.partition(actual)["c"])
-        self.assertEqual(len(actual), 6)
+        self.assertEqual(len(actual), 5)
     def test_aggregate_rejects_missing_cancelled_or_partial_phase(self):
         for status in ("", "failure", "skipped", "cancelled"):
             with self.subTest(status=status), self.phase_environment(), patch.dict(os.environ, {"M9E_PLATFORM_RESULT": status}):

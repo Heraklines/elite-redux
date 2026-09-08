@@ -39,14 +39,14 @@ jobs:
       - name: Verify exact source
         run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore native test build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
@@ -107,6 +107,8 @@ jobs:
           retention-days: 14
       - name: Preserve native compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: rust/target/debug
@@ -139,14 +141,14 @@ jobs:
       - name: Verify exact source
         run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore native test build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
@@ -203,6 +205,8 @@ jobs:
           retention-days: 14
       - name: Preserve native compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: rust/target/debug
@@ -232,14 +236,14 @@ jobs:
       - name: Verify exact source
         run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore native test build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
@@ -290,6 +294,8 @@ jobs:
           retention-days: 14
       - name: Preserve native compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: rust/target/debug
@@ -319,14 +325,14 @@ jobs:
       - name: Verify exact source
         run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore native test build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
@@ -377,6 +383,8 @@ jobs:
           retention-days: 14
       - name: Preserve native compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: rust/target/debug
@@ -406,14 +414,14 @@ jobs:
       - name: Verify exact source
         run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore native test build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
@@ -464,6 +472,8 @@ jobs:
           retention-days: 14
       - name: Preserve native compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: rust/target/debug
@@ -502,33 +512,33 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore native test build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/debug
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
       - name: Restore browser release Wasm build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/wasm32-unknown-unknown/release
           key: m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
       - name: Restore Chromium download
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ~/.cache/ms-playwright
           key: m9e-focused-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Restore pinned Wasm tools
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/bin/wasm-bindgen
@@ -536,7 +546,7 @@ jobs:
             ~/.cargo/bin/wasm2es6js
           key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
       - name: Restore separate Wasm build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/m9e-wasm-target
           key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
@@ -606,12 +616,16 @@ jobs:
           retention-days: 14
       - name: Preserve browser compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: rust/target/wasm32-unknown-unknown/release
           key: m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
       - name: Preserve test Wasm compilation after failed checks
         if: failure()
+        timeout-minutes: 1
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: ${{ runner.temp }}/m9e-wasm-target
