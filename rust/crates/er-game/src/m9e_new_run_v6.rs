@@ -53,6 +53,13 @@ pub fn construct_natural_run_v6(
     if bootstrap.stage != RunBootstrapStageV1::Complete || authority_revision == SafeU53::ZERO {
         return Err(NaturalRunV6Error::Invalid);
     }
+    let difficulty = bootstrap
+        .selections
+        .difficulty
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    if !difficulty.production() && !bootstrap.catalog.developer_mode {
+        return Err(NaturalRunV6Error::Invalid);
+    }
     let mode_id = bootstrap
         .selections
         .mode
@@ -229,6 +236,10 @@ pub fn construct_natural_run_v6(
     profile.statistics.runs_started = increment(profile.statistics.runs_started)?;
     let state = GameStateV6 {
         current_battle_participation: None,
+        current_run_difficulty: Some(er_state::m9e_state_v6::CurrentRunDifficultyV1 {
+            run_id,
+            difficulty,
+        }),
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: content.identity().clone(),
         identities,

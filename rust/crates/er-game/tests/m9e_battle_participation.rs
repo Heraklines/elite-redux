@@ -254,6 +254,12 @@ fn strip(state: &GameStateV6) -> GameStateV6 {
     state
 }
 fn assert_projection(observed: &GameRuntimeV6, plain: &GameRuntimeV6) -> TestResult {
+    for runtime in [observed, plain] {
+        let state = runtime.state().ok_or("current state")?;
+        let owner = state.current_run_difficulty.ok_or("captured difficulty")?;
+        assert_eq!(owner.run_id, run(runtime)?.run_id);
+        assert_eq!(owner.difficulty, RunDifficultyV1::Youngster);
+    }
     assert_eq!(
         strip(observed.state().ok_or("observed state")?),
         plain.state().ok_or("plain state")?.clone()

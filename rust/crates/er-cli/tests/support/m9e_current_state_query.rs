@@ -553,6 +553,7 @@ fn controlled_terminal(
     // A fresh, explicitly controlled fixture; no old material history is edited
     // or claimed to describe the changed state. This is not a terminal journey.
     state.active_run = None;
+    state.current_run_difficulty = None;
     state.validate_with(content.as_ref())?;
     let fresh = CurrentGameSession::from_active(
         state,

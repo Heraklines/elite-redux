@@ -716,6 +716,7 @@ fn title_read_rejects_corrupt_nonlocal_private_and_inactive_saves_atomically()
     let before = reader.snapshot()?;
     let mut inactive = saved.state.clone();
     inactive.active_run = None;
+    inactive.current_run_difficulty = None;
     let mut nonlocal = saved.state.clone();
     let control = &mut nonlocal.active_run.as_mut().ok_or("run absent")?.control;
     control.owner_seat = Some(SeatId::new(safe(2)));

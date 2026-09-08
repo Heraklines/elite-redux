@@ -478,6 +478,7 @@ impl GameActionDispatcherV1 {
         let mut candidate = execution.candidate.ok_or(GameRuntimeV6Error::Invalid)?;
         if candidate.active_run.is_none() {
             candidate.current_battle_participation = None;
+            candidate.current_run_difficulty = None;
         }
         let next_control = normalize_next_control(
             &mut candidate,
@@ -2657,6 +2658,11 @@ fn adopt_v5_with_participation(
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let candidate = GameStateV6 {
         current_battle_participation: participation,
+        current_run_difficulty: if after.active_run.is_some() {
+            before.current_run_difficulty
+        } else {
+            None
+        },
         schema_version: before.schema_version,
         content_identity: before.content_identity.clone(),
         identities: before.identities.clone(),
