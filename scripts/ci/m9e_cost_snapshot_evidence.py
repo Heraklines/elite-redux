@@ -23,7 +23,7 @@ DEADLINE = time.monotonic() + 1800 - (time.time() - START) - 20
 SOURCE = "rust/crates/er-repro/tests/m9e_current_cost_probe.rs"
 HELPER = "scripts/ci/m9e_current_cost.py"
 ORIGINAL_SHA = "aaa5fe82ecd79baa4905902ea77fb4ba990f3b3d4202cc388c94f0f511554b36"
-HELPER_SHA = "22285aefe9c4588f5abbc9500801cbaececaef31646646d7f947975ecff9ce75"
+HELPER_SHA = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 ANCHOR = b"    assert_eq!(session.snapshot()?, snapshot);\n    Ok(json!({\n"
 INSTRUMENTATION = b'''    assert_eq!(session.snapshot()?, snapshot);
     std::fs::write(
