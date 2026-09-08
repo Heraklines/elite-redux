@@ -326,11 +326,22 @@ const GENERATED_METADATA_PARITY: (&str, &str, usize, &str) = (
     "e426cc7e5fef4bf23b2f081d5d0f3fe44b4ceb33046982638a620e1f6cd9276b",
 );
 
+const DRAIN_METADATA_PARITY: (&str, &str, usize, &str) = (
+    "blake3-v1:4e11aa7e6ef4f5c0bc39e4a29ab0b28a512f5cdefa4e5bdd2fc9aab20e2c815a",
+    "b167ad856885c95dab4f1e9cdf1456dd4924f6c4dbc8443e12918f232215192e",
+    16_335_369,
+    "658cd9b848fb230ddd21df241162a97f47d98a37420a06126bf88edbb6380c89",
+);
+
 fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {
-    [PRE_METADATA_PARITY, GENERATED_METADATA_PARITY]
-        .into_iter()
-        .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))
-        .map(|cohort| cohort.3)
+    [
+        PRE_METADATA_PARITY,
+        GENERATED_METADATA_PARITY,
+        DRAIN_METADATA_PARITY,
+    ]
+    .into_iter()
+    .find(|cohort| (bundle, progression, bytes) == (cohort.0, cohort.1, cohort.2))
+    .map(|cohort| cohort.3)
 }
 
 fn assert_eventwise_parity_contract(

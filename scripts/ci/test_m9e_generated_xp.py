@@ -58,8 +58,8 @@ class GeneratedXpTests(unittest.TestCase):
         return plan, identity, inventory
 
     def test_published_five_policy_rejects_missing_foreign_mixed_and_wrong_typed_metadata(self):
-        self.assertEqual(len(generated.PATHS), 5)
-        self.assertEqual(len(set(generated.PATHS)), 5)
+        self.assertEqual(len(generated.PATHS), 7)
+        self.assertEqual(len(set(generated.PATHS)), 7)
         self.assertTrue(generated.enabled(self.config))
         self.assertFalse(generated.enabled({}))
         for path in generated.PATHS:
@@ -109,9 +109,9 @@ class GeneratedXpTests(unittest.TestCase):
             generated.validate_binding(receipt)
             cohort = {**generated.POLICY, "files": self.small}
             self.assertEqual(receipt["cohort_sha256"], hashlib.sha256(generated.encoded(cohort)).hexdigest())
-            self.assertEqual(receipt["verified_files"], 5)
+            self.assertEqual(receipt["verified_files"], 7)
             for field, value in (("cohort_sha256", "0" * 64), ("verified_files", 4),
-                                 ("verified_files", 5.0), ("verified_files", True),
+                                 ("verified_files", 7.0), ("verified_files", True),
                                  ("schema_version", True), ("extra", "unbound")):
                 changed = {**receipt, field: value}
                 with self.subTest(field=field, value=value), self.assertRaises(RuntimeError):

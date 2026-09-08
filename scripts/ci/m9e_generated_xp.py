@@ -1,18 +1,14 @@
-"""Exact generated XP source cohort. File bodies are hashed only on the runner."""
+"""Exact published XP and drain composition; original XP provenance retained. File bodies are hashed only on the runner."""
 import hashlib
 import json
 from pathlib import Path
 
-FILES = {"rust/fixtures/m9/engineering/complete-progression-definitions-v1.json":{"bytes":3724089,"git_blob":"9d8a49da2746c5e5cf3b3eeddafdf67d7d23c7aa","sha256":"bba00376cae18feae56bebe38c5be0f1bb3aae3fd9a6e99e3ec7fa60a15de08f"},"rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json":{"bytes":1219,"git_blob":"76c320db3187e35ba64eccecf382fb7473209f8d","sha256":"63bf9531e080c09ea47b12b328af0a09abe7333e5c0d228dd45fa666f239bb2e"},"rust/fixtures/m9/engineering/game-content-bundle-v2.json":{"bytes":16325821,"git_blob":"778d0bd4f31fac16c2823ad1ad0c6a8761fede68","sha256":"9afce9fd3bc6e05e2159f19e8578ff64fc342b8a5974bec5f15648b0799d74d2"},"rust/fixtures/m9/engineering/progression-content-pack-v2.json":{"bytes":3576205,"git_blob":"e9c7ed41d2fa5be32d279a8cd9524a720e5f1665","sha256":"1864120e3130162bdd11c9370ae436140b0896a062fa10da9100445776bad17b"},"rust/fixtures/m9/engineering/progression-oracle-report-v2.json":{"bytes":510,"git_blob":"96ecd22adee9d85269d7f5cfe57927fd539aaa12","sha256":"64b4b759c46a897720230ffa0c87d73158d6ff69c2e18f4bdfb2d9c64408bec7"}}
+FILES = {"rust/fixtures/m9/engineering/complete-progression-definitions-v1.json":{"bytes":3724089,"git_blob":"9d8a49da2746c5e5cf3b3eeddafdf67d7d23c7aa","sha256":"bba00376cae18feae56bebe38c5be0f1bb3aae3fd9a6e99e3ec7fa60a15de08f"},"rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json":{"bytes":1219,"git_blob":"062fcdc9016d38a29932c1852e70379859f05c1b","sha256":"793ac4bc98a74232850f7a1c124fd876c212a18e7db0afa2c15a65e33108502f"},"rust/fixtures/m9/engineering/game-content-bundle-v2.json":{"bytes":16335369,"git_blob":"cabb11ce9bc146b3a615bf334d5342d7b67528da","sha256":"a42bf206c6e9a848df5774e58c1f0190f562ceefb90f4dc07e97125eaf0ae6af"},"rust/fixtures/m9/engineering/progression-content-pack-v2.json":{"bytes":3576205,"git_blob":"e9c7ed41d2fa5be32d279a8cd9524a720e5f1665","sha256":"1864120e3130162bdd11c9370ae436140b0896a062fa10da9100445776bad17b"},"rust/fixtures/m9/engineering/progression-oracle-report-v2.json":{"bytes":510,"git_blob":"96ecd22adee9d85269d7f5cfe57927fd539aaa12","sha256":"64b4b759c46a897720230ffa0c87d73158d6ff69c2e18f4bdfb2d9c64408bec7"},"rust/fixtures/m9/engineering/battle-content-pack-v3.json":{"bytes":8093947,"git_blob":"a3cb39b2a30a404e799e04dfaacfee910a2eae0d","sha256":"19d02806cfd82a59814a8786a00a2d0e783b064651b74271d1d2bc8a685f2b5e"},"rust/fixtures/m9/engineering/run-content-pack-v3.json":{"bytes":1845,"git_blob":"6ca98567b96ce029c834a6e4adb1bc9880014077","sha256":"7286f3aa5e17189c46a70d9e6e46e51760efd7b577e120c0501c106e8a411004"}}
 PATHS = list(FILES)
 POLICY_KEY = "current_generated_xp_fixtures"
 SOURCE = "scripts/ci/m9e_generated_xp.py"
 SELFTESTS = "scripts/ci/test_m9e_generated_xp.py"
-POLICY = {"schema_version": 1,
-          "publication_commit": "24beac2761fec35131380ba4b64fc5bd2cf4129d",
-          "publication_tree": "1df6c9f6525f5ee8072ec5fa42b2a6de0e145bb9",
-          "export_source": "d0a2e37059e65c4cd7fa8743ce6cb9e3dfec2caa",
-          "export_run": "34125184738", "files": FILES}
+POLICY = {"export_source":"4395e38a8eb3e3f32951925fab8a4945bc463daa","prior_publication":{"export_run":"34125184738","publication_commit":"24beac2761fec35131380ba4b64fc5bd2cf4129d","export_source":"d0a2e37059e65c4cd7fa8743ce6cb9e3dfec2caa","publication_tree":"1df6c9f6525f5ee8072ec5fa42b2a6de0e145bb9"},"schema_version":2,"files":{"rust/fixtures/m9/engineering/complete-progression-definitions-v1.json":{"bytes":3724089,"git_blob":"9d8a49da2746c5e5cf3b3eeddafdf67d7d23c7aa","sha256":"bba00376cae18feae56bebe38c5be0f1bb3aae3fd9a6e99e3ec7fa60a15de08f"},"rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json":{"bytes":1219,"git_blob":"062fcdc9016d38a29932c1852e70379859f05c1b","sha256":"793ac4bc98a74232850f7a1c124fd876c212a18e7db0afa2c15a65e33108502f"},"rust/fixtures/m9/engineering/game-content-bundle-v2.json":{"bytes":16335369,"git_blob":"cabb11ce9bc146b3a615bf334d5342d7b67528da","sha256":"a42bf206c6e9a848df5774e58c1f0190f562ceefb90f4dc07e97125eaf0ae6af"},"rust/fixtures/m9/engineering/progression-content-pack-v2.json":{"bytes":3576205,"git_blob":"e9c7ed41d2fa5be32d279a8cd9524a720e5f1665","sha256":"1864120e3130162bdd11c9370ae436140b0896a062fa10da9100445776bad17b"},"rust/fixtures/m9/engineering/progression-oracle-report-v2.json":{"bytes":510,"git_blob":"96ecd22adee9d85269d7f5cfe57927fd539aaa12","sha256":"64b4b759c46a897720230ffa0c87d73158d6ff69c2e18f4bdfb2d9c64408bec7"},"rust/fixtures/m9/engineering/battle-content-pack-v3.json":{"bytes":8093947,"git_blob":"a3cb39b2a30a404e799e04dfaacfee910a2eae0d","sha256":"19d02806cfd82a59814a8786a00a2d0e783b064651b74271d1d2bc8a685f2b5e"},"rust/fixtures/m9/engineering/run-content-pack-v3.json":{"bytes":1845,"git_blob":"6ca98567b96ce029c834a6e4adb1bc9880014077","sha256":"7286f3aa5e17189c46a70d9e6e46e51760efd7b577e120c0501c106e8a411004"}},"export_run":"34261503406","publication_tree":"0f05a699f5e0d36ad2865c2529fb88b4402df992","publication_commit":"32a5c987c9767c9c6e87ff57e2bce6dced0ffb46"}
 PACK_IDS = {
     "er-content-compiler:m9e_bundle": [
         "direct_bundle_is_byte_stable_and_prepares_without_v1_domains"],
@@ -44,7 +40,7 @@ def enabled(config):
 
 def expected_binding():
     # The source-bound policy retains every per-file identity; the phase receipt
-    # names that exact cohort after bind has checked all five actual byte streams.
+    # names that exact cohort after bind has checked all seven actual byte streams.
     cohort = {**POLICY, "files": FILES}
     return {"schema_version": 1, "cohort_sha256": hashlib.sha256(encoded(cohort)).hexdigest(),
             "verified_files": len(FILES), "verification": "git-tree-and-streamed-bytes"}
