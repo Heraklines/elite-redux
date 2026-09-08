@@ -1,6 +1,8 @@
 //! Typed browser worker contracts for BrowserKernelHostV2.
 
-use er_env::current::{CurrentCoopRebindEventV1, CurrentGameObservation, CurrentSessionRebindOutputV1};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentGameObservation, CurrentSessionRebindOutputV1,
+};
 use er_game::m9e_content_v2::{
     PresentationAssetIdentityV1, PresentationAudioCueV1, PresentationSemanticIdV1,
 };

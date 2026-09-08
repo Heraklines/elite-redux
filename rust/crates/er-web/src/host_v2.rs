@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use er_canonical::{canonical_bytes, content_digest};
-use er_env::current::{CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError,
+};
 use er_game::m9e_content_v2::{
     GameContentBundleV2, PreparedGameContentV2, PresentationSemanticIdV1,
 };
@@ -488,7 +490,10 @@ impl BrowserKernelHostV2 {
         // The actual kernel owns control-generation validation. An actual typed
         // rejection is replayable; adapter admission failures create a capture gap.
         let before = self.session()?.snapshot().ok();
-        let prepared = self.session.as_mut().ok_or(BrowserWebErrorV2::Invalid)?
+        let prepared = self
+            .session
+            .as_mut()
+            .ok_or(BrowserWebErrorV2::Invalid)?
             .apply_rebind_with(control.clone(), |candidate, output| {
                 let response = BrowserResponseV2::Rebind {
                     output: output.clone(),
@@ -506,15 +511,24 @@ impl BrowserKernelHostV2 {
         if let Some(outcome) = outcome
             && let Some(recorder) = &mut self.repro
         {
-            let evidence = self.session.as_ref()
+            let evidence = self
+                .session
+                .as_ref()
                 .and_then(|session| Some((session.snapshot().ok()?, session.observe().ok()?)));
             if let (Some(before), Some((after, observation))) = (before, evidence) {
                 recorder.record_rebind_with_browser_transport(
-                    &before, control, outcome, &after, &observation,
-                    Some("browser.coop.REBIND"), self.generation,
+                    &before,
+                    control,
+                    outcome,
+                    &after,
+                    &observation,
+                    Some("browser.coop.REBIND"),
+                    self.generation,
                 );
             } else {
-                recorder.invalidate_attempt("browser rebind diagnostic snapshot or observation unavailable");
+                recorder.invalidate_attempt(
+                    "browser rebind diagnostic snapshot or observation unavailable",
+                );
             }
         }
         match prepared {
