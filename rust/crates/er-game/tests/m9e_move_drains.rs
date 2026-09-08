@@ -351,7 +351,7 @@ fn turn(content: &PreparedGameContentV2, state: &GameStateV5) -> TestResult<Batt
 }
 
 #[test]
-fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs() -> TestResult {
+fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units() -> TestResult {
     use er_types::BehaviorSourceId;
     let (content, _) = fixture()?;
     let before: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
@@ -366,7 +366,6 @@ fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs
     let expected = [
         (71, 1, 2),
         (72, 1, 2),
-        (138, 1, 2),
         (141, 1, 2),
         (202, 1, 2),
         (409, 1, 2),
@@ -382,6 +381,24 @@ fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs
         after.programs.len(),
         before.battle.programs.len() + expected.len()
     );
+    let changed = before
+        .battle
+        .classifications
+        .0
+        .iter()
+        .zip(&after.classifications.0)
+        .filter(|(before, after)| before != after)
+        .collect::<Vec<_>>();
+    assert_eq!(changed.len(), expected.len());
+    for (old, new) in changed {
+        assert_eq!(old.behavior_unit, new.behavior_unit);
+        assert_eq!(old.kind, er_types::BehaviorClassificationKindV2::Bespoke);
+        assert_eq!(new.kind, er_types::BehaviorClassificationKindV2::Compiled);
+        let BehaviorSourceId::Move { numeric_id } = new.behavior_unit.source else {
+            return Err("non-move classification changed".into());
+        };
+        assert!(expected.iter().any(|(id, _, _)| safe(*id) == numeric_id));
+    }
     for (numeric_id, numerator, denominator) in expected {
         let definition = content
             .battle
@@ -407,14 +424,18 @@ fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs
         }
         assert_eq!(drains, vec![(numerator, denominator)]);
     }
-    let stat_drain = content.battle.move_definition(MoveId::new(safe(668)))?;
-    assert_eq!(
-        stat_drain.mechanic_programs,
-        before.battle.moves[668]
-            .as_ref()
-            .ok_or("stat drain")?
-            .mechanic_programs
-    );
+    // Dream Eater has a source callback condition; Strength Sap uses a stat
+    // operand and a callback. Neither is an unconditional damage drain.
+    for index in [138, 668] {
+        let deferred = content.battle.move_definition(MoveId::new(safe(index)))?;
+        assert_eq!(
+            deferred.mechanic_programs,
+            before.battle.moves[index as usize]
+                .as_ref()
+                .ok_or("deferred drain")?
+                .mechanic_programs
+        );
+    }
     Ok(())
 }
 

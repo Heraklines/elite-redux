@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::m6::bespoke::handlers_for;
+use crate::m6::routine_executor::execute_after_damage_actor_hook_v2;
 use crate::m6::{
     MechanicsContextV2, MechanicsOperationEvidenceV2, QueryValueV2, execute_hook_v2,
     execute_query_v2,
@@ -696,7 +697,7 @@ fn apply_move_drain_after_damage(
         let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
         let sources = active_sources(actor, hit.move_id);
         let context = mechanics_context(actor, battle, &sources);
-        execute_hook_v2(content, &context, MechanicHookV2::AfterDamage)
+        execute_after_damage_actor_hook_v2(content, &context)
             .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?
     };
     for evidence in &after_damage.operations {
