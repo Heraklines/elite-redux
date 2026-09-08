@@ -104,13 +104,13 @@ test.afterAll(async () => {
   server.closeAllConnections();
   await closed;
 });
-const initialization: BrowserRequestV2 = { kind: "INITIALIZE", initialization: {
+const initialization = { kind: "INITIALIZE", initialization: {
   kind: "NATURAL_START", context: { local_seat: 1, role: "AUTHORITY", protocol: null,
     scheduler: { disposed: false, next_timer_id: 0, pauses: [], timers: [] } },
   local_is_host: true, profile: { schema_version: 1, unlocks: [], achievements: [], challenges: [], flags: [],
     dex: { entries: [] }, statistics: { runs_started: 0, runs_won: 0, runs_lost: 0, battles_won: 0,
       pokemon_captured: 0, highest_wave: 1 } }, save_slots: ["browser-v7-slot"], seed: "browser-v7-corrective",
-} };
+} } satisfies BrowserRequestV2;
 function assets(blocked = false) {
   return { wasm_url: `${address}/m9e-assets/er_web_bg.wasm${blocked ? "?blocked=1" : ""}`,
     wasm_sha256: manifest.cohort.wasm_sha256, glue_url: `${address}/m9e-assets/er_web.js`,
@@ -238,7 +238,12 @@ test("current V7 Worker executes natural input and presentation settlement", asy
       try { await client.dispatch({ kind: "PRESENTATION_SETTLED", event_id: Number.MAX_SAFE_INTEGER,
         outcome: { kind: "SETTLED" } }); }
       catch (error) {
-        if (error instanceof module.CurrentWorkerRequestErrorV2) rejectedCode = error.diagnostic.code;
+        if (error instanceof module.CurrentWorkerRequestErrorV2
+          && typeof error === "object" && error !== null && "diagnostic" in error
+          && typeof error.diagnostic === "object" && error.diagnostic !== null
+          && "code" in error.diagnostic && typeof error.diagnostic.code === "string") {
+          rejectedCode = error.diagnostic.code;
+        }
         else throw error;
       }
       assert(rejectedCode === "HOST_REJECTED" && client.status.acceptedSequence === frontier,

@@ -33,6 +33,17 @@ AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "browser_rebind_selftests": "scripts/ci/test_m9e_browser_rebind.py",
+    "browser_rebind_fixture": "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
+    "browser_rebind_helper": "scripts/ci/m9e_browser_rebind.py",
+    "owned_browser_0": "rust/crates/er-web/src/contracts_v2.rs",
+    "owned_browser_1": "rust/crates/er-web/src/host_v2.rs",
+    "owned_browser_2": "rust/crates/er-web/src/host_v2/rebind_transaction_tests.rs",
+    "owned_browser_3": "src/rust-browser/contracts/browser-contracts-v2.ts",
+    "owned_browser_4": "src/rust-browser/host/current-rust-browser-host.ts",
+    "owned_browser_5": "test/browser/rust-browser/m9e-v7-rebind.spec.ts",
+    "owned_browser_6": "test/browser/rust-browser/m9e-v7-worker.spec.ts",
+    "owned_browser_7": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
     "owned_host_0": "rust/crates/er-agent-protocol/src/lib.rs",
     "owned_host_1": "rust/crates/er-cli/src/current_agent.rs",
     "owned_host_2": "rust/crates/er-cli/src/current_native_capture.rs",
@@ -162,7 +173,9 @@ WORKER_TEST_IDS = ["current V7 Worker executes natural input and presentation se
                    "current V7 Worker rejects wrong ABI and settles pending work on termination"]
 WORKER_CODEC_IDS = ["current V2 canonical payload preserves signed state values",
                     "current V2 canonical payload rejects ambiguous numeric values",
-                    "current V2 envelope keeps correlation IDs nonnegative"]
+                    "current V2 envelope keeps correlation IDs nonnegative",
+                    "current V2 rebind codec preserves typed controls and exact output bytes",
+                    "current V2 rebind codec rejects malformed generation frames and observation"]
 RTC_PATHS = ["src/rust-browser/adapters/current-rtc-transport.ts",
              "src/rust-browser/routes/rust-current-rtc-entry.ts",
              "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"]
@@ -1009,7 +1022,7 @@ def validate_browser_rtc_tests(tests, evidence, binding, cohort_assets, *, owner
 def validate_browser_worker_codec(evidence):
     if (not isinstance(evidence, dict) or set(evidence) != {"expected", "passed", "failed", "skipped", "selected_test_ids"}
             or any(type(evidence[key]) is not int for key in ("expected", "passed", "failed", "skipped"))
-            or evidence["expected"] != 3 or evidence["passed"] != 3 or evidence["failed"] != 0 or evidence["skipped"] != 0
+            or evidence["expected"] != 5 or evidence["passed"] != 5 or evidence["failed"] != 0 or evidence["skipped"] != 0
             or evidence["selected_test_ids"] != WORKER_CODEC_IDS):
         raise RuntimeError("current Worker codec identities/counts disagree")
 
@@ -1092,6 +1105,8 @@ def validate_platform(proof, native, native_hash):
     generated.validate_platform(proof, native)
     import m9e_coop_startup as coop
     coop.validate_platform(proof, native, ROOT)
+    import m9e_browser_rebind as browser_rebind
+    browser_rebind.validate_platform(proof, native, ROOT)
     if "plan" in proof and proof["plan"] != plan:
         raise RuntimeError("platform duplicated plan differs from its bound native plan")
     from m9e_current_proposal import validate_obligations
@@ -1217,6 +1232,9 @@ def platform(feedback):
     if native["plan"].get("requires_current_coop_startup"):
         import m9e_coop_startup as coop
         summary["current_coop_rtc"] = coop.execute_platform(feedback, expected, native["plan"]["current_coop_startup_binding"])
+    if native["plan"].get("requires_current_browser_rebind"):
+        import m9e_browser_rebind as browser_rebind
+        summary["current_browser_rebind"] = browser_rebind.execute_platform(feedback, summary)
     summary["status"] = "passed"
     summary = reference_platform_plan(summary, native, native_hash)
     proof_hash = write_bounded(source / "platform/platform.json", summary)
@@ -1281,7 +1299,7 @@ def aggregate(feedback):
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
-            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
+            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native},
             **{key: third[key] for key in ("rule_worker",) if key in third},
             **campaign_replay.aggregate_reference(fourth, os.environ["M9E_NATIVE_D_MANIFEST_SHA256"]),
@@ -1326,7 +1344,7 @@ def compact_summary(summary, full_hash, timings):
         "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup", "natural_campaign_replay", "natural_cooperative_campaign",
         "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
         "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "native_e_manifest_sha256", "platform_manifest_sha256",
-        "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
+        "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
         "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
     compact.update({"phase_summary_sha256": full_hash, "timing_ms": timings})
     if pack_aggregate_proof(summary) is not summary:

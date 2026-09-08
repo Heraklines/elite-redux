@@ -1,0 +1,44 @@
+name: M9E Browser integration harness preflight
+on:
+  push:
+    branches:
+      - 'codex/m9e-browser-integration-preflight-*'
+permissions:
+  contents: read
+concurrency:
+  group: m9e-browser-integration-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - name: Start bounded preflight clock
+        run: echo "M9E_PREFLIGHT_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          lfs: false
+          submodules: false
+      - name: All harness tests on exact source
+        run: python3 scripts/ci/m9e_browser_integration_preflight.py
+      - name: Bounded summary
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-browser-integration-preflight-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-browser-integration-preflight/compact/
+          if-no-files-found: error
+          retention-days: 2
+      - name: Remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-browser-integration-preflight-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-browser-integration-preflight/full/
+          if-no-files-found: error
+          retention-days: 2

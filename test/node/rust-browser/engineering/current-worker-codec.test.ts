@@ -47,3 +47,35 @@ it("current V2 envelope keeps correlation IDs nonnegative", () => {
     version: 2, request_id: 1, sequence: 0, request: { kind: "ADVANCE_TIME", milliseconds: 1 },
   });
 });
+
+it("current V2 rebind codec preserves typed controls and exact output bytes", () => {
+  for (const control of [{ kind: "BEGIN" }, { kind: "RETRY" },
+    { kind: "RECEIVE", generation: 2, bytes: [0, 1, 127, 255] }] as const) {
+    const encoded = encodeBrowserRequestEnvelopeV2({ version: 2, request_id: 2, sequence: 1,
+      request: { kind: "COOP_REBIND", control: structuredClone(control) as any } });
+    expect(JSON.parse(new TextDecoder().decode(encoded)).request).toEqual({ kind: "COOP_REBIND", control });
+  }
+  for (const frames of [[], [[0, 1, 127, 255]]]) {
+    const response = { version: 2, request_id: 2, accepted_sequence: 1, response: { kind: "REBIND",
+      output: { generation: 2, frames }, observation: { kernel_version: 7, control: null } } };
+    expect(decodeBrowserResponseEnvelopeV2(encodeCanonicalJsonV2(response).buffer as ArrayBuffer)).toEqual(response);
+  }
+});
+
+it("current V2 rebind codec rejects malformed generation frames and observation", () => {
+  const valid = { version: 2, request_id: 2, accepted_sequence: 1, response: { kind: "REBIND",
+    output: { generation: 2, frames: [[0, 255]] }, observation: { kernel_version: 7 } } };
+  for (const output of [null, { generation: 0, frames: [] }, { generation: -1, frames: [] },
+    { generation: 2, frames: null }, { generation: 2, frames: [[]] },
+    { generation: 2, frames: [[256]] }, { generation: 2, frames: [[-1]] },
+    { generation: 2, frames: [new Array(16 * 1024 + 1).fill(0)] }]) {
+    const value = { ...valid, response: { ...valid.response, output } };
+    expect(() => decodeBrowserResponseEnvelopeV2(encodeCanonicalJsonV2(value).buffer as ArrayBuffer))
+      .toThrow("rebind result is invalid");
+  }
+  for (const observation of [null, [], { kernel_version: 6 }]) {
+    const value = { ...valid, response: { ...valid.response, observation } };
+    expect(() => decodeBrowserResponseEnvelopeV2(encodeCanonicalJsonV2(value).buffer as ArrayBuffer))
+      .toThrow("rebind result is invalid");
+  }
+});

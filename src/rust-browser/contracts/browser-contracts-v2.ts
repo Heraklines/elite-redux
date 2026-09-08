@@ -41,7 +41,17 @@ export type BrowserStorageResultV2 =
   | { kind: "FAILED" | "UNCERTAIN"; reason: string }
   | { kind: "CONFLICT"; current_generation: number };
 
+export type CurrentCoopRebindEventV1 =
+  | { kind: "BEGIN" | "RETRY" }
+  | { kind: "RECEIVE"; generation: number; bytes: number[] };
+
+export interface CurrentSessionRebindOutputV1 {
+  generation: number;
+  frames: number[][];
+}
+
 export type BrowserRequestV2 =
+  | { kind: "COOP_REBIND"; control: CurrentCoopRebindEventV1 }
   | { kind: "INITIALIZE"; initialization: BrowserSessionInitializationV2 }
   | { kind: "RAW_INPUT"; event: RawInputEventV1 }
   | { kind: "ADVANCE_TIME"; milliseconds: number }
@@ -61,6 +71,7 @@ export interface BrowserRequestEnvelopeV2 {
 }
 
 export type BrowserResponseV2 =
+  | { kind: "REBIND"; output: CurrentSessionRebindOutputV1; observation: CurrentJsonObject }
   | { kind: "READY" | "DISPOSED" }
   | { kind: "EFFECTS"; batch: BrowserEffectBatchV2 }
   | { kind: "SNAPSHOT"; snapshot: CurrentJsonObject }
@@ -169,6 +180,16 @@ export function decodeBrowserResponseEnvelopeV2(buffer: ArrayBuffer): BrowserRes
   }
   const response = value.response;
   switch (response.kind) {
+    case "REBIND":
+      if (!safeCurrentInteger(response.output?.generation) || response.output.generation === 0
+        || !Array.isArray(response.output.frames)
+        || response.output.frames.some(frame => !Array.isArray(frame) || frame.length === 0
+          || frame.length > 16 * 1024 || frame.some(byte => !safeCurrentInteger(byte) || byte > 255))
+        || response.observation == null || typeof response.observation !== "object"
+        || Array.isArray(response.observation) || response.observation.kernel_version !== 7) {
+        throw new Error("current Worker rebind result is invalid");
+      }
+      break;
     case "READY":
     case "DISPOSED":
       break;

@@ -2457,14 +2457,16 @@ class FeedbackTests(unittest.TestCase):
 
     def test_browser_worker_codec_requires_all_three_exact_numeric_boundary_witnesses(self):
         import m9e_phases as phases
-        report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+        report = {"success": True, "numTotalTests": 5, "numPassedTests": 5, "testResults": [{
             "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
             "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
         evidence = self.feedback.browser_worker_codec_evidence(report)
         phases.validate_browser_worker_codec(evidence)
         self.assertEqual(evidence["selected_test_ids"], ["current V2 canonical payload preserves signed state values",
                          "current V2 canonical payload rejects ambiguous numeric values",
-                         "current V2 envelope keeps correlation IDs nonnegative"])
+                         "current V2 envelope keeps correlation IDs nonnegative",
+                         "current V2 rebind codec preserves typed controls and exact output bytes",
+                         "current V2 rebind codec rejects malformed generation frames and observation"])
         for mutation in ("missing", "duplicate", "renamed", "skipped", "wrong_file", "false_success"):
             bad = copy.deepcopy(report)
             suite = bad["testResults"][0]
@@ -2505,7 +2507,7 @@ class FeedbackTests(unittest.TestCase):
         (output / "m9e-v7-web-assets.json").write_text(json.dumps({"source_sha": CANDIDATE,
             "assets": old_assets, "browser_worker_protocol_version": 2}))
         (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
-        codec_report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+        codec_report = {"success": True, "numTotalTests": 5, "numPassedTests": 5, "testResults": [{
             "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
             "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
         calls = []
@@ -3295,7 +3297,7 @@ class FeedbackTests(unittest.TestCase):
             rtc_tests[key]["replica_fixture_sha256"] = old_assets["coop-replica-snapshot.json"]["sha256"]
         (output / "m9e-v7-web-assets.json").write_text(json.dumps({"source_sha": CANDIDATE, "assets": old_assets, "browser_worker_protocol_version": 2}))
         (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
-        codec_report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+        codec_report = {"success": True, "numTotalTests": 5, "numPassedTests": 5, "testResults": [{
             "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
             "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
         calls = []
@@ -4893,7 +4895,7 @@ class FeedbackTests(unittest.TestCase):
         (output / "m9e-v7-web-assets.json").write_text(json.dumps({"source_sha": CANDIDATE,
             "assets": old_assets, "browser_worker_protocol_version": 2}))
         (self.rust / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
-        codec_report = {"success": True, "numTotalTests": 3, "numPassedTests": 3, "testResults": [{
+        codec_report = {"success": True, "numTotalTests": 5, "numPassedTests": 5, "testResults": [{
             "name": "test/node/rust-browser/engineering/current-worker-codec.test.ts",
             "assertionResults": [{"fullName": name, "status": "passed"} for name in phases.WORKER_CODEC_IDS]}]}
         _, storage_tests, storage_report, storage_node, storage_node_report = current_storage_fixture(
@@ -5281,7 +5283,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
-        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 6, 6, 8, 11])
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 6, 6, 8, 9, 11])
         for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
             crate, target = key.split(":")
             self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
@@ -5326,7 +5328,8 @@ class FeedbackTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("bounded synthetic XP source for planner test\n")
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
-        for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER]:
+        from m9e_browser_rebind import SOURCE_PATHS as browser_rebind_sources
+        for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER, *browser_rebind_sources]:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if not path.exists():
@@ -6071,7 +6074,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertFalse(selection["boundary_paths"])
         self.assertFalse(selection["unknown_paths"])
         self.assertEqual(selection["title_storage_binding"], title.source_binding(self.root, CANDIDATE))
-        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 56)
         for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
             self.assertEqual(selection["required_native_test_ids"][identity], ids)
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
@@ -6134,7 +6137,7 @@ class FeedbackTests(unittest.TestCase):
                      "requires_worker_storage", "requires_current_storage", "requires_browser_worker", "requires_browser_rtc",
                      "requires_wasm", "requires_browser", "requires_cli_executable", "requires_worker_executable", "timer_focus"):
             self.assertTrue(selection[flag], flag)
-        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 56)
         for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
             self.assertEqual(selection["required_native_test_ids"][identity], ids)
             self.assertIn(identity.split(":")[1], selection["required_native_targets"][identity.split(":")[0]])
@@ -6304,7 +6307,7 @@ class FeedbackTests(unittest.TestCase):
                 for check in (wasm, browser, timer, replica):
                     check.assert_not_called()
             else:
-                self.assertEqual(len(summary["required_native_target_counts"]), 55)
+                self.assertEqual(len(summary["required_native_target_counts"]), 56)
                 for target, ids in self.feedback.TITLE_STORAGE_IDS.items():
                     self.assertEqual(summary["required_native_target_counts"][target], len(ids))
                 self.assertEqual([(self.binary_crates[name], self.binary_targets[name]) for name in self.executed[:4]],
@@ -6585,7 +6588,7 @@ class FeedbackTests(unittest.TestCase):
                                                 ("er-lab", "current_worker_rebind_v2"),
                                                 ("er-progression", "m9e_owned_friendship")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
-        self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
+        self.assertEqual(len(phases.WORKER_CODEC_IDS), 5)
 
     def test_control_query_mixed_paths_reject_and_existing_dispatcher_overlap_keeps_its_scope(self):
         self.configure_control_query_scope()
@@ -6885,7 +6888,7 @@ class FeedbackTests(unittest.TestCase):
                                                 ("er-lab", "current_worker_rebind_v2"),
                                                 ("er-progression", "m9e_owned_friendship")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
-        self.assertEqual(len(phases.WORKER_CODEC_IDS), 3)
+        self.assertEqual(len(phases.WORKER_CODEC_IDS), 5)
 
     def test_state_query_mixed_paths_reject_and_overlap_keeps_existing_scope(self):
         self.configure_state_query_scope()
@@ -7799,7 +7802,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
                               "browser_worker_assets": assets, "browser_worker_tests": tests,
-                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                              "browser_worker_codec": {"expected": 5, "passed": 5, "failed": 0, "skipped": 0,
                                                        "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)}})
         self.platform["browser_assets"]["assets"] = cohort
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
@@ -7877,7 +7880,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
                               "browser_worker_assets": assets, "browser_worker_tests": tests,
-                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                              "browser_worker_codec": {"expected": 5, "passed": 5, "failed": 0, "skipped": 0,
                                                        "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)}})
         self.platform["browser_assets"]["assets"] = cohort
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
@@ -8058,7 +8061,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
                               "browser_worker_assets": assets, "browser_worker_tests": tests,
-                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                              "browser_worker_codec": {"expected": 5, "passed": 5, "failed": 0, "skipped": 0,
                                                        "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)}})
         self.platform["browser_assets"]["assets"] = cohort
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
@@ -8099,7 +8102,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
             "browser_worker_assets": worker_assets, "browser_worker_tests": worker_tests,
-            "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0, "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)},
+            "browser_worker_codec": {"expected": 5, "passed": 5, "failed": 0, "skipped": 0, "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)},
             "browser_rtc_assets": assets, "browser_rtc_tests": tests})
         self.platform["browser_assets"]["assets"] = cohort
         self.platform_hash = self.phases.write_bounded(self.root / "platform/platform.json", self.platform)
@@ -9216,7 +9219,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.other_hash = self.phases.write_bounded(self.root / "proof/native-b.json", self.other)
         self.platform.update({"native_manifest_sha256": self.native_hash, "plan_sha256": self.native["plan_sha256"],
                               "browser_worker_assets": assets, "browser_worker_tests": worker_tests,
-                              "browser_worker_codec": {"expected": 3, "passed": 3, "failed": 0, "skipped": 0,
+                              "browser_worker_codec": {"expected": 5, "passed": 5, "failed": 0, "skipped": 0,
                                                        "selected_test_ids": list(self.phases.WORKER_CODEC_IDS)},
                               "current_storage_node": node, "current_storage_browser": storage})
         self.platform["browser_assets"]["assets"] = cohort
@@ -11301,7 +11304,7 @@ class OwnedFoundationContractTests(unittest.TestCase):
 
     def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
         self.assertEqual(len(self.inventory), 105)
-        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 799)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 803)
         for change in ("remove", "rename", "exclude", "extra"):
             rows = copy.deepcopy(self.inventory)
             old = next(row for row in rows if row["crate"] == "er-canonical")
@@ -11313,12 +11316,12 @@ class OwnedFoundationContractTests(unittest.TestCase):
                 old["historical_excluded_ids"].append(old["ids"].pop())
             else:
                 rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
-            with self.assertRaisesRegex(RuntimeError, "complete799/105"):
+            with self.assertRaisesRegex(RuntimeError, "complete803/105"):
                 self.feedback.validate_owned_foundation_inventory(self.plan, rows)
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 47)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 55)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)

@@ -80,6 +80,14 @@
       "rust/crates/er-progression/tests/m9e_owned_friendship.rs",
       "rust/crates/er-repro/src/current.rs",
       "rust/crates/er-repro/tests/m9e_current_rebind_repro.rs",
+      "rust/crates/er-web/src/contracts_v2.rs",
+      "rust/crates/er-web/src/host_v2.rs",
+      "rust/crates/er-web/src/host_v2/rebind_transaction_tests.rs",
+      "src/rust-browser/contracts/browser-contracts-v2.ts",
+      "src/rust-browser/host/current-rust-browser-host.ts",
+      "test/browser/rust-browser/m9e-v7-rebind.spec.ts",
+      "test/browser/rust-browser/m9e-v7-worker.spec.ts",
+      "test/node/rust-browser/engineering/current-worker-codec.test.ts",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -269,6 +277,17 @@
         "owned_reward_admission_rejects_unsupported_context_and_keys",
         "owned_reward_duplicate_settlement_and_finish_emit_no_new_effects",
         "owned_reward_projection_keeps_unrelated_accounts_and_source_argument_identity"
+      ],
+      "er-web:er_web": [
+        "host_v2::rebind_transaction_tests::browser_rebind_duplicates_noops_and_wrong_generation_keep_capture_exact",
+        "host_v2::rebind_transaction_tests::browser_rebind_natural_controls_and_generation_two_gameplay_replay",
+        "host_v2::rebind_transaction_tests::browser_rebind_receive_response_and_cache_rejection_preserve_transaction",
+        "host_v2::rebind_transaction_tests::browser_rebind_wire_decoding_rejects_unknown_control_fields",
+        "host_v2::transaction_tests::late_response_limit_rejection_preserves_state_cache_and_retry",
+        "host_v2::transaction_tests::read_only_response_limit_failure_preserves_capture",
+        "host_v2::transaction_tests::retained_response_byte_boundary_evicts_by_acceptance_and_preserves_retry",
+        "host_v2::transaction_tests::sequence_exhaustion_preflight_preserves_current_session_and_cached_response",
+        "host_v2::transaction_tests::single_response_cache_boundary_rejects_before_commit_and_disposal_clears_payloads"
       ]
     }
   },

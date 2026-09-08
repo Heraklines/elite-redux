@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use er_canonical::{canonical_bytes, content_digest};
-use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
+use er_env::current::{
+    CurrentCoopRebindEventV1, CurrentExternalEvent, CurrentGameSession, CurrentSessionError,
+};
 use er_game::m9e_content_v2::{
     GameContentBundleV2, PreparedGameContentV2, PresentationSemanticIdV1,
 };
@@ -272,6 +274,9 @@ impl BrowserKernelHostV2 {
         let mut generation = self.generation;
         let mut origin = None;
         let event = match request {
+            BrowserRequestV2::CoopRebind { control } => {
+                return self.process_rebind(control, request_id, sequence, maximum_response_bytes);
+            }
             BrowserRequestV2::Initialize { initialization } => {
                 if self.session.is_some() {
                     return Err(BrowserWebErrorV2::Invalid);
@@ -470,6 +475,64 @@ impl BrowserKernelHostV2 {
                 self.generation = generation;
                 Ok(bytes)
             }
+            Err(BrowserCompletionErrorV2::Session(error)) => Err(error.into()),
+            Err(BrowserCompletionErrorV2::Adapter(error)) => Err(error),
+        }
+    }
+
+    fn process_rebind(
+        &mut self,
+        control: CurrentCoopRebindEventV1,
+        request_id: SafeU53,
+        sequence: SafeU53,
+        maximum_response_bytes: usize,
+    ) -> Result<Vec<u8>, BrowserWebErrorV2> {
+        // The actual kernel owns control-generation validation. An actual typed
+        // rejection is replayable; adapter admission failures create a capture gap.
+        let before = self.session()?.snapshot().ok();
+        let prepared = self
+            .session
+            .as_mut()
+            .ok_or(BrowserWebErrorV2::Invalid)?
+            .apply_rebind_with(control.clone(), |candidate, output| {
+                let response = BrowserResponseV2::Rebind {
+                    output: output.clone(),
+                    observation: Box::new(candidate.observe()?),
+                };
+                let bytes = encode_response(response, request_id, sequence, maximum_response_bytes)
+                    .map_err(BrowserCompletionErrorV2::Adapter)?;
+                Ok::<_, BrowserCompletionErrorV2>((bytes, output))
+            });
+        let outcome = match &prepared {
+            Ok((_, output)) => Some(Ok(output)),
+            Err(BrowserCompletionErrorV2::Session(error)) => Some(Err(error)),
+            Err(BrowserCompletionErrorV2::Adapter(_)) => None,
+        };
+        if let Some(outcome) = outcome
+            && let Some(recorder) = &mut self.repro
+        {
+            let evidence = self
+                .session
+                .as_ref()
+                .and_then(|session| Some((session.snapshot().ok()?, session.observe().ok()?)));
+            if let (Some(before), Some((after, observation))) = (before, evidence) {
+                recorder.record_rebind_with_browser_transport(
+                    &before,
+                    control,
+                    outcome,
+                    &after,
+                    &observation,
+                    Some("browser.coop.REBIND"),
+                    self.generation,
+                );
+            } else {
+                recorder.invalidate_attempt(
+                    "browser rebind diagnostic snapshot or observation unavailable",
+                );
+            }
+        }
+        match prepared {
+            Ok((bytes, _)) => Ok(bytes),
             Err(BrowserCompletionErrorV2::Session(error)) => Err(error.into()),
             Err(BrowserCompletionErrorV2::Adapter(error)) => Err(error),
         }
@@ -827,6 +890,9 @@ fn canonical_error(error: impl std::fmt::Display) -> BrowserWebErrorV2 {
 fn js_error(error: BrowserWebErrorV2) -> JsValue {
     JsValue::from_str(&error.to_string())
 }
+
+#[cfg(test)]
+mod rebind_transaction_tests;
 
 #[cfg(test)]
 mod transaction_tests {
