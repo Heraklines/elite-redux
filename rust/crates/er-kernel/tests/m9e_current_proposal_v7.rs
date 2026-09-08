@@ -712,21 +712,7 @@ fn historical_owner_rejection(
     assert!(restore(collision, content).is_err());
     Ok(())
 }
-#[test]
-fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
--> Result<(), Box<dyn Error>> {
-    let content = content()?;
-    let generation = ConnectionGeneration::new(safe(1));
-    ordinary_publication_atomicity(content.clone())?;
-    noncurrent_generation_raw_compatibility(content.clone())?;
-    let (mut state, revision, _) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
-    // Controlled guest-first canonical root, not a natural guest-first claim.
-    // The actual retention material must still await the other human's command.
-    bind_battle_root(&mut state, SeatId::new(safe(2)))?;
-    let (mut authority, mut replica) = pair_from_state(state, revision, content.clone())?;
-    let original_authority = authority.clone();
-    press(&mut replica, PhysicalKey::Space)?;
-    let initial = replica.snapshot()?;
+fn assert_publication_exhaustion(initial: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
     let mut exhausted_publication = initial.clone();
     exhausted_publication.replay_sequence = safe(9_007_199_254_740_991);
     let mut exhausted_publication = restore(exhausted_publication, content.clone())?;
@@ -735,46 +721,16 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     assert_eq!(exhausted_publication.snapshot()?, before_publication);
     assert!(initial.current_proposal.is_none());
     assert!(
-        serde_json::to_value(&initial)?
+        serde_json::to_value(initial)?
             .get("current_proposal")
             .is_none()
     );
-    let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
-    let pending = replica.snapshot()?;
-    assert_eq!(
-        pending.replay_sequence.get(),
-        initial.replay_sequence.get() + 1
-    );
-    let mut expected_publication = initial.clone();
-    expected_publication.current_proposal = pending.current_proposal.clone();
-    expected_publication.replay_sequence = pending.replay_sequence;
-    assert_eq!(
-        pending, expected_publication,
-        "publication changes only exact owner and replay, preserving state/RNG and allocators"
-    );
-    let owner = pending
-        .current_proposal
-        .as_ref()
-        .ok_or("pending owner missing")?;
-    let retained = owner.retained();
-    assert_eq!(retained.proposal_hex, current_bytes_hex_v1(&bytes));
-    assert_eq!(retained.proposal_digest, json_bytes_sha256_v1(&bytes)?);
-    assert_ne!(
-        retained.publication_context.run_id.as_str(),
-        retained.publication_game_run_id.get().to_string()
-    );
-    assert_eq!(
-        restore(pending.clone(), content.clone())?.snapshot()?,
-        pending
-    );
-    assert_eq!(proposal(&press(&mut replica, PhysicalKey::Space)?)?, bytes);
-    assert_eq!(
-        replica.snapshot()?,
-        pending,
-        "exact re-publication cannot reset the owner or replay"
-    );
-    historical_owner_rejection(&pending, content.clone())?;
-    let pending_json = serde_json::to_value(&pending)?;
+    Ok(())
+}
+
+fn assert_pending_restore_rejections(pending: &CoreGameKernelSnapshotV7, initial: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
+    historical_owner_rejection(pending, content.clone())?;
+    let pending_json = serde_json::to_value(pending)?;
     for (field, value) in [
         ("schema_version", serde_json::json!(2)),
         (
@@ -823,12 +779,95 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     );
     assert!(restore(wrong_role, content.clone()).is_ok());
 
+    Ok(())
+}
+
+fn assert_transport_exhaustion(pending: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
     let mut exhausted = pending.clone();
     exhausted.replay_sequence = safe(9_007_199_254_740_991);
     let mut exhausted = restore(exhausted, content.clone())?;
     let before = exhausted.snapshot()?;
-    assert!(exhausted.transport_changed(generation, false).is_err());
+    assert!(exhausted.transport_changed(ConnectionGeneration::new(safe(1)), false).is_err());
     assert_eq!(exhausted.snapshot()?, before);
+    Ok(())
+}
+
+fn assert_other_receipt(initial: &CoreGameKernelSnapshotV7, pending: &CoreGameKernelSnapshotV7, bytes: &[u8], original_authority: GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<(), Box<dyn Error>> {
+    // Independently admitted different proposal from the SAME canonical root.
+    // Its receipt applies real retention material but cannot retire our owner.
+    let mut alternative = restore(initial.clone(), content.clone())?;
+    press(&mut alternative, PhysicalKey::ArrowDown)?;
+    let other_bytes = proposal(&press(&mut alternative, PhysicalKey::Space)?)?;
+    assert_ne!(other_bytes, bytes);
+    let mut other_authority = original_authority;
+    let other_receipt = material(&other_authority.ingest_network_frame(ConnectionGeneration::new(safe(1)), &other_bytes)?)?;
+    let mut other_delivery = restore(pending.clone(), content.clone())?;
+    other_delivery.ingest_network_frame(ConnectionGeneration::new(safe(1)), &other_receipt)?;
+    assert_eq!(
+        other_delivery.snapshot()?.current_proposal,
+        pending.current_proposal
+    );
+    assert_eq!(other_delivery.state(), other_authority.state());
+    assert_eq!(
+        other_delivery.snapshot()?.replay_sequence.get(),
+        pending.replay_sequence.get() + 1
+    );
+    Ok(())
+}
+
+#[test]
+fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
+-> Result<(), Box<dyn Error>> {
+    eprintln!("m9e proposal test entered; kernel={} snapshot={}", std::mem::size_of::<GameKernelV7>(), std::mem::size_of::<CoreGameKernelSnapshotV7>());
+    let content = content()?;
+    let generation = ConnectionGeneration::new(safe(1));
+    ordinary_publication_atomicity(content.clone())?;
+    noncurrent_generation_raw_compatibility(content.clone())?;
+    let (mut state, revision, _) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
+    // Controlled guest-first canonical root, not a natural guest-first claim.
+    // The actual retention material must still await the other human's command.
+    bind_battle_root(&mut state, SeatId::new(safe(2)))?;
+    let (mut authority, mut replica) = pair_from_state(state, revision, content.clone())?;
+    let original_authority = authority.clone();
+    press(&mut replica, PhysicalKey::Space)?;
+    let initial = replica.snapshot()?;
+    assert_publication_exhaustion(&initial, content.clone())?;
+    let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
+    let pending = replica.snapshot()?;
+    assert_eq!(
+        pending.replay_sequence.get(),
+        initial.replay_sequence.get() + 1
+    );
+    let mut expected_publication = initial.clone();
+    expected_publication.current_proposal = pending.current_proposal.clone();
+    expected_publication.replay_sequence = pending.replay_sequence;
+    assert_eq!(
+        pending, expected_publication,
+        "publication changes only exact owner and replay, preserving state/RNG and allocators"
+    );
+    let owner = pending
+        .current_proposal
+        .as_ref()
+        .ok_or("pending owner missing")?;
+    let retained = owner.retained();
+    assert_eq!(retained.proposal_hex, current_bytes_hex_v1(&bytes));
+    assert_eq!(retained.proposal_digest, json_bytes_sha256_v1(&bytes)?);
+    assert_ne!(
+        retained.publication_context.run_id.as_str(),
+        retained.publication_game_run_id.get().to_string()
+    );
+    assert_eq!(
+        restore(pending.clone(), content.clone())?.snapshot()?,
+        pending
+    );
+    assert_eq!(proposal(&press(&mut replica, PhysicalKey::Space)?)?, bytes);
+    assert_eq!(
+        replica.snapshot()?,
+        pending,
+        "exact re-publication cannot reset the owner or replay"
+    );
+    assert_pending_restore_rejections(&pending, &initial, content.clone())?;
+    assert_transport_exhaustion(&pending, content.clone())?;
     for invalid_generation in [0, 2] {
         let before = replica.snapshot()?;
         assert!(
@@ -849,25 +888,7 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     assert!(press(&mut replica, PhysicalKey::Space).is_err());
     assert_eq!(replica.snapshot()?, disconnected);
 
-    // Independently admitted different proposal from the SAME canonical root.
-    // Its receipt applies real retention material but cannot retire our owner.
-    let mut alternative = restore(initial.clone(), content.clone())?;
-    press(&mut alternative, PhysicalKey::ArrowDown)?;
-    let other_bytes = proposal(&press(&mut alternative, PhysicalKey::Space)?)?;
-    assert_ne!(other_bytes, bytes);
-    let mut other_authority = original_authority;
-    let other_receipt = material(&other_authority.ingest_network_frame(generation, &other_bytes)?)?;
-    let mut other_delivery = restore(pending.clone(), content.clone())?;
-    other_delivery.ingest_network_frame(generation, &other_receipt)?;
-    assert_eq!(
-        other_delivery.snapshot()?.current_proposal,
-        pending.current_proposal
-    );
-    assert_eq!(other_delivery.state(), other_authority.state());
-    assert_eq!(
-        other_delivery.snapshot()?.replay_sequence.get(),
-        pending.replay_sequence.get() + 1
-    );
+    assert_other_receipt(&initial, &pending, &bytes, original_authority, content.clone())?;
     let admitted = authority.ingest_network_frame(generation, &bytes)?;
     let receipt_bytes = material(&admitted)?;
     let receipt = CurrentProposalMaterialReceiptV1::decode(&receipt_bytes)?;
@@ -1092,6 +1113,7 @@ fn submit_strongest_move(
 #[test]
 fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
 -> Result<(), Box<dyn Error>> {
+    eprintln!("m9e proposal test entered; kernel={} snapshot={}", std::mem::size_of::<GameKernelV7>(), std::mem::size_of::<CoreGameKernelSnapshotV7>());
     let content = content()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
