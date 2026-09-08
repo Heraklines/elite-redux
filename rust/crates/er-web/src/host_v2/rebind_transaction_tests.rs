@@ -150,7 +150,7 @@ fn profile() -> TestResult<ProfileStateV1> {
     })
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Peer {
     host: BrowserKernelHostV2,
 }
@@ -273,12 +273,6 @@ impl Peer {
     }
 
     fn navigate(&mut self, id: &str) -> TestResult {
-        // The catalog confirmation is the last option of the actual vertical
-        // menu. Hold its real key and deliver bounded real timer consequences;
-        // every consequence still runs in the host and remains replayable.
-        if id == "bootstrap/starter/confirm" {
-            return self.hold_to_starter_confirmation();
-        }
         let bound = self
             .host
             .session()?
@@ -305,103 +299,6 @@ impl Peer {
             assert!(self.press(PhysicalKey::ArrowDown)?.is_empty());
         }
         Err(format!("actual raw menu cannot reach {id}").into())
-    }
-
-    fn hold_to_starter_confirmation(&mut self) -> TestResult {
-        let menu = self
-            .host
-            .session()?
-            .observe()?
-            .control
-            .ok_or("starter control")?
-            .menu
-            .ok_or("starter menu")?;
-        let target = "bootstrap/starter/confirm";
-        assert_eq!(
-            menu.options
-                .last()
-                .ok_or("starter options")?
-                .option_id
-                .as_str(),
-            target
-        );
-        let bound = menu.options.len() + 1;
-        assert!(
-            self.frames(BrowserRequestV2::RawInput {
-                event: RawInputEvent::KeyDown {
-                    code: PhysicalKey::ArrowDown,
-                    printable: false,
-                    browser_repeat: false,
-                    focus: InputFocus::Game,
-                }
-            })?
-            .is_empty()
-        );
-        for _ in 0..bound.div_ceil(16) {
-            let before = self.host.session()?.snapshot()?;
-            if self
-                .host
-                .session()?
-                .observe()?
-                .control
-                .and_then(|control| control.menu)
-                .is_some_and(|menu| menu.selected_option_id.as_str() == target)
-            {
-                break;
-            }
-            assert_eq!(before.input_router.repeats.len(), 1);
-            let repeat = &before.input_router.repeats[0];
-            let timer = before
-                .scheduler
-                .timers
-                .iter()
-                .find(|timer| timer.registration.timer_id == repeat.timer_id)
-                .ok_or("actual held navigation timer")?;
-            assert_eq!(timer.registration.delay_ms, safe(250));
-            let elapsed = safe(timer.remaining_active_ms.get() + 15 * 250);
-            let mut reference = self.host.session()?.fork()?;
-            let expected = reference.apply(CurrentExternalEvent::AdvanceTime {
-                milliseconds: elapsed,
-            })?;
-            assert_eq!(expected.internal_events.len(), 16);
-            assert!(
-                self.frames(BrowserRequestV2::AdvanceTime {
-                    milliseconds: elapsed
-                })?
-                .is_empty()
-            );
-            assert_eq!(self.host.session()?.snapshot()?, reference.snapshot()?);
-            assert_eq!(self.host.session()?.observe()?, reference.observe()?);
-        }
-        assert!(
-            self.frames(BrowserRequestV2::RawInput {
-                event: RawInputEvent::KeyUp {
-                    code: PhysicalKey::ArrowDown
-                }
-            })?
-            .is_empty()
-        );
-        assert_eq!(
-            self.host
-                .session()?
-                .observe()?
-                .control
-                .ok_or("actual final control")?
-                .menu
-                .ok_or("actual final menu")?
-                .selected_option_id
-                .as_str(),
-            target
-        );
-        assert!(
-            self.host
-                .session()?
-                .snapshot()?
-                .input_router
-                .repeats
-                .is_empty()
-        );
-        Ok(())
     }
 
     fn choose(&mut self, authority: bool) -> TestResult<Vec<Vec<u8>>> {
@@ -540,10 +437,32 @@ fn one_frame(frames: &[Vec<u8>]) -> TestResult<Vec<u8>> {
 }
 
 fn pair() -> TestResult<(Peer, Peer)> {
+    // Build the genuine two-host raw-input journey once. Each transaction test
+    // gets an independent complete clone, including capture and response owners.
+    // The immutable fixture is never advanced by a rebind or negative test.
+    static STARTED: OnceLock<Result<(Peer, Peer), String>> = OnceLock::new();
+    let pair = STARTED.get_or_init(|| build_pair().map_err(|error| error.to_string()));
+    match pair {
+        Ok((host, guest)) => {
+            let copies = (host.clone(), guest.clone());
+            assert_eq!(evidence(&copies.0.host)?, evidence(&host.host)?);
+            assert_eq!(evidence(&copies.1.host)?, evidence(&guest.host)?);
+            Ok(copies)
+        }
+        Err(error) => Err(error.clone().into()),
+    }
+}
+
+fn build_pair() -> TestResult<(Peer, Peer)> {
     let mut host = Peer::natural(true)?;
     let mut guest = Peer::natural(false)?;
-    let choice = one_frame(&guest.choose(false)?)?;
-    assert!(host.choose(true)?.is_empty());
+    let choice = std::thread::scope(|scope| -> TestResult<Vec<u8>> {
+        let guest_start = scope.spawn(|| guest.choose(false).map_err(|error| error.to_string()));
+        let host_start = host.choose(true);
+        let guest_start = guest_start.join().map_err(|_| "guest startup thread panicked")?;
+        assert!(host_start?.is_empty());
+        one_frame(&guest_start?)
+    })?;
     let started = one_frame(&host.frames(BrowserRequestV2::NetworkFrame {
         generation: safe(1),
         bytes: choice,
