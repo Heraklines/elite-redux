@@ -11447,6 +11447,18 @@ class OwnedFoundationContractTests(unittest.TestCase):
         with patch.object(Path, "read_bytes", return_value=raw + b" "):
             with self.assertRaisesRegex(RuntimeError, "source binding"):
                 self.feedback.owned_foundation_inventory()
+        compact = json.loads(raw)
+        self.assertEqual(compact["schema_version"], 2)
+        self.assertTrue(all("historical_excluded_ids" not in row for row in compact["inventory"]))
+        self.assertEqual(self.feedback.owned_foundation_inventory(), self.inventory)
+        for bad in (None, True, ["invented_historical_exclusion"]):
+            value = copy.deepcopy(compact)
+            value["inventory"][0]["historical_excluded_ids"] = bad
+            altered = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            with patch.object(Path, "read_bytes", return_value=altered), patch.object(
+                    self.feedback, "OWNED_FOUNDATION_INVENTORY_SHA256", hashlib.sha256(altered).hexdigest()):
+                with self.assertRaises(RuntimeError):
+                    self.feedback.owned_foundation_inventory()
         for key in ("schema_version", "prior_tests", "prior_targets", "tests", "targets"):
             value = json.loads(raw)
             value[key] = True
