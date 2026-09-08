@@ -389,7 +389,12 @@ fn source_compiler_admits_thirteen_static_drains_and_preserves_original_programs
             for operation in &program.operations {
                 let value = serde_json::to_value(operation)?;
                 if value["kind"] == "DRAIN_FRACTION" {
-                    assert_eq!(program.source, BehaviorSourceId::Move { numeric_id });
+                    assert_eq!(
+                        program.source,
+                        BehaviorSourceId::Move {
+                            numeric_id: safe(numeric_id)
+                        }
+                    );
                     drains.push((
                         value["numerator"].as_u64().ok_or("numerator")?,
                         value["denominator"].as_u64().ok_or("denominator")?,
