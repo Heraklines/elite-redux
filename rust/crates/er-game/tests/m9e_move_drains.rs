@@ -370,7 +370,9 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
     assert_eq!(after.classifications.0.len(), 9411);
     assert_eq!(
         er_canonical::content_digest(&after.programs[..3679].to_vec())?,
-        baseline["programs_digest"].as_str().ok_or("baseline program digest")?
+        baseline["programs_digest"]
+            .as_str()
+            .ok_or("baseline program digest")?
     );
     let expected = [
         (71, 1, 2),
@@ -387,20 +389,34 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
         (902, 1, 2),
     ];
     assert_eq!(after.programs.len(), 3679 + expected.len());
-    let old_classes = baseline["admitted_classifications"].as_array().ok_or("baseline classifications")?;
+    let old_classes = baseline["admitted_classifications"]
+        .as_array()
+        .ok_or("baseline classifications")?;
     assert_eq!(old_classes.len(), expected.len());
     let mut restored = serde_json::to_value(&after.classifications.0)?;
     let rows = restored.as_array_mut().ok_or("classification array")?;
     let mut admitted = Vec::new();
     for old in old_classes {
         assert_eq!(old["kind"], "BESPOKE");
-        let matches = rows.iter_mut().filter(|row| row["behavior_unit"] == old["behavior_unit"]).collect::<Vec<_>>();
+        let matches = rows
+            .iter_mut()
+            .filter(|row| row["behavior_unit"] == old["behavior_unit"])
+            .collect::<Vec<_>>();
         assert_eq!(matches.len(), 1);
-        let row = matches.into_iter().next().ok_or("compiled classification")?;
+        let row = matches
+            .into_iter()
+            .next()
+            .ok_or("compiled classification")?;
         assert_eq!(row["kind"], "COMPILED");
         assert_eq!(row["behavior_unit"]["source"]["kind"], "MOVE");
-        let id = row["behavior_unit"]["source"]["numeric_id"].as_u64().ok_or("move source")?;
-        assert!(expected.iter().any(|(expected_id, _, _)| *expected_id == id));
+        let id = row["behavior_unit"]["source"]["numeric_id"]
+            .as_u64()
+            .ok_or("move source")?;
+        assert!(
+            expected
+                .iter()
+                .any(|(expected_id, _, _)| *expected_id == id)
+        );
         admitted.push(id);
         *row = old.clone();
     }
@@ -408,7 +424,9 @@ fn source_compiler_admits_twelve_unconditional_drains_and_preserves_other_units(
     assert_eq!(admitted, expected.map(|(id, _, _)| id));
     assert_eq!(
         er_canonical::content_digest(&restored)?,
-        baseline["classifications_digest"].as_str().ok_or("baseline classification digest")?
+        baseline["classifications_digest"]
+            .as_str()
+            .ok_or("baseline classification digest")?
     );
     for (numeric_id, numerator, denominator) in expected {
         let definition = content
