@@ -1,7 +1,7 @@
-name: M9E Natural Cooperative RTC Focused Diagnostic
+name: M9E Published Drain RTC Wire Observation
 on:
   push:
-    branches: [codex/m9e-coop-public-retry-browser-20260907]
+    branches: [codex/m9e-drain-rtc-wire-20260908]
 permissions:
   contents: read
 concurrency:
@@ -19,10 +19,12 @@ jobs:
       CARGO_PROFILE_TEST_DEBUG: '0'
       RUSTUP_TOOLCHAIN: '1.97.1'
     steps:
+      - name: Start shared budget before checkout
+        run: echo "M9E_FOCUS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          fetch-depth: 2
           persist-credentials: false
           submodules: false
           lfs: false
@@ -37,21 +39,21 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Restore dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Restore browser release Wasm build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: rust/target/wasm32-unknown-unknown/release
           key: m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-browser-release-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
       - name: Restore pinned Wasm tools
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/bin/wasm-bindgen
@@ -59,7 +61,7 @@ jobs:
             ~/.cargo/bin/wasm2es6js
           key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
       - name: Restore Chromium download
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ~/.cache/ms-playwright
           key: m9e-focused-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
