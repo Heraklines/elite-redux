@@ -65,8 +65,9 @@ fn build_fixture() -> TestResult<(Arc<PreparedGameContentV2>, GameStateV6)> {
     // battle pack. The published bundle remains the default integration input.
     if let Ok(path) = std::env::var("M9E_DRAIN_BATTLE_PACK") {
         bundle.battle = serde_json::from_slice(&std::fs::read(path)?)?;
-        bundle.run.battle_content_hash = bundle.battle.content_hash.clone();
-        bundle.run.content_hash = bundle.run.recompute_hash()?;
+        let run = Arc::make_mut(&mut bundle.run);
+        run.battle_content_hash = bundle.battle.content_hash.clone();
+        run.content_hash = run.recompute_hash()?;
         bundle.content_hash = bundle.recompute_hash()?;
     }
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
