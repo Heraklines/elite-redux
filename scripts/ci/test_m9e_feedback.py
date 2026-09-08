@@ -2535,7 +2535,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(summary["browser_tests"]["typed_effects"]["passed"], 1)
         self.assertEqual(summary["browser_worker_tests"], worker_tests)
-        self.assertEqual(summary["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(summary["browser_worker_codec"]["passed"], 5)
         self.assertEqual([name for name, _, _ in calls], ["browser-dependencies", "browser-build", "browser-chromium-install",
                          "browser-journey", "browser-effects", "browser-worker-codec", "browser-worker-journey"])
         build_env = next(env for name, _, env in calls if name == "browser-build")
@@ -3327,7 +3327,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(summary["browser_tests"]["typed_effects"]["passed"], 1)
         self.assertEqual(summary["browser_worker_tests"], worker_tests)
-        self.assertEqual(summary["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(summary["browser_worker_codec"]["passed"], 5)
         self.assertEqual(summary["browser_rtc_tests"], rtc_tests)
         self.assertEqual([name for name, _, _ in calls], ["browser-dependencies", "browser-build", "browser-chromium-install",
                          "browser-journey", "browser-effects", "browser-worker-codec", "browser-worker-journey", "browser-rtc-journey"])
@@ -4927,7 +4927,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(summary["browser_tests"]["typed_effects"]["passed"], 1)
         self.assertEqual(summary["browser_worker_tests"], worker_tests)
-        self.assertEqual(summary["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(summary["browser_worker_codec"]["passed"], 5)
         self.assertEqual([name for name, _, _ in calls], ["browser-dependencies", "browser-build", "browser-chromium-install",
                          "browser-journey", "browser-effects", "browser-worker-codec", "browser-worker-journey", "current-storage-node", "current-storage-browser"])
         self.assertEqual(summary["current_storage_node"], storage_node)
@@ -5230,7 +5230,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 79)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 87)
         self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
@@ -6074,7 +6074,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertFalse(selection["boundary_paths"])
         self.assertFalse(selection["unknown_paths"])
         self.assertEqual(selection["title_storage_binding"], title.source_binding(self.root, CANDIDATE))
-        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 56)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
         for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
             self.assertEqual(selection["required_native_test_ids"][identity], ids)
         self.assertEqual(len(selection["required_native_test_ids"]["er-kernel:m9e_game_kernel_v7"]), 12)
@@ -6137,7 +6137,7 @@ class FeedbackTests(unittest.TestCase):
                      "requires_worker_storage", "requires_current_storage", "requires_browser_worker", "requires_browser_rtc",
                      "requires_wasm", "requires_browser", "requires_cli_executable", "requires_worker_executable", "timer_focus"):
             self.assertTrue(selection[flag], flag)
-        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 56)
+        self.assertEqual(sum(map(len, selection["required_native_targets"].values())), 55)
         for identity, ids in self.feedback.TITLE_STORAGE_IDS.items():
             self.assertEqual(selection["required_native_test_ids"][identity], ids)
             self.assertIn(identity.split(":")[1], selection["required_native_targets"][identity.split(":")[0]])
@@ -6307,7 +6307,7 @@ class FeedbackTests(unittest.TestCase):
                 for check in (wasm, browser, timer, replica):
                     check.assert_not_called()
             else:
-                self.assertEqual(len(summary["required_native_target_counts"]), 56)
+                self.assertEqual(len(summary["required_native_target_counts"]), 55)
                 for target, ids in self.feedback.TITLE_STORAGE_IDS.items():
                     self.assertEqual(summary["required_native_target_counts"][target], len(ids))
                 self.assertEqual([(self.binary_crates[name], self.binary_targets[name]) for name in self.executed[:4]],
@@ -7812,7 +7812,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["tests"]["selected"], 15)
         self.assertEqual(aggregate["tests"]["passed"], 15)
         self.assertEqual(aggregate["browser_worker_tests"]["passed"], 2)
-        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 5)
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         for lane in ("a", "b"):
@@ -7890,7 +7890,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["tests"]["selected"], 17)
         self.assertEqual(aggregate["tests"]["passed"], 17)
         self.assertEqual(aggregate["browser_worker_tests"]["passed"], 2)
-        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 5)
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
         third = copy.deepcopy(self.native)
@@ -8070,7 +8070,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["qualification"], "passed")
         self.assertEqual(aggregate["browser_worker_tests"], tests)
         self.assertEqual(aggregate["browser_worker_assets"], assets)
-        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 5)
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_tests"]["typed_effects"]["passed"], 1)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
@@ -8819,7 +8819,10 @@ class PhaseTransferTests(unittest.TestCase):
             self.phases.unpack_native_ids(wire)
         # Incompressible deterministic metadata still cannot cross the same
         # wire bound; repeated padding is now valid bounded v3 evidence.
-        proof["padding"] = "".join(self.phases.sha(str(index).encode()) for index in range(1600))
+        proof["padding"] = ""
+        padding_budget = self.phases.NATIVE_PROOF_LIMIT - len(self.phases.encoded(proof))
+        self.assertGreater(padding_budget, self.phases.MANIFEST_LIMIT)
+        proof["padding"] = "".join(self.phases.sha(str(index).encode()) for index in range(1600))[:padding_budget]
         self.assertLessEqual(len(self.phases.encoded(proof)), self.phases.NATIVE_PROOF_LIMIT)
         with self.assertRaisesRegex(RuntimeError, "64 KiB"):
             self.phases.write_bounded(self.root / "compressed-still-oversized.json", proof)
@@ -9230,7 +9233,7 @@ class PhaseTransferTests(unittest.TestCase):
         self.assertEqual(aggregate["current_storage_browser"], storage)
         self.assertEqual(aggregate["current_storage_node"], node)
         self.assertEqual(aggregate["browser_worker_tests"], worker_tests)
-        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 3)
+        self.assertEqual(aggregate["browser_worker_codec"]["passed"], 5)
         self.assertEqual(aggregate["browser_tests"]["chromium"]["passed"], 2)
         self.assertEqual(aggregate["browser_tests"]["typed_effects"]["passed"], 1)
         self.assertEqual(aggregate["browser_current_repro_bridge"], self.platform["browser_current_repro_bridge"])
