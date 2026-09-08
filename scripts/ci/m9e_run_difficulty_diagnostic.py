@@ -32,7 +32,7 @@ def sha(data):
 
 
 def bounded_write(path, value, maximum):
-    raw = (json.dumps(value, sort_keys=True, indent=2) + "\n").encode()
+    raw = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
     require(len(raw) <= maximum, "compact result exceeds unchanged bound")
     path.write_bytes(raw)
 
