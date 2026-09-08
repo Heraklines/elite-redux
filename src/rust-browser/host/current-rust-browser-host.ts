@@ -214,6 +214,7 @@ export class CurrentRustBrowserHostV2 {
       const requested = active.pending.kind;
       if (kind === "FAULT" || (requested === "INITIALIZE" ? kind !== "READY"
         : requested === "SNAPSHOT" ? kind !== "SNAPSHOT"
+        : requested === "COOP_REBIND" ? kind !== "REBIND"
         : requested === "DISPOSE" ? kind !== "DISPOSED" : kind !== "EFFECTS")) {
         throw new Error("current host response kind does not satisfy the pending request");
       }

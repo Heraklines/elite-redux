@@ -1,5 +1,6 @@
 //! Typed browser worker contracts for BrowserKernelHostV2.
 
+use er_env::current::{CurrentCoopRebindEventV1, CurrentGameObservation, CurrentSessionRebindOutputV1};
 use er_game::m9e_content_v2::{
     PresentationAssetIdentityV1, PresentationAudioCueV1, PresentationSemanticIdV1,
 };
@@ -110,6 +111,9 @@ pub enum BrowserStorageResultV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserRequestV2 {
+    CoopRebind {
+        control: CurrentCoopRebindEventV1,
+    },
     RetryCoopSetup,
     Initialize {
         initialization: Box<BrowserSessionInitializationV2>,
@@ -237,6 +241,11 @@ pub struct BrowserKernelFaultV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserResponseV2 {
+    /// Dedicated transport control result; no gameplay operation or effect batch.
+    Rebind {
+        output: CurrentSessionRebindOutputV1,
+        observation: Box<CurrentGameObservation>,
+    },
     Ready,
     Effects {
         batch: BrowserEffectBatchV2,

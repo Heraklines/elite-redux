@@ -507,6 +507,33 @@ impl CurrentReproRecorderV1 {
         )
     }
 
+    /// Browser rebind controls preserve the separately owned transport generation.
+    /// Only a TransportChanged event can advance that browser generation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_rebind_with_browser_transport(
+        &mut self,
+        before: &CoreGameKernelSnapshotV7,
+        control: CurrentCoopRebindEventV1,
+        outcome: Result<&CurrentSessionRebindOutputV1, &CurrentSessionError>,
+        after: &CoreGameKernelSnapshotV7,
+        observation: &CurrentGameObservation,
+        origin: Option<&str>,
+        generation: SafeU53,
+    ) -> CurrentCaptureStatusV1 {
+        self.record_attempt(
+            before,
+            CurrentExternalEvent::CoopRebind { control },
+            CurrentRecordResult::Rebind(outcome),
+            after,
+            observation,
+            origin,
+            Some(CurrentReproBrowserTransitionV1 {
+                before_generation: generation,
+                after_generation: generation,
+            }),
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn record_attempt(
         &mut self,
