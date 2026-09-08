@@ -833,8 +833,9 @@ def execute_target(summary, crate, test_target, test_source, test_ids):
         raise RuntimeError("exact native rebind or compatibility test artifact required")
     artifact = matches[0]
     binary = Path(artifact.get("executable") or "")
+    summary["last_test_artifact"] = {key: artifact.get(key) for key in ("target", "features", "profile", "manifest_path", "executable")}
     if (artifact.get("manifest_path") != str(ROOT / f"rust/crates/{crate}/Cargo.toml")
-            or artifact.get("features") != [] or artifact.get("target", {}).get("kind") != (["cdylib", "rlib"] if library else ["test"])
+            or artifact.get("features") != (["default"] if crate == "er-web" else []) or artifact.get("target", {}).get("kind") != (["cdylib", "rlib"] if library else ["test"])
             or artifact["target"].get("src_path") != str(ROOT / test_source)
             or artifact.get("profile", {}).get("test") is not True
             or artifact["profile"].get("debug_assertions") is not True
@@ -850,7 +851,7 @@ def execute_target(summary, crate, test_target, test_source, test_ids):
         raise RuntimeError("exact complete sorted target test IDs required")
     receipt = {"crate": crate, "target": test_target, "sha256": binary_hash, "bytes": binary.stat().st_size,
                "profile": artifact["profile"], "source_sha256": summary["source_hashes"][test_source],
-               "source": test_source, "kind": artifact["target"]["kind"], "crate_types": artifact["target"]["crate_types"],
+               "source": test_source, "features": artifact["features"], "kind": artifact["target"]["kind"], "crate_types": artifact["target"]["crate_types"],
                "manifest_path": artifact["manifest_path"], "executable": str(binary),
                "execution_argv": [str(binary), "--format", "terse", "--nocapture", "--test-threads=1"],
                "execution_cwd": str(ROOT / f"rust/crates/{crate}"),
@@ -1164,7 +1165,7 @@ def browser_platform(summary):
     wasm = TARGET / "wasm32-unknown-unknown/release/er_web.wasm"
     data = bounded_file(wasm, TARGET, 32 << 20)
     if (artifact.get("target", {}).get("src_path") != str(ROOT / "rust/crates/er-web/src/lib.rs")
-            or artifact["target"].get("kind") != ["cdylib", "rlib"] or artifact.get("features") != []
+            or artifact["target"].get("kind") != ["cdylib", "rlib"] or artifact.get("features") != ["default"]
             or str(wasm) not in artifact.get("filenames", []) or artifact.get("executable") is not None
             or artifact.get("profile", {}).get("test") is not False
             or artifact["profile"].get("opt_level") != "3" or artifact["profile"].get("debug_assertions") is not False
@@ -1175,7 +1176,7 @@ def browser_platform(summary):
                                "profile": artifact["profile"], "path": str(wasm), "bytes": len(data), "sha256": wasm_hash,
                                "build_log_sha256": digest(build), "native_flags_removed": True, "kind": artifact["target"]["kind"],
                                "crate_types": artifact["target"]["crate_types"], "manifest_path": artifact["manifest_path"],
-                               "release_overflow_checks": False, "candidate": summary["source_sha"]}
+                               "release_overflow_checks": False, "features": artifact["features"], "candidate": summary["source_sha"]}
     run(["node", BUILDER, "--out-dir", str(WEB)], "original-worker-builder", cwd=ROOT, environment=release)
     if digest(wasm) != wasm_hash:
         raise RuntimeError("original builder must use the identical actual release artifact")
