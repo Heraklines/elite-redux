@@ -11279,6 +11279,32 @@ class CurrentCostReleaseExecutionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             phases.write_bounded(self.root / "oversized.json", first)
 class CompactWorkerEvidenceTests(unittest.TestCase):
+    def test_actual_six_lane_809_aggregate_publishes_with_complete_identity_and_lossless_references(self):
+        import m9e_phases as phases
+        path = HARNESS.parent / "fixtures/m9e-six-lane-aggregate-proof.json"
+        digest = "e2692359c28813f9576711539562a5cdd1b9af8f49e83ab1e62aa7dee0d989b9"
+        full = phases.read_bounded(path, digest)
+        original = copy.deepcopy(full)
+        self.assertEqual(full["identity"]["run_id"], "34230969965")
+        self.assertEqual(full["tests"], {"selected": 809, "executed": 809, "passed": 809, "failed": 0, "skipped": 0})
+        compact = phases.compact_summary(full, digest, {})
+        self.assertLessEqual(len(phases.encoded(compact)), 16000)
+        self.assertEqual(compact["identity"], full["identity"])
+        self.assertEqual(compact["tests"], full["tests"])
+        self.assertEqual(compact["qualification"], "passed")
+        for field in ("native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256",
+                      "native_d_manifest_sha256", "native_e_manifest_sha256", "native_f_manifest_sha256", "platform_manifest_sha256"):
+            self.assertEqual(compact[field], full[field])
+        self.assertEqual(compact["phase_summary_sha256"], digest)
+        self.assertEqual(compact["phase_summary_decoded_sha256"], phases.sha(phases.encoded(full)))
+        for field, value in compact.items():
+            if isinstance(value, dict) and value.get("file") == "phase-summary.json":
+                self.assertEqual(value["sha256"], digest)
+                if "field" in value:
+                    self.assertEqual(value["field"], field)
+                    self.assertIn(field, full)
+        self.assertEqual(full, original)
+
     def test_worker_details_become_exact_full_proof_references(self):
         import m9e_phases as phases
         for key in ("worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):

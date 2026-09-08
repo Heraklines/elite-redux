@@ -1352,7 +1352,7 @@ def compact_summary(summary, full_hash, timings):
     compact = {key: summary[key] for key in (
         "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup", "natural_campaign_replay", "natural_cooperative_campaign",
         "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
-        "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "native_e_manifest_sha256", "platform_manifest_sha256",
+        "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "native_e_manifest_sha256", "native_f_manifest_sha256", "platform_manifest_sha256",
         "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
         "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
     compact.update({"phase_summary_sha256": full_hash, "timing_ms": timings})
@@ -1378,7 +1378,7 @@ def compact_summary(summary, full_hash, timings):
     # These references bind exact fields of the unchanged full proof. Source
     # identity and headline execution counts always remain inline; expanded
     # target maps and negative-control details may use the bounded proof channel.
-    for key in ("browser_worker_codec", "browser_tests", "required_native_target_counts", "timer_mutant", "replica_mutant"):
+    for key in ("browser_worker_codec", "browser_tests", "required_native_target_counts", "timer_mutant", "replica_mutant", "ledger_mutant", "current_coop_startup", "natural_campaign_replay", "natural_cooperative_campaign"):
         if len(encoded(compact)) <= 16000:
             break
         if key in compact:
