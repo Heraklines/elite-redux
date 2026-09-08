@@ -446,6 +446,35 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
                 .collect::<Vec<_>>()
         );
     }
+    if let Ok(directory) = std::env::var("M9E_RECOIL_EXPORT") {
+        let directory = std::path::Path::new(&directory);
+        std::fs::create_dir(directory)?;
+        let bundle = content.bundle();
+        let serialized = serde_json::to_vec(bundle)?;
+        let decoded: GameContentBundleV2 = serde_json::from_slice(&serialized)?;
+        assert_eq!(serde_json::to_vec(&decoded)?, serialized);
+        PreparedGameContentV2::prepare(Arc::new(decoded))?;
+        let mut manifest: serde_json::Value = serde_json::from_slice(include_bytes!(
+            "../../../fixtures/m9/engineering/game-content-bundle-v2-manifest.json"
+        ))?;
+        manifest["content_hash"] = serde_json::to_value(&bundle.content_hash)?;
+        manifest["components"]["battle"] = serde_json::to_value(&bundle.battle.content_hash)?;
+        manifest["components"]["run"] = serde_json::to_value(&bundle.run.content_hash)?;
+        for (name, bytes) in [
+            (
+                "battle-content-pack-v3.json",
+                serde_json::to_vec(&bundle.battle)?,
+            ),
+            ("run-content-pack-v3.json", serde_json::to_vec(&bundle.run)?),
+            ("game-content-bundle-v2.json", serialized),
+            (
+                "game-content-bundle-v2-manifest.json",
+                serde_json::to_vec(&manifest)?,
+            ),
+        ] {
+            std::fs::write(directory.join(name), bytes)?;
+        }
+    }
     Ok(())
 }
 
