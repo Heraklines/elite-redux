@@ -498,11 +498,13 @@ fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let mut host = Peer::from_snapshot(
-        &bundle, Arc::clone(&content), true, limits, host_snapshot.clone(),
+        &bundle,
+        Arc::clone(&content),
+        true,
+        limits,
+        host_snapshot.clone(),
     )?;
-    let mut guest = Peer::from_snapshot(
-        &bundle, content, false, limits, guest_snapshot.clone(),
-    )?;
+    let mut guest = Peer::from_snapshot(&bundle, content, false, limits, guest_snapshot.clone())?;
     assert_ne!(host.worker.process_id(), guest.worker.process_id());
     assert_eq!(host.snapshot()?, *host_snapshot);
     assert_eq!(guest.snapshot()?, *guest_snapshot);
