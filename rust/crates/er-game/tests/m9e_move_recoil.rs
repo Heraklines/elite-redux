@@ -370,7 +370,9 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
     assert_eq!(after.classifications.0.len(), 9411);
     assert_eq!(
         er_canonical::content_digest(&after.programs[..3691].to_vec())?,
-        baseline["programs_digest"].as_str().ok_or("baseline program digest")?
+        baseline["programs_digest"]
+            .as_str()
+            .ok_or("baseline program digest")?
     );
     let expected = [
         (36, 1, 4),
@@ -381,18 +383,32 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
         (617, 1, 2),
     ];
     let mut restored = serde_json::to_value(&after.classifications.0)?;
-    let old_rows = baseline["admitted_classifications"].as_array().ok_or("old classes")?;
+    let old_rows = baseline["admitted_classifications"]
+        .as_array()
+        .ok_or("old classes")?;
     assert_eq!(old_rows.len(), expected.len());
     let rows = restored.as_array_mut().ok_or("classes")?;
     let mut changed = Vec::new();
     for old in old_rows {
-        let matches = rows.iter_mut().filter(|row| row["behavior_unit"] == old["behavior_unit"]).collect::<Vec<_>>();
+        let matches = rows
+            .iter_mut()
+            .filter(|row| row["behavior_unit"] == old["behavior_unit"])
+            .collect::<Vec<_>>();
         assert_eq!(matches.len(), 1);
-        let row = matches.into_iter().next().ok_or("compiled classification")?;
+        let row = matches
+            .into_iter()
+            .next()
+            .ok_or("compiled classification")?;
         assert_eq!(old["kind"], "BESPOKE");
         assert_eq!(row["kind"], "COMPILED");
-        let id = row["behavior_unit"]["source"]["numeric_id"].as_u64().ok_or("move")?;
-        assert!(expected.iter().any(|(expected_id, _, _)| *expected_id == id));
+        let id = row["behavior_unit"]["source"]["numeric_id"]
+            .as_u64()
+            .ok_or("move")?;
+        assert!(
+            expected
+                .iter()
+                .any(|(expected_id, _, _)| *expected_id == id)
+        );
         changed.push(id);
         *row = old.clone();
     }
@@ -400,7 +416,9 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
     assert_eq!(changed, expected.map(|(id, _, _)| id));
     assert_eq!(
         er_canonical::content_digest(&restored)?,
-        baseline["classifications_digest"].as_str().ok_or("baseline classes digest")?
+        baseline["classifications_digest"]
+            .as_str()
+            .ok_or("baseline classes digest")?
     );
     for (numeric_id, numerator, denominator) in expected {
         let definition = content
@@ -431,12 +449,28 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
         let source = BehaviorSourceId::Move {
             numeric_id: safe(id),
         };
-        let actual = after.classifications.0.iter().filter(|row| row.behavior_unit.source == source).collect::<Vec<_>>();
-        let expected = baseline["deferred_classifications"].as_array().ok_or("deferred baseline")?.iter()
-            .filter(|row| row["behavior_unit"]["source"] == serde_json::to_value(&source).expect("source serialization"))
-            .cloned().collect::<Vec<_>>();
-        assert_eq!(serde_json::to_value(actual)?, serde_json::to_value(expected)?);
-    }    Ok(())
+        let actual = after
+            .classifications
+            .0
+            .iter()
+            .filter(|row| row.behavior_unit.source == source)
+            .collect::<Vec<_>>();
+        let expected = baseline["deferred_classifications"]
+            .as_array()
+            .ok_or("deferred baseline")?
+            .iter()
+            .filter(|row| {
+                row["behavior_unit"]["source"]
+                    == serde_json::to_value(&source).expect("source serialization")
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            serde_json::to_value(actual)?,
+            serde_json::to_value(expected)?
+        );
+    }
+    Ok(())
 }
 
 #[test]
