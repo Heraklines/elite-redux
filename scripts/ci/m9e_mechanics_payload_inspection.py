@@ -10,7 +10,7 @@ raw = path.read_bytes()
 expected = '9afce9fd3bc6e05e2159f19e8578ff64fc342b8a5974bec5f15648b0799d74d2'
 assert len(raw) == 16325821 and hashlib.sha256(raw).hexdigest() == expected
 battle = json.loads(raw)['battle']
-selected = [38, 71, 165, 577]
+selected = []
 semantic_path = Path(os.environ['RUNNER_TEMP']) / 'm9e-semantic/semantic-catalog-v1.json'
 semantic_raw = semantic_path.read_bytes()
 assert 0 < len(semantic_raw) <= 32 << 20
@@ -55,7 +55,7 @@ result = {
         'programs': [battle['programs'][identifier] for identifier in battle['moves'][unit['id']['source']['numeric_id']]['mechanic_programs']
                      if any(operation['kind'] == 'DRAIN_FRACTION' for operation in battle['programs'][identifier]['operations'])]}
         for unit in semantic['behavior_units'] if unit['semantic']['effect'].get('attribute') == 'HitHealAttr'],
-    'drain_operands': [{'id': unit['id'], 'operands': unit['semantic']['operands']} for unit in semantic['behavior_units'] if unit['semantic']['effect'].get('attribute') == 'HitHealAttr'],
+    'drain_operands': [{'id': unit['id'], 'operands': unit['semantic']['operands'], 'gates': {key: unit['semantic'].get(key) for key in ('condition', 'target', 'hook', 'effect', 'implementation')}} for unit in semantic['behavior_units'] if unit['semantic']['effect'].get('attribute') == 'HitHealAttr'],
     'pack_counts': {
         'moves': sum(row is not None for row in battle['moves']),
         'programs': sum(row is not None for row in battle['programs']),
