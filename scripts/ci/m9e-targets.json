@@ -1,7 +1,6 @@
 {
   "current_recovery_integration": {
     "paths": [
-      "rust/crates/er-content-compiler/tests/m9e_full_content.rs",
       "rust/crates/er-battle/src/m6/routine_executor.rs",
       "rust/crates/er-content-compiler/src/lib.rs",
       "rust/crates/er-content-compiler/src/m9e_full_content.rs",
@@ -98,6 +97,7 @@
       "rust/crates/er-cli/tests/support/m9e_current_state_query.rs",
       "rust/crates/er-game/tests/m9e_run_difficulty.rs",
       "rust/crates/er-kernel/tests/m9e_title_storage.rs",
+      "rust/crates/er-content-compiler/tests/m9e_full_content.rs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",

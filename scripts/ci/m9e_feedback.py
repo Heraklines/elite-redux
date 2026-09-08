@@ -271,7 +271,7 @@ OWNED_EXISTING_TARGET_ADDITIONS = {"er-web:er_web":["host_v2::rebind_transaction
 OWNED_FOUNDATION_INVENTORY = "scripts/ci/m9e-owned-foundations-inventory.json"
 OWNED_FOUNDATION_INVENTORY_SHA256 = "0518465b97faa214637295df44dbbf8edf313a5da86e017f934456295bb2e37d"
 
-RECOVERY_PATHS = [*["rust/crates/er-content-compiler/tests/m9e_full_content.rs","rust/crates/er-battle/src/m6/routine_executor.rs","rust/crates/er-content-compiler/src/lib.rs","rust/crates/er-content-compiler/src/m9e_full_content.rs","rust/crates/er-content-compiler/src/m9e_move_drains.rs","rust/crates/er-game/tests/m9e_move_drains.rs"], *AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
+RECOVERY_PATHS = [*["rust/crates/er-battle/src/m6/routine_executor.rs","rust/crates/er-content-compiler/src/lib.rs","rust/crates/er-content-compiler/src/m9e_full_content.rs","rust/crates/er-content-compiler/src/m9e_move_drains.rs","rust/crates/er-game/tests/m9e_move_drains.rs"], *AI_COMMAND_PATHS, "rust/crates/er-game/src/m9e_runtime_v6.rs",
                   "rust/crates/er-kernel/tests/" + REPLACEMENT_TARGET + ".rs",
                   "src/rust-browser/routes/rust-current-rtc-entry.ts",
                   "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts", *PROGRESSION_PATHS,
@@ -281,6 +281,7 @@ RECOVERY_PATHS += ["rust/crates/er-agent-protocol/src/lib.rs","rust/crates/er-cl
 RECOVERY_PATHS += ["rust/crates/er-web/src/contracts_v2.rs","rust/crates/er-web/src/host_v2.rs","rust/crates/er-web/src/host_v2/rebind_transaction_tests.rs","src/rust-browser/contracts/browser-contracts-v2.ts","src/rust-browser/host/current-rust-browser-host.ts","test/browser/rust-browser/m9e-v7-rebind.spec.ts","test/browser/rust-browser/m9e-v7-worker.spec.ts","test/node/rust-browser/engineering/current-worker-codec.test.ts"]
 RECOVERY_PATHS += ["rust/crates/er-game/tests/m9e_damage_query.rs"]
 RECOVERY_PATHS += ["rust/crates/er-cli/tests/support/m9e_current_state_query.rs","rust/crates/er-game/tests/m9e_run_difficulty.rs","rust/crates/er-kernel/tests/m9e_title_storage.rs"]
+RECOVERY_PATHS += ["rust/crates/er-content-compiler/tests/m9e_full_content.rs"]
 RECOVERY_POLICY = {"paths": RECOVERY_PATHS, "replacement_test_ids": REPLACEMENT_IDS, "progression_test_ids": PROGRESSION_IDS, "checkpoint_test_ids": CHECKPOINT_IDS, "canonical_test_ids": CANONICAL_IDS, "struggle_test_ids": STRUGGLE_IDS, "campaign_test_ids": CAMPAIGN_TEST_IDS, "rng_test_ids": RNG_TEST_IDS, "coop_campaign_test_ids": COOP_CAMPAIGN_IDS, "coop_receipt_test_ids": COOP_RECEIPT_IDS, "xp_test_ids": XP_TEST_IDS, "owned_foundation_test_ids": OWNED_FOUNDATION_TEST_IDS}
 
 
