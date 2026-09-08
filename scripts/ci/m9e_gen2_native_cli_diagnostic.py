@@ -789,7 +789,7 @@ def fixture_inputs(phase):
     return result
 
 
-def execute_target(summary, crate, test_target, test_source, test_ids, *, opt_level="0"):
+def execute_target(summary, crate, test_target, test_source, test_ids, *, opt_level="0", test_threads=1):
     label = crate + "-" + test_target
     library = (crate, test_target) == ("er-agent-protocol", "er_agent_protocol")
     selector = ["--lib"] if library else ["--test", test_target]
@@ -827,7 +827,12 @@ def execute_target(summary, crate, test_target, test_source, test_ids, *, opt_le
                "profile": artifact["profile"], "source_sha256": summary["source_hashes"][test_source],
                "ids": list(test_ids), "listing_bytes": listing.stat().st_size, "listing_sha256": digest(listing)}
     verify_process_executables(summary)
-    output = run([str(binary), "--format", "terse", "--nocapture", "--test-threads=1"], label + "-execute",
+    if test_threads != (2 if opt_level == "1" else 1):
+        raise RuntimeError("only the isolated optimized startup pair runs concurrently")
+    argv = [str(binary), "--format", "terse", "--nocapture", "--test-threads=" + str(test_threads)]
+    receipt["execution_argv"] = argv
+    receipt["execution_cwd"] = str(ROOT / f"rust/crates/{crate}")
+    output = run(argv, label + "-execute",
                  cwd=ROOT / f"rust/crates/{crate}", seconds=600, bound=16384).read_text()
     counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
     if counts != [(str(len(test_ids)), "0", "0", "0", "0")]:
@@ -848,6 +853,8 @@ def execute_optimized_coop_target(summary, target):
     global TARGET
     if target[0:2] != ["er-cli", "m9e_current_coop_startup"]:
         raise RuntimeError("optimized compatibility profile is restricted to the two startup cases")
+    if "ER_M9E_ENTRY_PROGRESS" in os.environ:
+        raise RuntimeError("concurrent isolated cases require no shared progress file")
     previous_target = TARGET
     previous_environment = dict(os.environ)
     previous_bindings = summary["process_executables"]
@@ -865,10 +872,10 @@ def execute_optimized_coop_target(summary, target):
         os.environ["CARGO_TARGET_DIR"] = str(TARGET)
         optimized = {"source_sha": summary["source_sha"], "source_hashes": summary["source_hashes"]}
         executable_bindings(optimized, opt_level="1", label_suffix="-coop-optimized-debug")
-        receipt = execute_target(optimized, *target, opt_level="1")
+        receipt = execute_target(optimized, *target, opt_level="1", test_threads=2)
         summary["optimized_coop_compatibility"] = {
             "target": str(TARGET), "opt_level": "1", "debug_assertions": True,
-            "overflow_checks": True, "whole_target": True,
+            "overflow_checks": True, "whole_target": True, "test_threads": 2,
             "process_executables": optimized["process_executables"],
             "compiler_configuration": {key: os.environ[key] for key in (
                 "CARGO_PROFILE_DEV_OPT_LEVEL", "CARGO_PROFILE_TEST_OPT_LEVEL",
