@@ -446,6 +446,44 @@ fn source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units() -> T
                 .collect::<Vec<_>>()
         );
     }
+    if let Ok(path) = std::env::var("M9E_RECOIL_BASELINE_EXPORT") {
+        let admitted = before
+            .battle
+            .classifications
+            .0
+            .iter()
+            .filter(|row| {
+                changed.iter().any(|id| {
+                    row.behavior_unit.source
+                        == BehaviorSourceId::Move {
+                            numeric_id: safe(*id),
+                        }
+                }) && !after.classifications.0.contains(row)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(admitted.len(), 6);
+        let deferred = before
+            .battle
+            .classifications
+            .0
+            .iter()
+            .filter(|row| {
+                [38, 165, 344, 394, 413, 452, 834, 835]
+                    .iter()
+                    .any(|id| row.behavior_unit.source == BehaviorSourceId::Move { numeric_id: safe(*id) })
+            })
+            .collect::<Vec<_>>();
+        let metadata = serde_json::json!({
+            "schema_version": 1,
+            "program_count": before.battle.programs.len(),
+            "classification_count": before.battle.classifications.0.len(),
+            "programs_digest": er_canonical::content_digest(&before.battle.programs)?,
+            "classifications_digest": er_canonical::content_digest(&before.battle.classifications.0)?,
+            "admitted_classifications": admitted,
+            "deferred_classifications": deferred,
+        });
+        std::fs::write(path, serde_json::to_vec(&metadata)?)?;
+    }
     if let Ok(directory) = std::env::var("M9E_RECOIL_EXPORT") {
         let directory = std::path::Path::new(&directory);
         std::fs::create_dir(directory)?;
