@@ -81,7 +81,7 @@ def main():
                     or len(inventory) != 108 or sum(len(row["ids"]) for row in inventory) != 819
                     or sum(map(len, plan["required_native_targets"].values())) != 64
                     or len(plan["required_native_test_ids"]) != 58
-                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 65):
+                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 66):
                 raise RuntimeError("actual819 full source plan or Browser obligations differ")
             for row in inventory:
                 if not ("*" in plan["execution_scope"].get(row["crate"], [])
@@ -95,7 +95,7 @@ def main():
             if lane_counts != {"a": 701, "b": 12, "c": 14, "d": 78, "e": 4, "f": 10}:
                 raise RuntimeError("exact whole-target balanced lane assignment differs")
             planner = {"lane_counts": lane_counts, "status": "passed", "tests": 819, "targets": 108, "required_targets": 64,
-                       "exact_maps": 58, "owned_sources": 65,
+                       "exact_maps": 58, "owned_sources": 66,
                        "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                        "browser_binding": expected_binding}
         except Exception as error:

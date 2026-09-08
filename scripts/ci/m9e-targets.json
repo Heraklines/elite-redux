@@ -1,6 +1,7 @@
 {
   "current_recovery_integration": {
     "paths": [
+      "rust/crates/er-content-compiler/tests/m9e_full_content.rs",
       "rust/crates/er-battle/src/m6/routine_executor.rs",
       "rust/crates/er-content-compiler/src/lib.rs",
       "rust/crates/er-content-compiler/src/m9e_full_content.rs",
