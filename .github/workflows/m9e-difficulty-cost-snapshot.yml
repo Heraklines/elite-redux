@@ -73,7 +73,7 @@ jobs:
           path: ${{ runner.temp }}/m9e-cost-snapshot/compact/
           if-no-files-found: error
           retention-days: 14
-      - name: Exact small original active snapshot
+      - name: Actual checkpoint preimages retained remotely
         if: success()
         uses: actions/upload-artifact@v6
         with:
@@ -87,5 +87,41 @@ jobs:
         with:
           name: m9e-cost-snapshot-${{ matrix.cohort }}-diagnostics-${{ github.sha }}
           path: ${{ runner.temp }}/m9e-cost-snapshot/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
+  compare:
+    needs: measure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: m9e-cost-snapshot-old-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-pairs/old-summary
+      - uses: actions/download-artifact@v6
+        with:
+          name: m9e-cost-snapshot-new-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-pairs/new-summary
+      - uses: actions/download-artifact@v6
+        with:
+          name: m9e-cost-snapshot-old-packet-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-pairs/old-packet
+      - uses: actions/download-artifact@v6
+        with:
+          name: m9e-cost-snapshot-new-packet-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-pairs/new-packet
+      - name: Enumerate every actual checkpoint difference remotely
+        run: python3 scripts/ci/m9e_compare_cost_snapshots.py
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9e-cost-snapshot-comparison-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-cost-comparison/
           if-no-files-found: error
           retention-days: 14

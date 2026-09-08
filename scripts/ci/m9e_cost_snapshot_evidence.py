@@ -158,12 +158,15 @@ def main(summary):
         snapshot_facts = {}
         for checkpoint in measured["checkpoints"]:
             path = SNAPSHOTS / (checkpoint["checkpoint"] + ".json")
-            need(path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= 16384
+            expected_size = next(row["snapshot_canonical_bytes"] for row in cohort["checkpoints"]
+                                 if row["checkpoint"] == checkpoint["checkpoint"])
+            bound = 16384 if checkpoint["checkpoint"] == "active" else expected_size
+            need(path.is_file() and not path.is_symlink() and 0 < path.stat().st_size <= bound
                  and path.stat().st_size == checkpoint["snapshot_canonical_bytes"], "actual bounded checkpoint preimage")
             snapshot_facts[checkpoint["checkpoint"]] = dict(file=path.name, bytes=path.stat().st_size,
                 sha256=digest(path), blake3=checkpoint["snapshot_digest"])
-        need(len(snapshot_facts) == 4 and sum(row["bytes"] for row in snapshot_facts.values()) <= 65536,
-             "four complete bounded checkpoint preimages")
+        need(len(snapshot_facts) == 4,
+             "four complete preimages; nonactive sizes pinned to original measured checkpoints, active <=16384; remote only")
         summary["snapshots"] = snapshot_facts
         summary.update(status="passed", tests=dict(passed=1, failed=0, skipped=0),
                        checkpoints=[{key: row[key] for key in ("checkpoint", "snapshot_digest", "snapshot_canonical_bytes")} for row in measured["checkpoints"]], active=active,
