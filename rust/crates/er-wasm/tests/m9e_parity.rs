@@ -323,7 +323,7 @@ const GENERATED_METADATA_PARITY: (&str, &str, usize, &str) = (
     "blake3-v1:dc4ab1ede5c52152e40f1dc5579d93841898126903b3047bf66b60efd7646493",
     "b167ad856885c95dab4f1e9cdf1456dd4924f6c4dbc8443e12918f232215192e",
     16_325_821,
-    "c28ac3b994c687413a4d0bcae7c558f0e02dfafd5e9ec3482bbb9462f5598063",
+    "e426cc7e5fef4bf23b2f081d5d0f3fe44b4ceb33046982638a620e1f6cd9276b",
 );
 
 fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option<&'static str> {
