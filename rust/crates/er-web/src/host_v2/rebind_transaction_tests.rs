@@ -372,6 +372,39 @@ impl Peer {
         Ok(capsule)
     }
 
+    fn capture_from_actual_battle(&mut self) -> TestResult {
+        let snapshot = self.host.session()?.snapshot()?;
+        assert!(self.host.session()?.kernel_ref()?.state().is_some());
+        let observation = self.host.session()?.observe()?;
+        let (local_seat, role) = self.host.session()?.session_context()?;
+        let mut restored = Self {
+            host: BrowserKernelHostV2::from_content(content()?),
+        };
+        assert_eq!(
+            restored.send(BrowserRequestV2::Initialize {
+                initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+                    context: BrowserSessionContextV2 {
+                        local_seat,
+                        role,
+                        scheduler: snapshot.scheduler.clone(),
+                        protocol: snapshot.protocol.clone(),
+                    },
+                    snapshot: snapshot.clone(),
+                }),
+            })?,
+            BrowserResponseV2::Ready
+        );
+        assert_eq!(restored.host.session()?.snapshot()?, snapshot);
+        assert_eq!(restored.host.session()?.observe()?, observation);
+        let capsule = restored.export()?;
+        assert_eq!(capsule.checkpoint, snapshot);
+        assert_eq!(capsule.base_position, 0);
+        assert_eq!(capsule.final_position, 0);
+        assert!(capsule.attempts.is_empty());
+        *self = restored;
+        Ok(())
+    }
+
     fn import(&mut self) -> TestResult {
         let capsule = self.export()?;
         let before = self.host.session()?.snapshot()?;
@@ -484,6 +517,12 @@ fn build_pair() -> TestResult<(Peer, Peer)> {
     );
     host.export()?;
     guest.export()?;
+    // Startup above is real adapter execution with its own verified replay.
+    // The rebind witness starts a new public snapshot-based capture at exactly
+    // that reached battle, before disconnect or any rebind control. This keeps
+    // the obsolete starter-menu tail out of the bounded rebind capsule.
+    host.capture_from_actual_battle()?;
+    guest.capture_from_actual_battle()?;
     Ok((host, guest))
 }
 
