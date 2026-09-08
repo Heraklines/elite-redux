@@ -9039,7 +9039,7 @@ class PhaseTransferTests(unittest.TestCase):
             result = self.phases.aggregate(None)
         self.assertEqual(result["tests"], {"selected": 16, "executed": 16, "passed": 16, "failed": 0, "skipped": 0})
         self.assertEqual(result["native_c_manifest_sha256"], self.third_hash)
-        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d", "e"})
+        self.assertEqual(set(result["worker_executables"]), {"a", "b", "c", "d", "e", "f"})
 
     def test_third_lane_is_mandatory_even_for_an_empty_assigned_partition(self):
         for state in ("", "failure", "skipped", "cancelled"):

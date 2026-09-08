@@ -228,7 +228,7 @@ class CoopPolicyTests(unittest.TestCase):
         self.assertEqual(rows, before)
         self.assertEqual(assignment["c"], [])
         self.assertEqual(assignment["d"], [list(coop.KERNEL_TARGET)])
-        self.assertEqual(assignment["e"], [list(phases.STATE_QUERY_TARGET)])
+        self.assertEqual(assignment["f"], [list(phases.STATE_QUERY_TARGET)])
         self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
         self.assertEqual(assignment["a"], [list(coop.ENTRY_TARGET), list(phases.CONTROL_QUERY_TARGET)])
         self.assertEqual(len({tuple(pair) for targets in assignment.values() for pair in targets}), len(rows))
@@ -466,13 +466,14 @@ class CoopPolicyTests(unittest.TestCase):
                                   "native_browser_capsule_replays_through_actual_cli_and_continues"],
                           "historical_excluded_ids": []})
         original = copy.deepcopy(inventory)
-        expected_e = {phases.STATE_QUERY_TARGET, campaign.TARGET,
+        expected_e = {campaign.TARGET,
                       ("er-cli", "m9e_current_coop_rebind"), ("er-cli", "m9e_current_repro")}
         self.assertEqual(phases.LANE_E_TARGETS, expected_e)
         self.assertNotIn(phases.STATE_QUERY_TARGET, phases.LANE_D_TARGETS)
         for rows in (inventory, list(reversed(inventory))):
             assignment = phases.partition(rows)
             self.assertEqual(set(map(tuple, assignment["e"])), expected_e)
+            self.assertEqual(assignment["f"], [list(phases.STATE_QUERY_TARGET)])
             self.assertEqual(assignment["c"], [])
             self.assertEqual(assignment["d"], [])
             self.assertEqual(set(map(tuple, assignment["b"])), {phases.STATE_QUERY_WORKER_TARGET, ("er-lab", "current_worker_rebind_v2")})
