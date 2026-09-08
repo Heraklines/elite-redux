@@ -68,7 +68,14 @@ def main():
                 if not ("*" in plan["execution_scope"].get(row["crate"], [])
                         or row["target"] in plan["execution_scope"].get(row["crate"], [])):
                     raise RuntimeError("actual whole native target omitted")
-            planner = {"status": "passed", "tests": 803, "targets": 105, "required_targets": 61,
+            import m9e_phases as phases
+            partitions = phases.partition(inventory)
+            lane_counts = {lane: sum(len(row["ids"]) for row in inventory
+                                     if [row["crate"], row["target"]] in targets)
+                           for lane, targets in partitions.items()}
+            if lane_counts != {"a": 707, "b": 11, "c": 14, "d": 65, "e": 6}:
+                raise RuntimeError("exact whole-target balanced lane assignment differs")
+            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 803, "targets": 105, "required_targets": 61,
                        "exact_maps": 55, "owned_sources": 55,
                        "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                        "browser_binding": expected_binding}

@@ -6583,9 +6583,6 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
-                                                ("er-repro", "m9e_current_rebind_repro"),
-                                                ("er-cli", "m9e_current_coop_rebind"),
-                                                ("er-lab", "current_worker_rebind_v2"),
                                                 ("er-progression", "m9e_owned_friendship")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 5)
@@ -6883,9 +6880,6 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(self.config, original)
         self.assertEqual(phases.LANE_B_TARGETS, {("er-cli", "m9e_current_repro"),
                                                 ("er-cli", "m9e_current_reload"), phases.STATE_QUERY_WORKER_TARGET,
-                                                ("er-repro", "m9e_current_rebind_repro"),
-                                                ("er-cli", "m9e_current_coop_rebind"),
-                                                ("er-lab", "current_worker_rebind_v2"),
                                                 ("er-progression", "m9e_owned_friendship")})
         self.assertEqual(len(phases.WORKER_TEST_IDS), 2)
         self.assertEqual(len(phases.WORKER_CODEC_IDS), 5)
