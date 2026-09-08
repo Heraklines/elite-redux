@@ -11,6 +11,12 @@ expected = '9afce9fd3bc6e05e2159f19e8578ff64fc342b8a5974bec5f15648b0799d74d2'
 assert len(raw) == 16325821 and hashlib.sha256(raw).hexdigest() == expected
 battle = json.loads(raw)['battle']
 selected = [38, 71, 165, 577]
+semantic_path = root / 'rust/fixtures/m9/solo-entry/semantic/semantic-catalog-v1.json'
+semantic_raw = semantic_path.read_bytes()
+assert 0 < len(semantic_raw) <= 32 << 20
+assert hashlib.sha1(b'blob ' + str(len(semantic_raw)).encode() + b'\0' + semantic_raw).hexdigest() == '40e1bb67265ea4f870962f20bca6ba7cf10add6d'
+semantic = json.loads(semantic_raw)
+assert semantic['oracle_sha'] == battle['oracle_sha']
 rows = []
 for index in selected:
     move = battle['moves'][index]
@@ -21,13 +27,15 @@ for index in selected:
         programs.append(battle['programs'][program_id])
     classifications = [entry for entry in battle['classifications']
                        if entry['behavior_unit']['source'] == {'kind': 'MOVE', 'numeric_id': index}]
-    rows.append({'move': move, 'programs': programs, 'classifications': classifications})
+    rows.append({'move': move, 'programs': programs, 'classifications': classifications,
+                 'source_units': [unit for unit in semantic['behavior_units'] if unit['id']['source'] == {'kind': 'MOVE', 'numeric_id': index}]})
 result = {
     'status': 'observed', 'scope': 'published payload inspection only; no behavior qualification',
     'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
     'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'bundle_sha256': expected,
     'oracle_sha': battle['oracle_sha'],
     'script_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    'semantic_sha256': hashlib.sha256(semantic_raw).hexdigest(),
     'selected_ids': selected, 'rows': rows,
     'pack_counts': {
         'moves': sum(row is not None for row in battle['moves']),
