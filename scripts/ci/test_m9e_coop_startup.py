@@ -444,12 +444,13 @@ class CoopPolicyTests(unittest.TestCase):
                               "historical_excluded_ids": []})
         original = copy.deepcopy(inventory)
         expected_e = {phases.STATE_QUERY_TARGET, campaign.TARGET,
-                      ("er-cli", "m9e_current_coop_rebind"), ("er-lab", "current_worker_rebind_v2")}
+                      ("er-cli", "m9e_current_coop_rebind")}
         self.assertEqual(phases.LANE_E_TARGETS, expected_e)
         self.assertNotIn(phases.STATE_QUERY_TARGET, phases.LANE_D_TARGETS)
         for rows in (inventory, list(reversed(inventory))):
             assignment = phases.partition(rows)
             self.assertEqual(set(map(tuple, assignment["e"])), expected_e)
+            self.assertEqual(assignment["c"], [["er-lab", "current_worker_rebind_v2"]])
             self.assertEqual(assignment["d"], [])
             self.assertEqual(assignment["b"], [list(phases.STATE_QUERY_WORKER_TARGET)])
             self.assertEqual(assignment["a"], [["er-other", phases.STATE_QUERY_TARGET[1]]])
