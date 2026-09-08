@@ -618,77 +618,9 @@ fn browser_rebind_natural_controls_and_generation_two_gameplay_replay() -> TestR
     let (mut host, mut guest) = pair()?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
-    host.settle()?;
-    guest.settle()?;
-    let material = host.next_frame()?;
-    er_game::m9e_material_v6::GameMaterialV6::decode(&material)?;
-    assert!(
-        guest
-            .frames(BrowserRequestV2::NetworkFrame {
-                generation: safe(2),
-                bytes: material
-            })?
-            .is_empty()
-    );
-    host.settle()?;
-    guest.settle()?;
-    let proposal = guest.next_frame()?;
-    let decoded = er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?;
-    assert_eq!(decoded.connection_generation, generation(2));
-    let pending = guest.host.session()?.snapshot()?;
-    assert_eq!(
-        one_frame(&guest.frames(BrowserRequestV2::RetryCoopSetup)?)?,
-        proposal
-    );
-    assert_eq!(guest.host.session()?.snapshot()?, pending);
-    let reply = one_frame(&host.frames(BrowserRequestV2::NetworkFrame {
-        generation: safe(2),
-        bytes: proposal.clone(),
-    })?)?;
-    let receipt = er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV2::decode(&reply)?;
-    assert_eq!(receipt.evidence()?.proposal_bytes, proposal);
-    assert_eq!(
-        receipt.authority_context.connection_generation,
-        generation(2)
-    );
-    assert!(
-        er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV1::decode(&reply).is_err()
-    );
-    let after = host.host.session()?.snapshot()?;
-    assert_eq!(
-        one_frame(&host.frames(BrowserRequestV2::NetworkFrame {
-            generation: safe(2),
-            bytes: proposal
-        })?)?,
-        reply
-    );
-    assert_eq!(host.host.session()?.snapshot()?, after);
-    guest.import()?;
-    assert!(
-        guest
-            .frames(BrowserRequestV2::NetworkFrame {
-                generation: safe(2),
-                bytes: reply.clone()
-            })?
-            .is_empty()
-    );
-    assert!(guest.host.session()?.snapshot()?.current_proposal.is_none());
-    let after = guest.host.session()?.snapshot()?;
-    assert!(
-        guest
-            .frames(BrowserRequestV2::NetworkFrame {
-                generation: safe(2),
-                bytes: reply
-            })?
-            .is_empty()
-    );
-    assert_eq!(guest.host.session()?.snapshot()?, after);
-    assert!(guest.settle()? > 0);
-    host.settle()?;
-    assert_eq!(
-        host.host.session()?.kernel_ref()?.state(),
-        guest.host.session()?.kernel_ref()?.state()
-    );
+    deliver_generation_two_material(&mut host, &mut guest)?;
+    let reply = produce_generation_two_reply(&mut host, &mut guest)?;
+    receive_generation_two_reply(&mut host, &mut guest, reply)?;
     for (index, peer) in [&mut host, &mut guest].into_iter().enumerate() {
         let capsule = peer.export()?;
         let controls = capsule
@@ -722,6 +654,97 @@ fn browser_rebind_natural_controls_and_generation_two_gameplay_replay() -> TestR
         }
         peer.import()?;
     }
+    Ok(())
+}
+
+// Keep snapshot-heavy phases in separate frames on the default test stack.
+#[inline(never)]
+fn deliver_generation_two_material(host: &mut Peer, guest: &mut Peer) -> TestResult {
+    host.settle()?;
+    guest.settle()?;
+    let material = host.next_frame()?;
+    er_game::m9e_material_v6::GameMaterialV6::decode(&material)?;
+    assert!(
+        guest
+            .frames(BrowserRequestV2::NetworkFrame {
+                generation: safe(2),
+                bytes: material
+            })?
+            .is_empty()
+    );
+    host.settle()?;
+    guest.settle()?;
+    Ok(())
+}
+
+#[inline(never)]
+fn produce_generation_two_reply(host: &mut Peer, guest: &mut Peer) -> TestResult<Vec<u8>> {
+    let proposal = guest.next_frame()?;
+    let decoded = er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?;
+    assert_eq!(decoded.connection_generation, generation(2));
+    let pending = guest.host.session()?.snapshot()?;
+    assert_eq!(
+        one_frame(&guest.frames(BrowserRequestV2::RetryCoopSetup)?)?,
+        proposal
+    );
+    assert_eq!(guest.host.session()?.snapshot()?, pending);
+    let reply = one_frame(&host.frames(BrowserRequestV2::NetworkFrame {
+        generation: safe(2),
+        bytes: proposal.clone(),
+    })?)?;
+    let receipt = er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV2::decode(&reply)?;
+    assert_eq!(receipt.evidence()?.proposal_bytes, proposal);
+    assert_eq!(
+        receipt.authority_context.connection_generation,
+        generation(2)
+    );
+    assert!(
+        er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV1::decode(&reply).is_err()
+    );
+    let after = host.host.session()?.snapshot()?;
+    assert_eq!(
+        one_frame(&host.frames(BrowserRequestV2::NetworkFrame {
+            generation: safe(2),
+            bytes: proposal
+        })?)?,
+        reply
+    );
+    assert_eq!(host.host.session()?.snapshot()?, after);
+    Ok(reply)
+}
+
+#[inline(never)]
+fn receive_generation_two_reply(
+    host: &mut Peer,
+    guest: &mut Peer,
+    reply: Vec<u8>,
+) -> TestResult {
+    guest.import()?;
+    assert!(
+        guest
+            .frames(BrowserRequestV2::NetworkFrame {
+                generation: safe(2),
+                bytes: reply.clone()
+            })?
+            .is_empty()
+    );
+    assert!(guest.host.session()?.snapshot()?.current_proposal.is_none());
+    let after = guest.host.session()?.snapshot()?;
+    assert!(
+        guest
+            .frames(BrowserRequestV2::NetworkFrame {
+                generation: safe(2),
+                bytes: reply
+            })?
+            .is_empty()
+    );
+    assert_eq!(guest.host.session()?.snapshot()?, after);
+    assert!(guest.settle()? > 0);
+    host.settle()?;
+    assert_eq!(
+        host.host.session()?.kernel_ref()?.state(),
+        guest.host.session()?.kernel_ref()?.state()
+    );
     Ok(())
 }
 
