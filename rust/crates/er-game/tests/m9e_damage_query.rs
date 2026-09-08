@@ -595,3 +595,141 @@ fn current_damage_query_zero_and_inactive_inputs_leave_state_unchanged() -> Test
     assert_eq!(fainted_target, fainted_target_before);
     Ok(())
 }
+
+#[test]
+fn current_immune_turn_preserves_hp_and_skips_only_damage_variance() -> TestResult {
+    let (content, original) = fixture()?;
+    let mut state = controlled_state(&content, original)?;
+    state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping {
+        primary: PokemonType::Ghost,
+        secondary: Some(PokemonType::Fire),
+    };
+    state.validate()?;
+    let run = state.active_run.as_ref().ok_or("run missing")?;
+    let battle = run.battle.as_ref().ok_or("battle missing")?;
+    let source = field(run, BattleSide::Enemy)?;
+    let target = field(run, BattleSide::Player)?;
+    let actor = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.slot == source)
+        .and_then(|slot| slot.occupant)
+        .ok_or("enemy occupant missing")?;
+    let command = ScriptedEnemyBattleCommandV1::new(
+        scripted_enemy_command_operation_id(
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            source,
+            SafeU53::ZERO,
+        )?,
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        SafeU53::ZERO,
+        actor,
+        source,
+        BattleCommand::fight(
+            actor,
+            MoveSlotIndex::new(0)?,
+            BattleTargetSelection::selected(vec![target])?,
+        )?,
+    )?;
+    let commands = CommandSet::new(vec![AcceptedBattleCommand::scripted_enemy(command)])?;
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: battle.authority_seat,
+        revision: safe(1),
+    };
+    let baseline = resolve_turn_v5(&state, &commands, &content.battle, &authority)?;
+    let before_bytes = serde_json::to_vec(&state)?;
+    for (slot, expected) in [(0, 0), (1, 13), (1, 13), (0, 0)] {
+        assert_eq!(query(&content, &state, slot)?, expected);
+        assert_eq!(serde_json::to_vec(&state)?, before_bytes);
+    }
+    let after_queries = resolve_turn_v5(&state, &commands, &content.battle, &authority)?;
+    assert_eq!(after_queries.rng_audit, baseline.rng_audit);
+    assert_eq!(after_queries, baseline);
+    assert_eq!(serde_json::to_vec(&state)?, before_bytes);
+    let damage_draws = baseline
+        .rng_audit
+        .iter()
+        .filter(|draw| draw.reason == RngReason::DamageVariance)
+        .collect::<Vec<_>>();
+    assert_eq!(damage_draws.len(), 0);
+    let damage_reasons = baseline
+        .rng_audit
+        .iter()
+        .filter(|draw| {
+            matches!(
+                draw.reason,
+                RngReason::Accuracy | RngReason::CriticalHit | RngReason::DamageVariance
+            )
+        })
+        .map(|draw| draw.reason)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        damage_reasons,
+        vec![
+            RngReason::Accuracy,
+            RngReason::CriticalHit
+        ]
+    );
+    for draw in &baseline.rng_audit {
+        draw.validate()?;
+    }
+    let after_run = baseline
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("after run missing")?;
+    assert_eq!(after_run.party[0].hp, run.party[0].hp);
+    assert_eq!(after_run.run_rng, run.run_rng);
+    assert_eq!(
+        after_run
+            .battle
+            .as_ref()
+            .ok_or("after battle missing")?
+            .enemy_party[0]
+            .moves[0]
+            .ok_or("after enemy move missing")?
+            .pp_used,
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn current_immunity_queries_preserve_zero_minimum_damage_and_typeless_struggle() -> TestResult {
+    let (content, original) = fixture()?;
+    let baseline = controlled_state(&content, original)?;
+    for (slot, primary) in [(0, PokemonType::Ghost), (1, PokemonType::Dark)] {
+        for secondary in [None, Some(PokemonType::Normal)] {
+            let mut state = baseline.clone();
+            state.active_run.as_mut().ok_or("run")?.party[0].types = PokemonTyping { primary, secondary };
+            state.validate()?;
+            let before = serde_json::to_vec(&state)?;
+            assert_eq!(query(&content, &state, slot)?, 0);
+            assert_eq!(query(&content, &state, slot)?, 0);
+            assert_eq!(serde_json::to_vec(&state)?, before);
+        }
+    }
+    assert_eq!(query(&content, &baseline, 0)?, 46);
+    let mut resisted = baseline.clone();
+    let run = resisted.active_run.as_mut().ok_or("run")?;
+    run.party[0].types = PokemonTyping { primary: PokemonType::Flying, secondary: Some(PokemonType::Poison) };
+    run.party[0].stats.defense = 100_000;
+    resisted.validate()?;
+    assert_eq!(query(&content, &resisted, 0)?, 1);
+    let mut exhausted = baseline.clone();
+    let run = exhausted.active_run.as_mut().ok_or("run")?;
+    run.party[0].types = PokemonTyping { primary: PokemonType::Ghost, secondary: None };
+    for slot in run.battle.as_mut().ok_or("battle")?.enemy_party[0].moves.iter_mut().flatten() {
+        slot.pp_used = 20;
+    }
+    exhausted.validate()?;
+    let before = serde_json::to_vec(&exhausted)?;
+    assert!(query(&content, &exhausted, 0)? > 0);
+    assert_eq!(serde_json::to_vec(&exhausted)?, before);
+    Ok(())
+}
