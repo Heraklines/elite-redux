@@ -12,7 +12,7 @@ import time
 BASE = "af3e7824ba7c204a48a5ba9d1123f37736cadd8c"
 SOURCE = "rust/crates/er-game/tests/m9e_run_difficulty.rs"
 CI = [".github/workflows/m9e-run-difficulty-focused.yml", "scripts/ci/m9e_run_difficulty_diagnostic.py"]
-DELTAS = json.loads(r'''{"after":{"rust/crates/er-game/src/m9e_material_v6.rs":"7ebefdf8fd78878154564554a1d566b02246578a6d22198e9540a7a0f6add835","rust/crates/er-game/src/m9e_new_run_v6.rs":"0dbd2ace8ff9e6d4b064b0279bfc90bbb587051e37782a8837760de1de63ec44","rust/crates/er-game/src/m9e_runtime_v6.rs":"b910e8a9a708942ea4df944106204817f9664dae83c320fa7eb962a00a1e6327","rust/crates/er-game/tests/m9e_material_retention.rs":"7ae7c17c0be080b5f6bfe19d5012c04369003a22e2dfa4d2794b76d0f804db5b","rust/crates/er-game/tests/m9e_run_difficulty.rs":"4856b0ffa97c572dee0a22f05c4d01b51a161e9c30f7693050db22653447acb7","rust/crates/er-game/tests/m9e_runtime_v6.rs":"f8d05269eb16f3d017ced44f8b70c03dd2a9dd7d2522077127535aa853130ff7","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs":"96d5746d55c11dbda1e14e6ce94d2e918aadf15d3d2773c14c43e1b78585bd74","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs":"1ad4f345710c3ee4bd8333ce5b5d089a4838a5338efce32d37cf6ef8c249b70f","rust/crates/er-save/src/m9e_save_v2.rs":"4ce731b6dff6078339c7fa1ceb624f505ed961720ed00005389253d09865b5f8","rust/crates/er-state/src/m9e_state_v6.rs":"6e0937529780f4cb50c65122173a68820c4823bdfb9569ff8b46583cf9d8e9fb","rust/crates/er-game/tests/m9e_material_v6.rs":"346b30f656a1934e250aa217585139ad8d816b4a5b99c7c5f7e183498b068135","rust/crates/er-game/tests/m9e_content_v2.rs":"949be46f3f140e7250ac87b97b12552560533d4e1e4d61e4e363f2143a78fe47"},"before":{"rust/crates/er-state/src/m9e_state_v6.rs":"c14440b7e248256288f65712c9f660cb1f69a572666ede9597f271d2f54e627f","rust/crates/er-game/src/m9e_new_run_v6.rs":"b854bdc3decbecce6d3f75eee194d1f187facf3a79c5edc2cd0fa6e2a3ac1478","rust/crates/er-game/src/m9e_runtime_v6.rs":"8b7915641190ab9de735a42c3cf2e67a95e9abad4fc9b778dc3e6180350f7ed6","rust/crates/er-game/src/m9e_material_v6.rs":"923b991279112c390c787768a44860f1ac57174f59782e5a39387ebca836ad0f","rust/crates/er-game/tests/m9e_runtime_v6.rs":"97f208d8d77d6afb99c7bee19c8d36914c700fc4c20b82fa60d1f695f4f05c34","rust/crates/er-game/tests/m9e_material_retention.rs":"33cdf461523dbe13ca38582f73e8175d64cd62cf367682af3c1d6168aa0c38f4","rust/crates/er-save/src/m9e_save_v2.rs":"cabb1d0de57778aa82aa77423f73e2156987296d0e2e849f38ae334026f37b5b","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs":"48599e1eef12df8fc3e418f5dd619c8aab96a5d37fd0096b915288781e72f7de","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs":"be5f4fbe18665b09b36e5a53f10ea5d38140e200ec0604577f29affed322de1c","rust/crates/er-game/tests/m9e_material_v6.rs":"bff3f3c6e3d4365e3ab9522d842cbd6191b03214d1f6cd6bd1438e20c467ba51","rust/crates/er-game/tests/m9e_content_v2.rs":"c7a2278f7cb8bdaa4699168bfe5ea64f76e9e00898791891cd9154c3b1d6c1b2"}}''')
+DELTAS = json.loads(r'''{"after":{"rust/crates/er-game/src/m9e_material_v6.rs":"7ebefdf8fd78878154564554a1d566b02246578a6d22198e9540a7a0f6add835","rust/crates/er-game/src/m9e_new_run_v6.rs":"0dbd2ace8ff9e6d4b064b0279bfc90bbb587051e37782a8837760de1de63ec44","rust/crates/er-game/src/m9e_runtime_v6.rs":"b910e8a9a708942ea4df944106204817f9664dae83c320fa7eb962a00a1e6327","rust/crates/er-game/tests/m9e_material_retention.rs":"7ae7c17c0be080b5f6bfe19d5012c04369003a22e2dfa4d2794b76d0f804db5b","rust/crates/er-game/tests/m9e_run_difficulty.rs":"4856b0ffa97c572dee0a22f05c4d01b51a161e9c30f7693050db22653447acb7","rust/crates/er-game/tests/m9e_runtime_v6.rs":"f8d05269eb16f3d017ced44f8b70c03dd2a9dd7d2522077127535aa853130ff7","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs":"96d5746d55c11dbda1e14e6ce94d2e918aadf15d3d2773c14c43e1b78585bd74","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs":"1ad4f345710c3ee4bd8333ce5b5d089a4838a5338efce32d37cf6ef8c249b70f","rust/crates/er-save/src/m9e_save_v2.rs":"4ce731b6dff6078339c7fa1ceb624f505ed961720ed00005389253d09865b5f8","rust/crates/er-state/src/m9e_state_v6.rs":"6e0937529780f4cb50c65122173a68820c4823bdfb9569ff8b46583cf9d8e9fb","rust/crates/er-game/tests/m9e_material_v6.rs":"346b30f656a1934e250aa217585139ad8d816b4a5b99c7c5f7e183498b068135","rust/crates/er-game/tests/m9e_content_v2.rs":"949be46f3f140e7250ac87b97b12552560533d4e1e4d61e4e363f2143a78fe47","rust/crates/er-game/tests/m9e_battle_participation.rs":"41053fbc84418e1265f2b0b67040aed62f60bc7d5979a52d31a8da857896c647"},"before":{"rust/crates/er-state/src/m9e_state_v6.rs":"c14440b7e248256288f65712c9f660cb1f69a572666ede9597f271d2f54e627f","rust/crates/er-game/src/m9e_new_run_v6.rs":"b854bdc3decbecce6d3f75eee194d1f187facf3a79c5edc2cd0fa6e2a3ac1478","rust/crates/er-game/src/m9e_runtime_v6.rs":"8b7915641190ab9de735a42c3cf2e67a95e9abad4fc9b778dc3e6180350f7ed6","rust/crates/er-game/src/m9e_material_v6.rs":"923b991279112c390c787768a44860f1ac57174f59782e5a39387ebca836ad0f","rust/crates/er-game/tests/m9e_runtime_v6.rs":"97f208d8d77d6afb99c7bee19c8d36914c700fc4c20b82fa60d1f695f4f05c34","rust/crates/er-game/tests/m9e_material_retention.rs":"33cdf461523dbe13ca38582f73e8175d64cd62cf367682af3c1d6168aa0c38f4","rust/crates/er-save/src/m9e_save_v2.rs":"cabb1d0de57778aa82aa77423f73e2156987296d0e2e849f38ae334026f37b5b","rust/crates/er-kernel/tests/m9e_material_retention_v7.rs":"48599e1eef12df8fc3e418f5dd619c8aab96a5d37fd0096b915288781e72f7de","rust/crates/er-kernel/tests/m9e_snapshot_v7.rs":"be5f4fbe18665b09b36e5a53f10ea5d38140e200ec0604577f29affed322de1c","rust/crates/er-game/tests/m9e_material_v6.rs":"bff3f3c6e3d4365e3ab9522d842cbd6191b03214d1f6cd6bd1438e20c467ba51","rust/crates/er-game/tests/m9e_content_v2.rs":"c7a2278f7cb8bdaa4699168bfe5ea64f76e9e00898791891cd9154c3b1d6c1b2","rust/crates/er-game/tests/m9e_battle_participation.rs":"b2df2425e62954a034fa04c3bffa248c4aafc0a7262d778ca508b0248fef3fab"}}''')
 ROOT = Path.cwd().resolve()
 RUNNER = Path(os.environ["RUNNER_TEMP"]).resolve()
 OUT = RUNNER / "m9e-run-difficulty"
@@ -78,7 +78,7 @@ def main():
     (OUT / "diagnostics").mkdir()
     TARGET.mkdir()
     os.environ["CARGO_TARGET_DIR"] = str(TARGET)
-    result = {"status": "failed", "qualification": "four natural run difficulty ownership tests; not complete M9 qualification",
+    result = {"status": "failed", "qualification": "fifteen whole tests: captured difficulty and natural battle transitions; not complete M9 qualification",
               "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": BASE,
               "tests_executed": 0, "commands": COMMANDS}
@@ -135,38 +135,42 @@ def main():
                 "ambient compiler flags prohibited")
         require(not os.environ.get("RUST_MIN_STACK") and not os.environ.get("RUST_TEST_THREADS"),
                 "ordinary default stack and libtest execution required")
-        selector = ["-p", "er-game", "--test", "m9e_run_difficulty"]
-        run("proposal-clippy", ["cargo", "clippy", "--locked", "-p", "er-game", "--tests", "--no-deps", "--", "-D", "warnings"], ROOT / "rust")
+        selector = ["-p", "er-game", "--test", "m9e_run_difficulty", "--test", "m9e_battle_participation"]
+        run("proposal-clippy", ["cargo", "clippy", "--locked", "-p", "er-game", "-p", "er-kernel", "-p", "er-save", "--tests", "--no-deps", "--", "-D", "warnings"], ROOT / "rust")
         raw = run("proposal-build", ["cargo", "test", "--locked", *selector, "--no-run", "--message-format=json"], ROOT / "rust")
         rows = [json.loads(line) for line in raw.splitlines() if line.startswith(b"{")]
         require([row.get("success") for row in rows if row.get("reason") == "build-finished"] == [True], "complete successful Cargo artifact stream required")
-        artifacts = [row for row in rows if row.get("reason") == "compiler-artifact" and row.get("target", {}).get("name") == "m9e_run_difficulty"]
-        require(len(artifacts) == 1, "exact complete proposal artifact required")
-        artifact = artifacts[0]
-        profile = artifact["profile"]
-        binary = Path(artifact.get("executable") or "")
-        require(artifact.get("manifest_path") == str(ROOT / "rust/crates/er-game/Cargo.toml")
-                and artifact["target"]["src_path"] == str(ROOT / "rust/crates/er-game/tests/m9e_run_difficulty.rs")
-                and artifact["target"]["kind"] == ["test"] and artifact.get("features") == []
-                and profile["test"] is True and profile["opt_level"] == "0"
-                and profile["debug_assertions"] is True and profile["overflow_checks"] is True
-                and profile["debuginfo"] == 0
-                and binary.is_absolute() and binary.parent == TARGET / "debug/deps"
-                and binary.is_file() and not binary.is_symlink() and binary.resolve() == binary
-                and re.fullmatch(r"m9e_run_difficulty-[0-9a-f]{16}", binary.name)
-                and 0 < binary.stat().st_size <= 128 << 20, "actual proposal artifact/source/profile differs")
-        ids = ["historical_absence_remains_unknown_and_canonical_on_save_restore", "malformed_completed_selection_and_wrong_run_ownership_are_rejected", "natural_choices_survive_material_save_restore_and_continued_dispatch", "same_run_material_cannot_change_erase_or_invent_difficulty"]
-        listing = run("proposal-list", [str(binary), "--list", "--format", "terse"], ROOT / "rust/crates/er-game", maximum=16384)
-        require(listing == "".join(name + ": test\n" for name in ids).encode(), "four exact unfiltered target IDs required")
-        binary_hash = sha(binary.read_bytes())
-        result["artifact"] = {"profile": profile, "target": artifact["target"], "manifest_path": artifact["manifest_path"],
-                              "path": str(binary), "bytes": binary.stat().st_size, "sha256": binary_hash,
-                              "ids": ids, "listing_bytes": len(listing), "listing_sha256": sha(listing)}
-        output = run("proposal-execute", [str(binary), "--format", "terse"], ROOT / "rust/crates/er-game", maximum=16384)
-        require(re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output) == [(b"4", b"0", b"0", b"0", b"0")], "all four whole difficulty target tests must pass")
-        require(sha(binary.read_bytes()) == binary_hash, "executed artifact changed")
-        result["tests_executed"] = 4
-        result["tests"] = {"passed": 4, "failed": 0, "ignored": 0, "filtered": 0}
+        targets = {"m9e_run_difficulty": ["historical_absence_remains_unknown_and_canonical_on_save_restore", "malformed_completed_selection_and_wrong_run_ownership_are_rejected", "natural_choices_survive_material_save_restore_and_continued_dispatch", "same_run_material_cannot_change_erase_or_invent_difficulty"], "m9e_battle_participation": ["current_faint_membership_uses_stable_ids_and_removes_player_after_recording","historical_owner_absence_preserves_canonical_bytes","malformed_evidence_capacity_and_counter_failures_roll_back","natural_bootstrap_switch_and_ko_preserve_legacy_gameplay","natural_enemy_faint_owns_unresolved_experience_without_applying_amount","next_natural_battle_retains_occurrence_highwater","observed_save_snapshot_and_material_replay_preserve_ownership","pending_experience_counter_exhaustion_rolls_back_real_enemy_faint","pending_experience_restore_rejects_source_policy_and_frontier_forgeries","pending_experience_survives_real_save_replay_and_rejects_owner_stripping_material","pending_experience_unsettled_tail_rejects_actions_and_next_encounter"]}
+        artifacts = [row for row in rows if row.get("reason") == "compiler-artifact" and row.get("executable")]
+        require(len(artifacts) == 2 and {row["target"]["name"] for row in artifacts} == set(targets), "two exact whole target executables required")
+        result["artifacts"] = []
+        for artifact in sorted(artifacts, key=lambda row: row["target"]["name"]):
+            name = artifact["target"]["name"]
+            ids = targets[name]
+            profile = artifact["profile"]
+            binary = Path(artifact.get("executable") or "")
+            require(artifact.get("manifest_path") == str(ROOT / "rust/crates/er-game/Cargo.toml")
+                    and artifact["target"]["src_path"] == str(ROOT / ("rust/crates/er-game/tests/" + name + ".rs"))
+                    and artifact["target"]["kind"] == ["test"] and artifact.get("features") == []
+                    and profile["test"] is True and profile["opt_level"] == "0"
+                    and profile["debug_assertions"] is True and profile["overflow_checks"] is True and profile["debuginfo"] == 0
+                    and binary.is_absolute() and binary.parent == TARGET / "debug/deps"
+                    and binary.is_file() and not binary.is_symlink() and binary.resolve() == binary
+                    and re.fullmatch(re.escape(name) + r"-[0-9a-f]{16}", binary.name)
+                    and 0 < binary.stat().st_size <= 128 << 20, "actual whole artifact/source/profile differs")
+            listing = run(name + "-list", [str(binary), "--list", "--format", "terse"], ROOT / "rust/crates/er-game", maximum=16384)
+            require(listing == "".join(test + ": test\n" for test in ids).encode(), "exact unfiltered target IDs required")
+            binary_hash = sha(binary.read_bytes())
+            result["artifacts"].append({"profile": profile, "target": artifact["target"], "manifest_path": artifact["manifest_path"],
+                                       "path": str(binary), "bytes": binary.stat().st_size, "sha256": binary_hash,
+                                       "ids": ids, "listing_bytes": len(listing), "listing_sha256": sha(listing)})
+            output = run(name + "-execute", [str(binary), "--format", "terse"], ROOT / "rust/crates/er-game", maximum=16384)
+            require(re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
+                    == [(str(len(ids)).encode(), b"0", b"0", b"0", b"0")], "every whole-target test must pass")
+            require(sha(binary.read_bytes()) == binary_hash, "executed artifact changed")
+            result["tests_executed"] += len(ids)
+        require(result["tests_executed"] == 15, "all four new and eleven prior tests required")
+        result["tests"] = {"passed": 15, "failed": 0, "ignored": 0, "filtered": 0}
         require(sha((ROOT / SOURCE).read_bytes()) == DELTAS["after"][SOURCE], "lint changed reviewed source")
         for path, expected in result["source_hashes"].items():
             require(sha((ROOT / path).read_bytes()) == expected,

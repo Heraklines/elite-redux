@@ -45,13 +45,13 @@ jobs:
           test "$remaining" -gt 0
           timeout "$((remaining < 600 ? remaining : 600))" git fetch --no-tags --depth=1 origin af3e7824ba7c204a48a5ba9d1123f37736cadd8c
       - name: Restore existing dependency downloads
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - name: Qualify all four run difficulty tests
+      - name: Qualify all fifteen natural difficulty and battle tests
         run: python3 scripts/ci/m9e_run_difficulty_diagnostic.py
       - name: Compact run difficulty result
         if: always()
