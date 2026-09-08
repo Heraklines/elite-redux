@@ -27,9 +27,26 @@ def main():
     paths = sorted({*ROOT.glob("scripts/ci/test_m9e*.py"),
                     *(ROOT / name for name in (
                         "scripts/ci/m9e_feedback.py", "scripts/ci/m9e_phases.py", "scripts/ci/m9e_browser_rebind.py",
+                        "scripts/ci/m9e_friendship_inputs.py", ".github/workflows/m9e-focused-feedback.yml",
                         "scripts/ci/m9e_browser_integration_preflight.py", "scripts/ci/m9e-owned-foundations-inventory.json",
                         "scripts/ci/m9e-targets.json", "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
                         ".github/workflows/m9e-browser-integration-preflight.yml"))})
+    import m9e_friendship_inputs as friendship
+    receipt_path = Path(os.environ["RUNNER_TEMP"]) / "m9e-feedback/full/qualified-oracle.json"
+    if (receipt_path.is_symlink() or not receipt_path.is_file()
+            or not 0 < receipt_path.stat().st_size <= 16384):
+        raise RuntimeError("actual qualified friendship receipt required")
+    receipt = json.loads(receipt_path.read_bytes())
+    expected_inputs = {name: {"bytes": size, "sha256": sha, "member": "generated/" + name}
+                       for name, (size, sha) in friendship.ORACLE_FILES.items()}
+    if receipt["files"] != expected_inputs or receipt["source_run"]["id"] != friendship.ORACLE_RUN:
+        raise RuntimeError("qualified friendship source identity differs")
+    for name, expected in expected_inputs.items():
+        path = receipt_path.parent / "qualified-oracle" / name
+        if (path.is_symlink() or not path.is_file() or path.stat().st_size != expected["bytes"]
+                or digest(path) != expected["sha256"]):
+            raise RuntimeError("actual original friendship input differs")
+    receipt["receipt_sha256"] = digest(receipt_path)
     before = {str(path.relative_to(ROOT)): digest(path) for path in paths}
     log = FULL / "harness-tests.log"
     argv = [sys.executable, "-m", "unittest", "discover", "-s", "scripts/ci", "-p", "test_m9e*.py", "-v"]
@@ -92,7 +109,7 @@ def main():
                "elapsed_seconds": round(time.monotonic() - started, 3), "including_checkout_seconds": round(elapsed, 3),
                "source_hashes": before, "source_unchanged": before == after,
                "log_bytes": len(raw), "log_sha256": hashlib.sha256(raw).hexdigest(),
-               "planner": planner, "planner_error": planner_error,
+               "planner": planner, "planner_error": planner_error, "friendship_inputs": receipt,
                "native_qualified": False, "browser_qualified": False, "full_integration_qualified": False}
     payload = (json.dumps(summary, sort_keys=True, separators=(",", ":")) + "\n").encode()
     if len(payload) > 16384:

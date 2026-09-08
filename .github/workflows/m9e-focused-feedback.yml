@@ -113,6 +113,9 @@ jobs:
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
 
   native_b:
+    permissions:
+      contents: read
+      actions: read
     outputs:
       manifest_sha256: ${{ steps.native.outputs.native_manifest_sha256 }}
       has_cli: ${{ steps.native.outputs.has_cli }}
@@ -149,12 +152,18 @@ jobs:
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - name: Prepare qualified friendship observations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: timeout --signal=TERM --kill-after=5s 120s python3 scripts/ci/m9e_friendship_inputs.py
       - name: Complete native checks and evidence
         id: native
         env:
           M9E_REPORT_DIR: ${{ runner.temp }}/m9e-feedback
           M9E_PHASE: native
           M9E_PHASE_DIR: ${{ runner.temp }}/m9e-phase
+          M9_FRIENDSHIP_COMPARISON_INPUT: ${{ runner.temp }}/m9e-feedback/full/qualified-oracle/export-one.json
+          M9_FRIENDSHIP_EFFECTS_INPUT: ${{ runner.temp }}/m9e-feedback/full/qualified-oracle/effects-one.json
         run: python3 scripts/ci/m9e_feedback.py
       # Only successful complete native checks publish these single-file payloads.
       # Producer checks raw bytes/count before upload (64 KiB proof, 128 MiB CLI).

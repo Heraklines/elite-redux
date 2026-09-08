@@ -5,6 +5,7 @@ on:
       - 'codex/m9e-browser-integration-preflight-*'
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: m9e-browser-integration-preflight-${{ github.ref }}
   cancel-in-progress: true
@@ -24,6 +25,11 @@ jobs:
           persist-credentials: false
           lfs: false
           submodules: false
+      - name: Verify qualified friendship input preparation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          M9E_NATIVE_LANE: b
+        run: timeout --signal=TERM --kill-after=5s 120s python3 scripts/ci/m9e_friendship_inputs.py
       - name: All harness tests on exact source
         run: python3 scripts/ci/m9e_browser_integration_preflight.py
       - name: Bounded summary
