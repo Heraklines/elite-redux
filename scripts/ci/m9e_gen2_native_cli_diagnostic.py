@@ -713,13 +713,13 @@ def compile_reverse_consumers(summary):
         "check_log_sha256": digest(build), "executed": False,
     }
 
-def executable_bindings(summary):
-    version = run(["rustc", "--version", "--verbose"], "compiler-host", seconds=30, bound=16384).read_text()
+def executable_bindings(summary, *, opt_level="0", label_suffix=""):
+    version = run(["rustc", "--version", "--verbose"], "compiler-host" + label_suffix, seconds=30, bound=16384).read_text()
     hosts = re.findall(r"^host: ([a-z0-9_]+-[a-z0-9_-]+)$", version, re.M)
     if hosts != ["x86_64-unknown-linux-gnu"]:
         raise RuntimeError("actual Ubuntu runner compiler host differs")
     build = run(["cargo", "build", "--locked", "-p", "er-cli", "-p", "er-kernel-worker",
-                 "--bins", "--message-format=json"], "actual-cli-and-worker-binaries")
+                 "--bins", "--message-format=json"], "actual-cli-and-worker-binaries" + label_suffix)
     rows = [json.loads(line) for line in build.read_text().splitlines() if line.startswith("{")]
     if [row.get("success") for row in rows if row.get("reason") == "build-finished"] != [True]:
         raise RuntimeError("actual CLI and Worker binary build did not complete")
@@ -737,7 +737,8 @@ def executable_bindings(summary):
         if (artifact.get("manifest_path") != str(ROOT / f"rust/crates/{crate}/Cargo.toml")
                 or artifact["target"].get("src_path") != str(ROOT / source)
                 or artifact.get("features") != []
-                or artifact["profile"].get("opt_level") != "0"
+                or artifact["profile"].get("opt_level") != opt_level
+                or artifact["profile"].get("overflow_checks") is not True
                 or artifact["profile"].get("debug_assertions") is not True
                 or artifact["profile"].get("debuginfo") != 0
                 or not path.is_absolute() or path.is_symlink() or not path.is_file()
@@ -788,7 +789,7 @@ def fixture_inputs(phase):
     return result
 
 
-def execute_target(summary, crate, test_target, test_source, test_ids):
+def execute_target(summary, crate, test_target, test_source, test_ids, *, opt_level="0"):
     label = crate + "-" + test_target
     library = (crate, test_target) == ("er-agent-protocol", "er_agent_protocol")
     selector = ["--lib"] if library else ["--test", test_target]
@@ -810,8 +811,9 @@ def execute_target(summary, crate, test_target, test_source, test_ids):
             or artifact.get("features") != [] or artifact.get("target", {}).get("kind") != (["lib"] if library else ["test"])
             or artifact["target"].get("src_path") != str(ROOT / test_source)
             or artifact.get("profile", {}).get("test") is not True
-            or artifact["profile"].get("debug_assertions") is not True
-            or artifact["profile"].get("opt_level") != "0" or artifact["profile"].get("debuginfo") != 0
+            or artifact["profile"].get("overflow_checks") is not True
+                or artifact["profile"].get("debug_assertions") is not True
+            or artifact["profile"].get("opt_level") != opt_level or artifact["profile"].get("debuginfo") != 0
             or not binary.is_absolute() or binary.is_symlink() or not binary.is_file()
             or binary.resolve() != binary or binary.parent != TARGET / "debug/deps"
             or not re.fullmatch(test_target + "-[0-9a-f]{16}", binary.name)
@@ -835,6 +837,53 @@ def execute_target(summary, crate, test_target, test_source, test_ids):
     verify_process_executables(summary)
     receipt["tests"] = {"executed": len(test_ids), "passed": len(test_ids), "failed": 0, "skipped": 0}
     return receipt
+
+def execute_optimized_coop_target(summary, target):
+    """Preserve the established opt-level=1 debug profile of the legacy startup cases.
+
+    A fresh nested target directory keeps both compiler artifacts and child binaries
+    separate from the unoptimized rebind qualification. All existing command and
+    shared limits apply; these results are never labelled opt-level=0.
+    """
+    global TARGET
+    if target[0:2] != ["er-cli", "m9e_current_coop_startup"]:
+        raise RuntimeError("optimized compatibility profile is restricted to the two startup cases")
+    previous_target = TARGET
+    previous_environment = dict(os.environ)
+    previous_bindings = summary["process_executables"]
+    verify_process_executables(summary)
+    try:
+        TARGET = previous_target / "coop-optimized-debug"
+        if TARGET.exists() or TARGET.is_symlink() or TARGET.parent != previous_target:
+            raise RuntimeError("optimized debug target must be fresh and contained")
+        for profile in ("DEV", "TEST"):
+            os.environ.update({f"CARGO_PROFILE_{profile}_OPT_LEVEL": "1",
+                               f"CARGO_PROFILE_{profile}_DEBUG": "0",
+                               f"CARGO_PROFILE_{profile}_DEBUG_ASSERTIONS": "true",
+                               f"CARGO_PROFILE_{profile}_OVERFLOW_CHECKS": "true"})
+        os.environ["CARGO_ENCODED_RUSTFLAGS"] = "-Copt-level=1\x1f-Cdebug-assertions=yes\x1f-Coverflow-checks=yes"
+        os.environ["CARGO_TARGET_DIR"] = str(TARGET)
+        optimized = {"source_sha": summary["source_sha"], "source_hashes": summary["source_hashes"]}
+        executable_bindings(optimized, opt_level="1", label_suffix="-coop-optimized-debug")
+        receipt = execute_target(optimized, *target, opt_level="1")
+        summary["optimized_coop_compatibility"] = {
+            "target": str(TARGET), "opt_level": "1", "debug_assertions": True,
+            "overflow_checks": True, "whole_target": True,
+            "process_executables": optimized["process_executables"],
+            "compiler_configuration": {key: os.environ[key] for key in (
+                "CARGO_PROFILE_DEV_OPT_LEVEL", "CARGO_PROFILE_TEST_OPT_LEVEL",
+                "CARGO_PROFILE_DEV_DEBUG_ASSERTIONS", "CARGO_PROFILE_TEST_DEBUG_ASSERTIONS",
+                "CARGO_PROFILE_DEV_OVERFLOW_CHECKS", "CARGO_PROFILE_TEST_OVERFLOW_CHECKS",
+                "CARGO_PROFILE_DEV_DEBUG", "CARGO_PROFILE_TEST_DEBUG", "CARGO_ENCODED_RUSTFLAGS")}}
+        return receipt
+    finally:
+        TARGET = previous_target
+        os.environ.clear()
+        os.environ.update(previous_environment)
+        if summary["process_executables"] != previous_bindings:
+            raise RuntimeError("unoptimized process evidence changed during compatibility run")
+        verify_process_executables(summary)
+
 
 def main(summary):
     global STARTED_AT, DEADLINE, run_bounded
@@ -894,9 +943,16 @@ def main(summary):
     compile_reverse_consumers(summary)
     executable_bindings(summary)
     summary["test_artifacts"] = {}
+    optimized_targets = [target for target in TARGETS if target[0:2] == ["er-cli", "m9e_current_coop_startup"]]
+    if len(optimized_targets) != 1 or len(optimized_targets[0][3]) != 2:
+        raise RuntimeError("exact two-case optimized compatibility target required")
     for crate, test_target, test_source, test_ids in TARGETS:
+        if [crate, test_target] == ["er-cli", "m9e_current_coop_startup"]:
+            continue
         summary["test_artifacts"][crate + ":" + test_target] = execute_target(
             summary, crate, test_target, test_source, test_ids)
+    summary["test_artifacts"]["er-cli:m9e_current_coop_startup"] = execute_optimized_coop_target(
+        summary, optimized_targets[0])
     if any(digest(ROOT / name) != expected for name, expected in summary["source_hashes"].items()):
         raise RuntimeError("actual source changed during execution")
     if fixture_inputs("after") != summary["fixture_inputs"]:
@@ -911,7 +967,7 @@ if __name__ == "__main__":
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
                "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"], "base_sha": BASE_SHA,
-               "qualification": "41 complete tests including all five current protocol library tests: new actual native CLI rebind journey, existing CLI entry/capture/co-op/replay including actual Worker regressions, and all20 qualified session/repro/kernel tests; all115 targets of twelve reverse consumers compile and lint. New rebind method supports native CLI only; no new Worker rebind or browser qualification"}
+               "qualification": "41 complete tests: 39 unoptimized debug cases and the two existing startup cases in their established opt-level=1 debug profile, including all five current protocol library tests: new actual native CLI rebind journey, existing CLI entry/capture/co-op/replay including actual Worker regressions, and all20 qualified session/repro/kernel tests; all115 targets of twelve reverse consumers compile and lint. New rebind method supports native CLI only; no new Worker rebind or browser qualification"}
     try:
         main(summary)
         summary["status"] = "passed"
