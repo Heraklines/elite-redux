@@ -31,9 +31,18 @@ pub fn query_ordinary_attack_score(
     let damage = query_simulated_move_damage_v5(content, run, source_slot, move_slot, target_slot)?;
     let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
     let occupant = |slot| {
-        battle.field.slots.iter().find(|field| field.slot == slot)
+        battle
+            .field
+            .slots
+            .iter()
+            .find(|field| field.slot == slot)
             .and_then(|field| field.occupant)
-            .and_then(|id| run.party.iter().chain(battle.enemy_party.iter()).find(|pokemon| pokemon.id == id))
+            .and_then(|id| {
+                run.party
+                    .iter()
+                    .chain(battle.enemy_party.iter())
+                    .find(|pokemon| pokemon.id == id)
+            })
     };
     let actor = occupant(source_slot).ok_or(BattleV5Error::Target)?;
     let target = occupant(target_slot).ok_or(BattleV5Error::Target)?;

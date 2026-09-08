@@ -757,9 +757,25 @@ fn current_ordinary_ai_score_uses_actual_damage_bulk_and_knockout_boundary() -> 
         let run = state.active_run.as_ref().ok_or("run missing")?;
         let source = field(run, BattleSide::Enemy)?;
         let target = field(run, BattleSide::Player)?;
-        let physical = query_ordinary_attack_score(&content.battle, run, source, MoveSlotIndex::new(0)?, target)?;
-        let special = query_ordinary_attack_score(&content.battle, run, source, MoveSlotIndex::new(1)?, target)?;
-        let (high, low) = if inverted { (special, physical) } else { (physical, special) };
+        let physical = query_ordinary_attack_score(
+            &content.battle,
+            run,
+            source,
+            MoveSlotIndex::new(0)?,
+            target,
+        )?;
+        let special = query_ordinary_attack_score(
+            &content.battle,
+            run,
+            source,
+            MoveSlotIndex::new(1)?,
+            target,
+        )?;
+        let (high, low) = if inverted {
+            (special, physical)
+        } else {
+            (physical, special)
+        };
         assert_eq!(high.damage, 46);
         assert_eq!(low.damage, 13);
         assert_eq!(high.score.to_bits(), 8.625_f64.to_bits());
@@ -773,7 +789,13 @@ fn current_ordinary_ai_score_uses_actual_damage_bulk_and_knockout_boundary() -> 
     state.validate()?;
     let before = serde_json::to_vec(&state)?;
     let run = state.active_run.as_ref().ok_or("run missing")?;
-    let score = query_ordinary_attack_score(&content.battle, run, field(run, BattleSide::Enemy)?, MoveSlotIndex::new(1)?, field(run, BattleSide::Player)?)?;
+    let score = query_ordinary_attack_score(
+        &content.battle,
+        run,
+        field(run, BattleSide::Enemy)?,
+        MoveSlotIndex::new(1)?,
+        field(run, BattleSide::Player)?,
+    )?;
     assert_eq!(score.damage, 46);
     assert_eq!(score.score.to_bits(), 1008.625_f64.to_bits());
     assert_eq!(serde_json::to_vec(&state)?, before);
@@ -789,31 +811,70 @@ fn current_ordinary_ai_score_queries_preserve_full_turn_and_rng_audit() -> TestR
     let battle = run.battle.as_ref().ok_or("battle missing")?;
     let source = field(run, BattleSide::Enemy)?;
     let target = field(run, BattleSide::Player)?;
-    let actor = battle.field.slots.iter().find(|slot| slot.slot == source)
-        .and_then(|slot| slot.occupant).ok_or("enemy occupant missing")?;
+    let actor = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.slot == source)
+        .and_then(|slot| slot.occupant)
+        .ok_or("enemy occupant missing")?;
     let command = ScriptedEnemyBattleCommandV1::new(
-        scripted_enemy_command_operation_id(battle.battle_id, battle.wave, battle.turn, source, SafeU53::ZERO)?,
-        battle.battle_id, battle.wave, battle.turn, SafeU53::ZERO, actor, source,
-        BattleCommand::fight(actor, MoveSlotIndex::new(1)?, BattleTargetSelection::selected(vec![target])?)?,
+        scripted_enemy_command_operation_id(
+            battle.battle_id,
+            battle.wave,
+            battle.turn,
+            source,
+            SafeU53::ZERO,
+        )?,
+        battle.battle_id,
+        battle.wave,
+        battle.turn,
+        SafeU53::ZERO,
+        actor,
+        source,
+        BattleCommand::fight(
+            actor,
+            MoveSlotIndex::new(1)?,
+            BattleTargetSelection::selected(vec![target])?,
+        )?,
     )?;
     let commands = CommandSet::new(vec![AcceptedBattleCommand::scripted_enemy(command)])?;
-    let authority = TurnAuthorityContextV1 { authority_seat: battle.authority_seat, revision: safe(1) };
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: battle.authority_seat,
+        revision: safe(1),
+    };
     let before = serde_json::to_vec(&state)?;
     let baseline = resolve_turn_v5(&state, &commands, &content.battle, &authority)?;
     for slot in [0, 1, 1, 0, 2] {
-        let observed = query_ordinary_attack_score(&content.battle, run, source, MoveSlotIndex::new(slot)?, target)?;
+        let observed = query_ordinary_attack_score(
+            &content.battle,
+            run,
+            source,
+            MoveSlotIndex::new(slot)?,
+            target,
+        )?;
         if slot == 2 {
             assert_eq!(observed.damage, 0);
             assert_eq!(observed.score.to_bits(), 0.0_f64.to_bits());
         }
         assert_eq!(serde_json::to_vec(&state)?, before);
     }
-    assert!(query_ordinary_attack_score(&content.battle, run, source, MoveSlotIndex::new(3)?, target).is_err());
+    assert!(
+        query_ordinary_attack_score(&content.battle, run, source, MoveSlotIndex::new(3)?, target)
+            .is_err()
+    );
     assert_eq!(serde_json::to_vec(&state)?, before);
     let after_queries = resolve_turn_v5(&state, &commands, &content.battle, &authority)?;
     assert_eq!(after_queries.rng_audit, baseline.rng_audit);
     assert_eq!(after_queries, baseline);
     assert_eq!(serde_json::to_vec(&state)?, before);
-    assert_eq!(baseline.rng_audit.iter().filter(|draw| draw.reason == RngReason::DamageVariance && draw.consumed).count(), 1);
+    assert_eq!(
+        baseline
+            .rng_audit
+            .iter()
+            .filter(|draw| draw.reason == RngReason::DamageVariance && draw.consumed)
+            .count(),
+        1
+    );
     Ok(())
 }

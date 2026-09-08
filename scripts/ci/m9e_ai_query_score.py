@@ -21,7 +21,7 @@ TARGET = RUNNER / "m9e-ai-query-score-target"
 START = float(os.environ["M9E_STARTED_AT"])
 DEADLINE = START + 1800
 COMMANDS = []
-PRODUCTS = {"rust/crates/er-game/src/lib.rs":"933678c6d1fef09602e3272c84dcb3f8ec62039da6e254a8ac49cfd9c6390eb3","rust/crates/er-game/src/m9e_ai_score_query.rs":"3f1bf2fce8ef454bfdbbbb4cd21fe695135a770c2512e3c5a9753830fee8f889","rust/crates/er-game/tests/m9e_damage_query.rs":"7f5091d4ebb7baf93d8e68fb092d23df2ae5b8f747cd48fffe6cc2f77cf41dfe"}
+PRODUCTS = {"rust/crates/er-game/src/lib.rs":"eb7889d78ded4c5d86bda24e85d99ac8b767e5d938512dcbbcbf85d9543ef15e","rust/crates/er-game/src/m9e_ai_score_query.rs":"6b5b008bd60607ae1ae9de2c1fc508968fe585c42e390ae75cb38b18ef2f49fa","rust/crates/er-game/tests/m9e_damage_query.rs":"8a248df5313aecaa109c582d63cd9014f7223c9a45e85cda772073183e1d1996"}
 
 def require(ok, reason):
     if not ok:
