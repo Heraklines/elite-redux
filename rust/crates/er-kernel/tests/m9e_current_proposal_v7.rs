@@ -31,6 +31,7 @@ use er_types::{
     TimeClass,
 };
 use std::error::Error;
+use std::io::Write;
 use std::sync::Arc;
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -840,11 +841,12 @@ fn assert_other_receipt(
 #[test]
 fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
 -> Result<(), Box<dyn Error>> {
-    eprintln!(
+    writeln!(
+        std::io::stderr().lock(),
         "m9e proposal test entered; kernel={} snapshot={}",
         std::mem::size_of::<GameKernelV7>(),
         std::mem::size_of::<CoreGameKernelSnapshotV7>()
-    );
+    )?;
     let content = content()?;
     let generation = ConnectionGeneration::new(safe(1));
     ordinary_publication_atomicity(content.clone())?;
@@ -1145,11 +1147,12 @@ fn submit_strongest_move(
 #[test]
 fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
 -> Result<(), Box<dyn Error>> {
-    eprintln!(
+    writeln!(
+        std::io::stderr().lock(),
         "m9e proposal test entered; kernel={} snapshot={}",
         std::mem::size_of::<GameKernelV7>(),
         std::mem::size_of::<CoreGameKernelSnapshotV7>()
-    );
+    )?;
     let content = content()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
