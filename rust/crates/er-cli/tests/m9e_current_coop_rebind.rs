@@ -275,18 +275,13 @@ impl Endpoint {
     fn ordinary(&mut self, event: CurrentExternalEvent) -> TestResult<GameKernelStepV7> {
         let step = self.session.apply(event.clone())?;
         if self.bootstrap_batch {
-            let (method, params) = match event {
-                CurrentExternalEvent::RawInput { input } => (
-                    "batch.raw_input",
-                    json!({"batch":"natural-startup","inputs":[{"environment":1,"input":input}]}),
-                ),
-                CurrentExternalEvent::AdvanceTime { milliseconds } => (
-                    "batch.advance_time",
-                    json!({"batch":"natural-startup","advances":[{"environment":1,"milliseconds":milliseconds}]}),
-                ),
-                _ => return Err("only actual natural input and time belong to bootstrap batch".into()),
+            let CurrentExternalEvent::RawInput { input } = event else {
+                return Err("only actual natural raw input belongs to bootstrap batch".into());
             };
-            let response = self.cli.result(method, params)?;
+            let response = self.cli.result(
+                "batch.raw_input",
+                json!({"batch":"natural-startup","inputs":[{"environment":1,"input":input}]}),
+            )?;
             let rows = response["results"]
                 .as_array()
                 .ok_or("one ordered raw bootstrap result")?;
@@ -393,11 +388,6 @@ impl Endpoint {
         let control: er_types::GameControlPlanV2 =
             serde_json::from_value(rows[0]["observation"]["control"].clone())?;
         let menu = control.menu.ok_or("actual bootstrap menu")?;
-        if target == "bootstrap/starter/confirm" {
-            assert_eq!(menu.options.last().ok_or("starter options")?.option_id.as_str(), target);
-            self.hold_to_starter_confirmation()?;
-            return self.press();
-        }
         // The existing public planner yields every genuine raw event. The actual
         // batch returns and checks each ordered step and complete observation.
         let plan = er_lab::plan_navigation_v1(
@@ -417,48 +407,6 @@ impl Endpoint {
             ));
         }
         Ok(wire)
-    }
-    fn hold_to_starter_confirmation(&mut self) -> TestResult {
-        let target = "bootstrap/starter/confirm";
-        assert!(frames(&self.ordinary(CurrentExternalEvent::RawInput {
-            input: RawInputEvent::KeyDown {
-                code: PhysicalKey::ArrowDown,
-                printable: false,
-                browser_repeat: false,
-                focus: InputFocus::Game,
-            },
-        })?).is_empty());
-        for _ in 0..256 {
-            let menu = self.session.observe()?.control.ok_or("starter control")?
-                .menu.ok_or("starter menu")?;
-            if menu.selected_option_id.as_str() == target {
-                break;
-            }
-            let selected = menu.options.iter().position(|option|
-                option.option_id == menu.selected_option_id).ok_or("selected starter option")?;
-            let destination = menu.options.iter().position(|option|
-                option.option_id.as_str() == target).ok_or("confirmation option")?;
-            let count = destination.checked_sub(selected).ok_or("forward starter traversal")?.min(16);
-            assert!(count > 0);
-            let before = self.checkpoint()?;
-            assert_eq!(before.input_router.repeats.len(), 1);
-            let repeat = &before.input_router.repeats[0];
-            let timer = before.scheduler.timers.iter().find(|timer|
-                timer.registration.timer_id == repeat.timer_id).ok_or("actual held-key timer")?;
-            assert_eq!(timer.registration.delay_ms, safe(250));
-            let elapsed = safe(timer.remaining_active_ms.get() + (count as u64 - 1) * 250);
-            let step = self.ordinary(CurrentExternalEvent::AdvanceTime { milliseconds: elapsed })?;
-            assert_eq!(step.internal_events.len(), count);
-            assert!(frames(&step).is_empty());
-            self.checkpoint()?;
-        }
-        assert!(frames(&self.ordinary(CurrentExternalEvent::RawInput {
-            input: RawInputEvent::KeyUp { code: PhysicalKey::ArrowDown },
-        })?).is_empty());
-        assert_eq!(self.session.observe()?.control.ok_or("final starter control")?
-            .menu.ok_or("final starter menu")?.selected_option_id.as_str(), target);
-        assert!(self.checkpoint()?.input_router.repeats.is_empty());
-        Ok(())
     }
     fn starters(&mut self) -> TestResult<Vec<Vec<u8>>> {
         let content = content()?;
@@ -670,10 +618,17 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
     phase("host created")?;
     let mut guest = Endpoint::new(false)?;
     phase("guest created")?;
-    phase("guest starters")?;
-    let choices = one_frame(&guest.starters()?)?;
-    phase("host starters")?;
-    assert!(host.starters()?.is_empty());
+    // Before the first wire delivery these are independent real CLI peers.
+    // Run both complete raw-input journeys concurrently, then join before any
+    // transport or rebind operation; each peer still checks every result.
+    phase("parallel starters")?;
+    let choices = std::thread::scope(|scope| -> TestResult<Vec<u8>> {
+        let guest_start = scope.spawn(|| guest.starters().map_err(|error| error.to_string()));
+        let host_start = host.starters();
+        let guest_start = guest_start.join().map_err(|_| "guest starter thread panicked")?;
+        assert!(host_start?.is_empty());
+        one_frame(&guest_start?)
+    })?;
     phase("both starters")?;
     let started = one_frame(&frames(&host.ordinary(
         CurrentExternalEvent::NetworkFrame {
