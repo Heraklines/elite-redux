@@ -60,7 +60,7 @@ def main():
     count = int(found[0][0]) if len(found) == 1 else None
     planner = None
     planner_error = None
-    if result.returncode == 0 and count == 480:
+    if result.returncode == 0 and count == 481:
         try:
             os.environ["M9E_REPORT_DIR"] = str(REPORT / "planner")
             import m9e_feedback as feedback
@@ -103,11 +103,11 @@ def main():
             (COMPACT / "planner-failure.txt").write_text(planner_error[:16000] + "\n")
     after = {str(path.relative_to(ROOT)): digest(path) for path in paths}
     elapsed = time.time() - int(os.environ["M9E_PREFLIGHT_STARTED"])
-    passed = (result.returncode == 0 and count == 480 and planner is not None and before == after
+    passed = (result.returncode == 0 and count == 481 and planner is not None and before == after
               and 0 < elapsed <= 540 and 0 < len(raw) <= 256 << 10)
     summary = {"status": "passed" if passed else "failed", "source_sha": source,
                "run_id": os.environ["GITHUB_RUN_ID"], "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-               "tests": count, "expected_tests": 480, "returncode": result.returncode, "execution_argv": argv,
+               "tests": count, "expected_tests": 481, "returncode": result.returncode, "execution_argv": argv,
                "elapsed_seconds": round(time.monotonic() - started, 3), "including_checkout_seconds": round(elapsed, 3),
                "source_hashes": before, "source_unchanged": before == after,
                "log_bytes": len(raw), "log_sha256": hashlib.sha256(raw).hexdigest(),
