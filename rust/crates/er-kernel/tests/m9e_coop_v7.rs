@@ -720,6 +720,7 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
             semantic: presentation.semantic,
             blocking: presentation.blocking,
             skip: presentation.skip,
+            payload: presentation.payload.clone(),
         });
     collision_snapshot
         .pending_presentations
@@ -863,6 +864,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         semantic,
         blocking: mapping.blocking,
         skip: mapping.skip,
+        payload: None,
     };
     let authority_presentations: Vec<_> = authority_step
         .effects
@@ -913,6 +915,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         semantic: expected_presentation.semantic,
         blocking: expected_presentation.blocking,
         skip: expected_presentation.skip,
+        payload: expected_presentation.payload.clone(),
     };
     assert_eq!(
         authority_snapshot.pending_presentations.as_slice(),

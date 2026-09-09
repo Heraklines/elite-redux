@@ -11,6 +11,21 @@ use crate::current_battle_participation::{
 };
 use crate::m7_state::RunStateV3;
 
+#[path = "current_friendship_phase.rs"]
+mod friendship_phase;
+pub use friendship_phase::{
+    CurrentFriendshipAwardV1, CurrentFriendshipClockPurposeV1, CurrentFriendshipClockRequestV1,
+    CurrentFriendshipHeadV1, CurrentFriendshipPhaseV1,
+};
+
+/// Established only by the explicit fresh account's ordinary Classic launch.
+/// Historical pending owners do not acquire this provenance during restoration.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CurrentExperienceExecutionOriginV1 {
+    FreshNormalClassic,
+}
+
 pub const CURRENT_EXPERIENCE_ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 pub const MAX_PENDING_EXPERIENCE_V1: usize = 6;
 
@@ -77,6 +92,10 @@ pub struct CurrentPendingExperienceV1 {
     /// Actual party order; includes ineligible members. It is NOT an eligible-recipient count.
     pub recipients: Vec<CurrentExperienceRecipientV1>,
     pub continuation: CurrentExperienceContinuationV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub friendship: Option<CurrentFriendshipPhaseV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub victory: Option<crate::current_victory_execution::CurrentVictoryExecutionV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -90,6 +109,10 @@ pub struct CurrentExperienceOwnerV1 {
     pub mode: GameModeId,
     pub cap_policy: CurrentExperienceCapPolicyV1,
     pub encounter: CurrentExperienceEncounterV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_origin: Option<CurrentExperienceExecutionOriginV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_progression: Option<crate::current_source_progression::CurrentSourceProgressionV1>,
     pub enemy_sources: Vec<CurrentExperienceSourceV1>,
     pub next_observation: SafeU53,
     pub next_pending_id: SafeU53,
@@ -132,6 +155,8 @@ impl CurrentExperienceOwnerV1 {
             mode: run.mode,
             cap_policy,
             encounter,
+            execution_origin: None,
+            source_progression: None,
             enemy_sources,
             next_observation: observation.next_occurrence,
             next_pending_id: SafeU53::new(1).map_err(|_| CurrentExperienceOwnerError::Invalid)?,
@@ -151,6 +176,12 @@ impl CurrentExperienceOwnerV1 {
             .battle
             .as_ref()
             .ok_or(CurrentExperienceOwnerError::Invalid)?;
+        if self.source_progression.as_ref().is_some_and(|source| {
+            self.execution_origin != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
+                || source.profile_owner != self.authority || !source.valid(run)
+        }) {
+            return Err(CurrentExperienceOwnerError::Invalid);
+        }
         if self.content_identity.oracle_sha.as_str() != CURRENT_EXPERIENCE_ORACLE
             || self.run != observation.run
             || self.run != run.run_id
@@ -208,6 +239,16 @@ impl CurrentExperienceOwnerV1 {
         }
         let recipients = recipient_snapshot(run)?;
         for (index, (pending, faint)) in self.pending.iter().zip(expected).enumerate() {
+            match (&self.execution_origin, &pending.friendship) {
+                (Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic), Some(phase)) => {
+                    phase.validate(pending)?;
+                    if pending.victory.as_ref().is_some_and(|victory|
+                        !phase.complete || !victory.valid(pending.id))
+                    { return Err(CurrentExperienceOwnerError::Invalid); }
+                }
+                (None, None) if pending.victory.is_none() => {}
+                _ => return Err(CurrentExperienceOwnerError::Invalid),
+            }
             let source = self
                 .enemy_sources
                 .iter()
@@ -316,6 +357,8 @@ impl CurrentExperienceOwnerV1 {
                 participants: faint.participants.clone(),
                 recipients: recipient_snapshot(run)?,
                 continuation: continuation(battle.outcome),
+                friendship: self.execution_origin.map(|_| CurrentFriendshipPhaseV1::default()),
+                victory: None,
             });
             candidate.next_pending_id = next;
         }

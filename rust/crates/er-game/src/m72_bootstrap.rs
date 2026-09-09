@@ -17,6 +17,10 @@ use thiserror::Error;
 
 pub const RUN_BOOTSTRAP_SCHEMA_VERSION_V1: u32 = 1;
 
+#[path = "current_starter_pokerus.rs"]
+pub mod current_pokerus;
+pub use current_pokerus::CurrentStarterPokerusOwnerV1;
+
 #[path = "current_bootstrap_storage.rs"]
 mod current_storage;
 pub use current_storage::{
@@ -90,6 +94,8 @@ pub struct RunBootstrapMachineV1 {
     pub pressed_keys: BTreeSet<PhysicalKey>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_storage: Option<CurrentBootstrapStorageV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_starter_pokerus: Option<CurrentStarterPokerusOwnerV1>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -168,6 +174,7 @@ impl RunBootstrapMachineV1 {
             catalog,
             pressed_keys: BTreeSet::new(),
             current_storage: None,
+            current_starter_pokerus: None,
         };
         value.replace_control(owner_seat)?;
         value.validate()?;
@@ -193,11 +200,12 @@ impl RunBootstrapMachineV1 {
             owner.validate().map_err(|_| RunBootstrapErrorV1::Invalid)?;
         }
         self.validate_starters()?;
-        self.validate_current_storage()
+        self.validate_current_storage()?;
+        self.validate_starter_pokerus()
     }
 
     pub fn raw_input(&mut self, input: RawInputEvent) -> Result<bool, RunBootstrapErrorV1> {
-        if self.current_storage.is_some() {
+        if self.current_storage.is_some() || self.current_starter_pokerus.is_some() {
             self.validate()?;
             let mut candidate = self.clone();
             let changed = candidate.raw_input_transaction(input)?;
@@ -282,7 +290,7 @@ impl RunBootstrapMachineV1 {
     }
 
     pub fn apply_game_action(&mut self, action: GameActionV1) -> Result<(), RunBootstrapErrorV1> {
-        if self.current_storage.is_some() {
+        if self.current_storage.is_some() || self.current_starter_pokerus.is_some() {
             self.validate()?;
             let menu = self
                 .control
@@ -310,7 +318,10 @@ impl RunBootstrapMachineV1 {
         action
             .validate(self.catalog.developer_mode)
             .map_err(|_| RunBootstrapErrorV1::IllegalAction)?;
+        self.check_starter_pokerus_action(&action)?;
+        let previous_stage = self.stage;
         self.apply_action(action)?;
+        self.synchronize_starter_pokerus(previous_stage)?;
         if self.stage != RunBootstrapStageV1::Complete {
             let owner = self
                 .control
@@ -339,7 +350,7 @@ impl RunBootstrapMachineV1 {
                     .iter()
                     .find(|entry| entry.mode == mode)
                     .ok_or(RunBootstrapErrorV1::IllegalAction)?;
-                if !policy.supported || (self.current_storage.is_some() && policy.cooperative) {
+                if !policy.supported || ((self.current_storage.is_some() || self.current_starter_pokerus.is_some()) && policy.cooperative) {
                     return Err(RunBootstrapErrorV1::UnsupportedMode);
                 }
                 self.selections.mode = Some(mode);
@@ -532,7 +543,7 @@ impl RunBootstrapMachineV1 {
             owner,
             revision,
             instance,
-            self.current_storage.as_ref(),
+            (self.current_storage.as_ref(), self.current_starter_pokerus.as_ref()),
         )?;
         Ok(())
     }
@@ -545,8 +556,12 @@ fn build_control(
     owner: SeatId,
     revision: SafeU53,
     instance: MenuInstanceId,
-    storage: Option<&CurrentBootstrapStorageV1>,
+    extensions: (Option<&CurrentBootstrapStorageV1>, Option<&CurrentStarterPokerusOwnerV1>),
 ) -> Result<GameControlPlanV2, RunBootstrapErrorV1> {
+    let (storage, pokerus) = extensions;
+    if let Some(entries) = current_pokerus::control_entries(stage, pokerus) {
+        return build_menu_control(stage, owner, revision, instance, entries);
+    }
     if let Some(entries) = current_storage::control_entries(stage, storage)? {
         return build_menu_control(stage, owner, revision, instance, entries);
     }

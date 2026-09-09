@@ -144,6 +144,10 @@ pub enum BrowserRequestV2 {
         request_id: PlatformRequestId,
         result: BrowserStorageResultV2,
     },
+    UtcClockResult {
+        request_id: PlatformRequestId,
+        utc_milliseconds: i64,
+    },
     PresentationSettled {
         event_id: PresentationEventId,
         outcome: BrowserPresentationOutcomeV2,
@@ -187,6 +191,9 @@ pub struct BrowserStorageRequestV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserEffectV2 {
+    UtcClockRequest {
+        request_id: PlatformRequestId,
+    },
     UiChanged {
         control: GameControlPlanV2,
     },

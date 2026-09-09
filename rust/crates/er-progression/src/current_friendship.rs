@@ -271,13 +271,7 @@ pub(crate) fn prepare_friendship_head(
     if resolved.boosted_amount < 0.0 {
         return Err(CurrentFriendshipError::Input);
     }
-    let next = safe(before_friendship + resolved.boosted_amount)?;
-    let capped = if resolved.capped && next > 200.0 {
-        before_friendship.max(200.0)
-    } else {
-        next
-    };
-    plan.friendship = capped.min(255.0);
+    plan.friendship = positive_friendship_value(before_friendship, resolved.boosted_amount, resolved.capped)?;
     if resolved.fun_debug {
         return Ok(FriendshipHead {
             plan,
@@ -313,6 +307,22 @@ pub(crate) fn prepare_friendship_head(
         plan,
         has_tail: true,
     })
+}
+
+// Shared with the phase bridge: no timed-event or account input is read by the
+// source Pokemon head, which precedes the achievement and timed-event calls.
+pub(crate) fn positive_friendship_value(
+    before_friendship: f64,
+    boosted_amount: f64,
+    is_capped: bool,
+) -> Result<f64, CurrentFriendshipError> {
+    let next = safe(before_friendship + boosted_amount)?;
+    let capped = if is_capped && next > 200.0 {
+        before_friendship.max(200.0)
+    } else {
+        next
+    };
+    Ok(capped.min(255.0))
 }
 
 pub(crate) fn continue_friendship_tail(

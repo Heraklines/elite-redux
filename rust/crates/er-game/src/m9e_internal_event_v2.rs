@@ -38,6 +38,11 @@ pub enum StorageResultV2 {
     reason = "Preserve the public by-value transition payload; changing its ownership is a separate API change"
 )]
 pub enum GameInternalEventV2 {
+    OwnedPhaseRequested {
+        operation_id: OperationId,
+        authority_seat: SeatId,
+        phase: crate::m9e_runtime_v6::GameOwnedPhaseV1,
+    },
     ControlSelected {
         action: GameActionV1,
         context: GameActionDispatchContextV1,
@@ -92,6 +97,7 @@ pub enum GameInternalEventV2 {
 )]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GameInternalEventKindV2 {
+    OwnedPhaseRequested,
     ControlSelected,
     ControlCancelled,
     ProposalPrepared,
@@ -152,6 +158,7 @@ pub struct GameInternalEventQueueV2 {
 impl GameInternalEventV2 {
     pub const fn kind(&self) -> GameInternalEventKindV2 {
         match self {
+            Self::OwnedPhaseRequested { .. } => GameInternalEventKindV2::OwnedPhaseRequested,
             Self::ControlSelected { .. } => GameInternalEventKindV2::ControlSelected,
             Self::ControlCancelled { .. } => GameInternalEventKindV2::ControlCancelled,
             Self::ProposalPrepared { .. } => GameInternalEventKindV2::ProposalPrepared,

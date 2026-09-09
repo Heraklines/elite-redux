@@ -47,6 +47,10 @@ fn state(content: &PreparedGameContentV2) -> Result<GameStateV6, Box<dyn Error>>
         current_battle_participation: None,
         current_run_difficulty: None,
         current_targeting: None,
+        current_turn_execution: None,
+        current_defender_dispatch: None,
+        current_achievement_tracker: None,
+        current_presentation: None,
         current_friendship_profile: None,
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: content.identity().clone(),
@@ -149,6 +153,7 @@ fn typed_pending_effects_cross_validate_allocator_and_content() -> Result<(), Bo
         semantic: PresentationSemanticIdV1::Control(GameControlKindV2::Waiting),
         blocking: PresentationBlockingPolicy::NonBlocking,
         skip: PresentationSkipPolicy::Allowed,
+        payload: None,
     });
     snapshot.validate(&content)?;
 

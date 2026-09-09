@@ -140,6 +140,17 @@ impl<'a> CurrentTargetExecution<'a> {
         run: &RunStateV3,
         pokemon: &PokemonStateV5,
     ) -> Result<Vec<BehaviorSourceId>, CurrentTargetExecutionError> {
+        Ok(self.ability_sources_with_slots(run, pokemon)?
+            .into_iter().map(|(source, _)| source).collect())
+    }
+
+    /// Preserve the actual admitted innate slot before ability-ID deduplication.
+    /// A disabled earlier duplicate must never acquire a later slot's provenance.
+    pub fn ability_sources_with_slots(
+        &self,
+        run: &RunStateV3,
+        pokemon: &PokemonStateV5,
+    ) -> Result<Vec<(BehaviorSourceId, Option<u8>)>, CurrentTargetExecutionError> {
         self.validate_run(run)?;
         let mask = if pokemon.owner_seat.is_some() {
             self.passive_attr(pokemon)?
@@ -156,7 +167,7 @@ impl<'a> CurrentTargetExecution<'a> {
         let mut ids = Vec::with_capacity(4);
         let active = pokemon.abilities.active;
         if ability_applies(source_ability(active.get().get())?, pokemon) {
-            ids.push((active, false));
+            ids.push((active, None));
         }
         for (slot, candidate) in pokemon.abilities.passives.iter().enumerate() {
             let Some(ability) = *candidate else {
@@ -174,12 +185,12 @@ impl<'a> CurrentTargetExecution<'a> {
             {
                 continue;
             }
-            ids.push((ability, true));
+            ids.push((ability, Some(u8::try_from(slot).map_err(|_| CurrentTargetExecutionError)?)));
         }
         Ok(ids
             .into_iter()
-            .map(|(ability, passive)| {
-                if passive {
+            .map(|(ability, innate_slot)| {
+                let source = if innate_slot.is_some() {
                     BehaviorSourceId::PassiveAbility {
                         numeric_id: ability.get(),
                     }
@@ -187,7 +198,8 @@ impl<'a> CurrentTargetExecution<'a> {
                     BehaviorSourceId::ActiveAbility {
                         numeric_id: ability.get(),
                     }
-                }
+                };
+                (source, innate_slot)
             })
             .collect())
     }

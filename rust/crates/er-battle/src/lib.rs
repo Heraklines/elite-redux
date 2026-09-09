@@ -44,3 +44,4 @@ pub use turn::{
 };
 
 pub mod current_target_execution;
+mod current_defender_abilities;

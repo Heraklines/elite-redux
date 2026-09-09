@@ -118,6 +118,19 @@ pub enum MoveLearningActionV1 {
     },
 }
 
+/// Current source batch panel decisions. The retained phase owns the Pokemon,
+/// offered set, original moveset and exact material/menu revision.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
+pub enum CurrentLearnMoveBatchActionV1 {
+    SelectMove { move_id: MoveId },
+    Assign { move_id: MoveId, slot: MoveSlotIndex },
+    CancelSlot,
+    Undo,
+    Done,
+    ConfirmCancel { confirmed: bool },
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum EvolutionActionV1 {
@@ -241,6 +254,9 @@ pub enum GameActionV1 {
     },
     MoveLearning {
         action: MoveLearningActionV1,
+    },
+    CurrentLearnMoveBatch {
+        action: CurrentLearnMoveBatchActionV1,
     },
     Evolution {
         action: EvolutionActionV1,

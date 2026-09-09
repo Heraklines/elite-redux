@@ -425,6 +425,7 @@ dependencies = [
  "er-canonical",
  "er-content",
  "er-game",
+ "er-progression",
  "er-protocol",
  "er-rng",
  "er-run",

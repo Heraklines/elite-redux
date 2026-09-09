@@ -17,6 +17,7 @@ struct ChunkEffects {
     mutations: Vec<BattleMutation>,
     presentation: Vec<BattlePresentationCueV5>,
     mechanics: Vec<MechanicsOperationEvidenceV2>,
+    source_events: Vec<er_state::current_battle_source_events::CurrentBattleSourceEventV1>,
 }
 
 /// Select and shuffle exactly once. No action or turn-end work executes here.
@@ -140,6 +141,7 @@ fn advance_current_turn(
     let mut mutations = Vec::new();
     let mut presentation = Vec::new();
     let mut mechanics = Vec::new();
+    let mut source_events = Vec::new();
     if finalize {
         finalize_turn(run, &mut rng, &mut mutations, &mut presentation)?;
         next.finalization_done = true;
@@ -157,6 +159,7 @@ fn advance_current_turn(
                 &mut mutations,
                 &mut presentation,
                 &mut mechanics,
+                Some(&mut source_events),
             )?
         } else {
             ActionDisposition::SkippedActorInactive
@@ -234,6 +237,7 @@ fn advance_current_turn(
             mutations,
             presentation,
             mechanics,
+            source_events,
         },
     )?;
     Ok(CurrentTurnChunkV1 {
@@ -287,6 +291,7 @@ fn make_chunk(
         action_order: effects.actions,
         mutations: effects.mutations,
         presentation: effects.presentation,
+        source_events: Some(effects.source_events),
         mechanics_evidence: effects.mechanics.into_iter().map(Into::into).collect(),
         rng_audit: rng.audit_entries().to_vec(),
         outcome,

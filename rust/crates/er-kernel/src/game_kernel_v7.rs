@@ -1,5 +1,8 @@
 //! GameKernelV7: sole production owner for the direct M9-E runtime path.
 
+#[path = "current_phase_v7.rs"]
+mod current_phase_v7;
+
 #[path = "current_coop_rebind_v7.rs"]
 pub mod current_coop_rebind_v7;
 #[path = "current_coop_setup_v7.rs"]
@@ -250,6 +253,8 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         };
         bootstrap.current_friendship_profile = Some(owner);
+        bootstrap.enable_current_starter_pokerus()
+            .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
         value.validate()?;
         Ok(value)
     }
@@ -905,7 +910,7 @@ impl GameKernelV7 {
                 }
                 other => other,
             };
-            if matches!(&self.lifecycle, GameKernelLifecycleV7::Bootstrap(bootstrap) if bootstrap.current_storage.is_some())
+            if matches!(&self.lifecycle, GameKernelLifecycleV7::Bootstrap(bootstrap) if bootstrap.current_storage.is_some() || bootstrap.current_starter_pokerus.is_some())
                 || self.current_coop_setup.is_some()
             {
                 let mut candidate = self.clone();
@@ -935,7 +940,8 @@ impl GameKernelV7 {
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         self.require_current_rebind_gameplay()?;
         let mut candidate = self.clone();
-        let step = candidate.advance_time_transaction(milliseconds)?;
+        let mut step = candidate.advance_time_transaction(milliseconds)?;
+        candidate.resume_owned_phase(&mut step)?;
         candidate.validate()?;
         *self = candidate;
         Ok(step)
@@ -1572,6 +1578,9 @@ impl GameKernelV7 {
         &mut self,
         request_id: PlatformRequestId,
     ) -> Result<(), GameKernelV7Error> {
+        if self.pending_platform.get(&request_id).is_some_and(|pending| {
+            matches!(pending.effect, GamePlatformEffectV2::CurrentFriendshipClock { .. } | GamePlatformEffectV2::StarterPokerusClock { .. })
+        }) { return Err(GameKernelV7Error::Invalid); }
         if matches!(&self.lifecycle, GameKernelLifecycleV7::Bootstrap(bootstrap) if bootstrap.current_storage.is_some())
         {
             return Err(GameKernelV7Error::Invalid);
@@ -2156,7 +2165,8 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         };
         let previous = bootstrap.current_storage_effect();
-        let current_storage = bootstrap.current_storage.is_some();
+        let previous_clock = current_phase_v7::bootstrap_clock_effect(bootstrap);
+        let current_storage = bootstrap.current_storage.is_some() || bootstrap.current_starter_pokerus.is_some();
         let before = current_storage.then(|| bootstrap.clone());
         match bootstrap.raw_input(event) {
             Ok(_) => {}
@@ -2165,6 +2175,17 @@ impl GameKernelV7 {
             }
             Err(error) => return Err(GameKernelV7Error::Bootstrap(error.to_string())),
         }
+        if bootstrap.needs_starter_pokerus_clock() {
+            let floor = bootstrap.current_starter_pokerus.as_ref().ok_or(GameKernelV7Error::Invalid)?
+                .next_platform_request_id.max(bootstrap.current_storage.as_ref()
+                    .map_or(SafeU53::ZERO, |owner| owner.next_platform_request_id));
+            let request = PlatformRequestId::new(floor);
+            bootstrap.begin_starter_pokerus_clock(request, self.local_seat)
+                .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+            if let Some(storage) = &mut bootstrap.current_storage {
+                storage.next_platform_request_id = increment_safe(floor)?;
+            }
+        }
         self.next_menu_instance_id = next_menu_after(bootstrap.menu_instance_high_water)?;
         if self.current_coop_setup.is_some() {
             self.advance_replay_sequence()?;
@@ -2172,6 +2193,7 @@ impl GameKernelV7 {
         }
         if bootstrap.stage != RunBootstrapStageV1::Complete {
             let next = bootstrap.current_storage_effect();
+            let next_clock = current_phase_v7::bootstrap_clock_effect(bootstrap);
             let changed = before.as_ref().is_some_and(|before| before != bootstrap);
             let mut step = GameKernelStepV7 {
                 effects: vec![GameKernelEffectV7::UiChanged(bootstrap.control.clone())],
@@ -2187,6 +2209,17 @@ impl GameKernelV7 {
                     step.effects.push(GameKernelEffectV7::Platform(next));
                 }
                 self.install_step_effects(&step.effects)?;
+            }
+            if previous_clock != next_clock {
+                if let Some(previous) = previous_clock {
+                    self.pending_platform.remove(&platform_request_id(&previous))
+                        .ok_or(GameKernelV7Error::Invalid)?;
+                }
+                if let Some(next) = next_clock {
+                    let effects = vec![GameKernelEffectV7::Platform(next)];
+                    self.install_step_effects(&effects)?;
+                    step.effects.extend(effects);
+                }
             }
             if changed {
                 self.advance_replay_sequence()?;
@@ -2206,6 +2239,10 @@ impl GameKernelV7 {
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
             .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        if let Some(daily) = &bootstrap.current_starter_pokerus {
+            candidate.identities.next_platform_request_id = candidate.identities.next_platform_request_id
+                .max(daily.next_platform_request_id);
+        }
         if let Some(storage) = &bootstrap.current_storage {
             candidate.identities.next_platform_request_id = candidate
                 .identities
@@ -3051,6 +3088,7 @@ impl GameKernelV7 {
                                 semantic: presentation.semantic,
                                 blocking: presentation.blocking,
                                 skip: presentation.skip,
+                                payload: presentation.payload.clone(),
                             },
                         )
                         .is_some()
@@ -3488,12 +3526,23 @@ fn execute_action_transaction(
     action: GameActionV1,
     context: GameActionDispatchContextV1,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+    execute_current_transaction(runtime, GameInternalEventV2::ControlSelected { action, context })
+}
+
+fn execute_current_transaction(
+    runtime: &mut GameRuntimeV6, initial: GameInternalEventV2,
+) -> Result<GameKernelStepV7, GameKernelV7Error> {
     let mut queue =
-        GameInternalEventQueueV2::new(GameInternalEventV2::ControlSelected { action, context })
+        GameInternalEventQueueV2::new(initial)
             .map_err(internal_error)?;
     let mut effects = Vec::new();
     queue
         .run_to_quiescence(|event| match event {
+            GameInternalEventV2::OwnedPhaseRequested { operation_id, authority_seat, phase } => {
+                let prepared = runtime.execute_owned_phase(operation_id, authority_seat, phase)
+                    .map_err(|error| error.to_string())?;
+                Ok(vec![GameInternalEventV2::TransitionPrepared(prepared)])
+            }
             GameInternalEventV2::ControlSelected { action, context }
             | GameInternalEventV2::ControlCancelled { action, context } => {
                 let prepared = runtime
@@ -4292,6 +4341,8 @@ fn empty_input_router() -> InputRouterSnapshotV2 {
 
 fn platform_request_id(effect: &GamePlatformEffectV2) -> PlatformRequestId {
     match effect {
+        GamePlatformEffectV2::StarterPokerusClock { request, .. } => *request,
+        GamePlatformEffectV2::CurrentFriendshipClock { request } => request.request,
         GamePlatformEffectV2::StorageRead { request, .. }
         | GamePlatformEffectV2::StorageWrite { request, .. }
         | GamePlatformEffectV2::StorageDelete { request, .. }

@@ -219,6 +219,7 @@ fn case(
         semantic,
         blocking: mapping.blocking,
         skip: mapping.skip,
+        payload: None,
     };
     let presentations: Vec<_> = step
         .effects

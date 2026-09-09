@@ -137,7 +137,7 @@ impl RunBootstrapMachineV1 {
             owner,
             candidate.control.revision,
             candidate.menu_instance_high_water,
-            candidate.current_storage.as_ref(),
+            (candidate.current_storage.as_ref(), candidate.current_starter_pokerus.as_ref()),
         )?;
         candidate.validate()?;
         *self = candidate;
@@ -349,7 +349,7 @@ impl RunBootstrapMachineV1 {
             storage.owner_seat,
             self.control.revision,
             self.menu_instance_high_water,
-            Some(storage),
+            (Some(storage), self.current_starter_pokerus.as_ref()),
         )?;
         if let (Some(expected_menu), Some(actual_menu)) = (&mut expected.menu, &self.control.menu) {
             if !expected_menu

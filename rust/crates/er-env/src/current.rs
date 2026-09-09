@@ -83,6 +83,10 @@ impl From<er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindOu
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum CurrentExternalEvent {
+    CurrentUtcClockResult {
+        request_id: PlatformRequestId,
+        utc_milliseconds: i64,
+    },
     /// Chronological capture tag. Execute only through apply_rebind, never apply.
     CoopRebind {
         control: CurrentCoopRebindEventV1,
@@ -452,6 +456,9 @@ fn reduce(
         CurrentExternalEvent::PresentationOutcome { event_id, outcome } => {
             kernel.settle_presentation_outcome(event_id, outcome)?;
             Ok(GameKernelStepV7::default())
+        }
+        CurrentExternalEvent::CurrentUtcClockResult { request_id, utc_milliseconds } => {
+            kernel.apply_current_utc_clock_result(request_id, utc_milliseconds)
         }
         CurrentExternalEvent::StorageResult { request_id, result } => {
             kernel.apply_storage_result(request_id, result)

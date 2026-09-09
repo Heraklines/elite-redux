@@ -6,9 +6,11 @@ pub mod battle_adapter_v2;
 pub mod battle_start_v2;
 pub mod command_menu;
 pub mod current_friendship_profile;
+pub(crate) mod current_friendship_execution;
 pub mod internal_event;
 pub mod m6;
 pub mod m72_bootstrap;
+pub use m72_bootstrap::current_pokerus as current_starter_pokerus;
 pub mod m72_new_run_material;
 pub mod m7_content;
 pub mod m7_internal_event;
@@ -39,3 +41,6 @@ pub mod runtime;
 pub mod snapshot;
 pub mod target_menu;
 pub mod transaction;
+
+pub mod current_experience_settlement;
+pub(crate) mod current_source_progression;

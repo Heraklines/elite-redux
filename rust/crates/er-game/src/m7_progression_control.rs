@@ -20,6 +20,97 @@ pub enum ProgressionControlError {
     Menu(String),
 }
 
+/// One current batch panel; each assignment and its source tracker mutation is
+/// separately authoritative. Undo remains in the panel; Cancel with no teaches
+/// opens the source confirmation, while Cancel after a teach commits and exits.
+pub fn current_learn_move_batch_control(
+    context: &GameActionContextV1,
+    batch: &er_state::current_experience_settlement::CurrentLearnMoveBatchV1,
+) -> Result<GameControlPlanV2, ProgressionControlError> {
+    use er_types::m7_action::CurrentLearnMoveBatchActionV1;
+    if batch.complete { return Err(ProgressionControlError::Empty); }
+    if batch.cancel_confirmation {
+        let options = vec![
+            ("current/learn-batch/cancel/no".to_owned(), GameActionV1::CurrentLearnMoveBatch {
+                action: CurrentLearnMoveBatchActionV1::ConfirmCancel { confirmed: false },
+            }),
+            ("current/learn-batch/cancel/yes".to_owned(), GameActionV1::CurrentLearnMoveBatch {
+                action: CurrentLearnMoveBatchActionV1::ConfirmCancel { confirmed: true },
+            }),
+        ];
+        let mut plan = vertical_control(context.menu_instance, context.authority_revision, context.authority_seat,
+            context.operation_id.clone(), GameControlKindV2::MoveLearn,
+            "current/learn-batch/cancel", &options, GameMenuCancelV2::Back { action: Box::new(
+                GameActionV1::CurrentLearnMoveBatch {
+                    action: CurrentLearnMoveBatchActionV1::ConfirmCancel { confirmed: false },
+                }) })?;
+        let menu = plan.menu.take().ok_or(ProgressionControlError::Empty)?;
+        let no = menu.selected_option_id.clone();
+        let yes = menu.options.iter().find(|row| row.option_id != no)
+            .ok_or(ProgressionControlError::Empty)?.option_id.clone();
+        let edges = vec![
+            MenuNavigationEdge::new(no.clone(), NavigationDirection::Left, yes.clone()),
+            MenuNavigationEdge::new(no.clone(), NavigationDirection::Right, yes.clone()),
+            MenuNavigationEdge::new(yes.clone(), NavigationDirection::Left, no.clone()),
+            MenuNavigationEdge::new(yes, NavigationDirection::Right, no.clone()),
+        ];
+        plan.menu = Some(GameMenuV2::new(menu.instance_id, menu.owner_seat, menu.control_id,
+            no, menu.options, edges, menu.cancel)
+            .map_err(|error| ProgressionControlError::Menu(error.to_string()))?);
+        return Ok(plan);
+    }
+    let mut options = Vec::new();
+    if let Some(move_id) = batch.pending_move {
+        for index in 0..4 {
+            let slot = MoveSlotIndex::new(index)
+                .map_err(|error| ProgressionControlError::Identity(error.to_string()))?;
+            options.push((format!("current/learn-batch/{}/slot/{index}", move_id.get()),
+                GameActionV1::CurrentLearnMoveBatch {
+                    action: CurrentLearnMoveBatchActionV1::Assign { move_id, slot },
+                }));
+        }
+        return current_batch_vertical_control(context, "current/learn-batch/slot", &options, 0,
+            GameMenuCancelV2::Back { action: Box::new(GameActionV1::CurrentLearnMoveBatch {
+                action: CurrentLearnMoveBatchActionV1::CancelSlot,
+            }) });
+    }
+    for move_id in &batch.offered {
+        if batch.assignments.iter().any(|row| row.move_id == *move_id) { continue; }
+        options.push((format!("current/learn-batch/move/{}", move_id.get()),
+            GameActionV1::CurrentLearnMoveBatch {
+                action: CurrentLearnMoveBatchActionV1::SelectMove { move_id: *move_id },
+            }));
+    }
+    let done = GameActionV1::CurrentLearnMoveBatch {
+        action: CurrentLearnMoveBatchActionV1::Done,
+    };
+    let undo = GameActionV1::CurrentLearnMoveBatch { action: CurrentLearnMoveBatchActionV1::Undo };
+    if !batch.assignments.is_empty() { options.push(("current/learn-batch/undo".to_owned(), undo)); }
+    options.push(("current/learn-batch/done".to_owned(), done.clone()));
+    current_batch_vertical_control(context, "current/learn-batch", &options, usize::from(batch.list_cursor),
+        GameMenuCancelV2::Back { action: Box::new(done) })
+}
+
+fn current_batch_vertical_control(
+    context: &GameActionContextV1, control_id: &str, entries: &[(String, GameActionV1)],
+    selected: usize,
+    cancel: GameMenuCancelV2,
+) -> Result<GameControlPlanV2, ProgressionControlError> {
+    let mut plan = vertical_control(context.menu_instance, context.authority_revision, context.authority_seat,
+        context.operation_id.clone(), GameControlKindV2::MoveLearn, control_id, entries, cancel)?;
+    let first = entries.first().ok_or(ProgressionControlError::Empty)?.0.as_str();
+    let last = entries.last().ok_or(ProgressionControlError::Empty)?.0.as_str();
+    let menu = plan.menu.as_mut().ok_or(ProgressionControlError::Empty)?;
+    let selected_id = &entries.get(selected).ok_or(ProgressionControlError::Empty)?.0;
+    menu.selected_option_id = menu.options.iter().find(|row| row.option_id.as_str() == selected_id)
+        .ok_or(ProgressionControlError::Empty)?.option_id.clone();
+    // Actual batch UP/DOWN stops at the first/last row; no wrap is installed.
+    menu.navigation.retain(|edge| !((edge.from.as_str() == first && edge.direction == NavigationDirection::Up)
+        || (edge.from.as_str() == last && edge.direction == NavigationDirection::Down)));
+    plan.validate().map_err(|error| ProgressionControlError::Menu(error.to_string()))?;
+    Ok(plan)
+}
+
 pub fn capture_control(
     instance: MenuInstanceId,
     revision: SafeU53,

@@ -43,6 +43,12 @@ pub struct CurrentBattleFaintObservationV1 {
     pub resolved_turn: TurnIndex,
     /// Ordinal in the current field/HP observation stream, not a TS phase address.
     pub event_ordinal: u16,
+    /// Present only for the source-owned retained-turn path. Historical whole
+    /// turns keep their existing ordinal namespace and serialized bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_action: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_faint: Option<SafeU53>,
     pub pokemon: PokemonId,
     pub slot: FieldSlot,
     pub owner: Option<SeatId>,
@@ -128,6 +134,21 @@ impl CurrentBattleParticipationV1 {
 
     /// Restore checks structural consistency. Only a validated resolver transaction supplies the causal trace.
     pub fn validate(&self, run: &RunStateV3) -> Result<(), CurrentBattleParticipationError> {
+        self.validate_at_boundary(run, None)
+    }
+
+    pub fn validate_during_turn(
+        &self, run: &RunStateV3,
+        turn: &crate::current_turn_execution::CurrentTurnExecutionV1,
+    ) -> Result<(), CurrentBattleParticipationError> {
+        turn.validate(run).map_err(|_| CurrentBattleParticipationError::Invalid)?;
+        self.validate_at_boundary(run, Some(turn))
+    }
+
+    fn validate_at_boundary(
+        &self, run: &RunStateV3,
+        turn: Option<&crate::current_turn_execution::CurrentTurnExecutionV1>,
+    ) -> Result<(), CurrentBattleParticipationError> {
         let battle = run
             .battle
             .as_ref()
@@ -201,13 +222,22 @@ impl CurrentBattleParticipationV1 {
                 || faint.before_hp > pokemon.max_hp
                 || faint.occurrence == SafeU53::ZERO
                 || faint.occurrence >= self.next_occurrence
-                || faint.resolved_turn >= self.next_turn
+                || faint.resolved_turn > self.next_turn
+                || (faint.resolved_turn == self.next_turn && turn.is_none_or(|turn| {
+                    turn.turn != faint.resolved_turn || turn.finalization_done
+                        || faint.current_action.is_none_or(|action| action == 0 || action > turn.next_action)
+                }))
+                || match (faint.current_action, faint.current_faint) {
+                    (None, None) => faint.resolved_turn == self.next_turn,
+                    (Some(action), Some(_)) => action == 0 || action > 7,
+                    _ => true,
+                }
                 || usize::from(faint.event_ordinal) >= MAX_CURRENT_PARTICIPATION_EVENTS_V1
                 || !ids.insert(faint.pokemon)
                 || previous.is_some_and(|prior| {
                     prior.occurrence.get().checked_add(1) != Some(faint.occurrence.get())
-                        || (prior.resolved_turn, prior.event_ordinal)
-                            >= (faint.resolved_turn, faint.event_ordinal)
+                        || (prior.resolved_turn, prior.current_action, prior.event_ordinal)
+                            >= (faint.resolved_turn, faint.current_action, faint.event_ordinal)
                 })
             {
                 return Err(CurrentBattleParticipationError::Invalid);
@@ -277,7 +307,44 @@ impl CurrentBattleParticipationV1 {
         after: &RunStateV3,
         events: &[CurrentBattleObservationEventV1],
     ) -> Result<Self, CurrentBattleParticipationError> {
-        self.validate(before)?;
+        self.observe_events(before, after, events, None)
+    }
+
+    /// Retains the old whole-turn contract. This additional entry takes both
+    /// actual continuation frontiers and checks their step/finalization edge.
+    pub fn observe_current_chunk(
+        &self, before: &RunStateV3, after: &RunStateV3,
+        events: &[CurrentBattleObservationEventV1],
+        previous: &crate::current_turn_execution::CurrentTurnExecutionV1,
+        current: &crate::current_turn_execution::CurrentTurnExecutionV1,
+    ) -> Result<Self, CurrentBattleParticipationError> {
+        use crate::current_turn_execution::CurrentTurnStageV1;
+        self.validate_during_turn(before, previous)?;
+        current.validate(after).map_err(|_| CurrentBattleParticipationError::Invalid)?;
+        if previous.stage != CurrentTurnStageV1::ReadyForMove || previous.finalization_done
+            || previous.run != current.run || previous.battle != current.battle
+            || previous.turn != current.turn || previous.wave != current.wave
+            || previous.authority != current.authority
+            || previous.authority_revision != current.authority_revision
+            || previous.accepted_commands != current.accepted_commands
+            || previous.actions != current.actions
+            || current.next_rng_sequence < previous.next_rng_sequence
+            || if current.finalization_done {
+                current.next_action != previous.next_action
+                    || usize::from(previous.next_action) != previous.actions.len()
+            } else { previous.next_action.checked_add(1) != Some(current.next_action) }
+        { return Err(CurrentBattleParticipationError::Invalid); }
+        self.observe_events(before, after, events, Some((previous, current)))
+    }
+
+    fn observe_events(
+        &self, before: &RunStateV3, after: &RunStateV3,
+        events: &[CurrentBattleObservationEventV1],
+        boundary: Option<(&crate::current_turn_execution::CurrentTurnExecutionV1,
+            &crate::current_turn_execution::CurrentTurnExecutionV1)>,
+    ) -> Result<Self, CurrentBattleParticipationError> {
+        if let Some((turn, _)) = boundary { self.validate_during_turn(before, turn)?; }
+        else { self.validate(before)?; }
         if events.len() > MAX_CURRENT_PARTICIPATION_EVENTS_V1 {
             return Err(CurrentBattleParticipationError::Unsupported);
         }
@@ -289,7 +356,8 @@ impl CurrentBattleParticipationV1 {
             .battle
             .as_ref()
             .ok_or(CurrentBattleParticipationError::Invalid)?;
-        if self.next_turn.get().get().checked_add(1) != Some(after_battle.turn.get().get()) {
+        let turn_increment = boundary.map_or(1, |(_, current)| u64::from(current.finalization_done));
+        if self.next_turn.get().get().checked_add(turn_increment) != Some(after_battle.turn.get().get()) {
             return Err(CurrentBattleParticipationError::Invalid);
         }
         let mut candidate = self.clone();
@@ -303,6 +371,7 @@ impl CurrentBattleParticipationV1 {
         // Source TurnInit membership: active players. Switch itself does not add a participant.
         for slot in &field.slots {
             if slot.slot.side == BattleSide::Player
+                && boundary.is_none_or(|(previous, _)| previous.next_action == 0)
                 && let Some(id) = slot.occupant
                 && hp.get(&id).is_some_and(|value| *value > 0)
             {
@@ -380,6 +449,15 @@ impl CurrentBattleParticipationV1 {
                             resolved_turn: self.next_turn,
                             event_ordinal: u16::try_from(ordinal)
                                 .map_err(|_| CurrentBattleParticipationError::Unsupported)?,
+                            current_action: boundary.map(|(_, current)| current.next_action
+                                + u8::from(current.finalization_done)),
+                            current_faint: boundary.map(|(_, current)| {
+                                let crate::current_turn_execution::CurrentTurnStageV1::AwaitingInterlude { faints } = &current.stage else {
+                                    return Err(CurrentBattleParticipationError::Invalid);
+                                };
+                                faints.iter().find(|faint| faint.pokemon == pokemon && faint.slot == slot)
+                                    .map(|faint| faint.id).ok_or(CurrentBattleParticipationError::Invalid)
+                            }).transpose()?,
                             pokemon,
                             slot,
                             owner: (slot.side == BattleSide::Player).then_some(self.authority),
@@ -406,6 +484,18 @@ impl CurrentBattleParticipationV1 {
             return Err(CurrentBattleParticipationError::Invalid);
         }
         candidate.next_turn = after_battle.turn;
+        if let Some((previous, current)) = boundary {
+            let observed = &candidate.faints[self.faints.len()..];
+            let expected = match &current.stage {
+                crate::current_turn_execution::CurrentTurnStageV1::AwaitingInterlude { faints } => faints.as_slice(),
+                _ => &[],
+            };
+            if observed.len() != expected.len() || !observed.iter().zip(expected).all(|(left, right)| {
+                left.current_faint == Some(right.id) && left.pokemon == right.pokemon && left.slot == right.slot
+            }) || previous.next_faint_sequence.get().checked_add(u64::try_from(observed.len())
+                .map_err(|_| CurrentBattleParticipationError::Invalid)?) != Some(current.next_faint_sequence.get())
+            { return Err(CurrentBattleParticipationError::Invalid); }
+        }
         if let Some(experience) = &self.experience {
             candidate.experience = Some(experience.observe_next(&candidate, after).map_err(
                 |error| match error {
@@ -421,7 +511,8 @@ impl CurrentBattleParticipationV1 {
                 },
             )?);
         }
-        candidate.validate(after)?;
+        if let Some((_, current)) = boundary { candidate.validate_during_turn(after, current)?; }
+        else { candidate.validate(after)?; }
         Ok(candidate)
     }
 }

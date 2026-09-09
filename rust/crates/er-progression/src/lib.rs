@@ -3,6 +3,7 @@ pub mod content_v2;
 pub mod current_experience;
 pub mod current_friendship;
 pub mod current_friendship_owner;
+pub mod current_friendship_phase;
 pub mod current_party_experience;
 pub mod current_phase_experience;
 pub mod current_phase_tree;
@@ -329,3 +330,5 @@ fn require_sorted_by<T, K: Ord>(
 fn strictly_sorted<T: Ord>(values: &[T]) -> bool {
     !values.windows(2).any(|pair| pair[0] >= pair[1])
 }
+
+pub mod current_stats;

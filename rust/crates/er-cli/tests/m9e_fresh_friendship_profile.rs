@@ -180,6 +180,11 @@ fn material_owner_contract(
         // Isolate the profile conservation contract from the later optional
         // targeting owner, which itself requires a known profile.
         before.current_targeting = None;
+        before.current_turn_execution = None;
+        before.current_presentation = None;
+        before.current_defender_dispatch = None;
+        before.current_achievement_tracker = None;
+        before.current_battle_participation = None;
         if !known {
             before.current_friendship_profile = None;
         }
@@ -203,6 +208,7 @@ fn material_owner_contract(
             authority_seat: SeatId::new(one()?),
             authority_revision: revision,
             content_identity: content.identity().clone(),
+            owned_phase: None,
             accepted_action: Some(er_types::GameActionV1::Save {
                 action: er_types::SaveActionV1::Cancel,
             }),
@@ -300,11 +306,18 @@ fn fresh_title_accounts_survive_natural_state_save_and_captured_replay() -> Resu
         },
         content.clone(),
     )?;
-    press(&mut current, PhysicalKey::Space)?;
+    let entered = press(&mut current, PhysicalKey::Space)?;
     assert_eq!(
         current.kernel_ref()?.current_control().map(|c| c.kind),
         Some(GameControlKindV2::StarterSelect)
     );
+    let request = entered.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::Platform(er_game::m9e_material_v6::GamePlatformEffectV2::StarterPokerusClock { request, .. }) => Some(*request),
+        _ => None,
+    }).ok_or("actual daily source clock request absent")?;
+    captured(&mut current, CurrentExternalEvent::CurrentUtcClockResult {
+        request_id: request, utc_milliseconds: 0,
+    }, content.clone())?;
     press(&mut current, PhysicalKey::Space)?;
     navigate(&mut current, "bootstrap/starter/confirm")?;
     let mut committed = false;

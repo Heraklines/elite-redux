@@ -1,4 +1,11 @@
 //! GameRuntimeV6 and the closed production GameActionV1 dispatcher.
+#[path = "current_battle_presentation.rs"]
+mod current_battle_presentation;
+
+#[path = "current_phase_runtime.rs"]
+mod current_phase_runtime;
+pub use current_phase_runtime::GameOwnedPhaseV1;
+pub(crate) use current_phase_runtime::{validate_owned_phase_transition, validate_current_turn_transition};
 
 use std::sync::Arc;
 
@@ -473,9 +480,11 @@ impl GameActionDispatcherV1 {
                 semantic,
                 blocking: mapping.blocking,
                 skip: mapping.skip,
+                payload: None,
             });
         }
         let mut candidate = execution.candidate.ok_or(GameRuntimeV6Error::Invalid)?;
+        current_phase_runtime::assign_presentations(&mut candidate, &mut execution.presentation)?;
         if candidate.active_run.is_none() {
             candidate.current_battle_participation = None;
             candidate.current_run_difficulty = None;
@@ -525,6 +534,7 @@ impl GameActionDispatcherV1 {
             authority_revision: context.action.authority_revision,
             content_identity: content.identity().clone(),
             accepted_action: Some(action),
+            owned_phase: None,
             before_digest,
             after_digest,
             mutations: mutations.clone(),
@@ -582,6 +592,16 @@ fn execute_domain(
     action: &GameActionV1,
     context: &GameActionDispatchContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
+    if before.and_then(|state| state.current_battle_participation.as_ref())
+        .and_then(|owner| owner.experience.as_ref())
+        .is_some_and(|owner| owner.source_progression.is_some())
+        && !matches!(action, GameActionV1::Battle { .. } | GameActionV1::Save { .. }
+            | GameActionV1::CurrentLearnMoveBatch { .. })
+    {
+        // Generic modifier/world/fusion/scenario/reward helpers cannot preserve
+        // fresh source configuration across state they do not source-own.
+        return Err(GameRuntimeV6Error::Action);
+    }
     if before.is_some_and(has_pending_experience)
         && !matches!(
             action,
@@ -626,6 +646,7 @@ fn execute_domain(
         GameActionV1::MoveLearning { action } => {
             execute_move_learning(before, action, &context.input)
         }
+        GameActionV1::CurrentLearnMoveBatch { .. } => Err(GameRuntimeV6Error::Action),
         GameActionV1::Fusion { action } => execute_fusion(before, action, &context.input),
         GameActionV1::World { action } => execute_world(before, action, &context.input),
         GameActionV1::Scenario { action } => {
@@ -841,6 +862,11 @@ fn execute_battle(
     else {
         return Err(GameRuntimeV6Error::Invalid);
     };
+    if before.current_battle_participation.as_ref().and_then(|value| value.experience.as_ref())
+        .is_some_and(|owner| owner.execution_origin.is_some())
+    {
+        return current_phase_runtime::begin_owned_turn(before, content, commands, authority);
+    }
     let (transition, observations) = if before.current_targeting.is_some() {
         let targeting =
             er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
@@ -2608,6 +2634,7 @@ fn action_domain(
         GameActionV1::Progression { .. } => GameActionDomainV2::Progression,
         GameActionV1::MoveLearning { .. } => GameActionDomainV2::MoveLearning,
         GameActionV1::Evolution { .. } => GameActionDomainV2::Evolution,
+        GameActionV1::CurrentLearnMoveBatch { .. } => GameActionDomainV2::MoveLearning,
         GameActionV1::Fusion { .. } => GameActionDomainV2::Fusion,
         GameActionV1::Inventory { .. } => GameActionDomainV2::Inventory,
         GameActionV1::Reward { .. } => GameActionDomainV2::Reward,
@@ -2711,11 +2738,40 @@ fn adopt_v5_with_participation(
     after: GameStateV5,
     participation: Option<er_state::current_battle_participation::CurrentBattleParticipationV1>,
 ) -> Result<GameStateV6, GameRuntimeV6Error> {
+    adopt_v5_with_turn(before, after, participation, before.current_turn_execution.clone())
+}
+
+fn adopt_v5_with_turn(
+    before: &GameStateV6, after: GameStateV5,
+    participation: Option<er_state::current_battle_participation::CurrentBattleParticipationV1>,
+    turn: Option<er_state::current_turn_execution::CurrentTurnExecutionV1>,
+) -> Result<GameStateV6, GameRuntimeV6Error> {
     after
         .validate()
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let candidate = GameStateV6 {
         current_battle_participation: participation,
+        current_turn_execution: if after.active_run.is_some() {
+            turn
+        } else { None },
+        current_defender_dispatch: after.active_run.as_ref().map(|run| {
+            before.current_defender_dispatch.as_ref().map(|owner| {
+                let mut owner = owner.clone();
+                owner.synchronize(run).map_err(|_| GameRuntimeV6Error::Invalid)?;
+                Ok::<_, GameRuntimeV6Error>(owner)
+            }).transpose()
+        }).transpose()?.flatten(),
+        current_achievement_tracker: after.active_run.as_ref().map(|run| {
+            before.current_achievement_tracker.as_ref().map(|owner| {
+                if owner.run_id != run.run_id { return Err(GameRuntimeV6Error::Invalid); }
+                let mut owner = owner.clone();
+                if owner.battle.as_ref().is_some_and(|battle| battle.wave_index != run.wave) {
+                    owner.battle = None;
+                }
+                Ok::<_, GameRuntimeV6Error>(owner)
+            }).transpose()
+        }).transpose()?.flatten(),
+        current_presentation: before.current_presentation.clone(),
         current_friendship_profile: before.current_friendship_profile.clone(),
         current_targeting: if after.active_run.is_some() {
             before.current_targeting

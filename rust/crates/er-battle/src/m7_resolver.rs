@@ -9,6 +9,7 @@ use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
 use er_state::m7_state::{BattleStateV5, GameStateV5, PokemonStateV5, RunStateV3};
 use er_state::pokemon::calculate_max_pp;
+use er_state::current_battle_source_events::CurrentBattleSourceEventV1;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandSet,
 };
@@ -54,6 +55,26 @@ pub enum BattlePresentationCueV5 {
         before: u32,
         after: u32,
     },
+    AbilityShown {
+        pokemon: PokemonId,
+        ability: er_types::battle_ids::AbilityId,
+        innate_slot: Option<u8>,
+    },
+    AbilityHeal {
+        pokemon: PokemonId,
+        before: u32,
+        after: u32,
+        requested_heal: u32,
+    },
+    AbilityHidden {
+        pokemon: PokemonId,
+        ability: er_types::battle_ids::AbilityId,
+        innate_slot: Option<u8>,
+    },
+    MoveNoEffect {
+        pokemon: PokemonId,
+        move_id: MoveId,
+    },
     Switched {
         slot: FieldSlot,
         pokemon: PokemonId,
@@ -98,6 +119,9 @@ pub struct BattleTransitionV5 {
     pub action_order: Vec<ResolvedAction>,
     pub mutations: Vec<BattleMutation>,
     pub presentation: Vec<BattlePresentationCueV5>,
+    /// Actual decisions from the owned current phase path; absent historically.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_events: Option<Vec<CurrentBattleSourceEventV1>>,
     pub mechanics_evidence: Vec<MechanicsOperationEvidenceV5>,
     pub rng_audit: Vec<RngDraw>,
     pub outcome: BattleOutcome,
@@ -185,6 +209,9 @@ pub fn verify_v5_dispatch_closure(
 
 type PendingAction = er_state::current_turn_execution::CurrentTurnActionV1;
 
+#[path = "current_defender_execution.rs"]
+mod current_defender_execution;
+
 #[path = "current_turn_continuation.rs"]
 mod current_turn_continuation;
 pub use current_turn_continuation::{
@@ -264,6 +291,7 @@ fn resolve_turn_v5_inner(
                 &mut mutations,
                 &mut presentation,
                 &mut mechanics_evidence,
+                None,
             )?
         };
         if let Some(owner) = targeting {
@@ -352,6 +380,7 @@ fn resolve_turn_v5_inner(
         action_order,
         mutations,
         presentation,
+        source_events: None,
         mechanics_evidence: mechanics_evidence.into_iter().map(Into::into).collect(),
         rng_audit: rng.audit_entries().to_vec(),
         outcome,
@@ -538,6 +567,7 @@ fn execute_action(
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
     mechanics_evidence: &mut Vec<MechanicsOperationEvidenceV2>,
+    source_events: Option<&mut Vec<CurrentBattleSourceEventV1>>,
 ) -> Result<ActionDisposition, BattleV5Error> {
     match &action.command {
         BattleCommand::Switch { actor, party_slot } => execute_switch(
@@ -565,6 +595,7 @@ fn execute_action(
             mutations,
             presentation,
             mechanics_evidence,
+            source_events,
         ),
     }
 }
@@ -640,6 +671,7 @@ fn execute_move(
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
     mechanics_evidence: &mut Vec<MechanicsOperationEvidenceV2>,
+    source_events: Option<&mut Vec<CurrentBattleSourceEventV1>>,
 ) -> Result<ActionDisposition, BattleV5Error> {
     let battle_snapshot = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?.clone();
     let actor_snapshot = pokemon(run, actor_id)
@@ -687,6 +719,16 @@ fn execute_move(
         Some(slots) => slots,
         None => resolve_targets(run, source_slot, targets)?,
     };
+    if let Some(owner) = targeting {
+        return current_defender_execution::execute(
+            run,
+            current_defender_execution::CurrentMoveContext {
+                content, targeting: owner, definition,
+                actor: &actor_snapshot, source_slot, source_events, mechanics: &context,
+            },
+            target_slots, rng, mutations, presentation, mechanics_evidence,
+        );
+    }
     if matches!(definition.category, MoveCategory::Status)
         || matches!(definition.power, MovePower::None)
     {
@@ -1105,10 +1147,11 @@ fn critical_hits(
 /// This is an ordinary noncritical, full-variance (100%) estimate. It shares the
 /// current move-power/damage queries, stats, STAB and type calculation; it does
 /// not roll accuracy/critical/variance or execute move hooks, PP/HP mutations.
-/// It is not the complete source AI simulation: forced criticals, defender/ally
-/// ability knowledge and other missing current-resolver modifiers are not added.
-/// The current resolver's minimum-one floor (including its immunity limitation)
-/// is preserved here; callers must not claim source-equivalent immune damage.
+/// It is not the complete source AI simulation: forced criticals and other
+/// missing current-resolver modifiers are not added. The legacy entry has no
+/// current defender owner; the typed current entry additionally recognizes the
+/// qualified5082 absorb predicate. A zero ordinary type multiplier returns zero,
+/// but source move-attribute overrides still require their own implementations.
 /// No RNG runtime is accepted or constructed.
 pub fn query_simulated_move_damage_v5(
     content: &PreparedBattleContentV3,
@@ -1121,7 +1164,7 @@ pub fn query_simulated_move_damage_v5(
 }
 
 /// Same bounded noncritical estimate, using the actual current eligible ability
-/// sources. This does not add missing defender effects or claim source AI parity.
+/// sources and the owned5082 pre-hit immunity. It does not claim full source AI parity.
 pub fn query_simulated_move_damage_with_current_targets(
     content: &PreparedBattleContentV3,
     run: &RunStateV3,
@@ -1166,6 +1209,13 @@ fn query_simulated_move_damage_inner(
     if target.fainted {
         return Err(BattleV5Error::Target);
     }
+    if let Some(owner) = targeting {
+        if crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition)
+            .map_err(|_| BattleV5Error::UnsupportedContent)?.is_some()
+        {
+            return Ok(0);
+        }
+    }
     if matches!(definition.category, MoveCategory::Status)
         || matches!(definition.power, MovePower::None)
     {
@@ -1175,7 +1225,7 @@ fn query_simulated_move_damage_inner(
     let context = mechanics_context(actor, battle, &sources);
     calculate_damage_with_variance(content, &context, definition, actor, target, false, || {
         Ok(100)
-    })
+    }).map(|result| result.damage)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1188,6 +1238,25 @@ fn calculate_damage(
     critical: bool,
     rng: &mut RngRuntime,
 ) -> Result<u32, BattleV5Error> {
+    calculate_damage_observed(content, context, definition, actor, target, critical, rng)
+        .map(|result| result.damage)
+}
+
+#[derive(Default)]
+struct CalculatedDamage {
+    damage: u32,
+    super_effective: bool,
+}
+
+fn calculate_damage_observed(
+    content: &PreparedBattleContentV3,
+    context: &MechanicsContextV2<'_>,
+    definition: &MoveDefinitionV3,
+    actor: &PokemonStateV5,
+    target: &PokemonStateV5,
+    critical: bool,
+    rng: &mut RngRuntime,
+) -> Result<CalculatedDamage, BattleV5Error> {
     calculate_damage_with_variance(
         content,
         context,
@@ -1217,9 +1286,9 @@ fn calculate_damage_with_variance(
     target: &PokemonStateV5,
     critical: bool,
     variance: impl FnOnce() -> Result<u64, BattleV5Error>,
-) -> Result<u32, BattleV5Error> {
+) -> Result<CalculatedDamage, BattleV5Error> {
     let MovePower::Value(base_power) = definition.power else {
-        return Ok(0);
+        return Ok(CalculatedDamage::default());
     };
     let power = execute_query_v2(
         content,
@@ -1229,13 +1298,13 @@ fn calculate_damage_with_variance(
     )
     .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
     if power.cancelled || power.allowed == Some(false) {
-        return Ok(0);
+        return Ok(CalculatedDamage::default());
     }
     let power = query_u64(power.after)?;
     let (attack, defense) = match definition.category {
         MoveCategory::Physical => (actor.stats.attack, target.stats.defense),
         MoveCategory::Special => (actor.stats.special_attack, target.stats.special_defense),
-        MoveCategory::Status => return Ok(0),
+        MoveCategory::Status => return Ok(CalculatedDamage::default()),
     };
     if defense == 0 {
         return Err(BattleV5Error::Overflow);
@@ -1270,7 +1339,7 @@ fn calculate_damage_with_variance(
     // The pinned damage calculation returns immunity before damage variance.
     // A true zero multiplier must not become the minimum one point of damage.
     if effectiveness.0 == 0 {
-        return Ok(0);
+        return Ok(CalculatedDamage::default());
     }
     damage = damage
         .checked_mul(effectiveness.0)
@@ -1295,10 +1364,13 @@ fn calculate_damage_with_variance(
     )
     .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
     if query.cancelled || query.allowed == Some(false) {
-        return Ok(0);
+        return Ok(CalculatedDamage::default());
     }
     let damage = query_u64(query.after)?;
-    u32::try_from(damage.max(1)).map_err(|_| BattleV5Error::Overflow)
+    Ok(CalculatedDamage {
+        damage: u32::try_from(damage.max(1)).map_err(|_| BattleV5Error::Overflow)?,
+        super_effective: effectiveness.0 > effectiveness.1,
+    })
 }
 
 fn type_effectiveness(

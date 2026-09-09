@@ -3,6 +3,13 @@ use er_types::{GameContentIdentityV2, SafeU53, battle_ids::SpeciesId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+#[path = "current_friendship_rewards.rs"]
+mod rewards;
+pub use rewards::{
+    CURRENT_FRIENDSHIP_RIBBON_V1, CurrentFriendshipRewardProfileV1,
+    CurrentFriendshipRibbonV1,
+};
+
 pub const MAX_CURRENT_FRIENDSHIP_ACCOUNTS_V1: usize = 4_096;
 pub const CURRENT_FRIENDSHIP_ORACLE_V1: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 
@@ -29,6 +36,10 @@ pub struct CurrentFriendshipProfileV1 {
     pub origin: CurrentFriendshipProfileOriginV1,
     pub owner_seat: er_types::SeatId,
     pub accounts: Vec<CurrentFriendshipAccountV1>,
+    /// Unknown in older accounts. Only the explicit fresh constructor seeds the
+    /// source's empty timestamp/ribbon/cosmetic state; restore never backfills it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rewards: Option<CurrentFriendshipRewardProfileV1>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -56,6 +67,7 @@ impl CurrentFriendshipProfileV1 {
                     passive_attr: 0,
                 })
                 .collect(),
+            rewards: Some(CurrentFriendshipRewardProfileV1::fresh()),
         };
         value.validate()?;
         Ok(value)
@@ -77,6 +89,9 @@ impl CurrentFriendshipProfileV1 {
                 .any(|pair| pair[0].species >= pair[1].species)
         {
             return Err(CurrentFriendshipProfileError);
+        }
+        if let Some(rewards) = &self.rewards {
+            rewards.validate()?;
         }
         Ok(())
     }

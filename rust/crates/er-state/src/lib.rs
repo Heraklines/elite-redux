@@ -10,6 +10,7 @@ pub mod current_friendship_profile;
 pub mod current_phase_tree;
 pub mod current_targeting;
 pub mod current_turn_execution;
+pub mod current_presentation;
 pub mod digest;
 pub mod digest_v2;
 pub mod digest_v4;
@@ -31,3 +32,13 @@ pub mod surface_digest;
 pub mod validation;
 pub mod validation_v2;
 pub mod world_v2;
+
+pub mod current_defender_dispatch;
+
+pub mod current_experience_settlement;
+pub mod current_victory_execution;
+
+pub mod current_battle_source_events;
+
+pub mod current_achievement_tracker;
+pub mod current_source_progression;
