@@ -177,6 +177,9 @@ fn material_owner_contract(
     };
     for known in [false, true] {
         let mut before = state.clone();
+        // Isolate the profile conservation contract from the later optional
+        // targeting owner, which itself requires a known profile.
+        before.current_targeting = None;
         if !known {
             before.current_friendship_profile = None;
         }
