@@ -154,7 +154,12 @@ impl CurrentGameSession {
         let content = start.content.clone();
         let local_seat = start.local_seat;
         let kernel = GameKernelV7::natural_start_with_fresh_friendship(start)?;
-        Ok(Self { kernel: Some(kernel), content, local_seat, role: GameKernelRoleV7::Authority })
+        Ok(Self {
+            kernel: Some(kernel),
+            content,
+            local_seat,
+            role: GameKernelRoleV7::Authority,
+        })
     }
 
     pub fn enable_current_coop_setup(&mut self) -> Result<(), CurrentSessionError> {

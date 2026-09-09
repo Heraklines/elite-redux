@@ -213,23 +213,41 @@ pub struct FreshFriendshipStartV7 {
 }
 
 impl GameKernelV7 {
-    pub fn natural_start_with_fresh_friendship(start: FreshFriendshipStartV7) -> Result<Self, GameKernelV7Error> {
+    pub fn natural_start_with_fresh_friendship(
+        start: FreshFriendshipStartV7,
+    ) -> Result<Self, GameKernelV7Error> {
         let profile = &start.profile;
         if profile.schema_version != er_state::m7_state::PROFILE_STATE_SCHEMA_VERSION_V1
-            || !profile.unlocks.is_empty() || !profile.achievements.is_empty()
-            || !profile.challenges.is_empty() || !profile.flags.is_empty() || !profile.dex.entries.is_empty()
+            || !profile.unlocks.is_empty()
+            || !profile.achievements.is_empty()
+            || !profile.challenges.is_empty()
+            || !profile.flags.is_empty()
+            || !profile.dex.entries.is_empty()
             || profile.statistics.runs_started != SafeU53::ZERO
             || profile.statistics.runs_won != SafeU53::ZERO
             || profile.statistics.runs_lost != SafeU53::ZERO
             || profile.statistics.battles_won != SafeU53::ZERO
             || profile.statistics.pokemon_captured != SafeU53::ZERO
             || profile.statistics.highest_wave.get().get() != 1
-        { return Err(GameKernelV7Error::Invalid); }
-        let owner = er_game::current_friendship_profile::fresh_profile(&start.content, start.local_seat)
-            .map_err(|_| GameKernelV7Error::Invalid)?;
-        let mut value = Self::natural_start(start.profile, start.seed, start.local_seat, start.save_slots,
-            true, start.content, start.scheduler, None)?;
-        let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut value.lifecycle else { return Err(GameKernelV7Error::Invalid); };
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        let owner =
+            er_game::current_friendship_profile::fresh_profile(&start.content, start.local_seat)
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+        let mut value = Self::natural_start(
+            start.profile,
+            start.seed,
+            start.local_seat,
+            start.save_slots,
+            true,
+            start.content,
+            start.scheduler,
+            None,
+        )?;
+        let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut value.lifecycle else {
+            return Err(GameKernelV7Error::Invalid);
+        };
         bootstrap.current_friendship_profile = Some(owner);
         value.validate()?;
         Ok(value)
@@ -2004,8 +2022,13 @@ impl GameKernelV7 {
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
         let profile = match &self.lifecycle {
-            GameKernelLifecycleV7::Bootstrap(bootstrap) => bootstrap.current_friendship_profile.as_ref(),
-            GameKernelLifecycleV7::Active(runtime) | GameKernelLifecycleV7::Terminal { runtime, .. } => runtime.state().and_then(|state| state.current_friendship_profile.as_ref()),
+            GameKernelLifecycleV7::Bootstrap(bootstrap) => {
+                bootstrap.current_friendship_profile.as_ref()
+            }
+            GameKernelLifecycleV7::Active(runtime)
+            | GameKernelLifecycleV7::Terminal { runtime, .. } => runtime
+                .state()
+                .and_then(|state| state.current_friendship_profile.as_ref()),
         };
         if profile.is_some_and(|owner| owner.owner_seat != self.local_seat) {
             return Err(GameKernelV7Error::Invalid);

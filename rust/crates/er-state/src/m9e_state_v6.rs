@@ -40,7 +40,8 @@ pub struct GameStateV6 {
     pub identities: GameIdentityAllocatorStateV1,
     pub profile: ProfileStateV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_friendship_profile: Option<crate::current_friendship_profile::CurrentFriendshipProfileV1>,
+    pub current_friendship_profile:
+        Option<crate::current_friendship_profile::CurrentFriendshipProfileV1>,
     pub active_run: Option<RunStateV3>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_run_difficulty: Option<CurrentRunDifficultyV1>,
@@ -52,7 +53,9 @@ pub struct GameStateV6 {
 pub trait GameStateV6ContentContext {
     fn identity(&self) -> &GameContentIdentityV2;
     fn has_mode(&self, mode: GameModeId) -> bool;
-    fn current_friendship_seed_species(&self) -> Option<Vec<SpeciesId>> { None }
+    fn current_friendship_seed_species(&self) -> Option<Vec<SpeciesId>> {
+        None
+    }
     fn has_species_form(&self, species: SpeciesId, form: u16) -> bool;
     fn has_move(&self, move_id: MoveId) -> bool;
     fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
@@ -198,7 +201,9 @@ impl GameStateV6 {
             .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
         if let Some(owner) = &self.current_friendship_profile {
             owner.validate().map_err(|_| GameStateV6Error::Invalid)?;
-            if owner.content_identity != self.content_identity { return Err(GameStateV6Error::Content); }
+            if owner.content_identity != self.content_identity {
+                return Err(GameStateV6Error::Content);
+            }
         }
         if let Some(participation) = &self.current_battle_participation {
             if participation
@@ -221,8 +226,12 @@ impl GameStateV6 {
     ) -> Result<(), GameStateV6Error> {
         self.validate()?;
         if let Some(owner) = &self.current_friendship_profile {
-            let expected = content.current_friendship_seed_species().ok_or(GameStateV6Error::Content)?;
-            owner.validate_catalog(content.identity(), &expected).map_err(|_| GameStateV6Error::Content)?;
+            let expected = content
+                .current_friendship_seed_species()
+                .ok_or(GameStateV6Error::Content)?;
+            owner
+                .validate_catalog(content.identity(), &expected)
+                .map_err(|_| GameStateV6Error::Content)?;
         }
         if let Some(owner) = self
             .current_battle_participation

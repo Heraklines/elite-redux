@@ -79,7 +79,8 @@ pub struct RunBootstrapMachineV1 {
     pub schema_version: u32,
     pub profile: ProfileStateV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_friendship_profile: Option<er_state::current_friendship_profile::CurrentFriendshipProfileV1>,
+    pub current_friendship_profile:
+        Option<er_state::current_friendship_profile::CurrentFriendshipProfileV1>,
     pub seed: String,
     pub stage: RunBootstrapStageV1,
     pub selections: RunBootstrapSelectionsV1,

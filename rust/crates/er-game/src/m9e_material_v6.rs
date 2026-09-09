@@ -457,7 +457,9 @@ pub fn apply_game_material_v6_with_retention(
     }
     // This prerequisite does not admit account awards yet. Every existing owner,
     // including unknown historical state, survives material exactly unchanged.
-    if live.as_ref().is_some_and(|prior| prior.current_friendship_profile != transition.after_state.current_friendship_profile) {
+    if live.as_ref().is_some_and(|prior| {
+        prior.current_friendship_profile != transition.after_state.current_friendship_profile
+    }) {
         return Err(GameMaterialV6Error::Invalid);
     }
     // Difficulty is selected once at bootstrap. Same-run material cannot erase,

@@ -129,7 +129,7 @@ mod tests {
         GameStateV6 {
             current_battle_participation: None,
             current_run_difficulty: None,
-        current_friendship_profile: None,
+            current_friendship_profile: None,
             schema_version: GAME_STATE_SCHEMA_VERSION_V6,
             content_identity,
             identities: GameIdentityAllocatorStateV1 {
