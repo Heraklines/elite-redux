@@ -4,30 +4,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum TargetKind {
-    User,
-    Other,
-    AllOthers,
-    NearOther,
-    AllNearOthers,
-    NearEnemy,
-    AllNearEnemies,
-    RandomNearEnemy,
-    AllEnemies,
-    Attacker,
-    NearAlly,
-    Ally,
-    UserOrNearAlly,
-    UserAndAllies,
-    All,
-    UserSide,
-    EnemySide,
-    BothSides,
-    Party,
-    Curse,
-}
+pub use er_types::battle_model::MoveTarget as TargetKind;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

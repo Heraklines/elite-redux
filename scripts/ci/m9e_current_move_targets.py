@@ -66,7 +66,7 @@ def git(*args):
 
 
 
-PRODUCTS = {"rust/crates/er-battle/tests/m9e_current_move_targets.rs":"a14919d77330d9608d6aa21e742a64025b2c73934887dfe49cdb1ee94de09c09","rust/crates/er-battle/src/lib.rs":"e3b035c6ee1fa52237dc64945d0e42f897d0118e0479a769190c81164c77ed75","rust/crates/er-battle/src/current_move_targets.rs":"bbacf5979e0ae788bd2e69edc18df9859a075f05b6b54cbf2903902a69e433f6"}
+PRODUCTS = {"rust/crates/er-battle/src/lib.rs":"e3b035c6ee1fa52237dc64945d0e42f897d0118e0479a769190c81164c77ed75","rust/crates/er-battle/tests/m9e_current_move_targets.rs":"8f36bad43867a12018e8dfe4df3895b557460c1647afb7b5de841abc8f1bcc68","rust/crates/er-battle/src/current_move_targets.rs":"77b3268c5449e4cc8d35c7aff3fc316f46526ce17935429370d9e7cc5e00f2b6"}
 
 def main():
     require(os.name == "posix" and os.uname().machine == "x86_64", "remote Ubuntu x64 required")
@@ -88,6 +88,10 @@ def main():
         require((ROOT/lib).read_bytes() == previous.replace(b"pub mod critical;", b"pub mod critical;\npub mod current_move_targets;"), "entire old crate surface preserved")
         original = (ROOT/MODULE).read_bytes()
         result["source_hashes"] = {path:sha((ROOT/path).read_bytes()) for path in [*PRODUCTS,*CI]}
+        enum_path = "rust/crates/er-types/src/battle_model.rs"
+        enum_hash = "c8b6862c9e9ae604d9fbfdf50728c0b7f65076fb96f3e209ce8bdcbcd83722d9"
+        require(sha((ROOT/enum_path).read_bytes()) == enum_hash and sha(git("show",BASE+":"+enum_path)) == enum_hash, "unchanged canonical MoveTarget")
+        result["source_hashes"][enum_path] = enum_hash
         run("toolchain-install", ["rustup","toolchain","install","1.97.1","--profile","minimal","--component","rustfmt","--component","clippy"])
         result["rustc"] = run("rustc-version", ["rustc","-Vv"], ROOT/"rust").decode()
         require("release: 1.97.1\n" in result["rustc"], "pinned toolchain")

@@ -1,6 +1,10 @@
 use er_battle::current_move_targets::{TargetContext, TargetKind, TargetSet, resolve_move_targets};
 use serde::Deserialize;
 
+fn resolved(input: &TargetContext) -> TargetSet {
+    resolve_move_targets(input).expect("valid resolved targeting context")
+}
+
 fn context() -> TargetContext {
     TargetContext {
         capacities: [3, 3],
@@ -40,11 +44,7 @@ fn whole_source_targeting_matches_all_twenty_categories_and_owner_call_order() {
         .collect::<Vec<_>>();
     assert_eq!(cases.len(), 200);
     for (index, case) in cases.into_iter().enumerate() {
-        assert_eq!(
-            resolved(&case.input),
-            case.expected,
-            "case {index}"
-        );
+        assert_eq!(resolved(&case.input), case.expected, "case {index}");
     }
 }
 
