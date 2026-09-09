@@ -203,6 +203,7 @@ pub enum GameKernelV7Error {
 
 /// Explicit creation of the ordinary current friendship component. This is not a
 /// migration API: existing saves and the historical natural_start keep unknown data.
+#[derive(Debug)]
 pub struct FreshFriendshipStartV7 {
     pub profile: ProfileStateV1,
     pub seed: String,
