@@ -329,6 +329,26 @@ def inventory_receipt(records, label):
     return {"count": len(records), **file_fact(path, 8 << 20)}
 
 
+def installed_phaser_inputs():
+    # pnpm's package entry is a link. Resolve only this reviewed dependency,
+    # preserving the strict nonredirected rule for every source/output file.
+    store = ORACLE / "node_modules" / ".pnpm"
+    require(store.is_dir() and not store.is_symlink() and store.resolve() == store,
+            "owned real pnpm package store required")
+    package = (ORACLE / "node_modules" / "phaser").resolve(strict=True)
+    parts = package.relative_to(store).parts
+    require(len(parts) == 3 and parts[1:] == ("node_modules", "phaser")
+            and re.fullmatch(r"phaser@3\.90\.0(?:_patch_hash=[a-z0-9]+)?", parts[0]),
+            "exact owned Phaser3.90.0 package containment required")
+    result = {}
+    for logical in RNG_FILES:
+        relative = Path(logical).relative_to("node_modules/phaser")
+        actual = package / relative
+        require(actual.resolve(strict=True) == actual, "nested Phaser file redirect")
+        result[logical] = {"resolved_path": actual.relative_to(ORACLE).as_posix(),
+                           **file_fact(actual, 262144)}
+    return result
+
 def initialize(summary):
     global DEADLINE, WORK_DEADLINE, run_bounded
     epoch = os.environ.get("M9E_FOCUS_STARTED_AT", "")
@@ -391,8 +411,8 @@ def main(summary):
     summary["injected_exporter"] = {"candidate_path": HELPER, "oracle_path": INJECTED, **injected}
     run(["pnpm", "install", "--frozen-lockfile"], "pinned-dependencies", cwd=ORACLE)
     require(inventory(ORACLE, PIN, "oracle-after-install") == pinned, "install changed pinned source")
-    rng_inputs = {path: file_fact(ORACLE / path, 262144) for path in RNG_FILES}
-    require(json.loads((ORACLE / RNG_FILES[0]).read_bytes()).get("version") == "3.90.0", "qualified Phaser version required")
+    rng_inputs = installed_phaser_inputs()
+    require(json.loads((ORACLE / rng_inputs[RNG_FILES[0]]["resolved_path"]).read_bytes()).get("version") == "3.90.0", "qualified Phaser version required")
     summary["phaser_runtime_inputs"] = rng_inputs
     summary["fresh_process_exports"] = []
     for ordinal in ("one", "two"):
@@ -423,7 +443,7 @@ def main(summary):
     require(summary["data_validation"].get("status") == "passed", "independent data verifier did not pass")
     require(inventory(ORACLE, PIN, "oracle-after-queue-verification") == pinned,
             "oracle changed during actual queue verification")
-    require({path: file_fact(ORACLE / path, 262144) for path in RNG_FILES} == rng_inputs, "actual Phaser source changed")
+    require(installed_phaser_inputs() == rng_inputs, "actual Phaser source changed")
     require(inventory(ROOT, sha, "candidate-after", candidate=True) == candidate, "candidate changed")
     require(file_fact(ORACLE / INJECTED) == injected, "exporter changed after execution")
     require(file_fact(ORACLE / "assets" / ASSET_PATH, 256 << 10)["sha256"] == summary["tackle_input"]["sha256"],
