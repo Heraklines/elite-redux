@@ -1,7 +1,7 @@
-name: M9E Daily Pokerus Source Diagnostic
+name: M9E Dex and Encounter Source Diagnostic
 on:
   push:
-    branches: [codex/m9e-daily-pokerus-source-20260909]
+    branches: [codex/m9e-dex-encounter-source-20260910]
 permissions:
   contents: read
 concurrency:

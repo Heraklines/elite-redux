@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "8de64a956441365bccf83b04028ebd2b24f9cfa6afa78fc324c2913d72a935e1"
+EXPORTER_SHA256 = "ead3b8682301077ab2de7f8509d7ce3fe2afb402bf3e80b5ac0261531a5254cb"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -376,9 +376,166 @@ def initialize(summary):
                        "NODE_OPTIONS": "--max-old-space-size=4096"})
 
 
+
+# DEX_SOURCE_ADDITIONS: preserve every preceding qualified source pin.
+ORACLE_PINS.update({
+  "src/constants.ts": [
+    "afc6d1b7102ebbd84da11d7d0b6beaaedb1f0de633d5a5f8bdc914131e4dbbdf",
+    5571
+  ],
+  "src/data/gender.ts": [
+    "90b57b814b73b72732c92d6533e9f9c876c6cea0627cb1f83ec4b64483722116",
+    486
+  ],
+  "src/enums/ability-attr.ts": [
+    "bfbb7255e907db24a9b0885b9831e374644ede7f6cdd00c88918884c1d9d6ec7",
+    350
+  ],
+  "src/enums/dex-attr.ts": [
+    "331f83996f2ef931e3ff5067f764c5bdd51f6c572344941018c76ef0d95823f5",
+    291
+  ],
+  "src/system/achv.ts": [
+    "6255c52e60695bca88fab0fc91dab7a0b779d40d06bc563fd26927800e3847e5",
+    65655
+  ],
+  "src/data/elite-redux/er-achievement-rewards.ts": [
+    "28d729a2e88fe0761fe9a293a08fba5d10c1a17037af7eb362f4ca7835f026c2",
+    56578
+  ],
+  "src/overrides.ts": [
+    "50c3f84157ecbd881534a01b989b2bf4da197b33870c0e84fd1b17847b0b0ae3",
+    17413
+  ],
+  "src/enums/battle-type.ts": [
+    "4c84f68729ddf68f5d5e8cec595ece20b0219a4467edff3bd9a1ac3511df1c7b",
+    154
+  ],
+  "src/enums/game-modes.ts": [
+    "20dafb4f0957f2a9a90b0925216b0f907fe1fa07e861f8337395dd037d044b9a",
+    515
+  ],
+  "src/system/game-data.ts": [
+    "16a69ee97d552e16ab6bb6bb2504d358a05fcf1ca80a6d53c38a4f3d1910e89f",
+    325510
+  ],
+  "src/system/game-stats.ts": [
+    "beac4a1162cd0e1b0ec342751142f2f2a7d1833a22d6e95b5bd4a90259922091",
+    6781
+  ],
+  "src/data/elite-redux/er-run-difficulty.ts": [
+    "944ddde4b3b6fda355e2be1b0688472a0cb56dfc654042dc604d4200e8be1809",
+    6093
+  ],
+  "src/data/battle-format.ts": [
+    "7619f84967643acc73a39c9e45f76c6a3ff4944b1f1794254bf37c279e9bffe8",
+    16071
+  ],
+  "src/enums/biome-id.ts": [
+    "23fba809ca467412434152faee002351fda15a164086255469664be7f2a2e072",
+    658
+  ],
+  "src/data/balance/biomes/town.ts": [
+    "c26b7950d04e26fab6816fbb4894d7b8e5c6f18952c0cdd40bf5c5940f0f7760",
+    5293
+  ],
+  "src/@types/biomes.ts": [
+    "907660afaba3151efa30e593a1cc0e62637416f27bef8b91ba417ef618020aed",
+    2382
+  ],
+  "src/system/ribbons/ribbon-data.ts": [
+    "f7bb2d610c2ea75036a328b7ab8ff19b38e29bd281f2c650b20c6fa0f8d19ba4",
+    7408
+  ],
+  "src/enums/species-id.ts": [
+    "6323f21fd3dfb859b6ae682f2f94507ad140ceeff811fdee43289779cf6665ba",
+    104981
+  ]
+})
+RECONNAISSANCE_METHODS = {
+  "constructor": {
+    "sha256": "816eeedca0d9550f2fb784a1db82f92d15f9be7141da9cf7c81b93772d8b2b5e",
+    "bytes": 1359
+  },
+  "initDexData": {
+    "sha256": "c5ded94bb7168881c81f03dc007f178a3635aded466855c90ca27dd5603b1124",
+    "bytes": 1306
+  },
+  "initStarterData": {
+    "sha256": "ada7540a7d684201c738fe6004c25f70c183e73ee4daa72267cc503613daab69",
+    "bytes": 920
+  },
+  "createStarterDataEntry": {
+    "sha256": "c52e757ef51c72011189703d9e23c95859aa92b8955c313681ca9ffadc7bce74",
+    "bytes": 354
+  },
+  "getRootStarterSpeciesId": {
+    "sha256": "a34feb42c475f23d904a796de6e0e94cee3d27455a47b446f0aaabfa068997f9",
+    "bytes": 689
+  },
+  "getStarterDataEntry": {
+    "sha256": "e5fdfcb6b704258cb148c3236d58d6e55cb5d711d671b3413d908c50515ba3d6",
+    "bytes": 965
+  },
+  "setPokemonSeen": {
+    "sha256": "2d249bb1059a2d2cfa51d6a8fd2175a82e913cb26ff3d26c0f2fc5626229ea3b",
+    "bytes": 1021
+  },
+  "setPokemonCaught": {
+    "sha256": "86114b7449ab214c026e6ae5d393cb276b70edab42bde6f7eaefc3770208acbd",
+    "bytes": 4139
+  },
+  "setPokemonSpeciesCaught": {
+    "sha256": "36df697263855fbe8a07ea17d5dc2d9b1f50615413e64316cdf473b01827dabd",
+    "bytes": 6378
+  },
+  "updateSpeciesDexIvs": {
+    "sha256": "d55dbe526d6bf905b080bd8cc76f9d2d9fac47e0a2e9b00e5fc9c0dcbaf7e6b2",
+    "bytes": 574
+  }
+}
+
+def source_method_closure(summary):
+    path = ORACLE / "src/system/game-data.ts"
+    fact = file_fact(path, 400000)
+    require(fact["git_blob"] == "b88d78bbcf0e36c937af4fa30e45e73d7e5aea90"
+            and fact["sha256"] == "16a69ee97d552e16ab6bb6bb2504d358a05fcf1ca80a6d53c38a4f3d1910e89f"
+            and fact["bytes"] == 325510, "actual pinned GameData identity")
+    rows = path.read_text(encoding="utf-8").splitlines()
+    require(rows.count("export class GameData {") == 1, "exact GameData class anchor")
+    start_class = rows.index("export class GameData {")
+    selected = []
+    methods = {}
+    for name, expected in RECONNAISSANCE_METHODS.items():
+        matches = [i for i in range(start_class, len(rows))
+                   if re.match(r"^  (?:(?:public|private|async) )*" + re.escape(name) + r"\(", rows[i])]
+        require(len(matches) == 1, "unique named actual method: " + name)
+        start = matches[0]
+        end = next((i for i in range(start, len(rows)) if rows[i] == "  }"), None)
+        require(end is not None, "complete named method boundary: " + name)
+        raw = ("\n".join(rows[start:end + 1]) + "\n").encode()
+        methods[name] = {"line_start": start + 1, "line_end": end + 1,
+                         "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
+                         "reconnaissance_matches": len(raw) == expected["bytes"]
+                         and hashlib.sha256(raw).hexdigest() == expected["sha256"]}
+        selected.append(f"\nMETHOD {name} LINES {start + 1}-{end + 1}\n" + raw.decode())
+    excerpt = ("Pinned399d src/system/game-data.ts " + json.dumps(fact, sort_keys=True)
+               + "\n" + "".join(selected)).encode()
+    require(len(excerpt) <= 32768, "named source method excerpt bound")
+    destination = OUTPUT / "source-methods.txt"
+    require(not destination.exists(), "fresh named source excerpt")
+    destination.write_bytes(excerpt)
+    summary["game_data_method_source"] = {"path": "src/system/game-data.ts", **fact,
+        "excerpt": file_fact(destination, 32768), "methods": methods,
+        "reconnaissance_source": "dcd09ddf17ef2e979b2d344c279ba0e6c5a1f89b",
+        "reconnaissance_sha256": "d46396460429b26df9553f4bd6d59d1d32fbca8836ed5e9fd1bba6de061df4f6"}
+    require(all(row["reconnaissance_matches"] for row in methods.values()),
+            "reviewed GameData method differs from actual399d; inspect retained named source excerpt")
+
+
 def main(summary):
     sha = os.environ["GITHUB_SHA"]
-    require(os.environ.get("GITHUB_REF_NAME") == "codex/m9e-daily-pokerus-source-20260909" and os.environ.get("GITHUB_EVENT_NAME") == "push", "exact source branch/event")
+    require(os.environ.get("GITHUB_REF_NAME") == "codex/m9e-dex-encounter-source-20260910" and os.environ.get("GITHUB_EVENT_NAME") == "push", "exact source branch/event")
     require(re.fullmatch(r"[0-9a-f]{40}", sha), "candidate SHA format")
     require(git_text(ROOT, ["rev-parse", "HEAD"], "candidate-head") == sha, "candidate identity")
     require(git_text(ROOT, ["rev-parse", BASE + "^{tree}"], "baseline-tree") == BASE_TREE, "base tree identity")
@@ -403,6 +560,7 @@ def main(summary):
     summary["oracle_inventory"] = inventory_receipt(pinned, "oracle")
     summary["reviewed_oracle_inputs"] = {path: pinned[path] for path in ORACLE_PINS}
     summary["daily_tuning_source"] = {"path": TUNING_PATH, **pinned[TUNING_PATH]}
+    source_method_closure(summary)
     require(git_text(ORACLE, ["config", "--file", ".gitmodules", "--get", "submodule.assets.url"],
                      "assets-repository") == ASSET_REPOSITORY, "assets repository identity")
     run([sys.executable, str(ROOT / PRODUCER), "--fetch-tackle"], "pinned-tackle-input", seconds=60, bound=262144)
@@ -426,9 +584,13 @@ def main(summary):
         require(file_fact(ORACLE / INJECTED) == injected, "exporter changed before execution")
         run(["pnpm", "exec", "vitest", "run", INJECTED, "--pool=forks", "--isolate", "--no-file-parallelism",
              "--reporter=json", "--outputFile=" + str(report)], "fresh-export-" + ordinal,
-            cwd=ORACLE, extra={"M9_TARGET_REGISTRY_OUTPUT": str(destination)})
+            cwd=ORACLE, extra={"M9_TARGET_REGISTRY_OUTPUT": str(destination),
+                "M9_DEX_ENCOUNTER_OUTPUT": str(OUTPUT / f"sidecar-{ordinal}.json")})
         summary["fresh_process_exports"].append({"ordinal": ordinal, "report": validate_vitest(report),
-            "export": file_fact(destination, 32768), "helper_sha256": injected["sha256"]})
+            "export": file_fact(destination, 32768), "helper_sha256": injected["sha256"],
+            "sidecar": file_fact(OUTPUT / f"sidecar-{ordinal}.json", 32768)})
+        require(file_fact(destination,32768)["bytes"] == 29641 and file_fact(destination,32768)["sha256"] ==
+                "9b58691e1c5b3796e2b1bfe511483a445b7ab158e72e895fd15c86e5f9bc4576", "retained qualified legacy bytes differ")
         require(inventory(ORACLE, PIN, "oracle-after-" + ordinal) == pinned, "export changed pinned source")
     require((OUTPUT / "export-one.json").read_bytes() == (OUTPUT / "export-two.json").read_bytes(),
             "two actual fresh source outputs are not byte-identical")
@@ -441,7 +603,8 @@ def main(summary):
         for path in phase_paths}}, sort_keys=True) + "\n", encoding="utf-8")
     require(phase_pins.stat().st_size <= 32768, "phase source pin bound")
     run(["node", str(ROOT / VERIFIER), str(OUTPUT / "export-one.json"), str(OUTPUT / "export-two.json"),
-         str(OUTPUT / "validation.json"), str(ORACLE), str(phase_pins)],
+         str(OUTPUT / "validation.json"), str(ORACLE), str(phase_pins),
+         str(OUTPUT / "sidecar-one.json"), str(OUTPUT / "sidecar-two.json")],
         "independent-data-and-source-queue-verification", seconds=60, bound=65536)
     summary["data_validation"] = json.loads((OUTPUT / "validation.json").read_bytes())
     require(summary["data_validation"].get("status") == "passed", "independent data verifier did not pass")
@@ -455,8 +618,8 @@ def main(summary):
     summary["conservation"] = {"candidate": True, "oracle_after_install": True,
                                "oracle_after_each_export": True, "oracle_after_queue_verification": True, "injected_exporter": True, "asset": True}
     summary["generated"] = {path.name: file_fact(path, 32768) for path in sorted(OUTPUT.iterdir())}
-    require(set(summary["generated"]) == {"export-one.json", "export-two.json", "validation.json"}, "exact output inventory")
-    require(sum(row["bytes"] for row in summary["generated"].values()) <= 3 * 32768, "aggregate generated bound")
+    require(set(summary["generated"]) == {"export-one.json", "export-two.json", "sidecar-one.json", "sidecar-two.json", "source-methods.txt", "validation.json"}, "exact output inventory")
+    require(sum(row["bytes"] for row in summary["generated"].values()) <= 6 * 32768, "aggregate generated bound")
     require(time.monotonic() < WORK_DEADLINE, "work deadline exceeded before reserved cleanup")
 
 
@@ -470,7 +633,7 @@ def bound_partial_outputs():
     removed = []
     for path in sorted(OUTPUT.iterdir()):
         require(path.parent == OUTPUT and path.is_file() and not path.is_symlink(), "unexpected generated output type")
-        if path.name not in {"export-one.json", "export-two.json", "validation.json"} or path.stat().st_size > 32768:
+        if path.name not in {"export-one.json", "export-two.json", "sidecar-one.json", "sidecar-two.json", "source-methods.txt", "validation.json"} or path.stat().st_size > 32768:
             removed.append({"name": path.name[:128], "bytes": path.stat().st_size})
             path.unlink()
     return removed
@@ -483,9 +646,9 @@ def entry():
     COMPACT.mkdir()
     summary = {"schema_version": 1, "source_sha": os.environ.get("GITHUB_SHA"), "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "branch": os.environ.get("GITHUB_REF_NAME"), "event": os.environ.get("GITHUB_EVENT_NAME"), "baseline": BASE, "oracle_sha": PIN,
-        "scope": "two actual daily Pokerus, initialized registry and controlled stat-method observations plus source PhaseTree nesting; no runtime XP or UI qualification",
+        "scope": "retained actual daily/registry/stat/queue observations plus fresh dex constructor and direct account methods, initial encounter; no evolution-phase or runtime XP qualification",
         "status": "failed", "limits": {"per_command_seconds": 600, "shared_seconds": 1800,
-        "cleanup_reserve_seconds": 20, "data_file_bytes": 32768, "compact_metadata_bytes": 65536}}
+        "cleanup_reserve_seconds": 20, "data_file_bytes": 32768, "source_excerpt_bytes":32768, "aggregate_generated_bytes":196608, "compact_metadata_bytes": 65536}}
     error = None
     try:
         require(all(re.fullmatch(r"[1-9][0-9]{0,19}", summary[key] or "") for key in ("run_id", "run_attempt")),

@@ -155,7 +155,211 @@ function validate(row) {
     assert.equal(v.effective,valid ? r : i===0 ? 5 : 3);
   }
 }
-assert.equal(process.argv.length, 7);
+// Pinned399d enums: WILD=0, CLASSIC=0, TOWN=0; SINGLE_FORMAT.id="single".
+// Source override defaults: health_segments=0, species=null, level=0.
+// These are assertions for the unchanged startup, not replacement observations.
+function validateInitialEncounter(value) {
+  keys(value,["scope","wave","battle_type","mode","biome","trainer_absent","double","format","cadence_boss","overrides","enemies","rng_unchanged"]);
+  assert.equal(value.scope,"actual fresh initial encounter before controlled observations; not later waves or custom doubles");
+  assert.equal(value.wave,1);
+  assert.equal(value.battle_type,0);
+  assert.equal(value.mode,0);
+  assert.equal(value.biome,0);
+  assert.equal(value.trainer_absent,true);
+  assert.equal(value.double,false);
+  assert.equal(value.format,"single");
+  assert.equal(value.cadence_boss,false);
+  assert.equal(value.rng_unchanged,true);
+  keys(value.overrides,["health_segments","species","level"]);
+  for (const field of Object.values(value.overrides)) keys(field,["source_type","value"]);
+  assert.deepEqual(value.overrides.health_segments,{source_type:"number",value:0});
+  assert.deepEqual(value.overrides.species,{source_type:"object",value:null});
+  assert.deepEqual(value.overrides.level,{source_type:"number",value:0});
+  assert(Array.isArray(value.enemies));
+  assert.equal(value.enemies.length,1);
+  for (const row of value.enemies) {
+    keys(row,["id","species","form","level","boss_segments","boss_segment_index","is_boss","predicate_segments","sub_legendary","legendary","mythical"]);
+    integer(row.id,0,Number.MAX_SAFE_INTEGER);
+    integer(row.species,1,Number.MAX_SAFE_INTEGER);
+    integer(row.form,0,Number.MAX_SAFE_INTEGER);
+    integer(row.level,1,Number.MAX_SAFE_INTEGER);
+    for (const key of ["boss_segments","boss_segment_index","predicate_segments"]) assert.equal(row[key],0);
+    for (const key of ["is_boss","sub_legendary","legendary","mythical"]) assert.equal(row[key],false);
+  }
+}
+
+// Invoke on an ACTUAL already-validated sidecar. Each clone changes just the
+// named receipt fact; no synthetic passing fixture or production mutation.
+function initialEncounterMutants(actual) {
+  const mutations = [
+    ["initial-missing-predicate", v => { delete v.enemies[0].predicate_segments; }],
+    ["initial-boss-owner", v => { v.enemies[0].boss_segments = 1; }],
+    ["initial-boss-predicate", v => { v.enemies[0].predicate_segments = 1; }],
+    ["initial-legendary", v => { v.enemies[0].legendary = true; }],
+    ["initial-forced-nonboss", v => { v.overrides.health_segments.value = 1; }],
+    ["initial-species-override", v => { v.overrides.species = {source_type:"number",value:16}; }],
+    ["initial-missing-override-vs-null", v => { v.overrides.species.source_type = "undefined"; }],
+    ["initial-double", v => { v.double = true; v.format = "double"; }],
+    ["initial-trainer", v => { v.trainer_absent = false; }],
+    ["initial-rng-moved", v => { v.rng_unchanged = false; }],
+    ["initial-false-is-not-zero", v => { v.enemies[0].boss_segments = false; }],
+    ["initial-extra-owner", v => { v.enemies[0].unbound_owner = true; }],
+  ];
+  for (const [, mutate] of mutations) {
+    const value = structuredClone(actual);
+    mutate(value);
+    assert.throws(() => validateInitialEncounter(value));
+  }
+  return mutations.map(([name]) => name);
+}
+
+const hex = value => assert(typeof value === "string" && /^[0-9a-f]{64}$/.test(value));
+const decimal = value => assert(typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value) && value.length<=1024);
+const defaultSpecies = [1,4,7,152,155,158,252,255,258,387,390,393,495,498,501,650,653,656,722,725,728,810,813,816,906,909,912];
+function validateDex(d) {
+  keys(d,["scope","initial","context","cases","root_uncaught","genderless_dex_attr","original_account_unchanged"]);
+  assert.equal(d.scope,"actual initDexData/initStarterData through public fromRaw constructor, then direct ordered account methods; not Pokemon.evolve or phase execution");
+  assert.equal(d.original_account_unchanged,true);
+  const i=d.initial;
+  keys(i,["constructor","date_milliseconds","trainer_id","secret_id","all_species_ids","dex_ids_sha256","default_starter_ids",
+    "zero_entry","default_attributes","default_ivs","default_natures","starter_ids","starter_zero","starter_ability_default",
+    "account_defaults","level_achievements","default_dex_entry_aliases","rng_restored","full_state_sha256"]);
+  assert.equal(i.constructor,"new GameData(true)");assert.equal(i.date_milliseconds,1783641600000);assert.equal(i.trainer_id,0);assert.equal(i.secret_id,0);
+  const ids=value=>{assert(Array.isArray(value));integer(value.length,27,4096);assert.equal(new Set(value).size,value.length);for(const id of value)integer(id,1,1000000);};
+  ids(i.all_species_ids);ids(i.starter_ids);
+  assert.deepEqual(i.starter_ids,[...i.starter_ids].sort((a,b)=>a-b));
+  assert(i.starter_ids.every(id=>i.all_species_ids.includes(id)));
+  assert.equal(i.dex_ids_sha256,digest(Buffer.from(JSON.stringify([...i.all_species_ids].sort((a,b)=>a-b)))));
+  assert.deepEqual(i.default_starter_ids,defaultSpecies);
+  assert(defaultSpecies.every(id=>i.all_species_ids.includes(id) && i.starter_ids.includes(id)));
+  keys(i.zero_entry,["seenAttr","caughtAttr","natureAttr","seenCount","caughtCount","hatchedCount","ivs","ribbons"]);
+  assert.deepEqual({...i.zero_entry,ribbons:null},{seenAttr:"0",caughtAttr:"0",natureAttr:0,seenCount:0,caughtCount:0,hatchedCount:0,ivs:[0,0,0,0,0,0],ribbons:null});
+  assert.equal(i.zero_entry.ribbons,"0");
+  assert.equal(i.default_attributes,"157");assert.deepEqual(i.default_ivs,[15,15,15,15,15,15]);
+  assert.equal(i.default_natures.length,27);
+  assert.deepEqual(i.default_natures.map(row=>row[0]).sort((a,b)=>a-b),[...defaultSpecies].sort((a,b)=>a-b));
+  for(const row of i.default_natures){assert.equal(row.length,2);integer(row[1],1,1<<25);assert([0,6,12,18,24].some(n=>(1<<(n+1))===row[1]));}
+  assert.deepEqual(i.starter_zero,{moveset:null,eggMoves:0,candyCount:0,friendship:0,abilityAttr:0,passiveAttr:0,valueReduction:0,classicWinCount:0});
+  assert.equal(i.starter_ability_default,1);assert.equal(i.default_dex_entry_aliases,true);assert.equal(i.rng_restored,true);hex(i.full_state_sha256);
+  keys(i.account_defaults,["highest_level","achv_unlocks","voucher_unlocks","voucher_counts","eggs"]);
+  assert.equal(i.account_defaults.highest_level,0);assert.deepEqual(i.account_defaults.achv_unlocks,{});
+  assert.deepEqual(i.account_defaults.voucher_unlocks,{});assert.deepEqual(i.account_defaults.eggs,[]);
+  assert.deepEqual(i.account_defaults.voucher_counts,{0:0,1:0,2:0,3:0});
+  assert.deepEqual(i.level_achievements,[["LV_100",100],["LV_250",250],["LV_1000",1000]]);
+  const c=d.context;
+  keys(c,["source_species","target_species","form","ability_index","nature","gender","shiny","variant","ivs","dex_attr","root","starter_root","full_unlocks","level_moves_1_10","perfect_reward","original","coop","daily","fun","mystery","fusion","black_shiny","shiny_lab"]);
+  assert.equal(c.source_species,1);assert.equal(c.target_species,2);assert.equal(c.form,0);assert.equal(c.ability_index,0);
+  assert.equal(c.nature,0);assert.equal(c.gender,0);assert.equal(c.shiny,false);assert.equal(c.variant,0);
+    assert(Array.isArray(c.level_moves_1_10));integer(c.level_moves_1_10.length,1,64);
+  for(const row of c.level_moves_1_10){assert.equal(row.length,2);integer(row[0],1,10);integer(row[1],1,1000000);}
+  keys(c.perfect_reward,["id","recipe","difficulty","team"]);
+  assert(typeof c.perfect_reward.id === "string" && c.perfect_reward.id.length>0);
+  assert.deepEqual(c.perfect_reward.recipe,{kind:"candyTeam",perMon:10});
+  assert(["youngster","ace","elite","hell"].includes(c.perfect_reward.difficulty));
+  assert.deepEqual(c.perfect_reward.team,[{species:2,root:1,starter_root:1}]);
+  const perfectCandy=Math.round(10*({youngster:1,ace:1.5,elite:2,hell:3}[c.perfect_reward.difficulty]));
+assert.deepEqual(c.ivs,[31,1,2,3,4,5]);assert.equal(c.dex_attr,"149");assert.equal(c.root,1);assert.equal(c.starter_root,1);
+  assert.deepEqual(c.full_unlocks.map(row=>row[0]),[1,2]);
+  for(const [id,value] of c.full_unlocks){integer(id,1,2);decimal(value);assert((BigInt(value)&149n)===149n);}
+  keys(c.original,["species","form","ability_index","nature","gender","shiny","variant"]);
+  assert.equal(c.original.species,1);integer(c.original.form,0,65535);integer(c.original.ability_index,0,2);
+  integer(c.original.nature,0,24);integer(c.original.gender,-1,1);bool(c.original.shiny);integer(c.original.variant,0,3);
+  for(const flag of ["coop","daily","fun","mystery","fusion","black_shiny","shiny_lab"])assert.equal(c[flag],false);
+  assert.equal(d.genderless_dex_attr,"145");
+  assert.deepEqual(d.root_uncaught,{root_caught:"0",caught_result:false,full_state_unchanged:true});
+  const dex=new Map(i.all_species_ids.map(id=>[id,structuredClone(i.zero_entry)]));
+  const starters=new Map(i.starter_ids.map(id=>[id,{...i.starter_zero,abilityAttr:defaultSpecies.includes(id)?1:0}]));
+  for(const [id,nature] of i.default_natures)Object.assign(dex.get(id),{seenAttr:"157",caughtAttr:"157",natureAttr:nature,ivs:[15,15,15,15,15,15]});
+  const checkDelta=(change,kind,ivs,perfect)=>{
+    keys(change,["dex","starters","rest","before_sha256","after_sha256"]);hex(change.before_sha256);hex(change.after_sha256);
+    assert(Array.isArray(change.dex)&&Array.isArray(change.starters)&&Array.isArray(change.rest));
+    assert.deepEqual(change.dex.map(row=>row[0]),[...change.dex.map(row=>row[0])].sort((a,b)=>a-b));
+    assert.equal(new Set(change.dex.map(row=>row[0])).size,change.dex.length);
+    const expected=structuredClone(dex);
+    if(kind==="ivs")for(const id of [2,1])expected.get(id).ivs=expected.get(id).ivs.map((value,index)=>Math.max(value,ivs[index]));
+    if(kind==="seen")expected.get(2).seenAttr=(BigInt(expected.get(2).seenAttr)|149n).toString();
+    if(kind==="caught")for(const id of [2,1]){
+      expected.get(id).caughtAttr=(BigInt(expected.get(id).caughtAttr)|(149n&BigInt(c.full_unlocks.find(row=>row[0]===id)[1]))).toString();
+      expected.get(id).natureAttr|=2;
+    }
+    const changed=[...dex.keys()].sort((a,b)=>a-b).filter(id=>JSON.stringify(dex.get(id))!==JSON.stringify(expected.get(id)));
+    assert.deepEqual(change.dex.map(row=>row[0]),changed);
+    for(const [id,before,after] of change.dex){assert.deepEqual(before,dex.get(id));assert.deepEqual(after,expected.get(id));dex.set(id,after);}
+    // Only the actual perfect-IV achievement owner may affect non-dex state.
+    if(!perfect || kind!=="ivs"){
+      assert.deepEqual(change.starters,[]);assert.deepEqual(change.rest,[]);
+    } else {
+      assert.equal(change.starters.length,1);
+      assert.equal(new Set(change.starters.map(row=>row[0])).size,change.starters.length);
+      for(const row of change.starters){assert.equal(row.length,3);const[id,before,after]=row;assert.deepEqual(before,starters.get(id));
+        assert.equal(id,1);assert.equal(after.candyCount,before.candyCount+perfectCandy);
+        assert.deepEqual({...after,candyCount:before.candyCount},before);starters.set(id,after);}
+      assert.equal(new Set(change.rest.map(row=>row[0])).size,change.rest.length);
+      for(const row of change.rest){assert.equal(row.length,3);assert(typeof row[0]==="string");assert.notDeepEqual(row[1],row[2]);}
+      const unlock=change.rest.find(row=>row[0]==="achvUnlocks");assert(unlock);
+      assert.deepEqual(unlock[1],{});assert.deepEqual(Object.keys(unlock[2]),[c.perfect_reward.id]);
+      assert.equal(Object.values(unlock[2])[0],1783641600000);
+    }
+    const any=change.dex.length+change.starters.length+change.rest.length;
+    if(any===0)assert.equal(change.before_sha256,change.after_sha256);else assert.notEqual(change.before_sha256,change.after_sha256);
+  };
+  assert.deepEqual(d.cases.map(row=>row.name),["owned-ivysaur-account-methods","repeat-idempotent-account-methods","perfect-ivs-real-validation"]);
+  let frontier=i.full_state_sha256;
+  for(const [index,row] of d.cases.entries()){
+    keys(row,["name","ivs","caught_result","achievement_calls","ivs_delta","seen_delta","caught_delta"]);
+    assert.deepEqual(row.ivs,index===2?[31,31,31,31,31,31]:[31,1,2,3,4,5]);
+    assert.equal(row.caught_result,false);assert.deepEqual(row.achievement_calls,index===2?["PERFECT_IVS","PERFECT_IVS"]:[]);
+    for(const kind of ["ivs","seen","caught"]){const delta=row[`${kind}_delta`];assert.equal(delta.before_sha256,frontier);checkDelta(delta,kind,row.ivs,index===2);frontier=delta.after_sha256;}
+  }
+}
+
+function validateSidecar(row) {
+  keys(row,["schema_version","source_sha","seed","legacy_sha256","initial_encounter","town_boss_pool","dex"]);
+  assert.equal(row.schema_version,1);assert.equal(row.source_sha,"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
+  assert.equal(row.seed,"m9e-target-registry-source-v1");
+  assert.equal(row.legacy_sha256,"9b58691e1c5b3796e2b1bfe511483a445b7ab158e72e895fd15c86e5f9bc4576");
+  validateInitialEncounter(row.initial_encounter);validateTownBossPool(row.town_boss_pool);validateDex(row.dex);
+}
+
+// Exact399d town.ts source c26b7950d04e26fab6816fbb4894d7b8e5c6f18952c0cdd40bf5c5940f0f7760;
+// numeric SpeciesId binding6323f21fd3dfb859b6ae682f2f94507ad140ceeff811fdee43289779cf6665ba.
+// Full45 source tier/time rows, including empty boss pools; no fixture body.
+const sourceTownPoolRows = [[0,-1,[16,19,21,263,265,276,399,504,506,661,831,915]],[0,0,[10,161,165,187,191,266,396,519,546,664,734,819]],[0,1,[10,161,165,187,191,266,396,519,546,664,734,819]],[0,2,[13,163,167,261,268,509,824]],[0,3,[13,163,167,261,268,509,824]],[1,-1,[273,293,543,926]],[1,0,[29,32,69,261,270,300,415,420,572,921]],[1,1,[29,32,69,261,270,300,415,420,572,921]],[1,2,[23,43,46,48,52,285,401]],[1,3,[23,43,46,48,52,285,401]],[2,-1,[63,173,174,283,440,821,924]],[2,0,[]],[2,1,[]],[2,2,[]],[2,3,[]],[3,-1,[133,172,175,280,290,447]],[3,0,[]],[3,1,[]],[3,2,[]],[3,3,[]],[4,-1,[132,446,570]],[4,0,[]],[4,1,[]],[4,2,[]],[4,3,[]],[5,-1,[]],[5,0,[]],[5,1,[]],[5,2,[]],[5,3,[]],[6,-1,[]],[6,0,[]],[6,1,[]],[6,2,[]],[6,3,[]],[7,-1,[]],[7,0,[]],[7,1,[]],[7,2,[]],[7,3,[]],[8,-1,[]],[8,0,[]],[8,1,[]],[8,2,[]],[8,3,[]]];
+function validateTownBossPool(value) {
+  keys(value,["scope","wave","level","biome","trainer_chance","pool_rows","species","rng_unchanged"]);
+  assert.equal(value.scope,"initialized Town pool and actual first-wave boss predicate; not encounter selection parity");
+  assert.equal(value.wave,1);assert.equal(value.level,5);assert.equal(value.biome,0);
+  assert.equal(value.trainer_chance,0);assert.equal(value.rng_unchanged,true);
+  assert.deepEqual(value.pool_rows,sourceTownPoolRows);
+  const ids = [...new Set(sourceTownPoolRows.flatMap(row => row[2]))].sort((a,b)=>a-b);
+  assert.equal(ids.length,67);
+  assert(Array.isArray(value.species));assert.equal(value.species.length,ids.length);
+  for (const [index,row] of value.species.entries()) {
+    assert(Array.isArray(row));assert.equal(row.length,5);
+    assert.deepEqual(row,[ids[index],false,false,false,0]);
+  }
+}
+function townBossPoolMutants(actual) {
+  const mutations = [
+    ["town-missing-species", v => { v.species.pop(); }],
+    ["town-duplicate-species", v => { v.species[1] = v.species[0]; }],
+    ["town-legendary", v => { v.species[0][2] = true; }],
+    ["town-actual-boss", v => { v.species[0][4] = 2; }],
+    ["town-missing-empty-pool", v => { v.pool_rows.pop(); }],
+    ["town-altered-membership", v => { v.pool_rows[0][2].pop(); }],
+    ["town-altered-time", v => { v.pool_rows[0][1] = 0; }],
+    ["town-boolean-segments", v => { v.species[0][4] = false; }],
+    ["town-trainer-chance", v => { v.trainer_chance = 1; }],
+    ["town-rng-change", v => { v.rng_unchanged = false; }],
+  ];
+  for (const [, mutate] of mutations) {
+    const value = structuredClone(actual);mutate(value);
+    assert.throws(() => validateTownBossPool(value));
+  }
+  return mutations.map(([name]) => name);
+}
+
+assert.equal(process.argv.length, 9);
 const raws = process.argv.slice(2, 4).map(path => {
   const stat = fs.lstatSync(path);
   assert(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= 32768);
@@ -164,6 +368,30 @@ const raws = process.argv.slice(2, 4).map(path => {
 assert(raws[0].equals(raws[1]));
 const row = JSON.parse(raws[0]);
 validate(row);
+assert.equal(raws[0].length,29641);
+assert.equal(digest(raws[0]),"9b58691e1c5b3796e2b1bfe511483a445b7ab158e72e895fd15c86e5f9bc4576");
+const sidecarRaws=process.argv.slice(7,9).map(path=>{
+  const stat=fs.lstatSync(path);assert(stat.isFile()&&!stat.isSymbolicLink()&&stat.size>0&&stat.size<=32768);
+  return fs.readFileSync(path);
+});
+assert(sidecarRaws[0].equals(sidecarRaws[1]));
+const sidecar=JSON.parse(sidecarRaws[0]);validateSidecar(sidecar);
+const sidecarNegatives=[...initialEncounterMutants(sidecar.initial_encounter),...townBossPoolMutants(sidecar.town_boss_pool)];
+for(const[name,mutate]of[
+  ["dex-default-attribute",v=>{v.dex.initial.default_attributes="149";}],
+  ["dex-missing-species",v=>{v.dex.initial.all_species_ids.pop();}],
+  ["dex-duplicate-starter",v=>{v.dex.initial.starter_ids.push(v.dex.initial.starter_ids[0]);}],
+  ["dex-zero-ability",v=>{v.dex.initial.starter_ability_default=0;}],
+  ["dex-unknown-highest-level",v=>{v.dex.initial.account_defaults.highest_level=null;}],
+  ["dex-nonzero-highest-level",v=>{v.dex.initial.account_defaults.highest_level=5;}],
+  ["dex-genderless-male-bit",v=>{v.dex.genderless_dex_attr="149";}],
+  ["dex-repeated-payment",v=>{v.dex.cases[1].caught_delta.starters=[[1,{},{}]];}],
+  ["dex-iv-prevolution-missing",v=>{v.dex.cases[0].ivs_delta.dex.shift();}],
+  ["dex-validation-order",v=>{v.dex.cases[2].achievement_calls.pop();}],
+  ["dex-root-gate",v=>{v.dex.root_uncaught.full_state_unchanged=false;}],
+  ["dex-perfect-reward",v=>{v.dex.cases[2].ivs_delta.starters[0][2].candyCount++;}],
+  ["dex-level-threshold",v=>{v.dex.initial.level_achievements[0][1]=99;}],
+]){const copy=structuredClone(sidecar);mutate(copy);assert.throws(()=>validateSidecar(copy));sidecarNegatives.push(name);}
 let rejected = 0;
 for (const mutate of [
   r => { r.abilities[0].spread = 0; },
@@ -292,6 +520,6 @@ const families = {post_faint:row.abilities.filter(a => a.post_faint).map(a => a.
   post_victory:row.abilities.filter(a => a.post_victory).map(a => a.id),
   post_victory_stat:row.moves.filter(m => m.post_victory_stat).map(m => m.id),
   experience_meta:row.abilities.filter(a => a.meta_kinds.includes("experience-gain-multiplier")).map(a => a.id)};
-const output = `${JSON.stringify({schema_version:2,status:"passed",scope:"registry observations and actual source queue nesting; no gameplay or general neutrality qualification",source_sha:row.source_sha,ability_count:24,move_count:27,negative_cases:rejected,families,phase_order:phaseOrder,no_effect_family_ids:row.moves.filter(m=>m.no_effect).map(m=>m.id),daily_pokerus:{clock_cases:row.daily_pokerus.clock_cases.length,positive_starters:[1,4,7],effective_count:row.daily_pokerus.effective_count,starter_key_count:706,source_calls:row.daily_pokerus.source_calls,rng_restored:true},stat_cases:row.stats.cases.length,balance:row.balance,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
+const output = `${JSON.stringify({schema_version:3,status:"passed",scope:"registry observations and actual source queue nesting; no gameplay or general neutrality qualification",source_sha:row.source_sha,ability_count:24,move_count:27,negative_cases:rejected,sidecar_negative_cases:sidecarNegatives,sidecars:sidecarRaws.map(raw=>({bytes:raw.length,sha256:digest(raw)})),dex:{species:sidecar.dex.initial.all_species_ids.length,starters:sidecar.dex.initial.starter_ids.length,defaults:27,cases:3,highest_level:sidecar.dex.initial.account_defaults.highest_level},initial_encounter:sidecar.initial_encounter,town_boss_pool:{pool_rows:sidecar.town_boss_pool.pool_rows.length,species:sidecar.town_boss_pool.species.length},families,phase_order:phaseOrder,no_effect_family_ids:row.moves.filter(m=>m.no_effect).map(m=>m.id),daily_pokerus:{clock_cases:row.daily_pokerus.clock_cases.length,positive_starters:[1,4,7],effective_count:row.daily_pokerus.effective_count,starter_key_count:706,source_calls:row.daily_pokerus.source_calls,rng_restored:true},stat_cases:row.stats.cases.length,balance:row.balance,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
 assert(Buffer.byteLength(output) <= 8192);
 fs.writeFileSync(process.argv[4], output, {flag:"wx"});
