@@ -149,8 +149,13 @@ impl CurrentTurnExecutionV1 {
                     && faints.iter().all(|faint| {
                         battle.field.slots.iter().any(|row| row.slot == faint.slot)
                             && match faint.slot.side {
-                                er_types::battle_ids::BattleSide::Player => run.party.iter().any(|pokemon| pokemon.id == faint.pokemon),
-                                er_types::battle_ids::BattleSide::Enemy => battle.enemy_party.iter().any(|pokemon| pokemon.id == faint.pokemon),
+                                er_types::battle_ids::BattleSide::Player => {
+                                    run.party.iter().any(|pokemon| pokemon.id == faint.pokemon)
+                                }
+                                er_types::battle_ids::BattleSide::Enemy => battle
+                                    .enemy_party
+                                    .iter()
+                                    .any(|pokemon| pokemon.id == faint.pokemon),
                             }
                     }) =>
             {
