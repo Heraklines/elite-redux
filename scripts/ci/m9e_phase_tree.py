@@ -21,7 +21,7 @@ TARGET = RUNNER / "m9e-phase-tree-target"
 START = float(os.environ["M9E_STARTED_AT"])
 DEADLINE = START + 1800
 COMMANDS = []
-PRODUCTS = {"rust/crates/er-progression/src/current_phase_tree.rs":"9ad12b810b370f0f86813769287502e58f1c6ffc0f778581809c8464eb3a3aea","rust/crates/er-progression/src/lib.rs":"725c9a073583a5939ec8d3541eb8d0165ab5ff89491079e11e4490c0cb8fbfd1","rust/crates/er-progression/tests/m9e_phase_tree.rs":"23f2ef640f4658083f9346b6519ce65b11eedf04db5442fa3d4eb28f7888d539"}
+PRODUCTS = {"rust/crates/er-progression/src/current_phase_tree.rs":"15dfdb67aed2b56bd9265b47a580c68bd8d7c34a9d5f4116383040d235656b89","rust/crates/er-progression/src/lib.rs":"725c9a073583a5939ec8d3541eb8d0165ab5ff89491079e11e4490c0cb8fbfd1","rust/crates/er-progression/tests/m9e_phase_tree.rs":"1c0ca74f47d47ffec8c6e5f1d7d9c5a253fc3941947e2c9744b261d94ee02ac6"}
 
 def require(ok, reason):
     if not ok:

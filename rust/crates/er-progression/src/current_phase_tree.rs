@@ -78,7 +78,11 @@ impl<T: Clone> CurrentPhaseTree<T> {
             }
             self.state.levels.push(VecDeque::new());
         }
-        self.state.levels.get_mut(level).ok_or(CurrentPhaseTreeError::InvalidLevel)?.push_back(phase);
+        self.state
+            .levels
+            .get_mut(level)
+            .ok_or(CurrentPhaseTreeError::InvalidLevel)?
+            .push_back(phase);
         Ok(())
     }
 
@@ -91,10 +95,16 @@ impl<T: Clone> CurrentPhaseTree<T> {
                 return Err(CurrentPhaseTreeError::Capacity);
             }
             candidate.state.deferred_active = true;
-            candidate.state.levels.insert(candidate.state.levels.len() - 1, VecDeque::new());
+            candidate
+                .state
+                .levels
+                .insert(candidate.state.levels.len() - 1, VecDeque::new());
             candidate.state.current_level += 1;
         }
-        candidate.add(phase, candidate.state.current_level + 1 - usize::from(defer))?;
+        candidate.add(
+            phase,
+            candidate.state.current_level + 1 - usize::from(defer),
+        )?;
         *self = candidate;
         Ok(())
     }
@@ -105,14 +115,19 @@ impl<T: Clone> CurrentPhaseTree<T> {
 
     pub fn add_barrier(&mut self, phase: T) -> Result<(), CurrentPhaseTreeError> {
         self.room()?;
-        let siblings = self.state.levels.get_mut(self.state.current_level).ok_or(CurrentPhaseTreeError::InvalidLevel)?;
+        let siblings = self
+            .state
+            .levels
+            .get_mut(self.state.current_level)
+            .ok_or(CurrentPhaseTreeError::InvalidLevel)?;
         siblings.push_front(phase);
         Ok(())
     }
 
     pub fn next_phase(&mut self) -> Option<T> {
         self.state.current_level = self.state.levels.len() - 1;
-        while self.state.current_level > 0 && self.state.levels[self.state.current_level].is_empty() {
+        while self.state.current_level > 0 && self.state.levels[self.state.current_level].is_empty()
+        {
             self.state.deferred_active = false;
             self.state.levels.pop();
             self.state.current_level -= 1;
@@ -121,7 +136,12 @@ impl<T: Clone> CurrentPhaseTree<T> {
     }
 
     pub fn queued(&self) -> Vec<T> {
-        self.state.levels.iter().rev().flat_map(|level| level.iter().cloned()).collect()
+        self.state
+            .levels
+            .iter()
+            .rev()
+            .flat_map(|level| level.iter().cloned())
+            .collect()
     }
 
     pub fn clear(&mut self, leave_first_level: bool) {

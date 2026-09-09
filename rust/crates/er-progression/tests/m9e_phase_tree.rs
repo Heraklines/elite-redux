@@ -1,12 +1,15 @@
 use std::collections::VecDeque;
 
 use er_progression::current_phase_tree::{
-    CurrentPhaseTree, CurrentPhaseTreeError, CurrentPhaseTreeSnapshot,
-    MAX_CURRENT_QUEUED_PHASES,
+    CurrentPhaseTree, CurrentPhaseTreeError, CurrentPhaseTreeSnapshot, MAX_CURRENT_QUEUED_PHASES,
 };
 
 fn numbers(values: impl IntoIterator<Item = u32>) -> String {
-    values.into_iter().map(|n| n.to_string()).collect::<Vec<_>>().join(",")
+    values
+        .into_iter()
+        .map(|n| n.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 #[test]
@@ -32,8 +35,20 @@ fn every_actual_source_trace_and_intermediate_snapshot_matches() {
                 other => assert_eq!(other, 'a', "unknown oracle operation"),
             }
             let snapshot = tree.snapshot();
-            let levels = snapshot.levels.iter().map(|level| numbers(level.iter().copied())).collect::<Vec<_>>().join("/");
-            let actual = format!("{}:{}:{}:{}:{}", popped.map_or_else(|| "-".to_owned(), |n| n.to_string()), snapshot.current_level, u8::from(snapshot.deferred_active), levels, numbers(tree.queued()));
+            let levels = snapshot
+                .levels
+                .iter()
+                .map(|level| numbers(level.iter().copied()))
+                .collect::<Vec<_>>()
+                .join("/");
+            let actual = format!(
+                "{}:{}:{}:{}:{}",
+                popped.map_or_else(|| "-".to_owned(), |n| n.to_string()),
+                snapshot.current_level,
+                u8::from(snapshot.deferred_active),
+                levels,
+                numbers(tree.queued())
+            );
             assert_eq!(actual, expected[index], "case {} step {index}", parts[0]);
             let restored = CurrentPhaseTree::restore(snapshot).expect("exact intermediate restore");
             assert_eq!(restored, tree);
@@ -78,11 +93,25 @@ fn source_clear_preserves_deferred_flag_and_retains_only_deepest_level() {
 
 #[test]
 fn malformed_restore_and_excess_capacity_leave_queue_unchanged() {
-    assert_eq!(CurrentPhaseTree::<u32>::restore(CurrentPhaseTreeSnapshot { levels: vec![], current_level: 0, deferred_active: false }), Err(CurrentPhaseTreeError::InvalidLevel));
-    let full = CurrentPhaseTreeSnapshot { levels: vec![VecDeque::from(vec![1_u32; MAX_CURRENT_QUEUED_PHASES])], current_level: 0, deferred_active: false };
+    assert_eq!(
+        CurrentPhaseTree::<u32>::restore(CurrentPhaseTreeSnapshot {
+            levels: vec![],
+            current_level: 0,
+            deferred_active: false
+        }),
+        Err(CurrentPhaseTreeError::InvalidLevel)
+    );
+    let full = CurrentPhaseTreeSnapshot {
+        levels: vec![VecDeque::from(vec![1_u32; MAX_CURRENT_QUEUED_PHASES])],
+        current_level: 0,
+        deferred_active: false,
+    };
     let mut tree = CurrentPhaseTree::restore(full).expect("exact bounded queue");
     let before = tree.clone();
-    assert_eq!(tree.add_phase(2, true), Err(CurrentPhaseTreeError::Capacity));
+    assert_eq!(
+        tree.add_phase(2, true),
+        Err(CurrentPhaseTreeError::Capacity)
+    );
     assert_eq!(tree, before);
     assert_eq!(tree.add_barrier(3), Err(CurrentPhaseTreeError::Capacity));
     assert_eq!(tree, before);
