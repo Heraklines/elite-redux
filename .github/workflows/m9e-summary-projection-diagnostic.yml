@@ -1,0 +1,29 @@
+name: M9E Bounded Summary Failure Diagnosis
+on:
+  push:
+    branches: [codex/m9e-summary-projection-diagnostic-20260909]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          lfs: false
+          submodules: false
+      - name: Inspect exact failed evidence and verify bounded projection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/m9e_summary_projection_diagnostic.py
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m9e-summary-projection-diagnostic-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-summary-diagnostic/summary.json
+          if-no-files-found: error
+          retention-days: 14
