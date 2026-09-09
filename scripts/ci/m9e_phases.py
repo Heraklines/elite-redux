@@ -33,6 +33,12 @@ AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "standard_score_library": "rust/crates/er-ai/src/lib.rs",
+    "standard_score_module": "rust/crates/er-ai/src/m9e_standard_attack_score.rs",
+    "standard_score_tests": "rust/crates/er-ai/tests/m9e_standard_attack_score.rs",
+    "standard_score_game_library": "rust/crates/er-game/src/lib.rs",
+    "standard_score_query": "rust/crates/er-game/src/m9e_ai_score_query.rs",
+    "standard_score_oracle": "scripts/ci/m9e_standard_score_oracle.mjs",
     "drain_actor_executor": "rust/crates/er-battle/src/m6/routine_executor.rs",
     "drain_compiler_library": "rust/crates/er-content-compiler/src/lib.rs",
     "drain_full_content": "rust/crates/er-content-compiler/src/m9e_full_content.rs",
