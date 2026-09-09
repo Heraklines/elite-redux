@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "df5b06e0d5d5c5a1179e072dded3a29ccb2c8ba2432315873e19d074188bafed"
+EXPORTER_SHA256 = "8de64a956441365bccf83b04028ebd2b24f9cfa6afa78fc324c2913d72a935e1"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -177,6 +177,8 @@ DAILY_SOURCE_PINS = {"src/enums/ability-id.ts":["7dba96b370f03f820f3188c51874d1e
 ORACLE_PINS.update(DAILY_SOURCE_PINS)
 DAILY_INITIALIZATION_PINS = {"src/init/init.ts":["64e5cd4219f2dd2460560f790719fef7cf373907721897871c317bf6035f1ae7",30003],"src/data/elite-redux/init-elite-redux-egg-tiers.ts":["1e39d3c2d1827e43adb806412cb27ce56905023196a95c5921dbd910aea1ba25",21945],"src/data/elite-redux/init-elite-redux-starter-costs.ts":["bb0a5613d52c50b40adcf5754de2a0555473ec9d89a734d9f5d214755d3d0494",6226],"src/data/elite-redux/init-elite-redux-species-tuning.ts":["d03413ef6ab7b41839b661dfada242dd4691bb5a901d4a8d22fefe336889247c",4665],"src/data/elite-redux/init-elite-redux-custom-mons.ts":["5812cf088dd13629a0a3b14dd6523ddf2cdaaea6f1faeda3dd61e588e2ca33c4",9396],"src/data/elite-redux/init-elite-redux-custom-species.ts":["c2d67bba52927710929f424d721de03ac0135114d09e9af7cefa9b2ed97d0678",35217],"src/data/elite-redux/er-egg-pool-bans.ts":["69ea53ea9fc9133a7c053a2c42a659488555aea9e7344da995545a5199294cc4",13660]}
 ORACLE_PINS.update(DAILY_INITIALIZATION_PINS)
+STAT_OWNER_PINS = {"src/modifier/modifier.ts":["ce600a1acbe931402679f95832919f8d4ec05ad9e4ff2bce5a9e68b1aaa21b4f",157626],"src/data/elite-redux/moody/moody-runtime-game-adapter.ts":["d5e316a6f5ec1fbf550993f4f8552bb93253109eb762331b955fdcb150ee0b80",105998],"src/phases/select-starter-phase.ts":["818c060ada86e24a31a0bb0095e75dd915604d2812e9edf865bd5a17b647fe57",69292]}
+ORACLE_PINS.update(STAT_OWNER_PINS)
 TUNING_PATH = "src/data/elite-redux/er-balance-tuning.json"
 TUNING_BLOB = "04755b16e916c3e364917b67a9718cf0ee01ae6b"
 RNG_FILES = ["node_modules/phaser/package.json", "node_modules/phaser/src/math/random-data-generator/RandomDataGenerator.js"]

@@ -3,6 +3,11 @@ import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts, FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getPokemonSpecies, getPokerusStarters } from "#utils/pokemon-utils";
+import { ExpBoosterModifier, PokemonExpBoosterModifier, ExpShareModifier, ExpBalanceModifier,
+  MultipleParticipantExpBonusModifier, BaseStatModifier, PokemonBaseStatTotalModifier, PokemonBaseStatFlatModifier,
+  PokemonIncrementingStatModifier, PokemonNatureWeightModifier } from "#modifiers/modifier";
+import { getMoodyCoordinatorMaxHpMultiplier, getMoodyCoordinatorHpDebt }
+  from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { Nature } from "#enums/nature";
 import { AbilityId } from "#enums/ability-id";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
@@ -172,9 +177,22 @@ test("observe actual initialized target capability registry", async () => {
   expect(pokemon.species.speciesId).toBe(SpeciesId.BULBASAUR);
   expect(pokemon.formIndex).toBe(0);
   expect(vi.isMockFunction(pokemon.calculateStats)).toBe(false);
+  const observeModifiers=()=>globalScene.modifiers.map(modifier=>({
+    constructor:modifier.constructor.name,type_id:modifier.type.id,stack_count:modifier.stackCount,
+    virtual_stack_count:modifier.virtualStackCount,total_stacks:modifier.getStackCount(),
+    stat_families:[BaseStatModifier,PokemonBaseStatTotalModifier,PokemonBaseStatFlatModifier,
+      PokemonIncrementingStatModifier,PokemonNatureWeightModifier].map(kind=>modifier instanceof kind),
+    xp_families:[ExpBoosterModifier,PokemonExpBoosterModifier,ExpShareModifier,ExpBalanceModifier,
+      MultipleParticipantExpBonusModifier,PokemonIncrementingStatModifier].map(kind=>modifier instanceof kind)}));
+  const modifierObservations=observeModifiers();
+  expect(modifierObservations).toHaveLength(1);
+  expect(modifierObservations.every(row=>row.stat_families.every(value=>!value))).toBe(true);
+  expect(modifierObservations.every(row=>row.xp_families.every(value=>!value))).toBe(true);
+  const observeHp=()=>({multiplier:getMoodyCoordinatorMaxHpMultiplier(pokemon),
+    debt:getMoodyCoordinatorHpDebt(pokemon.id),max_hp:pokemon.getMaxHp()});
   const statContext = {
     species:pokemon.species.speciesId, form:pokemon.formIndex,
-    modifiers:globalScene.modifiers.length, challenges:globalScene.gameMode.challenges.length,
+    modifiers:globalScene.modifiers.length, modifier_observations:modifierObservations, challenges:globalScene.gameMode.challenges.length,
     spliced:globalScene.gameMode.isSplicedOnly === true, spliced_source_type:typeof globalScene.gameMode.isSplicedOnly,
     fun_mode:globalScene.gameMode.isFun === true, fun_source_type:typeof globalScene.gameMode.isFun,
     fusion:pokemon.isFusion(),
@@ -182,7 +200,7 @@ test("observe actual initialized target capability registry", async () => {
     cursed_stat:pokemon.customPokemonData.erCursedStat, moody:getMoodyModeState(),
     wonder_guard:pokemon.hasAbility(AbilityId.WONDER_GUARD, false, true),
   };
-  expect(statContext.modifiers).toBe(0);expect(statContext.challenges).toBe(0);
+  expect(statContext.modifiers).toBe(1);expect(statContext.challenges).toBe(0);
   expect(globalScene.gameMode.isSplicedOnly).toBeUndefined();expect(globalScene.gameMode.isFun).toBeUndefined();
   expect(statContext.spliced).toBe(false);expect(statContext.fun_mode).toBe(false);expect(statContext.fusion).toBe(false);
   expect(statContext.fun_pseudo_mega).toBe(false);expect(statContext.fun_shuffle).toBe(false);
@@ -193,18 +211,21 @@ test("observe actual initialized target capability registry", async () => {
   const customBefore=JSON.stringify(pokemon.customPokemonData);
   const rngBeforeStats=Phaser.Math.RND.state();
   const statCases: Array<{name:string;level:number;nature:number;ivs:number[];pre_stats:number[];pre_hp:number;
-    base_stats:number[];post_stats:number[];post_hp:number}> = [];
+    base_stats:number[];post_stats:number[];post_hp:number;
+    hp_before:ReturnType<typeof observeHp>;hp_after:ReturnType<typeof observeHp>}> = [];
   try {
     pokemon.stats=[...original.stats];
     pokemon.customPokemonData.nature=-1;
     const runStat=(name:string,level:number,nature:Nature,ivs:number[],hp:number) => {
       pokemon.level=level;pokemon.nature=nature;pokemon.ivs=[...ivs];pokemon.hp=hp;
-      const preStats=[...pokemon.stats];const preHp=pokemon.hp;
+      const preStats=[...pokemon.stats];const preHp=pokemon.hp;const hpBefore=observeHp();
+      expect(hpBefore.multiplier).toBe(1);expect(hpBefore.debt).toBe(0);
       const baseStats=pokemon.calculateBaseStats();
       expect(baseStats).toEqual(pokemon.getSpeciesForm(true).baseStats);
       pokemon.calculateStats();
+      const hpAfter=observeHp();expect(hpAfter.multiplier).toBe(1);expect(hpAfter.debt).toBe(0);
       statCases.push({name,level,nature,ivs:[...ivs],pre_stats:preStats,pre_hp:preHp,
-        base_stats:baseStats,post_stats:[...pokemon.stats],post_hp:pokemon.hp});
+        base_stats:baseStats,post_stats:[...pokemon.stats],post_hp:pokemon.hp,hp_before:hpBefore,hp_after:hpAfter});
     };
     runStat("hardy-level5-missing-hp",5,Nature.HARDY,[0,1,2,3,4,5],7);
     runStat("hardy-level6-carry-hp",6,Nature.HARDY,[0,1,2,3,4,5],pokemon.hp);
@@ -227,6 +248,7 @@ test("observe actual initialized target capability registry", async () => {
   const statObservations={scope:"actual calculateStats on controlled fresh player fields; not XP or LevelUpPhase",
     context:statContext, original_custom_nature:original.custom_nature,
     cases:statCases, original_fields_restored:true, custom_data_restored:true, rng_restored:true};
+  expect(observeModifiers()).toEqual(modifierObservations);
   expect(Object.keys(speciesStarterCosts)).toEqual(starterKeys);
   const raw = `${JSON.stringify({
     schema_version: 5, source_sha: PIN, seed: SEED,

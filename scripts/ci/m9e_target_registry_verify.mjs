@@ -66,11 +66,21 @@ function validateDaily(d) {
 function validateStats(s) {
   keys(s,["scope","context","original_custom_nature","cases","original_fields_restored","custom_data_restored","rng_restored"]);
   assert.equal(s.scope,"actual calculateStats on controlled fresh player fields; not XP or LevelUpPhase");
-  keys(s.context,["species","form","modifiers","challenges","spliced","spliced_source_type","fun_mode","fun_source_type","fusion","fun_pseudo_mega","fun_shuffle","cursed_stat","moody","wonder_guard"]);
-  const c=s.context;assert.equal(c.species,1);assert.equal(c.form,0);assert.equal(c.modifiers,0);assert.equal(c.challenges,0);
+  keys(s.context,["species","form","modifiers","modifier_observations","challenges","spliced","spliced_source_type","fun_mode","fun_source_type","fusion","fun_pseudo_mega","fun_shuffle","cursed_stat","moody","wonder_guard"]);
+  const c=s.context;assert.equal(c.species,1);assert.equal(c.form,0);assert.equal(c.modifiers,1);assert.equal(c.challenges,0);
   for(const key of ["spliced","fun_mode","fusion","fun_pseudo_mega","fun_shuffle","wonder_guard"]) assert.equal(c[key],false);
   assert.equal(c.spliced_source_type,"undefined");assert.equal(c.fun_source_type,"undefined");
   assert.equal(c.cursed_stat,-1);assert.equal(c.moody,null);
+  assert.equal(c.modifier_observations.length,1);
+  for(const m of c.modifier_observations){
+    keys(m,["constructor","type_id","stack_count","virtual_stack_count","total_stacks","stat_families","xp_families"]);
+    assert(typeof m.constructor === "string" && m.constructor.length>0);
+    assert(typeof m.type_id === "string" && m.type_id.length>0);
+    integer(m.stack_count,0,Number.MAX_SAFE_INTEGER);integer(m.virtual_stack_count,0,Number.MAX_SAFE_INTEGER);
+    assert.equal(m.total_stacks,m.stack_count+m.virtual_stack_count);
+    assert.deepEqual(m.stat_families,[false,false,false,false,false]);
+    assert.deepEqual(m.xp_families,[false,false,false,false,false,false]);
+  }
   integer(s.original_custom_nature,-1,24);
   for(const key of ["original_fields_restored","custom_data_restored","rng_restored"]) assert.equal(s[key],true);
   const names=["hardy-level5-missing-hp","hardy-level6-carry-hp","lonely-level6","modest-level13","hardy-level7-fainted","hardy-level4-clamp"];
@@ -79,7 +89,9 @@ function validateStats(s) {
   assert.deepEqual(s.cases.map(c=>c.nature),[0,0,1,15,0,0]);
   const expectedIvs=[[0,1,2,3,4,5],[0,1,2,3,4,5],Array(6).fill(31),Array(6).fill(0),Array(6).fill(0),Array(6).fill(0)];
   for(const [i,row] of s.cases.entries()){
-    keys(row,["name","level","nature","ivs","pre_stats","pre_hp","base_stats","post_stats","post_hp"]);
+    keys(row,["name","level","nature","ivs","pre_stats","pre_hp","base_stats","post_stats","post_hp","hp_before","hp_after"]);
+    for(const hp of [row.hp_before,row.hp_after]){keys(hp,["multiplier","debt","max_hp"]);assert.equal(hp.multiplier,1);assert.equal(hp.debt,0);integer(hp.max_hp,1,Number.MAX_SAFE_INTEGER);}
+    assert.equal(row.hp_before.max_hp,row.pre_stats[0]);assert.equal(row.hp_after.max_hp,row.post_stats[0]);
     assert.deepEqual(row.ivs,expectedIvs[i]);
     for(const key of ["pre_stats","base_stats","post_stats"]){assert.equal(row[key].length,6);for(const value of row[key]) integer(value,1,Number.MAX_SAFE_INTEGER);}
     assert.deepEqual(row.base_stats,s.cases[0].base_stats);
@@ -165,6 +177,10 @@ for (const mutate of [
   r => { r.stats.cases[4].post_hp = 1; },
   r => { r.balance.battle_friendship_gain = 4; },
   r => { r.stats.original_fields_restored = false; },
+  r => { r.stats.context.modifier_observations[0].stat_families[0] = true; },
+  r => { r.stats.context.modifier_observations[0].xp_families[0] = true; },
+  r => { r.stats.cases[0].hp_before.debt = 1; },
+  r => { r.stats.cases[0].hp_after.multiplier = 2; },
   r => { r.moves[0].no_effect_attrs = ["InheritedNoEffectAttr"]; },
   r => { r.daily_pokerus.clock_cases[4].midnight = 0; },
   r => { r.daily_pokerus.clock_cases[0].after.offset += 1; },
