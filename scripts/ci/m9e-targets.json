@@ -116,7 +116,9 @@
       "rust/fixtures/m9/engineering/progression-content-pack-v2.json",
       "rust/fixtures/m9/engineering/progression-oracle-report-v2.json",
       "rust/fixtures/m9/engineering/battle-content-pack-v3.json",
-      "rust/fixtures/m9/engineering/run-content-pack-v3.json"
+      "rust/fixtures/m9/engineering/run-content-pack-v3.json",
+      "rust/crates/er-progression/src/current_party_experience.rs",
+      "rust/crates/er-progression/tests/m9e_party_experience.rs"
     ],
     "replacement_test_ids": [
       "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
@@ -365,6 +367,12 @@
         "damage_not_base_power_controls_non_knockout_ranking",
         "knockout_bonus_uses_raw_damage_and_weights_accuracy",
         "zero_damage_and_always_hit_preserve_source_boundaries"
+      ],
+      "er-progression:m9e_party_experience": [
+        "actual_pinned_source_matrix_matches_every_phase_binary64_argument",
+        "balance_redistributes_without_share_and_preserves_fractional_phase_arguments",
+        "invalid_input_and_overflow_do_not_produce_a_partial_plan",
+        "living_at_cap_friendship_and_full_participant_denominator_preserve_source_order"
       ]
     }
   },
@@ -698,7 +706,8 @@
     "scripts/ci/m9e_browser_rebind_physical.py",
     "scripts/ci/test_m9e_browser_rebind_physical.py",
     "scripts/ci/fixtures/m9e-browser-rebind-physical-proof.json",
-    "scripts/ci/test_m9e_platform_envelope.py"
+    "scripts/ci/test_m9e_platform_envelope.py",
+    "scripts/ci/m9e_party_xp_oracle.mjs"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"

@@ -5,7 +5,7 @@ on:
     branches:
       - 'wrk/m9e-recovery-*'
       - 'wrk/m9e-task-*'
-      - 'codex/m9e-full-rtc-owner-20260909'
+      - 'codex/m9e-full-party-xp-20260909'
 
 permissions:
   contents: read

@@ -81,11 +81,11 @@ def main():
                     or plan.get("requires_browser_worker") is not True
                     or plan.get("requires_current_coop_startup") is not True
                     or plan["unknown_paths"] or plan["boundary_paths"]
-                    or len(inventory) != 110 or sum(len(row["ids"]) for row in inventory) != 830
-                    or sum(map(len, plan["required_native_targets"].values())) != 66
-                    or len(plan["required_native_test_ids"]) != 60
-                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 79):
-                raise RuntimeError("actual830 full source plan or Browser obligations differ")
+                    or len(inventory) != 111 or sum(len(row["ids"]) for row in inventory) != 834
+                    or sum(map(len, plan["required_native_targets"].values())) != 67
+                    or len(plan["required_native_test_ids"]) != 61
+                    or len(feedback.OWNED_FOUNDATION_SOURCES) != 81):
+                raise RuntimeError("actual834 full source plan or Browser obligations differ")
             for row in inventory:
                 if not ("*" in plan["execution_scope"].get(row["crate"], [])
                         or row["target"] in plan["execution_scope"].get(row["crate"], [])):
@@ -95,10 +95,10 @@ def main():
             lane_counts = {lane: sum(len(row["ids"]) for row in inventory
                                      if [row["crate"], row["target"]] in targets)
                            for lane, targets in partitions.items()}
-            if lane_counts != {"a": 712, "b": 12, "c": 14, "d": 78, "e": 4, "f": 10}:
+            if lane_counts != {"a": 716, "b": 12, "c": 14, "d": 78, "e": 4, "f": 10}:
                 raise RuntimeError("exact whole-target balanced lane assignment differs")
-            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 830, "targets": 110, "required_targets": 66,
-                       "exact_maps": 60, "owned_sources": 79,
+            planner = {"lane_counts": lane_counts, "status": "passed", "tests": 834, "targets": 111, "required_targets": 67,
+                       "exact_maps": 61, "owned_sources": 81,
                        "inventory_sha256": feedback.OWNED_FOUNDATION_INVENTORY_SHA256,
                        "browser_binding": expected_binding}
         except Exception as error:

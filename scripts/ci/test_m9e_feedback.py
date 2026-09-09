@@ -11395,8 +11395,8 @@ class OwnedFoundationContractTests(unittest.TestCase):
             self.feedback.validate_owned_foundation_inventory(absent, self.inventory)
 
     def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
-        self.assertEqual(len(self.inventory), 110)
-        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 830)
+        self.assertEqual(len(self.inventory), 111)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 834)
         for change in ("remove", "rename", "exclude", "extra"):
             rows = copy.deepcopy(self.inventory)
             old = next(row for row in rows if row["crate"] == "er-canonical")
@@ -11408,7 +11408,7 @@ class OwnedFoundationContractTests(unittest.TestCase):
                 old["historical_excluded_ids"].append(old["ids"].pop())
             else:
                 rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
-            with self.assertRaisesRegex(RuntimeError, "complete830/110"):
+            with self.assertRaisesRegex(RuntimeError, "complete834/111"):
                 self.feedback.validate_owned_foundation_inventory(self.plan, rows)
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
