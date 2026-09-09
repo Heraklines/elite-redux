@@ -29,3 +29,4 @@ pub mod surface_digest;
 pub mod validation;
 pub mod validation_v2;
 pub mod world_v2;
+pub mod current_targeting;

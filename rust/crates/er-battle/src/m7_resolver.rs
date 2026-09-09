@@ -33,6 +33,7 @@ use crate::m6::{
     execute_query_v2,
 };
 use crate::resolver::BattleMutation;
+use crate::current_target_execution::CurrentTargetExecution;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -189,6 +190,7 @@ struct PendingAction {
     source_slot: FieldSlot,
     priority: i8,
     effective_speed: u32,
+    current_targets: Option<Vec<FieldSlot>>,
 }
 
 pub fn resolve_turn_v5(
@@ -196,6 +198,27 @@ pub fn resolve_turn_v5(
     commands: &CommandSet,
     content: &PreparedBattleContentV3,
     authority: &TurnAuthorityContextV1,
+) -> Result<BattleTransitionV5, BattleV5Error> {
+    resolve_turn_v5_inner(before, commands, content, authority, None)
+}
+
+/// Current live target ownership; historical callers retain their original path.
+pub fn resolve_turn_v5_with_current_targets(
+    before: &GameStateV5,
+    commands: &CommandSet,
+    content: &PreparedBattleContentV3,
+    authority: &TurnAuthorityContextV1,
+    targeting: &CurrentTargetExecution<'_>,
+) -> Result<BattleTransitionV5, BattleV5Error> {
+    resolve_turn_v5_inner(before, commands, content, authority, Some(targeting))
+}
+
+fn resolve_turn_v5_inner(
+    before: &GameStateV5,
+    commands: &CommandSet,
+    content: &PreparedBattleContentV3,
+    authority: &TurnAuthorityContextV1,
+    targeting: Option<&CurrentTargetExecution<'_>>,
 ) -> Result<BattleTransitionV5, BattleV5Error> {
     verify_v5_dispatch_closure(content)?;
     before
@@ -213,7 +236,7 @@ pub fn resolve_turn_v5(
     }
     let mut rng = RngRuntime::from_states(run.run_rng.clone(), Some(battle.battle_rng.clone()))
         .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
-    let mut pending = build_actions(run, commands, content)?;
+    let mut pending = build_actions(run, commands, content, targeting)?;
     rng.speed_order_shuffle(&mut pending, &battle.wave_seed, battle.turn)
         .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
     pending.sort_by(|left, right| {
@@ -236,6 +259,7 @@ pub fn resolve_turn_v5(
                 run,
                 &action,
                 content,
+                targeting,
                 &mut rng,
                 &mut mutations,
                 &mut presentation,
@@ -319,10 +343,18 @@ pub fn resolve_turn_v5_with_current_observations(
     ),
     BattleV5Error,
 > {
+    let transition = resolve_turn_v5(before, commands, content, authority)?;
+    let events = current_observation_events(&transition)?;
+    Ok((transition, events))
+}
+
+/// Preserve the mutation-order observation projection for either resolver.
+pub fn current_observation_events(
+    transition: &BattleTransitionV5,
+) -> Result<Vec<er_state::current_battle_participation::CurrentBattleObservationEventV1>, BattleV5Error> {
     use er_state::current_battle_participation::{
         CurrentBattleObservationEventV1, MAX_CURRENT_PARTICIPATION_EVENTS_V1,
     };
-    let transition = resolve_turn_v5(before, commands, content, authority)?;
     let events = transition
         .mutations
         .iter()
@@ -354,7 +386,7 @@ pub fn resolve_turn_v5_with_current_observations(
             "current battle observation capacity exceeded".to_owned(),
         ));
     }
-    Ok((transition, events))
+    Ok(events)
 }
 /// Resolve the command's effective move without mutating PP or consuming RNG.
 /// An exhausted selected slot falls back only when every real move is exhausted.
@@ -397,6 +429,7 @@ fn build_actions(
     run: &RunStateV3,
     commands: &CommandSet,
     content: &PreparedBattleContentV3,
+    targeting: Option<&CurrentTargetExecution<'_>>,
 ) -> Result<Vec<PendingAction>, BattleV5Error> {
     let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
     let mut actions = Vec::with_capacity(commands.entries.len());
@@ -412,7 +445,7 @@ fn build_actions(
             BattleCommand::Switch { .. } => (i8::MAX, actor.stats.speed),
             BattleCommand::Fight { move_slot, .. } => {
                 let (definition, _) = effective_move_definition_v5(content, actor, *move_slot)?;
-                let sources = active_sources(actor, definition.id);
+                let sources = current_or_legacy_sources(run, actor, definition.id, targeting)?;
                 let context = mechanics_context(actor, battle, &sources);
                 let priority = execute_query_v2(
                     content,
@@ -431,21 +464,32 @@ fn build_actions(
                 (query_i8(priority.after)?, query_u32(speed.after)?)
             }
         };
+        let current_targets = match (&command, targeting) {
+            (BattleCommand::Fight { actor: actor_id, move_slot, targets }, Some(owner)) => {
+                let (definition, _) = effective_move_definition_v5(content, actor, *move_slot)?;
+                Some(owner.plan(run, *actor_id, definition)
+                    .and_then(|plan| plan.retain(targets)).map_err(|_| BattleV5Error::Target)?)
+            }
+            _ => None,
+        };
         actions.push(PendingAction {
             accepted: accepted.clone(),
             command,
             source_slot,
             priority,
             effective_speed,
+            current_targets,
         });
     }
     Ok(actions)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_action(
     run: &mut RunStateV3,
     action: &PendingAction,
     content: &PreparedBattleContentV3,
+    targeting: Option<&CurrentTargetExecution<'_>>,
     rng: &mut RngRuntime,
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
@@ -470,7 +514,9 @@ fn execute_action(
             *actor,
             *move_slot,
             targets,
+            action.current_targets.as_deref(),
             content,
+            targeting,
             rng,
             mutations,
             presentation,
@@ -543,7 +589,9 @@ fn execute_move(
     actor_id: PokemonId,
     move_slot: MoveSlotIndex,
     targets: &BattleTargetSelection,
+    retained_targets: Option<&[FieldSlot]>,
     content: &PreparedBattleContentV3,
+    targeting: Option<&CurrentTargetExecution<'_>>,
     rng: &mut RngRuntime,
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
@@ -554,6 +602,16 @@ fn execute_move(
         .ok_or(BattleV5Error::InactiveActor(actor_id))?
         .clone();
     let (definition, struggle) = effective_move_definition_v5(content, &actor_snapshot, move_slot)?;
+    let current_target_slots = match (targeting, retained_targets) {
+        (Some(owner), Some(retained)) => Some(owner.execution_targets(run, actor_id, definition, retained)
+            .map_err(|_| BattleV5Error::Target)?),
+        (None, None) => None,
+        _ => return Err(BattleV5Error::Target),
+    };
+    // Retained targets fainting earlier do not retarget another opponent.
+    if current_target_slots.as_ref().is_some_and(Vec::is_empty) {
+        return Ok(ActionDisposition::NoEffect);
+    }
     if !struggle {
         let actor = pokemon_mut(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
         let slot = move_slot_state_mut(actor, move_slot)?;
@@ -571,12 +629,17 @@ fn execute_move(
         move_id: definition.id,
     });
 
-    let sources = active_sources(&actor_snapshot, definition.id);
+    let sources = current_or_legacy_sources(run, &actor_snapshot, definition.id, targeting)?;
     let context = mechanics_context(&actor_snapshot, &battle_snapshot, &sources);
     let before_move = execute_hook_v2(content, &context, MechanicHookV2::BeforeMove)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
     mechanics_evidence.extend(before_move.operations);
-    let target_slots = resolve_targets(run, source_slot, targets)?;
+    // Preserve historical target resolution after BeforeMove; only the current
+    // retained-target path performs source cancellation before spending PP.
+    let target_slots = match current_target_slots {
+        Some(slots) => slots,
+        None => resolve_targets(run, source_slot, targets)?,
+    };
     if matches!(definition.category, MoveCategory::Status)
         || matches!(definition.power, MovePower::None)
     {
@@ -640,6 +703,7 @@ fn execute_move(
                 damage_dealt,
             },
             content,
+            targeting,
             mutations,
             presentation,
             mechanics_evidence,
@@ -652,6 +716,7 @@ fn execute_move(
         definition.id,
         total_damage_dealt,
         content,
+        targeting,
         mutations,
         presentation,
         mechanics_evidence,
@@ -699,6 +764,7 @@ fn apply_move_drain_after_damage(
     run: &mut RunStateV3,
     hit: MoveDamageHit,
     content: &PreparedBattleContentV3,
+    targeting: Option<&CurrentTargetExecution<'_>>,
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
     mechanics_evidence: &mut Vec<MechanicsOperationEvidenceV2>,
@@ -709,7 +775,7 @@ fn apply_move_drain_after_damage(
     let after_damage = {
         let actor = pokemon(run, hit.actor).ok_or(BattleV5Error::InactiveActor(hit.actor))?;
         let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
-        let sources = active_sources(actor, hit.move_id);
+        let sources = current_or_legacy_sources(run, actor, hit.move_id, targeting)?;
         let context = mechanics_context(actor, battle, &sources);
         execute_after_damage_actor_hook_v2(content, &context)
             .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?
@@ -784,6 +850,7 @@ fn apply_move_recoil_after_damage(
     move_id: MoveId,
     total_damage_dealt: u64,
     content: &PreparedBattleContentV3,
+    targeting: Option<&CurrentTargetExecution<'_>>,
     mutations: &mut Vec<BattleMutation>,
     presentation: &mut Vec<BattlePresentationCueV5>,
     mechanics_evidence: &mut Vec<MechanicsOperationEvidenceV2>,
@@ -794,7 +861,7 @@ fn apply_move_recoil_after_damage(
     let after_damage = {
         let actor = pokemon(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
         let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
-        let sources = active_sources(actor, move_id);
+        let sources = current_or_legacy_sources(run, actor, move_id, targeting)?;
         let context = mechanics_context(actor, battle, &sources);
         execute_after_damage_actor_hook_v2(content, &context)
             .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?
@@ -1003,6 +1070,31 @@ pub fn query_simulated_move_damage_v5(
     move_slot: MoveSlotIndex,
     target_slot: FieldSlot,
 ) -> Result<u32, BattleV5Error> {
+    query_simulated_move_damage_inner(content, run, source_slot, move_slot, target_slot, None)
+}
+
+/// Same bounded noncritical estimate, using the actual current eligible ability
+/// sources. This does not add missing defender effects or claim source AI parity.
+pub fn query_simulated_move_damage_with_current_targets(
+    content: &PreparedBattleContentV3,
+    run: &RunStateV3,
+    source_slot: FieldSlot,
+    move_slot: MoveSlotIndex,
+    target_slot: FieldSlot,
+    targeting: &CurrentTargetExecution<'_>,
+) -> Result<u32, BattleV5Error> {
+    targeting.validate_run(run).map_err(|_| BattleV5Error::UnsupportedContent)?;
+    query_simulated_move_damage_inner(content, run, source_slot, move_slot, target_slot, Some(targeting))
+}
+
+fn query_simulated_move_damage_inner(
+    content: &PreparedBattleContentV3,
+    run: &RunStateV3,
+    source_slot: FieldSlot,
+    move_slot: MoveSlotIndex,
+    target_slot: FieldSlot,
+    targeting: Option<&CurrentTargetExecution<'_>>,
+) -> Result<u32, BattleV5Error> {
     verify_v5_dispatch_closure(content)?;
     run.validate()
         .map_err(|error| BattleV5Error::State(error.to_string()))?;
@@ -1023,7 +1115,7 @@ pub fn query_simulated_move_damage_v5(
     {
         return Ok(0);
     }
-    let sources = active_sources(actor, definition.id);
+    let sources = current_or_legacy_sources(run, actor, definition.id, targeting)?;
     let context = mechanics_context(actor, battle, &sources);
     calculate_damage_with_variance(content, &context, definition, actor, target, false, || {
         Ok(100)
@@ -1212,6 +1304,23 @@ fn resolve_targets(
             .map(|entry| vec![entry.slot])
             .ok_or(BattleV5Error::Target),
     }
+}
+
+fn current_or_legacy_sources(
+    run: &RunStateV3,
+    actor: &PokemonStateV5,
+    move_id: MoveId,
+    targeting: Option<&CurrentTargetExecution<'_>>,
+) -> Result<Vec<BehaviorSourceId>, BattleV5Error> {
+    let mut sources = active_sources(actor, move_id);
+    if let Some(owner) = targeting {
+        sources.retain(|source| !matches!(source,
+            BehaviorSourceId::ActiveAbility { .. } | BehaviorSourceId::PassiveAbility { .. }));
+        sources.extend(owner.ability_sources(run, actor).map_err(|_| BattleV5Error::UnsupportedContent)?);
+        sources.sort();
+        sources.dedup();
+    }
+    Ok(sources)
 }
 
 fn active_sources(actor: &PokemonStateV5, move_id: MoveId) -> Vec<BehaviorSourceId> {

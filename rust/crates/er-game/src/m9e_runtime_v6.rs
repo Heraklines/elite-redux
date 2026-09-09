@@ -479,6 +479,7 @@ impl GameActionDispatcherV1 {
         if candidate.active_run.is_none() {
             candidate.current_battle_participation = None;
             candidate.current_run_difficulty = None;
+            candidate.current_targeting = None;
         }
         let next_control = normalize_next_control(
             &mut candidate,
@@ -691,7 +692,7 @@ fn execute_battle(
             GameRuntimeV6Error::Domain(format!("battle retention proposal: {error}"))
         })?;
         let mut candidate = before.clone();
-        let offer = battle_command_offer(&candidate, proposal.actor).map_err(|error| {
+        let offer = battle_command_offer(&candidate, proposal.actor, content).map_err(|error| {
             GameRuntimeV6Error::Domain(format!("battle retention offer: {error}"))
         })?;
         let accepted = AcceptedBattleCommand::human(proposal.clone());
@@ -840,7 +841,18 @@ fn execute_battle(
     else {
         return Err(GameRuntimeV6Error::Invalid);
     };
-    let (transition, observations) = if before.current_battle_participation.is_some() {
+    let (transition, observations) = if before.current_targeting.is_some() {
+        let targeting = er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        let transition = er_battle::m7_resolver::resolve_turn_v5_with_current_targets(
+            &project_v5(before), commands, &content.battle, authority, &targeting,
+        ).map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        let observations = if before.current_battle_participation.is_some() {
+            Some(er_battle::m7_resolver::current_observation_events(&transition)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?)
+        } else { None };
+        (transition, observations)
+    } else if before.current_battle_participation.is_some() {
         let (transition, observations) =
             er_battle::m7_resolver::resolve_turn_v5_with_current_observations(
                 &project_v5(before),
@@ -953,6 +965,7 @@ fn execute_battle(
 fn battle_command_offer(
     state: &GameStateV6,
     actor: er_types::battle_ids::PokemonId,
+    content: &PreparedGameContentV2,
 ) -> Result<BattleCommandOffer, GameRuntimeV6Error> {
     let run = state
         .active_run
@@ -964,7 +977,31 @@ fn battle_command_offer(
         .iter()
         .find(|pokemon| pokemon.id == actor && !pokemon.fainted)
         .ok_or(GameRuntimeV6Error::Action)?;
-    let fight = pokemon
+    let fight = if state.current_targeting.is_some() {
+        let owner = er_battle::current_target_execution::CurrentTargetExecution::from_state(state)
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        let mut fight = Vec::new();
+        for (index, slot) in pokemon.moves.iter().enumerate() {
+            if slot.is_none() { continue; }
+            let move_slot = er_types::battle_ids::MoveSlotIndex::new(
+                u8::try_from(index).map_err(|_| GameRuntimeV6Error::Action)?)
+                .map_err(|_| GameRuntimeV6Error::Action)?;
+            let (definition, _) = match er_battle::m7_resolver::effective_move_definition_v5(
+                &content.battle, pokemon, move_slot,
+            ) {
+                Ok(value) => value,
+                Err(er_battle::m7_resolver::BattleV5Error::MoveSlot) => continue,
+                Err(error) => return Err(GameRuntimeV6Error::Domain(error.to_string())),
+            };
+            let choices = owner.plan(run, actor, definition).and_then(|plan| plan.selections())
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            if !choices.is_empty() {
+                fight.push(OfferedMoveCommand::new(move_slot, choices)
+                    .map_err(|_| GameRuntimeV6Error::Action)?);
+            }
+        }
+        fight
+    } else { pokemon
         .moves
         .iter()
         .enumerate()
@@ -978,7 +1015,7 @@ fn battle_command_offer(
             )
             .ok()
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>() };
     let switches = run
         .party
         .iter()
@@ -2659,6 +2696,7 @@ fn adopt_v5_with_participation(
     let candidate = GameStateV6 {
         current_battle_participation: participation,
         current_friendship_profile: before.current_friendship_profile.clone(),
+        current_targeting: if after.active_run.is_some() { before.current_targeting } else { None },
         current_run_difficulty: if after.active_run.is_some() {
             before.current_run_difficulty
         } else {

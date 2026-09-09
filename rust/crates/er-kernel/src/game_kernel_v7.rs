@@ -569,6 +569,10 @@ impl GameKernelV7 {
         if player_targets.is_empty() {
             return Err(GameKernelV7Error::Invalid);
         }
+        let targeting = state.current_targeting.as_ref().map(|_| {
+            er_battle::current_target_execution::CurrentTargetExecution::from_state(&state)
+                .map_err(|_| GameKernelV7Error::Invalid)
+        }).transpose()?;
         let policy = self
             .content
             .ai
@@ -590,6 +594,7 @@ impl GameKernelV7 {
             if actor.fainted {
                 continue;
             }
+            let mut target_choices = BTreeMap::new();
             let mut moves = actor
                 .moves
                 .iter()
@@ -617,15 +622,27 @@ impl GameKernelV7 {
                         er_types::battle_model::MovePower::None => 0,
                         er_types::battle_model::MovePower::Value(power) => power,
                     };
+                    let targets = if let Some(owner) = &targeting {
+                        let plan = owner.plan(run, actor.id, definition)
+                            .map_err(|_| GameKernelV7Error::Invalid)?;
+                        let choices = plan.selections().map_err(|_| GameKernelV7Error::Invalid)?;
+                        let mut ordinals = Vec::new();
+                        for (index, selection) in choices.into_iter().enumerate() {
+                            let ordinal = u8::try_from(index).map_err(|_| GameKernelV7Error::Invalid)?;
+                            let retained = plan.retain(&selection).map_err(|_| GameKernelV7Error::Invalid)?;
+                            target_choices.insert((move_slot, ordinal), (selection, retained));
+                            ordinals.push(ordinal);
+                        }
+                        ordinals
+                    } else {
+                        player_targets.iter().map(|target| target.position).collect::<Vec<_>>()
+                    };
                     Ok(Some((
                         slot.move_id,
                         move_slot,
                         power,
                         definition.priority,
-                        player_targets
-                            .iter()
-                            .map(|target| target.position)
-                            .collect::<Vec<_>>(),
+                        targets,
                     )))
                 })
                 .collect::<Result<Vec<_>, GameKernelV7Error>>()?
@@ -653,6 +670,11 @@ impl GameKernelV7 {
                 let er_types::battle_model::MovePower::Value(power) = definition.power else {
                     return Err(GameKernelV7Error::Invalid);
                 };
+                if targeting.is_some() {
+                    // Random Struggle needs command-stage RNG ownership; reject
+                    // before committing the AI cursor instead of choosing a foe.
+                    return Err(GameKernelV7Error::Invalid);
+                }
                 moves.push((
                     definition.id,
                     index,
@@ -689,7 +711,19 @@ impl GameKernelV7 {
                 .iter()
                 .cloned()
                 .map(|action| {
-                    let target = action
+                    let current_target = if targeting.is_some() && action.kind == AiActionKindV1::Move {
+                        let key = (action.move_slot.ok_or(GameKernelV7Error::Invalid)?,
+                            action.target.ok_or(GameKernelV7Error::Invalid)?);
+                        let (_, retained) = target_choices.get(&key).ok_or(GameKernelV7Error::Invalid)?;
+                        let first = retained.first().ok_or(GameKernelV7Error::Invalid)?;
+                        let id = battle.field.slots.iter().find(|row| row.slot == *first)
+                            .and_then(|row| row.occupant).ok_or(GameKernelV7Error::Invalid)?;
+                        Some(er_battle::current_target_execution::find_pokemon(run, id)
+                            .ok_or(GameKernelV7Error::Invalid)?)
+                    } else { None };
+                    // Existing scalar heuristic uses the first source-ordered member.
+                    // This is legal group construction, not source AI score parity.
+                    let target = current_target.or_else(|| action
                         .target
                         .and_then(|position| {
                             battle.field.slots.iter().find(|slot| {
@@ -699,7 +733,7 @@ impl GameKernelV7 {
                         })
                         .and_then(|slot| slot.occupant)
                         .and_then(|pokemon| run.party.iter().find(|target| target.id == pokemon))
-                        .or_else(|| run.party.iter().find(|pokemon| !pokemon.fainted))
+                        .or_else(|| run.party.iter().find(|pokemon| !pokemon.fainted)))
                         .ok_or(GameKernelV7Error::Invalid)?;
                     let (effectiveness_percent, accuracy_percent) =
                         if let Some(move_id) = action.move_id {
@@ -751,17 +785,20 @@ impl GameKernelV7 {
                 AiActionKindV1::Move => {
                     let slot = action.move_slot.ok_or(GameKernelV7Error::Invalid)?;
                     let target_position = action.target.ok_or(GameKernelV7Error::Invalid)?;
-                    let target = player_targets
-                        .iter()
-                        .find(|target| target.position == target_position)
-                        .copied()
-                        .ok_or(GameKernelV7Error::Invalid)?;
+                    let selection = if targeting.is_some() {
+                        target_choices.get(&(slot, target_position))
+                            .map(|(selection, _)| selection.clone()).ok_or(GameKernelV7Error::Invalid)?
+                    } else {
+                        let target = player_targets.iter().find(|target| target.position == target_position)
+                            .copied().ok_or(GameKernelV7Error::Invalid)?;
+                        er_types::battle_command::BattleTargetSelection::selected(vec![target])
+                            .map_err(|_| GameKernelV7Error::Invalid)?
+                    };
                     er_types::battle_command::BattleCommand::fight(
                         actor.id,
                         er_types::battle_ids::MoveSlotIndex::new(slot)
                             .map_err(|_| GameKernelV7Error::Invalid)?,
-                        er_types::battle_command::BattleTargetSelection::selected(vec![target])
-                            .map_err(|_| GameKernelV7Error::Invalid)?,
+                        selection,
                     )
                     .map_err(|_| GameKernelV7Error::Invalid)?
                 }
@@ -2575,8 +2612,32 @@ impl GameKernelV7 {
                 });
             }
             GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::SelectMove { actor, move_slot },
+            } if self.state().is_some_and(|state| state.current_targeting.is_some()) => {
+                let state = self.state().ok_or(GameKernelV7Error::Invalid)?;
+                let plan = current_move_target_plan(state, &self.content.battle, self.local_seat, *actor, *move_slot)?;
+                if plan.ordered.is_empty() { return Err(GameKernelV7Error::Invalid); }
+                if !plan.multiple && plan.ordered.len() > 1 {
+                    let instance = self.allocate_menu_instance()?;
+                    let revision = self.active_runtime()?.next_authority_revision();
+                    let mut control = target_select_control(
+                        self.state().ok_or(GameKernelV7Error::Invalid)?, &self.content.battle,
+                        self.local_seat, *actor, *move_slot, instance, revision,
+                    )?;
+                    control.action_context.as_mut().ok_or(GameKernelV7Error::Invalid)?
+                        .authority_seat = action_context.authority_seat;
+                    self.active_runtime_mut()?.install_control(control.clone()).map_err(runtime_error)?;
+                    return Ok(GameKernelStepV7 { effects: vec![GameKernelEffectV7::UiChanged(control)],
+                        internal_events: Vec::new() });
+                }
+                if self.role == GameKernelRoleV7::Authority {
+                    return self.resolve_local_battle_action(action, action_context);
+                }
+            }
+            GameActionV1::Battle {
                 action:
                     er_types::BattleUiActionV1::SelectMove { .. }
+                    | er_types::BattleUiActionV1::SelectMoveTarget { .. }
                     | er_types::BattleUiActionV1::SelectSwitch { .. },
             } if self.role == GameKernelRoleV7::Authority => {
                 return self.resolve_local_battle_action(action, action_context);
@@ -2763,6 +2824,16 @@ impl GameKernelV7 {
             )
             .map_err(|_| GameKernelV7Error::Invalid)?,
             GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::SelectMoveTarget {
+                    actor: selected_actor, move_slot, target,
+                },
+            } if *selected_actor == actor && state.current_targeting.is_some() => {
+                er_types::battle_command::BattleCommand::fight(actor, *move_slot,
+                    er_types::battle_command::BattleTargetSelection::selected(vec![*target])
+                        .map_err(|_| GameKernelV7Error::Invalid)?)
+                    .map_err(|_| GameKernelV7Error::Invalid)?
+            }
+            GameActionV1::Battle {
                 action:
                     er_types::BattleUiActionV1::SelectSwitch {
                         actor: selected_actor,
@@ -2773,6 +2844,12 @@ impl GameKernelV7 {
             }
             _ => return Err(GameKernelV7Error::Invalid),
         };
+        if state.current_targeting.is_some()
+            && let er_types::battle_command::BattleCommand::Fight { move_slot, targets, .. } = &command
+        {
+            current_move_target_plan(&state, &self.content.battle, command_seat, actor, *move_slot)?
+                .retain(targets).map_err(|_| GameKernelV7Error::Invalid)?;
+        }
         let proposal = BattleCommandProposalV1::new(
             action_context.operation_id.clone(),
             battle.battle_id,
@@ -3503,6 +3580,14 @@ pub(crate) fn validate_private_battle_control_v7(
             leaf_menu.instance_id,
             revision,
         )?,
+        GameControlKindV2::BattleTarget => {
+            let first = leaf_menu.options.first().ok_or(GameKernelV7Error::Invalid)?;
+            let GameActionV1::Battle { action: er_types::BattleUiActionV1::SelectMoveTarget {
+                actor, move_slot, ..
+            }} = &first.action else { return Err(GameKernelV7Error::Invalid); };
+            target_select_control(state, content, owner.owner_seat, *actor, *move_slot,
+                leaf_menu.instance_id, revision)?
+        }
         GameControlKindV2::BattleSwitch => {
             switch_select_control(state, owner.owner_seat, leaf_menu.instance_id, revision)?
         }
@@ -3629,6 +3714,53 @@ fn move_select_control(
         },
     )
     .map_err(|_| GameKernelV7Error::Invalid)
+}
+
+fn current_move_target_plan(
+    state: &GameStateV6,
+    content: &er_content::pack::m6_prepared::PreparedBattleContentV3,
+    seat: SeatId,
+    actor: er_types::battle_ids::PokemonId,
+    move_slot: er_types::battle_ids::MoveSlotIndex,
+) -> Result<er_battle::current_target_execution::CurrentTargetPlan, GameKernelV7Error> {
+    let (_, actual_actor, _) = local_battle_actor(state, seat)?;
+    if actual_actor != actor { return Err(GameKernelV7Error::Invalid); }
+    let run = state.active_run.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+    let pokemon = run.party.iter().find(|pokemon| pokemon.id == actor)
+        .ok_or(GameKernelV7Error::Invalid)?;
+    let (definition, _) = er_battle::m7_resolver::effective_move_definition_v5(content, pokemon, move_slot)
+        .map_err(|_| GameKernelV7Error::Invalid)?;
+    er_battle::current_target_execution::CurrentTargetExecution::from_state(state)
+        .and_then(|owner| owner.plan(run, actor, definition)).map_err(|_| GameKernelV7Error::Invalid)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn target_select_control(
+    state: &GameStateV6,
+    content: &er_content::pack::m6_prepared::PreparedBattleContentV3,
+    seat: SeatId,
+    actor: er_types::battle_ids::PokemonId,
+    move_slot: er_types::battle_ids::MoveSlotIndex,
+    instance: MenuInstanceId,
+    revision: SafeU53,
+) -> Result<GameControlPlanV2, GameKernelV7Error> {
+    let (battle, _, field) = local_battle_actor(state, seat)?;
+    let plan = current_move_target_plan(state, content, seat, actor, move_slot)?;
+    if plan.multiple || plan.ordered.len() <= 1 { return Err(GameKernelV7Error::Invalid); }
+    let operation = er_types::battle_command::player_command_operation_id(
+        battle.battle_id, battle.wave, battle.turn, field, seat,
+    ).map_err(|_| GameKernelV7Error::Invalid)?;
+    let entries = plan.ordered.into_iter().enumerate().map(|(index, target)| (
+        format!("battle/target/{index}"), GameActionV1::Battle {
+            action: er_types::BattleUiActionV1::SelectMoveTarget { actor, move_slot, target },
+        },
+    )).collect::<Vec<_>>();
+    generic_vertical_control_v2(instance, revision, seat, operation,
+        GameControlKindV2::BattleTarget, "m9e/battle/target", &entries,
+        GameMenuCancelV2::Back { action: Box::new(GameActionV1::Battle {
+            action: er_types::BattleUiActionV1::OpenFight,
+        })},
+    ).map_err(|_| GameKernelV7Error::Invalid)
 }
 
 fn switch_select_control(
@@ -3870,6 +4002,16 @@ fn battle_proposal_is_rooted_in_control(
             .and_then(|run| run.party.iter().find(|pokemon| pokemon.id == actor))
             .and_then(|pokemon| pokemon.moves.get(usize::from(move_slot.get())))
             .is_some_and(Option::is_some),
+        GameActionV1::Battle {
+            action: er_types::BattleUiActionV1::SelectMoveTarget {
+                actor: selected, move_slot, target,
+            },
+        } if *selected == actor && state.current_targeting.is_some() => state.active_run.as_ref()
+            .is_some_and(|run| run.party.iter().find(|pokemon| pokemon.id == actor)
+                .and_then(|pokemon| pokemon.moves.get(usize::from(move_slot.get())))
+                .is_some_and(Option::is_some)
+                && run.battle.as_ref().is_some_and(|battle| battle.field.slots.iter()
+                    .any(|row| row.slot == *target && row.occupant.is_some()))),
         GameActionV1::Battle {
             action:
                 er_types::BattleUiActionV1::SelectSwitch {

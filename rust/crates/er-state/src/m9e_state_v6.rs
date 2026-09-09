@@ -46,6 +46,8 @@ pub struct GameStateV6 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_run_difficulty: Option<CurrentRunDifficultyV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_targeting: Option<crate::current_targeting::CurrentTargetingV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_battle_participation:
         Option<crate::current_battle_participation::CurrentBattleParticipationV1>,
 }
@@ -58,6 +60,12 @@ pub trait GameStateV6ContentContext {
     }
     fn has_species_form(&self, species: SpeciesId, form: u16) -> bool;
     fn has_move(&self, move_id: MoveId) -> bool;
+    fn current_targeting_form_matches(&self, _species: SpeciesId, _form: u16) -> bool {
+        false
+    }
+    fn supports_current_targeting_mode(&self, _mode: GameModeId) -> bool {
+        false
+    }
     fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
         false
     }
@@ -185,6 +193,21 @@ impl GameStateV6 {
         {
             return Err(GameStateV6Error::Invalid);
         }
+        if let Some(owner) = self.current_targeting {
+            let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
+            // Shared canonical account ownership is supplied by the separately
+            // qualified fresh-profile prerequisite, never by a private copy.
+            let profile = self.current_friendship_profile.as_ref()
+                .ok_or(GameStateV6Error::Invalid)?;
+            if !crate::current_targeting::matches_current_target_content(&self.content_identity)
+                || owner.run_id != run.run_id || owner.mode != run.mode
+                || owner.profile_owner != profile.owner_seat
+                || profile.content_identity != self.content_identity
+                || self.current_run_difficulty.is_none()
+            {
+                return Err(GameStateV6Error::Invalid);
+            }
+        }
         let legacy = GameStateV5 {
             schema_version: crate::m7_state::GAME_STATE_SCHEMA_VERSION_V5,
             content_identity: er_types::GameContentIdentity {
@@ -245,6 +268,11 @@ impl GameStateV6 {
         {
             return Err(GameStateV6Error::Content);
         }
+        if self.current_targeting.is_some_and(|owner| !content.supports_current_targeting_mode(owner.mode)
+            || self.active_run.as_ref().is_some_and(|run| run.party.iter().any(|pokemon|
+                !content.current_targeting_form_matches(pokemon.species_id, pokemon.form_index)))) {
+            return Err(GameStateV6Error::Content);
+        }
         if &self.content_identity != content.identity() {
             return Err(GameStateV6Error::Content);
         }
@@ -293,6 +321,7 @@ impl GameStateV6 {
             active_run: source.active_run,
             current_battle_participation: None,
             current_run_difficulty: None,
+            current_targeting: None,
         };
         value.validate()?;
         Ok(value)

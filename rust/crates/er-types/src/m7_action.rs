@@ -44,6 +44,13 @@ pub enum BattleUiActionV1 {
         actor: PokemonId,
         target: FieldSlot,
     },
+    /// Current target menu submission retains the chosen move explicitly. The
+    /// older SelectTarget action cannot convey that choice to a remote authority.
+    SelectMoveTarget {
+        actor: PokemonId,
+        move_slot: MoveSlotIndex,
+        target: FieldSlot,
+    },
     SelectSwitch {
         actor: PokemonId,
         party_slot: PartyIndex,

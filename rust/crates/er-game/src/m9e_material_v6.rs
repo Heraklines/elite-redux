@@ -213,6 +213,8 @@ pub enum GameMaterialApplyOutcomeV6 {
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum GameMaterialV6Error {
+    #[error("current targeting ownership cannot change across this material")]
+    CurrentTargetOwnership,
     #[error("material V6 is invalid")]
     Invalid,
     #[error("material V6 canonical encoding failed: {0}")]
@@ -461,6 +463,17 @@ pub fn apply_game_material_v6_with_retention(
         prior.current_friendship_profile != transition.after_state.current_friendship_profile
     }) {
         return Err(GameMaterialV6Error::Invalid);
+    }
+    // Current targeting is established only by bootstrap. Same-run material cannot
+    // erase or invent it; a true terminal transition may retire the run owner.
+    if let Some(prior) = live.as_ref() {
+        let same_run = prior.active_run.as_ref().map(|run| run.run_id)
+            == transition.after_state.active_run.as_ref().map(|run| run.run_id);
+        if (same_run && prior.current_targeting != transition.after_state.current_targeting)
+            || (!same_run && transition.after_state.current_targeting.is_some())
+        {
+            return Err(GameMaterialV6Error::CurrentTargetOwnership);
+        }
     }
     // Difficulty is selected once at bootstrap. Same-run material cannot erase,
     // replace or invent it, including when the prior save has unknown difficulty.

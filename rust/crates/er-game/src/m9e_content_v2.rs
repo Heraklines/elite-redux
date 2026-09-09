@@ -684,6 +684,19 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
         crate::current_friendship_profile::seed_species(self).ok()
     }
 
+    fn current_targeting_form_matches(&self, species: SpeciesId, form: u16) -> bool {
+        matches!(species.get().get(), 1 | 4 | 7) && form == 0
+            && self.progression.experience_for_compiled_form(species, form)
+                .is_ok_and(|metadata| metadata.source_form_count == 0
+                    && matches!(metadata.source_form, er_progression::content_v2::ExperienceSourceFormV2::Species))
+    }
+    fn supports_current_targeting_mode(&self, mode: GameModeId) -> bool {
+        self.identity.oracle_sha.as_str() == "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7"
+            && self.world.mode(mode).is_some_and(|definition| {
+                definition.key == "CLASSIC" && definition.supported
+                    && !definition.cooperative && !definition.challenge_selection
+            })
+    }
     fn supports_current_experience_mode(&self, mode: GameModeId) -> bool {
         self.world.mode(mode).is_some_and(|definition| {
             definition.key == "CLASSIC"

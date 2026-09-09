@@ -234,7 +234,27 @@ pub fn construct_natural_run_v6(
     };
     let mut profile = bootstrap.profile.clone();
     profile.statistics.runs_started = increment(profile.statistics.runs_started)?;
+    let current_targeting = if let Some(shared) = &bootstrap.current_friendship_profile {
+        // Fresh source GameMode construction owns the empty challenge set. This
+        // path also owns empty per-Pokemon overrides and atomic field membership;
+        // loaded states without the retained admission cannot acquire those facts.
+        if mode.key != "CLASSIC" || mode.cooperative || mode.challenge_selection
+            || !mode.supported || !bootstrap.selections.choices.is_empty()
+            || shared.owner_seat != owner || shared.content_identity != *content.identity()
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        Some(er_state::current_targeting::CurrentTargetingV1 {
+            run_id,
+            mode: mode_id,
+            profile_owner: owner,
+            origin: er_state::current_targeting::CurrentTargetingOriginV1::FreshNormalClassic,
+        })
+    } else {
+        None
+    };
     let state = GameStateV6 {
+        current_targeting,
         current_battle_participation: None,
         current_friendship_profile: bootstrap.current_friendship_profile.clone(),
         current_run_difficulty: Some(er_state::m9e_state_v6::CurrentRunDifficultyV1 {
