@@ -36,12 +36,12 @@ fn whole_source_targeting_matches_all_twenty_categories_and_owner_call_order() {
     assert!(raw.len() <= 262_144);
     let cases = raw
         .lines()
-        .map(|line| serde_json::from_str::<Case>(line).unwrap())
+        .map(|line| serde_json::from_str::<Case>(line).expect("valid source case"))
         .collect::<Vec<_>>();
     assert_eq!(cases.len(), 200);
     for (index, case) in cases.into_iter().enumerate() {
         assert_eq!(
-            resolve_move_targets(&case.input).unwrap(),
+            resolved(&case.input),
             case.expected,
             "case {index}"
         );
@@ -52,14 +52,14 @@ fn whole_source_targeting_matches_all_twenty_categories_and_owner_call_order() {
 fn source_spread_promotion_keeps_adjacency_and_multihit_exception() {
     let mut input = context();
     input.spread_flag = true;
-    let spread = resolve_move_targets(&input).unwrap();
+    let spread = resolved(&input);
     assert!(spread.multiple);
     assert_eq!(spread.targets, [4, 5]);
     input.multi_hit = true;
-    assert!(!resolve_move_targets(&input).unwrap().multiple);
+    assert!(!resolved(&input).multiple);
     input.multi_hit = false;
     input.flying = true;
-    assert_eq!(resolve_move_targets(&input).unwrap().targets, [3, 4, 5]);
+    assert_eq!(resolved(&input).targets, [3, 4, 5]);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn source_random_draw_precedes_alive_filter_and_other_never_falls_back_to_ally()
     input.target = TargetKind::RandomNearEnemy;
     input.random_index = Some(0);
     input.active[3] = false;
-    let result = resolve_move_targets(&input).unwrap();
+    let result = resolved(&input);
     assert!(result.targets.is_empty());
     assert_eq!(result.random_bounds, [3]);
     input.target = TargetKind::NearOther;
@@ -77,9 +77,9 @@ fn source_random_draw_precedes_alive_filter_and_other_never_falls_back_to_ally()
     input.active[4] = false;
     input.active[5] = false;
     // The sole active foe recenters, making it reachable even from this wing.
-    assert_eq!(resolve_move_targets(&input).unwrap().targets, [3, 1]);
+    assert_eq!(resolved(&input).targets, [3, 1]);
     input.active[3] = false;
-    assert!(resolve_move_targets(&input).unwrap().targets.is_empty());
+    assert!(resolved(&input).targets.is_empty());
 }
 
 #[test]
