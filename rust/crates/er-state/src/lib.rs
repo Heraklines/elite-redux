@@ -9,6 +9,7 @@ pub mod current_experience_owner;
 pub mod current_friendship_profile;
 pub mod current_phase_tree;
 pub mod current_targeting;
+pub mod current_turn_execution;
 pub mod digest;
 pub mod digest_v2;
 pub mod digest_v4;

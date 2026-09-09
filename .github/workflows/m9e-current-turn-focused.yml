@@ -1,11 +1,11 @@
-name: M9E Current Target Execution
+name: M9E Retained Current Turn
 on:
   push:
-    branches: [codex/m9e-target-execution-focused-20260909]
+    branches: [codex/m9e-current-turn-focused-20260909]
 permissions:
   contents: read
 concurrency:
-  group: m9e-target-execution-${{ github.ref }}
+  group: m9e-current-turn-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   measure:
@@ -54,23 +54,23 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - name: Qualify all47 actual targeting and retained regression tests
+      - name: Qualify all49 retained turn and targeting regression tests
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 scripts/ci/m9e_target_execution_diagnostic.py
-      - name: Compact actual target execution result
+        run: python3 scripts/ci/m9e_current_turn_diagnostic.py
+      - name: Compact actual retained turn result
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-target-execution-summary-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-target-execution/compact/
+          name: m9e-current-turn-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-current-turn/compact/
           if-no-files-found: error
           retention-days: 14
       - name: Remote proposal diagnostics
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: m9e-target-execution-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/m9e-target-execution/diagnostics/
+          name: m9e-current-turn-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-current-turn/diagnostics/
           if-no-files-found: error
           retention-days: 14
