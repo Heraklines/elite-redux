@@ -110,7 +110,7 @@ def source_oracle():
     require(len(entries) == len([line for line in block.splitlines() if line.strip()]) == 570, "complete starter cost literals")
     expected_table = [(ids[name], int(cost), name) for name, cost in entries]
     rust = (ROOT/"rust/crates/er-game/src/current_friendship_profile.rs").read_text()
-    actual_table = [(int(species), int(cost), name) for species, cost, name in re.findall(r"^\s*\(([0-9]+), ([0-9]+)\), // ([A-Z0-9_]+)$", rust, re.M)]
+    actual_table = [(int(species), int(cost), name) for species, cost, name in re.findall(r"^\s*\(([0-9]+), ([0-9]+)\),[ \t]+// ([A-Z0-9_]+)$", rust, re.M)]
     require(actual_table == expected_table, "every Rust table row must match actual pinned source")
     definitions_path = ROOT/"rust/fixtures/m9/engineering/complete-progression-definitions-v1.json"
     definitions_raw = definitions_path.read_bytes()
