@@ -184,18 +184,40 @@ def main():
         result["rustc"] = rustc
         originals = {path: (ROOT/path).read_bytes() for path in DELTAS["after"] if path.endswith(".rs")}
         run("rustfmt", ["rustfmt", "--edition", "2024", "--config", "skip_children=true", *originals])
-        patch, format_rows = b"", []
+        patch, format_rows, file_patches = b"", [], []
         for path, original in originals.items():
             formatted = (ROOT/path).read_bytes()
             if formatted != original:
-                patch += "".join(difflib.unified_diff(original.decode().splitlines(True), formatted.decode().splitlines(True), fromfile="a/"+path, tofile="b/"+path, n=0)).encode()
+                file_patch = "".join(difflib.unified_diff(original.decode().splitlines(True), formatted.decode().splitlines(True), fromfile="a/"+path, tofile="b/"+path, n=0)).encode()
+                patch += file_patch
+                file_patches.append((path, file_patch))
                 format_rows.append(dict(path=path, before_sha256=sha(original), after_sha256=sha(formatted)))
         if patch:
+            # Handoff permits pagination when the routine diagnostic exceeds its
+            # target. Never split a file, enlarge a member, or retrieve an archive.
+            pages = []
+            page_raw, page_paths = b"", []
+            for path, file_patch in file_patches:
+                require(len(file_patch) <= 262144, "one formatter file exceeds named member bound")
+                if page_raw and len(page_raw)+len(file_patch) > 262144:
+                    pages.append((page_raw, page_paths))
+                    page_raw, page_paths = b"", []
+                page_raw += file_patch
+                page_paths.append(path)
+            if page_raw:
+                pages.append((page_raw, page_paths))
+            page_index = [dict(path=f"format-{index+1:02}.patch", bytes=len(raw), sha256=sha(raw), files=paths)
+                for index, (raw, paths) in enumerate(pages)]
+            allowed = len(patch) <= 524288 and len(pages) <= 2
             result["format_patch"] = dict(bytes=len(patch), sha256=sha(patch), files=format_rows,
-                context_lines=0, emitted=len(patch) <= 262144)
-            require(len(patch) <= 262144, "named format patch bound")
-            (OUT/"diagnostics/format.patch").write_bytes(patch)
-            raise RuntimeError("exact remote formatter patch required before qualification")
+                context_lines=0, emitted=allowed, pages=page_index,
+                member_limit_bytes=262144, aggregate_limit_bytes=524288)
+            require(allowed, "two-page formatter evidence bound")
+            require([path for _, paths in pages for path in paths] == [row["path"] for row in format_rows],
+                "exact ordered formatter page partition")
+            for page, (raw, _) in zip(page_index, pages, strict=True):
+                (OUT/"diagnostics"/page["path"]).write_bytes(raw)
+            raise RuntimeError("exact remote formatter pages required before qualification")
         cases = OUT/"diagnostics/target-source-cases.jsonl"
         oracle = json.loads(run("target-source-oracle", ["node", "--disable-warning=ExperimentalWarning", "scripts/ci/m9e_current_move_targets_oracle.mjs", str(cases)], maximum=65536))
         require(oracle["cases"] == 200 and oracle["runtime"] == "v24.9.0" and oracle["whole_target_function"] is True and oracle["whole_line_adjacency"] is True and oracle["resolved_owner_inputs_only"] is True, "whole current target source")
