@@ -229,6 +229,12 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
         ],
     )?;
     state.validate_with(content.as_ref())?;
+    // This deliberately edited field is a controlled checkpoint, not the state
+    // produced by the retained natural bootstrap material. Keep its real next
+    // revision but start an empty ledger; never fabricate a matching old digest.
+    snapshot.material_ledger = er_game::m9e_material_v6::AppliedGameMaterialLedgerV1::new(
+        snapshot.material_ledger.next_authority_revision,
+    )?;
     Ok(snapshot)
 }
 fn assign_move(state: &mut GameStateV6, id: u64) -> Result<()> {
