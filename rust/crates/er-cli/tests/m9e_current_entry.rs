@@ -676,3 +676,100 @@ fn current_session_rolls_back_when_adapter_completion_rejects() -> Result<(), Bo
     }
     Ok(())
 }
+
+#[test]
+fn new_run_fresh_profile_process_owns_catalog_and_resumes_exactly() -> Result<(), Box<dyn Error>> {
+    use er_env::current::CurrentGameSession;
+    use er_kernel::game_kernel_v7::FreshFriendshipStartV7;
+
+    let files = CommandFiles::new()?;
+    let profile_path = files.write("fresh.json", &profile()?)?;
+    let output = run_current_command(
+        "new-run",
+        &[
+            ("profile", profile_path.to_string_lossy().into_owned()),
+            ("seed", "m9e-cli-fresh-profile".into()),
+            ("save-slot", "fresh-process".into()),
+            ("fresh-profile", "true".into()),
+        ],
+        "snapshot\nspace\nsnapshot\nq\n",
+    )?;
+    let values = command_values(&output)?;
+    let snapshots = values
+        .iter()
+        .filter_map(|value| value.get("snapshot"))
+        .map(|value| serde_json::from_value::<CoreGameKernelSnapshotV7>(value.clone()))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(snapshots.len(), 2);
+    let GameKernelLifecycleSnapshotV7::Bootstrap(title) = &snapshots[0].lifecycle else {
+        return Err("CLI fresh Title missing".into());
+    };
+    assert_eq!(title.control.kind, GameControlKindV2::Title);
+    let owner = title.current_friendship_profile.as_ref().ok_or("fresh accounts absent")?;
+    assert_eq!(owner.accounts.len(), 1450);
+    assert!(owner.accounts.iter().all(|account| account.friendship_progress == SafeU53::ZERO
+        && account.candy_count == SafeU53::ZERO && account.passive_attr == 0));
+    let direct = CurrentGameSession::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
+        profile: profile()?,
+        seed: "m9e-cli-fresh-profile".into(),
+        local_seat: SeatId::new(SafeU53::new(1)?),
+        save_slots: vec!["fresh-process".into()],
+        content: content()?,
+        scheduler: KernelSchedulerSnapshotV2 {
+            next_timer_id: Some(SafeU53::ZERO),
+            timers: Vec::new(),
+            pauses: Vec::new(),
+            disposed: false,
+        },
+    })?;
+    assert_eq!(snapshots[0], direct.snapshot()?);
+    let path = files.write("title.json", &snapshots[0])?;
+    let resumed = run_current_command(
+        "resume",
+        &[("snapshot", path.to_string_lossy().into_owned())],
+        "space\nsnapshot\nq\n",
+    )?;
+    let resumed = command_values(&resumed)?;
+    assert_eq!(
+        resumed.iter().find_map(|value| value.get("snapshot")),
+        Some(&serde_json::to_value(&snapshots[1])?)
+    );
+    let GameKernelLifecycleSnapshotV7::Bootstrap(mode) = &snapshots[1].lifecycle else {
+        return Err("CLI raw input lost bootstrap".into());
+    };
+    assert_eq!(mode.control.kind, GameControlKindV2::ModeSelect);
+    assert_eq!(mode.current_friendship_profile.as_ref(), Some(owner));
+    Ok(())
+}
+
+#[test]
+fn new_run_fresh_profile_is_explicit_and_rejects_nonpristine_accounts() -> Result<(), Box<dyn Error>> {
+    let files = CommandFiles::new()?;
+    let mut legacy = profile()?;
+    legacy.statistics.runs_started = SafeU53::new(1)?;
+    let legacy_path = files.write("legacy.json", &legacy)?;
+    let options = vec![
+        ("profile", legacy_path.to_string_lossy().into_owned()),
+        ("seed", "m9e-cli-legacy-profile".into()),
+        ("save-slot", "legacy-process".into()),
+    ];
+    let ordinary = run_current_command("new-run", &options, "snapshot\nq\n")?;
+    command_values(&ordinary)?;
+    let mut explicit_false = options.clone();
+    explicit_false.push(("fresh-profile", "false".into()));
+    let disabled = run_current_command("new-run", &explicit_false, "snapshot\nq\n")?;
+    command_values(&disabled)?;
+    assert_eq!(ordinary.stdout, disabled.stdout);
+    assert!(!String::from_utf8(ordinary.stdout)?.contains("current_friendship_profile"));
+    for value in ["true", "TRUE", "yes", "1", ""] {
+        let mut rejected = options.clone();
+        rejected.push(("fresh-profile", value.into()));
+        let output = run_current_command("new-run", &rejected, "")?;
+        assert!(!output.status.success(), "unexpected admission for {value:?}");
+        assert!(output.stdout.is_empty(), "rejected profile emitted a session");
+        if value != "true" {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("fresh-profile must be true or false"));
+        }
+    }
+    Ok(())
+}

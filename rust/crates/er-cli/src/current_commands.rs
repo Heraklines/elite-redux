@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_kernel::game_kernel_v7::GameKernelRoleV7;
+use er_kernel::game_kernel_v7::{FreshFriendshipStartV7, GameKernelRoleV7};
+use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_state::m7_state::ProfileStateV1;
 use er_types::{InputFocus, PhysicalKey, RawInputEvent, SafeU53, SeatId};
@@ -110,15 +111,37 @@ pub fn new_run(options: &Options) -> Result<(), Box<dyn Error>> {
         .filter(|slot| !slot.is_empty())
         .ok_or("new-run requires a nonempty --save-slot")?
         .clone();
-    play(CurrentGameSession::natural_start(
-        profile,
-        seed,
-        seat(options)?,
-        vec![save_slot],
-        true,
-        content,
-        None,
-    )?)
+    let fresh_profile = match options.get("fresh-profile").map(String::as_str) {
+        None | Some("false") => false,
+        Some("true") => true,
+        Some(_) => return Err("fresh-profile must be true or false".into()),
+    };
+    let session = if fresh_profile {
+        CurrentGameSession::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
+            profile,
+            seed,
+            local_seat: seat(options)?,
+            save_slots: vec![save_slot],
+            content,
+            scheduler: KernelSchedulerSnapshotV2 {
+                next_timer_id: Some(SafeU53::ZERO),
+                timers: Vec::new(),
+                pauses: Vec::new(),
+                disposed: false,
+            },
+        })?
+    } else {
+        CurrentGameSession::natural_start(
+            profile,
+            seed,
+            seat(options)?,
+            vec![save_slot],
+            true,
+            content,
+            None,
+        )?
+    };
+    play(session)
 }
 
 pub fn resume(options: &Options) -> Result<(), Box<dyn Error>> {
