@@ -1,0 +1,53 @@
+name: M9E Actual Target Roster Diagnostic
+on:
+  push:
+    branches: [codex/m9e-target-roster-20260909]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-target-roster-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Start bounded remote diagnostic
+        run: echo "M9E_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Observe real raw Title construction remotely
+        run: python3 scripts/ci/m9e_current_target_roster.py
+      - name: Bounded source and roster metadata
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-target-roster-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-target-roster/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Complete diagnostic logs remain remote
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-target-roster-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-target-roster/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
