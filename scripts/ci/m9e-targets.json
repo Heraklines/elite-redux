@@ -115,6 +115,12 @@
       "rust/crates/er-progression/src/current_phase_experience.rs",
       "rust/crates/er-progression/tests/m9e_phase_experience.rs",
       "rust/crates/er-progression/tests/m9e_held_experience.rs",
+      "rust/crates/er-progression/src/current_phase_tree.rs",
+      "rust/crates/er-state/src/current_phase_tree.rs",
+      "rust/crates/er-progression/tests/m9e_phase_tree.rs",
+      "rust/crates/er-progression/tests/m9e_phase_tree_queries.rs",
+      "scripts/ci/m9e_phase_tree_oracle.mjs",
+      "scripts/ci/m9e_phase_tree_queries_oracle.mjs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -388,6 +394,18 @@
         "explicit_empty_held_context_preserves_unboosted_source_behavior",
         "held_booster_receives_fractional_product_before_distribution_floor",
         "malformed_held_context_and_unsafe_awards_are_rejected_atomically"
+      ],
+      "er-progression:m9e_phase_tree": [
+        "descendant_level_up_tasks_precede_barrier_and_recipient_siblings",
+        "every_actual_source_trace_and_intermediate_snapshot_matches",
+        "malformed_restore_and_excess_capacity_leave_queue_unchanged",
+        "source_clear_preserves_deferred_flag_and_retains_only_deepest_level"
+      ],
+      "er-progression:m9e_phase_tree_queries": [
+        "find_and_exists_preserve_opposite_source_search_orders",
+        "insertion_and_removal_choose_first_deepest_match_and_source_fallback",
+        "query_admission_bounds_and_unknown_snapshot_fields_fail_closed",
+        "whole_source_queries_match_results_predicate_visits_and_restored_state"
       ]
     }
   },
