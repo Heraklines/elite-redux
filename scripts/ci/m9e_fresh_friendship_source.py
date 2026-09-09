@@ -55,7 +55,7 @@ def main():
                 and hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest() == OID,
                 "immutable source bytes")
         lines = raw.decode("utf-8").splitlines(keepends=True)
-        method = re.compile(r"^  (?:(?:public|private|protected) )?(constructor|createStarterDataEntry|initStarterData)\(")
+        method = re.compile(r"^  (?:(?:public|private|protected) )?(constructor|createStarterDataEntry|initStarterData|applyLocalAllStartersDebug)\(")
         starts = [(i, method.search(line).group(1)) for i, line in enumerate(lines) if method.search(line)]
         require(any(name == "constructor" for _, name in starts)
                 and any(name == "createStarterDataEntry" for _, name in starts)
