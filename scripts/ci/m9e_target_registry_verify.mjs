@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import assert from "node:assert/strict";
 
 const abilityIds = [0,18,41,43,47,49,51,62,65,66,67,75,82,94,113,172,192,257,268,5006,5033,5082,5097,5115];
-const moveIds = [10,33,39,43,45,57,61,64,78,79,98,103,105,108,110,165,230,310,331,336,458,501,541,580];
+const moveIds = [10,33,39,40,43,45,57,61,64,78,79,98,103,105,108,110,165,230,310,331,336,458,497,501,541,580];
 const digest = raw => crypto.createHash("sha256").update(raw).digest("hex");
 const keys = (value, expected) => assert.deepEqual(Object.keys(value).sort(), [...expected].sort());
 const bool = value => assert.equal(typeof value, "boolean");
@@ -67,6 +67,6 @@ for (const mutate of [
   const copy = structuredClone(row); mutate(copy);
   assert.throws(() => validate(copy)); rejected++;
 }
-const output = `${JSON.stringify({schema_version:1,status:"passed",scope:"registry schema/provenance and fresh-process equality only; source behavior still requires review",source_sha:row.source_sha,ability_count:24,move_count:24,negative_cases:rejected,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
+const output = `${JSON.stringify({schema_version:1,status:"passed",scope:"registry schema/provenance and fresh-process equality only; source behavior still requires review",source_sha:row.source_sha,ability_count:24,move_count:26,negative_cases:rejected,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
 assert(Buffer.byteLength(output) <= 8192);
 fs.writeFileSync(process.argv[4], output, {flag:"wx"});

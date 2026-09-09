@@ -19,7 +19,7 @@ import { afterAll, expect, test, vi } from "vitest";
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 const SEED = "m9e-target-registry-source-v1";
 const ABILITIES = [0, 18, 41, 43, 47, 49, 51, 62, 65, 66, 67, 75, 82, 94, 113, 172, 192, 257, 268, 5006, 5033, 5082, 5097, 5115];
-const MOVES = [10, 33, 39, 43, 45, 57, 61, 64, 78, 79, 98, 103, 105, 108, 110, 165, 230, 310, 331, 336, 458, 501, 541, 580];
+const MOVES = [10, 33, 39, 40, 43, 45, 57, 61, 64, 78, 79, 98, 103, 105, 108, 110, 165, 230, 310, 331, 336, 458, 497, 501, 541, 580];
 let game: Phaser.Game | null = null;
 let manager: GameManager | null = null;
 
