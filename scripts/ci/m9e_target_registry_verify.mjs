@@ -14,7 +14,7 @@ const attrs = value => {
 };
 function validate(row) {
   keys(row, ["schema_version","source_sha","seed","scope","roster_source_sha","roster_run_id","roster_sha256","shattered_ability_id","abilities","moves"]);
-  assert.equal(row.schema_version, 2);
+  assert.equal(row.schema_version, 3);
   assert.equal(row.source_sha, "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
   assert.equal(row.seed, "m9e-target-registry-source-v1");
   assert.equal(row.scope, "actual initialized registry diagnostic; no ability activation, target execution or neutrality claim");
@@ -41,11 +41,12 @@ function validate(row) {
   }
   const kinds = ["USER","NEAR_OTHER","ALL_NEAR_OTHERS","NEAR_ENEMY","ALL_NEAR_ENEMIES","RANDOM_NEAR_ENEMY","ALL_ENEMIES","ATTACKER","NEAR_ALLY","ALLY","USER_OR_NEAR_ALLY","USER_AND_ALLIES","ALL","USER_SIDE","ENEMY_SIDE","BOTH_SIDES","PARTY","CURSE","OTHER","ALL_OTHERS"];
   for (const m of row.moves) {
-    keys(m, ["id","name","target","attrs","variable","multi_hit","pulse"]);
+    keys(m, ["id","name","target","attrs","variable","multi_hit","pulse","sound_based"]);
     assert(typeof m.name === "string" && m.name.length <= 256);
     assert(kinds.includes(m.target)); attrs(m.attrs);
-    for (const key of ["variable","multi_hit","pulse"]) bool(m[key]);
+    for (const key of ["variable","multi_hit","pulse","sound_based"]) bool(m[key]);
   }
+  assert.equal(row.moves.find(m => m.id === 448).sound_based, true);
 }
 assert.equal(process.argv.length, 5);
 const raws = process.argv.slice(2, 4).map(path => {
@@ -62,6 +63,7 @@ for (const mutate of [
   r => { r.abilities.pop(); },
   r => { r.moves[0].variable = null; },
   r => { r.moves.reverse(); },
+  r => { r.moves.find(m => m.id === 448).sound_based = false; },
   r => { r.roster_sha256 = "0".repeat(64); },
   r => { r.abilities[0].extra = true; },
 ]) {

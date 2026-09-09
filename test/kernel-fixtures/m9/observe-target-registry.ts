@@ -79,10 +79,11 @@ test("observe actual initialized target capability registry", async () => {
       variable: move.hasAttr("VariableTargetAttr"),
       multi_hit: move.hasAttr("MultiHitAttr"),
       pulse: move.hasFlag(MoveFlags.PULSE_MOVE),
+      sound_based: move.hasFlag(MoveFlags.SOUND_BASED),
     };
   });
   const raw = `${JSON.stringify({
-    schema_version: 2, source_sha: PIN, seed: SEED,
+    schema_version: 3, source_sha: PIN, seed: SEED,
     scope: "actual initialized registry diagnostic; no ability activation, target execution or neutrality claim",
     roster_source_sha: "f0a2b8c185a4e68dc88b4ea0b34128aeb8b28356",
     roster_run_id: "34373633488",
