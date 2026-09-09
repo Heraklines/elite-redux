@@ -5230,7 +5230,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 109)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 111)
         self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
@@ -5287,7 +5287,7 @@ class FeedbackTests(unittest.TestCase):
                          physical_rebind.source_binding(self.root, CANDIDATE))
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
-        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 11, 15])
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9, 11, 15])
         for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
             crate, target = key.split(":")
             self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
@@ -11413,7 +11413,7 @@ class OwnedFoundationContractTests(unittest.TestCase):
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 79)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 81)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)
