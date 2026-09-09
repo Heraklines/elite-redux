@@ -43,9 +43,8 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
     for (case, line) in lines.into_iter().enumerate() {
         let columns: Vec<_> = line.split('\t').collect();
         assert_eq!(columns.len(), 12);
-        let optional_u8 = |index: usize| {
-            (columns[index] != "-").then(|| columns[index].parse::<u8>().unwrap())
-        };
+        let optional_u8 =
+            |index: usize| (columns[index] != "-").then(|| columns[index].parse::<u8>().unwrap());
         let party = columns[9]
             .split(',')
             .map(|member| {
@@ -78,7 +77,10 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
         } else {
             columns[10].split(',').map(|v| v.parse().unwrap()).collect()
         };
-        assert_eq!(plan.battle_friendship_calls, expected_friends, "case {case}");
+        assert_eq!(
+            plan.battle_friendship_calls, expected_friends,
+            "case {case}"
+        );
         let expected_phases: Vec<(usize, bool, u64)> = if columns[11] == "-" {
             vec![]
         } else {
@@ -111,7 +113,10 @@ fn balance_redistributes_without_share_and_preserves_fractional_phase_arguments(
     assert_eq!(plan.phase_insertions.len(), 2);
     assert_eq!(plan.phase_insertions[0].party_index, 0);
     assert!(plan.phase_insertions[0].on_field);
-    assert_eq!(plan.phase_insertions[0].experience.to_bits(), 80.8_f64.to_bits());
+    assert_eq!(
+        plan.phase_insertions[0].experience.to_bits(),
+        80.8_f64.to_bits()
+    );
     assert_eq!(plan.phase_insertions[1].party_index, 1);
     assert!(!plan.phase_insertions[1].on_field);
     assert_eq!(
@@ -141,7 +146,12 @@ fn living_at_cap_friendship_and_full_participant_denominator_preserve_source_ord
     assert_eq!(plan.phase_insertions[0].party_index, 1);
     assert_eq!(plan.phase_insertions[0].experience, 50.0);
     value.pokemon_defeated = false;
-    assert!(plan_unboosted_party_experience(&value).unwrap().battle_friendship_calls.is_empty());
+    assert!(
+        plan_unboosted_party_experience(&value)
+            .unwrap()
+            .battle_friendship_calls
+            .is_empty()
+    );
 }
 
 #[test]
@@ -149,18 +159,35 @@ fn invalid_input_and_overflow_do_not_produce_a_partial_plan() {
     for invalid in [f64::NAN, f64::INFINITY, -1.0] {
         let mut value = input();
         value.raw_exp_value = invalid;
-        assert_eq!(plan_unboosted_party_experience(&value), Err(PartyExperiencePlanError::Input));
+        assert_eq!(
+            plan_unboosted_party_experience(&value),
+            Err(PartyExperiencePlanError::Input)
+        );
     }
     let mut value = input();
     value.exp_balance_stacks = Some(5);
-    assert_eq!(plan_unboosted_party_experience(&value), Err(PartyExperiencePlanError::Input));
+    assert_eq!(
+        plan_unboosted_party_experience(&value),
+        Err(PartyExperiencePlanError::Input)
+    );
     value = input();
     value.participant_count = 0;
-    assert_eq!(plan_unboosted_party_experience(&value), Err(PartyExperiencePlanError::Input));
+    assert_eq!(
+        plan_unboosted_party_experience(&value),
+        Err(PartyExperiencePlanError::Input)
+    );
     value.party[0].participated = false;
-    assert!(plan_unboosted_party_experience(&value).unwrap().phase_insertions.is_empty());
+    assert!(
+        plan_unboosted_party_experience(&value)
+            .unwrap()
+            .phase_insertions
+            .is_empty()
+    );
     value = input();
     value.raw_exp_value = 9_007_199_254_740_991.0;
     value.trainer = true;
-    assert_eq!(plan_unboosted_party_experience(&value), Err(PartyExperiencePlanError::Overflow));
+    assert_eq!(
+        plan_unboosted_party_experience(&value),
+        Err(PartyExperiencePlanError::Overflow)
+    );
 }

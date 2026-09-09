@@ -5,7 +5,7 @@ import { stripTypeScriptTypes, createRequire } from "node:module";
 
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
 const pins = {
-  "src/battle-scene.ts": "0e2c5eff0aa70c45c4ef92a4c279d93d35b6e1fc71719d481603e5d2242ae2af",
+  "src/battle-scene.ts": "ac66742dffd05d97104c375bb4b0d4b2585873627a66413e34ae233bc47c7100",
   "src/data/balance/starters.ts": "21bd9442711f1f7381f5e7e5c4a51dac43db0584272fd5b4767493f8a68e39ef",
   "src/modifier/modifier.ts": "ce600a1acbe931402679f95832919f8d4ec05ad9e4ff2bce5a9e68b1aaa21b4f",
   "pnpm-lock.yaml": "dcbcaf6df44509c71b28becffdd70b33a7410a0873f5b1297ede84150a6effff",
@@ -20,6 +20,8 @@ if (process.version !== "v24.9.0") throw new Error("Pinned Node required");
 const text = sources["src/battle-scene.ts"];
 const start = text.indexOf("  applyPartyExp(\n");
 const end = text.indexOf("\n  /**\n   * Determine whether a wave should", start);
+// Current enclosing file has unrelated additions; the whole method below is
+// byte-identical to reference commit 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7.
 const original = text.slice(start, end);
 if (start < 0 || end <= start || Buffer.byteLength(original) !== 4977 ||
     hash(original) !== "37f19d82a8772ad0edddd7724a70994b0a11aa03b8901bfd10a29ed334d6e96c") {
@@ -31,6 +33,8 @@ const friendship = Number(friendshipMatches[0][1]);
 const require = createRequire(import.meta.url);
 const linearPath = require.resolve("phaser/src/math/Linear.js");
 const linearBytes = fs.readFileSync(linearPath);
+if (linearBytes.length > 4096) throw new Error("Bounded actual dependency source");
+fs.writeFileSync(new URL("./linear-source.js", new URL("file://" + process.argv[2])), linearBytes, { flag: "wx" });
 const phaserVersion = require("phaser/package.json").version;
 if (phaserVersion !== "3.90.0") throw new Error("Exact locked Phaser dependency required");
 const Linear = require(linearPath);

@@ -75,12 +75,20 @@ pub fn plan_unboosted_party_experience(
         || input.level_cap == 0
         || input.party.len() > usize::from(u16::MAX)
         || input.party.iter().any(|member| member.level == 0)
-        || input.party.iter().filter(|member| member.participated).count()
+        || input
+            .party
+            .iter()
+            .filter(|member| member.participated)
+            .count()
             > input.participant_count as usize
         || input.exp_share_stacks.is_some_and(|stacks| stacks > 5)
         || input.exp_balance_stacks.is_some_and(|stacks| stacks > 4)
-        || input.multiple_participant_stacks.is_some_and(|stacks| stacks > 5)
-        || input.multiplier_override.is_some_and(|value| !finite_nonnegative(value))
+        || input
+            .multiple_participant_stacks
+            .is_some_and(|stacks| stacks > 5)
+        || input
+            .multiplier_override
+            .is_some_and(|value| !finite_nonnegative(value))
     {
         return Err(PartyExperiencePlanError::Input);
     }
