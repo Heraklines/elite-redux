@@ -12,14 +12,15 @@ fn whole_actual_phase_matrix_matches_every_add_exp_argument() {
         let fields: Vec<_> = line.split('\t').collect();
         assert_eq!(fields.len(), 7);
         let number = |i: usize| fields[i].parse::<f64>().expect("source numeric argument");
-        let phase = match fields[1] {
-            "0" => ResolvedExperiencePhase::Party { ability: number(2) },
-            "1" => ResolvedExperiencePhase::Field {
+        let phase = if fields[1] == "0" {
+            ResolvedExperiencePhase::Party { ability: number(2) }
+        } else {
+            assert_eq!(fields[1], "1", "source phase discriminator");
+            ResolvedExperiencePhase::Field {
                 ability: number(2),
                 moody: number(3),
                 coordinator: number(4),
-            },
-            _ => panic!("source phase discriminator"),
+            }
         };
         let boosters: Vec<_> = if fields[5] == "-" {
             Vec::new()
