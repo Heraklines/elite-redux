@@ -56,6 +56,9 @@ test("observe actual initialized target capability registry", async () => {
       attrs: ability.attrs.map(attr => attr.constructor.name),
       conditions: ability.conditions.length,
       meta_kinds: ability.attrs.flatMap(attr => "erMetaKind" in attr ? [attr.erMetaKind] : []),
+      post_faint: ability.hasAttr("PostFaintAbAttr"),
+      post_knock_out: ability.hasAttr("PostKnockOutAbAttr"),
+      post_victory: ability.hasAttr("PostVictoryAbAttr"),
       spread: ability.hasAttr("SpreadTargetByFlagAbAttr"),
       spread_flags: ability.getAttrs("SpreadTargetByFlagAbAttr").map(attr => attr.flag),
       redirect_types: ability.getAttrs("RedirectTypeMoveAbAttr").map(attr => attr.type),
@@ -80,10 +83,11 @@ test("observe actual initialized target capability registry", async () => {
       multi_hit: move.hasAttr("MultiHitAttr"),
       pulse: move.hasFlag(MoveFlags.PULSE_MOVE),
       sound_based: move.hasFlag(MoveFlags.SOUND_BASED),
+      post_victory_stat: move.hasAttr("PostVictoryStatStageChangeAttr"),
     };
   });
   const raw = `${JSON.stringify({
-    schema_version: 3, source_sha: PIN, seed: SEED,
+    schema_version: 4, source_sha: PIN, seed: SEED,
     scope: "actual initialized registry diagnostic; no ability activation, target execution or neutrality claim",
     roster_source_sha: "f0a2b8c185a4e68dc88b4ea0b34128aeb8b28356",
     roster_run_id: "34373633488",

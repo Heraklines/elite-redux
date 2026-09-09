@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "0e1cad7ae194be10a6bac5b02f945649fb5d17e4ff51bc22f28b5601121a5119"
+EXPORTER_SHA256 = "fbf8e3ffb435771e921a700838440f79269ac990d26bc39b2b1770eb218dec57"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -160,7 +160,16 @@ ORACLE_PINS = {
   "src/enums/move-target.ts": [
     "dd9272781d53e85b051fe071bb12d23d54c3625892bc973f535f4f14cd68cd80",
     1194
-  ]
+  ],
+  "src/phase-tree.ts": ["2a152ebab21e2d54e72a0655896ece0d731c48aa82d61d8130d2a30f1e895b3c", 9396],
+  "src/phase-manager.ts": ["8905870d2c79b52032e8d7770b864d4511c77480fce3c04cd4d7c9595995547b", 51511],
+  "src/phases/turn-start-phase.ts": ["1e55cd59ec77c473a1c048a978fcf031a6b205aa9c8e04a0e6f55d76f8fa475c", 18754],
+  "src/phases/move-phase.ts": ["9e83a1b00a494f638dcc7e6dd59867ca1e7c72ad27ef5568d65a8af9da1325ce", 54218],
+  "src/phases/move-effect-phase.ts": ["5e02a2c6f6fdb11ea6b30143ff881975e8d2f5b88f020c9c84f61c89d29a4382", 57798],
+  "src/phases/faint-phase.ts": ["4a71a91d8e582fd3244ac4eb7d3d268749c4167233f5855ca26e16515f351b10", 22615],
+  "src/phases/victory-phase.ts": ["699cb5273390636dc83b0dc17332ba66b5a59e62c58802010d5f0aefa274bc05", 33397],
+  "src/battle-scene.ts": ["0e2c5eff0aa70c45c4ef92a4c279d93d35b6e1fc71719d481603e5d2242ae2af", 235075],
+  "src/data/elite-redux/archetypes/ability-meta-consumers.ts": ["87d53ff46ef2148debdd250827657180cefcbd187a7c494fd6b6f6973d522166", 5899]
 }
 
 
@@ -337,7 +346,7 @@ def initialize(summary):
 
 def main(summary):
     sha = os.environ["GITHUB_SHA"]
-    require(os.environ.get("GITHUB_REF_NAME") == "codex/m9e-target-registry-20260909" and os.environ.get("GITHUB_EVENT_NAME") == "push", "exact source branch/event")
+    require(os.environ.get("GITHUB_REF_NAME") == "codex/m9e-friendship-phase-source-20260909" and os.environ.get("GITHUB_EVENT_NAME") == "push", "exact source branch/event")
     require(re.fullmatch(r"[0-9a-f]{40}", sha), "candidate SHA format")
     require(git_text(ROOT, ["rev-parse", "HEAD"], "candidate-head") == sha, "candidate identity")
     require(git_text(ROOT, ["rev-parse", BASE + "^{tree}"], "baseline-tree") == BASE_TREE, "base tree identity")
@@ -387,16 +396,27 @@ def main(summary):
         require(inventory(ORACLE, PIN, "oracle-after-" + ordinal) == pinned, "export changed pinned source")
     require((OUTPUT / "export-one.json").read_bytes() == (OUTPUT / "export-two.json").read_bytes(),
             "two actual fresh source outputs are not byte-identical")
+    phase_paths = ["src/phase-tree.ts", "src/phase-manager.ts", "src/phases/turn-start-phase.ts",
+        "src/phases/move-phase.ts", "src/phases/move-effect-phase.ts", "src/phases/faint-phase.ts",
+        "src/phases/victory-phase.ts", "src/field/pokemon.ts", "src/battle-scene.ts",
+        "src/data/elite-redux/archetypes/ability-meta-consumers.ts"]
+    phase_pins = FULL / "phase-source-pins.json"
+    phase_pins.write_text(json.dumps({"oracle": PIN, "sources": {path: ORACLE_PINS[path]
+        for path in phase_paths}}, sort_keys=True) + "\n", encoding="utf-8")
+    require(phase_pins.stat().st_size <= 32768, "phase source pin bound")
     run(["node", str(ROOT / VERIFIER), str(OUTPUT / "export-one.json"), str(OUTPUT / "export-two.json"),
-         str(OUTPUT / "validation.json")], "independent-data-verification", seconds=60, bound=65536)
+         str(OUTPUT / "validation.json"), str(ORACLE), str(phase_pins)],
+        "independent-data-and-source-queue-verification", seconds=60, bound=65536)
     summary["data_validation"] = json.loads((OUTPUT / "validation.json").read_bytes())
     require(summary["data_validation"].get("status") == "passed", "independent data verifier did not pass")
+    require(inventory(ORACLE, PIN, "oracle-after-queue-verification") == pinned,
+            "oracle changed during actual queue verification")
     require(inventory(ROOT, sha, "candidate-after", candidate=True) == candidate, "candidate changed")
     require(file_fact(ORACLE / INJECTED) == injected, "exporter changed after execution")
     require(file_fact(ORACLE / "assets" / ASSET_PATH, 256 << 10)["sha256"] == summary["tackle_input"]["sha256"],
             "tackle asset changed")
     summary["conservation"] = {"candidate": True, "oracle_after_install": True,
-                               "oracle_after_each_export": True, "injected_exporter": True, "asset": True}
+                               "oracle_after_each_export": True, "oracle_after_queue_verification": True, "injected_exporter": True, "asset": True}
     summary["generated"] = {path.name: file_fact(path, 32768) for path in sorted(OUTPUT.iterdir())}
     require(set(summary["generated"]) == {"export-one.json", "export-two.json", "validation.json"}, "exact output inventory")
     require(sum(row["bytes"] for row in summary["generated"].values()) <= 3 * 32768, "aggregate generated bound")
@@ -426,7 +446,7 @@ def entry():
     COMPACT.mkdir()
     summary = {"schema_version": 1, "source_sha": os.environ.get("GITHUB_SHA"), "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "branch": os.environ.get("GITHUB_REF_NAME"), "event": os.environ.get("GITHUB_EVENT_NAME"), "baseline": BASE, "oracle_sha": PIN,
-        "scope": "two actual initialized registry observations; no activation, gameplay or targeting qualification",
+        "scope": "two actual initialized registry observations plus actual PhaseTree nesting; no gameplay or general neutrality qualification",
         "status": "failed", "limits": {"per_command_seconds": 600, "shared_seconds": 1800,
         "cleanup_reserve_seconds": 20, "data_file_bytes": 32768, "compact_metadata_bytes": 65536}}
     error = None

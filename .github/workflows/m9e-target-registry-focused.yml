@@ -1,7 +1,7 @@
-name: M9E Actual Target Registry Diagnostic
+name: M9E Friendship Phase Source Diagnostic
 on:
   push:
-    branches: [codex/m9e-target-registry-20260909]
+    branches: [codex/m9e-friendship-phase-source-20260909]
 permissions:
   contents: read
 concurrency:
