@@ -5281,6 +5281,10 @@ class FeedbackTests(unittest.TestCase):
         self.configure_recovery_integration_scope()
         original = copy.deepcopy(self.config)
         selection = self.feedback.plan()
+        import m9e_browser_rebind_physical as physical_rebind
+        self.assertTrue(selection["requires_current_browser_rebind_physical"])
+        self.assertEqual(selection["current_browser_rebind_physical_binding"],
+                         physical_rebind.source_binding(self.root, CANDIDATE))
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
         self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 11, 15])
@@ -5329,7 +5333,9 @@ class FeedbackTests(unittest.TestCase):
             path.write_text("bounded synthetic XP source for planner test\n")
         self.config["current_coop_startup_focus"] = copy.deepcopy(coop.POLICY)
         from m9e_browser_rebind import SOURCE_PATHS as browser_rebind_sources
-        for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER, *browser_rebind_sources]:
+        from m9e_browser_rebind_physical import SOURCE_PATHS as physical_rebind_sources
+        for name in [*coop.PRODUCT_PATHS, coop.HELPER, coop.ENTRY_PRODUCER, coop.RTC_PRODUCER,
+                     *browser_rebind_sources, *physical_rebind_sources]:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if not path.exists():
