@@ -190,6 +190,9 @@ pub struct PokemonStateV5 {
     pub nature: er_types::run_ids::NatureId,
     pub effective_nature: er_types::run_ids::NatureId,
     pub friendship: u16,
+    /// None preserves historical unknown state; explicit false is a known source value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pokerus: Option<bool>,
     pub permanent_bonuses: PermanentStatBonuses,
     pub pause_evolutions: bool,
     pub held_items: Vec<HeldItemOwnershipStateV1>,
