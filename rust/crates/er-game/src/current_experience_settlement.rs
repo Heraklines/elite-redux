@@ -22,7 +22,7 @@ use er_state::current_experience_settlement::{
     CurrentLearnMoveBatchV1, CurrentLevelUpChildrenV1, CurrentLevelUpEndV1, CurrentLevelUpV1,
 };
 use er_state::m7_state::{PokemonStateV5, RunStateV3};
-use er_state::m9e_state_v6::GameStateV6;
+use er_state::m9e_state_v6::{GameStateV6, GameStateV6ContentContext};
 use er_types::SafeU53;
 use er_types::battle_ids::MoveId;
 use er_types::battle_model::MoveSlotState;
