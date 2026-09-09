@@ -794,7 +794,8 @@ fn new_run_fresh_profile_is_explicit_and_rejects_nonpristine_accounts() -> Resul
 }
 
 #[test]
-fn public_agent_fresh_profile_forks_and_rejects_invalid_creation_atomically() -> Result<(), Box<dyn Error>> {
+fn public_agent_fresh_profile_forks_and_rejects_invalid_creation_atomically()
+-> Result<(), Box<dyn Error>> {
     let mut create = create_request()?;
     create["params"]["start"]["fresh_profile"] = json!(true);
     create["params"]["start"]["existing_saves"] = json!(true);
@@ -816,14 +817,22 @@ fn public_agent_fresh_profile_forks_and_rejects_invalid_creation_atomically() ->
     let responses = run_cli(&[
         create,
         request("before", "session.snapshot", json!({"session": "current"})),
-        request("fork", "session.fork", json!({"session": "current", "target_session": "forked"})),
+        request(
+            "fork",
+            "session.fork",
+            json!({"session": "current", "target_session": "forked"}),
+        ),
         request("forked", "session.snapshot", json!({"session": "forked"})),
         legacy,
         replica,
         mistyped,
         request("after", "session.snapshot", json!({"session": "current"})),
         retry,
-        request("retry-snapshot", "session.snapshot", json!({"session": "rejected"})),
+        request(
+            "retry-snapshot",
+            "session.snapshot",
+            json!({"session": "rejected"}),
+        ),
     ])?;
     for index in [0, 1, 2, 3, 7, 8, 9] {
         result(&responses[index])?;
@@ -840,6 +849,13 @@ fn public_agent_fresh_profile_forks_and_rejects_invalid_creation_atomically() ->
         return Err("agent fresh Title absent".into());
     };
     assert_eq!(bootstrap.control.kind, GameControlKindV2::Title);
-    assert_eq!(bootstrap.current_friendship_profile.ok_or("agent accounts absent")?.accounts.len(), 1450);
+    assert_eq!(
+        bootstrap
+            .current_friendship_profile
+            .ok_or("agent accounts absent")?
+            .accounts
+            .len(),
+        1450
+    );
     Ok(())
 }
