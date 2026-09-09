@@ -734,6 +734,7 @@ fn pokemon_state(id: u64, owner: Option<SeatId>) -> TestResult<PokemonStateV5> {
         },
         ivs: [Iv::new(31)?; 6],
         gender: None,
+        pokerus: None,
         nature: NatureId::new(0),
         effective_nature: NatureId::new(0),
         friendship: 70,

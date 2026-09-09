@@ -62,6 +62,8 @@ pub struct CurrentExperienceRecipientV1 {
     pub hp: u32,
     pub level: u16,
     pub experience: Experience,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pokerus: Option<bool>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -337,6 +339,7 @@ fn recipient_snapshot(
                 hp: pokemon.hp,
                 level: pokemon.level,
                 experience: pokemon.experience,
+                pokerus: pokemon.pokerus,
             })
         })
         .collect()

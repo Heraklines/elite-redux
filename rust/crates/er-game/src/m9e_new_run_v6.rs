@@ -338,6 +338,51 @@ pub fn construct_natural_run_v6_with_pending_experience(
     Ok(state)
 }
 
+/// Explicit resolved starter input, bound to the complete selected entry and its order.
+/// Eligibility in the source starter profile remains the caller's responsibility.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentStarterPokerusV1 {
+    pub selection: er_types::StarterSelectionV1,
+    pub pokerus: bool,
+}
+
+/// Construct the existing pending-XP run with known starter Pokérus values.
+/// Historical construction retains unknown values; this does not settle XP.
+pub fn construct_natural_run_v6_with_starter_pokerus(
+    bootstrap: &RunBootstrapMachineV1,
+    content: &PreparedGameContentV2,
+    authority_revision: SafeU53,
+    cap_policy: er_state::current_experience_owner::CurrentExperienceCapPolicyV1,
+    starters: &[CurrentStarterPokerusV1],
+) -> Result<GameStateV6, NaturalRunV6Error> {
+    if starters.len() != bootstrap.selections.starters.len()
+        || starters.iter().zip(&bootstrap.selections.starters).any(|(resolved, selected)| {
+            resolved.selection != *selected
+        })
+    {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let mut state = construct_natural_run_v6_with_pending_experience(
+        bootstrap, content, authority_revision, cap_policy,
+    )?;
+    let run = state.active_run.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
+    if run.party.len() != starters.len() {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    for (pokemon, starter) in run.party.iter_mut().zip(starters) {
+        if pokemon.owner_seat != Some(starter.selection.owner_seat)
+            || pokemon.species_id.get() != starter.selection.species_id
+            || pokemon.form_index != starter.selection.form_index
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        pokemon.pokerus = Some(starter.pokerus);
+    }
+    state.validate_with(content).map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    Ok(state)
+}
+
 /// Historical fixture expansion. Current owned setup supplies both seats' choices.
 pub fn expand_cooperative_topology_v6(
     state: &mut GameStateV6,
@@ -919,6 +964,7 @@ fn pokemon(
         },
         ivs,
         gender: None,
+        pokerus: None,
         nature: nature.id,
         effective_nature: nature.id,
         friendship: progression.base_friendship,
