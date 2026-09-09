@@ -93,7 +93,7 @@ class GeneratedXpTests(unittest.TestCase):
         paths = [*feedback.RECOVERY_PATHS, *generated.PATHS]
         config = {**copy.deepcopy(legacy), **copy.deepcopy(self.config)}
         config["current_recovery_integration"]["paths"] = paths
-        self.assertEqual(len(paths), 111)
+        self.assertEqual(len(paths), 116)
         self.assertEqual(len(set(paths)), 111)
         self.assertEqual(feedback.select_recovery_scope(config, paths), (True, True))
         for changed in (feedback.RECOVERY_PATHS, paths[:-1], [*paths[:-1], paths[0]],
@@ -278,7 +278,7 @@ class AggregateEnvelopeTests(unittest.TestCase):
                       {"phase": "native"}, {"phase": "aggregate", "tests": {"passed": 1}}):
             self.assertIs(self.phases.pack_aggregate_proof(value), value)
         with self.assertRaises(RuntimeError):
-            self.phases.write_bounded(self.path, {"phase": "platform", "metadata": "x" * 65536})
+            self.phases.write_bounded(self.path, {"phase": "platform", "metadata": "x" * 196608})
 
     def test_aggregate_envelope_rejects_field_type_size_unknown_version_and_base64_mutations(self):
         good = self.envelope(self.phases.encoded(self.proof()))

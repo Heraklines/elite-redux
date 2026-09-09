@@ -31,8 +31,20 @@ NATIVE_COMPRESSED_PROOF_ENCODING = "native-proof-zlib-indices-v3"
 AGGREGATE_ENCODING = "aggregate-proof-zlib-v1"
 AGGREGATE_DECODED_LIMIT = 196608
 AGGREGATE_INLINE_LIMIT = 49152
+PLATFORM_ENCODING = "platform-proof-zlib-v1"
+PLATFORM_DECODED_LIMIT = 196608
+PLATFORM_INLINE_LIMIT = MANIFEST_LIMIT
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "physical_rebind_0": "src/rust-browser/adapters/current-rtc-transport-v2.ts",
+    "physical_rebind_1": "src/rust-browser/routes/rust-current-rtc-rebind-entry.ts",
+    "physical_rebind_2": "test/browser/rust-browser/m9e-v7-rebind-rtc.spec.ts",
+    "physical_rebind_3": "test/browser/rust-browser/m9e-v7-rebind-rtc-transport.spec.ts",
+    "physical_rebind_4": "test/browser/rust-browser/m9e-v7-rebind-rtc-owner.spec.ts",
+    "physical_rebind_5": "scripts/ci/m9e_browser_rebind_physical.py",
+    "physical_rebind_6": "scripts/ci/test_m9e_browser_rebind_physical.py",
+    "physical_rebind_7": "scripts/ci/fixtures/m9e-browser-rebind-physical-proof.json",
+    "physical_rebind_8": "scripts/ci/test_m9e_platform_envelope.py",
     "standard_score_library": "rust/crates/er-ai/src/lib.rs",
     "standard_score_module": "rust/crates/er-ai/src/m9e_standard_attack_score.rs",
     "standard_score_tests": "rust/crates/er-ai/tests/m9e_standard_attack_score.rs",
@@ -337,8 +349,50 @@ def unpack_aggregate_proof(value):
     return proof
 
 
+def pack_platform_proof(value):
+    """Lossless platform envelope; complete evidence and the 64 KiB wire cap remain."""
+    if not isinstance(value, dict) or value.get("phase") != "platform":
+        return value
+    raw = encoded(value)
+    if "encoding" in value or len(raw) > PLATFORM_DECODED_LIMIT:
+        raise RuntimeError("platform semantic proof exceeds its bound or nests an encoding")
+    if len(raw) <= PLATFORM_INLINE_LIMIT:
+        return value
+    return {"encoding": PLATFORM_ENCODING, "decoded_bytes": len(raw),
+            "data": base64.b64encode(zlib.compress(raw, level=9)).decode("ascii")}
+
+
+def unpack_platform_proof(value):
+    if not isinstance(value, dict) or value.get("encoding") != PLATFORM_ENCODING:
+        return value
+    if set(value) != {"encoding", "decoded_bytes", "data"}:
+        raise RuntimeError("platform envelope fields are invalid")
+    size, text = value["decoded_bytes"], value["data"]
+    if (type(size) is not int or not 0 < size <= PLATFORM_DECODED_LIMIT
+            or not isinstance(text, str) or not text or len(text) > MANIFEST_LIMIT
+            or len(encoded(value)) > MANIFEST_LIMIT):
+        raise RuntimeError("platform envelope bounds are invalid")
+    try:
+        compressed = base64.b64decode(text, validate=True)
+        if base64.b64encode(compressed).decode("ascii") != text:
+            raise ValueError("noncanonical base64")
+        stream = zlib.decompressobj()
+        raw = stream.decompress(compressed, size + 1)
+        if len(raw) != size or not stream.eof or stream.unused_data or stream.unconsumed_tail:
+            raise ValueError("incomplete, trailing or oversized zlib stream")
+        def invalid_constant(text):
+            raise ValueError("non-finite platform JSON number " + text)
+        proof = json.loads(raw, parse_constant=invalid_constant)
+        if (not isinstance(proof, dict) or proof.get("phase") != "platform"
+                or "encoding" in proof or encoded(proof) != raw):
+            raise ValueError("noncanonical or nested platform JSON")
+    except (ValueError, UnicodeError, RecursionError, binascii.Error, zlib.error) as error:
+        raise RuntimeError("platform envelope payload is invalid or exceeds its bound") from error
+    return proof
+
+
 def write_bounded(path, value):
-    data = encoded(pack_aggregate_proof(pack_native_inventory(value)))
+    data = encoded(pack_platform_proof(pack_aggregate_proof(pack_native_inventory(value))))
     if len(data) > MANIFEST_LIMIT:
         raise RuntimeError("phase manifest exceeds 64 KiB")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -355,7 +409,7 @@ def read_bounded(path, expected_hash):
         raise RuntimeError("phase manifest size changed while reading")
     if sha(data) != expected_hash:
         raise RuntimeError("phase manifest digest mismatch")
-    return unpack_native_ids(unpack_aggregate_proof(json.loads(data)))
+    return unpack_native_ids(unpack_platform_proof(unpack_aggregate_proof(json.loads(data))))
 
 
 def pack_native_ids(value):
@@ -1125,6 +1179,8 @@ def validate_platform(proof, native, native_hash):
     coop.validate_platform(proof, native, ROOT)
     import m9e_browser_rebind as browser_rebind
     browser_rebind.validate_platform(proof, native, ROOT)
+    import m9e_browser_rebind_physical as physical_rebind
+    physical_rebind.validate_platform(proof, native, ROOT)
     if "plan" in proof and proof["plan"] != plan:
         raise RuntimeError("platform duplicated plan differs from its bound native plan")
     from m9e_current_proposal import validate_obligations
@@ -1253,6 +1309,9 @@ def platform(feedback):
     if native["plan"].get("requires_current_browser_rebind"):
         import m9e_browser_rebind as browser_rebind
         summary["current_browser_rebind"] = browser_rebind.execute_platform(feedback, summary)
+    if native["plan"].get("requires_current_browser_rebind_physical"):
+        import m9e_browser_rebind_physical as physical_rebind
+        summary["current_browser_rebind_physical"] = physical_rebind.execute_platform(feedback, summary)
     summary["status"] = "passed"
     summary = reference_platform_plan(summary, native, native_hash)
     proof_hash = write_bounded(source / "platform/platform.json", summary)
@@ -1323,7 +1382,7 @@ def aggregate(feedback):
             "tests": totals, "selected_test_ids_sha256": native["selected_test_ids_sha256"],
             "native_timer_parity_digest": native["native_timer_parity_digest"],
             "required_native_target_counts": native["required_native_target_counts"],
-            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
+            **{key: result[key] for key in ("wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "current_browser_rebind_physical", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests") if key in result},
             **{key: native[key] for key in ("timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe") if key in native},
             **{key: third[key] for key in ("rule_worker",) if key in third},
             **campaign_replay.aggregate_reference(fourth, os.environ["M9E_NATIVE_D_MANIFEST_SHA256"]),
@@ -1354,7 +1413,7 @@ def compact_storage_evidence(compact, full_hash):
 def compact_worker_evidence(compact, full_hash):
     # Native and browser worker bytes, profiles and hashes stay in the full proof.
     # The bounded result index may refer to each exact field of that same proof.
-    for key in ("current_browser_rebind", "worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
+    for key in ("current_browser_rebind", "current_browser_rebind_physical", "worker_executables", "browser_worker_assets", "cli_executable", "browser_assets", "browser_current_repro_bridge", "browser_worker_tests"):
         if len(encoded(compact)) <= 16000:
             break
         if key in compact:
@@ -1368,7 +1427,7 @@ def compact_summary(summary, full_hash, timings):
         "phase", "status", "qualification", "product_sha", "identity", "tests", "current_coop_startup", "natural_campaign_replay", "natural_cooperative_campaign",
         "required_native_target_counts", "selected_test_ids_sha256", "inventory_sha256", "plan_sha256",
         "native_manifest_sha256", "native_b_manifest_sha256", "native_c_manifest_sha256", "native_d_manifest_sha256", "native_e_manifest_sha256", "native_f_manifest_sha256", "platform_manifest_sha256",
-        "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
+        "native_timer_parity_digest", "wasm_tests", "browser_tests", "browser_assets", "browser_current_repro_bridge", "browser_worker_assets", "browser_worker_tests", "browser_worker_codec", "current_browser_rebind", "current_browser_rebind_physical", "browser_rtc_assets", "browser_rtc_tests", "current_storage_node", "current_storage_browser", "worker_storage_assets", "worker_storage_tests", "title_storage_assets", "title_storage_oracle", "title_storage_tests",
         "cli_executable", "worker_executables", "content_manifest_hash", "native_target_timing_ms", "timer_mutant", "replica_mutant", "ledger_mutant", "current_cost_probe", "rule_worker") if key in summary}
     compact.update({"phase_summary_sha256": full_hash, "timing_ms": timings})
     if pack_aggregate_proof(summary) is not summary:

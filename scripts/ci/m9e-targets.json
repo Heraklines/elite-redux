@@ -105,6 +105,11 @@
       "rust/crates/er-ai/tests/m9e_standard_attack_score.rs",
       "rust/crates/er-game/src/lib.rs",
       "rust/crates/er-game/src/m9e_ai_score_query.rs",
+      "src/rust-browser/adapters/current-rtc-transport-v2.ts",
+      "src/rust-browser/routes/rust-current-rtc-rebind-entry.ts",
+      "test/browser/rust-browser/m9e-v7-rebind-rtc.spec.ts",
+      "test/browser/rust-browser/m9e-v7-rebind-rtc-transport.spec.ts",
+      "test/browser/rust-browser/m9e-v7-rebind-rtc-owner.spec.ts",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -688,7 +693,12 @@
     "scripts/ci/test_m9e_browser_rebind.py",
     "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
     "scripts/ci/fixtures/m9e-six-lane-aggregate-proof.json",
-    "scripts/ci/m9e_standard_score_oracle.mjs"
+    "scripts/ci/m9e_standard_score_oracle.mjs",
+    "scripts/build-kernel-m9e-v7-web.mjs",
+    "scripts/ci/m9e_browser_rebind_physical.py",
+    "scripts/ci/test_m9e_browser_rebind_physical.py",
+    "scripts/ci/fixtures/m9e-browser-rebind-physical-proof.json",
+    "scripts/ci/test_m9e_platform_envelope.py"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"

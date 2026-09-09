@@ -5230,7 +5230,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 104)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 109)
         self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
@@ -11403,7 +11403,7 @@ class OwnedFoundationContractTests(unittest.TestCase):
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 73)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 79)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)
