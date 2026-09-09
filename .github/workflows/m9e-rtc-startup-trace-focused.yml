@@ -1,0 +1,38 @@
+name: M9E Existing RTC Failure Trace Metadata
+on:
+  push:
+    branches: [codex/m9e-rtc-startup-trace-20260909]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Start bounded metadata budget before checkout
+        run: echo "M9E_FOCUS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            scripts/ci/m9e_rtc_trace_diagnostic.py
+            .github/workflows/m9e-rtc-startup-trace-focused.yml
+          sparse-checkout-cone-mode: false
+      - name: Inspect only the existing failed trace remotely
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/m9e_rtc_trace_diagnostic.py
+      - name: Bounded timing metadata only
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-rtc-startup-trace-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-rtc-startup-trace/summary.json
+          if-no-files-found: error
+          retention-days: 14
