@@ -125,7 +125,17 @@ def main(summary):
         argv = ["cargo", "test", "--manifest-path", "rust/Cargo.toml", "--locked", "-p", crate,
                 "--test", target, "--", "--test-threads=1"]
         output = run(argv, "native-" + target).read_text()
-        actual = re.findall(r"^test ([A-Za-z0-9_:]+) \.\.\. ok$", output, re.M)
+        # A spawned native CLI inherits stderr and may split libtest's result line.
+        # Match each serial test start and its terminal status, keeping all IDs exact.
+        starts = list(re.finditer(r"^test ([A-Za-z0-9_:]+) \.\.\. ", output, re.M))
+        actual = []
+        for index, start in enumerate(starts):
+            end = starts[index + 1].start() if index + 1 < len(starts) else output.index("test result:", start.end())
+            body = output[start.end():end].rstrip()
+            if body == "ok" or body.endswith("\nok"):
+                actual.append(start.group(1))
+        if len(starts) != len(ids):
+            raise RuntimeError(f"actual integration test starts differ: {target}")
         expected = f"test result: ok. {len(ids)} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;"
         if sorted(actual) != sorted(ids) or output.count(expected) != 1:
             raise RuntimeError(f"complete actual integration target differs: {target}")
