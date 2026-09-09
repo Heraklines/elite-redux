@@ -51,6 +51,8 @@ pub(crate) enum CurrentStart {
         local_is_host: bool,
         #[serde(default)]
         existing_saves: bool,
+        #[serde(default)]
+        fresh_profile: bool,
     },
     Snapshot {
         snapshot: Box<CoreGameKernelSnapshotV7>,
@@ -363,17 +365,40 @@ impl CurrentStart {
                 save_slots,
                 local_is_host,
                 existing_saves,
+                fresh_profile,
             } => {
-                let mut session = CurrentGameSession::natural_start(
-                    *profile,
-                    seed,
-                    owner_seat,
-                    save_slots,
-                    local_is_host,
-                    content,
-                    None,
-                )
-                .map_err(backend)?;
+                let mut session = if fresh_profile {
+                    if !local_is_host {
+                        return Err(backend("fresh profile requires the solo authority"));
+                    }
+                    CurrentGameSession::natural_start_with_fresh_friendship(
+                        er_kernel::game_kernel_v7::FreshFriendshipStartV7 {
+                            profile: *profile,
+                            seed,
+                            local_seat: owner_seat,
+                            save_slots,
+                            content,
+                            scheduler: er_kernel::snapshot::KernelSchedulerSnapshotV2 {
+                                next_timer_id: Some(SafeU53::ZERO),
+                                timers: Vec::new(),
+                                pauses: Vec::new(),
+                                disposed: false,
+                            },
+                        },
+                    )
+                    .map_err(backend)?
+                } else {
+                    CurrentGameSession::natural_start(
+                        *profile,
+                        seed,
+                        owner_seat,
+                        save_slots,
+                        local_is_host,
+                        content,
+                        None,
+                    )
+                    .map_err(backend)?
+                };
                 if existing_saves {
                     session.enable_current_title_storage().map_err(backend)?;
                 }

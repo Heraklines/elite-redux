@@ -792,3 +792,54 @@ fn new_run_fresh_profile_is_explicit_and_rejects_nonpristine_accounts() -> Resul
     }
     Ok(())
 }
+
+#[test]
+fn public_agent_fresh_profile_forks_and_rejects_invalid_creation_atomically() -> Result<(), Box<dyn Error>> {
+    let mut create = create_request()?;
+    create["params"]["start"]["fresh_profile"] = json!(true);
+    create["params"]["start"]["existing_saves"] = json!(true);
+    let mut legacy = create.clone();
+    legacy["id"] = json!("legacy");
+    legacy["params"]["session"] = json!("rejected");
+    legacy["params"]["start"]["profile"]["statistics"]["runs_started"] = json!(1);
+    let mut replica = create.clone();
+    replica["id"] = json!("replica");
+    replica["params"]["session"] = json!("rejected");
+    replica["params"]["start"]["local_is_host"] = json!(false);
+    let mut mistyped = create.clone();
+    mistyped["id"] = json!("mistyped");
+    mistyped["params"]["session"] = json!("rejected");
+    mistyped["params"]["start"]["fresh_profile"] = json!("true");
+    let mut retry = create.clone();
+    retry["id"] = json!("retry");
+    retry["params"]["session"] = json!("rejected");
+    let responses = run_cli(&[
+        create,
+        request("before", "session.snapshot", json!({"session": "current"})),
+        request("fork", "session.fork", json!({"session": "current", "target_session": "forked"})),
+        request("forked", "session.snapshot", json!({"session": "forked"})),
+        legacy,
+        replica,
+        mistyped,
+        request("after", "session.snapshot", json!({"session": "current"})),
+        retry,
+        request("retry-snapshot", "session.snapshot", json!({"session": "rejected"})),
+    ])?;
+    for index in [0, 1, 2, 3, 7, 8, 9] {
+        result(&responses[index])?;
+    }
+    for index in [4, 5, 6] {
+        assert!(!responses[index]["error"].is_null());
+        assert!(responses[index]["result"].is_null());
+    }
+    let before = snapshot(&responses[1])?;
+    assert_eq!(snapshot(&responses[3])?, before);
+    assert_eq!(snapshot(&responses[7])?, before);
+    assert_eq!(snapshot(&responses[9])?, before);
+    let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = before.lifecycle else {
+        return Err("agent fresh Title absent".into());
+    };
+    assert_eq!(bootstrap.control.kind, GameControlKindV2::Title);
+    assert_eq!(bootstrap.current_friendship_profile.ok_or("agent accounts absent")?.accounts.len(), 1450);
+    Ok(())
+}
