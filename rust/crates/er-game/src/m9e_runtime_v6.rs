@@ -842,15 +842,25 @@ fn execute_battle(
         return Err(GameRuntimeV6Error::Invalid);
     };
     let (transition, observations) = if before.current_targeting.is_some() {
-        let targeting = er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
-            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+        let targeting =
+            er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
         let transition = er_battle::m7_resolver::resolve_turn_v5_with_current_targets(
-            &project_v5(before), commands, &content.battle, authority, &targeting,
-        ).map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            &project_v5(before),
+            commands,
+            &content.battle,
+            authority,
+            &targeting,
+        )
+        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
         let observations = if before.current_battle_participation.is_some() {
-            Some(er_battle::m7_resolver::current_observation_events(&transition)
-                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?)
-        } else { None };
+            Some(
+                er_battle::m7_resolver::current_observation_events(&transition)
+                    .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+            )
+        } else {
+            None
+        };
         (transition, observations)
     } else if before.current_battle_participation.is_some() {
         let (transition, observations) =
@@ -982,40 +992,51 @@ fn battle_command_offer(
             .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
         let mut fight = Vec::new();
         for (index, slot) in pokemon.moves.iter().enumerate() {
-            if slot.is_none() { continue; }
+            if slot.is_none() {
+                continue;
+            }
             let move_slot = er_types::battle_ids::MoveSlotIndex::new(
-                u8::try_from(index).map_err(|_| GameRuntimeV6Error::Action)?)
-                .map_err(|_| GameRuntimeV6Error::Action)?;
+                u8::try_from(index).map_err(|_| GameRuntimeV6Error::Action)?,
+            )
+            .map_err(|_| GameRuntimeV6Error::Action)?;
             let (definition, _) = match er_battle::m7_resolver::effective_move_definition_v5(
-                &content.battle, pokemon, move_slot,
+                &content.battle,
+                pokemon,
+                move_slot,
             ) {
                 Ok(value) => value,
                 Err(er_battle::m7_resolver::BattleV5Error::MoveSlot) => continue,
                 Err(error) => return Err(GameRuntimeV6Error::Domain(error.to_string())),
             };
-            let choices = owner.plan(run, actor, definition).and_then(|plan| plan.selections())
+            let choices = owner
+                .plan(run, actor, definition)
+                .and_then(|plan| plan.selections())
                 .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
             if !choices.is_empty() {
-                fight.push(OfferedMoveCommand::new(move_slot, choices)
-                    .map_err(|_| GameRuntimeV6Error::Action)?);
+                fight.push(
+                    OfferedMoveCommand::new(move_slot, choices)
+                        .map_err(|_| GameRuntimeV6Error::Action)?,
+                );
             }
         }
         fight
-    } else { pokemon
-        .moves
-        .iter()
-        .enumerate()
-        .filter_map(|(index, slot)| {
-            slot.as_ref()?;
-            let move_slot =
-                er_types::battle_ids::MoveSlotIndex::new(u8::try_from(index).ok()?).ok()?;
-            OfferedMoveCommand::new(
-                move_slot,
-                vec![er_types::battle_command::BattleTargetSelection::implicit()],
-            )
-            .ok()
-        })
-        .collect::<Vec<_>>() };
+    } else {
+        pokemon
+            .moves
+            .iter()
+            .enumerate()
+            .filter_map(|(index, slot)| {
+                slot.as_ref()?;
+                let move_slot =
+                    er_types::battle_ids::MoveSlotIndex::new(u8::try_from(index).ok()?).ok()?;
+                OfferedMoveCommand::new(
+                    move_slot,
+                    vec![er_types::battle_command::BattleTargetSelection::implicit()],
+                )
+                .ok()
+            })
+            .collect::<Vec<_>>()
+    };
     let switches = run
         .party
         .iter()
@@ -2696,7 +2717,11 @@ fn adopt_v5_with_participation(
     let candidate = GameStateV6 {
         current_battle_participation: participation,
         current_friendship_profile: before.current_friendship_profile.clone(),
-        current_targeting: if after.active_run.is_some() { before.current_targeting } else { None },
+        current_targeting: if after.active_run.is_some() {
+            before.current_targeting
+        } else {
+            None
+        },
         current_run_difficulty: if after.active_run.is_some() {
             before.current_run_difficulty
         } else {

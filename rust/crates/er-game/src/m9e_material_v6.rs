@@ -468,7 +468,11 @@ pub fn apply_game_material_v6_with_retention(
     // erase or invent it; a true terminal transition may retire the run owner.
     if let Some(prior) = live.as_ref() {
         let same_run = prior.active_run.as_ref().map(|run| run.run_id)
-            == transition.after_state.active_run.as_ref().map(|run| run.run_id);
+            == transition
+                .after_state
+                .active_run
+                .as_ref()
+                .map(|run| run.run_id);
         if (same_run && prior.current_targeting != transition.after_state.current_targeting)
             || (!same_run && transition.after_state.current_targeting.is_some())
         {

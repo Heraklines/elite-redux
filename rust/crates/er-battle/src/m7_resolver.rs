@@ -26,6 +26,7 @@ use er_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::current_target_execution::CurrentTargetExecution;
 use crate::m6::bespoke::handlers_for;
 use crate::m6::routine_executor::execute_after_damage_actor_hook_v2;
 use crate::m6::{
@@ -33,7 +34,6 @@ use crate::m6::{
     execute_query_v2,
 };
 use crate::resolver::BattleMutation;
-use crate::current_target_execution::CurrentTargetExecution;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -274,11 +274,24 @@ fn resolve_turn_v5_inner(
             // redirection here; unrelated source Faint child hooks remain outside
             // this current resolver's qualified damage/phase scope.
             for mutation in &mutations[mutation_before..] {
-                if let BattleMutation::HpChanged { pokemon, before, after } = mutation {
-                    if *before == 0 || *after != 0 { continue; }
-                    for queued in &mut pending[index+1..] {
+                if let BattleMutation::HpChanged {
+                    pokemon,
+                    before,
+                    after,
+                } = mutation
+                {
+                    if *before == 0 || *after != 0 {
+                        continue;
+                    }
+                    for queued in &mut pending[index + 1..] {
                         if let Some(retained) = &mut queued.current_targets {
-                            owner.retarget_pending_after_faint(run, *pokemon, queued.command.actor(), retained)
+                            owner
+                                .retarget_pending_after_faint(
+                                    run,
+                                    *pokemon,
+                                    queued.command.actor(),
+                                    retained,
+                                )
                                 .map_err(|_| BattleV5Error::Target)?;
                         }
                     }
@@ -370,7 +383,10 @@ pub fn resolve_turn_v5_with_current_observations(
 /// Preserve the mutation-order observation projection for either resolver.
 pub fn current_observation_events(
     transition: &BattleTransitionV5,
-) -> Result<Vec<er_state::current_battle_participation::CurrentBattleObservationEventV1>, BattleV5Error> {
+) -> Result<
+    Vec<er_state::current_battle_participation::CurrentBattleObservationEventV1>,
+    BattleV5Error,
+> {
     use er_state::current_battle_participation::{
         CurrentBattleObservationEventV1, MAX_CURRENT_PARTICIPATION_EVENTS_V1,
     };
@@ -484,10 +500,21 @@ fn build_actions(
             }
         };
         let current_targets = match (&command, targeting) {
-            (BattleCommand::Fight { actor: actor_id, move_slot, targets }, Some(owner)) => {
+            (
+                BattleCommand::Fight {
+                    actor: actor_id,
+                    move_slot,
+                    targets,
+                },
+                Some(owner),
+            ) => {
                 let (definition, _) = effective_move_definition_v5(content, actor, *move_slot)?;
-                Some(owner.plan(run, *actor_id, definition)
-                    .and_then(|plan| plan.retain(targets)).map_err(|_| BattleV5Error::Target)?)
+                Some(
+                    owner
+                        .plan(run, *actor_id, definition)
+                        .and_then(|plan| plan.retain(targets))
+                        .map_err(|_| BattleV5Error::Target)?,
+                )
             }
             _ => None,
         };
@@ -622,8 +649,11 @@ fn execute_move(
         .clone();
     let (definition, struggle) = effective_move_definition_v5(content, &actor_snapshot, move_slot)?;
     let current_target_slots = match (targeting, retained_targets) {
-        (Some(owner), Some(retained)) => Some(owner.execution_targets(run, actor_id, definition, retained)
-            .map_err(|_| BattleV5Error::Target)?),
+        (Some(owner), Some(retained)) => Some(
+            owner
+                .execution_targets(run, actor_id, definition, retained)
+                .map_err(|_| BattleV5Error::Target)?,
+        ),
         (None, None) => None,
         _ => return Err(BattleV5Error::Target),
     };
@@ -1102,8 +1132,17 @@ pub fn query_simulated_move_damage_with_current_targets(
     target_slot: FieldSlot,
     targeting: &CurrentTargetExecution<'_>,
 ) -> Result<u32, BattleV5Error> {
-    targeting.validate_run(run).map_err(|_| BattleV5Error::UnsupportedContent)?;
-    query_simulated_move_damage_inner(content, run, source_slot, move_slot, target_slot, Some(targeting))
+    targeting
+        .validate_run(run)
+        .map_err(|_| BattleV5Error::UnsupportedContent)?;
+    query_simulated_move_damage_inner(
+        content,
+        run,
+        source_slot,
+        move_slot,
+        target_slot,
+        Some(targeting),
+    )
 }
 
 fn query_simulated_move_damage_inner(
@@ -1333,9 +1372,17 @@ fn current_or_legacy_sources(
 ) -> Result<Vec<BehaviorSourceId>, BattleV5Error> {
     let mut sources = active_sources(actor, move_id);
     if let Some(owner) = targeting {
-        sources.retain(|source| !matches!(source,
-            BehaviorSourceId::ActiveAbility { .. } | BehaviorSourceId::PassiveAbility { .. }));
-        sources.extend(owner.ability_sources(run, actor).map_err(|_| BattleV5Error::UnsupportedContent)?);
+        sources.retain(|source| {
+            !matches!(
+                source,
+                BehaviorSourceId::ActiveAbility { .. } | BehaviorSourceId::PassiveAbility { .. }
+            )
+        });
+        sources.extend(
+            owner
+                .ability_sources(run, actor)
+                .map_err(|_| BattleV5Error::UnsupportedContent)?,
+        );
         sources.sort();
         sources.dedup();
     }

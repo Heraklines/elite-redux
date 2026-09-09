@@ -197,10 +197,13 @@ impl GameStateV6 {
             let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
             // Shared canonical account ownership is supplied by the separately
             // qualified fresh-profile prerequisite, never by a private copy.
-            let profile = self.current_friendship_profile.as_ref()
+            let profile = self
+                .current_friendship_profile
+                .as_ref()
                 .ok_or(GameStateV6Error::Invalid)?;
             if !crate::current_targeting::matches_current_target_content(&self.content_identity)
-                || owner.run_id != run.run_id || owner.mode != run.mode
+                || owner.run_id != run.run_id
+                || owner.mode != run.mode
                 || owner.profile_owner != profile.owner_seat
                 || profile.content_identity != self.content_identity
                 || self.current_run_difficulty.is_none()
@@ -268,9 +271,15 @@ impl GameStateV6 {
         {
             return Err(GameStateV6Error::Content);
         }
-        if self.current_targeting.is_some_and(|owner| !content.supports_current_targeting_mode(owner.mode)
-            || self.active_run.as_ref().is_some_and(|run| run.party.iter().any(|pokemon|
-                !content.current_targeting_form_matches(pokemon.species_id, pokemon.form_index)))) {
+        if self.current_targeting.is_some_and(|owner| {
+            !content.supports_current_targeting_mode(owner.mode)
+                || self.active_run.as_ref().is_some_and(|run| {
+                    run.party.iter().any(|pokemon| {
+                        !content
+                            .current_targeting_form_matches(pokemon.species_id, pokemon.form_index)
+                    })
+                })
+        }) {
             return Err(GameStateV6Error::Content);
         }
         if &self.content_identity != content.identity() {

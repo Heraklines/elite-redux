@@ -238,9 +238,13 @@ pub fn construct_natural_run_v6(
         // Fresh source GameMode construction owns the empty challenge set. This
         // path also owns empty per-Pokemon overrides and atomic field membership;
         // loaded states without the retained admission cannot acquire those facts.
-        if mode.key != "CLASSIC" || mode.cooperative || mode.challenge_selection
-            || !mode.supported || !bootstrap.selections.choices.is_empty()
-            || shared.owner_seat != owner || shared.content_identity != *content.identity()
+        if mode.key != "CLASSIC"
+            || mode.cooperative
+            || mode.challenge_selection
+            || !mode.supported
+            || !bootstrap.selections.choices.is_empty()
+            || shared.owner_seat != owner
+            || shared.content_identity != *content.identity()
         {
             return Err(NaturalRunV6Error::Invalid);
         }
