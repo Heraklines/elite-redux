@@ -687,7 +687,8 @@
     "scripts/ci/m9e_friendship_inputs.py",
     "scripts/ci/test_m9e_browser_rebind.py",
     "scripts/ci/fixtures/m9e-browser-rebind-proof.json",
-    "scripts/ci/fixtures/m9e-six-lane-aggregate-proof.json"
+    "scripts/ci/fixtures/m9e-six-lane-aggregate-proof.json",
+    "scripts/ci/m9e_standard_score_oracle.mjs"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"
