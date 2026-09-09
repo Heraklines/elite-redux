@@ -103,6 +103,74 @@ async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
     for (const page of [left, right]) page.on("worker", worker => workers.push(worker.url()));
     await Promise.all([left.goto(address), right.goto(address)]);
     await Promise.all([left, right].map((page, index) => page.evaluate(async ({ entry, path, assets, source, workerHash }) => {
+      // Diagnostic-only observers never retain payloads, modify events, or await.
+      const journal: { t: number; event: string; owner: number; kind?: string; q?: number; a?: number }[] = [];
+      let overflow = false; let active = true; let owners = 0;
+      const started = performance.now();
+      const note = (event: string, owner: number, fields: { kind?: string; q?: number; a?: number } = {}) => {
+        if (!active) return;
+        if (journal.length >= 96) { overflow = true; return; }
+        journal.push({ t: Math.round((performance.now() - started) * 1000) / 1000, event, owner, ...fields });
+      };
+      const metadata = (data: unknown, rtc = false): { kind?: string; q?: number; a?: number } => {
+        if (!active) return {};
+        try {
+          let value: any = data;
+          if (data instanceof ArrayBuffer) {
+            if (data.byteLength > (rtc ? 4096 : 65536)) return { kind: "OVERSIZE_UNINSPECTED" };
+            value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(data));
+          }
+          const candidate = rtc ? value?.kind : value?.request?.kind ?? value?.response?.kind ?? value?.kind;
+          const kind = typeof candidate === "string" && /^[A-Z0-9_]{1,64}$/u.test(candidate) ? candidate : "UNCLASSIFIED";
+          return { kind, ...(Number.isSafeInteger(value?.sequence) ? { q: value.sequence } : {}),
+            ...(Number.isSafeInteger(value?.accepted_sequence) ? { a: value.accepted_sequence } : {}) };
+        } catch { return { kind: "UNINSPECTED" }; }
+      };
+      const channels = new WeakMap<RTCDataChannel, number>();
+      const observe = (channel: RTCDataChannel) => {
+        if (channels.has(channel)) return;
+        const owner = ++owners; channels.set(channel, owner);
+        note("rtc-attached", owner, { kind: channel.readyState.toUpperCase() });
+        for (const name of ["open", "close", "error"]) channel.addEventListener(name, () => note(`rtc-${name}`, owner));
+        channel.addEventListener("message", event => note("rtc-message", owner, metadata(event.data, true)));
+      };
+      const NativePeer = RTCPeerConnection;
+      globalThis.RTCPeerConnection = class extends NativePeer {
+        constructor(configuration?: RTCConfiguration) {
+          super(configuration);
+          this.addEventListener("datachannel", event => observe(event.channel));
+        }
+      };
+      const createChannel = NativePeer.prototype.createDataChannel;
+      (NativePeer.prototype as any).createDataChannel = function(this: RTCPeerConnection, ...args: any[]) {
+        const channel = Reflect.apply(createChannel, this, args); observe(channel); return channel;
+      };
+      const send = RTCDataChannel.prototype.send;
+      (RTCDataChannel.prototype as any).send = function(this: RTCDataChannel, ...args: any[]) {
+        note("rtc-send", channels.get(this) ?? 0, metadata(args[0], true));
+        return Reflect.apply(send, this, args);
+      };
+      const NativeWorker = Worker;
+      const workerIds = new WeakMap<Worker, number>();
+      globalThis.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          const owner = ++owners; workerIds.set(this, owner); note("worker-created", owner);
+          this.addEventListener("message", event => note("worker-response", owner, metadata(event.data)));
+          this.addEventListener("error", () => note("worker-error", owner));
+          this.addEventListener("messageerror", () => note("worker-messageerror", owner));
+        }
+      };
+      const post = NativeWorker.prototype.postMessage;
+      (NativeWorker.prototype as any).postMessage = function(this: Worker, ...args: any[]) {
+        note("worker-request", workerIds.get(this) ?? 0, metadata(args[0]));
+        return Reflect.apply(post, this, args);
+      };
+      (globalThis as any).__rtcJournal = () => {
+        active = false;
+        return { journal, overflow, elapsed_ms: performance.now() - started,
+          status: (globalThis as any).__naturalCoop?.peer?.status ?? null };
+      };
       const module = await import(entry);
       const initialization = await (await fetch(path)).json();
       if (initialization.kind !== "NATURAL_COOP") throw new Error("explicit natural setup required");
@@ -195,7 +263,14 @@ async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
     }, delayOffer ? 12_000 : 0);
     const answer = await right.evaluate(offer => (globalThis as any).__naturalCoop.peer.answer(offer), offer);
     await left.evaluate(answer => (globalThis as any).__naturalCoop.peer.accept(answer), answer);
-    await Promise.all([left, right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.ready())));
+    try {
+      await Promise.all([left, right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.peer.ready())));
+    } finally {
+      const journals = await Promise.all([left, right].map(page => page.evaluate(() => (globalThis as any).__rtcJournal())));
+      const bytes = Buffer.from(JSON.stringify({ schema_version: 1, source_sha: manifest.source_sha, journals }));
+      if (bytes.length > 32768) throw new Error("bounded handshake journal exceeds32KiB");
+      await test.info().attach("m9e-rtc-startup-kind-journal", { body: bytes, contentType: "application/json" });
+    }
     return { contexts, left, right, workers };
   } catch (error) { await Promise.allSettled(contexts.map(context => context.close())); throw error; }
 }
