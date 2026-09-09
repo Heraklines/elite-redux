@@ -741,6 +741,7 @@ fn pokemon_state(
         },
         ivs,
         gender: Some(oracle.gender),
+        pokerus: None,
         nature: NatureId::new(
             u8::try_from(oracle.nature).map_err(|error| M9NewRunError::State(error.to_string()))?,
         ),

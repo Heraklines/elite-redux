@@ -1173,3 +1173,239 @@ fn pending_experience_counter_exhaustion_rolls_back_real_enemy_faint() -> TestRe
     }
     Err("bounded real enemy faint never reached the checked XP identity frontier".into())
 }
+
+// Explicit selected Pokérus is an input boundary, not source profile eligibility.
+fn pokerus_selection() -> TestResult<RunBootstrapMachineV1> {
+    let content = content()?;
+    let base = bootstrap(&content)?;
+    for index in 0..64 {
+        let mut selection = base.clone();
+        selection.seed = format!("m9e-pending-experience/{index}");
+        selection.validate()?;
+        let observed = construct_natural_run_v6_with_participation(&selection, &content, safe(1)?)?;
+        let battle = observed
+            .active_run
+            .as_ref()
+            .and_then(|run| run.battle.as_ref())
+            .ok_or("natural battle")?;
+        if battle.enemy_party.iter().all(|pokemon| {
+            content
+                .progression
+                .experience_for_compiled_form(pokemon.species_id, pokemon.form_index)
+                .is_ok()
+        }) {
+            return Ok(selection);
+        }
+    }
+    Err("no naturally resolvable source within 64 constructor seeds".into())
+}
+
+fn pokerus_inputs(
+    selection: &RunBootstrapMachineV1,
+    flags: [bool; 2],
+) -> TestResult<Vec<er_game::m9e_new_run_v6::CurrentStarterPokerusV1>> {
+    assert_eq!(selection.selections.starters.len(), 2);
+    Ok(selection
+        .selections
+        .starters
+        .iter()
+        .zip(flags)
+        .map(
+            |(selection, pokerus)| er_game::m9e_new_run_v6::CurrentStarterPokerusV1 {
+                selection: selection.clone(),
+                pokerus,
+            },
+        )
+        .collect())
+}
+
+fn pokerus_state(flags: [bool; 2]) -> TestResult<GameStateV6> {
+    let selection = pokerus_selection()?;
+    Ok(
+        er_game::m9e_new_run_v6::construct_natural_run_v6_with_starter_pokerus(
+            &selection,
+            content()?.as_ref(),
+            safe(1)?,
+            er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
+            &pokerus_inputs(&selection, flags)?,
+        )?,
+    )
+}
+
+fn pokerus_runtime() -> TestResult<GameRuntimeV6> {
+    let mut runtime = GameRuntimeV6::new(None, content()?, safe(1)?)?;
+    dispatch(
+        &mut runtime,
+        GameActionV1::Bootstrap {
+            action: BootstrapActionV1::Confirm,
+        },
+        GameDomainExecutionInputV1::BootstrapCandidate(pokerus_state([true, false])?),
+    )?;
+    Ok(runtime)
+}
+
+#[test]
+fn selected_pokerus_preserves_all_other_natural_state_and_distinguishes_unknown() -> TestResult {
+    let selection = pokerus_selection()?;
+    let old = er_game::m9e_new_run_v6::construct_natural_run_v6_with_pending_experience(
+        &selection,
+        content()?.as_ref(),
+        safe(1)?,
+        er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
+    )?;
+    let old_bytes = er_canonical::canonical_bytes(&old)?;
+    assert!(!String::from_utf8(old_bytes.clone())?.contains("pokerus"));
+    let source_cases = std::fs::read_to_string(std::env::var("M9E_STARTER_POKERUS_ORACLE")?)?;
+    let rows = source_cases.lines().collect::<Vec<_>>();
+    assert_eq!(rows.len(), 4);
+    for row in rows {
+        let values = row
+            .split('\t')
+            .map(str::parse::<bool>)
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(values.len(), 4);
+        let flags = [values[0], values[1]];
+        let expected_flags = [values[2], values[3]];
+        let current = pokerus_state(flags)?;
+        let roundtrip: GameStateV6 =
+            serde_json::from_slice(&er_canonical::canonical_bytes(&current)?)?;
+        assert_eq!(current, roundtrip);
+        let mut normalized = current.clone();
+        let run = normalized.active_run.as_mut().ok_or("run")?;
+        for (pokemon, expected) in run.party.iter_mut().zip(expected_flags) {
+            assert_eq!(pokemon.pokerus, Some(expected));
+            pokemon.pokerus = None;
+        }
+        assert_eq!(er_canonical::canonical_bytes(&normalized)?, old_bytes);
+    }
+    let mut invalid = serde_json::to_value(&old)?;
+    invalid["active_run"]["party"][0]["pokerus"] = serde_json::json!(1);
+    assert!(serde_json::from_value::<GameStateV6>(invalid).is_err());
+    Ok(())
+}
+
+#[test]
+fn selected_pokerus_rejects_missing_reordered_and_mismatched_whole_selections() -> TestResult {
+    let selection = pokerus_selection()?;
+    let selected = pokerus_inputs(&selection, [true, false])?;
+    let before = er_canonical::canonical_bytes(&selection)?;
+    let mut cases = vec![
+        Vec::new(),
+        vec![selected[0].clone()],
+        vec![selected[1].clone(), selected[0].clone()],
+    ];
+    for field in 0..6 {
+        let mut altered = selected.clone();
+        let value = &mut altered[0].selection;
+        match field {
+            0 => value.pokemon_id = PokemonId::new(safe(999)?),
+            1 => value.species_id = safe(999)?,
+            2 => value.form_index = u16::MAX,
+            3 => value.ability_index = u8::MAX,
+            4 => value.cost = u16::MAX,
+            _ => value.owner_seat = SeatId::new(safe(999)?),
+        }
+        cases.push(altered);
+    }
+    for values in cases {
+        assert!(
+            er_game::m9e_new_run_v6::construct_natural_run_v6_with_starter_pokerus(
+                &selection,
+                content()?.as_ref(),
+                safe(1)?,
+                er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
+                &values,
+            )
+            .is_err()
+        );
+        assert_eq!(er_canonical::canonical_bytes(&selection)?, before);
+    }
+    Ok(())
+}
+
+#[test]
+fn selected_pokerus_reaches_pending_experience_and_survives_real_save_replay() -> TestResult {
+    use er_game::m9e_material_v6::GamePlatformEffectV2;
+    let mut runtime = pokerus_runtime()?;
+    reach_pending_experience(&mut runtime)?;
+    let pending = experience(&runtime)?.clone();
+    assert!(!pending.pending.is_empty());
+    for entry in &pending.pending {
+        assert_eq!(
+            entry
+                .recipients
+                .iter()
+                .map(|value| value.pokerus)
+                .collect::<Vec<_>>(),
+            vec![Some(true), Some(false)]
+        );
+    }
+    let snapshot_bytes = er_canonical::canonical_bytes(&runtime.snapshot())?;
+    let mut replica =
+        GameRuntimeV6::from_snapshot(serde_json::from_slice(&snapshot_bytes)?, content()?)?;
+    let saved = dispatch(
+        &mut runtime,
+        GameActionV1::Save {
+            action: er_types::SaveActionV1::Write {
+                slot: "pokerus-pending".to_owned(),
+            },
+        },
+        GameDomainExecutionInputV1::SaveGeneration(safe(1)?),
+    )?;
+    let bytes = saved
+        .platform_effects
+        .iter()
+        .find_map(|effect| match effect {
+            GamePlatformEffectV2::StorageWrite { bytes, .. } => Some(bytes),
+            _ => None,
+        })
+        .ok_or("actual storage write")?;
+    let decoded = GameSaveV2::decode(bytes)?;
+    assert_eq!(&decoded.encode()?, bytes);
+    assert_eq!(
+        decoded
+            .state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|value| value.experience.as_ref()),
+        Some(&pending)
+    );
+    assert_eq!(
+        replica.apply_material_bytes(&saved.material_bytes)?,
+        GameMaterialApplyOutcomeV6::Applied
+    );
+    assert_eq!(
+        replica.apply_material_bytes(&saved.material_bytes)?,
+        GameMaterialApplyOutcomeV6::DuplicateApplied
+    );
+    assert_eq!(runtime.snapshot(), replica.snapshot());
+    Ok(())
+}
+
+#[test]
+fn pending_experience_rejects_pokerus_changes_and_unknown_substitution() -> TestResult {
+    let mut runtime = pokerus_runtime()?;
+    reach_pending_experience(&mut runtime)?;
+    let original = runtime.state().ok_or("state")?.clone();
+    let before = er_canonical::canonical_bytes(&original)?;
+    for replacement in [None, Some(false)] {
+        let mut altered = original.clone();
+        altered.active_run.as_mut().ok_or("run")?.party[0].pokerus = replacement;
+        assert!(altered.validate_with(content()?.as_ref()).is_err());
+    }
+    let mut altered = original.clone();
+    altered
+        .current_battle_participation
+        .as_mut()
+        .and_then(|owner| owner.experience.as_mut())
+        .ok_or("owner")?
+        .pending[0]
+        .recipients[0]
+        .pokerus = None;
+    assert!(altered.validate_with(content()?.as_ref()).is_err());
+    assert_eq!(
+        er_canonical::canonical_bytes(runtime.state().ok_or("state")?)?,
+        before
+    );
+    Ok(())
+}
