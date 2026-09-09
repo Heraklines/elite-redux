@@ -119,7 +119,7 @@ fn navigate(session: &mut CurrentGameSession, option: &str) -> Result<()> {
             .kernel_ref()?
             .current_control()
             .and_then(|c| c.menu.as_ref())
-            .is_some_and(|m| m.selected_option_id == option)
+            .is_some_and(|m| m.selected_option_id.as_str() == option)
         {
             return Ok(());
         }
