@@ -1,19 +1,19 @@
 import {
   type BrowserRequestV2, type BrowserResponseEnvelopeV2, type BrowserSessionContextV2, type BrowserSessionInitializationV2,
-  type CurrentJsonObject, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2,
+  type CurrentJsonObject, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2, safeCurrentInteger,
 } from "../contracts/browser-contracts-v2";
-import { CurrentRtcTransportV1, type CurrentRtcIdentityV1 } from "../adapters/current-rtc-transport";
+import { CurrentRtcTransportV2, type CurrentRtcIdentityV2 } from "../adapters/current-rtc-transport-v2";
 import { createCurrentDevelopmentWorkerV2, BrowserEffectRouterV2, CurrentWorkerRequestErrorV2, type CurrentRustBrowserHostV2 } from "./rust-current-worker-entry";
 import type { CurrentWorkerAssetsV2 } from "../worker/rust-wasm-loader";
 
-interface CurrentRtcPeerCommonOptionsV1 {
+interface CurrentRtcPeerCommonOptionsV2 {
   assets: CurrentWorkerAssetsV2;
-  identity: CurrentRtcIdentityV1;
+  identity: CurrentRtcIdentityV2;
   context: BrowserSessionContextV2;
   present(effect: GamePresentationEffectV2Wire, signal: AbortSignal): void | Promise<void>;
   frame?(direction: "sent" | "received", generation: number, bytes: Uint8Array): void;
 }
-export type CurrentRtcPeerOptionsV1 = CurrentRtcPeerCommonOptionsV1 & (
+export type CurrentRtcPeerOptionsV2 = CurrentRtcPeerCommonOptionsV2 & (
   | { checkpoint: CurrentJsonObject; natural_start?: never }
   | { checkpoint?: never; natural_start: { profile: CurrentJsonObject; seed: string;
       save_slots: string[]; local_is_host: boolean } }
@@ -27,24 +27,25 @@ interface PendingOperation {
 /** This error means the kernel response already committed but effect delivery
  * failed. It must never cause automatic replay of the original input.
  */
-export class CurrentRtcCommittedDeliveryError extends Error {
+export class CurrentRtcCommittedDeliveryErrorV2 extends Error {
   readonly acceptance = "ACCEPTED";
   constructor(readonly accepted_sequence: number, reason: string) { super(reason); }
 }
 
-/** Additive development owner for an explicitly paired fixed-generation session.
- * Supports checkpoint restore and independent Title setup; no lobby discovery,
- * reconnect manager or production selector.
+/** Explicitly paired development owner with kernel-owned generation rebind.
+ * Signaling stays caller-owned; the kernel admits the rebind and gameplay.
  */
-export class CurrentDevelopmentRtcPeerV1 {
-  readonly #options: CurrentRtcPeerOptionsV1;
+export class CurrentDevelopmentRtcPeerV2 {
+  readonly #options: CurrentRtcPeerOptionsV2;
   readonly #client: CurrentRustBrowserHostV2;
   readonly #router: BrowserEffectRouterV2;
-  readonly #pc: RTCPeerConnection;
+  #pc: RTCPeerConnection;
+  #generation: number;
+  #rebindStarting = false;
   readonly #abort = new AbortController();
   readonly #operations: PendingOperation[] = [];
   readonly #settlements: BrowserResponseEnvelopeV2[] = [];
-  #transport: CurrentRtcTransportV1 | null = null;
+  #transport: CurrentRtcTransportV2 | null = null;
   #operationCount = 0;
   #operationBytes = 0;
   #operationBusy = false;
@@ -65,7 +66,7 @@ export class CurrentDevelopmentRtcPeerV1 {
   #reason: string | null = null;
   #deliveryFailure: { acceptance: "ACCEPTED"; accepted_sequence: number; message: string } | null = null;
 
-  constructor(options: CurrentRtcPeerOptionsV1) {
+  constructor(options: CurrentRtcPeerOptionsV2) {
     if (options.natural_start != null && options.checkpoint != null) throw new Error("current RTC binding does not match one initialization owner");
     const owned = encodeCanonicalJsonV2({ assets: options.assets, identity: options.identity,
       ...(options.natural_start == null ? { checkpoint: options.checkpoint } : { natural_start: options.natural_start }),
@@ -76,6 +77,7 @@ export class CurrentDevelopmentRtcPeerV1 {
     } finally { owned.fill(0); }
     assertCheckpointBinding(options);
     this.#options = options;
+    this.#generation = options.identity.generation;
     this.#pc = new RTCPeerConnection({ iceServers: [] });
     try { this.#client = createCurrentDevelopmentWorkerV2({ assets: options.assets }); }
     catch (error) { this.#pc.close(); throw error; }
@@ -112,6 +114,7 @@ export class CurrentDevelopmentRtcPeerV1 {
 
   get status() {
     return { closed: this.#closed, reason: this.#reason, initialized: this.#initialized,
+      generation: this.#generation, rebindStarting: this.#rebindStarting,
       deliveryFailure: this.#deliveryFailure == null ? null : { ...this.#deliveryFailure },
       pending: this.#operationCount, queuedBytes: this.#operationBytes, disposeAcknowledged: this.#disposeAcknowledged,
       connectedEvents: this.#connectedEvents, disconnectedEvents: this.#disconnectedEvents,
@@ -133,7 +136,7 @@ export class CurrentDevelopmentRtcPeerV1 {
   }
 
   dispatch(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
-    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
+    if (this.#disposing || this.#rebindStarting || !this.#initialized || !["SNAPSHOT", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
       return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot/export scope"));
     }
     if (!["SNAPSHOT", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
@@ -152,6 +155,39 @@ export class CurrentDevelopmentRtcPeerV1 {
       throw new Error("current RTC export did not return its sole current capsule");
     }
     return Uint8Array.from(response.response.batch.effects[0].capsule_bytes);
+  }
+
+  /** Advance only through the kernel's accepted BEGIN after the prior physical
+   * connection is closed and drained. No input or frame is replayed here.
+   */
+  async beginRebind(): Promise<BrowserResponseEnvelopeV2> {
+    if (this.#closed || this.#disposing || !this.#initialized || this.#rebindStarting
+      || this.#operationCount !== 0 || this.#transport?.status.connected) {
+      throw new Error("current RTC rebind requires an idle disconnected owner");
+    }
+    this.#rebindStarting = true;
+    let replacement: RTCPeerConnection | null = null;
+    try {
+      await this.closeTransport();
+      replacement = new RTCPeerConnection({ iceServers: [] });
+      const response = await this.#enqueue({ kind: "COOP_REBIND", control: { kind: "BEGIN" } });
+      if (response.response.kind !== "REBIND") throw new Error("current RTC BEGIN response differs");
+      this.#pc.removeEventListener("datachannel", this.#onDataChannel);
+      this.#pc = replacement; replacement = null;
+      this.#transport = null;
+      this.#generation = response.response.output.generation;
+      this.#signalingStarted = false;
+      this.#pc.addEventListener("datachannel", this.#onDataChannel);
+      return response;
+    } finally { replacement?.close(); this.#rebindStarting = false; }
+  }
+
+  /** Retransmit the kernel's retained control after the new pair is ready. */
+  retryRebind(): Promise<BrowserResponseEnvelopeV2> {
+    if (this.#closed || this.#disposing || this.#rebindStarting || !this.#initialized || !this.#transport?.status.connected) {
+      return Promise.reject(new Error("current RTC rebind retry requires a ready generation"));
+    }
+    return this.#enqueue({ kind: "COOP_REBIND", control: { kind: "RETRY" } });
   }
 
   #enqueue(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
@@ -175,7 +211,7 @@ export class CurrentDevelopmentRtcPeerV1 {
 
   async offer(): Promise<string> {
     this.#startSignaling();
-    const channel = this.#pc.createDataChannel("er-current-development-v2", { ordered: true, protocol: "er-current-v2" });
+    const channel = this.#pc.createDataChannel("er-current-development-rebind-v2", { ordered: true, protocol: "er-current-rebind-v2" });
     try {
       await boundedOperation(this.#pc.setLocalDescription(await boundedOperation(this.#pc.createOffer(), this.#abort.signal)), this.#abort.signal);
       await this.#waitIce();
@@ -214,9 +250,9 @@ export class CurrentDevelopmentRtcPeerV1 {
   sendFrame(generation: number, bytes: Uint8Array): Promise<void> {
     if (this.#closed || this.#disposing || this.#transport == null) return Promise.reject(new Error("current RTC transport is unavailable"));
     const admission = this.#transport.status;
-    if (admission.closed || generation !== 1 || bytes.byteLength === 0 || bytes.byteLength > 1 << 20
+    if (admission.closed || generation !== this.#generation || bytes.byteLength === 0 || bytes.byteLength > 1 << 20
       || admission.sendPending >= 16 || bytes.byteLength > (2 << 20) - admission.sendBytes) {
-      return Promise.reject(new Error("current RTC frame cannot enter bounded generation1 queue"));
+      return Promise.reject(new Error("current RTC frame cannot enter its bounded generation queue"));
     }
     const owned = Uint8Array.from(bytes);
     return this.#transport.send(generation, owned)
@@ -260,7 +296,7 @@ export class CurrentDevelopmentRtcPeerV1 {
   }
 
   #startSignaling(): void {
-    if (!this.#initialized || this.#signalingStarted || this.#closed) throw new Error("current RTC signaling requires one initialized checkpoint");
+    if (!this.#initialized || this.#signalingStarted || this.#closed || this.#disposing || this.#rebindStarting) throw new Error("current RTC signaling requires one initialized checkpoint");
     this.#signalingStarted = true;
   }
   readonly #onDataChannel = (event: RTCDataChannelEvent): void => {
@@ -269,18 +305,29 @@ export class CurrentDevelopmentRtcPeerV1 {
   };
   #attach(channel: RTCDataChannel): void {
     if (this.#transport != null || this.#closed) { channel.close(); throw new Error("current RTC pair already owns its single channel"); }
-    this.#transport = new CurrentRtcTransportV1({ channel, identity: this.#options.identity,
-      negotiatedMaximumMessageBytes: () => this.#pc.sctp?.maxMessageSize,
-      connected: async () => { await this.#enqueue({ kind: "TRANSPORT_CHANGED", generation: 1, connected: true }); this.#connectedEvents++; },
+    const generation = this.#generation;
+    const connection = this.#pc;
+    this.#transport = new CurrentRtcTransportV2({ channel, identity: { ...this.#options.identity, generation },
+      negotiatedMaximumMessageBytes: () => connection.sctp?.maxMessageSize,
+      connected: async () => { await this.#enqueue({ kind: "TRANSPORT_CHANGED", generation, connected: true }); this.#connectedEvents++; },
       receive: async (generation, bytes) => {
         this.#observeFrame("received", generation, bytes);
-        const response = await this.#enqueue({ kind: "NETWORK_FRAME", generation, bytes: Array.from(bytes) });
-        if (response.response.kind !== "EFFECTS") throw new Error("current RTC network response is not an effect batch");
-        this.#lastNetworkEffects = response.response.batch.effects.length;
+        const decoded: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+        const control = decoded != null && typeof decoded === "object" && "kind" in decoded
+          && decoded.kind === "CURRENT_COOP_REBIND";
+        const response = await this.#enqueue(control
+          ? { kind: "COOP_REBIND", control: { kind: "RECEIVE", generation, bytes: Array.from(bytes) } }
+          : { kind: "NETWORK_FRAME", generation, bytes: Array.from(bytes) });
+        if (control) {
+          if (response.response.kind !== "REBIND") throw new Error("current RTC control response differs");
+        } else {
+          if (response.response.kind !== "EFFECTS") throw new Error("current RTC network response is not an effect batch");
+          this.#lastNetworkEffects = response.response.batch.effects.length;
+        }
       },
       disconnected: async () => {
         if (this.#closed) throw new Error("current RTC disconnected event could not reach its closed Worker owner");
-        await this.#enqueue({ kind: "TRANSPORT_CHANGED", generation: 1, connected: false });
+        await this.#enqueue({ kind: "TRANSPORT_CHANGED", generation, connected: false });
         this.#disconnectedEvents++;
       },
     });
@@ -300,6 +347,17 @@ export class CurrentDevelopmentRtcPeerV1 {
           accepted = response.accepted_sequence;
           this.#activeAcceptedSequence = accepted;
           if (response.response.kind === "EFFECTS") await boundedOperation(this.#router.dispatch(response.response.batch), this.#abort.signal);
+          if (response.response.kind === "REBIND") {
+            const output = response.response.output;
+            const begin = request.kind === "COOP_REBIND" && request.control.kind === "BEGIN";
+            if (!safeCurrentInteger(output.generation) || output.generation !== this.#generation + (begin ? 1 : 0)
+              || (begin && output.frames.length !== 0)) throw new Error("current RTC kernel rebind generation differs");
+            for (const bytes of output.frames) {
+              if (this.#transport == null) throw new Error("current RTC rebind frame has no ready transport");
+              await this.#transport.send(output.generation, Uint8Array.from(bytes));
+              this.#observeFrame("sent", output.generation, Uint8Array.from(bytes));
+            }
+          }
           while (this.#settlements.length > 0) {
             const settlement = this.#settlements.shift()!;
             if (settlement.response.kind !== "EFFECTS") throw new Error("current RTC deferred settlement shape changed");
@@ -308,7 +366,7 @@ export class CurrentDevelopmentRtcPeerV1 {
           if (this.#closed) throw new Error("current RTC owner fenced before operation publication");
           pending.resolve(response);
         } catch (error) {
-          const failure = accepted == null ? error : new CurrentRtcCommittedDeliveryError(accepted,
+          const failure = accepted == null ? error : new CurrentRtcCommittedDeliveryErrorV2(accepted,
             `current RTC effect delivery failed after kernel acceptance: ${error instanceof Error ? error.message : String(error)}`);
           pending.reject(failure instanceof Error ? failure : new Error(String(failure)));
           if (accepted != null || !(error instanceof CurrentWorkerRequestErrorV2)) this.#fail(error);
@@ -349,7 +407,7 @@ export class CurrentDevelopmentRtcPeerV1 {
     this.#pc.close();
     this.#client.terminate("current RTC route fenced; pending kernel acceptance may be unknown");
     this.#activeOperation?.reject(this.#activeAcceptedSequence == null ? new Error(this.#reason)
-      : new CurrentRtcCommittedDeliveryError(this.#activeAcceptedSequence, this.#reason));
+      : new CurrentRtcCommittedDeliveryErrorV2(this.#activeAcceptedSequence, this.#reason));
     this.#rejectQueued(this.#reason);
     void this.#router.dispose().catch(() => {});
   }
@@ -359,7 +417,7 @@ export class CurrentDevelopmentRtcPeerV1 {
   }
 }
 
-function assertCheckpointBinding(options: CurrentRtcPeerOptionsV1): void {
+function assertCheckpointBinding(options: CurrentRtcPeerOptionsV2): void {
   const natural = options.natural_start != null;
   const protocol = (natural ? options.context.protocol : options.checkpoint?.protocol) as CurrentJsonObject | null;
   const frame = (protocol?.frame_context as CurrentJsonObject | undefined)?.context as CurrentJsonObject | undefined;
@@ -367,18 +425,19 @@ function assertCheckpointBinding(options: CurrentRtcPeerOptionsV1): void {
   const rebinds = protocol?.staged_rebinds;
   const peer = Array.isArray(connections) ? connections[0] as CurrentJsonObject : null;
   if ((!natural && options.checkpoint?.schema_version !== 7)
-    || (natural && (options.checkpoint != null || options.natural_start?.local_is_host !== (options.context.role === "AUTHORITY")))
+    || (natural && (options.identity.generation !== 1 || options.checkpoint != null || options.natural_start?.local_is_host !== (options.context.role === "AUTHORITY")))
     || options.context.local_seat !== options.identity.local_seat
-    || options.assets.content_sha256 !== options.identity.content_sha256 || options.identity.generation !== 1
+    || options.assets.content_sha256 !== options.identity.content_sha256
+    || !safeCurrentInteger(options.identity.generation) || options.identity.generation === 0
     || options.context.role !== protocol?.role || frame?.sessionId !== options.identity.session_id
     || frame?.runId !== options.identity.run_id || frame?.authoritySeatId !== options.identity.authority_seat
     || frame?.sessionEpoch !== options.identity.session_epoch || frame?.seatMapId !== options.identity.seat_map_id
     || frame?.membershipRevision !== options.identity.membership_revision
-    || frame?.senderSeatId !== options.identity.local_seat || frame?.connectionGeneration !== 1
+    || frame?.senderSeatId !== options.identity.local_seat || frame?.connectionGeneration !== options.identity.generation
     || !Array.isArray(connections) || connections.length !== 1
     || !Array.isArray(rebinds) || rebinds.length !== 0
     || protocol?.authority_rebind_pending !== false
-    || peer?.peer_seat !== options.identity.peer_seat || peer?.generation !== 1
+    || peer?.peer_seat !== options.identity.peer_seat || peer?.generation !== options.identity.generation
     || options.context.role !== (options.identity.local_seat === options.identity.authority_seat ? "AUTHORITY" : "REPLICA")) {
     throw new Error("current RTC binding does not match the declared current checkpoint context");
   }
@@ -412,5 +471,3 @@ function boundedOperation<T>(operation: Promise<T>, signal?: AbortSignal): Promi
     if (signal?.aborted) abort();
   });
 }
-export { CurrentRtcTransportV2, type CurrentRtcIdentityV2, type CurrentRtcTransportOptionsV2 } from "../adapters/current-rtc-transport-v2";
-export { CurrentDevelopmentRtcPeerV2, CurrentRtcCommittedDeliveryErrorV2, type CurrentRtcPeerOptionsV2 } from "./rust-current-rtc-rebind-entry";
