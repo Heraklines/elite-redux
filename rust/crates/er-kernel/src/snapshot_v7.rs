@@ -166,6 +166,10 @@ impl CoreGameKernelSnapshotV7 {
         match &self.lifecycle {
             GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
                 bootstrap.validate().map_err(|_| SnapshotV7Error::Invalid)?;
+                if let Some(owner) = &bootstrap.current_friendship_profile {
+                    let expected = er_game::current_friendship_profile::seed_species(content).map_err(|_| SnapshotV7Error::Invalid)?;
+                    owner.validate_catalog(content.identity(), &expected).map_err(|_| SnapshotV7Error::Invalid)?;
+                }
                 if self.private_battle_control.is_some()
                     || !self.input_router.pressed.is_empty()
                     || !self.input_router.held_buttons.is_empty()

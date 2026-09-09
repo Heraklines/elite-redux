@@ -236,6 +236,7 @@ pub fn construct_natural_run_v6(
     profile.statistics.runs_started = increment(profile.statistics.runs_started)?;
     let state = GameStateV6 {
         current_battle_participation: None,
+        current_friendship_profile: bootstrap.current_friendship_profile.clone(),
         current_run_difficulty: Some(er_state::m9e_state_v6::CurrentRunDifficultyV1 {
             run_id,
             difficulty,

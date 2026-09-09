@@ -78,6 +78,8 @@ pub struct BootstrapCatalogV1 {
 pub struct RunBootstrapMachineV1 {
     pub schema_version: u32,
     pub profile: ProfileStateV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_friendship_profile: Option<er_state::current_friendship_profile::CurrentFriendshipProfileV1>,
     pub seed: String,
     pub stage: RunBootstrapStageV1,
     pub selections: RunBootstrapSelectionsV1,
@@ -156,6 +158,7 @@ impl RunBootstrapMachineV1 {
         let mut value = Self {
             schema_version: RUN_BOOTSTRAP_SCHEMA_VERSION_V1,
             profile,
+            current_friendship_profile: None,
             seed,
             stage: RunBootstrapStageV1::Title,
             selections: RunBootstrapSelectionsV1::default(),
@@ -184,6 +187,9 @@ impl RunBootstrapMachineV1 {
                 || self.selections.save_slot.is_none())
         {
             return Err(RunBootstrapErrorV1::Invalid);
+        }
+        if let Some(owner) = &self.current_friendship_profile {
+            owner.validate().map_err(|_| RunBootstrapErrorV1::Invalid)?;
         }
         self.validate_starters()?;
         self.validate_current_storage()

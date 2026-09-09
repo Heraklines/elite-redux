@@ -84,6 +84,7 @@ fn state_v6_validates_the_complete_content_identity() -> Result<(), Box<dyn Erro
     let state = GameStateV6 {
         current_battle_participation: None,
         current_run_difficulty: None,
+        current_friendship_profile: None,
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: prepared.identity().clone(),
         identities: GameIdentityAllocatorStateV1::derive(None)?,

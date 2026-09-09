@@ -2658,6 +2658,7 @@ fn adopt_v5_with_participation(
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let candidate = GameStateV6 {
         current_battle_participation: participation,
+        current_friendship_profile: before.current_friendship_profile.clone(),
         current_run_difficulty: if after.active_run.is_some() {
             before.current_run_difficulty
         } else {

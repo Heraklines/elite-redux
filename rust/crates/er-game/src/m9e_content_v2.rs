@@ -680,6 +680,10 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
         &self.identity
     }
 
+    fn current_friendship_seed_species(&self) -> Option<Vec<SpeciesId>> {
+        crate::current_friendship_profile::seed_species(self).ok()
+    }
+
     fn supports_current_experience_mode(&self, mode: GameModeId) -> bool {
         self.world.mode(mode).is_some_and(|definition| {
             definition.key == "CLASSIC"

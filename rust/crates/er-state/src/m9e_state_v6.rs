@@ -39,6 +39,8 @@ pub struct GameStateV6 {
     pub content_identity: GameContentIdentityV2,
     pub identities: GameIdentityAllocatorStateV1,
     pub profile: ProfileStateV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_friendship_profile: Option<crate::current_friendship_profile::CurrentFriendshipProfileV1>,
     pub active_run: Option<RunStateV3>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_run_difficulty: Option<CurrentRunDifficultyV1>,
@@ -50,6 +52,7 @@ pub struct GameStateV6 {
 pub trait GameStateV6ContentContext {
     fn identity(&self) -> &GameContentIdentityV2;
     fn has_mode(&self, mode: GameModeId) -> bool;
+    fn current_friendship_seed_species(&self) -> Option<Vec<SpeciesId>> { None }
     fn has_species_form(&self, species: SpeciesId, form: u16) -> bool;
     fn has_move(&self, move_id: MoveId) -> bool;
     fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
@@ -193,6 +196,10 @@ impl GameStateV6 {
         legacy
             .validate()
             .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
+        if let Some(owner) = &self.current_friendship_profile {
+            owner.validate().map_err(|_| GameStateV6Error::Invalid)?;
+            if owner.content_identity != self.content_identity { return Err(GameStateV6Error::Content); }
+        }
         if let Some(participation) = &self.current_battle_participation {
             if participation
                 .experience
@@ -213,6 +220,10 @@ impl GameStateV6 {
         content: &impl GameStateV6ContentContext,
     ) -> Result<(), GameStateV6Error> {
         self.validate()?;
+        if let Some(owner) = &self.current_friendship_profile {
+            let expected = content.current_friendship_seed_species().ok_or(GameStateV6Error::Content)?;
+            owner.validate_catalog(content.identity(), &expected).map_err(|_| GameStateV6Error::Content)?;
+        }
         if let Some(owner) = self
             .current_battle_participation
             .as_ref()
@@ -269,6 +280,7 @@ impl GameStateV6 {
             content_identity,
             identities,
             profile: source.profile,
+            current_friendship_profile: None,
             active_run: source.active_run,
             current_battle_participation: None,
             current_run_difficulty: None,

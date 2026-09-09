@@ -147,6 +147,16 @@ pub struct CurrentGameSession {
 }
 
 impl CurrentGameSession {
+    /// Explicit ordinary fresh account creation; historical natural starts stay unknown.
+    pub fn natural_start_with_fresh_friendship(
+        start: er_kernel::game_kernel_v7::FreshFriendshipStartV7,
+    ) -> Result<Self, CurrentSessionError> {
+        let content = start.content.clone();
+        let local_seat = start.local_seat;
+        let kernel = GameKernelV7::natural_start_with_fresh_friendship(start)?;
+        Ok(Self { kernel: Some(kernel), content, local_seat, role: GameKernelRoleV7::Authority })
+    }
+
     pub fn enable_current_coop_setup(&mut self) -> Result<(), CurrentSessionError> {
         self.kernel
             .as_mut()
