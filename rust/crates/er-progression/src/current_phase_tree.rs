@@ -145,7 +145,11 @@ impl<T: Clone> CurrentPhaseTree<T> {
     }
 
     /// The predicate supplies the source phase-type test and optional filter.
-    pub fn add_after_where(&mut self, phase: T, mut matches: impl FnMut(&T) -> bool) -> Result<(), CurrentPhaseTreeError> {
+    pub fn add_after_where(
+        &mut self,
+        phase: T,
+        mut matches: impl FnMut(&T) -> bool,
+    ) -> Result<(), CurrentPhaseTreeError> {
         self.room()?;
         for level in self.state.levels.iter_mut().rev() {
             if let Some(index) = level.iter().position(&mut matches) {
@@ -166,7 +170,13 @@ impl<T: Clone> CurrentPhaseTree<T> {
     }
 
     pub fn find_all_where(&self, mut matches: impl FnMut(&T) -> bool) -> Vec<&T> {
-        self.state.levels.iter().rev().flat_map(|level| level.iter()).filter(|phase| matches(phase)).collect()
+        self.state
+            .levels
+            .iter()
+            .rev()
+            .flat_map(|level| level.iter())
+            .filter(|phase| matches(phase))
+            .collect()
     }
 
     pub fn remove_where(&mut self, mut matches: impl FnMut(&T) -> bool) -> bool {
