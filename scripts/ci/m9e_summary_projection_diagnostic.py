@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import urllib.request
+import urllib.parse
 import zipfile
 
 REPO = "Heraklines/elite-redux"
@@ -24,9 +25,16 @@ def require(ok, message):
         raise RuntimeError(message)
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+class SafeRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, url):
+        redirected = super().redirect_request(request, response, code, message, headers, url)
+        if redirected is not None and urllib.parse.urlsplit(url).netloc != urllib.parse.urlsplit(request.full_url).netloc:
+            redirected.remove_header("Authorization")
+        return redirected
+opener = urllib.request.build_opener(SafeRedirect())
 def get(path, maximum):
     request = urllib.request.Request("https://api.github.com/repos/"+REPO+path,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"User-Agent":"m9e-bounded-diagnostic"})
-    with urllib.request.urlopen(request,timeout=45) as response:
+    with opener.open(request,timeout=45) as response:
         raw = response.read(maximum+1)
     require(len(raw)<=maximum,"remote diagnostic bound")
     return raw
