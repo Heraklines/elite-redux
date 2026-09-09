@@ -1224,7 +1224,7 @@ fn pokerus_state(flags: [bool; 2]) -> TestResult<GameStateV6> {
     Ok(
         er_game::m9e_new_run_v6::construct_natural_run_v6_with_starter_pokerus(
             &selection,
-            &content()?,
+            content()?.as_ref(),
             safe(1)?,
             er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
             &pokerus_inputs(&selection, flags)?,
@@ -1249,7 +1249,7 @@ fn selected_pokerus_preserves_all_other_natural_state_and_distinguishes_unknown(
     let selection = pokerus_selection()?;
     let old = er_game::m9e_new_run_v6::construct_natural_run_v6_with_pending_experience(
         &selection,
-        &content()?,
+        content()?.as_ref(),
         safe(1)?,
         er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
     )?;
@@ -1311,7 +1311,7 @@ fn selected_pokerus_rejects_missing_reordered_and_mismatched_whole_selections() 
         assert!(
             er_game::m9e_new_run_v6::construct_natural_run_v6_with_starter_pokerus(
                 &selection,
-                &content()?,
+                content()?.as_ref(),
                 safe(1)?,
                 er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
                 &values,
