@@ -705,10 +705,19 @@ fn new_run_fresh_profile_process_owns_catalog_and_resumes_exactly() -> Result<()
         return Err("CLI fresh Title missing".into());
     };
     assert_eq!(title.control.kind, GameControlKindV2::Title);
-    let owner = title.current_friendship_profile.as_ref().ok_or("fresh accounts absent")?;
+    let owner = title
+        .current_friendship_profile
+        .as_ref()
+        .ok_or("fresh accounts absent")?;
     assert_eq!(owner.accounts.len(), 1450);
-    assert!(owner.accounts.iter().all(|account| account.friendship_progress == SafeU53::ZERO
-        && account.candy_count == SafeU53::ZERO && account.passive_attr == 0));
+    assert!(
+        owner
+            .accounts
+            .iter()
+            .all(|account| account.friendship_progress == SafeU53::ZERO
+                && account.candy_count == SafeU53::ZERO
+                && account.passive_attr == 0)
+    );
     let direct = CurrentGameSession::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile: profile()?,
         seed: "m9e-cli-fresh-profile".into(),
@@ -743,7 +752,8 @@ fn new_run_fresh_profile_process_owns_catalog_and_resumes_exactly() -> Result<()
 }
 
 #[test]
-fn new_run_fresh_profile_is_explicit_and_rejects_nonpristine_accounts() -> Result<(), Box<dyn Error>> {
+fn new_run_fresh_profile_is_explicit_and_rejects_nonpristine_accounts() -> Result<(), Box<dyn Error>>
+{
     let files = CommandFiles::new()?;
     let mut legacy = profile()?;
     legacy.statistics.runs_started = SafeU53::new(1)?;
@@ -765,10 +775,19 @@ fn new_run_fresh_profile_is_explicit_and_rejects_nonpristine_accounts() -> Resul
         let mut rejected = options.clone();
         rejected.push(("fresh-profile", value.into()));
         let output = run_current_command("new-run", &rejected, "")?;
-        assert!(!output.status.success(), "unexpected admission for {value:?}");
-        assert!(output.stdout.is_empty(), "rejected profile emitted a session");
+        assert!(
+            !output.status.success(),
+            "unexpected admission for {value:?}"
+        );
+        assert!(
+            output.stdout.is_empty(),
+            "rejected profile emitted a session"
+        );
         if value != "true" {
-            assert!(String::from_utf8_lossy(&output.stderr).contains("fresh-profile must be true or false"));
+            assert!(
+                String::from_utf8_lossy(&output.stderr)
+                    .contains("fresh-profile must be true or false")
+            );
         }
     }
     Ok(())
