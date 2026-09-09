@@ -43,7 +43,11 @@ pub fn resolve_phase_experience(
     phase: ResolvedExperiencePhase,
 ) -> Result<f64, PhaseExperienceError> {
     let factors = match phase {
-        ResolvedExperiencePhase::Field { ability, moody, coordinator } => [ability, moody, coordinator],
+        ResolvedExperiencePhase::Field {
+            ability,
+            moody,
+            coordinator,
+        } => [ability, moody, coordinator],
         ResolvedExperiencePhase::Party { ability } => [ability, 1.0, 1.0],
     };
     if !admitted(phase_argument) || factors.iter().any(|value| !admitted(*value)) {
@@ -54,7 +58,13 @@ pub fn resolve_phase_experience(
             return Err(PhaseExperienceError::Input);
         }
         let multiplier = booster.boost_percent * 0.01;
-        let maximum = if multiplier < 0.6 { 99 } else if multiplier < 1.0 { 30 } else { 10 };
+        let maximum = if multiplier < 0.6 {
+            99
+        } else if multiplier < 1.0 {
+            30
+        } else {
+            10
+        };
         if booster.stacks > maximum {
             return Err(PhaseExperienceError::Input);
         }
@@ -69,7 +79,11 @@ pub fn resolve_phase_experience(
     }
     // Preserve the source expression's grouping: build the field product first.
     let multiplier = match phase {
-        ResolvedExperiencePhase::Field { ability, moody, coordinator } => ability * moody * coordinator,
+        ResolvedExperiencePhase::Field {
+            ability,
+            moody,
+            coordinator,
+        } => ability * moody * coordinator,
         ResolvedExperiencePhase::Party { ability } => ability,
     };
     amount = (amount * multiplier).floor();
