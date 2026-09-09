@@ -89,9 +89,10 @@ pub fn plan_party_experience_with_held_boosters(
     held: &[Vec<HeldExperienceBooster>],
 ) -> Result<UnboostedPartyExperiencePlan, PartyExperiencePlanError> {
     if held.len() != input.party.len()
-        || held.iter().flatten().any(|booster| {
-            !finite_nonnegative(booster.boost_percent) || booster.stacks > 99
-        })
+        || held
+            .iter()
+            .flatten()
+            .any(|booster| !finite_nonnegative(booster.boost_percent) || booster.stacks > 99)
     {
         return Err(PartyExperiencePlanError::Input);
     }

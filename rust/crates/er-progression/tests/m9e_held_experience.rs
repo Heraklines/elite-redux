@@ -1,6 +1,7 @@
 use er_progression::current_party_experience::{
-    PartyExperiencePlanError, UnboostedPartyExperienceInput, UnboostedPartyExperienceMember,
-    HeldExperienceBooster, plan_party_experience_with_held_boosters, plan_unboosted_party_experience,
+    HeldExperienceBooster, PartyExperiencePlanError, UnboostedPartyExperienceInput,
+    UnboostedPartyExperienceMember, plan_party_experience_with_held_boosters,
+    plan_unboosted_party_experience,
 };
 
 fn input() -> UnboostedPartyExperienceInput {
@@ -77,16 +78,24 @@ fn actual_whole_source_held_matrix_matches_every_fractional_phase_argument() {
                 .then(|| columns[8].parse().expect("source override")),
             party,
         };
-        let held: Vec<Vec<HeldExperienceBooster>> = columns[10].split(',').map(|member| {
-            member.split(';').map(|pair| {
-                let (percent, stacks) = pair.split_once(':').expect("source held booster pair");
-                HeldExperienceBooster {
-                    boost_percent: percent.parse().expect("source held percent"),
-                    stacks: stacks.parse().expect("source held stacks"),
-                }
-            }).collect()
-        }).collect();
-        let plan = plan_party_experience_with_held_boosters(&value, &held).expect("admitted source input");
+        let held: Vec<Vec<HeldExperienceBooster>> = columns[10]
+            .split(',')
+            .map(|member| {
+                member
+                    .split(';')
+                    .map(|pair| {
+                        let (percent, stacks) =
+                            pair.split_once(':').expect("source held booster pair");
+                        HeldExperienceBooster {
+                            boost_percent: percent.parse().expect("source held percent"),
+                            stacks: stacks.parse().expect("source held stacks"),
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        let plan =
+            plan_party_experience_with_held_boosters(&value, &held).expect("admitted source input");
         let expected_friends: Vec<usize> = if columns[11] == "-" {
             vec![]
         } else {
@@ -130,8 +139,15 @@ fn held_booster_receives_fractional_product_before_distribution_floor() {
     value.raw_exp_value = 7.0;
     value.participant_count = 2;
     value.exp_balance_stacks = None;
-    let held = vec![vec![HeldExperienceBooster { boost_percent: 20.0, stacks: 1 }], vec![]];
-    let plan = plan_party_experience_with_held_boosters(&value, &held).expect("fractional source input");
+    let held = vec![
+        vec![HeldExperienceBooster {
+            boost_percent: 20.0,
+            stacks: 1,
+        }],
+        vec![],
+    ];
+    let plan =
+        plan_party_experience_with_held_boosters(&value, &held).expect("fractional source input");
     assert_eq!(plan.phase_insertions.len(), 1);
     assert_eq!(plan.phase_insertions[0].experience, 4.0);
     assert_eq!(plan.battle_friendship_calls, vec![0]);
@@ -141,13 +157,21 @@ fn held_booster_receives_fractional_product_before_distribution_floor() {
 fn explicit_empty_held_context_preserves_unboosted_source_behavior() {
     let value = input();
     let before = plan_unboosted_party_experience(&value).expect("original source input");
-    let after = plan_party_experience_with_held_boosters(&value, &[vec![], vec![]]).expect("explicit empty context");
+    let after = plan_party_experience_with_held_boosters(&value, &[vec![], vec![]])
+        .expect("explicit empty context");
     assert_eq!(before, after);
     let mut value = value;
     value.party[0].hp = 0;
     value.party[1].level = 50;
-    let held = vec![vec![HeldExperienceBooster { boost_percent: 20.0, stacks: 99 }]; 2];
-    let plan = plan_party_experience_with_held_boosters(&value, &held).expect("ineligible source party");
+    let held = vec![
+        vec![HeldExperienceBooster {
+            boost_percent: 20.0,
+            stacks: 99
+        }];
+        2
+    ];
+    let plan =
+        plan_party_experience_with_held_boosters(&value, &held).expect("ineligible source party");
     assert!(plan.phase_insertions.is_empty());
     assert!(plan.battle_friendship_calls.is_empty());
 }
@@ -155,13 +179,34 @@ fn explicit_empty_held_context_preserves_unboosted_source_behavior() {
 #[test]
 fn malformed_held_context_and_unsafe_awards_are_rejected_atomically() {
     let value = input();
-    assert_eq!(plan_party_experience_with_held_boosters(&value, &[]), Err(PartyExperiencePlanError::Input));
+    assert_eq!(
+        plan_party_experience_with_held_boosters(&value, &[]),
+        Err(PartyExperiencePlanError::Input)
+    );
     for (percent, stacks) in [(20.0, 100), (-1.0, 0), (f64::NAN, 0), (f64::INFINITY, 1)] {
-        let held = vec![vec![HeldExperienceBooster { boost_percent: percent, stacks }], vec![]];
-        assert_eq!(plan_party_experience_with_held_boosters(&value, &held), Err(PartyExperiencePlanError::Input));
+        let held = vec![
+            vec![HeldExperienceBooster {
+                boost_percent: percent,
+                stacks,
+            }],
+            vec![],
+        ];
+        assert_eq!(
+            plan_party_experience_with_held_boosters(&value, &held),
+            Err(PartyExperiencePlanError::Input)
+        );
     }
     let mut value = value;
     value.raw_exp_value = 9_007_199_254_740_991.0;
-    let held = vec![vec![HeldExperienceBooster { boost_percent: 100.0, stacks: 1 }], vec![]];
-    assert_eq!(plan_party_experience_with_held_boosters(&value, &held), Err(PartyExperiencePlanError::Overflow));
+    let held = vec![
+        vec![HeldExperienceBooster {
+            boost_percent: 100.0,
+            stacks: 1,
+        }],
+        vec![],
+    ];
+    assert_eq!(
+        plan_party_experience_with_held_boosters(&value, &held),
+        Err(PartyExperiencePlanError::Overflow)
+    );
 }
