@@ -5,6 +5,7 @@ on:
     branches:
       - 'wrk/m9e-recovery-*'
       - 'wrk/m9e-task-*'
+      - 'codex/m9e-full-ai-score-20260909'
 
 permissions:
   contents: read
@@ -52,6 +53,9 @@ jobs:
           key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
       - name: Complete native checks and evidence
         id: native
         env:

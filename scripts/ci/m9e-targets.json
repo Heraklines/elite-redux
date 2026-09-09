@@ -100,6 +100,11 @@
       "rust/crates/er-game/tests/m9e_run_difficulty.rs",
       "rust/crates/er-kernel/tests/m9e_title_storage.rs",
       "rust/crates/er-content-compiler/tests/m9e_full_content.rs",
+      "rust/crates/er-ai/src/lib.rs",
+      "rust/crates/er-ai/src/m9e_standard_attack_score.rs",
+      "rust/crates/er-ai/tests/m9e_standard_attack_score.rs",
+      "rust/crates/er-game/src/lib.rs",
+      "rust/crates/er-game/src/m9e_ai_score_query.rs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -309,7 +314,9 @@
         "current_damage_query_honors_pp_up_and_override_bounds_without_mutation",
         "current_damage_query_zero_and_inactive_inputs_leave_state_unchanged",
         "current_immune_turn_preserves_hp_and_skips_only_damage_variance",
-        "current_immunity_queries_preserve_zero_minimum_damage_and_typeless_struggle"
+        "current_immunity_queries_preserve_zero_minimum_damage_and_typeless_struggle",
+        "current_ordinary_ai_score_queries_preserve_full_turn_and_rng_audit",
+        "current_ordinary_ai_score_uses_actual_damage_bulk_and_knockout_boundary"
       ],
       "er-kernel:m9e_game_kernel_v7": [
         "authority_ai_can_choose_a_legal_enemy_switch",
@@ -347,6 +354,12 @@
         "immune_recoil_neither_hurts_nor_consumes_damage_variance",
         "recoil_damage_queries_preserve_actual_turn_and_borrowed_state",
         "source_compiler_admits_six_exact_recoils_and_preserves_all_prior_units"
+      ],
+      "er-ai:m9e_standard_attack_score": [
+        "all_remote_pinned_javascript_cases_match_binary64_bits",
+        "damage_not_base_power_controls_non_knockout_ranking",
+        "knockout_bonus_uses_raw_damage_and_weights_accuracy",
+        "zero_damage_and_always_hit_preserve_source_boundaries"
       ]
     }
   },
