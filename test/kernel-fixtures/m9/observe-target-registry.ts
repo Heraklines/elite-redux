@@ -2,7 +2,6 @@ import { allAbilities, allMoves } from "#data/data-lists";
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts, FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
-import balanceTuning from "#data/elite-redux/er-balance-tuning.json";
 import { getPokemonSpecies, getPokerusStarters } from "#utils/pokemon-utils";
 import { Nature } from "#enums/nature";
 import { AbilityId } from "#enums/ability-id";
@@ -17,7 +16,7 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
 
@@ -109,7 +108,7 @@ test("observe actual initialized target capability registry", async () => {
   expect(starterKeys).toHaveLength(570);
   const effectiveCount = erBalanceNum("vanilla.pokerusCount");
   expect(Number.isInteger(effectiveCount) && effectiveCount > 0 && effectiveCount <= 10).toBe(true);
-  const tuning = balanceTuning as Record<string, unknown>;
+  const tuning = JSON.parse(readFileSync("src/data/elite-redux/er-balance-tuning.json", "utf8")) as Record<string, unknown>;
   expect(vi.isMockFunction(erBalanceNum)).toBe(false);
   const balanceValues={battle_friendship_gain:FRIENDSHIP_GAIN_FROM_BATTLE,
     values:["vanilla.friendship.lossFaint","vanilla.friendship.candyMultClassic"].map(key=>({
