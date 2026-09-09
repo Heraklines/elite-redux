@@ -148,7 +148,7 @@ def execute_prepared(summary, *, install_chromium=True):
     os.environ["M9E_V7_WEB_DIR"] = str(OUTPUT)
     os.environ["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-results.json")
     run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
-         *SPECS, "--workers=1", "--reporter=line,json"], "browser", 900)
+         *SPECS, "--workers=2", "--reporter=line,json"], "browser", 900)
     report = json.loads((FULL / "browser-results.json").read_text())
     specs = []
     def collect(suite):
