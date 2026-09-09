@@ -101,9 +101,10 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
     let first = battle.enemy_party[0].id;
     let other = second.id;
     battle.enemy_party.push(second);
-    battle.format = BattleFormat::new(1, 2, vec![])?;
+    battle.format = BattleFormat::new(2, 2, vec![])?;
     battle.field = FieldState::new_for_format(&battle.format, vec![
         FieldSlotState::new(slot(BattleSide::Player, 0), Some(player)),
+        FieldSlotState::new(slot(BattleSide::Player, 1), None),
         FieldSlotState::new(slot(BattleSide::Enemy, 0), Some(first)),
         FieldSlotState::new(slot(BattleSide::Enemy, 1), Some(other)),
     ])?;
@@ -139,8 +140,8 @@ fn commands(state: &GameStateV6, targets: &[FieldSlot], prepared: &PreparedGameC
     let run = active_run(state)?; let battle = run.battle.as_ref().ok_or("battle absent")?;
     let menu = run.control.menu.as_ref().ok_or("root menu absent")?;
     let mut entries = Vec::new();
-    for (index, row) in battle.field.slots.iter().enumerate() {
-        let actor = row.occupant.ok_or("full controlled field required")?;
+    for (index, row) in battle.field.slots.iter().filter(|row| row.occupant.is_some()).enumerate() {
+        let Some(actor) = row.occupant else { continue; };
         let target = *targets.get(index).ok_or("exact command targets required")?;
         let pokemon = er_battle::current_target_execution::find_pokemon(run, actor).ok_or("actor absent")?;
         let move_id = pokemon.moves[0].as_ref().ok_or("move absent")?.move_id;
@@ -303,7 +304,7 @@ fn poison_redirect_and_source_passive_gate_share_actual_owner() -> Result<()> {
 }
 
 #[test]
-fn queued_same_side_target_faint_cancels_without_pp() -> Result<()> {
+fn queued_faint_retargets_opponents_but_preserves_same_side_cancellation() -> Result<()> {
     let content = content()?; let mut snapshot = two_enemies(content.clone())?;
     let state = active_mut(&mut snapshot)?; assign_move(state, 33)?;
     let run = active_run_mut(state)?; run.party[0].stats.speed = 500; run.party[0].stats.attack = 500;
@@ -326,6 +327,39 @@ fn queued_same_side_target_faint_cancels_without_pp() -> Result<()> {
     assert_eq!(after.enemy_party[1].hp, 0);
     assert_eq!(after.enemy_party[0].moves[0].as_ref().ok_or("move absent")?.pp_used, 0);
     assert_eq!(canonical_bytes(state)?, before);
+
+    // Positive source double case: the second player selected the same enemy
+    // before the first player's KO. The actual pending owner redirects only its
+    // remaining one-target vector to the live enemy ally, preserving the command.
+    let mut double = state.clone();
+    let next_id = double.identities.next_pokemon_id;
+    double.identities.next_pokemon_id = safe(next_id.get().checked_add(1).ok_or("allocator overflow")?);
+    let run = active_run_mut(&mut double)?;
+    let mut second = run.party[0].clone();
+    second.id = PokemonId::new(next_id);
+    second.stats.speed = 400; second.stats.attack = 1;
+    let second_id = second.id;
+    run.party.push(second);
+    run.battle.as_mut().ok_or("battle absent")?.field.slots.iter_mut()
+        .find(|row| row.slot == slot(BattleSide::Player,1)).ok_or("second player field absent")?.occupant = Some(second_id);
+    double.validate_with(content.as_ref())?;
+    let accepted = commands(&double, &[slot(BattleSide::Enemy,1),slot(BattleSide::Enemy,1),
+        slot(BattleSide::Player,0),slot(BattleSide::Player,0)], content.as_ref())?;
+    let commands_before = canonical_bytes(&accepted)?;
+    let owner = CurrentTargetExecution::from_state(&double)?;
+    let mut unremoved = vec![slot(BattleSide::Enemy,1)];
+    let live_enemy = active_run(&double)?.battle.as_ref().ok_or("battle absent")?.enemy_party[1].id;
+    assert!(owner.retarget_pending_after_faint(active_run(&double)?, live_enemy, second_id, &mut unremoved).is_err());
+    assert_eq!(unremoved, vec![slot(BattleSide::Enemy,1)]);
+    let result = resolve_turn_v5_with_current_targets(&project(&double), &accepted, &content.battle,
+        &TurnAuthorityContextV1 { authority_seat: seat(), revision: active_run(&double)?.control.revision }, &owner)?;
+    let after = result.after_state.active_run.as_ref().ok_or("run absent")?;
+    let battle = after.battle.as_ref().ok_or("battle absent")?;
+    assert_eq!(battle.enemy_party[1].hp, 0);
+    assert!(battle.enemy_party[0].hp < 200);
+    assert_eq!(after.party.iter().find(|pokemon| pokemon.id == second_id).ok_or("second actor absent")?
+        .moves[0].as_ref().ok_or("second move absent")?.pp_used, 1);
+    assert_eq!(canonical_bytes(&accepted)?, commands_before);
     Ok(())
 }
 

@@ -250,7 +250,9 @@ fn resolve_turn_v5_inner(
     let mut mutations = Vec::new();
     let mut presentation = Vec::new();
     let mut mechanics_evidence = Vec::new();
-    for (index, action) in pending.into_iter().enumerate() {
+    for index in 0..pending.len() {
+        let action = pending[index].clone();
+        let mutation_before = mutations.len();
         let sequence = SafeU53::new(index as u64).map_err(|_| BattleV5Error::Overflow)?;
         let disposition = if !actor_is_active(run, action.source_slot, action.command.actor()) {
             ActionDisposition::SkippedActorInactive
@@ -266,6 +268,23 @@ fn resolve_turn_v5_inner(
                 &mut mechanics_evidence,
             )?
         };
+        if let Some(owner) = targeting {
+            // Source MoveEffect descendants complete their deferred Faint work
+            // before the next base MovePhase. Mirror its narrow pending-target
+            // redirection here; unrelated source Faint child hooks remain outside
+            // this current resolver's qualified damage/phase scope.
+            for mutation in &mutations[mutation_before..] {
+                if let BattleMutation::HpChanged { pokemon, before, after } = mutation {
+                    if *before == 0 || *after != 0 { continue; }
+                    for queued in &mut pending[index+1..] {
+                        if let Some(retained) = &mut queued.current_targets {
+                            owner.retarget_pending_after_faint(run, *pokemon, queued.command.actor(), retained)
+                                .map_err(|_| BattleV5Error::Target)?;
+                        }
+                    }
+                }
+            }
+        }
         action_order.push(ResolvedAction {
             sequence,
             kind: match action.command {

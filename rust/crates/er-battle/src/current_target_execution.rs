@@ -62,6 +62,9 @@ impl<'a> CurrentTargetExecution<'a> {
             return Err(CurrentTargetExecutionError);
         }
         let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
+        if !matches!((battle.format.player_capacity, battle.format.enemy_capacity), (1, 1) | (2, 2)) {
+            return Err(CurrentTargetExecutionError);
+        }
         // The current schema explicitly represents these fields. Nonempty weather,
         // field effects and suppression require their own source queries before
         // admission; they are not interpreted as neutral merely for being unhandled.
@@ -135,6 +138,33 @@ impl<'a> CurrentTargetExecution<'a> {
             if passive { BehaviorSourceId::PassiveAbility { numeric_id: ability.get() } }
             else { BehaviorSourceId::ActiveAbility { numeric_id: ability.get() } }
         }).collect())
+    }
+
+    /// Current counterpart of the source pending MovePhase queue update after
+    /// FaintPhase removes a target. The accepted command stays unchanged; only
+    /// its transaction-owned not-yet-executed target vector is redirected.
+    pub fn retarget_pending_after_faint(&self, run: &RunStateV3, removed: PokemonId,
+        actor: PokemonId, retained: &mut [FieldSlot]) -> Result<(), CurrentTargetExecutionError>
+    {
+        self.validate_run(run)?;
+        let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
+        let removed_pokemon = find_pokemon(run, removed).ok_or(CurrentTargetExecutionError)?;
+        if removed_pokemon.hp != 0 || !removed_pokemon.fainted { return Err(CurrentTargetExecutionError); }
+        if battle.format.player_capacity != 2 || battle.format.enemy_capacity != 2 || retained.len() != 1 {
+            return Ok(());
+        }
+        let removed_slot = battle.field.slots.iter().find(|row| row.occupant == Some(removed))
+            .map(|row| row.slot).ok_or(CurrentTargetExecutionError)?;
+        let actor_slot = battle.field.slots.iter().find(|row| row.occupant == Some(actor))
+            .map(|row| row.slot).ok_or(CurrentTargetExecutionError)?;
+        if actor_slot.side == removed_slot.side || retained[0] != removed_slot {
+            return Ok(());
+        }
+        let ally = battle.field.slots.iter().find(|row| row.slot.side == removed_slot.side
+            && row.slot != removed_slot && row.occupant.is_some_and(|id|
+                find_pokemon(run,id).is_some_and(|pokemon| pokemon.hp > 0 && !pokemon.fainted)));
+        if let Some(ally) = ally { retained[0] = ally.slot; }
+        Ok(())
     }
 
     /// Apply the source redirect pass to the retained command targets, then remove
