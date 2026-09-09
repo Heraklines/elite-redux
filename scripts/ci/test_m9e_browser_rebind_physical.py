@@ -23,6 +23,9 @@ class PhysicalRebindProofTests(unittest.TestCase):
 
     def test_all_three_actual_complete_qualified_receipts_are_accepted(self):
         self.assertEqual(set(self.fixture["cases"]), set(physical.CASES))
+        import m9e_phases
+        self.assertEqual(set(m9e_phases.RTC_SOURCE_PATHS),
+                         set(self.fixture["rtc"]["manifest"]["source_hashes"]))
         for spec, value in self.fixture["cases"].items():
             with self.subTest(spec=spec):
                 before = copy.deepcopy(value)

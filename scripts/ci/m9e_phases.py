@@ -206,6 +206,8 @@ WORKER_CODEC_IDS = ["current V2 canonical payload preserves signed state values"
 RTC_PATHS = ["src/rust-browser/adapters/current-rtc-transport.ts",
              "src/rust-browser/routes/rust-current-rtc-entry.ts",
              "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"]
+RTC_PATHS += ["src/rust-browser/adapters/current-rtc-transport-v2.ts",
+              "src/rust-browser/routes/rust-current-rtc-rebind-entry.ts"]
 RTC_SOURCE_PATHS = WORKER_SOURCE_PATHS + RTC_PATHS
 RTC_TEST_IDS = ["two current Workers exchange real RTC proposals and converge one natural checkpoint turn",
                 "current RTC identity mismatch and stalled presentation teardown settle owned work"]
