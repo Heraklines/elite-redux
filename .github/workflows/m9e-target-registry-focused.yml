@@ -1,0 +1,112 @@
+name: M9E Actual Target Registry Diagnostic
+on:
+  push:
+    branches: [codex/m9e-target-registry-20260909]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-target-registry-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      GIT_NO_LAZY_FETCH: '1'
+      GIT_TERMINAL_PROMPT: '0'
+    steps:
+      - name: Start shared budget before checkout
+        timeout-minutes: 1
+        run: echo "M9E_FOCUS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        timeout-minutes: 10
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Verify candidate and retrieve pinned base metadata
+        timeout-minutes: 10
+        id: before_source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          [[ "$M9E_FOCUS_STARTED_AT" =~ ^[0-9]{10}$ ]]
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          remaining=$((1780 - elapsed))
+          test "$remaining" -gt 0
+          timeout "$((remaining < 600 ? remaining : 600))" git -c protocol.version=2 fetch --no-tags --filter=blob:none --depth=1 origin d9a6391a94cae965eaa2c5af5f910002631d5254
+          test "$(git rev-parse 'd9a6391a94cae965eaa2c5af5f910002631d5254^{tree}')" = 5d6e96b5a1968c73ceb3d6f1accc93d61e98ba6d
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          remaining=$((1780 - elapsed))
+          minutes=$((remaining / 60))
+          test "$minutes" -gt 0
+          echo "minutes=$((minutes < 10 ? minutes : 10))" >> "$GITHUB_OUTPUT"
+      - name: Pinned TypeScript source without assets or submodules
+        uses: actions/checkout@v6
+        timeout-minutes: ${{ fromJSON(steps.before_source.outputs.minutes) }}
+        with:
+          ref: 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7
+          path: .m9e-target-registry-source
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Bound Node setup against remaining shared time
+        id: before_node
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$M9E_FOCUS_STARTED_AT" =~ ^[0-9]{10}$ ]]
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          minutes=$(((1780 - elapsed) / 60))
+          test "$minutes" -gt 0
+          echo "minutes=$((minutes < 10 ? minutes : 10))" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v6
+        timeout-minutes: ${{ fromJSON(steps.before_node.outputs.minutes) }}
+        with:
+          node-version: 24.9.0
+      - name: Bound pnpm setup against remaining shared time
+        id: before_pnpm
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$M9E_FOCUS_STARTED_AT" =~ ^[0-9]{10}$ ]]
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          minutes=$(((1780 - elapsed) / 60))
+          test "$minutes" -gt 0
+          echo "minutes=$((minutes < 10 ? minutes : 10))" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v4
+        timeout-minutes: ${{ fromJSON(steps.before_pnpm.outputs.minutes) }}
+        with:
+          version: 10.33.2
+          run_install: false
+          package_json_file: .m9e-target-registry-source/package.json
+      - name: Two fresh actual source-method observations and independent data validation
+        timeout-minutes: 30
+        run: python3 scripts/ci/m9e_target_registry_diagnostic.py
+      - name: Compact source oracle result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-target-registry-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-target-registry-focused/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Bounded actual source data and complete remote diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-target-registry-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-target-registry-focused/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
