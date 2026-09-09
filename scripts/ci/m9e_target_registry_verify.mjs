@@ -14,7 +14,7 @@ const attrs = value => {
 };
 function validate(row) {
   keys(row, ["schema_version","source_sha","seed","scope","roster_source_sha","roster_run_id","roster_sha256","shattered_ability_id","abilities","moves"]);
-  assert.equal(row.schema_version, 1);
+  assert.equal(row.schema_version, 2);
   assert.equal(row.source_sha, "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
   assert.equal(row.seed, "m9e-target-registry-source-v1");
   assert.equal(row.scope, "actual initialized registry diagnostic; no ability activation, target execution or neutrality claim");
@@ -25,7 +25,7 @@ function validate(row) {
   assert.deepEqual(row.abilities.map(a => a.id), abilityIds);
   assert.deepEqual(row.moves.map(m => m.id), moveIds);
   for (const a of row.abilities) {
-    keys(a, ["id","name","attrs","conditions","spread","spread_flags","bypass_faint","suppressable","shattered_id"]);
+    keys(a, ["id","name","attrs","conditions","spread","spread_flags","redirect_types","studio_capabilities","studio_sources","bypass_faint","suppressable","shattered_id"]);
     assert(typeof a.name === "string" && a.name.length <= 256);
     attrs(a.attrs); integer(a.conditions, 0, 128);
     for (const key of ["spread","bypass_faint","suppressable","shattered_id"]) bool(a[key]);
@@ -33,6 +33,10 @@ function validate(row) {
     assert(Array.isArray(a.spread_flags) && a.spread_flags.length <= 128);
     assert.equal(a.spread, a.spread_flags.length > 0);
     for (const flag of a.spread_flags) integer(flag, 1, 2 ** 31);
+    for (const field of ["redirect_types","studio_capabilities","studio_sources"]) assert(Array.isArray(a[field]) && a[field].length <= 128);
+    for (const type of a.redirect_types) integer(type, 0, 255);
+    for (const id of a.studio_sources) integer(id, 0, 1000000);
+    for (const capability of a.studio_capabilities) assert(typeof capability === "string" && /^[a-z][a-z0-9-]{0,127}$/.test(capability));
   }
   const kinds = ["USER","NEAR_OTHER","ALL_NEAR_OTHERS","NEAR_ENEMY","ALL_NEAR_ENEMIES","RANDOM_NEAR_ENEMY","ALL_ENEMIES","ATTACKER","NEAR_ALLY","ALLY","USER_OR_NEAR_ALLY","USER_AND_ALLIES","ALL","USER_SIDE","ENEMY_SIDE","BOTH_SIDES","PARTY","CURSE","OTHER","ALL_OTHERS"];
   for (const m of row.moves) {

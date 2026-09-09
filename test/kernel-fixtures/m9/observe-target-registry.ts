@@ -57,6 +57,11 @@ test("observe actual initialized target capability registry", async () => {
       conditions: ability.conditions.length,
       spread: ability.hasAttr("SpreadTargetByFlagAbAttr"),
       spread_flags: ability.getAttrs("SpreadTargetByFlagAbAttr").map(attr => attr.flag),
+      redirect_types: ability.getAttrs("RedirectTypeMoveAbAttr").map(attr => attr.type),
+      studio_capabilities: ability.attrs.flatMap(attr =>
+        "abilityStudioCapability" in attr ? [attr.abilityStudioCapability] : []),
+      studio_sources: ability.attrs.flatMap(attr =>
+        "abilityStudioSourceAbilityId" in attr ? [attr.abilityStudioSourceAbilityId] : []),
       bypass_faint: ability.bypassFaint,
       suppressable: ability.suppressable,
       shattered_id: id === ER_SHATTERED_PSYCHE_ABILITY_ID,
@@ -76,7 +81,7 @@ test("observe actual initialized target capability registry", async () => {
     };
   });
   const raw = `${JSON.stringify({
-    schema_version: 1, source_sha: PIN, seed: SEED,
+    schema_version: 2, source_sha: PIN, seed: SEED,
     scope: "actual initialized registry diagnostic; no ability activation, target execution or neutrality claim",
     roster_source_sha: "f0a2b8c185a4e68dc88b4ea0b34128aeb8b28356",
     roster_run_id: "34373633488",
