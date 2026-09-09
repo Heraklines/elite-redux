@@ -1185,7 +1185,7 @@ impl GameKernelV7 {
                     )
                 } else {
                     // Actual host actions still publish unchanged inner V6
-                    // material. Only the validated generation-two ingress may
+                    // material. Only the validated current-generation ingress may
                     // admit it, above the committed generation-one frontier.
                     let material =
                         GameMaterialV6::decode(bytes).map_err(|_| GameKernelV7Error::Invalid)?;
@@ -1850,6 +1850,7 @@ impl GameKernelV7 {
         if let Some(owner) = staged.current_coop_setup.as_mut() {
             owner.last_reply = None;
             owner.last_reply_v2 = None;
+            owner.retired_reply_rebind = None;
         }
         if let Some(index) = retirement {
             protocol

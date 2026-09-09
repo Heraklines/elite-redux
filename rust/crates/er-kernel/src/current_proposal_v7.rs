@@ -278,7 +278,7 @@ impl CurrentProposalMaterialReceiptV1 {
     }
 }
 
-/// Generation two has its own strict wire discriminator. The V1 decoder and
+/// Rebound generations (two and later) share a strict wire discriminator. The V1 decoder and
 /// its exact generation-one encoding remain unchanged.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -381,8 +381,7 @@ impl CurrentProposalMaterialReceiptV2 {
             || self.authority_context.sender_seat_id != context.authority_seat
             || self.authority_context.authority_seat_id != context.authority_seat
             || self.authority_context.connection_generation != proposal.connection_generation
-            || proposal.connection_generation.get()
-                != SafeU53::new(2).map_err(|_| CurrentProposalErrorV1)?
+            || proposal.connection_generation.get().get() <= 1
             || proposal.sender_seat == context.authority_seat
         {
             return Err(CurrentProposalErrorV1);
