@@ -104,7 +104,7 @@ def main():
             result["format_patch"] = {"bytes":len(patch),"sha256":sha(patch)}
             raise RuntimeError("remote formatting correction required")
         cases = OUT/"diagnostics/source-cases.jsonl"
-        oracle = json.loads(run("source-oracle", ["node",CI[2],str(cases)]))
+        oracle = json.loads(run("source-oracle", ["node","--disable-warning=ExperimentalWarning",CI[2],str(cases)]))
         require(oracle["cases"] == 200 and oracle["runtime"] == "v24.9.0" and oracle["whole_target_function"] is True and oracle["whole_line_adjacency"] is True and oracle["resolved_owner_inputs_only"] is True, "whole current target source")
         require(oracle["output_bytes"] == cases.stat().st_size <= 262144 and oracle["output_sha256"] == sha(cases.read_bytes()), "complete source observations")
         for path, expected in oracle["source_hashes"].items():
