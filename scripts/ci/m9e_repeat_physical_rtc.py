@@ -6,17 +6,25 @@ import os
 import re
 from pathlib import Path
 import shutil
+import sys
 import time
 
-from m9e_current_cost import run_bounded
+run_bounded = None
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORT = Path(os.environ["RUNNER_TEMP"]) / "m9e-repeat-physical-rtc-focused"
 FULL = REPORT / "diagnostics"
 COMPACT = REPORT / "compact"
 OUTPUT = REPORT / "web"
-START = int(os.environ["M9E_FOCUS_STARTED_AT"])
-DEADLINE = time.monotonic() + 1780 - (time.time() - START)
+START_TEXT = os.environ.get("M9E_FOCUS_STARTED_AT", "")
+if not re.fullmatch(r"[0-9]{10}", START_TEXT):
+    raise RuntimeError("exact pre-checkout timestamp required")
+START = int(START_TEXT)
+ELAPSED = time.time() - START
+if not 0 <= ELAPSED < 1780:
+    raise RuntimeError("invalid elapsed time or exhausted shared budget")
+DEADLINE = time.monotonic() + 1780 - ELAPSED
+FINAL_DEADLINE = DEADLINE + 20
 EXAMPLE = "rust/crates/er-web/examples/m9e_v7_coop_startup.rs"
 SPEC = "test/browser/rust-browser/m9e-v7-repeat-rebind-rtc.spec.ts"
 OWNER_SPEC = "test/browser/rust-browser/m9e-v7-repeat-rebind-rtc-owner.spec.ts"
@@ -58,7 +66,7 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def run(args, name, seconds=900, bound=16 << 20):
+def run(args, name, seconds=600, bound=16 << 20):
     global failed_log
     output = FULL / f"{len(logs) + 1:03d}-{name}.log"
     try:
@@ -78,6 +86,18 @@ def asset(path, maximum):
 
 
 def main(summary):
+    global run_bounded
+    helper = ROOT / "scripts/ci/m9e_current_cost.py"
+    if helper.is_symlink() or not helper.is_file() or helper.resolve() != helper or not 0 < helper.stat().st_size <= 262144:
+        raise RuntimeError("bounded contained run helper required")
+    if digest(helper) != "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8" or "m9e_current_cost" in sys.modules:
+        raise RuntimeError("pinned bounded runner differs or is already loaded")
+    import m9e_current_cost
+    if Path(m9e_current_cost.__file__).resolve() != helper:
+        raise RuntimeError("bounded runner imported from unexpected path")
+    run_bounded = m9e_current_cost.run_bounded
+    summary["limits"] = {"command_seconds": 600, "work_seconds_including_checkout": 1780,
+        "cleanup_reserve_seconds": 20, "summary_bytes": 32768, "command_log_bytes": 16 << 20}
     sha = os.environ["GITHUB_SHA"]
     if run(["git", "rev-parse", "HEAD"], "identity", 30, 16384).read_text().strip() != sha:
         raise RuntimeError("exact candidate required")
@@ -156,7 +176,7 @@ def execute_prepared(summary, *, install_chromium=True):
     os.environ["M9E_V7_WEB_DIR"] = str(OUTPUT)
     os.environ["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "browser-results.json")
     run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
-         SPEC, "--workers=1", "--reporter=line,json"], "browser", 660)
+         SPEC, "--workers=1", "--reporter=line,json"], "browser", 600)
     report = json.loads((FULL / "browser-results.json").read_text())
     specs = []
     def collect(suite):
@@ -209,7 +229,7 @@ def execute_prepared(summary, *, install_chromium=True):
     summary["browser_evidence"] = evidence
     os.environ["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "owner-browser-results.json")
     run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
-         OWNER_SPEC, "--workers=1", "--reporter=line,json"], "owner-browser", 660)
+         OWNER_SPEC, "--workers=1", "--reporter=line,json"], "owner-browser", 600)
     owner_report = json.loads((FULL / "owner-browser-results.json").read_text())
     specs.clear()
     for suite in owner_report.get("suites", []):
@@ -270,6 +290,22 @@ if __name__ == "__main__":
                 tail = stream.read(24000)
         (FULL / "failure.txt").write_text(str(error) + "\nBounded tail; complete logs remain remote.\n" + tail.decode("utf-8", errors="replace"))
     finally:
+        try:
+            cleaned = []
+            for owned, parent, name in ((ROOT / "rust/target", ROOT / "rust", "target"), (OUTPUT, REPORT, "web")):
+                if owned.parent != parent or owned.name != name or owned.is_symlink() or owned.resolve() != owned:
+                    raise RuntimeError("cleanup target is not its contained owned directory")
+                if owned.exists():
+                    shutil.rmtree(owned)
+                if owned.exists():
+                    raise RuntimeError("owned output cleanup incomplete")
+                cleaned.append(str(owned))
+            if time.monotonic() > FINAL_DEADLINE:
+                raise RuntimeError("owned cleanup exceeded shared deadline")
+            summary["cleanup"] = {"contained": True, "removed": cleaned, "deadline_checked": True}
+        except Exception as error:
+            summary["status"] = "failed"
+            summary["cleanup_failure"] = str(error)
         summary["logs"] = logs
         summary["elapsed_seconds_including_checkout"] = time.time() - START
         summary["run_attempt"] = os.environ["GITHUB_RUN_ATTEMPT"]

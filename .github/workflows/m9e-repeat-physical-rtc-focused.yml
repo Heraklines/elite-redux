@@ -39,7 +39,7 @@ jobs:
           test "$elapsed" -ge 0
           remaining=$((1780 - elapsed))
           test "$remaining" -gt 0
-          timeout "$((remaining < 600 ? remaining : 600))" git fetch --no-tags --depth=1 origin 9568027f51a15af9449d01939e3e8e8da9d863e6
+          timeout "$((remaining < 600 ? remaining : 600))" git fetch --no-tags --filter=blob:none --depth=1 origin 9568027f51a15af9449d01939e3e8e8da9d863e6
       - uses: pnpm/action-setup@v5
         with:
           version: 10.33.2
@@ -76,7 +76,15 @@ jobs:
           path: ~/.cache/ms-playwright
           key: m9e-focused-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install pinned Rust tooling remotely
-        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          elapsed=$(($(date +%s) - M9E_FOCUS_STARTED_AT))
+          test "$elapsed" -ge 0
+          remaining=$((1780 - elapsed))
+          test "$remaining" -gt 0
+          timeout "$((remaining < 600 ? remaining : 600))" rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
       - name: Two actual Workers and RTC from independent Title setup
         run: python3 scripts/ci/m9e_repeat_physical_rtc.py
       - name: Compact focused result

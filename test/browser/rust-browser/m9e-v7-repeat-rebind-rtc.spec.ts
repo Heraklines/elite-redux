@@ -451,7 +451,7 @@ test("current V7 Workers physically reconnect RTC generations two and three with
         equal(await snapshot(peer.client), before, "third-generation retry changed kernel state");
         if (index < 7) { equal(retry, output, "third-generation pending retry differs"); wire = one(retry.frames); }
         else assert(output.frames.length === 0, "third-generation authority must open");
-        if (index === 2) {
+        if (index === 3) {
           const saved = await capsule(peer.client);
           const restored = create();
           await restored.dispatch({ kind: "INITIALIZE", initialization: { kind: "CURRENT_REPRO_CAPSULE", capsule_bytes: saved.bytes } });
