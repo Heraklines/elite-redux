@@ -43,12 +43,17 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
     for (case, line) in lines.into_iter().enumerate() {
         let columns: Vec<_> = line.split('\t').collect();
         assert_eq!(columns.len(), 12);
-        let optional_u8 =
-            |index: usize| (columns[index] != "-").then(|| columns[index].parse::<u8>().expect("source stack count"));
+        let optional_u8 = |index: usize| {
+            (columns[index] != "-")
+                .then(|| columns[index].parse::<u8>().expect("source stack count"))
+        };
         let party = columns[9]
             .split(',')
             .map(|member| {
-                let values: Vec<u32> = member.split(':').map(|v| v.parse().expect("source numeric field")).collect();
+                let values: Vec<u32> = member
+                    .split(':')
+                    .map(|v| v.parse().expect("source numeric field"))
+                    .collect();
                 assert_eq!(values.len(), 3);
                 UnboostedPartyExperienceMember {
                     hp: values[0],
@@ -68,14 +73,18 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
             exp_share_stacks: optional_u8(5),
             exp_balance_stacks: optional_u8(6),
             multiple_participant_stacks: optional_u8(7),
-            multiplier_override: (columns[8] != "-").then(|| columns[8].parse().expect("source override")),
+            multiplier_override: (columns[8] != "-")
+                .then(|| columns[8].parse().expect("source override")),
             party,
         };
         let plan = plan_unboosted_party_experience(&value).expect("admitted source input");
         let expected_friends: Vec<usize> = if columns[10] == "-" {
             vec![]
         } else {
-            columns[10].split(',').map(|v| v.parse().expect("source numeric field")).collect()
+            columns[10]
+                .split(',')
+                .map(|v| v.parse().expect("source numeric field"))
+                .collect()
         };
         assert_eq!(
             plan.battle_friendship_calls, expected_friends,

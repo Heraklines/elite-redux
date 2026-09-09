@@ -21,7 +21,7 @@ TARGET = RUNNER / "m9e-party-xp-target"
 START = float(os.environ["M9E_STARTED_AT"])
 DEADLINE = START + 1800
 COMMANDS = []
-PRODUCTS = {"rust/crates/er-progression/src/current_party_experience.rs":"26b3e17d7940314cae10ce1bc6d29e5f20dfe65928830c7263cfea819a6e3cb2","rust/crates/er-progression/src/lib.rs":"1fd6db5158d66252849626e858fc70191ff1b28f2ced468a58ab13a090c177a0","rust/crates/er-progression/tests/m9e_party_experience.rs":"9a863002c9700645a480b148582c2e4a8aa951157965757b20a0386ce6c1c27d"}
+PRODUCTS = {"rust/crates/er-progression/src/current_party_experience.rs":"26b3e17d7940314cae10ce1bc6d29e5f20dfe65928830c7263cfea819a6e3cb2","rust/crates/er-progression/src/lib.rs":"1fd6db5158d66252849626e858fc70191ff1b28f2ced468a58ab13a090c177a0","rust/crates/er-progression/tests/m9e_party_experience.rs":"8eb725d8d6d7904b2654448fb0a359188f989fcabc3de3895a7272e79317a205"}
 
 def require(ok, reason):
     if not ok:
