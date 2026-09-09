@@ -36,7 +36,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[test]
 fn retained_turn_matches_uninterrupted_actions_rng_and_finalization() -> Result<()> {
-    use er_battle::m7_resolver::{begin_current_turn, step_current_turn, finish_current_turn};
+    use er_battle::m7_resolver::{begin_current_turn, finish_current_turn, step_current_turn};
     use er_state::current_turn_execution::{CurrentTurnExecutionV1, CurrentTurnStageV1};
     let content = content()?;
     let mut snapshot = two_enemies(content.clone())?;
@@ -51,39 +51,118 @@ fn retained_turn_matches_uninterrupted_actions_rng_and_finalization() -> Result<
         enemy.moves[0].as_mut().ok_or("move absent")?.pp_used = 0;
         enemy.stats.attack = 1;
     }
-    let accepted = commands(state, &[slot(BattleSide::Enemy, 0), slot(BattleSide::Player, 0),
-        slot(BattleSide::Player, 0)], content.as_ref())?;
+    let accepted = commands(
+        state,
+        &[
+            slot(BattleSide::Enemy, 0),
+            slot(BattleSide::Player, 0),
+            slot(BattleSide::Player, 0),
+        ],
+        content.as_ref(),
+    )?;
     let targeting = CurrentTargetExecution::from_state(state)?;
     let before = project(state);
-    let authority = TurnAuthorityContextV1 { authority_seat: seat(), revision: active_run(state)?.control.revision };
-    let whole = resolve_turn_v5_with_current_targets(&before, &accepted, &content.battle, &authority, &targeting)?;
-    let mut chunk = begin_current_turn(&before, &accepted, &content.battle, &authority, &targeting, SafeU53::ZERO)?;
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: seat(),
+        revision: active_run(state)?.control.revision,
+    };
+    let whole = resolve_turn_v5_with_current_targets(
+        &before,
+        &accepted,
+        &content.battle,
+        &authority,
+        &targeting,
+    )?;
+    let mut chunk = begin_current_turn(
+        &before,
+        &accepted,
+        &content.battle,
+        &authority,
+        &targeting,
+        SafeU53::ZERO,
+    )?;
     let mut audit = chunk.transition.rng_audit.clone();
     let mut actions = Vec::new();
     let mut mutations = Vec::new();
     let mut cues = Vec::new();
     let selected_order = chunk.continuation.actions.clone();
-    let original_turn = active_run(state)?.battle.as_ref().ok_or("battle absent")?.turn;
+    let original_turn = active_run(state)?
+        .battle
+        .as_ref()
+        .ok_or("battle absent")?
+        .turn;
     assert!(chunk.transition.action_order.is_empty());
-    assert!(finish_current_turn(&chunk.transition.after_state, &chunk.continuation, &content.battle, &authority, &targeting).is_err());
+    assert!(
+        finish_current_turn(
+            &chunk.transition.after_state,
+            &chunk.continuation,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
     while usize::from(chunk.continuation.next_action) < chunk.continuation.actions.len() {
         // A real serde round trip between every action retains the exact queue/RNG frontier.
-        let owner: CurrentTurnExecutionV1 = serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
+        let owner: CurrentTurnExecutionV1 =
+            serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
         assert_eq!(owner, chunk.continuation);
         let mut stale = authority;
         stale.revision = safe(authority.revision.get() + 1);
-        assert!(step_current_turn(&chunk.transition.after_state, &owner, &content.battle, &stale, &targeting).is_err());
-        chunk = step_current_turn(&chunk.transition.after_state, &owner, &content.battle, &authority, &targeting)?;
+        assert!(
+            step_current_turn(
+                &chunk.transition.after_state,
+                &owner,
+                &content.battle,
+                &stale,
+                &targeting
+            )
+            .is_err()
+        );
+        chunk = step_current_turn(
+            &chunk.transition.after_state,
+            &owner,
+            &content.battle,
+            &authority,
+            &targeting,
+        )?;
         assert_eq!(chunk.continuation.stage, CurrentTurnStageV1::ReadyForMove);
         assert_eq!(chunk.continuation.actions, selected_order);
-        assert_eq!(chunk.transition.after_state.active_run.as_ref().ok_or("run absent")?.battle.as_ref().ok_or("battle absent")?.turn, original_turn);
+        assert_eq!(
+            chunk
+                .transition
+                .after_state
+                .active_run
+                .as_ref()
+                .ok_or("run absent")?
+                .battle
+                .as_ref()
+                .ok_or("battle absent")?
+                .turn,
+            original_turn
+        );
         audit.extend(chunk.transition.rng_audit.clone());
         actions.extend(chunk.transition.action_order.clone());
         mutations.extend(chunk.transition.mutations.clone());
         cues.extend(chunk.transition.presentation.clone());
     }
-    assert!(step_current_turn(&chunk.transition.after_state, &chunk.continuation, &content.battle, &authority, &targeting).is_err());
-    chunk = finish_current_turn(&chunk.transition.after_state, &chunk.continuation, &content.battle, &authority, &targeting)?;
+    assert!(
+        step_current_turn(
+            &chunk.transition.after_state,
+            &chunk.continuation,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
+    chunk = finish_current_turn(
+        &chunk.transition.after_state,
+        &chunk.continuation,
+        &content.battle,
+        &authority,
+        &targeting,
+    )?;
     audit.extend(chunk.transition.rng_audit.clone());
     mutations.extend(chunk.transition.mutations.clone());
     cues.extend(chunk.transition.presentation.clone());
@@ -94,13 +173,22 @@ fn retained_turn_matches_uninterrupted_actions_rng_and_finalization() -> Result<
     assert_eq!(actions, whole.action_order);
     assert_eq!(mutations, whole.mutations);
     assert_eq!(cues, whole.presentation);
-    assert!(finish_current_turn(&chunk.transition.after_state, &chunk.continuation, &content.battle, &authority, &targeting).is_err());
+    assert!(
+        finish_current_turn(
+            &chunk.transition.after_state,
+            &chunk.continuation,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
     Ok(())
 }
 
 #[test]
 fn retained_turn_faint_blocks_later_move_at_live_reward_preimage() -> Result<()> {
-    use er_battle::m7_resolver::{begin_current_turn, step_current_turn, finish_current_turn};
+    use er_battle::m7_resolver::{begin_current_turn, finish_current_turn, step_current_turn};
     use er_state::current_turn_execution::{CurrentTurnExecutionV1, CurrentTurnStageV1};
     let content = content()?;
     let mut snapshot = two_enemies(content.clone())?;
@@ -120,30 +208,85 @@ fn retained_turn_faint_blocks_later_move_at_live_reward_preimage() -> Result<()>
     }
     battle.enemy_party[1].hp = 1;
     let defeated = battle.enemy_party[1].id;
-    let accepted = commands(state, &[slot(BattleSide::Enemy, 1), slot(BattleSide::Player, 0),
-        slot(BattleSide::Player, 0)], content.as_ref())?;
+    let accepted = commands(
+        state,
+        &[
+            slot(BattleSide::Enemy, 1),
+            slot(BattleSide::Player, 0),
+            slot(BattleSide::Player, 0),
+        ],
+        content.as_ref(),
+    )?;
     let targeting = CurrentTargetExecution::from_state(state)?;
-    let authority = TurnAuthorityContextV1 { authority_seat: seat(), revision: active_run(state)?.control.revision };
-    let begin = begin_current_turn(&project(state), &accepted, &content.battle, &authority, &targeting, safe(37))?;
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: seat(),
+        revision: active_run(state)?.control.revision,
+    };
+    let begin = begin_current_turn(
+        &project(state),
+        &accepted,
+        &content.battle,
+        &authority,
+        &targeting,
+        safe(37),
+    )?;
     let selected = begin.continuation.actions.clone();
-    let chunk = step_current_turn(&begin.transition.after_state, &begin.continuation, &content.battle, &authority, &targeting)?;
-    let CurrentTurnStageV1::AwaitingInterlude { faints } = &chunk.continuation.stage else { return Err("missing actual faint interlude".into()); };
+    let chunk = step_current_turn(
+        &begin.transition.after_state,
+        &begin.continuation,
+        &content.battle,
+        &authority,
+        &targeting,
+    )?;
+    let CurrentTurnStageV1::AwaitingInterlude { faints } = &chunk.continuation.stage else {
+        return Err("missing actual faint interlude".into());
+    };
     assert_eq!(faints.len(), 1);
     assert_eq!(faints[0].id, SafeU53::ZERO);
     assert_eq!(faints[0].pokemon, defeated);
     assert_eq!(faints[0].slot, slot(BattleSide::Enemy, 1));
-    let run = chunk.transition.after_state.active_run.as_ref().ok_or("run absent")?;
+    let run = chunk
+        .transition
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?;
     assert_eq!(run.party[0].id, actor);
     assert_eq!(run.party[0].hp, 1);
-    assert_eq!(run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].moves[0].as_ref().ok_or("move absent")?.pp_used, 0);
+    assert_eq!(
+        run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].moves[0]
+            .as_ref()
+            .ok_or("move absent")?
+            .pp_used,
+        0
+    );
     assert_eq!(chunk.continuation.actions, selected);
     assert_eq!(chunk.continuation.accepted_commands, accepted);
     assert_eq!(chunk.continuation.next_action, 1);
-    let restored: CurrentTurnExecutionV1 = serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
+    let restored: CurrentTurnExecutionV1 =
+        serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
     assert_eq!(restored, chunk.continuation);
     let frozen = canonical_bytes(&chunk.transition.after_state)?;
-    assert!(step_current_turn(&chunk.transition.after_state, &restored, &content.battle, &authority, &targeting).is_err());
-    assert!(finish_current_turn(&chunk.transition.after_state, &restored, &content.battle, &authority, &targeting).is_err());
+    assert!(
+        step_current_turn(
+            &chunk.transition.after_state,
+            &restored,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
+    assert!(
+        finish_current_turn(
+            &chunk.transition.after_state,
+            &restored,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
     assert_eq!(canonical_bytes(&chunk.transition.after_state)?, frozen);
     // This test stops at the actual boundary. Only the integrated phase owner may
     // release it after consuming real Faint/Victory/XP records, never a test flag.
