@@ -2120,13 +2120,15 @@
     "paths": [
       "src/rust-browser/adapters/current-rtc-transport.ts",
       "src/rust-browser/routes/rust-current-rtc-entry.ts",
-      "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts"
+      "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts",
+      "src/rust-browser/adapters/current-rtc-transport-v2.ts",
+      "src/rust-browser/routes/rust-current-rtc-rebind-entry.ts"
     ],
     "test_ids": [
       "two current Workers exchange real RTC proposals and converge one natural checkpoint turn",
       "current RTC identity mismatch and stalled presentation teardown settle owned work"
     ],
-    "reason": "Exactly three additive fixed-generation RTC checkpoint paths. Reuse the full causal22 native scope and controls; retain both lanes, Worker2/codec3, Wasm2, inpage2, typed1 and source-bound CLI bridge. Require two separate actual RTC witnesses and complete artifact/causal/teardown proof. No lock, dependency, reconnect, fragmentation or production-route exemption."
+    "reason": "Exactly five qualified RTC transport and application-owner paths. Reuse the full causal22 native scope and controls; retain both lanes, Worker2/codec3, Wasm2, inpage2, typed1 and source-bound CLI bridge. Require two separate actual RTC witnesses and complete artifact/causal/teardown proof. No lock, dependency, reconnect, fragmentation or production-route exemption."
   },
   "current_state_query_focus": {
     "paths": [
