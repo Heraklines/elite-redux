@@ -3034,7 +3034,7 @@ def main(preflight_failure=None):
             summary["plan"] = {"file": "plan.json", "sha256": digest(FULL / "plan.json")}
             encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()
         if len(encoded_summary) > 16000:
-            for key in ("native_target_timing_ms", "required_native_target_counts", "build_only_targets", "timing_ms", "current_cost_probe"):
+            for key in ("native_target_timing_ms", "required_native_target_counts", "build_only_targets", "timing_ms", "current_cost_probe", "standard_score_oracle", "party_xp_oracle", "phase_xp_oracle", "held_xp_oracle", "phase_tree_oracle", "phase_tree_queries_oracle", "starter_pokerus_oracle"):
                 if key in summary:
                     summary[key] = {"file": "full-summary.json", "sha256": digest(FULL / "full-summary.json")}
             encoded_summary = (json.dumps(summary, indent=2) + "\n").encode()

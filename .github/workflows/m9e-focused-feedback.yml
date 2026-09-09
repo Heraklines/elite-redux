@@ -5,7 +5,7 @@ on:
     branches:
       - 'wrk/m9e-recovery-*'
       - 'wrk/m9e-task-*'
-      - 'codex/m9e-full-phase-tree-20260909'
+      - 'codex/m9e-full-phase-tree-summary-20260909'
 
 permissions:
   contents: read
