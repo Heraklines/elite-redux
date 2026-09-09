@@ -16,6 +16,7 @@ pub mod m7_progression_control;
 pub mod m7_run_executor;
 pub mod m7_runtime;
 pub mod m9_new_run;
+pub mod m9e_ai_score_query;
 pub mod m9e_content_v2;
 pub mod m9e_internal_event_v2;
 pub mod m9e_material_v6;
