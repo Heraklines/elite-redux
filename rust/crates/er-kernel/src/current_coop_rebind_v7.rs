@@ -264,7 +264,8 @@ impl CurrentCoopRebindSnapshotV1 {
         bounded(self, MAX_CURRENT_REBIND_OWNER_BYTES_V1)?;
         if self.schema_version != 1
             || self.from_generation.get() == SafeU53::ZERO
-            || self.to_generation != ConnectionGeneration::new(checked_next(self.from_generation.get())?)
+            || self.to_generation
+                != ConnectionGeneration::new(checked_next(self.from_generation.get())?)
             || self.begin_replay_sequence == SafeU53::ZERO
             || self.begin_replay_sequence > replay
             || self.phase != phase(self.role, self.transcript.len())?
@@ -539,9 +540,15 @@ fn binding(
         .ok_or(GameKernelV7Error::Invalid)?;
     let (authority_origin, guest_origin) =
         if setup.local.sender_seat_id == setup.local.authority_seat_id {
-            (context_at(&setup.local, from_generation), context_at(&setup.peer, from_generation))
+            (
+                context_at(&setup.local, from_generation),
+                context_at(&setup.peer, from_generation),
+            )
         } else {
-            (context_at(&setup.peer, from_generation), context_at(&setup.local, from_generation))
+            (
+                context_at(&setup.peer, from_generation),
+                context_at(&setup.local, from_generation),
+            )
         };
     Ok(CurrentCoopRebindBindingV1 {
         authority_target: target(&authority_origin)?,
@@ -652,7 +659,10 @@ fn validate_retired_reply(
     snapshot: &CoreGameKernelSnapshotV7,
     current: &CurrentCoopRebindSnapshotV1,
 ) -> Result<()> {
-    let setup = snapshot.current_coop_setup.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+    let setup = snapshot
+        .current_coop_setup
+        .as_ref()
+        .ok_or(GameKernelV7Error::Invalid)?;
     let Some(retired) = &setup.retired_reply_rebind else {
         return Ok(());
     };
@@ -663,7 +673,9 @@ fn validate_retired_reply(
         || retired.role != EndpointRole::Authority
         || retired.phase != CurrentCoopRebindPhaseV1::Open
         || retired.to_generation > current.from_generation
-        || retired.commit_replay_sequence.is_none_or(|sequence| sequence >= current.begin_replay_sequence)
+        || retired
+            .commit_replay_sequence
+            .is_none_or(|sequence| sequence >= current.begin_replay_sequence)
         || retired.binding.authority_origin != context_at(&setup.local, retired.from_generation)
         || retired.binding.guest_origin != context_at(&setup.peer, retired.from_generation)
     {
@@ -675,8 +687,14 @@ fn validate_retired_reply(
 pub(super) fn receipt_owner(
     snapshot: &CoreGameKernelSnapshotV7,
 ) -> Result<&CurrentCoopRebindSnapshotV1> {
-    let setup = snapshot.current_coop_setup.as_ref().ok_or(GameKernelV7Error::Invalid)?;
-    let owner = setup.retired_reply_rebind.as_ref().or(setup.rebind.as_ref())
+    let setup = snapshot
+        .current_coop_setup
+        .as_ref()
+        .ok_or(GameKernelV7Error::Invalid)?;
+    let owner = setup
+        .retired_reply_rebind
+        .as_ref()
+        .or(setup.rebind.as_ref())
         .ok_or(GameKernelV7Error::Invalid)?;
     if owner.role != EndpointRole::Authority || owner.phase != CurrentCoopRebindPhaseV1::Open {
         return Err(GameKernelV7Error::Invalid);
@@ -892,8 +910,13 @@ impl GameKernelV7 {
                 CurrentCoopRebindPhaseV1::AwaitOffer
             },
             from_generation: protocol.frame_context.context.connection_generation,
-            to_generation: ConnectionGeneration::new(checked_next(protocol.frame_context.context.connection_generation.get())?),
-            binding: binding(&before, protocol.frame_context.context.connection_generation)?,
+            to_generation: ConnectionGeneration::new(checked_next(
+                protocol.frame_context.context.connection_generation.get(),
+            )?),
+            binding: binding(
+                &before,
+                protocol.frame_context.context.connection_generation,
+            )?,
             begin_replay_sequence: checked_next(before.replay_sequence)?,
             commit_replay_sequence: None,
             candidate_connected: false,
@@ -903,7 +926,10 @@ impl GameKernelV7 {
             owner.transcript.push(owner.next_control()?);
         }
         let mut candidate = self.clone();
-        let setup = candidate.current_coop_setup.as_mut().ok_or(GameKernelV7Error::Invalid)?;
+        let setup = candidate
+            .current_coop_setup
+            .as_mut()
+            .ok_or(GameKernelV7Error::Invalid)?;
         if setup.last_reply_v2.is_some() && setup.retired_reply_rebind.is_none() {
             setup.retired_reply_rebind = setup.rebind.clone();
         }

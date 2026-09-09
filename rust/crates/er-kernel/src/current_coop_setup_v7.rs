@@ -60,7 +60,8 @@ pub struct CurrentCoopSetupSnapshotV1 {
     // Exactly one completed transcript for last_reply_v2; the transcript type
     // contains no owner history. Absent on original generation-one/two snapshots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub retired_reply_rebind: Option<Box<super::current_coop_rebind_v7::CurrentCoopRebindSnapshotV1>>,
+    pub retired_reply_rebind:
+        Option<Box<super::current_coop_rebind_v7::CurrentCoopRebindSnapshotV1>>,
 }
 
 fn encode<T: serde::Serialize>(value: &T, maximum: usize) -> Result<Vec<u8>> {
@@ -262,7 +263,9 @@ pub(crate) fn validate_snapshot(
     if let Some(choices) = &owner.choices {
         validate_choices(choices, owner, content)?;
     }
-    if owner.retired_reply_rebind.is_some() && (owner.rebind.is_none() || owner.last_reply_v2.is_none()) {
+    if owner.retired_reply_rebind.is_some()
+        && (owner.rebind.is_none() || owner.last_reply_v2.is_none())
+    {
         return Err(GameKernelV7Error::Invalid);
     }
     let cached = match (&owner.last_reply, &owner.last_reply_v2) {
@@ -281,7 +284,10 @@ pub(crate) fn validate_snapshot(
         }
         (None, Some(reply)) => {
             let epoch = super::current_coop_rebind_v7::receipt_owner(snapshot)?;
-            let transaction = epoch.transcript.last().and_then(|frame| frame.transaction_id.as_ref())
+            let transaction = epoch
+                .transcript
+                .last()
+                .and_then(|frame| frame.transaction_id.as_ref())
                 .ok_or(GameKernelV7Error::Invalid)?;
             if &reply.rebind_transaction_id != transaction {
                 return Err(GameKernelV7Error::Invalid);
@@ -294,8 +300,13 @@ pub(crate) fn validate_snapshot(
                 < epoch.binding.frontier.next_authority_revision
                 || (owner.retired_reply_rebind.is_some()
                     && evidence.material.transition().authority_revision
-                        >= owner.rebind.as_ref().ok_or(GameKernelV7Error::Invalid)?
-                            .binding.frontier.next_authority_revision)
+                        >= owner
+                            .rebind
+                            .as_ref()
+                            .ok_or(GameKernelV7Error::Invalid)?
+                            .binding
+                            .frontier
+                            .next_authority_revision)
             {
                 return Err(GameKernelV7Error::Invalid);
             }
@@ -495,7 +506,7 @@ impl GameKernelV7 {
             last_reply: None,
             last_reply_v2: None,
             rebind: None,
-        retired_reply_rebind: None,
+            retired_reply_rebind: None,
         }));
         candidate.validate()?;
         *self = candidate;

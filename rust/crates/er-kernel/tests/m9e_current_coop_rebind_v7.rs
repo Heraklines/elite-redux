@@ -1320,7 +1320,11 @@ fn open_rebind_receipt_and_owner_mutations_reject_with_complete_state_conservati
 
 // Repeated epochs use the same natural setup and real transport entry points as
 // the original witnesses above. Only negative snapshots below are mutated.
-fn begin_epoch(host: &mut GameKernelV7, guest: &mut GameKernelV7, from: u64) -> TestResult<Vec<u8>> {
+fn begin_epoch(
+    host: &mut GameKernelV7,
+    guest: &mut GameKernelV7,
+    from: u64,
+) -> TestResult<Vec<u8>> {
     let origin = ConnectionGeneration::new(safe(from));
     let target = ConnectionGeneration::new(safe(from + 1));
     for kernel in [&mut *host, &mut *guest] {
@@ -1331,18 +1335,34 @@ fn begin_epoch(host: &mut GameKernelV7, guest: &mut GameKernelV7, from: u64) -> 
         let staged = kernel.snapshot()?;
         assert_eq!(owner(&staged)?.from_generation, origin);
         assert_eq!(owner(&staged)?.to_generation, target);
-        assert_eq!(staged.protocol.as_ref().ok_or("protocol")?.frame_context.context.connection_generation, origin);
+        assert_eq!(
+            staged
+                .protocol
+                .as_ref()
+                .ok_or("protocol")?
+                .frame_context
+                .context
+                .connection_generation,
+            origin
+        );
         assert_eq!(kernel.begin_current_coop_rebind_v1()?, output);
         assert_eq!(kernel.retry_current_coop_rebind_v1()?, output);
         assert_eq!(kernel.snapshot()?, staged);
-        assert!(kernel.transport_changed(ConnectionGeneration::new(safe(from + 2)), true).is_err());
+        assert!(
+            kernel
+                .transport_changed(ConnectionGeneration::new(safe(from + 2)), true)
+                .is_err()
+        );
         assert_eq!(kernel.snapshot()?, staged);
         kernel.transport_changed(target, true)?;
     }
     epoch_frame(&host.retry_current_coop_rebind_v1()?, target)
 }
 
-fn epoch_frame(output: &CurrentCoopRebindOutputV1, generation: ConnectionGeneration) -> TestResult<Vec<u8>> {
+fn epoch_frame(
+    output: &CurrentCoopRebindOutputV1,
+    generation: ConnectionGeneration,
+) -> TestResult<Vec<u8>> {
     assert_eq!(output.generation, generation);
     assert_eq!(output.frames.len(), 1);
     Ok(output.frames[0].clone())
@@ -1358,11 +1378,18 @@ fn handshake_epoch(
     let mut frames = Vec::new();
     for index in 0usize..8 {
         frames.push(frame.clone());
-        let receiver = if index.is_multiple_of(2) { &mut *guest } else { &mut *host };
+        let receiver = if index.is_multiple_of(2) {
+            &mut *guest
+        } else {
+            &mut *host
+        };
         let output = receiver.receive_current_coop_rebind_v1(generation, &frame)?;
         assert_eq!(output.generation, generation);
         let accepted = receiver.snapshot()?;
-        assert_eq!(receiver.receive_current_coop_rebind_v1(generation, &frame)?, output);
+        assert_eq!(
+            receiver.receive_current_coop_rebind_v1(generation, &frame)?,
+            output
+        );
         receiver.retry_current_coop_rebind_v1()?;
         assert_eq!(receiver.snapshot()?, accepted);
         if index < 7 {
@@ -1382,13 +1409,29 @@ fn handshake_epoch(
         assert_eq!(epoch.phase, CurrentCoopRebindPhaseV1::Open);
         assert_eq!(epoch.to_generation, generation);
         assert_eq!(epoch.transcript.len(), 8);
-        assert_eq!(snapshot.protocol.as_ref().ok_or("protocol")?.frame_context.context.connection_generation, generation);
+        assert_eq!(
+            snapshot
+                .protocol
+                .as_ref()
+                .ok_or("protocol")?
+                .frame_context
+                .context
+                .connection_generation,
+            generation
+        );
     }
-    assert_eq!(owner(&host.snapshot()?)?.transcript, owner(&guest.snapshot()?)?.transcript);
+    assert_eq!(
+        owner(&host.snapshot()?)?.transcript,
+        owner(&guest.snapshot()?)?.transcript
+    );
     Ok(frames)
 }
 
-fn assert_epoch_conserved(before: &CoreGameKernelSnapshotV7, after: &CoreGameKernelSnapshotV7, generation: u64) -> TestResult {
+fn assert_epoch_conserved(
+    before: &CoreGameKernelSnapshotV7,
+    after: &CoreGameKernelSnapshotV7,
+    generation: u64,
+) -> TestResult {
     let old_setup = before.current_coop_setup.as_ref().ok_or("setup")?;
     let new_setup = after.current_coop_setup.as_ref().ok_or("setup")?;
     let expected_retired = if old_setup.last_reply_v2.is_some() {
@@ -1415,14 +1458,21 @@ fn assert_epoch_conserved(before: &CoreGameKernelSnapshotV7, after: &CoreGameKer
     let target = ConnectionGeneration::new(safe(generation));
     expected.frame_context.context.connection_generation = target;
     expected.peer_identity.local.connection_generation = target;
-    expected.peer_identity.peer.as_mut().ok_or("peer")?.connection_generation = target;
+    expected
+        .peer_identity
+        .peer
+        .as_mut()
+        .ok_or("peer")?
+        .connection_generation = target;
     for connection in &mut expected.connections {
         connection.generation = target;
         connection.state = er_types::TransportState::Connected;
     }
     if let Some(log) = &mut expected.authority_log {
         log.local_context.connection_generation = target;
-        for peer in &mut log.peer_bindings { peer.generation = target; }
+        for peer in &mut log.peer_bindings {
+            peer.generation = target;
+        }
     }
     if let Some(replica) = &mut expected.authority_replica {
         replica.receipt_context.connection_generation = target;
@@ -1438,12 +1488,21 @@ fn assert_epoch_conserved(before: &CoreGameKernelSnapshotV7, after: &CoreGameKer
 }
 
 fn reject_retired_snapshot(snapshot: CoreGameKernelSnapshotV7) -> TestResult {
-    assert!(GameKernelV7::from_snapshot(snapshot, SeatId::new(safe(1)), GameKernelRoleV7::Authority, content()?).is_err());
+    assert!(
+        GameKernelV7::from_snapshot(
+            snapshot,
+            SeatId::new(safe(1)),
+            GameKernelRoleV7::Authority,
+            content()?
+        )
+        .is_err()
+    );
     Ok(())
 }
 
 #[test]
-fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_new_gameplay() -> TestResult {
+fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_new_gameplay()
+-> TestResult {
     use er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV2;
     let (mut host, mut guest) = pair_with_capacity(safe(1))?;
     let offer = begin(&mut host, &mut guest)?;
@@ -1451,7 +1510,8 @@ fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_ne
     let absent = er_canonical::canonical_bytes(&host.snapshot()?)?;
     assert!(!String::from_utf8(absent)?.contains("retired_reply_rebind"));
     let (old_material, old_proposal) = actual_guest_proposal(&mut host, &mut guest, 2)?;
-    let old_reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &old_proposal)?)?;
+    let old_reply =
+        wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &old_proposal)?)?;
     let old_receipt = CurrentProposalMaterialReceiptV2::decode(&old_reply)?;
     guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &old_reply)?;
     settle_owned_presentations(&mut host)?;
@@ -1462,10 +1522,21 @@ fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_ne
     let offer = begin_epoch(&mut host, &mut guest, 2)?;
     let staged = host.snapshot()?;
     let staged_setup = staged.current_coop_setup.as_ref().ok_or("setup")?;
-    let retired = staged_setup.retired_reply_rebind.as_ref().ok_or("retired owner")?.clone();
+    let retired = staged_setup
+        .retired_reply_rebind
+        .as_ref()
+        .ok_or("retired owner")?
+        .clone();
     assert_eq!(retired.to_generation, ConnectionGeneration::new(safe(2)));
     assert_eq!(retired.transcript, owner(&before_host)?.transcript);
-    assert_eq!(staged_setup.last_reply_v2.as_ref().ok_or("old receipt")?.canonical_bytes()?, old_reply);
+    assert_eq!(
+        staged_setup
+            .last_reply_v2
+            .as_ref()
+            .ok_or("old receipt")?
+            .canonical_bytes()?,
+        old_reply
+    );
     let controls = handshake_epoch(&mut host, &mut guest, offer, 3)?;
     assert_ne!(controls, old_controls);
     assert_epoch_conserved(&before_host, &host.snapshot()?, 3)?;
@@ -1474,11 +1545,25 @@ fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_ne
         let before_host = host.snapshot()?;
         let before_guest = guest.snapshot()?;
         let generation = ConnectionGeneration::new(safe(outer));
-        assert!(host.ingest_network_frame(generation, &old_proposal).is_err());
+        assert!(
+            host.ingest_network_frame(generation, &old_proposal)
+                .is_err()
+        );
         assert!(guest.ingest_network_frame(generation, &old_reply).is_err());
-        assert!(guest.ingest_network_frame(generation, &old_material).is_err());
-        assert!(guest.receive_current_coop_rebind_v1(generation, &old_controls[0]).is_err());
-        assert!(host.receive_current_coop_rebind_v1(generation, &old_controls[1]).is_err());
+        assert!(
+            guest
+                .ingest_network_frame(generation, &old_material)
+                .is_err()
+        );
+        assert!(
+            guest
+                .receive_current_coop_rebind_v1(generation, &old_controls[0])
+                .is_err()
+        );
+        assert!(
+            host.receive_current_coop_rebind_v1(generation, &old_controls[1])
+                .is_err()
+        );
         assert_eq!(host.snapshot()?, before_host);
         assert_eq!(guest.snapshot()?, before_guest);
     }
@@ -1486,22 +1571,57 @@ fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_ne
     let before_rejection = host.snapshot()?;
     let mut malformed: serde_json::Value = serde_json::from_slice(&proposal)?;
     malformed["extra"] = serde_json::json!(true);
-    assert!(host.ingest_network_frame(ConnectionGeneration::new(safe(3)), &er_canonical::canonical_bytes(&malformed)?).is_err());
+    assert!(
+        host.ingest_network_frame(
+            ConnectionGeneration::new(safe(3)),
+            &er_canonical::canonical_bytes(&malformed)?
+        )
+        .is_err()
+    );
     assert_eq!(host.snapshot()?, before_rejection);
     let reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(3)), &proposal)?)?;
     let receipt = CurrentProposalMaterialReceiptV2::decode(&reply)?;
     assert_eq!(receipt.evidence()?.proposal_bytes, proposal);
-    assert_eq!(receipt.authority_context.connection_generation, ConnectionGeneration::new(safe(3)));
-    assert_ne!(receipt.rebind_transaction_id, old_receipt.rebind_transaction_id);
-    assert_eq!(Some(&receipt.rebind_transaction_id), owner(&host.snapshot()?)?.transcript.last().ok_or("transcript")?.transaction_id.as_ref());
+    assert_eq!(
+        receipt.authority_context.connection_generation,
+        ConnectionGeneration::new(safe(3))
+    );
+    assert_ne!(
+        receipt.rebind_transaction_id,
+        old_receipt.rebind_transaction_id
+    );
+    assert_eq!(
+        Some(&receipt.rebind_transaction_id),
+        owner(&host.snapshot()?)?
+            .transcript
+            .last()
+            .ok_or("transcript")?
+            .transaction_id
+            .as_ref()
+    );
     let applied = host.snapshot()?;
-    assert!(applied.current_coop_setup.as_ref().ok_or("setup")?.retired_reply_rebind.is_none());
-    assert_eq!(wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(3)), &proposal)?)?, reply);
+    assert!(
+        applied
+            .current_coop_setup
+            .as_ref()
+            .ok_or("setup")?
+            .retired_reply_rebind
+            .is_none()
+    );
+    assert_eq!(
+        wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(3)), &proposal)?)?,
+        reply
+    );
     assert_eq!(host.snapshot()?, applied);
     guest.ingest_network_frame(ConnectionGeneration::new(safe(3)), &reply)?;
     assert!(guest.snapshot()?.current_proposal.is_none());
     let applied_guest = guest.snapshot()?;
-    assert!(guest.ingest_network_frame(ConnectionGeneration::new(safe(3)), &reply)?.effects.is_empty());
+    assert!(
+        guest
+            .ingest_network_frame(ConnectionGeneration::new(safe(3)), &reply)?
+            .effects
+            .is_empty()
+    );
     assert_eq!(guest.snapshot()?, applied_guest);
     settle_owned_presentations(&mut host)?;
     settle_owned_presentations(&mut guest)?;
@@ -1512,7 +1632,8 @@ fn repeated_rebind_natural_three_generations_preserve_old_receipt_and_execute_ne
 }
 
 #[test]
-fn repeated_rebind_retains_one_receipt_witness_across_idle_epochs_and_rejects_forged_history() -> TestResult {
+fn repeated_rebind_retains_one_receipt_witness_across_idle_epochs_and_rejects_forged_history()
+-> TestResult {
     let (mut host, mut guest) = pair_with_capacity(safe(1))?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
@@ -1540,22 +1661,76 @@ fn repeated_rebind_retains_one_receipt_witness_across_idle_epochs_and_rejects_fo
         assert_eq!(witness.to_generation, ConnectionGeneration::new(safe(2)));
         assert_eq!(witness.transcript.len(), 8);
         assert!(!String::from_utf8(bytes.clone())?.contains("retired_reply_rebind"));
-        if let Some(previous) = &retained_bytes { assert_eq!(previous, &bytes); }
+        if let Some(previous) = &retained_bytes {
+            assert_eq!(previous, &bytes);
+        }
         retained_bytes = Some(bytes);
-        assert_eq!(setup.last_reply_v2.as_ref().ok_or("receipt")?.canonical_bytes()?, reply);
+        assert_eq!(
+            setup
+                .last_reply_v2
+                .as_ref()
+                .ok_or("receipt")?
+                .canonical_bytes()?,
+            reply
+        );
         for case in 0..10 {
             let mut forged = valid.clone();
             let setup = forged.current_coop_setup.as_mut().ok_or("setup")?;
             match case {
                 0 => setup.retired_reply_rebind = None,
                 1 => setup.last_reply_v2 = None,
-                2 => setup.retired_reply_rebind.as_mut().ok_or("retired")?.transcript.pop().ok_or("transcript").map(|_| ())?,
-                3 => setup.retired_reply_rebind.as_mut().ok_or("retired")?.commit_replay_sequence = Some(owner(&valid)?.begin_replay_sequence),
-                4 => setup.retired_reply_rebind.as_mut().ok_or("retired")?.binding.authority_origin.run_id = RunId::new("forged-origin")?,
-                5 => setup.retired_reply_rebind.as_mut().ok_or("retired")?.binding.frontier.next_authority_revision = safe(1),
-                6 => setup.last_reply_v2.as_mut().ok_or("receipt")?.rebind_transaction_id = "0".repeat(64),
-                7 => setup.last_reply_v2.as_mut().ok_or("receipt")?.authority_context.connection_generation = ConnectionGeneration::new(safe(from + 1)),
-                8 => setup.rebind.as_mut().ok_or("owner")?.from_generation = ConnectionGeneration::new(safe(9_007_199_254_740_991)),
+                2 => setup
+                    .retired_reply_rebind
+                    .as_mut()
+                    .ok_or("retired")?
+                    .transcript
+                    .pop()
+                    .ok_or("transcript")
+                    .map(|_| ())?,
+                3 => {
+                    setup
+                        .retired_reply_rebind
+                        .as_mut()
+                        .ok_or("retired")?
+                        .commit_replay_sequence = Some(owner(&valid)?.begin_replay_sequence)
+                }
+                4 => {
+                    setup
+                        .retired_reply_rebind
+                        .as_mut()
+                        .ok_or("retired")?
+                        .binding
+                        .authority_origin
+                        .run_id = RunId::new("forged-origin")?
+                }
+                5 => {
+                    setup
+                        .retired_reply_rebind
+                        .as_mut()
+                        .ok_or("retired")?
+                        .binding
+                        .frontier
+                        .next_authority_revision = safe(1)
+                }
+                6 => {
+                    setup
+                        .last_reply_v2
+                        .as_mut()
+                        .ok_or("receipt")?
+                        .rebind_transaction_id = "0".repeat(64)
+                }
+                7 => {
+                    setup
+                        .last_reply_v2
+                        .as_mut()
+                        .ok_or("receipt")?
+                        .authority_context
+                        .connection_generation = ConnectionGeneration::new(safe(from + 1))
+                }
+                8 => {
+                    setup.rebind.as_mut().ok_or("owner")?.from_generation =
+                        ConnectionGeneration::new(safe(9_007_199_254_740_991))
+                }
                 _ => setup.retired_reply_rebind = setup.rebind.clone(),
             }
             reject_retired_snapshot(forged)?;
@@ -1567,7 +1742,11 @@ fn repeated_rebind_retains_one_receipt_witness_across_idle_epochs_and_rejects_fo
     }
     let complete = host.snapshot()?;
     let mut orphan = complete.clone();
-    orphan.current_coop_setup.as_mut().ok_or("setup")?.last_reply_v2 = None;
+    orphan
+        .current_coop_setup
+        .as_mut()
+        .ok_or("setup")?
+        .last_reply_v2 = None;
     reject_retired_snapshot(orphan)?;
     assert_eq!(host.snapshot()?, complete);
     assert_eq!(host.state(), guest.state());
