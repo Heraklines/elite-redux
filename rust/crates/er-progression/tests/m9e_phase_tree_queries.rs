@@ -34,7 +34,7 @@ fn whole_source_queries_match_results_predicate_visits_and_restored_state() {
                 }
                 if matches!(op, 'f' | 'g' | 'r' | 'e') && index % 2 == 1 {
                     visits.push(format!("f{phase}"));
-                    return phase % 2 == 0;
+                    return phase.is_multiple_of(2);
                 }
                 true
             };
