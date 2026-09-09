@@ -105,7 +105,10 @@ test("observe actual initialized target capability registry", async () => {
   expect(vi.isMockFunction(globalScene.executeWithSeedOffset)).toBe(false);
   expect(vi.isMockFunction(Phaser.Math.RND.pick)).toBe(false);
   const starterKeys = Object.keys(speciesStarterCosts);
-  expect(starterKeys).toHaveLength(570);
+  // Actual initialized registry includes the source init-chain custom roots and removals.
+  expect(starterKeys).toHaveLength(706);
+  expect(new Set(starterKeys).size).toBe(706);
+  expect(starterKeys).toEqual([...starterKeys].sort((a,b)=>Number(a)-Number(b)));
   const effectiveCount = erBalanceNum("vanilla.pokerusCount");
   expect(Number.isInteger(effectiveCount) && effectiveCount > 0 && effectiveCount <= 10).toBe(true);
   const tuning = JSON.parse(readFileSync("src/data/elite-redux/er-balance-tuning.json", "utf8")) as Record<string, unknown>;
@@ -224,6 +227,7 @@ test("observe actual initialized target capability registry", async () => {
   const statObservations={scope:"actual calculateStats on controlled fresh player fields; not XP or LevelUpPhase",
     context:statContext, original_custom_nature:original.custom_nature,
     cases:statCases, original_fields_restored:true, custom_data_restored:true, rng_restored:true};
+  expect(Object.keys(speciesStarterCosts)).toEqual(starterKeys);
   const raw = `${JSON.stringify({
     schema_version: 5, source_sha: PIN, seed: SEED,
     scope: "actual initialized registry diagnostic; no ability activation, target execution or neutrality claim",

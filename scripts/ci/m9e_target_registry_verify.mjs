@@ -17,8 +17,8 @@ const attrs = value => {
 function validateDaily(d) {
   keys(d,["scope","starter_keys","effective_count","tuning_has_override","tuning_override","clock_cases","repeated","positive_days","scan_limit","scanned_days","source_calls"]);
   assert.equal(d.scope,"actual getPokerusStarters with captured Date and unmocked Phaser RNG; identity membership matches starter selection predicate, not UI execution");
-  assert.equal(d.starter_keys.length,570);
-  assert.equal(new Set(d.starter_keys).size,570);
+  assert.equal(d.starter_keys.length,706);
+  assert.equal(new Set(d.starter_keys).size,706);
   for (const key of d.starter_keys) assert(typeof key === "string" && /^[1-9][0-9]{0,8}$/.test(key));
   assert.deepEqual(d.starter_keys,[...d.starter_keys].sort((a,b)=>Number(a)-Number(b)));
   integer(d.effective_count,1,10);bool(d.tuning_has_override);
@@ -276,6 +276,6 @@ const families = {post_faint:row.abilities.filter(a => a.post_faint).map(a => a.
   post_victory:row.abilities.filter(a => a.post_victory).map(a => a.id),
   post_victory_stat:row.moves.filter(m => m.post_victory_stat).map(m => m.id),
   experience_meta:row.abilities.filter(a => a.meta_kinds.includes("experience-gain-multiplier")).map(a => a.id)};
-const output = `${JSON.stringify({schema_version:2,status:"passed",scope:"registry observations and actual source queue nesting; no gameplay or general neutrality qualification",source_sha:row.source_sha,ability_count:24,move_count:27,negative_cases:rejected,families,phase_order:phaseOrder,no_effect_family_ids:row.moves.filter(m=>m.no_effect).map(m=>m.id),daily_pokerus:{clock_cases:row.daily_pokerus.clock_cases.length,positive_starters:[1,4,7],effective_count:row.daily_pokerus.effective_count,starter_key_count:570,source_calls:row.daily_pokerus.source_calls,rng_restored:true},stat_cases:row.stats.cases.length,balance:row.balance,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
+const output = `${JSON.stringify({schema_version:2,status:"passed",scope:"registry observations and actual source queue nesting; no gameplay or general neutrality qualification",source_sha:row.source_sha,ability_count:24,move_count:27,negative_cases:rejected,families,phase_order:phaseOrder,no_effect_family_ids:row.moves.filter(m=>m.no_effect).map(m=>m.id),daily_pokerus:{clock_cases:row.daily_pokerus.clock_cases.length,positive_starters:[1,4,7],effective_count:row.daily_pokerus.effective_count,starter_key_count:706,source_calls:row.daily_pokerus.source_calls,rng_restored:true},stat_cases:row.stats.cases.length,balance:row.balance,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
 assert(Buffer.byteLength(output) <= 8192);
 fs.writeFileSync(process.argv[4], output, {flag:"wx"});
