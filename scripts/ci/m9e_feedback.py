@@ -2609,7 +2609,8 @@ def main(preflight_failure=None):
             summary["worker_executable"] = worker_executable
         if selection.get("requires_cli_executable"):
             summary["cli_executable"] = discover_cli_executable(artifacts, summary)
-        if any((cwd.name, name) == ("er-ai", "m9e_standard_attack_score") for name, cwd in binaries.values()):
+        if (os.environ.get("M9E_NATIVE_LANE", "a") == "a"
+                and any((cwd.name, name) == ("er-ai", "m9e_standard_attack_score") for name, cwd in binaries.values())):
             oracle_script = ROOT / "scripts/ci/m9e_standard_score_oracle.mjs"
             if digest(oracle_script) != "9aca9f070392b1f442face1ea9d9df6832cc81c7b79d0ef93d990206dccdf513":
                 raise RuntimeError("qualified standard score oracle source differs")
