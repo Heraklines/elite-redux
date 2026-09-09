@@ -104,10 +104,10 @@ test("observe actual defender absorb phase and healing ownership", async () => {
     journal.push({ ordinal: journal.length, phase: pm.getCurrentPhase().phaseName, ...row });
   };
   function observe<T extends object, K extends keyof T>(object: T, key: K,
-    apply: (invoke: () => unknown, args: unknown[]) => unknown) {
+    apply: (invoke: () => unknown, args: unknown[], self: unknown) => unknown) {
     const original = object[key];
     if (typeof original !== "function") throw new Error("observer target is not callable");
-    object[key] = new Proxy(original, { apply(target, self, args) { return apply(() => Reflect.apply(target, self, args), args); } }) as T[K];
+    object[key] = new Proxy(original, { apply(target, self, args) { return apply(() => Reflect.apply(target, self, args), args, self); } }) as T[K];
     restores.push(() => { object[key] = original; });
   }
   observe(pm, "unshiftNew", (invoke, args) => {
@@ -141,11 +141,12 @@ test("observe actual defender absorb phase and healing ownership", async () => {
     add({ kind: "actor_rng", range: Number(args[0]), min: Number(args[1] ?? 0), result: Number(result) });
     return result;
   });
-  observe(MoveEffectPhase.prototype, "hitCheck", (invoke, args) => {
-    add({ kind: "hit_check_before", holder_target: args[0] === holder, hp: holder.hp });
+  observe(MoveEffectPhase.prototype, "hitCheck", (invoke, args, self) => {
+    if (!(self instanceof MoveEffectPhase)) throw new Error("real MoveEffectPhase receiver required");
+    add({ kind: "hit_check_before", move_id: self.move.id, holder_target: args[0] === holder, hp: holder.hp });
     const result = invoke();
     if (!Array.isArray(result) || result.length !== 2) throw new Error("unexpected real hitCheck output");
-    add({ kind: "hit_check_after", holder_target: args[0] === holder, result: Number(result[0]), effectiveness: Number(result[1]), hp: holder.hp });
+    add({ kind: "hit_check_after", move_id: self.move.id, holder_target: args[0] === holder, result: Number(result[0]), effectiveness: Number(result[1]), hp: holder.hp });
     return result;
   });
   const ledger = () => ({
@@ -177,7 +178,7 @@ test("observe actual defender absorb phase and healing ownership", async () => {
     expect(journal.filter(row => row.kind === "queue_heal")).toHaveLength(id === "wounded" ? 1 : 0);
     expect(journal.filter(row => row.kind === "critical_call")).toHaveLength(0);
     expect(journal.filter(row => row.kind === "actor_rng" && row.phase === "MoveEffectPhase")).toHaveLength(0);
-    expect(journal.find(row => row.kind === "hit_check_after" && row.holder_target)?.result).toBe(id === "wounded" ? 3 : 2);
+    expect(journal.find(row => row.kind === "hit_check_after" && row.holder_target && row.move_id === MoveId.POISON_STING)?.result).toBe(id === "wounded" ? 3 : 2);
     expect(journal.some(row => row.kind === "ability_display" && row.show === true && row.ability === 5082)).toBe(true);
     expect(ledger().wave).toContain(5082);
     expect(ledger().summon).toContain(5082);

@@ -49,7 +49,12 @@ function validate(value) {
       assert.equal(typeof event.kind, "string");
     }
     const select = kind => row.journal.filter(event => event.kind === kind);
-    const hit = select("hit_check_after").filter(event => event.holder_target);
+    const checks = select("hit_check_after");
+    assert.equal(checks.length, 2);
+    assert.deepEqual(checks.map(event => event.move_id).sort((a,b) => a-b), [40,106]);
+    const self = checks.find(event => event.move_id === 106);
+    assert.equal(self.holder_target, true); assert.equal(self.result, 1); assert.equal(self.effectiveness, 1);
+    const hit = checks.filter(event => event.holder_target && event.move_id === 40);
     assert.equal(hit.length, 1);
     assert.equal(hit[0].effectiveness, 0);
     assert.equal(hit[0].result, row.id === "wounded" ? 3 : 2);
