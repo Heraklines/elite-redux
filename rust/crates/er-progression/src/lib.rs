@@ -4,6 +4,7 @@ pub mod current_experience;
 pub mod current_friendship;
 pub mod current_friendship_owner;
 pub mod current_party_experience;
+pub mod current_phase_experience;
 pub mod lifecycle;
 pub mod material;
 pub mod oracle_surface;

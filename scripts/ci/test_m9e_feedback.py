@@ -5230,7 +5230,7 @@ class FeedbackTests(unittest.TestCase):
         selection = self.feedback.plan()
         self.assertTrue(selection["requires_current_xp_metadata"])
         self.assertEqual(len(self.feedback.XP_PATHS), 8)
-        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 111)
+        self.assertEqual(len(self.feedback.RECOVERY_PATHS), 114)
         self.assertEqual(sum(map(len, self.feedback.XP_TEST_IDS.values())), 16)
         self.assertEqual(selection["unknown_paths"], [])
         self.assertEqual(selection["boundary_paths"], [])
@@ -5287,7 +5287,7 @@ class FeedbackTests(unittest.TestCase):
                          physical_rebind.source_binding(self.root, CANDIDATE))
         self.assertTrue(selection["requires_owned_foundations"])
         self.assertEqual(selection["owned_foundation_inventory_sha256"], self.feedback.OWNED_FOUNDATION_INVENTORY_SHA256)
-        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9, 11, 15])
+        self.assertEqual(sorted(map(len, self.feedback.OWNED_FOUNDATION_TEST_IDS.values())), [1, 3, 3, 4, 4, 4, 4, 4, 5, 5, 6, 6, 8, 8, 9, 11, 15])
         for key, ids in self.feedback.OWNED_FOUNDATION_TEST_IDS.items():
             crate, target = key.split(":")
             self.assertEqual(selection["required_native_targets"][crate].count(target), 1)
@@ -11395,8 +11395,8 @@ class OwnedFoundationContractTests(unittest.TestCase):
             self.feedback.validate_owned_foundation_inventory(absent, self.inventory)
 
     def test_owned_foundation_inventory_conserves_all759_ids_and_historical_exclusions(self):
-        self.assertEqual(len(self.inventory), 111)
-        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 834)
+        self.assertEqual(len(self.inventory), 113)
+        self.assertEqual(sum(len(row["ids"]) for row in self.inventory), 842)
         for change in ("remove", "rename", "exclude", "extra"):
             rows = copy.deepcopy(self.inventory)
             old = next(row for row in rows if row["crate"] == "er-canonical")
@@ -11408,12 +11408,12 @@ class OwnedFoundationContractTests(unittest.TestCase):
                 old["historical_excluded_ids"].append(old["ids"].pop())
             else:
                 rows.append({"crate": "er-game", "target": "unreviewed", "ids": [], "historical_excluded_ids": []})
-            with self.assertRaisesRegex(RuntimeError, "complete834/111"):
+            with self.assertRaisesRegex(RuntimeError, "complete842/113"):
                 self.feedback.validate_owned_foundation_inventory(self.plan, rows)
 
     def test_owned_foundation_phase_identity_covers_products_and_only_three_xp_pins_change(self):
         import m9e_phases as phases
-        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 81)
+        self.assertEqual(len(self.feedback.OWNED_FOUNDATION_SOURCES), 84)
         for path in self.feedback.OWNED_FOUNDATION_PATHS:
             self.assertEqual(list(phases.IDENTITY_FILES.values()).count(path), 1, path)
         self.assertEqual(phases.IDENTITY_FILES["owned_foundation_inventory"], self.feedback.OWNED_FOUNDATION_INVENTORY)
@@ -11457,22 +11457,22 @@ class OwnedFoundationContractTests(unittest.TestCase):
         with patch.object(Path, "read_bytes", return_value=raw + b" "):
             with self.assertRaisesRegex(RuntimeError, "source binding"):
                 self.feedback.owned_foundation_inventory()
-        compact = json.loads(raw)
+        compact = self.feedback.decode_owned_foundation_inventory(raw)
         self.assertEqual(compact["schema_version"], 2)
         self.assertTrue(all("historical_excluded_ids" not in row for row in compact["inventory"]))
         self.assertEqual(self.feedback.owned_foundation_inventory(), self.inventory)
         for bad in (None, True, ["invented_historical_exclusion"]):
             value = copy.deepcopy(compact)
             value["inventory"][0]["historical_excluded_ids"] = bad
-            altered = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            altered = self.pack_inventory(value)
             with patch.object(Path, "read_bytes", return_value=altered), patch.object(
                     self.feedback, "OWNED_FOUNDATION_INVENTORY_SHA256", hashlib.sha256(altered).hexdigest()):
                 with self.assertRaises(RuntimeError):
                     self.feedback.owned_foundation_inventory()
         for key in ("schema_version", "prior_tests", "prior_targets", "tests", "targets"):
-            value = json.loads(raw)
+            value = self.feedback.decode_owned_foundation_inventory(raw)
             value[key] = True
-            altered = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            altered = self.pack_inventory(value)
             with patch.object(Path, "read_bytes", return_value=altered), patch.object(
                     self.feedback, "OWNED_FOUNDATION_INVENTORY_SHA256", hashlib.sha256(altered).hexdigest()):
                 with self.assertRaisesRegex(RuntimeError, "provenance"):
@@ -11495,6 +11495,48 @@ class OwnedFoundationContractTests(unittest.TestCase):
             self.assertEqual(phases.read_bounded(destination, digest), frozen)
         self.assertEqual(projection, frozen)
 
+
+    def pack_inventory(self, value, **changes):
+        decoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        wire = {"encoding": "owned-inventory-zlib-v1", "decoded_bytes": len(decoded),
+                "decoded_sha256": hashlib.sha256(decoded).hexdigest(),
+                "payload_base64": self.feedback.base64.b64encode(self.feedback.zlib.compress(decoded)).decode()}
+        wire.update(changes)
+        return json.dumps(wire, separators=(",", ":")).encode()
+
+    def test_inventory_wire_preserves_complete_logical_source(self):
+        raw = HARNESS.with_name("m9e-owned-foundations-inventory.json").read_bytes()
+        original = self.feedback.decode_owned_foundation_inventory(raw)
+        self.assertEqual(self.feedback.decode_owned_foundation_inventory(self.pack_inventory(original)), original)
+        self.assertEqual(self.feedback.decode_owned_foundation_inventory(b'{"plain":true}'), {"plain": True})
+
+    def test_inventory_wire_rejects_wrong_content_digest(self):
+        with self.assertRaisesRegex(RuntimeError, "wire payload"):
+            self.feedback.decode_owned_foundation_inventory(self.pack_inventory({"ids": ["a"]}, decoded_sha256="0" * 64))
+
+    def test_inventory_wire_rejects_noninteger_and_excessive_declared_lengths(self):
+        for length in (True, None, -1, 0, 131073, "100"):
+            with self.subTest(length=length), self.assertRaisesRegex(RuntimeError, "wire provenance"):
+                self.feedback.decode_owned_foundation_inventory(self.pack_inventory({}, decoded_bytes=length))
+
+    def test_inventory_wire_rejects_malformed_base64_and_extra_envelope_fields(self):
+        for changes in ({"payload_base64": "%%%"}, {"payload_base64": ""}, {"invented": True}):
+            with self.subTest(changes=changes), self.assertRaises(RuntimeError):
+                self.feedback.decode_owned_foundation_inventory(self.pack_inventory({}, **changes))
+
+    def test_inventory_wire_rejects_truncated_and_concatenated_streams(self):
+        wire = json.loads(self.pack_inventory({"ids": ["unchanged"]}))
+        payload = self.feedback.base64.b64decode(wire["payload_base64"])
+        for invalid in (payload[:-1], payload + b"trailing", payload + payload):
+            altered = {**wire, "payload_base64": self.feedback.base64.b64encode(invalid).decode()}
+            with self.subTest(size=len(invalid)), self.assertRaisesRegex(RuntimeError, "wire payload"):
+                self.feedback.decode_owned_foundation_inventory(json.dumps(altered).encode())
+
+    def test_inventory_wire_rejects_expansion_past_declared_bound_and_wire_ceiling(self):
+        with self.assertRaisesRegex(RuntimeError, "wire payload"):
+            self.feedback.decode_owned_foundation_inventory(self.pack_inventory({"ids": "x" * 131000}, decoded_bytes=10))
+        with self.assertRaisesRegex(RuntimeError, "wire limit"):
+            self.feedback.decode_owned_foundation_inventory(b" " * 65537)
 
 if __name__ == "__main__":
     unittest.main()

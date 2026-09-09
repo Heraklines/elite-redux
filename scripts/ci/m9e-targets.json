@@ -112,6 +112,9 @@
       "test/browser/rust-browser/m9e-v7-rebind-rtc-owner.spec.ts",
       "rust/crates/er-progression/src/current_party_experience.rs",
       "rust/crates/er-progression/tests/m9e_party_experience.rs",
+      "rust/crates/er-progression/src/current_phase_experience.rs",
+      "rust/crates/er-progression/tests/m9e_phase_experience.rs",
+      "rust/crates/er-progression/tests/m9e_held_experience.rs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -373,6 +376,18 @@
         "balance_redistributes_without_share_and_preserves_fractional_phase_arguments",
         "invalid_input_and_overflow_do_not_produce_a_partial_plan",
         "living_at_cap_friendship_and_full_participant_denominator_preserve_source_order"
+      ],
+      "er-progression:m9e_phase_experience": [
+        "field_product_and_bench_ability_follow_distinct_source_paths",
+        "global_boosters_floor_each_application_and_preserve_order",
+        "invalid_context_and_unsafe_arithmetic_fail_without_an_award",
+        "whole_actual_phase_matrix_matches_every_add_exp_argument"
+      ],
+      "er-progression:m9e_held_experience": [
+        "actual_whole_source_held_matrix_matches_every_fractional_phase_argument",
+        "explicit_empty_held_context_preserves_unboosted_source_behavior",
+        "held_booster_receives_fractional_product_before_distribution_floor",
+        "malformed_held_context_and_unsafe_awards_are_rejected_atomically"
       ]
     }
   },
@@ -707,7 +722,9 @@
     "scripts/ci/test_m9e_browser_rebind_physical.py",
     "scripts/ci/fixtures/m9e-browser-rebind-physical-proof.json",
     "scripts/ci/test_m9e_platform_envelope.py",
-    "scripts/ci/m9e_party_xp_oracle.mjs"
+    "scripts/ci/m9e_party_xp_oracle.mjs",
+    "scripts/ci/m9e_phase_xp_oracle.mjs",
+    "scripts/ci/m9e_held_xp_oracle.mjs"
   ],
   "documentation_prefixes": [
     "docs/plans/rust-kernel/m9e-"
