@@ -1,0 +1,37 @@
+name: M9E Fresh Friendship Source Inspection
+on:
+  push:
+    branches: [codex/m9e-fresh-friendship-source-20260909]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-fresh-friendship-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  inspect-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          lfs: false
+          submodules: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/m9e-fresh-friendship-source.yml
+            /scripts/ci/m9e_fresh_friendship_source.py
+      - name: Inspect exact pinned fresh account constructor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/m9e_fresh_friendship_source.py
+      - name: Bounded source excerpt and identity
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-fresh-friendship-source-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-fresh-friendship-source/
+          if-no-files-found: error
+          retention-days: 14
