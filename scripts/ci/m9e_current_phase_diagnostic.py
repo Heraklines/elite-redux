@@ -188,12 +188,13 @@ def main():
         for path, original in originals.items():
             formatted = (ROOT/path).read_bytes()
             if formatted != original:
-                patch += "".join(difflib.unified_diff(original.decode().splitlines(True), formatted.decode().splitlines(True), fromfile="a/"+path, tofile="b/"+path)).encode()
+                patch += "".join(difflib.unified_diff(original.decode().splitlines(True), formatted.decode().splitlines(True), fromfile="a/"+path, tofile="b/"+path, n=0)).encode()
                 format_rows.append(dict(path=path, before_sha256=sha(original), after_sha256=sha(formatted)))
         if patch:
+            result["format_patch"] = dict(bytes=len(patch), sha256=sha(patch), files=format_rows,
+                context_lines=0, emitted=len(patch) <= 262144)
             require(len(patch) <= 262144, "named format patch bound")
             (OUT/"diagnostics/format.patch").write_bytes(patch)
-            result["format_patch"] = dict(bytes=len(patch), sha256=sha(patch), files=format_rows)
             raise RuntimeError("exact remote formatter patch required before qualification")
         cases = OUT/"diagnostics/target-source-cases.jsonl"
         oracle = json.loads(run("target-source-oracle", ["node", "--disable-warning=ExperimentalWarning", "scripts/ci/m9e_current_move_targets_oracle.mjs", str(cases)], maximum=65536))
