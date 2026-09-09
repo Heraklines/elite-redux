@@ -100,15 +100,20 @@ pub fn construct_natural_run_v6(
         )?);
     }
     if bootstrap.current_starter_pokerus.is_some() {
-        let observed = bootstrap.current_starter_pokerus_selections()
+        let observed = bootstrap
+            .current_starter_pokerus_selections()
             .map_err(|_| NaturalRunV6Error::Invalid)?
             .ok_or(NaturalRunV6Error::Invalid)?;
-        if observed.len() != party.len() { return Err(NaturalRunV6Error::Invalid) }
+        if observed.len() != party.len() {
+            return Err(NaturalRunV6Error::Invalid);
+        }
         for (pokemon, selected) in party.iter_mut().zip(&observed) {
             if pokemon.owner_seat != Some(selected.selection.owner_seat)
                 || pokemon.species_id.get() != selected.selection.species_id
                 || pokemon.form_index != selected.selection.form_index
-            { return Err(NaturalRunV6Error::Invalid) }
+            {
+                return Err(NaturalRunV6Error::Invalid);
+            }
             pokemon.pokerus = Some(selected.pokerus);
         }
     }
@@ -275,9 +280,14 @@ pub fn construct_natural_run_v6(
         current_turn_execution: None,
         current_defender_dispatch: None,
         current_achievement_tracker: None,
-        current_presentation: bootstrap.current_friendship_profile.as_ref()
-            .and_then(|profile| profile.rewards.as_ref()).map(|_| {
-                er_state::current_presentation::CurrentPresentationOwnerV1::fresh(authority_revision)
+        current_presentation: bootstrap
+            .current_friendship_profile
+            .as_ref()
+            .and_then(|profile| profile.rewards.as_ref())
+            .map(|_| {
+                er_state::current_presentation::CurrentPresentationOwnerV1::fresh(
+                    authority_revision,
+                )
             }),
         current_battle_participation: None,
         current_friendship_profile: bootstrap.current_friendship_profile.clone(),
@@ -292,16 +302,23 @@ pub fn construct_natural_run_v6(
         active_run: Some(run),
     };
     if state.current_presentation.is_some() && state.current_targeting.is_some() {
-        state.current_achievement_tracker = Some(
-            er_state::current_achievement_tracker::CurrentAchievementTrackerV1::fresh(run_id),
-        );
+        state.current_achievement_tracker =
+            Some(er_state::current_achievement_tracker::CurrentAchievementTrackerV1::fresh(run_id));
         state.current_battle_participation = Some(
             er_state::current_battle_participation::CurrentBattleParticipationV1::fresh(
-                state.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?, safe(1)?,
-            ).map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
+                state
+                    .active_run
+                    .as_ref()
+                    .ok_or(NaturalRunV6Error::Invalid)?,
+                safe(1)?,
+            )
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
         );
-        install_pending_experience(&mut state, content,
-            er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic)?;
+        install_pending_experience(
+            &mut state,
+            content,
+            er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
+        )?;
         install_source_progression(&mut state, bootstrap, content)?;
         initialize_source_stats(&mut state, content)?;
     }
@@ -317,71 +334,132 @@ fn install_source_progression(
     content: &PreparedGameContentV2,
 ) -> Result<(), NaturalRunV6Error> {
     use er_state::current_source_progression::{
-        CurrentSourceConfigurationV1, CurrentSourcePokemonV1, CurrentSourceProgressionV1,
-        CurrentSourceInitialEnemyV1,
+        CurrentSourceConfigurationV1, CurrentSourceInitialEnemyV1, CurrentSourcePokemonV1,
+        CurrentSourceProgressionV1,
     };
-    let profile = state.current_friendship_profile.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
-    let run = state.active_run.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+    let profile = state
+        .current_friendship_profile
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
     let battle = run.battle.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
     validate_cooperative_choices_v7(content, profile.owner_seat, &bootstrap.selections.starters)?;
     if run.party.len() != bootstrap.selections.starters.len()
-        || run.wave.get().get() != 1 || battle.format != BattleFormat::single()
+        || run.wave.get().get() != 1
+        || battle.format != BattleFormat::single()
         || battle.enemy_party.len() != 1
-    { return Err(NaturalRunV6Error::Invalid); }
-    let party = run.party.iter().zip(&bootstrap.selections.starters)
+    {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let party = run
+        .party
+        .iter()
+        .zip(&bootstrap.selections.starters)
         .map(|(pokemon, selection)| {
             // Prepared bootstrap emits index0 and prepared battle selects the
             // source active_ability_ids[0]. Other indexes need an actual resolver.
-            if selection.ability_index != 0 || pokemon.species_id.get() != selection.species_id
+            if selection.ability_index != 0
+                || pokemon.species_id.get() != selection.species_id
                 || pokemon.form_index != selection.form_index
                 || pokemon.owner_seat != Some(selection.owner_seat)
-            { return Err(NaturalRunV6Error::Invalid); }
+            {
+                return Err(NaturalRunV6Error::Invalid);
+            }
             Ok(CurrentSourcePokemonV1 {
-                pokemon: pokemon.id, selection: selection.clone(),
+                pokemon: pokemon.id,
+                selection: selection.clone(),
                 ability_index: selection.ability_index,
             })
-        }).collect::<Result<Vec<_>, NaturalRunV6Error>>()?;
+        })
+        .collect::<Result<Vec<_>, NaturalRunV6Error>>()?;
     let source = CurrentSourceProgressionV1 {
-        run_id: run.run_id, profile_owner: profile.owner_seat,
+        run_id: run.run_id,
+        profile_owner: profile.owner_seat,
         configuration: CurrentSourceConfigurationV1::FreshOrdinaryClassic399d,
-        initial_battle: battle.battle_id, initial_wave: run.wave, party,
+        initial_battle: battle.battle_id,
+        initial_wave: run.wave,
+        party,
         initial_enemy: CurrentSourceInitialEnemyV1 {
-            pokemon: battle.enemy_party[0].id, species: battle.enemy_party[0].species_id,
+            pokemon: battle.enemy_party[0].id,
+            species: battle.enemy_party[0].species_id,
             form_index: battle.enemy_party[0].form_index,
         },
     };
-    if !source.valid(run) { return Err(NaturalRunV6Error::Invalid); }
-    state.current_battle_participation.as_mut().and_then(|owner| owner.experience.as_mut())
-        .ok_or(NaturalRunV6Error::Invalid)?.source_progression = Some(source);
+    if !source.valid(run) {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    state
+        .current_battle_participation
+        .as_mut()
+        .and_then(|owner| owner.experience.as_mut())
+        .ok_or(NaturalRunV6Error::Invalid)?
+        .source_progression = Some(source);
     Ok(())
 }
 
 fn initialize_source_stats(
-    state: &mut GameStateV6, content: &PreparedGameContentV2,
+    state: &mut GameStateV6,
+    content: &PreparedGameContentV2,
 ) -> Result<(), NaturalRunV6Error> {
     crate::current_source_progression::current_source_progression(state, content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    let run = state.active_run.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
+    let run = state
+        .active_run
+        .as_mut()
+        .ok_or(NaturalRunV6Error::Invalid)?;
     let battle = run.battle.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
     for pokemon in run.party.iter_mut().chain(&mut battle.enemy_party) {
         let bonuses = &pokemon.permanent_bonuses;
-        if pokemon.form_index != 0 || pokemon.species_id.get().get() == 292
-            || pokemon.hp != pokemon.max_hp || pokemon.fainted
-            || [bonuses.hp, bonuses.attack, bonuses.defense, bonuses.special_attack,
-                bonuses.special_defense, bonuses.speed].iter().any(|value| *value != 0)
-        { return Err(NaturalRunV6Error::Invalid); }
-        let species = content.battle.species(pokemon.species_id)
+        if pokemon.form_index != 0
+            || pokemon.species_id.get().get() == 292
+            || pokemon.hp != pokemon.max_hp
+            || pokemon.fainted
+            || [
+                bonuses.hp,
+                bonuses.attack,
+                bonuses.defense,
+                bonuses.special_attack,
+                bonuses.special_defense,
+                bonuses.speed,
+            ]
+            .iter()
+            .any(|value| *value != 0)
+        {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        let species = content
+            .battle
+            .species(pokemon.species_id)
             .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-        let form = content.battle.form(&FormId::parse(format!("{}:{}",
-            pokemon.species_id.get().get(), pokemon.form_index))
-            .map_err(|_| NaturalRunV6Error::Invalid)?)
+        let form = content
+            .battle
+            .form(
+                &FormId::parse(format!(
+                    "{}:{}",
+                    pokemon.species_id.get().get(),
+                    pokemon.form_index
+                ))
+                .map_err(|_| NaturalRunV6Error::Invalid)?,
+            )
             .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-        if form.species != pokemon.species_id { return Err(NaturalRunV6Error::Invalid); }
+        if form.species != pokemon.species_id {
+            return Err(NaturalRunV6Error::Invalid);
+        }
         let base = form.stat_override.unwrap_or(species.base_stats);
-        let nature = content.progression.pack().natures.iter()
-            .find(|row| row.id == pokemon.effective_nature).ok_or(NaturalRunV6Error::Invalid)?;
-        let stats = er_progression::current_stats::calculate_current_unmodified_stats(pokemon, base, nature)
-            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        let nature = content
+            .progression
+            .pack()
+            .natures
+            .iter()
+            .find(|row| row.id == pokemon.effective_nature)
+            .ok_or(NaturalRunV6Error::Invalid)?;
+        let stats = er_progression::current_stats::calculate_current_unmodified_stats(
+            pokemon, base, nature,
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
         // This is the actual fresh constructor, before any damage or public
         // action. Preserve all original selection/RNG draws; only source stat
         // rounding changes. Historical construction retains its old helper.
@@ -399,7 +477,9 @@ pub fn construct_natural_run_v6_with_participation(
     authority_revision: SafeU53,
 ) -> Result<GameStateV6, NaturalRunV6Error> {
     let mut state = construct_natural_run_v6(bootstrap, content, authority_revision)?;
-    if state.current_battle_participation.is_some() { return Ok(state); }
+    if state.current_battle_participation.is_some() {
+        return Ok(state);
+    }
     let run = state
         .active_run
         .as_ref()
@@ -421,9 +501,16 @@ pub fn construct_natural_run_v6_with_pending_experience(
     authority_revision: SafeU53,
     cap_policy: er_state::current_experience_owner::CurrentExperienceCapPolicyV1,
 ) -> Result<GameStateV6, NaturalRunV6Error> {
-    let mut state = construct_natural_run_v6_with_participation(bootstrap, content, authority_revision)?;
-    if let Some(owner) = state.current_battle_participation.as_ref().and_then(|value| value.experience.as_ref()) {
-        if owner.cap_policy != cap_policy { return Err(NaturalRunV6Error::Invalid); }
+    let mut state =
+        construct_natural_run_v6_with_participation(bootstrap, content, authority_revision)?;
+    if let Some(owner) = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|value| value.experience.as_ref())
+    {
+        if owner.cap_policy != cap_policy {
+            return Err(NaturalRunV6Error::Invalid);
+        }
         return Ok(state);
     }
     install_pending_experience(&mut state, content, cap_policy)?;
@@ -431,7 +518,8 @@ pub fn construct_natural_run_v6_with_pending_experience(
 }
 
 fn install_pending_experience(
-    state: &mut GameStateV6, content: &PreparedGameContentV2,
+    state: &mut GameStateV6,
+    content: &PreparedGameContentV2,
     cap_policy: er_state::current_experience_owner::CurrentExperienceCapPolicyV1,
 ) -> Result<(), NaturalRunV6Error> {
     use er_progression::content_v2::ExperienceSourceFormV2;
@@ -479,7 +567,11 @@ fn install_pending_experience(
         sources,
     )
     .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    if state.current_friendship_profile.as_ref().and_then(|profile| profile.rewards.as_ref()).is_some()
+    if state
+        .current_friendship_profile
+        .as_ref()
+        .and_then(|profile| profile.rewards.as_ref())
+        .is_some()
         && state.current_targeting.is_some()
     {
         experience.execution_origin = Some(
@@ -543,7 +635,10 @@ pub fn construct_natural_run_v6_with_starter_pokerus(
         {
             return Err(NaturalRunV6Error::Invalid);
         }
-        if pokemon.pokerus.is_some_and(|observed| observed != starter.pokerus) {
+        if pokemon
+            .pokerus
+            .is_some_and(|observed| observed != starter.pokerus)
+        {
             return Err(NaturalRunV6Error::Invalid);
         }
         pokemon.pokerus = Some(starter.pokerus);

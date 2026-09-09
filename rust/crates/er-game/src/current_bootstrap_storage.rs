@@ -137,7 +137,10 @@ impl RunBootstrapMachineV1 {
             owner,
             candidate.control.revision,
             candidate.menu_instance_high_water,
-            (candidate.current_storage.as_ref(), candidate.current_starter_pokerus.as_ref()),
+            (
+                candidate.current_storage.as_ref(),
+                candidate.current_starter_pokerus.as_ref(),
+            ),
         )?;
         candidate.validate()?;
         *self = candidate;

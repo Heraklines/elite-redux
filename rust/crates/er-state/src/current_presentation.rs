@@ -21,19 +21,29 @@ pub struct CurrentPresentationOwnerV1 {
 
 impl CurrentPresentationOwnerV1 {
     pub fn fresh(next_event_id: SafeU53) -> Self {
-        Self { next_event_id, receipts: Vec::new() }
+        Self {
+            next_event_id,
+            receipts: Vec::new(),
+        }
     }
 
     pub fn valid(&self) -> bool {
         self.next_event_id != SafeU53::ZERO
             && self.receipts.len() <= MAX_CURRENT_PRESENTATION_RECEIPTS_V1
-            && self.receipts.iter().all(|receipt| receipt.event_id.get() != SafeU53::ZERO
-                && receipt.event_id.get() < self.next_event_id
-                && receipt.effect_sha256.len() == 64
-                && receipt.effect_sha256.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')))
-            && self.receipts.windows(2).all(|pair| pair[0].event_id.get().get().checked_add(1)
-                == Some(pair[1].event_id.get().get()))
-            && self.receipts.last().is_none_or(|last| last.event_id.get().get().checked_add(1)
-                == Some(self.next_event_id.get()))
+            && self.receipts.iter().all(|receipt| {
+                receipt.event_id.get() != SafeU53::ZERO
+                    && receipt.event_id.get() < self.next_event_id
+                    && receipt.effect_sha256.len() == 64
+                    && receipt
+                        .effect_sha256
+                        .bytes()
+                        .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+            })
+            && self.receipts.windows(2).all(|pair| {
+                pair[0].event_id.get().get().checked_add(1) == Some(pair[1].event_id.get().get())
+            })
+            && self.receipts.last().is_none_or(|last| {
+                last.event_id.get().get().checked_add(1) == Some(self.next_event_id.get())
+            })
     }
 }

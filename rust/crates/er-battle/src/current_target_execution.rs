@@ -140,8 +140,11 @@ impl<'a> CurrentTargetExecution<'a> {
         run: &RunStateV3,
         pokemon: &PokemonStateV5,
     ) -> Result<Vec<BehaviorSourceId>, CurrentTargetExecutionError> {
-        Ok(self.ability_sources_with_slots(run, pokemon)?
-            .into_iter().map(|(source, _)| source).collect())
+        Ok(self
+            .ability_sources_with_slots(run, pokemon)?
+            .into_iter()
+            .map(|(source, _)| source)
+            .collect())
     }
 
     /// Preserve the actual admitted innate slot before ability-ID deduplication.
@@ -185,7 +188,10 @@ impl<'a> CurrentTargetExecution<'a> {
             {
                 continue;
             }
-            ids.push((ability, Some(u8::try_from(slot).map_err(|_| CurrentTargetExecutionError)?)));
+            ids.push((
+                ability,
+                Some(u8::try_from(slot).map_err(|_| CurrentTargetExecutionError)?),
+            ));
         }
         Ok(ids
             .into_iter()

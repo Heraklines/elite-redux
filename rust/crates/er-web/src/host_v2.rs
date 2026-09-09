@@ -383,9 +383,13 @@ impl BrowserKernelHostV2 {
                 };
                 CurrentExternalEvent::PresentationOutcome { event_id, outcome }
             }
-            BrowserRequestV2::UtcClockResult { request_id, utc_milliseconds } => {
-                CurrentExternalEvent::CurrentUtcClockResult { request_id, utc_milliseconds }
-            }
+            BrowserRequestV2::UtcClockResult {
+                request_id,
+                utc_milliseconds,
+            } => CurrentExternalEvent::CurrentUtcClockResult {
+                request_id,
+                utc_milliseconds,
+            },
             BrowserRequestV2::StorageResult { request_id, result } => {
                 let result = match result {
                     BrowserStorageResultV2::Read { bytes } => KernelStorageResultV2::Read { bytes },
@@ -792,10 +796,14 @@ fn map_platform(
 ) -> Result<(), BrowserWebErrorV2> {
     match effect {
         GamePlatformEffectV2::StarterPokerusClock { request, .. } => {
-            output.push(BrowserEffectV2::UtcClockRequest { request_id: request });
+            output.push(BrowserEffectV2::UtcClockRequest {
+                request_id: request,
+            });
         }
         GamePlatformEffectV2::CurrentFriendshipClock { request } => {
-            output.push(BrowserEffectV2::UtcClockRequest { request_id: request.request });
+            output.push(BrowserEffectV2::UtcClockRequest {
+                request_id: request.request,
+            });
         }
         GamePlatformEffectV2::StorageRead { request, slot } => {
             output.push(BrowserEffectV2::StorageRequest {

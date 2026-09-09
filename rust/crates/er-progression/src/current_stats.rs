@@ -20,8 +20,7 @@ pub fn calculate_current_unmodified_stats(
     }
     let level = f64::from(pokemon.level);
     let initial = |base: u32, index: usize| {
-        ((2.0 * f64::from(base) + f64::from(pokemon.ivs[index].get())) * level * 0.01)
-            .floor()
+        ((2.0 * f64::from(base) + f64::from(pokemon.ivs[index].get())) * level * 0.01).floor()
     };
     let other = |base, index, stat| {
         let value = initial(base, index) + 5.0;
@@ -49,11 +48,21 @@ pub fn calculate_current_unmodified_stats(
 /// Source HP restoration uses old maximum HP and actual HP, not the faint flag.
 /// It keeps zero HP at zero, adds maximum-HP growth only to living Pokemon and
 /// clamps an existing HP value when the new maximum decreases.
-pub fn current_hp_after_stat_calculation(hp: u32, old_max: u32, new_max: u32) -> Result<u32, ProgressionError> {
-    if new_max == 0 { return Err(ProgressionError::Content); }
-    if hp > new_max { return Ok(new_max); }
+pub fn current_hp_after_stat_calculation(
+    hp: u32,
+    old_max: u32,
+    new_max: u32,
+) -> Result<u32, ProgressionError> {
+    if new_max == 0 {
+        return Err(ProgressionError::Content);
+    }
+    if hp > new_max {
+        return Ok(new_max);
+    }
     if hp != 0 && old_max != 0 && new_max > old_max {
-        return hp.checked_add(new_max - old_max).ok_or(ProgressionError::Overflow);
+        return hp
+            .checked_add(new_max - old_max)
+            .ok_or(ProgressionError::Overflow);
     }
     Ok(hp)
 }

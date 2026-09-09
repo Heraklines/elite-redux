@@ -47,16 +47,27 @@ pub struct CurrentDefenderDispatchV1 {
 /// ordinal binds a real emission, not a synthetic gameplay operation or timer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CurrentDefenderObservationV1 {
-    Applied { ordinal: u16, holder: PokemonId, innate_slot: Option<u8> },
-    Summoned { ordinal: u16, holder: PokemonId },
+    Applied {
+        ordinal: u16,
+        holder: PokemonId,
+        innate_slot: Option<u8>,
+    },
+    Summoned {
+        ordinal: u16,
+        holder: PokemonId,
+    },
 }
 
 impl CurrentDefenderObservationV1 {
     fn ordinal(self) -> u16 {
-        match self { Self::Applied { ordinal, .. } | Self::Summoned { ordinal, .. } => ordinal }
+        match self {
+            Self::Applied { ordinal, .. } | Self::Summoned { ordinal, .. } => ordinal,
+        }
     }
     fn holder(self) -> PokemonId {
-        match self { Self::Applied { holder, .. } | Self::Summoned { holder, .. } => holder }
+        match self {
+            Self::Applied { holder, .. } | Self::Summoned { holder, .. } => holder,
+        }
     }
 }
 
@@ -78,7 +89,8 @@ impl CurrentDefenderDispatchV1 {
             return Err(CurrentDefenderDispatchError);
         }
         for holder in &self.holders {
-            if !in_roster(run, holder.pokemon) || (!holder.wave_observed && holder.summon_observed) {
+            if !in_roster(run, holder.pokemon) || (!holder.wave_observed && holder.summon_observed)
+            {
                 return Err(CurrentDefenderDispatchError);
             }
         }
@@ -88,7 +100,9 @@ impl CurrentDefenderDispatchV1 {
     /// Synchronize only represented lifecycle boundaries. This does not invent
     /// an observation when the source history was previously unowned.
     pub fn synchronize(&mut self, run: &RunStateV3) -> Result<(), CurrentDefenderDispatchError> {
-        if self.run_id != run.run_id { return Err(CurrentDefenderDispatchError); }
+        if self.run_id != run.run_id {
+            return Err(CurrentDefenderDispatchError);
+        }
         if self.wave != run.wave {
             self.wave = run.wave;
             self.holders.clear();
@@ -109,44 +123,63 @@ impl CurrentDefenderDispatchV1 {
         authority_revision: SafeU53,
         observations: &[CurrentDefenderObservationV1],
     ) -> Result<Option<Self>, CurrentDefenderDispatchError> {
-        if before.run_id != after.run_id { return Err(CurrentDefenderDispatchError); }
+        if before.run_id != after.run_id {
+            return Err(CurrentDefenderDispatchError);
+        }
         // A begin/finalize or no-ability continuation chunk has no dispatch to
         // identify. Preserve its bookkeeping identity, while applying only actual
         // roster/wave lifecycle changes. The retained turn revision is not a new
         // material revision and must never be used to manufacture an observation.
         if observations.is_empty() {
-            return previous.map(|previous| {
-                previous.validate(before)?;
-                let mut result = previous.clone();
-                result.synchronize(after)?;
-                Ok(result)
-            }).transpose();
+            return previous
+                .map(|previous| {
+                    previous.validate(before)?;
+                    let mut result = previous.clone();
+                    result.synchronize(after)?;
+                    Ok(result)
+                })
+                .transpose();
         }
         let battle = before.battle.as_ref().ok_or(CurrentDefenderDispatchError)?;
         if operation_id.as_str().is_empty()
-            || observations.windows(2).any(|pair| pair[0].ordinal() >= pair[1].ordinal())
+            || observations
+                .windows(2)
+                .any(|pair| pair[0].ordinal() >= pair[1].ordinal())
         {
             return Err(CurrentDefenderDispatchError);
         }
         // Each active participant can apply to each field slot and can summon
         // once in the same command set. This is a live topology-derived bound.
         let slots = battle.field.slots.len();
-        let maximum = slots.checked_mul(slots.checked_add(1).ok_or(CurrentDefenderDispatchError)?)
+        let maximum = slots
+            .checked_mul(slots.checked_add(1).ok_or(CurrentDefenderDispatchError)?)
             .ok_or(CurrentDefenderDispatchError)?;
-        if observations.len() > maximum { return Err(CurrentDefenderDispatchError); }
+        if observations.len() > maximum {
+            return Err(CurrentDefenderDispatchError);
+        }
         for event in observations {
             if !in_roster(before, event.holder()) && !in_roster(after, event.holder()) {
                 return Err(CurrentDefenderDispatchError);
             }
-            if let CurrentDefenderObservationV1::Applied { innate_slot: Some(slot), .. } = event {
-                if *slot > 2 { return Err(CurrentDefenderDispatchError); }
+            if let CurrentDefenderObservationV1::Applied {
+                innate_slot: Some(slot),
+                ..
+            } = event
+            {
+                if *slot > 2 {
+                    return Err(CurrentDefenderDispatchError);
+                }
             }
         }
         let action = CurrentDefenderActionV1 {
-            operation_id: operation_id.clone(), authority_revision,
-            battle_id: battle.battle_id, turn: battle.turn,
+            operation_id: operation_id.clone(),
+            authority_revision,
+            battle_id: battle.battle_id,
+            turn: battle.turn,
         };
-        let any_applied = observations.iter().any(|event| matches!(event, CurrentDefenderObservationV1::Applied { .. }));
+        let any_applied = observations
+            .iter()
+            .any(|event| matches!(event, CurrentDefenderObservationV1::Applied { .. }));
         let mut result = match previous {
             Some(previous) => {
                 previous.validate(before)?;
@@ -158,8 +191,11 @@ impl CurrentDefenderDispatchV1 {
                 previous.clone()
             }
             None if any_applied => Self {
-                run_id: before.run_id, wave: before.wave,
-                tracked_since: action.clone(), last_action: action.clone(), holders: Vec::new(),
+                run_id: before.run_id,
+                wave: before.wave,
+                tracked_since: action.clone(),
+                last_action: action.clone(),
+                holders: Vec::new(),
             },
             None => return Ok(None),
         };
@@ -167,12 +203,20 @@ impl CurrentDefenderDispatchV1 {
         for event in observations {
             match *event {
                 CurrentDefenderObservationV1::Applied { holder, .. } => {
-                    let position = match result.holders.binary_search_by_key(&holder, |row| row.pokemon) {
+                    let position = match result
+                        .holders
+                        .binary_search_by_key(&holder, |row| row.pokemon)
+                    {
                         Ok(position) => position,
                         Err(position) => {
-                            result.holders.insert(position, CurrentDefenderHolderV1 {
-                                pokemon: holder, wave_observed: false, summon_observed: false,
-                            });
+                            result.holders.insert(
+                                position,
+                                CurrentDefenderHolderV1 {
+                                    pokemon: holder,
+                                    wave_observed: false,
+                                    summon_observed: false,
+                                },
+                            );
                             position
                         }
                     };
@@ -180,7 +224,10 @@ impl CurrentDefenderDispatchV1 {
                     result.holders[position].summon_observed = true;
                 }
                 CurrentDefenderObservationV1::Summoned { holder, .. } => {
-                    if let Ok(position) = result.holders.binary_search_by_key(&holder, |row| row.pokemon) {
+                    if let Ok(position) = result
+                        .holders
+                        .binary_search_by_key(&holder, |row| row.pokemon)
+                    {
                         result.holders[position].summon_observed = false;
                     }
                 }
@@ -194,5 +241,8 @@ impl CurrentDefenderDispatchV1 {
 
 fn in_roster(run: &RunStateV3, id: PokemonId) -> bool {
     run.party.iter().any(|pokemon| pokemon.id == id)
-        || run.battle.as_ref().is_some_and(|battle| battle.enemy_party.iter().any(|pokemon| pokemon.id == id))
+        || run
+            .battle
+            .as_ref()
+            .is_some_and(|battle| battle.enemy_party.iter().any(|pokemon| pokemon.id == id))
 }

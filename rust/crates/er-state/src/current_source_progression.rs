@@ -1,9 +1,9 @@
 //! Resolved current source configuration owned by actual fresh construction.
 //! Absence is unknown. This record is never added while restoring old state.
+use er_types::SeatId;
 use er_types::battle_ids::{BattleId, PokemonId, SpeciesId, WaveIndex};
 use er_types::m72_bootstrap::StarterSelectionV1;
 use er_types::run_ids::GameRunId;
-use er_types::SeatId;
 use serde::{Deserialize, Serialize};
 
 use crate::m7_state::RunStateV3;

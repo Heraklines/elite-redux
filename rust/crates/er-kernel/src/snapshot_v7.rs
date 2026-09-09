@@ -128,7 +128,10 @@ impl CoreGameKernelSnapshotV7 {
             || self.pending_presentations.iter().any(|pending| {
                 pending.event_id == PresentationEventId::ZERO
                     || content.presentation(pending.semantic).is_none()
-                    || pending.payload.as_ref().is_some_and(|payload| payload.validate(pending.semantic).is_err())
+                    || pending
+                        .payload
+                        .as_ref()
+                        .is_some_and(|payload| payload.validate(pending.semantic).is_err())
             })
             || self
                 .pending_platform
@@ -181,7 +184,8 @@ impl CoreGameKernelSnapshotV7 {
                     || !self.input_router.held_buttons.is_empty()
                     || !self.input_router.locks.is_empty()
                     || !self.input_router.repeats.is_empty()
-                    || (bootstrap.current_storage.is_none() && bootstrap.current_starter_pokerus.is_none()
+                    || (bootstrap.current_storage.is_none()
+                        && bootstrap.current_starter_pokerus.is_none()
                         && !self.pending_platform.is_empty())
                 {
                     return Err(SnapshotV7Error::Invalid);
@@ -209,22 +213,37 @@ impl CoreGameKernelSnapshotV7 {
                         return Err(SnapshotV7Error::Invalid);
                     }
                 }
-                let mut expected_platform = bootstrap.current_storage_effect().into_iter().collect::<Vec<_>>();
+                let mut expected_platform = bootstrap
+                    .current_storage_effect()
+                    .into_iter()
+                    .collect::<Vec<_>>();
                 if let Some(pending) = bootstrap.current_starter_pokerus_pending() {
                     expected_platform.push(GamePlatformEffectV2::StarterPokerusClock {
-                        request: pending.request_id, context: pending.context,
+                        request: pending.request_id,
+                        context: pending.context,
                     });
                 }
                 expected_platform.sort_by_key(platform_request_id);
                 if expected_platform.len() != self.pending_platform.len()
-                    || expected_platform.iter().zip(&self.pending_platform).any(|(expected, actual)|
-                        platform_request_id(expected) != actual.request_id || expected != &actual.effect)
+                    || expected_platform.iter().zip(&self.pending_platform).any(
+                        |(expected, actual)| {
+                            platform_request_id(expected) != actual.request_id
+                                || expected != &actual.effect
+                        },
+                    )
                     || (bootstrap.current_starter_pokerus.is_some()
-                        && (self.protocol.is_some() || self.authority_ai.is_none()
+                        && (self.protocol.is_some()
+                            || self.authority_ai.is_none()
                             || self.next_menu_instance_id.get().get()
-                                != bootstrap.menu_instance_high_water.get().get().checked_add(1)
+                                != bootstrap
+                                    .menu_instance_high_water
+                                    .get()
+                                    .get()
+                                    .checked_add(1)
                                     .ok_or(SnapshotV7Error::Invalid)?))
-                { return Err(SnapshotV7Error::Invalid); }
+                {
+                    return Err(SnapshotV7Error::Invalid);
+                }
             }
             GameKernelLifecycleSnapshotV7::Active(state) => {
                 validate_active_state(state, self, content)?;
@@ -418,34 +437,65 @@ fn validate_active_state(
     snapshot: &CoreGameKernelSnapshotV7,
     content: &PreparedGameContentV2,
 ) -> Result<(), SnapshotV7Error> {
-    if snapshot.pending_platform.iter().any(|pending|
-        matches!(pending.effect, GamePlatformEffectV2::StarterPokerusClock { .. }))
-    { return Err(SnapshotV7Error::Invalid); }
+    if snapshot.pending_platform.iter().any(|pending| {
+        matches!(
+            pending.effect,
+            GamePlatformEffectV2::StarterPokerusClock { .. }
+        )
+    }) {
+        return Err(SnapshotV7Error::Invalid);
+    }
     state
         .validate_with(content)
         .map_err(|_| SnapshotV7Error::Invalid)?;
     if let Some(owner) = &state.current_presentation {
         for pending in &snapshot.pending_presentations {
             let effect = er_game::m9e_material_v6::GamePresentationEffectV2 {
-                event_id: pending.event_id, semantic: pending.semantic,
-                blocking: pending.blocking, skip: pending.skip, payload: pending.payload.clone(),
+                event_id: pending.event_id,
+                semantic: pending.semantic,
+                blocking: pending.blocking,
+                skip: pending.skip,
+                payload: pending.payload.clone(),
             };
-            let digest = er_canonical::fixture_digest(&effect).map_err(|_| SnapshotV7Error::Invalid)?;
-            if !owner.receipts.iter().any(|receipt| receipt.event_id == pending.event_id
-                && receipt.effect_sha256 == digest)
-            { return Err(SnapshotV7Error::Invalid); }
+            let digest =
+                er_canonical::fixture_digest(&effect).map_err(|_| SnapshotV7Error::Invalid)?;
+            if !owner.receipts.iter().any(|receipt| {
+                receipt.event_id == pending.event_id && receipt.effect_sha256 == digest
+            }) {
+                return Err(SnapshotV7Error::Invalid);
+            }
         }
-    } else if snapshot.pending_presentations.iter().any(|pending| pending.payload.is_some()) {
+    } else if snapshot
+        .pending_presentations
+        .iter()
+        .any(|pending| pending.payload.is_some())
+    {
         return Err(SnapshotV7Error::Invalid);
     }
-    let clocks = state.current_battle_participation.as_ref().and_then(|value| value.experience.as_ref())
-        .into_iter().flat_map(|owner| &owner.pending).filter_map(|pending| pending.friendship.as_ref())
-        .filter_map(|phase| phase.clock.as_ref()).collect::<Vec<_>>();
-    let effects = snapshot.pending_platform.iter().filter_map(|pending| match &pending.effect {
-        GamePlatformEffectV2::CurrentFriendshipClock { request } => Some(request),
-        _ => None,
-    }).collect::<Vec<_>>();
-    if clocks.len() > 1 || if snapshot.authority_ai.is_some() { effects != clocks } else { !effects.is_empty() } {
+    let clocks = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|value| value.experience.as_ref())
+        .into_iter()
+        .flat_map(|owner| &owner.pending)
+        .filter_map(|pending| pending.friendship.as_ref())
+        .filter_map(|phase| phase.clock.as_ref())
+        .collect::<Vec<_>>();
+    let effects = snapshot
+        .pending_platform
+        .iter()
+        .filter_map(|pending| match &pending.effect {
+            GamePlatformEffectV2::CurrentFriendshipClock { request } => Some(request),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if clocks.len() > 1
+        || if snapshot.authority_ai.is_some() {
+            effects != clocks
+        } else {
+            !effects.is_empty()
+        }
+    {
         return Err(SnapshotV7Error::Invalid);
     }
     if snapshot
@@ -557,10 +607,16 @@ fn next_menu_instance_from_v6(
 
 fn valid_platform_effect(effect: &GamePlatformEffectV2) -> bool {
     match effect {
-        GamePlatformEffectV2::StarterPokerusClock { request, context } => *request != PlatformRequestId::ZERO
-            && context.menu_instance.get() != SafeU53::ZERO && context.menu_revision != SafeU53::ZERO,
-        GamePlatformEffectV2::CurrentFriendshipClock { request } => request.request != PlatformRequestId::ZERO
-            && request.pending != SafeU53::ZERO && request.recipient.get() != SafeU53::ZERO,
+        GamePlatformEffectV2::StarterPokerusClock { request, context } => {
+            *request != PlatformRequestId::ZERO
+                && context.menu_instance.get() != SafeU53::ZERO
+                && context.menu_revision != SafeU53::ZERO
+        }
+        GamePlatformEffectV2::CurrentFriendshipClock { request } => {
+            request.request != PlatformRequestId::ZERO
+                && request.pending != SafeU53::ZERO
+                && request.recipient.get() != SafeU53::ZERO
+        }
         GamePlatformEffectV2::StorageRead { slot, .. }
         | GamePlatformEffectV2::StorageDelete { slot, .. } => !slot.is_empty(),
         GamePlatformEffectV2::StorageWrite {

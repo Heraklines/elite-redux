@@ -350,7 +350,10 @@ impl RunBootstrapMachineV1 {
                     .iter()
                     .find(|entry| entry.mode == mode)
                     .ok_or(RunBootstrapErrorV1::IllegalAction)?;
-                if !policy.supported || ((self.current_storage.is_some() || self.current_starter_pokerus.is_some()) && policy.cooperative) {
+                if !policy.supported
+                    || ((self.current_storage.is_some() || self.current_starter_pokerus.is_some())
+                        && policy.cooperative)
+                {
                     return Err(RunBootstrapErrorV1::UnsupportedMode);
                 }
                 self.selections.mode = Some(mode);
@@ -543,7 +546,10 @@ impl RunBootstrapMachineV1 {
             owner,
             revision,
             instance,
-            (self.current_storage.as_ref(), self.current_starter_pokerus.as_ref()),
+            (
+                self.current_storage.as_ref(),
+                self.current_starter_pokerus.as_ref(),
+            ),
         )?;
         Ok(())
     }
@@ -556,7 +562,10 @@ fn build_control(
     owner: SeatId,
     revision: SafeU53,
     instance: MenuInstanceId,
-    extensions: (Option<&CurrentBootstrapStorageV1>, Option<&CurrentStarterPokerusOwnerV1>),
+    extensions: (
+        Option<&CurrentBootstrapStorageV1>,
+        Option<&CurrentStarterPokerusOwnerV1>,
+    ),
 ) -> Result<GameControlPlanV2, RunBootstrapErrorV1> {
     let (storage, pokerus) = extensions;
     if let Some(entries) = current_pokerus::control_entries(stage, pokerus) {

@@ -43,5 +43,5 @@ pub use turn::{
     resolve_turn_trusted_with_finalizer,
 };
 
-pub mod current_target_execution;
 mod current_defender_abilities;
+pub mod current_target_execution;

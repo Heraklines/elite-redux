@@ -1,9 +1,9 @@
 //! Bridge for the source-ordered Pokemon head, achievement interlude and tail.
 //! Canonical ownership, account resolution and clocks belong to the game phase.
 use crate::current_friendship::{
-    CurrentFriendshipError, ExistingStarterAccount, FriendshipPlan,
-    ResolvedPositiveFriendship, StarterCandyResult, continue_friendship_tail,
-    positive_friendship_value, prepare_friendship_head,
+    CurrentFriendshipError, ExistingStarterAccount, FriendshipPlan, ResolvedPositiveFriendship,
+    StarterCandyResult, continue_friendship_tail, positive_friendship_value,
+    prepare_friendship_head,
 };
 
 /// Private fields prevent changing the arithmetic head between the two calls.
@@ -59,9 +59,7 @@ pub fn prepare_phase_head(
     fun_debug: bool,
 ) -> Result<FriendshipPhaseHeadV1, CurrentFriendshipError> {
     const MAX_SAFE: f64 = 9_007_199_254_740_991.0;
-    if !before.is_finite() || !original_delta.is_finite()
-        || original_delta.abs() > MAX_SAFE
-    {
+    if !before.is_finite() || !original_delta.is_finite() || original_delta.abs() > MAX_SAFE {
         return Err(CurrentFriendshipError::Arithmetic);
     }
     if !(0.0..=255.0).contains(&before) {
@@ -73,8 +71,13 @@ pub fn prepare_phase_head(
             return Err(CurrentFriendshipError::Arithmetic);
         }
         return Ok(FriendshipPhaseHeadV1 {
-            before, original_delta, boosted_amount: 0.0, capped, fun_debug,
-            friendship: next.max(0.0), has_tail: false,
+            before,
+            original_delta,
+            boosted_amount: 0.0,
+            capped,
+            fun_debug,
+            friendship: next.max(0.0),
+            has_tail: false,
         });
     }
     let amount = boosted_amount.ok_or(CurrentFriendshipError::Input)?;
@@ -86,8 +89,13 @@ pub fn prepare_phase_head(
     }
     let friendship = positive_friendship_value(before, amount, capped)?;
     Ok(FriendshipPhaseHeadV1 {
-        before, original_delta, boosted_amount: amount, capped, fun_debug,
-        friendship, has_tail: !fun_debug,
+        before,
+        original_delta,
+        boosted_amount: amount,
+        capped,
+        fun_debug,
+        friendship,
+        has_tail: !fun_debug,
     })
 }
 
@@ -99,13 +107,18 @@ pub fn finish_phase_tail(
     current_accounts: &[ExistingStarterAccount],
     resolved: &ResolvedPositiveFriendship,
 ) -> Result<FriendshipPhaseTailV1, CurrentFriendshipError> {
-    if !head.has_tail || resolved.boosted_amount != head.boosted_amount
-        || resolved.capped != head.capped || resolved.fun_debug != head.fun_debug
+    if !head.has_tail
+        || resolved.boosted_amount != head.boosted_amount
+        || resolved.capped != head.capped
+        || resolved.fun_debug != head.fun_debug
     {
         return Err(CurrentFriendshipError::Input);
     }
     let checked = prepare_friendship_head(
-        head.before, head.original_delta, current_accounts, Some(resolved),
+        head.before,
+        head.original_delta,
+        current_accounts,
+        Some(resolved),
     )?;
     if !checked.has_tail || checked.plan.friendship != head.friendship {
         return Err(CurrentFriendshipError::Input);
@@ -114,9 +127,15 @@ pub fn finish_phase_tail(
     let plan = continue_friendship_tail(checked.plan, resolved, Some(&mut calls))?;
     Ok(FriendshipPhaseTailV1 {
         plan,
-        candy_calls: calls.into_iter().map(|call| FriendshipPhaseCandyCallV1 {
-            species: call.species, root: call.root, requested_count: call.requested_count,
-            before_candy: call.before_candy, result: call.result,
-        }).collect(),
+        candy_calls: calls
+            .into_iter()
+            .map(|call| FriendshipPhaseCandyCallV1 {
+                species: call.species,
+                root: call.root,
+                requested_count: call.requested_count,
+                before_candy: call.before_candy,
+                result: call.result,
+            })
+            .collect(),
     })
 }

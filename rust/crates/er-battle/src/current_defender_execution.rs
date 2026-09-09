@@ -53,7 +53,9 @@ pub(super) fn execute(
         let holder = occupant(run, slot).ok_or(BattleV5Error::Target)?;
         let target = pokemon(run, holder).ok_or(BattleV5Error::Target)?;
         if target.fainted || target.hp == 0 {
-            if source_events.is_some() { return Err(BattleV5Error::Target); }
+            if source_events.is_some() {
+                return Err(BattleV5Error::Target);
+            }
             continue;
         }
         let absorb = pre_hit_absorb(input.targeting, run, input.actor, target, input.definition)
@@ -61,19 +63,29 @@ pub(super) fn execute(
         if let Some(plan) = absorb {
             let result = if plan.suppress_no_effect_message() {
                 CurrentHitCheckV1::NoEffectNoMessage
-            } else { CurrentHitCheckV1::NoEffect };
-            resolved_checks.push(CurrentResolvedHitCheckV1 { target: holder, slot, result });
+            } else {
+                CurrentHitCheckV1::NoEffect
+            };
+            resolved_checks.push(CurrentResolvedHitCheckV1 {
+                target: holder,
+                slot,
+                result,
+            });
             checks.push((slot, HitCheck::Immune(plan)));
         } else if status || accuracy_hits(input.content, input.mechanics, input.definition, rng)? {
             // Existing status-effect execution remains bounded separately. This
             // preserves its non-damage path; it does not claim full status parity.
             resolved_checks.push(CurrentResolvedHitCheckV1 {
-                target: holder, slot, result: CurrentHitCheckV1::Hit,
+                target: holder,
+                slot,
+                result: CurrentHitCheckV1::Hit,
             });
             checks.push((slot, HitCheck::Hit(holder)));
         } else {
             resolved_checks.push(CurrentResolvedHitCheckV1 {
-                target: holder, slot, result: CurrentHitCheckV1::Miss,
+                target: holder,
+                slot,
+                result: CurrentHitCheckV1::Miss,
             });
             checks.push((slot, HitCheck::Miss));
         }
@@ -83,9 +95,12 @@ pub(super) fn execute(
         // records the current execution; unrelated source modifiers remain
         // explicitly outside its qualified damage scope.
         events.push(CurrentBattleSourceEventV1::MoveResolution {
-            user: input.actor.id, source_slot: input.source_slot,
-            move_id: input.definition.id, use_mode: CurrentMoveUseModeV1::Direct,
-            first_hit: true, targets: resolved_checks,
+            user: input.actor.id,
+            source_slot: input.source_slot,
+            move_id: input.definition.id,
+            use_mode: CurrentMoveUseModeV1::Direct,
+            first_hit: true,
+            targets: resolved_checks,
         });
     }
 
@@ -96,9 +111,13 @@ pub(super) fn execute(
     let mut no_effect_messages = Vec::new();
     for (target_slot, check) in checks {
         match check {
-            HitCheck::Miss => { missed = true; }
+            HitCheck::Miss => {
+                missed = true;
+            }
             HitCheck::Immune(plan) => {
-                if !plan.suppress_no_effect_message() { no_effect_messages.push(plan.holder); }
+                if !plan.suppress_no_effect_message() {
+                    no_effect_messages.push(plan.holder);
+                }
                 absorbed.push(plan);
                 // Source applies NoEffectAttr even when the message is cancelled.
                 // Every currently admitted source row has an empty NoEffectAttr
@@ -106,21 +125,43 @@ pub(super) fn execute(
                 no_effect_continuation(input.definition)?;
             }
             HitCheck::Hit(holder) => {
-                if status { hit_any = true; continue; }
+                if status {
+                    hit_any = true;
+                    continue;
+                }
                 let target = pokemon(run, holder).ok_or(BattleV5Error::Target)?.clone();
-                if target.fainted || target.hp == 0 { continue; }
+                if target.fainted || target.hp == 0 {
+                    continue;
+                }
                 let critical = critical_hits(input.content, input.mechanics, rng)?;
-                let calculated = calculate_damage_observed(input.content, input.mechanics, input.definition,
-                    input.actor, &target, critical, rng)?;
+                let calculated = calculate_damage_observed(
+                    input.content,
+                    input.mechanics,
+                    input.definition,
+                    input.actor,
+                    &target,
+                    critical,
+                    rng,
+                )?;
                 let damage = calculated.damage;
-                if damage == 0 { continue; }
+                if damage == 0 {
+                    continue;
+                }
                 let target = pokemon_mut(run, holder).ok_or(BattleV5Error::Target)?;
                 let before = target.hp;
                 target.hp = target.hp.saturating_sub(damage);
                 target.fainted = target.hp == 0;
                 let after = target.hp;
-                mutations.push(BattleMutation::HpChanged { pokemon: holder, before, after });
-                presentation.push(BattlePresentationCueV5::HpChanged { pokemon: holder, before, after });
+                mutations.push(BattleMutation::HpChanged {
+                    pokemon: holder,
+                    before,
+                    after,
+                });
+                presentation.push(BattlePresentationCueV5::HpChanged {
+                    pokemon: holder,
+                    before,
+                    after,
+                });
                 if target.fainted {
                     presentation.push(BattlePresentationCueV5::Fainted { pokemon: holder });
                 }
@@ -130,26 +171,54 @@ pub(super) fn execute(
                     // the actual damage-hook argument. It is retained here,
                     // not reconstructed from a later final-state HP delta.
                     events.push(CurrentBattleSourceEventV1::MoveDamage {
-                        user: input.actor.id, source_slot: input.source_slot,
-                        target: holder, target_slot, move_id: input.definition.id,
-                        use_mode: CurrentMoveUseModeV1::Direct, damage: damage_dealt,
-                        critical, target_hp_before: before, target_hp_after: after,
+                        user: input.actor.id,
+                        source_slot: input.source_slot,
+                        target: holder,
+                        target_slot,
+                        move_id: input.definition.id,
+                        use_mode: CurrentMoveUseModeV1::Direct,
+                        damage: damage_dealt,
+                        critical,
+                        target_hp_before: before,
+                        target_hp_after: after,
                         target_max_hp: target.max_hp,
                         super_effective: calculated.super_effective,
-                        hit_count: 1, hits_left: 1,
+                        hit_count: 1,
+                        hits_left: 1,
                     });
                 }
-                total_damage = total_damage.checked_add(u64::from(damage_dealt)).ok_or(BattleV5Error::Overflow)?;
-                apply_move_drain_after_damage(run, MoveDamageHit {
-                    actor: input.actor.id, move_id: input.definition.id, damage_dealt,
-                }, input.content, Some(input.targeting), mutations, presentation, mechanics_evidence)?;
+                total_damage = total_damage
+                    .checked_add(u64::from(damage_dealt))
+                    .ok_or(BattleV5Error::Overflow)?;
+                apply_move_drain_after_damage(
+                    run,
+                    MoveDamageHit {
+                        actor: input.actor.id,
+                        move_id: input.definition.id,
+                        damage_dealt,
+                    },
+                    input.content,
+                    Some(input.targeting),
+                    mutations,
+                    presentation,
+                    mechanics_evidence,
+                )?;
                 hit_any = true;
             }
         }
     }
     if !status && hit_any {
-        apply_move_recoil_after_damage(run, input.actor.id, input.definition.id, total_damage,
-            input.content, Some(input.targeting), mutations, presentation, mechanics_evidence)?;
+        apply_move_recoil_after_damage(
+            run,
+            input.actor.id,
+            input.definition.id,
+            total_damage,
+            input.content,
+            Some(input.targeting),
+            mutations,
+            presentation,
+            mechanics_evidence,
+        )?;
         let after_hit = execute_hook_v2(input.content, input.mechanics, MechanicHookV2::AfterHit)
             .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
         mechanics_evidence.extend(after_hit.operations);
@@ -162,14 +231,20 @@ pub(super) fn execute(
     }
     for holder in no_effect_messages {
         presentation.push(BattlePresentationCueV5::MoveNoEffect {
-            pokemon: holder, move_id: input.definition.id,
+            pokemon: holder,
+            move_id: input.definition.id,
         });
     }
     let after_move = execute_hook_v2(input.content, input.mechanics, MechanicHookV2::AfterMove)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
     mechanics_evidence.extend(after_move.operations);
-    Ok(if hit_any { ActionDisposition::Executed }
-        else if missed { ActionDisposition::Missed } else { ActionDisposition::NoEffect })
+    Ok(if hit_any {
+        ActionDisposition::Executed
+    } else if missed {
+        ActionDisposition::Missed
+    } else {
+        ActionDisposition::NoEffect
+    })
 }
 
 fn flush_absorb(
@@ -186,21 +261,34 @@ fn flush_absorb(
     };
     let ability = er_types::battle_ids::AbilityId::new(numeric_id);
     presentation.push(BattlePresentationCueV5::AbilityShown {
-        pokemon: plan.holder, ability, innate_slot: plan.source.innate_slot,
+        pokemon: plan.holder,
+        ability,
+        innate_slot: plan.source.innate_slot,
     });
     let target = pokemon(run, plan.holder).ok_or(BattleV5Error::Target)?;
     if let Some((before, after)) = apply_absorb_heal(targeting, run, target, plan)
         .map_err(|_| BattleV5Error::UnsupportedContent)?
     {
         let requested_heal = plan.heal_request.ok_or(BattleV5Error::UnsupportedContent)?;
-        pokemon_mut(run, plan.holder).ok_or(BattleV5Error::Target)?.hp = after;
-        mutations.push(BattleMutation::HpChanged { pokemon: plan.holder, before, after });
+        pokemon_mut(run, plan.holder)
+            .ok_or(BattleV5Error::Target)?
+            .hp = after;
+        mutations.push(BattleMutation::HpChanged {
+            pokemon: plan.holder,
+            before,
+            after,
+        });
         presentation.push(BattlePresentationCueV5::AbilityHeal {
-            pokemon: plan.holder, before, after, requested_heal,
+            pokemon: plan.holder,
+            before,
+            after,
+            requested_heal,
         });
     }
     presentation.push(BattlePresentationCueV5::AbilityHidden {
-        pokemon: plan.holder, ability, innate_slot: plan.source.innate_slot,
+        pokemon: plan.holder,
+        ability,
+        innate_slot: plan.source.innate_slot,
     });
     Ok(())
 }
@@ -209,8 +297,8 @@ fn no_effect_continuation(definition: &MoveDefinitionV3) -> Result<(), BattleV5E
     // Actual initialized399d catalog observed by the target prerequisite. This
     // explicit empty capability is not a generic ignore-unimplemented handler.
     match definition.id.get().get() {
-        10 | 33 | 39 | 40 | 43 | 45 | 57 | 61 | 64 | 78 | 79 | 98 | 103 | 105
-        | 108 | 110 | 165 | 230 | 310 | 331 | 336 | 448 | 458 | 497 | 501 | 541 | 580 => Ok(()),
+        10 | 33 | 39 | 40 | 43 | 45 | 57 | 61 | 64 | 78 | 79 | 98 | 103 | 105 | 108 | 110 | 165
+        | 230 | 310 | 331 | 336 | 448 | 458 | 497 | 501 | 541 | 580 => Ok(()),
         _ => Err(BattleV5Error::UnsupportedContent),
     }
 }

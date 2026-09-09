@@ -6,8 +6,7 @@ use thiserror::Error;
 #[path = "current_friendship_rewards.rs"]
 mod rewards;
 pub use rewards::{
-    CURRENT_FRIENDSHIP_RIBBON_V1, CurrentFriendshipRewardProfileV1,
-    CurrentFriendshipRibbonV1,
+    CURRENT_FRIENDSHIP_RIBBON_V1, CurrentFriendshipRewardProfileV1, CurrentFriendshipRibbonV1,
 };
 
 pub const MAX_CURRENT_FRIENDSHIP_ACCOUNTS_V1: usize = 4_096;

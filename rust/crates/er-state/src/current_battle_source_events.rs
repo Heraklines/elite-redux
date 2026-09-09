@@ -5,14 +5,23 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CurrentMoveUseModeV1 { Direct }
+pub enum CurrentMoveUseModeV1 {
+    Direct,
+}
 
 /// Closed pinned399d HitCheckResult names, including distinct no-message result.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CurrentHitCheckV1 {
-    Pending, Hit, NoEffect, NoEffectNoMessage, Protected, Miss,
-    Reflected, TargetNotOnField, Error,
+    Pending,
+    Hit,
+    NoEffect,
+    NoEffectNoMessage,
+    Protected,
+    Miss,
+    Reflected,
+    TargetNotOnField,
+    Error,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

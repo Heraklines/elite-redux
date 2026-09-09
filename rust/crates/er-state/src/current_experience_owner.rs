@@ -178,7 +178,8 @@ impl CurrentExperienceOwnerV1 {
             .ok_or(CurrentExperienceOwnerError::Invalid)?;
         if self.source_progression.as_ref().is_some_and(|source| {
             self.execution_origin != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
-                || source.profile_owner != self.authority || !source.valid(run)
+                || source.profile_owner != self.authority
+                || !source.valid(run)
         }) {
             return Err(CurrentExperienceOwnerError::Invalid);
         }
@@ -242,9 +243,13 @@ impl CurrentExperienceOwnerV1 {
             match (&self.execution_origin, &pending.friendship) {
                 (Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic), Some(phase)) => {
                     phase.validate(pending)?;
-                    if pending.victory.as_ref().is_some_and(|victory|
-                        !phase.complete || !victory.valid(pending.id))
-                    { return Err(CurrentExperienceOwnerError::Invalid); }
+                    if pending
+                        .victory
+                        .as_ref()
+                        .is_some_and(|victory| !phase.complete || !victory.valid(pending.id))
+                    {
+                        return Err(CurrentExperienceOwnerError::Invalid);
+                    }
                 }
                 (None, None) if pending.victory.is_none() => {}
                 _ => return Err(CurrentExperienceOwnerError::Invalid),
@@ -357,7 +362,9 @@ impl CurrentExperienceOwnerV1 {
                 participants: faint.participants.clone(),
                 recipients: recipient_snapshot(run)?,
                 continuation: continuation(battle.outcome),
-                friendship: self.execution_origin.map(|_| CurrentFriendshipPhaseV1::default()),
+                friendship: self
+                    .execution_origin
+                    .map(|_| CurrentFriendshipPhaseV1::default()),
                 victory: None,
             });
             candidate.next_pending_id = next;

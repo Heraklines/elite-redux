@@ -7,9 +7,9 @@ use er_mechanics::selector_operation_v2::{MechanicOperationV2, SelectorNodeV2};
 use er_mechanics::v2::{MechanicHookV2, MechanicQueryV2};
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
+use er_state::current_battle_source_events::CurrentBattleSourceEventV1;
 use er_state::m7_state::{BattleStateV5, GameStateV5, PokemonStateV5, RunStateV3};
 use er_state::pokemon::calculate_max_pp;
-use er_state::current_battle_source_events::CurrentBattleSourceEventV1;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandSet,
 };
@@ -723,10 +723,19 @@ fn execute_move(
         return current_defender_execution::execute(
             run,
             current_defender_execution::CurrentMoveContext {
-                content, targeting: owner, definition,
-                actor: &actor_snapshot, source_slot, source_events, mechanics: &context,
+                content,
+                targeting: owner,
+                definition,
+                actor: &actor_snapshot,
+                source_slot,
+                source_events,
+                mechanics: &context,
             },
-            target_slots, rng, mutations, presentation, mechanics_evidence,
+            target_slots,
+            rng,
+            mutations,
+            presentation,
+            mechanics_evidence,
         );
     }
     if matches!(definition.category, MoveCategory::Status)
@@ -1211,7 +1220,8 @@ fn query_simulated_move_damage_inner(
     }
     if let Some(owner) = targeting {
         if crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition)
-            .map_err(|_| BattleV5Error::UnsupportedContent)?.is_some()
+            .map_err(|_| BattleV5Error::UnsupportedContent)?
+            .is_some()
         {
             return Ok(0);
         }
@@ -1225,7 +1235,8 @@ fn query_simulated_move_damage_inner(
     let context = mechanics_context(actor, battle, &sources);
     calculate_damage_with_variance(content, &context, definition, actor, target, false, || {
         Ok(100)
-    }).map(|result| result.damage)
+    })
+    .map(|result| result.damage)
 }
 
 #[allow(clippy::too_many_arguments)]

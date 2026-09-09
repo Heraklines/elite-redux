@@ -18,8 +18,8 @@ use crate::m9e_content_v2::{
 
 #[path = "m9e_presentation_payload.rs"]
 mod presentation_payload;
-pub use presentation_payload::{GamePresentationAchievementV1, GamePresentationPayloadV1};
 pub use crate::m9e_runtime_v6::GameOwnedPhaseV1;
+pub use presentation_payload::{GamePresentationAchievementV1, GamePresentationPayloadV1};
 
 pub const GAME_MATERIAL_SCHEMA_VERSION_V6: u32 = 6;
 pub const APPLIED_MATERIAL_LEDGER_SCHEMA_VERSION_V1: u32 = 1;
@@ -300,8 +300,11 @@ impl GameMaterialV6 {
                 > MAX_GAME_STATE_BYTES_V6
             || !variant_matches_transition(self, transition)
             || if transition.owned_phase.is_some() {
-                transition.accepted_action.is_some() || transition.domain != GameActionDomainV2::Progression
-            } else { !action_matches_domain(transition.accepted_action.as_ref(), transition.domain) }
+                transition.accepted_action.is_some()
+                    || transition.domain != GameActionDomainV2::Progression
+            } else {
+                !action_matches_domain(transition.accepted_action.as_ref(), transition.domain)
+            }
             || invalid_mutations(&transition.mutations)
             || invalid_rng(&transition.rng_audit)
             || invalid_presentations(&transition.presentation)
@@ -462,10 +465,15 @@ pub fn apply_game_material_v6_with_retention(
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     validate_presentation_frontier(live.as_ref(), transition)?;
     if transition.owned_phase.is_none()
-        && live.as_ref().and_then(|state| state.current_battle_participation.as_ref())
+        && live
+            .as_ref()
+            .and_then(|state| state.current_battle_participation.as_ref())
             .and_then(|owner| owner.experience.as_ref())
             .is_some_and(|owner| owner.source_progression.is_some())
-        && !matches!(transition.domain, GameActionDomainV2::BattleTurn | GameActionDomainV2::SaveControl)
+        && !matches!(
+            transition.domain,
+            GameActionDomainV2::BattleTurn | GameActionDomainV2::SaveControl
+        )
     {
         // A caller cannot bypass the runtime's source-context mutation guard by
         // supplying material for an unowned world/modifier/fusion/reward path.
@@ -476,11 +484,17 @@ pub fn apply_game_material_v6_with_retention(
     // roster/wave lifecycle or clear this run owner when the run ends.
     if transition.owned_phase.is_none() {
         let expected = match (live.as_ref(), transition.after_state.active_run.as_ref()) {
-            (Some(before), Some(run)) => before.current_defender_dispatch.as_ref().map(|owner| {
-                let mut owner = owner.clone();
-                owner.synchronize(run).map_err(|_| GameMaterialV6Error::Invalid)?;
-                Ok::<_, GameMaterialV6Error>(owner)
-            }).transpose()?,
+            (Some(before), Some(run)) => before
+                .current_defender_dispatch
+                .as_ref()
+                .map(|owner| {
+                    let mut owner = owner.clone();
+                    owner
+                        .synchronize(run)
+                        .map_err(|_| GameMaterialV6Error::Invalid)?;
+                    Ok::<_, GameMaterialV6Error>(owner)
+                })
+                .transpose()?,
             _ => None,
         };
         if transition.after_state.current_defender_dispatch != expected {
@@ -491,8 +505,11 @@ pub fn apply_game_material_v6_with_retention(
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     if transition.owned_phase.is_some() {
         crate::m9e_runtime_v6::validate_owned_phase_transition(
-            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?, content, transition,
-        ).map_err(|_| GameMaterialV6Error::Invalid)?;
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
+            content,
+            transition,
+        )
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     if let Some(prior) = live
         .as_ref()
@@ -506,14 +523,18 @@ pub fn apply_game_material_v6_with_retention(
             .and_then(|owner| owner.experience.as_ref())
             .ok_or(GameMaterialV6Error::Invalid)?;
         if transition.owned_phase.is_none() {
-            prior.validate_successor(next).map_err(|_| GameMaterialV6Error::Invalid)?;
+            prior
+                .validate_successor(next)
+                .map_err(|_| GameMaterialV6Error::Invalid)?;
         }
     }
     // Only a fully recomputed owned phase can change an established account.
     // Unknown historical profiles retain the original exact conservation rule.
-    if transition.owned_phase.is_none() && live.as_ref().is_some_and(|prior| {
-        prior.current_friendship_profile != transition.after_state.current_friendship_profile
-    }) {
+    if transition.owned_phase.is_none()
+        && live.as_ref().is_some_and(|prior| {
+            prior.current_friendship_profile != transition.after_state.current_friendship_profile
+        })
+    {
         return Err(GameMaterialV6Error::Invalid);
     }
     // Current targeting is established only by bootstrap. Same-run material cannot
@@ -689,10 +710,14 @@ fn invalid_rng(draws: &[RngDraw]) -> bool {
 
 fn invalid_presentations(presentation: &[GamePresentationEffectV2]) -> bool {
     let mut ids = BTreeSet::new();
-    presentation
-        .iter()
-        .any(|effect| effect.event_id == PresentationEventId::ZERO || !ids.insert(effect.event_id)
-            || effect.payload.as_ref().is_some_and(|payload| payload.validate(effect.semantic).is_err()))
+    presentation.iter().any(|effect| {
+        effect.event_id == PresentationEventId::ZERO
+            || !ids.insert(effect.event_id)
+            || effect
+                .payload
+                .as_ref()
+                .is_some_and(|payload| payload.validate(effect.semantic).is_err())
+    })
 }
 
 fn invalid_platform_effects(
@@ -716,8 +741,8 @@ fn invalid_platform_effects(
             // Daily sampling belongs to Bootstrap, outside active game material.
             GamePlatformEffectV2::StarterPokerusClock { request, .. } => (*request, true),
             GamePlatformEffectV2::CurrentFriendshipClock { request } => (
-                request.request, request.pending == SafeU53::ZERO
-                    || request.recipient.get() == SafeU53::ZERO,
+                request.request,
+                request.pending == SafeU53::ZERO || request.recipient.get() == SafeU53::ZERO,
             ),
             GamePlatformEffectV2::StorageRead { request, slot }
             | GamePlatformEffectV2::StorageDelete { request, slot } => (*request, slot.is_empty()),
@@ -751,33 +776,65 @@ fn invalid_platform_effects(
 }
 
 fn validate_presentation_frontier(
-    before: Option<&GameStateV6>, transition: &GameTransitionMaterialV6,
+    before: Option<&GameStateV6>,
+    transition: &GameTransitionMaterialV6,
 ) -> Result<(), GameMaterialV6Error> {
     let prior = before.and_then(|state| state.current_presentation.as_ref());
     let after = transition.after_state.current_presentation.as_ref();
     let mut expected = match (prior, after) {
         (Some(owner), Some(_)) => owner.clone(),
-        (None, Some(_)) if before.is_none() && transition.domain == GameActionDomainV2::NewRun
-            && transition.after_state.current_friendship_profile.as_ref()
-                .and_then(|profile| profile.rewards.as_ref()).is_some() =>
-                    er_state::current_presentation::CurrentPresentationOwnerV1::fresh(transition.authority_revision),
-        (None, None) if transition.presentation.iter().all(|effect| effect.payload.is_none()) => return Ok(()),
+        (None, Some(_))
+            if before.is_none()
+                && transition.domain == GameActionDomainV2::NewRun
+                && transition
+                    .after_state
+                    .current_friendship_profile
+                    .as_ref()
+                    .and_then(|profile| profile.rewards.as_ref())
+                    .is_some() =>
+        {
+            er_state::current_presentation::CurrentPresentationOwnerV1::fresh(
+                transition.authority_revision,
+            )
+        }
+        (None, None)
+            if transition
+                .presentation
+                .iter()
+                .all(|effect| effect.payload.is_none()) =>
+        {
+            return Ok(());
+        }
         _ => return Err(GameMaterialV6Error::Invalid),
     };
     let mut next = expected.next_event_id;
     for effect in &transition.presentation {
-        if effect.event_id.get() != next { return Err(GameMaterialV6Error::Invalid); }
-        expected.receipts.push(er_state::current_presentation::CurrentPresentationReceiptV1 {
-            event_id: effect.event_id,
-            effect_sha256: er_canonical::fixture_digest(effect).map_err(|_| GameMaterialV6Error::Invalid)?,
-        });
-        next = SafeU53::new(next.get().checked_add(1).ok_or(GameMaterialV6Error::Invalid)?)
-            .map_err(|_| GameMaterialV6Error::Invalid)?;
+        if effect.event_id.get() != next {
+            return Err(GameMaterialV6Error::Invalid);
+        }
+        expected.receipts.push(
+            er_state::current_presentation::CurrentPresentationReceiptV1 {
+                event_id: effect.event_id,
+                effect_sha256: er_canonical::fixture_digest(effect)
+                    .map_err(|_| GameMaterialV6Error::Invalid)?,
+            },
+        );
+        next = SafeU53::new(
+            next.get()
+                .checked_add(1)
+                .ok_or(GameMaterialV6Error::Invalid)?,
+        )
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
-    let excess = expected.receipts.len().saturating_sub(er_state::current_presentation::MAX_CURRENT_PRESENTATION_RECEIPTS_V1);
+    let excess = expected
+        .receipts
+        .len()
+        .saturating_sub(er_state::current_presentation::MAX_CURRENT_PRESENTATION_RECEIPTS_V1);
     expected.receipts.drain(..excess);
     expected.next_event_id = next;
-    if after != Some(&expected) { return Err(GameMaterialV6Error::Invalid); }
+    if after != Some(&expected) {
+        return Err(GameMaterialV6Error::Invalid);
+    }
     Ok(())
 }
 

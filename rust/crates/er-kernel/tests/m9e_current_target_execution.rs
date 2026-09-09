@@ -399,10 +399,18 @@ fn natural(content: Arc<PreparedGameContentV2>, index: usize) -> Result<GameKern
         .ok_or("ordinary Classic mode absent")?;
     navigate(&mut kernel, &format!("bootstrap/mode/{}", mode.mode.get()))?;
     let entered = press(&mut kernel, PhysicalKey::Space)?;
-    let request = entered.effects.iter().find_map(|effect| match effect {
-        GameKernelEffectV7::Platform(er_game::m9e_material_v6::GamePlatformEffectV2::StarterPokerusClock { request, .. }) => Some(*request),
-        _ => None,
-    }).ok_or("actual StarterSelect clock request absent")?;
+    let request = entered
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(
+                er_game::m9e_material_v6::GamePlatformEffectV2::StarterPokerusClock {
+                    request, ..
+                },
+            ) => Some(*request),
+            _ => None,
+        })
+        .ok_or("actual StarterSelect clock request absent")?;
     kernel.apply_current_utc_clock_result(request, 0)?;
     let snapshot = kernel.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = snapshot.lifecycle else {
@@ -517,30 +525,49 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
 // retained fresh source configuration is preserved and STILL rejects the edited
 // double format in source reward/achievement admission. No natural history or
 // completed payout is claimed for this controlled checkpoint.
-fn reseed_controlled_participation(state: &mut GameStateV6, content: &PreparedGameContentV2) -> Result<()> {
+fn reseed_controlled_participation(
+    state: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<()> {
     use er_progression::content_v2::ExperienceSourceFormV2;
     use er_state::current_battle_participation::CurrentBattleParticipationV1;
     use er_state::current_experience_owner::{CurrentExperienceOwnerV1, CurrentExperienceSourceV1};
-    let previous = state.current_battle_participation.as_ref().and_then(|value| value.experience.as_ref())
-        .ok_or("actual fresh experience owner absent")?.clone();
+    let previous = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|value| value.experience.as_ref())
+        .ok_or("actual fresh experience owner absent")?
+        .clone();
     assert!(previous.pending.is_empty());
     let run = active_run(state)?;
     let mut observation = CurrentBattleParticipationV1::fresh(run, safe(1))?;
     let battle = run.battle.as_ref().ok_or("controlled battle absent")?;
     let mut sources = Vec::new();
     for pokemon in &battle.enemy_party {
-        let metadata = content.progression.experience_for_compiled_form(pokemon.species_id, pokemon.form_index)?;
+        let metadata = content
+            .progression
+            .experience_for_compiled_form(pokemon.species_id, pokemon.form_index)?;
         sources.push(CurrentExperienceSourceV1 {
-            pokemon: pokemon.id, species: pokemon.species_id, compiled_form: pokemon.form_index,
+            pokemon: pokemon.id,
+            species: pokemon.species_id,
+            compiled_form: pokemon.form_index,
             source_form: match metadata.source_form {
-                ExperienceSourceFormV2::Species => None, ExperienceSourceFormV2::Form(index) => Some(index),
+                ExperienceSourceFormV2::Species => None,
+                ExperienceSourceFormV2::Form(index) => Some(index),
             },
-            unadjusted_base_exp: metadata.base_exp, source_sprite_key: metadata.source_sprite_key.clone(),
+            unadjusted_base_exp: metadata.base_exp,
+            source_sprite_key: metadata.source_sprite_key.clone(),
         });
     }
     sources.sort_by_key(|source| source.pokemon);
-    let mut experience = CurrentExperienceOwnerV1::fresh(&observation, run, state.content_identity.clone(),
-        previous.cap_policy, previous.encounter, sources)?;
+    let mut experience = CurrentExperienceOwnerV1::fresh(
+        &observation,
+        run,
+        state.content_identity.clone(),
+        previous.cap_policy,
+        previous.encounter,
+        sources,
+    )?;
     experience.execution_origin = previous.execution_origin;
     experience.source_progression = previous.source_progression;
     observation.experience = Some(experience);
@@ -582,31 +609,62 @@ struct MaterialJournal {
 impl MaterialJournal {
     fn before_command(snapshot: &CoreGameKernelSnapshotV7) -> Result<Self> {
         let mut state = active(snapshot)?.clone();
-        active_run_mut(&mut state)?.control = snapshot.private_battle_control.as_ref()
-            .ok_or("actual private command owner absent")?.canonical_control.clone();
-        Ok(Self { live: Some(state), ledger: snapshot.material_ledger.clone(), materials: Vec::new() })
+        active_run_mut(&mut state)?.control = snapshot
+            .private_battle_control
+            .as_ref()
+            .ok_or("actual private command owner absent")?
+            .canonical_control
+            .clone();
+        Ok(Self {
+            live: Some(state),
+            ledger: snapshot.material_ledger.clone(),
+            materials: Vec::new(),
+        })
     }
 
-    fn accept(&mut self, kernel: &GameKernelV7, content: &PreparedGameContentV2,
-        step: &GameKernelStepV7) -> Result<()>
-    {
-        let emitted: Vec<_> = step.effects.iter().filter_map(|effect| match effect {
-            GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
-            _ => None,
-        }).collect();
-        assert_eq!(emitted.len(), 1, "one actual transaction per public phase entry");
-        assert!(step.effects.iter().all(|effect| !matches!(effect,
-            GameKernelEffectV7::Platform(_) | GameKernelEffectV7::Terminal(_))),
-            "this non-fainting ordinary turn must not fabricate a clock/reward callback");
+    fn accept(
+        &mut self,
+        kernel: &GameKernelV7,
+        content: &PreparedGameContentV2,
+        step: &GameKernelStepV7,
+    ) -> Result<()> {
+        let emitted: Vec<_> = step
+            .effects
+            .iter()
+            .filter_map(|effect| match effect {
+                GameKernelEffectV7::AuthorityMaterial { bytes, .. } => Some(bytes),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            emitted.len(),
+            1,
+            "one actual transaction per public phase entry"
+        );
+        assert!(
+            step.effects.iter().all(|effect| !matches!(
+                effect,
+                GameKernelEffectV7::Platform(_) | GameKernelEffectV7::Terminal(_)
+            )),
+            "this non-fainting ordinary turn must not fabricate a clock/reward callback"
+        );
         let proof = material(step)?;
         assert_eq!(proof.canonical_bytes()?, *emitted[0]);
-        let presentations: Vec<_> = step.effects.iter().filter_map(|effect| match effect {
-            GameKernelEffectV7::Presentation(effect) => Some(effect.clone()),
-            _ => None,
-        }).collect();
+        let presentations: Vec<_> = step
+            .effects
+            .iter()
+            .filter_map(|effect| match effect {
+                GameKernelEffectV7::Presentation(effect) => Some(effect.clone()),
+                _ => None,
+            })
+            .collect();
         assert_eq!(presentations, proof.transition().presentation);
-        let outcome = apply_game_material_v6(&mut self.live, &mut self.ledger, content, emitted[0])?;
-        assert_eq!(outcome, er_game::m9e_material_v6::GameMaterialApplyOutcomeV6::Applied);
+        let outcome =
+            apply_game_material_v6(&mut self.live, &mut self.ledger, content, emitted[0])?;
+        assert_eq!(
+            outcome,
+            er_game::m9e_material_v6::GameMaterialApplyOutcomeV6::Applied
+        );
         assert_eq!(self.live.as_ref(), kernel.state());
         assert_eq!(self.ledger, kernel.snapshot()?.material_ledger);
         self.materials.push(proof);
@@ -624,32 +682,59 @@ impl MaterialJournal {
         Ok(())
     }
 
-    fn drain_non_fainting_turn(&mut self, kernel: &mut GameKernelV7,
-        content: &PreparedGameContentV2) -> Result<()>
-    {
+    fn drain_non_fainting_turn(
+        &mut self,
+        kernel: &mut GameKernelV7,
+        content: &PreparedGameContentV2,
+    ) -> Result<()> {
         use er_state::current_turn_execution::CurrentTurnStageV1;
-        let turn = kernel.state().and_then(|state| state.current_turn_execution.as_ref())
+        let turn = kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
             .ok_or("raw acceptance did not retain the actual turn")?;
         assert_eq!(turn.stage, CurrentTurnStageV1::ReadyForMove);
-        let remaining = turn.actions.len().checked_sub(usize::from(turn.next_action))
+        let remaining = turn
+            .actions
+            .len()
+            .checked_sub(usize::from(turn.next_action))
             .ok_or("invalid retained action cursor")?;
         // Exactly the retained action count plus its one real finish phase. No
         // guessed polling bound, unsolicited clock or manufactured gameplay.
         let phase_count = remaining.checked_add(1).ok_or("phase count overflow")?;
         for _ in 0..phase_count {
             self.settle_actual_presentations(kernel)?;
-            let turn = kernel.state().and_then(|state| state.current_turn_execution.as_ref())
+            let turn = kernel
+                .state()
+                .and_then(|state| state.current_turn_execution.as_ref())
                 .ok_or("turn finished before its actual action count")?;
             assert_eq!(turn.stage, CurrentTurnStageV1::ReadyForMove);
             let step = kernel.advance_time(SafeU53::ZERO)?;
             self.accept(kernel, content, &step)?;
-            assert!(self.materials.last().ok_or("phase material absent")?
-                .transition().accepted_action.is_none());
+            assert!(
+                self.materials
+                    .last()
+                    .ok_or("phase material absent")?
+                    .transition()
+                    .accepted_action
+                    .is_none()
+            );
         }
         self.settle_actual_presentations(kernel)?;
-        assert!(kernel.state().ok_or("active state absent")?.current_turn_execution.is_none());
-        assert_eq!(kernel.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleCommand));
-        assert_eq!(self.materials.len(), phase_count.checked_add(1).ok_or("receipt count overflow")?);
+        assert!(
+            kernel
+                .state()
+                .ok_or("active state absent")?
+                .current_turn_execution
+                .is_none()
+        );
+        assert_eq!(
+            kernel.current_control().map(|control| control.kind),
+            Some(GameControlKindV2::BattleCommand)
+        );
+        assert_eq!(
+            self.materials.len(),
+            phase_count.checked_add(1).ok_or("receipt count overflow")?
+        );
         Ok(())
     }
 }
@@ -793,7 +878,9 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
     let step = choose_first_move(&mut kernel)?;
     let actual = material(&step)?;
     let mut journal = MaterialJournal {
-        live: Some(state.clone()), ledger: before.material_ledger.clone(), materials: Vec::new(),
+        live: Some(state.clone()),
+        ledger: before.material_ledger.clone(),
+        materials: Vec::new(),
     };
     journal.accept(&kernel, content.as_ref(), &step)?;
     journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
@@ -821,7 +908,12 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
     let mut live = Some(state.clone());
     let mut ledger = before.material_ledger.clone();
     for material in &journal.materials {
-        apply_game_material_v6(&mut live, &mut ledger, content.as_ref(), &material.canonical_bytes()?)?;
+        apply_game_material_v6(
+            &mut live,
+            &mut ledger,
+            content.as_ref(),
+            &material.canonical_bytes()?,
+        )?;
     }
     assert_eq!(live.as_ref(), Some(after));
     assert_eq!(ledger, kernel.snapshot()?.material_ledger);
@@ -1047,10 +1139,16 @@ fn poison_redirect_and_source_passive_gate_share_actual_owner() -> Result<()> {
     // The actual source full-HP5082 holder is immune; the ordered ability cue
     // now proves the reached slot without pinning the previous missing hook.
     assert_eq!(enemies[0].hp, 200);
-    assert!(journal.materials.iter().flat_map(|proof| &proof.transition().presentation).any(|effect| matches!(effect.payload.as_ref(),
+    assert!(
+        journal
+            .materials
+            .iter()
+            .flat_map(|proof| &proof.transition().presentation)
+            .any(|effect| matches!(effect.payload.as_ref(),
         Some(er_game::m9e_material_v6::GamePresentationPayloadV1::AbilityShown {
             holder, ability, innate_slot: None,
-        }) if *holder == enemies[0].id && ability.get().get() == 5082)));
+        }) if *holder == enemies[0].id && ability.get().get() == 5082))
+    );
     assert_eq!(enemies[1].hp, 200);
     Ok(())
 }
@@ -1249,46 +1347,143 @@ fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
 // not an assertion that XP or the complete LevelUpPhase has executed.
 #[test]
 fn current_stat_calculation_matches_six_actual_source_observations() -> Result<()> {
-    use er_progression::current_stats::{calculate_current_unmodified_stats, current_hp_after_stat_calculation};
+    use er_progression::current_stats::{
+        calculate_current_unmodified_stats, current_hp_after_stat_calculation,
+    };
     use er_state::pokemon_v2::Iv;
     use er_types::battle_model::BattleStats;
     use er_types::run_ids::NatureId;
     let content = content()?;
     let kernel = natural(content.clone(), 0)?;
-    let mut pokemon = kernel.state().ok_or("active state absent")?.active_run.as_ref()
-        .ok_or("run absent")?.party.first().ok_or("party absent")?.clone();
+    let mut pokemon = kernel
+        .state()
+        .ok_or("active state absent")?
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?
+        .party
+        .first()
+        .ok_or("party absent")?
+        .clone();
     assert_eq!(pokemon.species_id.get().get(), 1);
     let base = content.battle.species(pokemon.species_id)?.base_stats;
-    assert_eq!([base.hp, base.attack, base.defense, base.special_attack, base.special_defense, base.speed],
-        [47, 49, 49, 65, 65, 45]);
+    assert_eq!(
+        [
+            base.hp,
+            base.attack,
+            base.defense,
+            base.special_attack,
+            base.special_defense,
+            base.speed
+        ],
+        [47, 49, 49, 65, 65, 45]
+    );
     // Literal observations from actual source cfff32c11/run34407108952,
     // stats.cases, two independent fresh executions. No expected value is
     // calculated with the Rust implementation under test.
     let rows = [
-        (5, 0, [0,1,2,3,4,5], [20,9,10,12,11,11], 7, [19,9,10,11,11,9], 7),
-        (6, 0, [0,1,2,3,4,5], [19,9,10,11,11,9], 7, [21,10,11,12,13,10], 9),
-        (6, 1, [31;6], [21,10,11,12,13,10], 7, [23,14,10,14,14,12], 9),
-        (13, 15, [0;6], [23,14,10,14,14,12], 7, [35,15,17,24,21,16], 19),
-        (7, 0, [0;6], [35,15,17,24,21,16], 0, [23,11,11,14,14,11], 0),
-        (4, 0, [0;6], [35,15,17,24,21,16], 35, [17,8,8,10,10,8], 17),
+        (
+            5,
+            0,
+            [0, 1, 2, 3, 4, 5],
+            [20, 9, 10, 12, 11, 11],
+            7,
+            [19, 9, 10, 11, 11, 9],
+            7,
+        ),
+        (
+            6,
+            0,
+            [0, 1, 2, 3, 4, 5],
+            [19, 9, 10, 11, 11, 9],
+            7,
+            [21, 10, 11, 12, 13, 10],
+            9,
+        ),
+        (
+            6,
+            1,
+            [31; 6],
+            [21, 10, 11, 12, 13, 10],
+            7,
+            [23, 14, 10, 14, 14, 12],
+            9,
+        ),
+        (
+            13,
+            15,
+            [0; 6],
+            [23, 14, 10, 14, 14, 12],
+            7,
+            [35, 15, 17, 24, 21, 16],
+            19,
+        ),
+        (
+            7,
+            0,
+            [0; 6],
+            [35, 15, 17, 24, 21, 16],
+            0,
+            [23, 11, 11, 14, 14, 11],
+            0,
+        ),
+        (
+            4,
+            0,
+            [0; 6],
+            [35, 15, 17, 24, 21, 16],
+            35,
+            [17, 8, 8, 10, 10, 8],
+            17,
+        ),
     ];
     for (level, nature_id, ivs, pre, hp, expected, expected_hp) in rows {
         pokemon.level = level;
         pokemon.nature = NatureId::new(nature_id);
         pokemon.effective_nature = pokemon.nature;
-        for (index, iv) in ivs.into_iter().enumerate() { pokemon.ivs[index] = Iv::new(iv)?; }
-        pokemon.stats = BattleStats { hp: pre[0], attack: pre[1], defense: pre[2],
-            special_attack: pre[3], special_defense: pre[4], speed: pre[5] };
+        for (index, iv) in ivs.into_iter().enumerate() {
+            pokemon.ivs[index] = Iv::new(iv)?;
+        }
+        pokemon.stats = BattleStats {
+            hp: pre[0],
+            attack: pre[1],
+            defense: pre[2],
+            special_attack: pre[3],
+            special_defense: pre[4],
+            speed: pre[5],
+        };
         pokemon.max_hp = pre[0];
         pokemon.hp = hp;
         pokemon.fainted = hp == 0;
-        let nature = content.progression.pack().natures.iter().find(|row| row.id == pokemon.nature)
+        let nature = content
+            .progression
+            .pack()
+            .natures
+            .iter()
+            .find(|row| row.id == pokemon.nature)
             .ok_or("nature absent")?;
         let original = canonical_bytes(&pokemon)?;
         let actual = calculate_current_unmodified_stats(&pokemon, base, nature)?;
-        assert_eq!([actual.hp, actual.attack, actual.defense, actual.special_attack, actual.special_defense, actual.speed], expected);
-        assert_eq!(current_hp_after_stat_calculation(hp, pre[0], actual.hp)?, expected_hp);
-        assert_eq!(canonical_bytes(&pokemon)?, original, "stat query mutated its input");
+        assert_eq!(
+            [
+                actual.hp,
+                actual.attack,
+                actual.defense,
+                actual.special_attack,
+                actual.special_defense,
+                actual.speed
+            ],
+            expected
+        );
+        assert_eq!(
+            current_hp_after_stat_calculation(hp, pre[0], actual.hp)?,
+            expected_hp
+        );
+        assert_eq!(
+            canonical_bytes(&pokemon)?,
+            original,
+            "stat query mutated its input"
+        );
     }
     // These source observations discriminate the old floor-only nature path:
     // Lonely Attack is14 rather than13; Modest SpAttack is24 rather than23.

@@ -271,7 +271,8 @@ pub(crate) fn prepare_friendship_head(
     if resolved.boosted_amount < 0.0 {
         return Err(CurrentFriendshipError::Input);
     }
-    plan.friendship = positive_friendship_value(before_friendship, resolved.boosted_amount, resolved.capped)?;
+    plan.friendship =
+        positive_friendship_value(before_friendship, resolved.boosted_amount, resolved.capped)?;
     if resolved.fun_debug {
         return Ok(FriendshipHead {
             plan,

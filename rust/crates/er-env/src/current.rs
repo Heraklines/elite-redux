@@ -457,9 +457,10 @@ fn reduce(
             kernel.settle_presentation_outcome(event_id, outcome)?;
             Ok(GameKernelStepV7::default())
         }
-        CurrentExternalEvent::CurrentUtcClockResult { request_id, utc_milliseconds } => {
-            kernel.apply_current_utc_clock_result(request_id, utc_milliseconds)
-        }
+        CurrentExternalEvent::CurrentUtcClockResult {
+            request_id,
+            utc_milliseconds,
+        } => kernel.apply_current_utc_clock_result(request_id, utc_milliseconds),
         CurrentExternalEvent::StorageResult { request_id, result } => {
             kernel.apply_storage_result(request_id, result)
         }

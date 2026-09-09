@@ -123,12 +123,19 @@ pub enum MoveLearningActionV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum CurrentLearnMoveBatchActionV1 {
-    SelectMove { move_id: MoveId },
-    Assign { move_id: MoveId, slot: MoveSlotIndex },
+    SelectMove {
+        move_id: MoveId,
+    },
+    Assign {
+        move_id: MoveId,
+        slot: MoveSlotIndex,
+    },
     CancelSlot,
     Undo,
     Done,
-    ConfirmCancel { confirmed: bool },
+    ConfirmCancel {
+        confirmed: bool,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

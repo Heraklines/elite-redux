@@ -50,9 +50,11 @@ pub struct GameStateV6 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_turn_execution: Option<crate::current_turn_execution::CurrentTurnExecutionV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_defender_dispatch: Option<crate::current_defender_dispatch::CurrentDefenderDispatchV1>,
+    pub current_defender_dispatch:
+        Option<crate::current_defender_dispatch::CurrentDefenderDispatchV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_achievement_tracker: Option<crate::current_achievement_tracker::CurrentAchievementTrackerV1>,
+    pub current_achievement_tracker:
+        Option<crate::current_achievement_tracker::CurrentAchievementTrackerV1>,
     /// Fresh current presentation identity frontier. Historical snapshots retain
     /// the existing revision-derived single-cue route and never acquire a value.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -198,35 +200,53 @@ impl GameStateV6 {
             return Err(GameStateV6Error::Invalid);
         }
         self.identities.validate_against(self.active_run.as_ref())?;
-        if let Some(source) = self.current_battle_participation.as_ref()
+        if let Some(source) = self
+            .current_battle_participation
+            .as_ref()
             .and_then(|owner| owner.experience.as_ref())
             .and_then(|owner| owner.source_progression.as_ref())
         {
-            let profile = self.current_friendship_profile.as_ref().ok_or(GameStateV6Error::Invalid)?;
+            let profile = self
+                .current_friendship_profile
+                .as_ref()
+                .ok_or(GameStateV6Error::Invalid)?;
             let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
             if source.profile_owner != profile.owner_seat
                 || profile.content_identity != self.content_identity
-                || !source.valid(run) || self.current_targeting.is_none()
+                || !source.valid(run)
+                || self.current_targeting.is_none()
                 || self.current_presentation.is_none()
-            { return Err(GameStateV6Error::Invalid); }
+            {
+                return Err(GameStateV6Error::Invalid);
+            }
         }
         if let Some(owner) = &self.current_presentation
-            && (!owner.valid() || self.current_friendship_profile.as_ref()
-                .and_then(|profile| profile.rewards.as_ref()).is_none())
+            && (!owner.valid()
+                || self
+                    .current_friendship_profile
+                    .as_ref()
+                    .and_then(|profile| profile.rewards.as_ref())
+                    .is_none())
         {
             return Err(GameStateV6Error::Invalid);
         }
         if let Some(owner) = &self.current_achievement_tracker {
             let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
-            if self.current_targeting.is_none() || self.current_presentation.is_none()
+            if self.current_targeting.is_none()
+                || self.current_presentation.is_none()
                 || !owner.valid(run)
-            { return Err(GameStateV6Error::Invalid); }
+            {
+                return Err(GameStateV6Error::Invalid);
+            }
         }
         if let Some(owner) = &self.current_defender_dispatch {
             let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
-            if self.current_targeting.is_none_or(|targeting|
-                targeting.origin != crate::current_targeting::CurrentTargetingOriginV1::FreshNormalClassic)
-            { return Err(GameStateV6Error::Invalid); }
+            if self.current_targeting.is_none_or(|targeting| {
+                targeting.origin
+                    != crate::current_targeting::CurrentTargetingOriginV1::FreshNormalClassic
+            }) {
+                return Err(GameStateV6Error::Invalid);
+            }
             owner.validate(run).map_err(|_| GameStateV6Error::Invalid)?;
         }
         if let Some(turn) = &self.current_turn_execution {
@@ -293,10 +313,12 @@ impl GameStateV6 {
                 return Err(GameStateV6Error::Content);
             }
             let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
-        if let Some(turn) = &self.current_turn_execution {
+            if let Some(turn) = &self.current_turn_execution {
                 participation.validate_during_turn(run, turn)
-            } else { participation.validate(run) }
-                .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
+            } else {
+                participation.validate(run)
+            }
+            .map_err(|error| GameStateV6Error::Source(error.to_string()))?;
         }
         Ok(())
     }

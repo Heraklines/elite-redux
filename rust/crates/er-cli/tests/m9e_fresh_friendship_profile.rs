@@ -311,13 +311,26 @@ fn fresh_title_accounts_survive_natural_state_save_and_captured_replay() -> Resu
         current.kernel_ref()?.current_control().map(|c| c.kind),
         Some(GameControlKindV2::StarterSelect)
     );
-    let request = entered.effects.iter().find_map(|effect| match effect {
-        GameKernelEffectV7::Platform(er_game::m9e_material_v6::GamePlatformEffectV2::StarterPokerusClock { request, .. }) => Some(*request),
-        _ => None,
-    }).ok_or("actual daily source clock request absent")?;
-    captured(&mut current, CurrentExternalEvent::CurrentUtcClockResult {
-        request_id: request, utc_milliseconds: 0,
-    }, content.clone())?;
+    let request = entered
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(
+                er_game::m9e_material_v6::GamePlatformEffectV2::StarterPokerusClock {
+                    request, ..
+                },
+            ) => Some(*request),
+            _ => None,
+        })
+        .ok_or("actual daily source clock request absent")?;
+    captured(
+        &mut current,
+        CurrentExternalEvent::CurrentUtcClockResult {
+            request_id: request,
+            utc_milliseconds: 0,
+        },
+        content.clone(),
+    )?;
     press(&mut current, PhysicalKey::Space)?;
     navigate(&mut current, "bootstrap/starter/confirm")?;
     let mut committed = false;

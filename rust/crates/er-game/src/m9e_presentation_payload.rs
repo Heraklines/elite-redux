@@ -51,24 +51,50 @@ pub enum GamePresentationPayloadV1 {
 impl GamePresentationPayloadV1 {
     pub fn validate(&self, semantic: PresentationSemanticIdV1) -> Result<(), GameMaterialV6Error> {
         let (family, valid) = match self {
-            Self::StarterCandy { root, scaled_count, before_candy, after_candy } => (
+            Self::StarterCandy {
+                root,
+                scaled_count,
+                before_candy,
+                after_candy,
+            } => (
                 PresentationCueFamilyV1::Reward,
-                root.get() != SafeU53::ZERO && scaled_count.unsigned_abs() <= 9_007_199_254_740_991
-                    && before_candy.get() < 9_999 && after_candy.get() <= 9_999,
+                root.get() != SafeU53::ZERO
+                    && scaled_count.unsigned_abs() <= 9_007_199_254_740_991
+                    && before_candy.get() < 9_999
+                    && after_candy.get() <= 9_999,
             ),
-            Self::AchievementUnlocked { utc_milliseconds, .. } => (
-                PresentationCueFamilyV1::Reward, (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(utc_milliseconds),
+            Self::AchievementUnlocked {
+                utc_milliseconds, ..
+            } => (
+                PresentationCueFamilyV1::Reward,
+                (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(utc_milliseconds),
             ),
-            Self::AbilityShown { holder, ability, innate_slot }
-                | Self::AbilityHidden { holder, ability, innate_slot } => (
+            Self::AbilityShown {
+                holder,
+                ability,
+                innate_slot,
+            }
+            | Self::AbilityHidden {
+                holder,
+                ability,
+                innate_slot,
+            } => (
                 PresentationCueFamilyV1::Ability,
-                holder.get() != SafeU53::ZERO && ability.get() != SafeU53::ZERO
+                holder.get() != SafeU53::ZERO
+                    && ability.get() != SafeU53::ZERO
                     && innate_slot.is_none_or(|slot| slot < 3),
             ),
-            Self::HpRestored { holder, before, after, requested_heal } => (
+            Self::HpRestored {
+                holder,
+                before,
+                after,
+                requested_heal,
+            } => (
                 PresentationCueFamilyV1::Hp,
-                holder.get() != SafeU53::ZERO && *after > *before
-                    && *requested_heal > 0 && after - before <= *requested_heal,
+                holder.get() != SafeU53::ZERO
+                    && *after > *before
+                    && *requested_heal > 0
+                    && after - before <= *requested_heal,
             ),
             Self::MoveNoEffect { holder, move_id } => (
                 PresentationCueFamilyV1::Move,
