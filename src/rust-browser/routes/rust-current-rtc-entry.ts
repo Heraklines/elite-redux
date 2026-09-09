@@ -412,3 +412,4 @@ function boundedOperation<T>(operation: Promise<T>, signal?: AbortSignal): Promi
     if (signal?.aborted) abort();
   });
 }
+export { CurrentRtcTransportV2, type CurrentRtcIdentityV2, type CurrentRtcTransportOptionsV2 } from "../adapters/current-rtc-transport-v2";

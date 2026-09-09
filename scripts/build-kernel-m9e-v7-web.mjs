@@ -100,7 +100,7 @@ for (const capability of ["worker", "rtc"]) {
     "test/node/rust-browser/engineering/current-worker-codec.test.ts",
     "scripts/build-kernel-m9e-v7-web.mjs",
   ];
-  if (isRtc) sourcePaths.push("src/rust-browser/adapters/current-rtc-transport.ts",
+  if (isRtc) sourcePaths.push("src/rust-browser/adapters/current-rtc-transport.ts", "src/rust-browser/adapters/current-rtc-transport-v2.ts",
     "src/rust-browser/routes/rust-current-rtc-entry.ts", "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts");
   const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
   const sourceHashes = Object.fromEntries(sourcePaths.map(path => [path, sha256(readFileSync(resolve(ROOT, path)))]));
