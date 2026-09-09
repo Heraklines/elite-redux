@@ -47,6 +47,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24.9.0'
+          package-manager-cache: false
       - name: Restore existing dependency downloads
         uses: actions/cache/restore@v5
         with:
