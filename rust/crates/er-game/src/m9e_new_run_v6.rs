@@ -357,16 +357,23 @@ pub fn construct_natural_run_v6_with_starter_pokerus(
     starters: &[CurrentStarterPokerusV1],
 ) -> Result<GameStateV6, NaturalRunV6Error> {
     if starters.len() != bootstrap.selections.starters.len()
-        || starters.iter().zip(&bootstrap.selections.starters).any(|(resolved, selected)| {
-            resolved.selection != *selected
-        })
+        || starters
+            .iter()
+            .zip(&bootstrap.selections.starters)
+            .any(|(resolved, selected)| resolved.selection != *selected)
     {
         return Err(NaturalRunV6Error::Invalid);
     }
     let mut state = construct_natural_run_v6_with_pending_experience(
-        bootstrap, content, authority_revision, cap_policy,
+        bootstrap,
+        content,
+        authority_revision,
+        cap_policy,
     )?;
-    let run = state.active_run.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
+    let run = state
+        .active_run
+        .as_mut()
+        .ok_or(NaturalRunV6Error::Invalid)?;
     if run.party.len() != starters.len() {
         return Err(NaturalRunV6Error::Invalid);
     }
@@ -379,7 +386,9 @@ pub fn construct_natural_run_v6_with_starter_pokerus(
         }
         pokemon.pokerus = Some(starter.pokerus);
     }
-    state.validate_with(content).map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    state
+        .validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     Ok(state)
 }
 
