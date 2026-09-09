@@ -66,7 +66,7 @@ def git(*args):
 
 
 
-PRODUCTS = {"rust/crates/er-battle/src/lib.rs":"e3b035c6ee1fa52237dc64945d0e42f897d0118e0479a769190c81164c77ed75","rust/crates/er-battle/src/current_move_targets.rs":"ffa44cc1268f37394c495e16a634b0975894e31523cbce1ede5cad616ee443e0","rust/crates/er-battle/tests/m9e_current_move_targets.rs":"83733f3076e8021acda246c3daeab3372eb53bd951ab76e67c8fac8aa62e5d71"}
+PRODUCTS = {"rust/crates/er-battle/src/current_move_targets.rs":"bbacf5979e0ae788bd2e69edc18df9859a075f05b6b54cbf2903902a69e433f6","rust/crates/er-battle/src/lib.rs":"e3b035c6ee1fa52237dc64945d0e42f897d0118e0479a769190c81164c77ed75","rust/crates/er-battle/tests/m9e_current_move_targets.rs":"d8b6b7234443cf24e4e3060701e574356861b7e7e7518edbaf30b61af41bc6b8"}
 
 def main():
     require(os.name == "posix" and os.uname().machine == "x86_64", "remote Ubuntu x64 required")

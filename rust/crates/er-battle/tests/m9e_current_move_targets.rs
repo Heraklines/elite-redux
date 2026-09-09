@@ -4,6 +4,7 @@ use serde::Deserialize;
 fn context() -> TargetContext {
     TargetContext {
         capacities: [3, 3],
+        allowed: [true; 6],
         active: [true; 6],
         user: 0,
         target: TargetKind::NearEnemy,
@@ -29,13 +30,21 @@ fn whole_source_targeting_matches_all_twenty_categories_and_owner_call_order() {
         input: TargetContext,
         expected: TargetSet,
     }
-    let path = std::env::var("M9E_CURRENT_MOVE_TARGETS_ORACLE").expect("actual source observations");
+    let path =
+        std::env::var("M9E_CURRENT_MOVE_TARGETS_ORACLE").expect("actual source observations");
     let raw = std::fs::read_to_string(path).expect("source observations readable");
     assert!(raw.len() <= 262_144);
-    let cases = raw.lines().map(|line| serde_json::from_str::<Case>(line).unwrap()).collect::<Vec<_>>();
+    let cases = raw
+        .lines()
+        .map(|line| serde_json::from_str::<Case>(line).unwrap())
+        .collect::<Vec<_>>();
     assert_eq!(cases.len(), 200);
     for (index, case) in cases.into_iter().enumerate() {
-        assert_eq!(resolve_move_targets(&case.input).unwrap(), case.expected, "case {index}");
+        assert_eq!(
+            resolve_move_targets(&case.input).unwrap(),
+            case.expected,
+            "case {index}"
+        );
     }
 }
 

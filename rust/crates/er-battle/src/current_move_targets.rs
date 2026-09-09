@@ -34,6 +34,8 @@ pub enum TargetKind {
 pub struct TargetContext {
     /// Flat source indices: player slots 0..capacity, enemy slots 3..3+capacity.
     pub capacities: [u8; 2],
+    /// Resolved isAllowedInBattle; opponent enumeration uses this before callbacks.
+    pub allowed: [bool; 6],
     pub active: [bool; 6],
     pub user: u8,
     pub target: TargetKind,
@@ -67,16 +69,25 @@ pub struct TargetContextError;
 
 pub fn resolve_move_targets(input: &TargetContext) -> Result<TargetSet, TargetContextError> {
     use TargetKind::*;
-    if input.capacities.iter().any(|capacity| !(1..=3).contains(capacity))
+    if input
+        .capacities
+        .iter()
+        .any(|capacity| !(1..=3).contains(capacity))
         || input.user >= 6
         || input.user % 3 >= input.capacities[usize::from(input.user / 3)]
-        || (0..6).any(|index| input.active[index] && index % 3 >= usize::from(input.capacities[index / 3]))
+        || (0..6).any(|index| {
+            input.active[index] && index % 3 >= usize::from(input.capacities[index / 3])
+        })
     {
         return Err(TargetContextError);
     }
     let side = input.user / 3;
+    if (0..6).any(|index| input.active[index] && !input.allowed[index]) {
+        return Err(TargetContextError);
+    }
     let opponents = (0..input.capacities[usize::from(1 - side)])
         .map(|position| (1 - side) * 3 + position)
+        .filter(|index| input.allowed[usize::from(*index)])
         .collect::<Vec<_>>();
     if input.variable.len() != opponents.len() {
         return Err(TargetContextError);
@@ -129,19 +140,27 @@ pub fn resolve_move_targets(input: &TargetContext) -> Result<TargetSet, TargetCo
         }
         All | BothSides => {
             output.multiple = true;
-            std::iter::once(input.user).chain(allies).chain(opponents.iter().copied()).collect()
+            std::iter::once(input.user)
+                .chain(allies)
+                .chain(opponents.iter().copied())
+                .collect()
         }
         Attacker => return Err(TargetContextError),
     };
     if input.arrangement
-        && matches!(kind, NearOther | AllNearOthers | NearEnemy | AllNearEnemies | NearAlly | UserOrNearAlly)
+        && matches!(
+            kind,
+            NearOther | AllNearOthers | NearEnemy | AllNearEnemies | NearAlly | UserOrNearAlly
+        )
         && !input.flying
         && !input.pulse
     {
         let axis = |index: u8| {
             let side = usize::from(index / 3);
             let capacity = input.capacities[side];
-            let only_active = (0..capacity).filter(|position| input.active[side * 3 + usize::from(*position)]).collect::<Vec<_>>();
+            let only_active = (0..capacity)
+                .filter(|position| input.active[side * 3 + usize::from(*position)])
+                .collect::<Vec<_>>();
             let position = if only_active.len() == 1 && only_active[0] == index % 3 {
                 (capacity - 1) / 2
             } else {
@@ -154,7 +173,8 @@ pub fn resolve_move_targets(input: &TargetContext) -> Result<TargetSet, TargetCo
         selected.retain(|index| *index == input.user || (user_axis - axis(*index)).abs() <= 2);
     }
     selected.retain(|index| input.active[usize::from(*index)]);
-    if matches!(kind, NearOther | Other) && !selected.iter().any(|index| opponents.contains(index)) {
+    if matches!(kind, NearOther | Other) && !selected.iter().any(|index| opponents.contains(index))
+    {
         selected.retain(|index| opponents.contains(index));
     }
     output.targets = selected.into_iter().map(|index| index as i8).collect();

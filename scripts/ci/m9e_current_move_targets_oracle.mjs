@@ -5,6 +5,7 @@ import { stripTypeScriptTypes } from "node:module";
 
 const hash = raw => crypto.createHash("sha256").update(raw).digest("hex");
 const pins = {
+  "src/field/pokemon.ts": "4074ff23323ec01f92422b5666ad0b397a0c73cafd11f158637346b5a35af8fa",
   "src/data/moves/move-utils.ts": "6f296e67ba9be531ba12dd1455cbebd04b7fdedfe6ec8cadb2d3df73743d50eb",
   "src/data/battle-format.ts": "7619f84967643acc73a39c9e45f76c6a3ff4944b1f1794254bf37c279e9bffe8",
   "src/enums/move-target.ts": "dd9272781d53e85b051fe071bb12d23d54c3625892bc973f535f4f14cd68cd80",
@@ -32,6 +33,17 @@ const end = format.indexOf("\nconst teamOf", start);
 if (start < 0 || end < start) throw new Error("Unique complete adjacency function required");
 vm.runInContext(transpile(format.slice(start, end)), sandbox, { timeout: 1000 });
 vm.runInContext(transpile(sources["src/data/moves/move-utils.ts"]), sandbox, { timeout: 1000 });
+// Execute the complete current enumeration methods too; their downstream
+// allowance/on-field owners are explicit resolved inputs rather than substitutes.
+const pokemon = sources["src/field/pokemon.ts"];
+const methods = ["public isActive(onField = false): boolean", "getOpponents(onField = true): Pokemon[]", "getAllies(): Pokemon[]"].map(signature => {
+  const marker = "  " + signature + " {";
+  const start = pokemon.indexOf(marker);
+  const end = pokemon.indexOf("\n  }", start);
+  if (start < 0 || end < start || pokemon.indexOf(marker, start + 1) !== -1) throw new Error("Unique source owner method");
+  return pokemon.slice(start, end + 4);
+});
+vm.runInContext(transpile("class SourcePokemon {\n" + methods.join("\n") + "\n}\nglobalThis.SourcePokemon = SourcePokemon;"), sandbox, { timeout: 1000 });
 const kinds = Object.keys(sandbox.MoveTarget).filter(key => Number.isNaN(Number(key)));
 if (kinds.length !== 20 || sandbox.BattlerIndex.ATTACKER !== -1) throw new Error("Exact source target domain");
 const cases = [];
@@ -40,31 +52,32 @@ for (let variant = 0; variant < 10; variant++) {
     const capacities = variant === 0 ? [1, 1] : variant === 1 ? [2, 2] : variant === 9 ? [2, 3] : [3, 3];
     const user = variant % 2 ? 3 : 0;
     const active = Array.from({ length: 6 }, (_, i) => i % 3 < capacities[Math.floor(i / 3)]);
+    const allowed = [...active];
     if (variant === 2) { active[3] = false; active[4] = false; }
     if (variant === 3) { active[1] = false; active[2] = false; }
     if (variant === 4) { active[1] = false; active[2] = false; active[3] = false; active[4] = false; }
     if (variant === 8) active[user] = false;
-    const opponentCount = capacities[1 - Math.floor(user / 3)];
+    if (variant === 9) { allowed[0] = false; active[0] = false; }
+    const opponentCount = allowed.slice(user < 3 ? 3 : 0, user < 3 ? 6 : 3).filter(Boolean).length;
     const variable = Array(opponentCount).fill(null);
     if (variant === 9) variable[opponentCount - 1] = target;
-    const input = { capacities, active, user, target, replacement: variant === 9 ? "USER" : null, variable,
+    const input = { capacities, allowed, active, user, target, replacement: variant === 9 ? "USER" : null, variable,
       spread_flag: variant === 5 || variant === 6, multi_hit: variant === 6,
       ghost: variant === 2, fog: variant === 3 || variant === 4, fog_suppressed: variant === 4,
       flying: variant === 7, pulse: variant === 8, arrangement: variant !== 0,
       random_index: target === "RANDOM_NEAR_ENEMY" ? variant % opponentCount : null };
     const visits = [], draws = [];
-    const mons = Array.from({ length: 6 }, (_, index) => ({
+    const mons = Array.from({ length: 6 }, (_, index) => Object.assign(new sandbox.SourcePokemon(), {
       getBattlerIndex: () => index,
       isPlayer: () => index < 3,
-      isActive: () => active[index],
+      isAllowedInBattle: () => allowed[index],
+      isOnField: () => active[index],
       isOfType: type => type === sandbox.PokemonType.GHOST && input.ghost,
       hasAbilityWithAttr: () => input.spread_flag,
       getAbilityAttrs: () => input.spread_flag ? [{ flag: 999 }] : [],
     }));
     const player = mons.slice(0, capacities[0]), enemy = mons.slice(3, 3 + capacities[1]);
-    const actor = mons[user], opponents = user < 3 ? enemy : player;
-    actor.getOpponents = () => opponents;
-    actor.getAllies = () => (user < 3 ? player : enemy).filter(mon => mon !== actor);
+    const actor = mons[user];
     actor.randBattleSeedInt = bound => { draws.push(bound); return input.random_index; };
     sandbox.applyMoveAttrs = (_attr, _user, opponent, _move, holder) => {
       visits.push(opponent.getBattlerIndex());
@@ -90,4 +103,4 @@ for (let variant = 0; variant < 10; variant++) {
 const output = Buffer.from(cases.map(value => JSON.stringify(value)).join("\n") + "\n");
 if (output.length > 262144) throw new Error("Bounded complete source observations");
 fs.writeFileSync(process.argv[2], output, { flag: "wx" });
-console.log(JSON.stringify({ runtime: process.version, source_hashes: pins, cases: cases.length, whole_target_function: true, whole_line_adjacency: true, resolved_owner_inputs_only: true, battle_execution_qualified: false, output_bytes: output.length, output_sha256: hash(output) }));
+console.log(JSON.stringify({ runtime: process.version, source_hashes: pins, cases: cases.length, whole_target_function: true, whole_line_adjacency: true, whole_enumeration_methods: true, resolved_owner_inputs_only: true, battle_execution_qualified: false, output_bytes: output.length, output_sha256: hash(output) }));
