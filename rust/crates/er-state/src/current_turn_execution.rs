@@ -137,7 +137,8 @@ impl CurrentTurnExecutionV1 {
             CurrentTurnStageV1::ReadyForMove if !self.finalization_done => Ok(()),
             CurrentTurnStageV1::Complete if self.finalization_done => Ok(()),
             CurrentTurnStageV1::AwaitingInterlude { faints }
-                if !faints.is_empty()
+                if self.next_action > 0
+                    && !faints.is_empty()
                     && faints.len() <= 12
                     && faints
                         .windows(2)
@@ -145,7 +146,13 @@ impl CurrentTurnExecutionV1 {
                     && faints.last().is_some_and(|last| {
                         last.id.get().checked_add(1) == Some(self.next_faint_sequence.get())
                     })
-                    && faints.iter().all(|faint| faint.slot.position < 3) =>
+                    && faints.iter().all(|faint| {
+                        battle.field.slots.iter().any(|row| row.slot == faint.slot)
+                            && match faint.slot.side {
+                                er_types::battle_ids::BattleSide::Player => run.party.iter().any(|pokemon| pokemon.id == faint.pokemon),
+                                er_types::battle_ids::BattleSide::Enemy => battle.enemy_party.iter().any(|pokemon| pokemon.id == faint.pokemon),
+                            }
+                    }) =>
             {
                 Ok(())
             }

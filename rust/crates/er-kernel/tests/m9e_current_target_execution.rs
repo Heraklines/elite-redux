@@ -266,6 +266,14 @@ fn retained_turn_faint_blocks_later_move_at_live_reward_preimage() -> Result<()>
     let restored: CurrentTurnExecutionV1 =
         serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
     assert_eq!(restored, chunk.continuation);
+    let mut invalid = restored.clone();
+    invalid.next_action = 0;
+    assert!(invalid.validate(run).is_err());
+    let mut invalid = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut invalid.stage {
+        faints[0].pokemon = actor;
+    }
+    assert!(invalid.validate(run).is_err());
     let frozen = canonical_bytes(&chunk.transition.after_state)?;
     assert!(
         step_current_turn(
