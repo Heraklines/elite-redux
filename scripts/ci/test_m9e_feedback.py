@@ -7773,8 +7773,10 @@ class PhaseTransferTests(unittest.TestCase):
         native["plan_sha256"] = self.phases.sha(self.phases.encoded(native["plan"]))
         proof = {**copy.deepcopy(self.platform), "plan": copy.deepcopy(native["plan"]), "plan_sha256": native["plan_sha256"]}
         self.assertGreater(len(self.phases.encoded(proof)), self.phases.MANIFEST_LIMIT)
-        with self.assertRaises(RuntimeError):
-            self.phases.write_bounded(self.root / "too-large.json", proof)
+        expanded_path = self.root / "expanded-platform.json"
+        expanded_hash = self.phases.write_bounded(expanded_path, proof)
+        self.assertLessEqual(expanded_path.stat().st_size, self.phases.MANIFEST_LIMIT)
+        self.assertEqual(self.phases.read_bounded(expanded_path, expanded_hash), proof)
         result = self.phases.reference_platform_plan(proof, native, self.native_hash)
         self.assertEqual(self.phases.MANIFEST_LIMIT, 65536)
         path = self.root / "referenced-platform.json"
@@ -8396,7 +8398,9 @@ class PhaseTransferTests(unittest.TestCase):
 
     def native_with_repeated_required_ids(self):
         proof = copy.deepcopy(self.native)
-        ids = [f"case_{index:04d}_" + "current_state_and_effect_owner_" * 2 for index in range(600)]
+        # Synthetic ID padding leaves room for the expanded source identity;
+        # retain all600 distinct IDs, reverse permutations and both size inequalities.
+        ids = [f"case_{index:04d}_" + "current_state_effect_owner_" * 2 for index in range(600)]
         proof["inventory"][1]["ids"] = ids
         proof["plan"]["required_native_test_ids"] = {"er-repro:m9e_current_repro": list(reversed(ids))}
         proof["required_native_target_counts"]["er-repro:m9e_current_repro"] = len(ids)

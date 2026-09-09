@@ -36,6 +36,7 @@ PLATFORM_DECODED_LIMIT = 196608
 PLATFORM_INLINE_LIMIT = MANIFEST_LIMIT
 CLI_LIMIT = 128 * 1024 * 1024
 IDENTITY_FILES = {
+    "physical_rebind_rtc_entry": "src/rust-browser/routes/rust-current-rtc-entry.ts",
     "physical_rebind_0": "src/rust-browser/adapters/current-rtc-transport-v2.ts",
     "physical_rebind_1": "src/rust-browser/routes/rust-current-rtc-rebind-entry.ts",
     "physical_rebind_2": "test/browser/rust-browser/m9e-v7-rebind-rtc.spec.ts",
