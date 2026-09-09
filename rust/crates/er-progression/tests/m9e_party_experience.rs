@@ -37,22 +37,22 @@ fn input() -> UnboostedPartyExperienceInput {
 fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
     let path = std::env::var("M9E_PARTY_XP_ORACLE")
         .expect("remote actual pinned JavaScript source oracle is mandatory");
-    let text = std::fs::read_to_string(path).unwrap();
+    let text = std::fs::read_to_string(path).expect("actual source cases");
     let lines: Vec<_> = text.lines().collect();
     assert_eq!(lines.len(), 144);
     for (case, line) in lines.into_iter().enumerate() {
         let columns: Vec<_> = line.split('\t').collect();
         assert_eq!(columns.len(), 12);
         let optional_u8 =
-            |index: usize| (columns[index] != "-").then(|| columns[index].parse::<u8>().unwrap());
+            |index: usize| (columns[index] != "-").then(|| columns[index].parse::<u8>().expect("source stack count"));
         let party = columns[9]
             .split(',')
             .map(|member| {
-                let values: Vec<u32> = member.split(':').map(|v| v.parse().unwrap()).collect();
+                let values: Vec<u32> = member.split(':').map(|v| v.parse().expect("source numeric field")).collect();
                 assert_eq!(values.len(), 3);
                 UnboostedPartyExperienceMember {
                     hp: values[0],
-                    level: u16::try_from(values[1]).unwrap(),
+                    level: u16::try_from(values[1]).expect("source level"),
                     participated: values[2] & 1 != 0,
                     pokerus: values[2] & 2 != 0,
                     on_field: values[2] & 4 != 0,
@@ -60,22 +60,22 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
             })
             .collect();
         let value = UnboostedPartyExperienceInput {
-            raw_exp_value: columns[0].parse().unwrap(),
+            raw_exp_value: columns[0].parse().expect("source raw XP"),
             trainer: columns[1] == "1",
             pokemon_defeated: columns[2] == "1",
-            level_cap: columns[3].parse().unwrap(),
-            participant_count: columns[4].parse().unwrap(),
+            level_cap: columns[3].parse().expect("source level cap"),
+            participant_count: columns[4].parse().expect("source participant count"),
             exp_share_stacks: optional_u8(5),
             exp_balance_stacks: optional_u8(6),
             multiple_participant_stacks: optional_u8(7),
-            multiplier_override: (columns[8] != "-").then(|| columns[8].parse().unwrap()),
+            multiplier_override: (columns[8] != "-").then(|| columns[8].parse().expect("source override")),
             party,
         };
-        let plan = plan_unboosted_party_experience(&value).unwrap();
+        let plan = plan_unboosted_party_experience(&value).expect("admitted source input");
         let expected_friends: Vec<usize> = if columns[10] == "-" {
             vec![]
         } else {
-            columns[10].split(',').map(|v| v.parse().unwrap()).collect()
+            columns[10].split(',').map(|v| v.parse().expect("source numeric field")).collect()
         };
         assert_eq!(
             plan.battle_friendship_calls, expected_friends,
@@ -90,9 +90,9 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
                     let values: Vec<_> = phase.split(':').collect();
                     assert_eq!(values.len(), 3);
                     (
-                        values[0].parse().unwrap(),
+                        values[0].parse().expect("source party index"),
                         values[1] == "1",
-                        u64::from_str_radix(values[2], 16).unwrap(),
+                        u64::from_str_radix(values[2], 16).expect("source binary64 bits"),
                     )
                 })
                 .collect()
@@ -108,7 +108,7 @@ fn actual_pinned_source_matrix_matches_every_phase_binary64_argument() {
 
 #[test]
 fn balance_redistributes_without_share_and_preserves_fractional_phase_arguments() {
-    let plan = plan_unboosted_party_experience(&input()).unwrap();
+    let plan = plan_unboosted_party_experience(&input()).expect("admitted source input");
     assert_eq!(plan.battle_friendship_calls, vec![0]);
     assert_eq!(plan.phase_insertions.len(), 2);
     assert_eq!(plan.phase_insertions[0].party_index, 0);
@@ -140,7 +140,7 @@ fn living_at_cap_friendship_and_full_participant_denominator_preserve_source_ord
         pokerus: false,
         on_field: false,
     });
-    let plan = plan_unboosted_party_experience(&value).unwrap();
+    let plan = plan_unboosted_party_experience(&value).expect("admitted source input");
     assert_eq!(plan.battle_friendship_calls, vec![0, 1]);
     assert_eq!(plan.phase_insertions.len(), 1);
     assert_eq!(plan.phase_insertions[0].party_index, 1);
@@ -148,7 +148,7 @@ fn living_at_cap_friendship_and_full_participant_denominator_preserve_source_ord
     value.pokemon_defeated = false;
     assert!(
         plan_unboosted_party_experience(&value)
-            .unwrap()
+            .expect("admitted source input")
             .battle_friendship_calls
             .is_empty()
     );
@@ -179,7 +179,7 @@ fn invalid_input_and_overflow_do_not_produce_a_partial_plan() {
     value.party[0].participated = false;
     assert!(
         plan_unboosted_party_experience(&value)
-            .unwrap()
+            .expect("admitted source input")
             .phase_insertions
             .is_empty()
     );
