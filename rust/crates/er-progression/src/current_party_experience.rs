@@ -1,7 +1,8 @@
 //! Pure normal-Classic `applyPartyExp` planning at the pinned 399d source boundary.
 //!
 //! This boundary excludes wave-value conversion, Sprint, Mystery encounters,
-//! held XP boosters and Macho Brace. The caller must establish those exclusions.
+//! Macho Brace. The unboosted API also excludes held XP boosters; the explicit
+//! held-booster API accepts resolved applicable modifiers. Callers establish scope.
 //! It accepts the raw enemy XP value BEFORE the ordinary trainer adjustment and
 //! the already resolved level cap. It does not mutate Pokemon, settle pending
 //! ownership, run ExpPhase/global boosters/abilities, or award friendship.
@@ -67,8 +68,39 @@ fn finite_nonnegative(value: f64) -> bool {
     value.is_finite() && (0.0..=MAX_SAFE_INTEGER).contains(&value)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HeldExperienceBooster {
+    /// Source constructor argument, before boostPercent * 0.01.
+    pub boost_percent: f64,
+    pub stacks: u8,
+}
+
 pub fn plan_unboosted_party_experience(
     input: &UnboostedPartyExperienceInput,
+) -> Result<UnboostedPartyExperiencePlan, PartyExperiencePlanError> {
+    plan_party_experience(input, None)
+}
+
+/// The caller supplies actual applicable held XP modifiers in source order for
+/// every party member. This does not infer item eligibility or run Macho Brace,
+/// friendship application, global boosters, ability effects, or XP settlement.
+pub fn plan_party_experience_with_held_boosters(
+    input: &UnboostedPartyExperienceInput,
+    held: &[Vec<HeldExperienceBooster>],
+) -> Result<UnboostedPartyExperiencePlan, PartyExperiencePlanError> {
+    if held.len() != input.party.len()
+        || held.iter().flatten().any(|booster| {
+            !finite_nonnegative(booster.boost_percent) || booster.stacks > 99
+        })
+    {
+        return Err(PartyExperiencePlanError::Input);
+    }
+    plan_party_experience(input, Some(held))
+}
+
+fn plan_party_experience(
+    input: &UnboostedPartyExperienceInput,
+    held: Option<&[Vec<HeldExperienceBooster>]>,
 ) -> Result<UnboostedPartyExperiencePlan, PartyExperiencePlanError> {
     // The modifier limits are the pinned classes' actual getMaxStackCount values.
     if !finite_nonnegative(input.raw_exp_value)
@@ -141,8 +173,19 @@ pub fn plan_unboosted_party_experience(
         if let Some(replacement) = input.multiplier_override {
             multiplier = replacement;
         }
-        // Held PokemonExpBoosterModifier application is explicitly absent here.
-        let amount = (exp_value * multiplier).floor();
+        // Source creates NumberHolder from the fractional product. Held boosters
+        // each round their application BEFORE the final distribution floor.
+        let mut amount = exp_value * multiplier;
+        if let Some(held) = held {
+            for booster in &held[index] {
+                let boost_multiplier = booster.boost_percent * 0.01;
+                amount = (amount * (1.0 + f64::from(booster.stacks) * boost_multiplier)).floor();
+                if !finite_nonnegative(amount) {
+                    return Err(PartyExperiencePlanError::Overflow);
+                }
+            }
+        }
+        amount = amount.floor();
         if !finite_nonnegative(amount) {
             return Err(PartyExperiencePlanError::Overflow);
         }
