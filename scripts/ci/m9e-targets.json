@@ -110,15 +110,15 @@
       "test/browser/rust-browser/m9e-v7-rebind-rtc.spec.ts",
       "test/browser/rust-browser/m9e-v7-rebind-rtc-transport.spec.ts",
       "test/browser/rust-browser/m9e-v7-rebind-rtc-owner.spec.ts",
+      "rust/crates/er-progression/src/current_party_experience.rs",
+      "rust/crates/er-progression/tests/m9e_party_experience.rs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
       "rust/fixtures/m9/engineering/progression-content-pack-v2.json",
       "rust/fixtures/m9/engineering/progression-oracle-report-v2.json",
       "rust/fixtures/m9/engineering/battle-content-pack-v3.json",
-      "rust/fixtures/m9/engineering/run-content-pack-v3.json",
-      "rust/crates/er-progression/src/current_party_experience.rs",
-      "rust/crates/er-progression/tests/m9e_party_experience.rs"
+      "rust/fixtures/m9/engineering/run-content-pack-v3.json"
     ],
     "replacement_test_ids": [
       "natural_faint_offers_owned_reserves_restores_and_continues_raw_battle",
