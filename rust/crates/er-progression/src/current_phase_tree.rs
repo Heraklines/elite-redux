@@ -144,6 +144,53 @@ impl<T: Clone> CurrentPhaseTree<T> {
             .collect()
     }
 
+    /// The predicate supplies the source phase-type test and optional filter.
+    pub fn add_after_where(&mut self, phase: T, mut matches: impl FnMut(&T) -> bool) -> Result<(), CurrentPhaseTreeError> {
+        self.room()?;
+        for level in self.state.levels.iter_mut().rev() {
+            if let Some(index) = level.iter().position(&mut matches) {
+                level.insert(index + 1, phase);
+                return Ok(());
+            }
+        }
+        self.add_phase(phase, false)
+    }
+
+    pub fn find_where(&self, mut matches: impl FnMut(&T) -> bool) -> Option<&T> {
+        for level in self.state.levels.iter().rev() {
+            if let Some(phase) = level.iter().find(|phase| matches(phase)) {
+                return Some(phase);
+            }
+        }
+        None
+    }
+
+    pub fn find_all_where(&self, mut matches: impl FnMut(&T) -> bool) -> Vec<&T> {
+        self.state.levels.iter().rev().flat_map(|level| level.iter()).filter(|phase| matches(phase)).collect()
+    }
+
+    pub fn remove_where(&mut self, mut matches: impl FnMut(&T) -> bool) -> bool {
+        for level in self.state.levels.iter_mut().rev() {
+            if let Some(index) = level.iter().position(&mut matches) {
+                level.remove(index);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn remove_all_where(&mut self, mut matches: impl FnMut(&T) -> bool) {
+        for level in &mut self.state.levels {
+            level.retain(|phase| !matches(phase));
+        }
+    }
+
+    pub fn exists_where(&self, mut matches: impl FnMut(&T) -> bool) -> bool {
+        // Unlike find, source exists visits the root level first.
+        let mut source_levels = self.state.levels.iter();
+        source_levels.any(|level| level.iter().any(&mut matches))
+    }
+
     pub fn clear(&mut self, leave_first_level: bool) {
         let retained = if leave_first_level {
             self.state.levels.last().cloned().unwrap_or_default()
