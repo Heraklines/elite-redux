@@ -128,6 +128,10 @@
       "rust/crates/er-state/src/m7_state.rs",
       "rust/crates/er-testkit/tests/m7_system_proof.rs",
       "scripts/ci/m9e_starter_pokerus_oracle.mjs",
+      "rust/crates/er-battle/src/current_move_targets.rs",
+      "rust/crates/er-battle/src/lib.rs",
+      "rust/crates/er-battle/tests/m9e_current_move_targets.rs",
+      "scripts/ci/m9e_current_move_targets_oracle.mjs",
       "rust/fixtures/m9/engineering/complete-progression-definitions-v1.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2-manifest.json",
       "rust/fixtures/m9/engineering/game-content-bundle-v2.json",
@@ -417,6 +421,12 @@
         "insertion_and_removal_choose_first_deepest_match_and_source_fallback",
         "query_admission_bounds_and_unknown_snapshot_fields_fail_closed",
         "whole_source_queries_match_results_predicate_visits_and_restored_state"
+      ],
+      "er-battle:m9e_current_move_targets": [
+        "invalid_owner_context_fails_without_inventing_rng_or_callback_results",
+        "source_random_draw_precedes_alive_filter_and_other_never_falls_back_to_ally",
+        "source_spread_promotion_keeps_adjacency_and_multihit_exception",
+        "whole_source_targeting_matches_all_twenty_categories_and_owner_call_order"
       ]
     }
   },

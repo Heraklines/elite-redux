@@ -6,6 +6,7 @@ pub mod accuracy;
 pub mod action_order;
 pub mod command;
 pub mod critical;
+pub mod current_move_targets;
 pub mod damage;
 pub mod error;
 pub mod faint;
