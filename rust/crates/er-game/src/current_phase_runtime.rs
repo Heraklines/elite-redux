@@ -335,6 +335,7 @@ fn phase_transition(
             request,
             *utc_milliseconds,
         )?,
+        _ => return Err(GameRuntimeV6Error::Invalid),
     };
     let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Reward);
     let mapping = content
@@ -693,7 +694,7 @@ fn descendant_menu_instance(
                 .map(|context| context.menu_instance)
         })
         .unwrap_or(base);
-    MenuInstanceId::new(safe_increment(current.get())?).map_err(|_| GameRuntimeV6Error::Invalid)
+    Ok(MenuInstanceId::new(safe_increment(current.get())?))
 }
 
 fn install_learn_batch_control(
@@ -1112,8 +1113,6 @@ fn victory_transition(
         content_identity: before.content_identity.clone(),
         accepted_action: None,
         owned_phase: Some(phase),
-        before_digest,
-        after_digest,
         mutations: vec![GameMutationEvidenceV2 {
             ordinal: 0,
             domain: GameActionDomainV2::Progression,
@@ -1121,6 +1120,8 @@ fn victory_transition(
             before_digest: before_digest.clone(),
             after_digest: after_digest.clone(),
         }],
+        before_digest,
+        after_digest,
         rng_audit: Vec::new(),
         after_state: candidate,
         next_control,

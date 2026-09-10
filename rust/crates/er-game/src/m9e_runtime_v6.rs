@@ -663,7 +663,7 @@ fn execute_domain(
             execute_move_learning(before, action, &context.input)
         }
         GameActionV1::CurrentLearnMoveBatch { action } => {
-            execute_current_learn_move_batch(before, content, action, &context.action, input)
+            execute_current_learn_move_batch(before, content, action, &context.action, &context.input)
         }
         GameActionV1::Fusion { action } => execute_fusion(before, action, &context.input),
         GameActionV1::World { action } => execute_world(before, action, &context.input),
@@ -695,7 +695,7 @@ fn execute_domain(
                     })
                 })
             {
-                execute_current_evolution(before, content, action, &context.action, input)
+                execute_current_evolution(before, content, action, &context.action, &context.input)
             } else {
                 execute_evolution(before, content, action, &context.input)
             }
@@ -3434,8 +3434,7 @@ fn execute_current_learn_move_batch(
                     .map(|context| context.menu_instance)
             })
             .ok_or(GameRuntimeV6Error::Invalid)?;
-        let menu_instance = MenuInstanceId::new(safe_increment(current_instance.get())?)
-            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        let menu_instance = MenuInstanceId::new(safe_increment(current_instance.get())?);
         let control_context = GameActionContextV1 {
             operation_id: OperationId::new(format!(
                 "current/learn-batch/{}/{}",
