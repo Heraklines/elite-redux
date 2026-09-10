@@ -46,6 +46,15 @@ pub enum GamePresentationPayloadV1 {
         holder: PokemonId,
         move_id: MoveId,
     },
+    ExperienceGained {
+        pokemon: PokemonId,
+        experience: er_types::run_ids::Experience,
+    },
+    LevelUp {
+        pokemon: PokemonId,
+        previous_level: u16,
+        new_level: u16,
+    },
 }
 
 impl GamePresentationPayloadV1 {
@@ -99,6 +108,23 @@ impl GamePresentationPayloadV1 {
             Self::MoveNoEffect { holder, move_id } => (
                 PresentationCueFamilyV1::Move,
                 holder.get() != SafeU53::ZERO && move_id.get() != SafeU53::ZERO,
+            ),
+            Self::ExperienceGained {
+                pokemon,
+                experience,
+            } => (
+                PresentationCueFamilyV1::Progression,
+                pokemon.get() != SafeU53::ZERO && experience.get() != SafeU53::ZERO,
+            ),
+            Self::LevelUp {
+                pokemon,
+                previous_level,
+                new_level,
+            } => (
+                PresentationCueFamilyV1::Progression,
+                pokemon.get() != SafeU53::ZERO
+                    && *previous_level > 0
+                    && *new_level > *previous_level,
             ),
         };
         if !valid || semantic != PresentationSemanticIdV1::Cue(family) {

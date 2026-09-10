@@ -24,8 +24,9 @@ use er_scenario::runtime_v2::{
 };
 use er_state::m7_state::{
     GameStateV5, MapNodeKindV1, MapNodeStateV1, ProgressionTaskKindV2, ProgressionTaskV2,
-    RouteRevealSourceV1, ScenarioRuntimeStageV2,
+    RouteRevealSourceV1, RunStateV3, ScenarioRuntimeStageV2,
 };
+use er_state::current_victory_execution::CurrentVictoryDescendantV1;
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommandOffer, BattleCommandProposalV1, CommandAdmissionSource,
@@ -585,7 +586,13 @@ fn has_pending_experience(state: &GameStateV6) -> bool {
         .current_battle_participation
         .as_ref()
         .and_then(|owner| owner.experience.as_ref())
-        .is_some_and(|owner| !owner.pending.is_empty())
+        .is_some_and(|owner| {
+            owner.pending.iter().any(|pending| {
+                !pending.victory.as_ref().is_some_and(|victory| {
+                    victory.descendant == CurrentVictoryDescendantV1::Complete
+                })
+            })
+        })
 }
 
 fn execute_domain(
@@ -603,6 +610,7 @@ fn execute_domain(
             GameActionV1::Battle { .. }
                 | GameActionV1::Save { .. }
                 | GameActionV1::CurrentLearnMoveBatch { .. }
+                | GameActionV1::Evolution { .. }
         )
     {
         // Generic modifier/world/fusion/scenario/reward helpers cannot preserve
@@ -614,7 +622,8 @@ fn execute_domain(
             action,
             GameActionV1::Save {
                 action: SaveActionV1::Write { .. }
-            }
+            } | GameActionV1::CurrentLearnMoveBatch { .. }
+                | GameActionV1::Evolution { .. }
         )
     {
         return Err(GameRuntimeV6Error::Action);
@@ -653,7 +662,9 @@ fn execute_domain(
         GameActionV1::MoveLearning { action } => {
             execute_move_learning(before, action, &context.input)
         }
-        GameActionV1::CurrentLearnMoveBatch { .. } => Err(GameRuntimeV6Error::Action),
+        GameActionV1::CurrentLearnMoveBatch { action } => {
+            execute_current_learn_move_batch(before, content, action, &context.action, input)
+        }
         GameActionV1::Fusion { action } => execute_fusion(before, action, &context.input),
         GameActionV1::World { action } => execute_world(before, action, &context.input),
         GameActionV1::Scenario { action } => {
@@ -672,7 +683,22 @@ fn execute_domain(
             execute_progression(before, content, action, &context.action, &context.input)
         }
         GameActionV1::Evolution { action } => {
-            execute_evolution(before, content, action, &context.input)
+            if before
+                .and_then(|state| state.current_battle_participation.as_ref())
+                .and_then(|owner| owner.experience.as_ref())
+                .is_some_and(|owner| {
+                    owner.pending.iter().any(|pending| {
+                        matches!(
+                            pending.victory.as_ref().map(|victory| &victory.descendant),
+                            Some(CurrentVictoryDescendantV1::Evolution { .. })
+                        )
+                    })
+                })
+            {
+                execute_current_evolution(before, content, action, &context.action, input)
+            } else {
+                execute_evolution(before, content, action, &context.input)
+            }
         }
         GameActionV1::Inventory { action } => execute_inventory(before, action, &context.input),
         GameActionV1::Reward { action } => {
@@ -3298,4 +3324,255 @@ fn validate_runtime_frontier(
 
 fn material_error(error: crate::m9e_material_v6::GameMaterialV6Error) -> GameRuntimeV6Error {
     GameRuntimeV6Error::Material(error.to_string())
+}
+
+fn current_experience_pending_index(
+    state: &GameStateV6,
+    matches: impl Fn(&CurrentVictoryDescendantV1) -> bool,
+) -> Result<usize, GameRuntimeV6Error> {
+    state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|value| value.experience.as_ref())
+        .and_then(|owner| {
+            owner.pending.iter().position(|pending| {
+                pending
+                    .victory
+                    .as_ref()
+                    .is_some_and(|victory| matches(&victory.descendant))
+            })
+        })
+        .ok_or(GameRuntimeV6Error::Action)
+}
+
+fn execute_current_learn_move_batch(
+    before: Option<&GameStateV6>,
+    content: &PreparedGameContentV2,
+    action: &er_types::m7_action::CurrentLearnMoveBatchActionV1,
+    action_context: &GameActionContextV1,
+    input: &GameDomainExecutionInputV1,
+) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
+    require_none_input(input)?;
+    let before = require_state(before)?;
+    let run = before
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    if run.control.kind != GameControlKindV2::MoveLearn || !run.control.actionable {
+        return Err(GameRuntimeV6Error::Action);
+    }
+    let index = current_experience_pending_index(before, |descendant| {
+        matches!(
+            descendant,
+            CurrentVictoryDescendantV1::LearnMoveBatch { batch } if !batch.complete
+        )
+    })?;
+    let pending = before
+        .current_battle_participation
+        .as_ref()
+        .and_then(|value| value.experience.as_ref())
+        .and_then(|owner| owner.pending.get(index))
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let Some(CurrentVictoryDescendantV1::LearnMoveBatch { batch }) =
+        pending.victory.as_ref().map(|victory| &victory.descendant)
+    else {
+        return Err(GameRuntimeV6Error::Action);
+    };
+    let pokemon_id = batch.children.parent.level_up.award.phase.pokemon;
+    let pending_id = pending.id;
+    let (mut candidate, result, learned) =
+        crate::current_experience_settlement::apply_current_learn_move_batch(
+            before, content, batch, action,
+        )?;
+    if let Some(move_id) = learned {
+        let run = candidate
+            .active_run
+            .as_ref()
+            .ok_or(GameRuntimeV6Error::Invalid)?;
+        candidate
+            .current_achievement_tracker
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Invalid)?
+            .stamp_learned_move(run, pokemon_id, move_id)
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    }
+    let pokemon_owner = candidate
+        .active_run
+        .as_ref()
+        .and_then(|run| {
+            run.party
+                .iter()
+                .find(|pokemon| pokemon.id == pokemon_id)
+                .and_then(|pokemon| pokemon.owner_seat)
+        })
+        .ok_or(GameRuntimeV6Error::Action)?;
+    candidate
+        .current_battle_participation
+        .as_mut()
+        .and_then(|value| value.experience.as_mut())
+        .and_then(|owner| owner.pending.get_mut(index))
+        .and_then(|pending| pending.victory.as_mut())
+        .ok_or(GameRuntimeV6Error::Invalid)?
+        .descendant = CurrentVictoryDescendantV1::LearnMoveBatch {
+        batch: result.clone(),
+    };
+    if !result.complete {
+        let next_revision = safe_increment(action_context.authority_revision)?;
+        let run = candidate
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Action)?;
+        let current_instance = run
+            .control
+            .menu
+            .as_ref()
+            .map(|menu| menu.instance_id)
+            .or_else(|| {
+                run.control
+                    .action_context
+                    .as_ref()
+                    .map(|context| context.menu_instance)
+            })
+            .ok_or(GameRuntimeV6Error::Invalid)?;
+        let menu_instance = MenuInstanceId::new(safe_increment(current_instance.get())?)
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        let control_context = GameActionContextV1 {
+            operation_id: OperationId::new(format!(
+                "current/learn-batch/{}/{}",
+                pending_id.get(),
+                next_revision.get()
+            ))
+            .map_err(|_| GameRuntimeV6Error::Invalid)?,
+            authority_seat: pokemon_owner,
+            authority_revision: next_revision,
+            menu_instance,
+        };
+        let mut control =
+            crate::m7_progression_control::current_learn_move_batch_control(
+                &control_context,
+                &result,
+            )
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        control
+            .action_context
+            .as_mut()
+            .ok_or(GameRuntimeV6Error::Invalid)?
+            .authority_seat = action_context.authority_seat;
+        run.control = control;
+    }
+    Ok(DomainExecutionV1 {
+        candidate: Some(candidate),
+        ..Default::default()
+    })
+}
+
+fn execute_current_evolution(
+    before: Option<&GameStateV6>,
+    content: &PreparedGameContentV2,
+    action: &EvolutionActionV1,
+    _action_context: &GameActionContextV1,
+    input: &GameDomainExecutionInputV1,
+) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
+    require_none_input(input)?;
+    let before = require_state(before)?;
+    let run = before
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    if run.control.kind != GameControlKindV2::Evolution || !run.control.actionable {
+        return Err(GameRuntimeV6Error::Action);
+    }
+    let index = current_experience_pending_index(before, |descendant| {
+        matches!(descendant, CurrentVictoryDescendantV1::Evolution { .. })
+    })?;
+    let pending = before
+        .current_battle_participation
+        .as_ref()
+        .and_then(|value| value.experience.as_ref())
+        .and_then(|owner| owner.pending.get(index))
+        .ok_or(GameRuntimeV6Error::Action)?;
+    let Some(CurrentVictoryDescendantV1::Evolution { children }) =
+        pending.victory.as_ref().map(|victory| &victory.descendant)
+    else {
+        return Err(GameRuntimeV6Error::Action);
+    };
+    let pokemon_id = children.parent.level_up.award.phase.pokemon;
+    let children = children.clone();
+    let mut candidate = before.clone();
+    match action {
+        EvolutionActionV1::Complete { pokemon, evolution } => {
+            if *pokemon != pokemon_id || !children.evolution_candidates.contains(evolution) {
+                return Err(GameRuntimeV6Error::Action);
+            }
+            apply_evolution_v2(&mut candidate, content, *pokemon, *evolution)?;
+            let pokemon = persistent_pokemon_mut(&mut candidate, *pokemon)?;
+            let species = content
+                .battle
+                .species(pokemon.species_id)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            let form_id = er_types::FormId::parse(format!(
+                "{}:{}",
+                pokemon.species_id.get().get(),
+                pokemon.form_index
+            ))
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+            let form = content
+                .battle
+                .form(&form_id)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            let nature = content
+                .progression
+                .pack()
+                .natures
+                .iter()
+                .find(|nature| nature.id == pokemon.effective_nature)
+                .ok_or(GameRuntimeV6Error::Action)?;
+            let stats = er_progression::current_stats::calculate_current_unmodified_stats(
+                pokemon,
+                form.stat_override.unwrap_or(species.base_stats),
+                nature,
+            )
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+            let hp = er_progression::current_stats::current_hp_after_stat_calculation(
+                pokemon.hp, pokemon.max_hp, stats.hp,
+            )
+            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+            pokemon.stats = stats;
+            pokemon.max_hp = stats.hp;
+            pokemon.hp = hp;
+        }
+        EvolutionActionV1::Cancel { pokemon, evolution } => {
+            if *pokemon != pokemon_id
+                || children.evolution_candidates.first() != Some(evolution)
+            {
+                return Err(GameRuntimeV6Error::Action);
+            }
+            let pokemon = persistent_pokemon_mut(&mut candidate, *pokemon)?;
+            if !pokemon.evolution.cancelled.contains(evolution) {
+                pokemon.evolution.cancelled.push(*evolution);
+                pokemon.evolution.cancelled.sort();
+            }
+        }
+    }
+    let victory = candidate
+        .current_battle_participation
+        .as_mut()
+        .and_then(|value| value.experience.as_mut())
+        .and_then(|owner| owner.pending.get_mut(index))
+        .and_then(|pending| pending.victory.as_mut())
+        .ok_or(GameRuntimeV6Error::Invalid)?;
+    victory
+        .completed
+        .push(children.parent.level_up.award.clone());
+    victory.next_phase = u8::try_from(victory.completed.len())
+        .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    victory.descendant = if usize::from(victory.next_phase) == victory.phases.len() {
+        CurrentVictoryDescendantV1::Complete
+    } else {
+        CurrentVictoryDescendantV1::Ready
+    };
+    Ok(DomainExecutionV1 {
+        candidate: Some(candidate),
+        ..Default::default()
+    })
 }

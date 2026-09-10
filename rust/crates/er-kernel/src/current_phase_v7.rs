@@ -2,6 +2,8 @@
 use super::*;
 use er_game::m9e_runtime_v6::GameOwnedPhaseV1;
 use er_state::current_turn_execution::CurrentTurnStageV1;
+use er_state::current_victory_execution::CurrentVictoryDescendantV1;
+use er_state::m9e_state_v6::GameStateV6;
 
 pub(super) fn bootstrap_clock_effect(
     bootstrap: &RunBootstrapMachineV1,
@@ -105,10 +107,10 @@ impl GameKernelV7 {
                 }
             }
             CurrentTurnStageV1::AwaitingInterlude { .. } => {
-                // The Faint/Victory descendants are not wired in this first
-                // diagnostic cut. Do not jump to friendship or release a
-                // retained move before their real source-ordered execution.
-                return Err(GameKernelV7Error::Invalid);
+                let Some(phase) = self.next_intermission_phase(state)? else {
+                    return Ok(());
+                };
+                phase
             }
             CurrentTurnStageV1::Complete => return Ok(()),
         };
@@ -116,6 +118,82 @@ impl GameKernelV7 {
         output.effects.extend(step.effects);
         output.internal_events.extend(step.internal_events);
         Ok(())
+    }
+
+    /// The next retained interlude step for the oldest unresolved pending.
+    /// `None` means an external edge owns the next step: an outstanding
+    /// friendship clock request, an unacknowledged retained prompt, or an
+    /// actionable learn/evolution control that belongs to the human owner.
+    fn next_intermission_phase(
+        &self,
+        state: &GameStateV6,
+    ) -> Result<Option<GameOwnedPhaseV1>, GameKernelV7Error> {
+        let owner = state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|value| value.experience.as_ref())
+            .ok_or(GameKernelV7Error::Invalid)?;
+        let Some(pending) = owner.pending.iter().find(|pending| {
+            !pending.victory.as_ref().is_some_and(|victory| {
+                victory.descendant == CurrentVictoryDescendantV1::Complete
+            })
+        }) else {
+            return Ok(Some(GameOwnedPhaseV1::PendingResolve));
+        };
+        if let Some(friendship) = &pending.friendship {
+            if !friendship.complete {
+                if let Some(request) = &friendship.clock {
+                    let issued = self.pending_platform.values().any(|pending| {
+                        matches!(
+                            &pending.effect,
+                            GamePlatformEffectV2::CurrentFriendshipClock {
+                                request: issued
+                            } if issued == request
+                        )
+                    });
+                    return if issued {
+                        Ok(None)
+                    } else {
+                        Err(GameKernelV7Error::Invalid)
+                    };
+                }
+                return Ok(Some(GameOwnedPhaseV1::FriendshipBegin));
+            }
+        }
+        let Some(victory) = &pending.victory else {
+            return Ok(Some(GameOwnedPhaseV1::VictoryBegin));
+        };
+        Ok(match &victory.descendant {
+            CurrentVictoryDescendantV1::Ready => Some(GameOwnedPhaseV1::AwardBegin),
+            CurrentVictoryDescendantV1::AwardPresentation { event_id, .. } => {
+                if self.pending_presentations.contains_key(event_id) {
+                    None
+                } else {
+                    Some(GameOwnedPhaseV1::AwardApply)
+                }
+            }
+            CurrentVictoryDescendantV1::LevelUpStart { .. } => {
+                Some(GameOwnedPhaseV1::LevelUpApply)
+            }
+            CurrentVictoryDescendantV1::LevelUpPresentation { event_id, .. } => {
+                if self.pending_presentations.contains_key(event_id) {
+                    None
+                } else {
+                    Some(GameOwnedPhaseV1::LevelUpChildren)
+                }
+            }
+            CurrentVictoryDescendantV1::LevelUpChildren { .. } => {
+                Some(GameOwnedPhaseV1::VictoryDescendant)
+            }
+            CurrentVictoryDescendantV1::LearnMoveBatch { batch } if batch.complete => {
+                Some(GameOwnedPhaseV1::VictoryDescendant)
+            }
+            CurrentVictoryDescendantV1::LearnMoveBatch { .. }
+            | CurrentVictoryDescendantV1::Evolution { .. } => None,
+            CurrentVictoryDescendantV1::Complete => {
+                return Err(GameKernelV7Error::Invalid)
+            }
+        })
     }
 
     fn execute_owned_phase(
