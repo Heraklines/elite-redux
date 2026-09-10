@@ -475,7 +475,7 @@ use er_battle::m7_resolver::query_simulated_move_damage_with_current_targets;
 use er_game::m9e_material_v6::GamePresentationPayloadV1;
 
 fn only_move(pokemon: &mut er_state::m7_state::PokemonStateV5, id: u64) -> Result<()> {
-    let mut first = pokemon.moves[0].clone().ok_or("actual move slot absent")?;
+    let mut first = pokemon.moves[0].ok_or("actual move slot absent")?;
     first.move_id = MoveId::new(safe(id));
     first.pp_used = 0;
     first.pp_ups = 0;
@@ -791,61 +791,60 @@ fn assert_current_damage_observations(
             use_mode,
             ..
         }) = events.first()
+            && *move_id == MoveId::new(safe(57))
         {
-            if *move_id == MoveId::new(safe(57)) {
-                assert!(!saw_spread);
-                saw_spread = true;
-                assert!(*first_hit);
-                assert_eq!(*use_mode, CurrentMoveUseModeV1::Direct);
-                assert_eq!(targets.len(), 2);
+            assert!(!saw_spread);
+            saw_spread = true;
+            assert!(*first_hit);
+            assert_eq!(*use_mode, CurrentMoveUseModeV1::Direct);
+            assert_eq!(targets.len(), 2);
+            assert_eq!(
+                targets.iter().map(|row| row.slot).collect::<Vec<_>>(),
+                vec![slot(BattleSide::Enemy, 0), slot(BattleSide::Enemy, 1)]
+            );
+            assert!(
+                targets
+                    .iter()
+                    .all(|row| row.result == CurrentHitCheckV1::Hit)
+            );
+            assert_eq!(events.len(), 3);
+            for (event, resolved) in events[1..].iter().zip(targets) {
+                let CurrentBattleSourceEventV1::MoveDamage {
+                    target,
+                    target_slot,
+                    damage,
+                    target_hp_before,
+                    target_hp_after,
+                    hit_count,
+                    hits_left,
+                    move_id,
+                    ..
+                } = event
+                else {
+                    return Err("resolution must precede actual damage hooks".into());
+                };
+                assert_eq!(*target, resolved.target);
+                assert_eq!(*target_slot, resolved.slot);
+                assert_eq!(*move_id, MoveId::new(safe(57)));
+                assert_eq!((*hit_count, *hits_left), (1, 1));
+                assert!(*damage > 0);
                 assert_eq!(
-                    targets.iter().map(|row| row.slot).collect::<Vec<_>>(),
-                    vec![slot(BattleSide::Enemy, 0), slot(BattleSide::Enemy, 1)]
+                    *damage,
+                    target_hp_before
+                        .checked_sub(*target_hp_after)
+                        .ok_or("negative actual damage")?
                 );
-                assert!(
-                    targets
-                        .iter()
-                        .all(|row| row.result == CurrentHitCheckV1::Hit)
-                );
-                assert_eq!(events.len(), 3);
-                for (event, resolved) in events[1..].iter().zip(targets) {
-                    let CurrentBattleSourceEventV1::MoveDamage {
-                        target,
-                        target_slot,
-                        damage,
-                        target_hp_before,
-                        target_hp_after,
-                        hit_count,
-                        hits_left,
-                        move_id,
-                        ..
-                    } = event
-                    else {
-                        return Err("resolution must precede actual damage hooks".into());
-                    };
-                    assert_eq!(*target, resolved.target);
-                    assert_eq!(*target_slot, resolved.slot);
-                    assert_eq!(*move_id, MoveId::new(safe(57)));
-                    assert_eq!((*hit_count, *hits_left), (1, 1));
-                    assert!(*damage > 0);
-                    assert_eq!(
-                        *damage,
-                        target_hp_before
-                            .checked_sub(*target_hp_after)
-                            .ok_or("negative actual damage")?
-                    );
-                    let live = er_battle::current_target_execution::find_pokemon(
-                        chunk
-                            .transition
-                            .after_state
-                            .active_run
-                            .as_ref()
-                            .ok_or("after run absent")?,
-                        *target,
-                    )
-                    .ok_or("actual damage target absent")?;
-                    assert_eq!(live.hp, *target_hp_after);
-                }
+                let live = er_battle::current_target_execution::find_pokemon(
+                    chunk
+                        .transition
+                        .after_state
+                        .active_run
+                        .as_ref()
+                        .ok_or("after run absent")?,
+                    *target,
+                )
+                .ok_or("actual damage target absent")?;
+                assert_eq!(live.hp, *target_hp_after);
             }
         }
         before = chunk.transition.after_state;
