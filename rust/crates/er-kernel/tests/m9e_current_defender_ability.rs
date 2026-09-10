@@ -95,7 +95,7 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
 fn natural(content: Arc<PreparedGameContentV2>, index: usize) -> Result<GameKernelV7> {
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile: profile()?,
-        seed: format!("m9e-defender-execution-source-{index}"),
+        seed: format!("m9e-defender-ability-{index}"),
         local_seat: seat(),
         save_slots: vec!["target-source-slot".to_owned()],
         content: content.clone(),

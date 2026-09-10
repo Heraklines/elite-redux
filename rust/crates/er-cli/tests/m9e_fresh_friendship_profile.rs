@@ -53,7 +53,7 @@ fn content() -> Result<Arc<PreparedGameContentV2>> {
 fn start(content: Arc<PreparedGameContentV2>) -> Result<FreshFriendshipStartV7> {
     Ok(FreshFriendshipStartV7 {
         profile: profile()?,
-        seed: "m9e-fresh-friendship-v1".to_owned(),
+        seed: "m9e-fresh-friendship-v2".to_owned(),
         local_seat: SeatId::new(one()?),
         save_slots: vec!["fresh-profile".to_owned()],
         content,
