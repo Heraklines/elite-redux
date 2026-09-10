@@ -299,14 +299,14 @@ fn controlled_before_knockout(
     pokemon.hp = pokemon.max_hp;
     pokemon.stats.speed = 1;
     pokemon.stats.attack = 500;
-    let mut tackle = pokemon.moves[0].clone().ok_or("source move absent")?;
+    let mut tackle = pokemon.moves[0].ok_or("source move absent")?;
     tackle.move_id = MoveId::new(safe(33)?);
     tackle.pp_used = 0;
     tackle.pp_ups = 0;
     tackle.max_pp_override = None;
     pokemon.moves = [None, None, None, None];
     for (slot, id) in moves.iter().enumerate() {
-        let mut entry = tackle.clone();
+        let mut entry = tackle;
         entry.move_id = MoveId::new(safe(*id)?);
         pokemon.moves[slot] = Some(entry);
     }
