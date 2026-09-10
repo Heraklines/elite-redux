@@ -165,10 +165,9 @@ impl CurrentDefenderDispatchV1 {
                 innate_slot: Some(slot),
                 ..
             } = event
+                && *slot > 2
             {
-                if *slot > 2 {
-                    return Err(CurrentDefenderDispatchError);
-                }
+                return Err(CurrentDefenderDispatchError);
             }
         }
         let action = CurrentDefenderActionV1 {
