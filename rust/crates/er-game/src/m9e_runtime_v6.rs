@@ -662,9 +662,13 @@ fn execute_domain(
         GameActionV1::MoveLearning { action } => {
             execute_move_learning(before, action, &context.input)
         }
-        GameActionV1::CurrentLearnMoveBatch { action } => {
-            execute_current_learn_move_batch(before, content, action, &context.action, &context.input)
-        }
+        GameActionV1::CurrentLearnMoveBatch { action } => execute_current_learn_move_batch(
+            before,
+            content,
+            action,
+            &context.action,
+            &context.input,
+        ),
         GameActionV1::Fusion { action } => execute_fusion(before, action, &context.input),
         GameActionV1::World { action } => execute_world(before, action, &context.input),
         GameActionV1::Scenario { action } => {
