@@ -899,6 +899,7 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
         "a real unsupported multi-hit may not fabricate source single-hit observations"
     );
     assert_eq!(canonical_bytes(&kernel.snapshot()?)?, before);
+    Ok(())
 }
 
 #[test]
