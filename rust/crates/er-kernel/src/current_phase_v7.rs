@@ -134,9 +134,10 @@ impl GameKernelV7 {
             .and_then(|value| value.experience.as_ref())
             .ok_or(GameKernelV7Error::Invalid)?;
         let Some(pending) = owner.pending.iter().find(|pending| {
-            !pending.victory.as_ref().is_some_and(|victory| {
-                victory.descendant == CurrentVictoryDescendantV1::Complete
-            })
+            !pending
+                .victory
+                .as_ref()
+                .is_some_and(|victory| victory.descendant == CurrentVictoryDescendantV1::Complete)
         }) else {
             return Ok(Some(GameOwnedPhaseV1::PendingResolve));
         };
@@ -172,9 +173,7 @@ impl GameKernelV7 {
                     Some(GameOwnedPhaseV1::AwardApply)
                 }
             }
-            CurrentVictoryDescendantV1::LevelUpStart { .. } => {
-                Some(GameOwnedPhaseV1::LevelUpApply)
-            }
+            CurrentVictoryDescendantV1::LevelUpStart { .. } => Some(GameOwnedPhaseV1::LevelUpApply),
             CurrentVictoryDescendantV1::LevelUpPresentation { event_id, .. } => {
                 if self.pending_presentations.contains_key(event_id) {
                     None
@@ -190,9 +189,7 @@ impl GameKernelV7 {
             }
             CurrentVictoryDescendantV1::LearnMoveBatch { .. }
             | CurrentVictoryDescendantV1::Evolution { .. } => None,
-            CurrentVictoryDescendantV1::Complete => {
-                return Err(GameKernelV7Error::Invalid)
-            }
+            CurrentVictoryDescendantV1::Complete => return Err(GameKernelV7Error::Invalid),
         })
     }
 

@@ -22,11 +22,11 @@ use er_scenario::runtime_v2::{
     SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioControlV2, ScenarioDomainFactoryV2,
     ScenarioInputV2, ScenarioRuntimeV2,
 };
+use er_state::current_victory_execution::CurrentVictoryDescendantV1;
 use er_state::m7_state::{
     GameStateV5, MapNodeKindV1, MapNodeStateV1, ProgressionTaskKindV2, ProgressionTaskV2,
     RouteRevealSourceV1, RunStateV3, ScenarioRuntimeStageV2,
 };
-use er_state::current_victory_execution::CurrentVictoryDescendantV1;
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommandOffer, BattleCommandProposalV1, CommandAdmissionSource,
@@ -3447,12 +3447,11 @@ fn execute_current_learn_move_batch(
             authority_revision: next_revision,
             menu_instance,
         };
-        let mut control =
-            crate::m7_progression_control::current_learn_move_batch_control(
-                &control_context,
-                &result,
-            )
-            .map_err(|_| GameRuntimeV6Error::Invalid)?;
+        let mut control = crate::m7_progression_control::current_learn_move_batch_control(
+            &control_context,
+            &result,
+        )
+        .map_err(|_| GameRuntimeV6Error::Invalid)?;
         control
             .action_context
             .as_mut()
@@ -3534,7 +3533,9 @@ fn execute_current_evolution(
             )
             .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
             let hp = er_progression::current_stats::current_hp_after_stat_calculation(
-                pokemon.hp, pokemon.max_hp, stats.hp,
+                pokemon.hp,
+                pokemon.max_hp,
+                stats.hp,
             )
             .map_err(|_| GameRuntimeV6Error::Invalid)?;
             pokemon.stats = stats;
@@ -3542,9 +3543,7 @@ fn execute_current_evolution(
             pokemon.hp = hp;
         }
         EvolutionActionV1::Cancel { pokemon, evolution } => {
-            if *pokemon != pokemon_id
-                || children.evolution_candidates.first() != Some(evolution)
-            {
+            if *pokemon != pokemon_id || children.evolution_candidates.first() != Some(evolution) {
                 return Err(GameRuntimeV6Error::Action);
             }
             let pokemon = persistent_pokemon_mut(&mut candidate, *pokemon)?;
@@ -3564,8 +3563,8 @@ fn execute_current_evolution(
     victory
         .completed
         .push(children.parent.level_up.award.clone());
-    victory.next_phase = u8::try_from(victory.completed.len())
-        .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    victory.next_phase =
+        u8::try_from(victory.completed.len()).map_err(|_| GameRuntimeV6Error::Invalid)?;
     victory.descendant = if usize::from(victory.next_phase) == victory.phases.len() {
         CurrentVictoryDescendantV1::Complete
     } else {

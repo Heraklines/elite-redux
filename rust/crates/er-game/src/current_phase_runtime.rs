@@ -9,9 +9,7 @@ use er_state::current_experience_settlement::{
 use er_state::current_turn_execution::{
     CurrentTurnExecutionV1, CurrentTurnFaintV1, CurrentTurnStageV1,
 };
-use er_state::current_victory_execution::{
-    CurrentVictoryDescendantV1, CurrentVictoryExecutionV1,
-};
+use er_state::current_victory_execution::{CurrentVictoryDescendantV1, CurrentVictoryExecutionV1};
 use er_types::SeatId;
 
 use crate::m9e_material_v6::GamePresentationPayloadV1;
@@ -658,8 +656,8 @@ fn advance_victory(
     award: CurrentExperienceAwardV1,
 ) -> Result<(), GameRuntimeV6Error> {
     victory.completed.push(award);
-    victory.next_phase = u8::try_from(victory.completed.len())
-        .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    victory.next_phase =
+        u8::try_from(victory.completed.len()).map_err(|_| GameRuntimeV6Error::Invalid)?;
     victory.descendant = if usize::from(victory.next_phase) == victory.phases.len() {
         CurrentVictoryDescendantV1::Complete
     } else {
@@ -668,9 +666,7 @@ fn advance_victory(
     Ok(())
 }
 
-fn turn_menu_base(
-    turn: &CurrentTurnExecutionV1,
-) -> Result<MenuInstanceId, GameRuntimeV6Error> {
+fn turn_menu_base(turn: &CurrentTurnExecutionV1) -> Result<MenuInstanceId, GameRuntimeV6Error> {
     turn.accepted_commands
         .entries
         .iter()
@@ -697,8 +693,7 @@ fn descendant_menu_instance(
                 .map(|context| context.menu_instance)
         })
         .unwrap_or(base);
-    MenuInstanceId::new(safe_increment(current.get())?)
-        .map_err(|_| GameRuntimeV6Error::Invalid)
+    MenuInstanceId::new(safe_increment(current.get())?).map_err(|_| GameRuntimeV6Error::Invalid)
 }
 
 fn install_learn_batch_control(
@@ -897,10 +892,9 @@ fn victory_transition(
             {
                 return Err(GameRuntimeV6Error::Action);
             }
-            let phases =
-                crate::current_experience_settlement::plan_current_victory_experience(
-                    before, content, pending.id,
-                )?;
+            let phases = crate::current_experience_settlement::plan_current_victory_experience(
+                before, content, pending.id,
+            )?;
             let descendant = if phases.is_empty() {
                 CurrentVictoryDescendantV1::Complete
             } else {
@@ -924,12 +918,10 @@ fn victory_transition(
                 .get(usize::from(victory.next_phase))
                 .ok_or(GameRuntimeV6Error::Action)?
                 .clone();
-            let award =
-                crate::current_experience_settlement::prepare_current_experience_phase(
-                    before, content, &phase_row,
-                )?;
-            let semantic =
-                PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
+            let award = crate::current_experience_settlement::prepare_current_experience_phase(
+                before, content, &phase_row,
+            )?;
+            let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
             let mapping = content
                 .presentation(semantic)
                 .ok_or(GameRuntimeV6Error::Invalid)?;
@@ -980,13 +972,11 @@ fn victory_transition(
                 return Err(GameRuntimeV6Error::Action);
             };
             let level_up = level_up.clone();
-            let (next, end) =
-                crate::current_experience_settlement::apply_current_level_up(
-                    before, content, &level_up,
-                )?;
+            let (next, end) = crate::current_experience_settlement::apply_current_level_up(
+                before, content, &level_up,
+            )?;
             candidate = next;
-            let semantic =
-                PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
+            let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
             let mapping = content
                 .presentation(semantic)
                 .ok_or(GameRuntimeV6Error::Invalid)?;
@@ -1017,10 +1007,9 @@ fn victory_transition(
             else {
                 return Err(GameRuntimeV6Error::Action);
             };
-            let children =
-                crate::current_experience_settlement::plan_current_level_up_children(
-                    before, content, end,
-                )?;
+            let children = crate::current_experience_settlement::plan_current_level_up_children(
+                before, content, end,
+            )?;
             victory_mut(&mut candidate, index)?.descendant =
                 CurrentVictoryDescendantV1::LevelUpChildren { children };
         }
@@ -1045,7 +1034,9 @@ fn victory_transition(
                         )?;
                     let complete = batch.complete;
                     victory_mut(&mut candidate, index)?.descendant =
-                        CurrentVictoryDescendantV1::LearnMoveBatch { batch: batch.clone() };
+                        CurrentVictoryDescendantV1::LearnMoveBatch {
+                            batch: batch.clone(),
+                        };
                     if !complete {
                         install_learn_batch_control(
                             &mut candidate,
@@ -1080,7 +1071,11 @@ fn victory_transition(
             }
         }
         GameOwnedPhaseV1::PendingResolve => {
-            if owner.pending.iter().any(|pending| !pending_resolved(pending)) {
+            if owner
+                .pending
+                .iter()
+                .any(|pending| !pending_resolved(pending))
+            {
                 return Err(GameRuntimeV6Error::Action);
             }
             if turn.finalization_done {
