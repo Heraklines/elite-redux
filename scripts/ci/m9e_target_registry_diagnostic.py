@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "ead3b8682301077ab2de7f8509d7ce3fe2afb402bf3e80b5ac0261531a5254cb"
+EXPORTER_SHA256 = "1f38c885f25aca6938a55fa094668e84e91ba0f8d1669fb64a9817d99d992810"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -452,6 +452,10 @@ ORACLE_PINS.update({
     104981
   ]
 })
+FAINT_SCORE_SOURCE_PINS = {
+    "src/battle.ts": ["1143e3f3272a959836e4fa4d63536c251a06b4bfa064b454ade0ccf184301bed", 31566]
+}
+ORACLE_PINS.update(FAINT_SCORE_SOURCE_PINS)
 RECONNAISSANCE_METHODS = {
   "constructor": {
     "sha256": "816eeedca0d9550f2fb784a1db82f92d15f9be7141da9cf7c81b93772d8b2b5e",
@@ -535,7 +539,7 @@ def source_method_closure(summary):
 
 def main(summary):
     sha = os.environ["GITHUB_SHA"]
-    require(os.environ.get("GITHUB_REF_NAME") == "codex/m9e-dex-encounter-source-20260910" and os.environ.get("GITHUB_EVENT_NAME") == "push", "exact source branch/event")
+    require(os.environ.get("GITHUB_REF_NAME") == "codex/m9e-faint-score-source-20260910" and os.environ.get("GITHUB_EVENT_NAME") == "push", "exact source branch/event")
     require(re.fullmatch(r"[0-9a-f]{40}", sha), "candidate SHA format")
     require(git_text(ROOT, ["rev-parse", "HEAD"], "candidate-head") == sha, "candidate identity")
     require(git_text(ROOT, ["rev-parse", BASE + "^{tree}"], "baseline-tree") == BASE_TREE, "base tree identity")
@@ -597,7 +601,7 @@ def main(summary):
     phase_paths = ["src/phase-tree.ts", "src/phase-manager.ts", "src/phases/turn-start-phase.ts",
         "src/phases/move-phase.ts", "src/phases/move-effect-phase.ts", "src/phases/faint-phase.ts",
         "src/phases/victory-phase.ts", "src/field/pokemon.ts", "src/battle-scene.ts",
-        "src/data/elite-redux/archetypes/ability-meta-consumers.ts"]
+        "src/data/elite-redux/archetypes/ability-meta-consumers.ts", "src/battle.ts"]
     phase_pins = FULL / "phase-source-pins.json"
     phase_pins.write_text(json.dumps({"oracle": PIN, "sources": {path: ORACLE_PINS[path]
         for path in phase_paths}}, sort_keys=True) + "\n", encoding="utf-8")
@@ -608,6 +612,24 @@ def main(summary):
         "independent-data-and-source-queue-verification", seconds=60, bound=65536)
     summary["data_validation"] = json.loads((OUTPUT / "validation.json").read_bytes())
     require(summary["data_validation"].get("status") == "passed", "independent data verifier did not pass")
+    score_projections = []
+    for index, ordinal in enumerate(("one", "two")):
+        path = OUTPUT / f"sidecar-{ordinal}.json"
+        fact = file_fact(path, 32768)
+        validated = summary["data_validation"]["sidecars"][index]
+        require(fact["bytes"] == validated["bytes"] and fact["sha256"] == validated["sha256"],
+                "score projection must come from the exact independently validated sidecar")
+        observed = json.loads(path.read_bytes())["faint_score"]
+        require(isinstance(observed, dict) and len(observed.get("cases", [])) == 5,
+                "complete actual score observation required")
+        encoded = json.dumps(observed, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        require(0 < len(encoded) <= 4096, "score-only metadata projection bound")
+        score_projections.append(encoded)
+    require(score_projections[0] == score_projections[1], "two actual score projections differ")
+    summary["faint_score_observation"] = json.loads(score_projections[0])
+    summary["faint_score_projection"] = {"encoding": "sorted-compact-json-utf8",
+        "bytes": len(score_projections[0]), "sha256": hashlib.sha256(score_projections[0]).hexdigest(),
+        "equal_fresh_processes": 2, "source_sidecars": summary["data_validation"]["sidecars"]}
     require(inventory(ORACLE, PIN, "oracle-after-queue-verification") == pinned,
             "oracle changed during actual queue verification")
     require(installed_phaser_inputs() == rng_inputs, "actual Phaser source changed")
@@ -646,7 +668,7 @@ def entry():
     COMPACT.mkdir()
     summary = {"schema_version": 1, "source_sha": os.environ.get("GITHUB_SHA"), "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "branch": os.environ.get("GITHUB_REF_NAME"), "event": os.environ.get("GITHUB_EVENT_NAME"), "baseline": BASE, "oracle_sha": PIN,
-        "scope": "retained actual daily/registry/stat/queue observations plus fresh dex constructor and direct account methods, initial encounter; no evolution-phase or runtime XP qualification",
+        "scope": "retained actual daily/registry/stat/queue/dex/encounter observations plus actual addFaintedEnemyScore calls; no FaintPhase, evolution-phase or runtime XP qualification",
         "status": "failed", "limits": {"per_command_seconds": 600, "shared_seconds": 1800,
         "cleanup_reserve_seconds": 20, "data_file_bytes": 32768, "source_excerpt_bytes":32768, "aggregate_generated_bytes":196608, "compact_metadata_bytes": 65536}}
     error = None

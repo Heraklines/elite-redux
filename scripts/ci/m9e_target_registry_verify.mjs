@@ -313,12 +313,60 @@ assert.deepEqual(c.ivs,[31,1,2,3,4,5]);assert.equal(c.dex_attr,"149");assert.equ
   }
 }
 
-function validateSidecar(row) {
+function validatePreviousSidecar(row) {
   keys(row,["schema_version","source_sha","seed","legacy_sha256","initial_encounter","town_boss_pool","dex"]);
   assert.equal(row.schema_version,1);assert.equal(row.source_sha,"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
   assert.equal(row.seed,"m9e-target-registry-source-v1");
   assert.equal(row.legacy_sha256,"9b58691e1c5b3796e2b1bfe511483a445b7ab158e72e895fd15c86e5f9bc4576");
   validateInitialEncounter(row.initial_encounter);validateTownBossPool(row.town_boss_pool);validateDex(row.dex);
+}
+
+function validateFaintScore(score,encounter) {
+  keys(score,["scope","initial","context","cases","score_restored","own_fields_restored","unrelated_values_unchanged","rng_restored"]);
+  assert.equal(score.scope,"actual addFaintedEnemyScore method only; controlled level/IV inputs, no FaintPhase execution");
+  assert.deepEqual(score.initial,{battle_score:0,enemy_faints:0,enemy_history:0,player_history:0});
+  for(const key of ["score_restored","own_fields_restored","unrelated_values_unchanged","rng_restored"])assert.equal(score[key],true);
+  const c=score.context;
+  keys(c,["enemy_id","species","form","natural_level","natural_ivs","hp","base_exp","current_cap","cap_override","held_score_sources","is_boss","boss_segments"]);
+  const enemy=encounter.enemies[0];
+  assert.equal(c.enemy_id,enemy.id);assert.equal(c.species,enemy.species);assert.equal(c.form,enemy.form);
+  assert.equal(c.natural_level,enemy.level);integer(c.hp,1,Number.MAX_SAFE_INTEGER);
+  integer(c.base_exp,1,Number.MAX_SAFE_INTEGER);integer(c.current_cap,1,Number.MAX_SAFE_INTEGER);
+  assert.equal(c.cap_override,0);assert.deepEqual(c.held_score_sources,[]);
+  assert.equal(c.is_boss,false);assert.equal(c.boss_segments,0);
+  assert(Array.isArray(c.natural_ivs));assert.equal(c.natural_ivs.length,6);
+  for(const iv of c.natural_ivs)integer(iv,0,31);
+  const inputs=[['natural-initial-enemy',c.natural_level,c.natural_ivs],
+    ['level1-zero-ivs',1,[0,0,0,0,0,0]],['level5-perfect-ivs',5,[31,31,31,31,31,31]],
+    ['level13-mixed-ivs',13,[0,1,2,3,4,5]],['level2-mid-ivs',2,[15,15,15,15,15,15]]];
+  assert.equal(score.cases.length,inputs.length);
+  let before=0;
+  let fractional=0;
+  for(const [index,row] of score.cases.entries()){
+    keys(row,["name","level","ivs","base_exp","cap","before","after","increment"]);
+    assert.deepEqual([row.name,row.level,row.ivs],inputs[index]);
+    assert.equal(row.base_exp,c.base_exp);assert.equal(row.cap,c.current_cap);
+    integer(row.before,0,Number.MAX_SAFE_INTEGER);integer(row.after,0,Number.MAX_SAFE_INTEGER);
+    integer(row.increment,1,Number.MAX_SAFE_INTEGER);assert.equal(row.increment,row.after-row.before);
+    assert.equal(row.before,before);
+    // Independent binary64 source equation; no replacement of the observed method.
+    const increase=c.base_exp*(row.level/c.current_cap)*((row.ivs.reduce((sum,iv)=>sum+iv,0)/93)*0.2+0.8);
+    if(increase!==Math.floor(increase))fractional++;
+    assert.equal(row.after,before+Math.ceil(increase));
+    assert(row.after>before);before=row.after;
+  }
+  assert(fractional>0,"actual controlled cases must exercise ceil on a fractional score");
+}
+
+function validateSidecar(row) {
+  keys(row,["schema_version","source_sha","seed","legacy_sha256","initial_encounter","town_boss_pool","dex","faint_score"]);
+  assert.equal(row.schema_version,2);
+  const {faint_score,...previous}=row;previous.schema_version=1;
+  validatePreviousSidecar(previous);
+  const raw=Buffer.from(`${JSON.stringify(previous)}\n`);
+  assert.equal(raw.length,27634);
+  assert.equal(digest(raw),"c4f31f8504f4c6c9435af8c0d90496bc14de297623dea916d464de44b2124d56");
+  validateFaintScore(faint_score,row.initial_encounter);
 }
 
 // Exact399d town.ts source c26b7950d04e26fab6816fbb4894d7b8e5c6f18952c0cdd40bf5c5940f0f7760;
@@ -377,6 +425,26 @@ const sidecarRaws=process.argv.slice(7,9).map(path=>{
 assert(sidecarRaws[0].equals(sidecarRaws[1]));
 const sidecar=JSON.parse(sidecarRaws[0]);validateSidecar(sidecar);
 const sidecarNegatives=[...initialEncounterMutants(sidecar.initial_encounter),...townBossPoolMutants(sidecar.town_boss_pool)];
+const scoreNegatives=[];
+for(const[name,mutate]of[
+  ["score-initial",v=>{v.initial.battle_score=1;}],
+  ["score-initial-faints",v=>{v.initial.enemy_faints=1;}],
+  ["score-initial-history",v=>{v.initial.enemy_history=1;}],
+  ["score-identity",v=>{v.context.enemy_id++;}],
+  ["score-held-source",v=>{v.context.held_score_sources.push({class_name:"x",multiplier:2});}],
+  ["score-boss",v=>{v.context.is_boss=true;}],
+  ["score-cap-override",v=>{v.context.cap_override=-1;}],
+  ["score-cap",v=>{v.context.current_cap=0;}],
+  ["score-base-exp",v=>{v.context.base_exp+=v.context.current_cap*465;for(const row of v.cases)row.base_exp=v.context.base_exp;}],
+  ["score-case-count",v=>{v.cases.pop();}],
+  ["score-case-order",v=>{[v.cases[1],v.cases[2]]=[v.cases[2],v.cases[1]];}],
+  ["score-amount",v=>{v.cases[0].after++;}],
+  ["score-equation",v=>{v.cases[0].increment++;for(const[index,row]of v.cases.entries()){row.after++;if(index>0)row.before++;}}],
+  ["score-chain",v=>{v.cases[1].before=0;}],
+  ["score-integer-type",v=>{v.cases[0].before=false;}],
+  ["score-restoration",v=>{v.score_restored=false;}],
+  ["score-rng",v=>{v.rng_restored=false;}],
+]){const copy=structuredClone(sidecar.faint_score);mutate(copy);assert.throws(()=>validateFaintScore(copy,sidecar.initial_encounter));scoreNegatives.push(name);}
 for(const[name,mutate]of[
   ["dex-default-attribute",v=>{v.dex.initial.default_attributes="149";}],
   ["dex-missing-species",v=>{v.dex.initial.all_species_ids.pop();}],
@@ -433,7 +501,7 @@ assert.equal(pins.oracle, row.source_sha);
 const required = ["src/phase-tree.ts", "src/phase-manager.ts", "src/phases/turn-start-phase.ts",
   "src/phases/move-phase.ts", "src/phases/move-effect-phase.ts", "src/phases/faint-phase.ts",
   "src/phases/victory-phase.ts", "src/field/pokemon.ts", "src/battle-scene.ts",
-  "src/data/elite-redux/archetypes/ability-meta-consumers.ts"];
+  "src/data/elite-redux/archetypes/ability-meta-consumers.ts","src/battle.ts"];
 keys(pins.sources, required);
 const sources = new Map();
 const sourceHashes = {};
@@ -449,6 +517,16 @@ for (const path of required) {
   sources.set(path, bytes.toString("utf8"));
 }
 const contains = (path, text) => assert(sources.get(path).includes(text), `${path}: ${text}`);
+contains("src/battle.ts","public battleScore = 0;");
+contains("src/battle.ts","public enemyFaints = 0;");
+contains("src/battle.ts","public playerFaintsHistory: FaintLogEntry[] = [];");
+contains("src/battle.ts","public enemyFaintsHistory: FaintLogEntry[] = [];");
+contains("src/battle-scene.ts","enemy.getSpeciesForm().getBaseExp()");
+contains("src/battle-scene.ts","* (enemy.level / this.getMaxExpLevel())");
+contains("src/battle-scene.ts","* ((enemy.ivs.reduce((iv: number, total: number) => (total += iv), 0) / 93) * 0.2 + 0.8);");
+contains("src/battle-scene.ts","scoreIncrease *= (m as PokemonHeldItemModifier).getScoreMultiplier()");
+contains("src/battle-scene.ts","scoreIncrease *= Math.sqrt(enemy.bossSegments);");
+contains("src/battle-scene.ts","this.currentBattle.battleScore += Math.ceil(scoreIncrease);");
 contains("src/phase-manager.ts", 'this.phaseQueue.addPhase(this.create("FaintPhase", ...args), true);');
 contains("src/phase-manager.ts", "this.phaseQueue.pushPhase(this.checkDynamic(phase));");
 contains("src/phases/turn-start-phase.ts", 'globalScene.phaseManager.pushNew(\n      "MovePhase",');
@@ -520,6 +598,6 @@ const families = {post_faint:row.abilities.filter(a => a.post_faint).map(a => a.
   post_victory:row.abilities.filter(a => a.post_victory).map(a => a.id),
   post_victory_stat:row.moves.filter(m => m.post_victory_stat).map(m => m.id),
   experience_meta:row.abilities.filter(a => a.meta_kinds.includes("experience-gain-multiplier")).map(a => a.id)};
-const output = `${JSON.stringify({schema_version:3,status:"passed",scope:"registry observations and actual source queue nesting; no gameplay or general neutrality qualification",source_sha:row.source_sha,ability_count:24,move_count:27,negative_cases:rejected,sidecar_negative_cases:sidecarNegatives,sidecars:sidecarRaws.map(raw=>({bytes:raw.length,sha256:digest(raw)})),dex:{species:sidecar.dex.initial.all_species_ids.length,starters:sidecar.dex.initial.starter_ids.length,defaults:27,cases:3,highest_level:sidecar.dex.initial.account_defaults.highest_level},initial_encounter:sidecar.initial_encounter,town_boss_pool:{pool_rows:sidecar.town_boss_pool.pool_rows.length,species:sidecar.town_boss_pool.species.length},families,phase_order:phaseOrder,no_effect_family_ids:row.moves.filter(m=>m.no_effect).map(m=>m.id),daily_pokerus:{clock_cases:row.daily_pokerus.clock_cases.length,positive_starters:[1,4,7],effective_count:row.daily_pokerus.effective_count,starter_key_count:706,source_calls:row.daily_pokerus.source_calls,rng_restored:true},stat_cases:row.stats.cases.length,balance:row.balance,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
+const output = `${JSON.stringify({schema_version:4,status:"passed",scope:"registry observations and actual source queue nesting; no gameplay or general neutrality qualification",source_sha:row.source_sha,ability_count:24,move_count:27,negative_cases:rejected,sidecar_negative_cases:sidecarNegatives,score_negative_cases:scoreNegatives,faint_score:{cases:sidecar.faint_score.cases.length,base_exp:sidecar.faint_score.context.base_exp,current_cap:sidecar.faint_score.context.current_cap,initial:sidecar.faint_score.initial},sidecars:sidecarRaws.map(raw=>({bytes:raw.length,sha256:digest(raw)})),dex:{species:sidecar.dex.initial.all_species_ids.length,starters:sidecar.dex.initial.starter_ids.length,defaults:27,cases:3,highest_level:sidecar.dex.initial.account_defaults.highest_level},initial_encounter:sidecar.initial_encounter,town_boss_pool:{pool_rows:sidecar.town_boss_pool.pool_rows.length,species:sidecar.town_boss_pool.species.length},families,phase_order:phaseOrder,no_effect_family_ids:row.moves.filter(m=>m.no_effect).map(m=>m.id),daily_pokerus:{clock_cases:row.daily_pokerus.clock_cases.length,positive_starters:[1,4,7],effective_count:row.daily_pokerus.effective_count,starter_key_count:706,source_calls:row.daily_pokerus.source_calls,rng_restored:true},stat_cases:row.stats.cases.length,balance:row.balance,exports:raws.map(raw => ({bytes:raw.length,sha256:digest(raw)}))})}\n`;
 assert(Buffer.byteLength(output) <= 8192);
 fs.writeFileSync(process.argv[4], output, {flag:"wx"});

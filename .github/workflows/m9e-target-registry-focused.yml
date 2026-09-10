@@ -1,7 +1,7 @@
-name: M9E Dex and Encounter Source Diagnostic
+name: M9E Faint Score Source Diagnostic
 on:
   push:
-    branches: [codex/m9e-dex-encounter-source-20260910]
+    branches: [codex/m9e-faint-score-source-20260910]
 permissions:
   contents: read
 concurrency:

@@ -16,7 +16,7 @@ import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getPokemonSpecies, getPokerusStarters } from "#utils/pokemon-utils";
 import { ExpBoosterModifier, PokemonExpBoosterModifier, ExpShareModifier, ExpBalanceModifier,
   MultipleParticipantExpBonusModifier, BaseStatModifier, PokemonBaseStatTotalModifier, PokemonBaseStatFlatModifier,
-  PokemonIncrementingStatModifier, PokemonNatureWeightModifier } from "#modifiers/modifier";
+  PokemonIncrementingStatModifier, PokemonNatureWeightModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { getMoodyCoordinatorMaxHpMultiplier, getMoodyCoordinatorHpDebt }
   from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { Nature } from "#enums/nature";
@@ -73,6 +73,7 @@ test("observe actual initialized target capability registry", async () => {
   await manager.classicMode.startBattle(SpeciesId.BULBASAUR);
   const initialEncounter=observeInitialEncounterContext();
   const townBossPool=observeTownBossPool();
+  const faintScore=observeFaintedEnemyScore();
   const abilities = ABILITIES.map(id => {
     const ability = allAbilities[id];
     expect(ability?.id).toBe(id);
@@ -280,11 +281,90 @@ test("observe actual initialized target capability registry", async () => {
   const sidecarPath=process.env.M9_DEX_ENCOUNTER_OUTPUT;
   if(!sidecarPath) throw new Error("M9_DEX_ENCOUNTER_OUTPUT required");
   const dex=await observeDexAccountMethods();
-  const sidecar=`${JSON.stringify({schema_version:1,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
+  const previousSidecar=`${JSON.stringify({schema_version:1,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
     initial_encounter:initialEncounter,town_boss_pool:townBossPool,dex})}\n`;
+  expect(Buffer.byteLength(previousSidecar,"utf8")).toBe(27634);
+  expect(createHash("sha256").update(previousSidecar).digest("hex"))
+    .toBe("c4f31f8504f4c6c9435af8c0d90496bc14de297623dea916d464de44b2124d56");
+  const sidecar=`${JSON.stringify({...JSON.parse(previousSidecar),schema_version:2,faint_score:faintScore})}\n`;
   expect(Buffer.byteLength(sidecar,"utf8")).toBeLessThanOrEqual(32768);
   writeFileSync(sidecarPath,sidecar,{encoding:"utf8",flag:"wx"});
 });
+
+function observeFaintedEnemyScore() {
+  const scene=globalScene;
+  const battle=scene.currentBattle;
+  const enemy=scene.getEnemyParty()[0];
+  expect(enemy).toBeDefined();
+  expect(scene.getEnemyParty()).toHaveLength(1);
+  for(const method of [scene.addFaintedEnemyScore,scene.getMaxExpLevel,scene.findModifiers,
+    enemy.getSpeciesForm,enemy.getSpeciesForm().getBaseExp,enemy.isBoss]) {
+    expect(vi.isMockFunction(method)).toBe(false);
+  }
+  const initial={battle_score:battle.battleScore,enemy_faints:battle.enemyFaints,
+    enemy_history:battle.enemyFaintsHistory.length,player_history:battle.playerFaintsHistory.length};
+  expect(initial).toEqual({battle_score:0,enemy_faints:0,enemy_history:0,player_history:0});
+  const original={score:battle.battleScore,level:enemy.level,ivs:enemy.ivs};
+  const battleOwn=Object.entries(battle);
+  const enemyOwn=Object.entries(enemy);
+  const unchangedOwn=(object:object,entries:[string,unknown][],changed:string[])=>{
+    const current=Object.fromEntries(Object.entries(object));
+    expect(Object.keys(current)).toEqual(entries.map(([key])=>key));
+    for(const [key,value] of entries)if(!changed.includes(key))expect(current[key]).toBe(value);
+  };
+  const stable=()=>({hp:enemy.hp,stats:[...enemy.stats],species:enemy.species.speciesId,form:enemy.formIndex,
+    boss_segments:enemy.bossSegments,boss_segment_index:enemy.bossSegmentIndex,
+    enemy_faints:battle.enemyFaints,enemy_history:[...battle.enemyFaintsHistory],
+    player_history:[...battle.playerFaintsHistory]});
+  const stableBefore=stable();
+  const rng=Phaser.Math.RND.state();
+  const held=scene.findModifiers(m=>m instanceof PokemonHeldItemModifier && m.pokemonId===enemy.id,false)
+    .map(modifier=>{
+      expect(modifier instanceof PokemonHeldItemModifier).toBe(true);
+      const item=modifier as PokemonHeldItemModifier;
+      expect(vi.isMockFunction(item.getScoreMultiplier)).toBe(false);
+      return {class_name:item.constructor.name,multiplier:item.getScoreMultiplier()};
+    });
+  expect(held).toEqual([]);
+  expect(enemy.isBoss()).toBe(false);
+  expect(enemy.bossSegments).toBe(0);
+  expect(Overrides.LEVEL_CAP_OVERRIDE).toBe(0);
+  const baseExp=enemy.getSpeciesForm().getBaseExp();
+  const cap=scene.getMaxExpLevel();
+  expect(Number.isSafeInteger(baseExp) && baseExp>0).toBe(true);
+  expect(Number.isSafeInteger(cap) && cap>0).toBe(true);
+  const cases:Array<{name:string;level:number;ivs:number[];base_exp:number;cap:number;before:number;after:number;increment:number}>=[];
+  const inputs=[{name:"natural-initial-enemy",level:original.level,ivs:[...original.ivs]},
+    {name:"level1-zero-ivs",level:1,ivs:[0,0,0,0,0,0]},
+    {name:"level5-perfect-ivs",level:5,ivs:[31,31,31,31,31,31]},
+    {name:"level13-mixed-ivs",level:13,ivs:[0,1,2,3,4,5]},
+    {name:"level2-mid-ivs",level:2,ivs:[15,15,15,15,15,15]}];
+  try {
+    for(const input of inputs){
+      enemy.level=input.level;enemy.ivs=[...input.ivs];
+      const before=battle.battleScore;
+      scene.addFaintedEnemyScore(enemy);
+      expect(Number.isSafeInteger(battle.battleScore)).toBe(true);
+      cases.push({...input,base_exp:enemy.getSpeciesForm().getBaseExp(),cap:scene.getMaxExpLevel(),
+        before,after:battle.battleScore,increment:battle.battleScore-before});
+      expect(stable()).toEqual(stableBefore);
+      unchangedOwn(battle,battleOwn,["battleScore"]);
+      unchangedOwn(enemy,enemyOwn,["level","ivs"]);
+      expect(Phaser.Math.RND.state()).toBe(rng);
+    }
+  } finally {
+    battle.battleScore=original.score;enemy.level=original.level;enemy.ivs=original.ivs;
+  }
+  unchangedOwn(battle,battleOwn,[]);unchangedOwn(enemy,enemyOwn,[]);
+  expect(stable()).toEqual(stableBefore);expect(Phaser.Math.RND.state()).toBe(rng);
+  return {scope:"actual addFaintedEnemyScore method only; controlled level/IV inputs, no FaintPhase execution",
+    initial,context:{enemy_id:enemy.id,species:enemy.species.speciesId,form:enemy.formIndex,
+      natural_level:original.level,natural_ivs:[...original.ivs],hp:enemy.hp,base_exp:baseExp,
+      current_cap:cap,cap_override:Overrides.LEVEL_CAP_OVERRIDE,held_score_sources:held,
+      is_boss:enemy.isBoss(),boss_segments:enemy.bossSegments},cases,
+    score_restored:battle.battleScore===original.score,own_fields_restored:true,
+    unrelated_values_unchanged:true,rng_restored:Phaser.Math.RND.state()===rng};
+}
 
 // Add imports to the existing cfff exporter (globalScene, Phaser, expect, vi,
 // BiomeId are already imported):
