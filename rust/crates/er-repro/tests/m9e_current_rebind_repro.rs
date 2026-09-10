@@ -367,6 +367,10 @@ fn reference_event(
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
     match event {
         CurrentExternalEvent::CoopRebind { .. } => Err(GameKernelV7Error::Invalid),
+        CurrentExternalEvent::CurrentUtcClockResult {
+            request_id,
+            utc_milliseconds,
+        } => kernel.apply_current_utc_clock_result(request_id, utc_milliseconds),
         CurrentExternalEvent::RetryCoopSetup => kernel.retry_current_coop_setup(),
         CurrentExternalEvent::RawInput { input } => kernel.raw_input(input),
         CurrentExternalEvent::AdvanceTime { milliseconds } => kernel.advance_time(milliseconds),
