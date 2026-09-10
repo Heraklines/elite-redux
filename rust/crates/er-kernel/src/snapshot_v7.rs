@@ -190,7 +190,7 @@ impl CoreGameKernelSnapshotV7 {
                 {
                     return Err(SnapshotV7Error::Invalid);
                 }
-                if let Some(storage) = &bootstrap.current_storage {
+                if bootstrap.current_storage.is_some() {
                     if self.protocol.is_some()
                         || self.authority_ai.is_none()
                         || self.scheduler.disposed

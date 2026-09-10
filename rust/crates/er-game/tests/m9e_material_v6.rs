@@ -34,10 +34,14 @@ fn prepared() -> Result<PreparedGameContentV2, Box<dyn Error>> {
 
 fn state(content: &PreparedGameContentV2) -> Result<GameStateV6, Box<dyn Error>> {
     Ok(GameStateV6 {
+        current_achievement_tracker: None,
         current_battle_participation: None,
+        current_defender_dispatch: None,
+        current_friendship_profile: None,
+        current_presentation: None,
         current_run_difficulty: None,
         current_targeting: None,
-        current_friendship_profile: None,
+        current_turn_execution: None,
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: content.identity().clone(),
         identities: GameIdentityAllocatorStateV1::derive(None)?,
@@ -79,6 +83,7 @@ fn new_run_material(
         accepted_action: Some(GameActionV1::Bootstrap {
             action: BootstrapActionV1::Confirm,
         }),
+        owned_phase: None,
         before_digest: empty_game_state_digest()?,
         after_digest: game_state_digest(&after_state)?,
         mutations: vec![GameMutationEvidenceV2 {
