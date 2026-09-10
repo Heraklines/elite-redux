@@ -338,15 +338,14 @@ impl RunBootstrapMachineV1 {
                 if self.stage != RunBootstrapStageV1::StarterSelect {
                     return Err(RunBootstrapErrorV1::Invalid);
                 }
-                if let Display::Pending(request) = &owner.display {
-                    if request.context != self.starter_clock_context(owner.owner_seat)?
+                if let Display::Pending(request) = &owner.display
+                    && (request.context != self.starter_clock_context(owner.owner_seat)?
                         || next_safe(request.request_id.get())? != owner.next_platform_request_id
                         || owner.selected.iter().any(|selected| {
                             selected.receipt.request.request_id >= request.request_id
-                        })
-                    {
-                        return Err(RunBootstrapErrorV1::Invalid);
-                    }
+                        }))
+                {
+                    return Err(RunBootstrapErrorV1::Invalid);
                 }
             }
             Display::Ready(receipt) => {

@@ -190,8 +190,8 @@ impl CoreGameKernelSnapshotV7 {
                 {
                     return Err(SnapshotV7Error::Invalid);
                 }
-                if bootstrap.current_storage.is_some() {
-                    if self.protocol.is_some()
+                if bootstrap.current_storage.is_some()
+                    && (self.protocol.is_some()
                         || self.authority_ai.is_none()
                         || self.scheduler.disposed
                         || !self.storage_frontiers.is_empty()
@@ -208,10 +208,9 @@ impl CoreGameKernelSnapshotV7 {
                                 .get()
                                 .get()
                                 .checked_add(1)
-                                .ok_or(SnapshotV7Error::Invalid)?
-                    {
-                        return Err(SnapshotV7Error::Invalid);
-                    }
+                                .ok_or(SnapshotV7Error::Invalid)?)
+                {
+                    return Err(SnapshotV7Error::Invalid);
                 }
                 let mut expected_platform = bootstrap
                     .current_storage_effect()

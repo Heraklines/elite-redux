@@ -1218,13 +1218,12 @@ fn query_simulated_move_damage_inner(
     if target.fainted {
         return Err(BattleV5Error::Target);
     }
-    if let Some(owner) = targeting {
-        if crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition)
+    if let Some(owner) = targeting
+        && crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition)
             .map_err(|_| BattleV5Error::UnsupportedContent)?
             .is_some()
-        {
-            return Ok(0);
-        }
+    {
+        return Ok(0);
     }
     if matches!(definition.category, MoveCategory::Status)
         || matches!(definition.power, MovePower::None)

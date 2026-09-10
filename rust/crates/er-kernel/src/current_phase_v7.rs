@@ -141,25 +141,25 @@ impl GameKernelV7 {
         }) else {
             return Ok(Some(GameOwnedPhaseV1::PendingResolve));
         };
-        if let Some(friendship) = &pending.friendship {
-            if !friendship.complete {
-                if let Some(request) = &friendship.clock {
-                    let issued = self.pending_platform.values().any(|pending| {
-                        matches!(
-                            &pending.effect,
-                            GamePlatformEffectV2::CurrentFriendshipClock {
-                                request: issued
-                            } if issued == request
-                        )
-                    });
-                    return if issued {
-                        Ok(None)
-                    } else {
-                        Err(GameKernelV7Error::Invalid)
-                    };
-                }
-                return Ok(Some(GameOwnedPhaseV1::FriendshipBegin));
+        if let Some(friendship) = &pending.friendship
+            && !friendship.complete
+        {
+            if let Some(request) = &friendship.clock {
+                let issued = self.pending_platform.values().any(|pending| {
+                    matches!(
+                        &pending.effect,
+                        GamePlatformEffectV2::CurrentFriendshipClock {
+                            request: issued
+                        } if issued == request
+                    )
+                });
+                return if issued {
+                    Ok(None)
+                } else {
+                    Err(GameKernelV7Error::Invalid)
+                };
             }
+            return Ok(Some(GameOwnedPhaseV1::FriendshipBegin));
         }
         let Some(victory) = &pending.victory else {
             return Ok(Some(GameOwnedPhaseV1::VictoryBegin));

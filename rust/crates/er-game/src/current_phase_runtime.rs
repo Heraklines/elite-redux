@@ -1066,7 +1066,7 @@ fn victory_transition(
                 _ => {
                     advance_victory(
                         victory_mut(&mut candidate, index)?,
-                        children.parent.level_up.award.clone(),
+                        children.parent.level_up.award,
                     )?;
                 }
             }
