@@ -951,7 +951,7 @@ fn source_spread_group_executes_all_opponents_and_multihit_exception() -> Result
     assign_move(active_mut(&mut snapshot)?, 57)?; // Genuine source Surf, ALL_NEAR_OTHERS.
     // Both enemies lead with a priority-2 Quick Attack; the player must survive
     // both hits or the retained turn parks at a faint interlude.
-    let run = active_run_mut(&mut snapshot)?;
+    let run = active_run_mut(active_mut(&mut snapshot)?)?;
     run.party[0].hp = 200;
     run.party[0].max_hp = 200;
     run.party[0].stats.hp = 200;
