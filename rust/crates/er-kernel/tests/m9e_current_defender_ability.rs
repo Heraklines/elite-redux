@@ -837,22 +837,21 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
         .current_turn_execution
         .as_ref()
         .ok_or("actual turn absent")?;
-    eprintln!(
-        "DBG next_action={} actions={:?}",
-        turn.next_action,
-        turn.actions
-            .iter()
-            .map(|a| (
-                a.command.actor(),
-                a.effective_speed,
-                a.priority,
-                a.source_slot
-            ))
-            .collect::<Vec<_>>()
-    );
+    let dump: Vec<_> = turn
+        .actions
+        .iter()
+        .map(|a| (
+            a.command.actor(),
+            a.effective_speed,
+            a.priority,
+            a.source_slot
+        ))
+        .collect();
     assert_eq!(
         turn.actions[usize::from(turn.next_action)].command.actor(),
-        active_run(owned)?.party[0].id
+        active_run(owned)?.party[0].id,
+        "DBG next_action={} actions={dump:?}",
+        turn.next_action
     );
     let before = canonical_bytes(&kernel.snapshot()?)?;
     assert!(
