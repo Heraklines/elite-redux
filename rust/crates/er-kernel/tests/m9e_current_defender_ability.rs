@@ -842,7 +842,12 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
         turn.next_action,
         turn.actions
             .iter()
-            .map(|a| (a.command.actor(), a.effective_speed, a.priority, a.source_slot))
+            .map(|a| (
+                a.command.actor(),
+                a.effective_speed,
+                a.priority,
+                a.source_slot
+            ))
             .collect::<Vec<_>>()
     );
     assert_eq!(
