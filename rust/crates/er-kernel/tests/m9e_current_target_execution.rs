@@ -510,7 +510,9 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
             FieldSlotState::new(slot(BattleSide::Enemy, 1), Some(other)),
         ],
     )?;
-    reseed_controlled_participation(state, content.as_ref())?;
+    // The bounded participation/XP owner only admits a single 1v1 battle; the
+    // controlled doubles checkpoint carries no owner rather than a stale roster.
+    state.current_battle_participation = None;
     state.validate_with(content.as_ref())?;
     // This deliberately edited field is a controlled checkpoint, not the state
     // produced by the retained natural bootstrap material. Keep its real next
@@ -521,59 +523,6 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
     Ok(snapshot)
 }
 
-// Only the explicit mechanics fixture's observed roster is reconstructed. The
-// retained fresh source configuration is preserved and STILL rejects the edited
-// double format in source reward/achievement admission. No natural history or
-// completed payout is claimed for this controlled checkpoint.
-fn reseed_controlled_participation(
-    state: &mut GameStateV6,
-    content: &PreparedGameContentV2,
-) -> Result<()> {
-    use er_progression::content_v2::ExperienceSourceFormV2;
-    use er_state::current_battle_participation::CurrentBattleParticipationV1;
-    use er_state::current_experience_owner::{CurrentExperienceOwnerV1, CurrentExperienceSourceV1};
-    let previous = state
-        .current_battle_participation
-        .as_ref()
-        .and_then(|value| value.experience.as_ref())
-        .ok_or("actual fresh experience owner absent")?
-        .clone();
-    assert!(previous.pending.is_empty());
-    let run = active_run(state)?;
-    let mut observation = CurrentBattleParticipationV1::fresh(run, safe(1))?;
-    let battle = run.battle.as_ref().ok_or("controlled battle absent")?;
-    let mut sources = Vec::new();
-    for pokemon in &battle.enemy_party {
-        let metadata = content
-            .progression
-            .experience_for_compiled_form(pokemon.species_id, pokemon.form_index)?;
-        sources.push(CurrentExperienceSourceV1 {
-            pokemon: pokemon.id,
-            species: pokemon.species_id,
-            compiled_form: pokemon.form_index,
-            source_form: match metadata.source_form {
-                ExperienceSourceFormV2::Species => None,
-                ExperienceSourceFormV2::Form(index) => Some(index),
-            },
-            unadjusted_base_exp: metadata.base_exp,
-            source_sprite_key: metadata.source_sprite_key.clone(),
-        });
-    }
-    sources.sort_by_key(|source| source.pokemon);
-    let mut experience = CurrentExperienceOwnerV1::fresh(
-        &observation,
-        run,
-        state.content_identity.clone(),
-        previous.cap_policy,
-        previous.encounter,
-        sources,
-    )?;
-    experience.execution_origin = previous.execution_origin;
-    experience.source_progression = previous.source_progression;
-    observation.experience = Some(experience);
-    state.current_battle_participation = Some(observation);
-    Ok(())
-}
 fn assign_move(state: &mut GameStateV6, id: u64) -> Result<()> {
     let player = active_run_mut(state)?
         .party
@@ -740,9 +689,13 @@ impl MaterialJournal {
 }
 
 fn choose_first_move(kernel: &mut GameKernelV7) -> Result<GameKernelStepV7> {
+    choose_move(kernel, 0)
+}
+
+fn choose_move(kernel: &mut GameKernelV7, slot: usize) -> Result<GameKernelStepV7> {
     navigate(kernel, "battle/command/fight")?;
     press(kernel, PhysicalKey::Space)?;
-    navigate(kernel, "battle/move/0")?;
+    navigate(kernel, &format!("battle/move/{}", slot))?;
     press(kernel, PhysicalKey::Space)
 }
 fn project(state: &GameStateV6) -> GameStateV5 {
@@ -857,11 +810,13 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
             .count(),
         0
     );
+    // Slot 1 is the actual single-hit Tackle; slot 0's genuine multi-hit move
+    // has no source hit-count owner in the current owned path.
     let plan = CurrentTargetExecution::from_state(state)?.plan(
         active_run(state)?,
         actor,
         content.battle.move_definition(
-            active_run(state)?.party[0].moves[0]
+            active_run(state)?.party[0].moves[1]
                 .as_ref()
                 .ok_or("move absent")?
                 .move_id,
@@ -875,7 +830,7 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
         )])?)
         .is_err()
     );
-    let step = choose_first_move(&mut kernel)?;
+    let step = choose_move(&mut kernel, 1)?;
     let actual = material(&step)?;
     let mut journal = MaterialJournal {
         live: Some(state.clone()),
@@ -899,7 +854,7 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
             .iter()
             .find(|p| p.id == actor)
             .ok_or("actor absent")?
-            .moves[0]
+            .moves[1]
             .as_ref()
             .ok_or("move absent")?
             .pp_used,
@@ -994,6 +949,12 @@ fn source_spread_group_executes_all_opponents_and_multihit_exception() -> Result
     let content = content()?;
     let mut snapshot = two_enemies(content.clone())?;
     assign_move(active_mut(&mut snapshot)?, 57)?; // Genuine source Surf, ALL_NEAR_OTHERS.
+    // Both enemies lead with a priority-2 Quick Attack; the player must survive
+    // both hits or the retained turn parks at a faint interlude.
+    let run = active_run_mut(&mut snapshot)?;
+    run.party[0].hp = 200;
+    run.party[0].max_hp = 200;
+    run.party[0].stats.hp = 200;
     let prior = active(&snapshot)?.clone();
     let plan = CurrentTargetExecution::from_state(&prior)?.plan(
         active_run(&prior)?,
@@ -1006,8 +967,13 @@ fn source_spread_group_executes_all_opponents_and_multihit_exception() -> Result
         vec![slot(BattleSide::Enemy, 0), slot(BattleSide::Enemy, 1)]
     );
     let mut kernel = restore(snapshot.clone(), content.clone())?;
-    let step = choose_first_move(&mut kernel)?;
-    material(&step)?;
+    navigate(&mut kernel, "battle/command/fight")?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    let mut journal = MaterialJournal::before_command(&kernel.snapshot()?)?;
+    navigate(&mut kernel, "battle/move/0")?;
+    let step = press(&mut kernel, PhysicalKey::Space)?;
+    journal.accept(&kernel, content.as_ref(), &step)?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
     let after = active_run(kernel.state().ok_or("state absent")?)?
         .battle
         .as_ref()
@@ -1034,8 +1000,13 @@ fn source_spread_group_executes_all_opponents_and_multihit_exception() -> Result
         vec![slot(BattleSide::Enemy, 0), slot(BattleSide::Enemy, 1)]
     );
     let mut sound_kernel = restore(snapshot.clone(), content.clone())?;
-    let sound_step = choose_first_move(&mut sound_kernel)?;
-    material(&sound_step)?;
+    navigate(&mut sound_kernel, "battle/command/fight")?;
+    press(&mut sound_kernel, PhysicalKey::Space)?;
+    let mut sound_journal = MaterialJournal::before_command(&sound_kernel.snapshot()?)?;
+    navigate(&mut sound_kernel, "battle/move/0")?;
+    let sound_step = press(&mut sound_kernel, PhysicalKey::Space)?;
+    sound_journal.accept(&sound_kernel, content.as_ref(), &sound_step)?;
+    sound_journal.drain_non_fainting_turn(&mut sound_kernel, content.as_ref())?;
     assert!(
         active_run(sound_kernel.state().ok_or("state absent")?)?
             .battle
@@ -1306,13 +1277,28 @@ fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
     let GameMaterialV6::BattleTurn(transition) = &mut stripped else {
         return Err("actual turn material required".into());
     };
+    // The forged after-state must stay self-valid to reach the ownership guard:
+    // the turn, dispatch, tracker and experience owners all depend on the
+    // stripped target owner, so they leave with it.
     transition.after_state.current_targeting = None;
+    transition.after_state.current_turn_execution = None;
+    transition.after_state.current_defender_dispatch = None;
+    transition.after_state.current_achievement_tracker = None;
+    if let Some(participation) = transition.after_state.current_battle_participation.as_mut() {
+        participation.experience = None;
+    }
     transition.after_digest = game_state_digest(&transition.after_state)?;
     for mutation in &mut transition.mutations {
         mutation.after_digest = transition.after_digest.clone();
     }
     stripped.validate()?;
-    let mut live = Some(active(&before)?.clone());
+    // The live prior keeps its participation shell but drops the experience
+    // owner, so the successor check yields to the target-ownership guard.
+    let mut live_state = active(&before)?.clone();
+    if let Some(participation) = live_state.current_battle_participation.as_mut() {
+        participation.experience = None;
+    }
+    let mut live = Some(live_state);
     let mut ledger = before.material_ledger.clone();
     let unchanged = canonical_bytes(&(live.clone(), ledger.clone()))?;
     assert_eq!(
