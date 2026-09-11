@@ -840,12 +840,14 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
     let dump: Vec<_> = turn
         .actions
         .iter()
-        .map(|a| (
-            a.command.actor(),
-            a.effective_speed,
-            a.priority,
-            a.source_slot
-        ))
+        .map(|a| {
+            (
+                a.command.actor(),
+                a.effective_speed,
+                a.priority,
+                a.source_slot,
+            )
+        })
         .collect();
     assert_eq!(
         turn.actions[usize::from(turn.next_action)].command.actor(),
