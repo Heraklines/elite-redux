@@ -207,59 +207,6 @@ fn restore(
         content,
     )?)
 }
-// Only the explicit mechanics fixture's observed roster is reconstructed. The
-// retained fresh source configuration is preserved and STILL rejects the edited
-// double format in source reward/achievement admission. No natural history or
-// completed payout is claimed for this controlled checkpoint.
-fn reseed_controlled_participation(
-    state: &mut GameStateV6,
-    content: &PreparedGameContentV2,
-) -> Result<()> {
-    use er_progression::content_v2::ExperienceSourceFormV2;
-    use er_state::current_battle_participation::CurrentBattleParticipationV1;
-    use er_state::current_experience_owner::{CurrentExperienceOwnerV1, CurrentExperienceSourceV1};
-    let previous = state
-        .current_battle_participation
-        .as_ref()
-        .and_then(|value| value.experience.as_ref())
-        .ok_or("actual fresh experience owner absent")?
-        .clone();
-    assert!(previous.pending.is_empty());
-    let run = active_run(state)?;
-    let mut observation = CurrentBattleParticipationV1::fresh(run, safe(1))?;
-    let battle = run.battle.as_ref().ok_or("controlled battle absent")?;
-    let mut sources = Vec::new();
-    for pokemon in &battle.enemy_party {
-        let metadata = content
-            .progression
-            .experience_for_compiled_form(pokemon.species_id, pokemon.form_index)?;
-        sources.push(CurrentExperienceSourceV1 {
-            pokemon: pokemon.id,
-            species: pokemon.species_id,
-            compiled_form: pokemon.form_index,
-            source_form: match metadata.source_form {
-                ExperienceSourceFormV2::Species => None,
-                ExperienceSourceFormV2::Form(index) => Some(index),
-            },
-            unadjusted_base_exp: metadata.base_exp,
-            source_sprite_key: metadata.source_sprite_key.clone(),
-        });
-    }
-    sources.sort_by_key(|source| source.pokemon);
-    let mut experience = CurrentExperienceOwnerV1::fresh(
-        &observation,
-        run,
-        state.content_identity.clone(),
-        previous.cap_policy,
-        previous.encounter,
-        sources,
-    )?;
-    experience.execution_origin = previous.execution_origin;
-    experience.source_progression = previous.source_progression;
-    observation.experience = Some(experience);
-    state.current_battle_participation = Some(observation);
-    Ok(())
-}
 fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnapshotV7> {
     let mut snapshot = natural(content.clone(), 2, "m9e-defender-ability-27")?.snapshot()?;
     let state = active_mut(&mut snapshot)?;
@@ -289,7 +236,9 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
             FieldSlotState::new(slot(BattleSide::Enemy, 1), Some(other)),
         ],
     )?;
-    reseed_controlled_participation(state, content.as_ref())?;
+    // The bounded participation/XP owner only admits a single 1v1 battle; the
+    // controlled doubles checkpoint carries no owner rather than a stale roster.
+    state.current_battle_participation = None;
     state.validate_with(content.as_ref())?;
     // This deliberately edited field is a controlled checkpoint, not the state
     // produced by the retained natural bootstrap material. Keep its real next

@@ -85,7 +85,10 @@ the retained list to the battle's enemy faints.
 | `1d667ed` | `34539242864` | red | All targets compile; `proposal-clippy` fires on train-era code. |
 | `23f6599` → `48a58f2` | `34539535673`, `34540028866` | red | `collapsible_if` in `er-state`, `er-battle`, `er-kernel`, `er-game` collapsed; `clone_on_copy` in two kernel witnesses dropped. |
 | `ae96d97`, `6814965` | `34540403940`, `34540761967` | red | Same class sweep; clippy then went green. First test execution: both `m9e_current_defender_ability` witnesses fail at bootstrap. |
-| `6f11f88` | pending | pending | Reseeded three fresh-natural witnesses onto XP-resolvable wave-0 species. |
+| `6f11f88` | `34542859467` | red | First reseed cleared the XP-source gate; second gate surfaced: `GameRuntimeV6Error::Action` via `current_source_progression`/`source_ability` whitelist — only species 276 and 915 admit all required abilities. |
+| `341360f` | `34579067892` | red | Ledger doc itself is pinned in DELTAS; stale pin check fired. |
+| `9aaa2da` | `34579557081` | red | Remote formatter wanted single-line `natural` signatures. |
+| `7f26121` | `34580074905` | red | `actual_innate_absorb` green; poison-redirect witness hit `CurrentBattleParticipationError::Unsupported` — participation owner is 1v1-bounded, cannot exist on the (2,2) controlled checkpoint. Dropped to `None`. |
 
 ## Wave-0 XP-source coverage limitation (latent train gap, surfaced 2026-09-10)
 
@@ -137,3 +140,17 @@ Witness seeds now decouple the seed string from the starter index:
 `natural(content, index, seed)`. Eligible draws:
 `"m9e-defender-ability-27"` → 276, `"m9e-defender-ability-28"` → 915,
 `"m9e-target-execution-v2-7"` → 915, `"m9e-fresh-friendship-v6"` → 915.
+
+Third bootstrap gate, surfaced by run `34580074905` (`Error: Unsupported` =
+`CurrentBattleParticipationError::Unsupported`): `two_enemies`' controlled
+doubles checkpoint rebuilt its participation/XP owner via
+`CurrentBattleParticipationV1::fresh`, but `validate_at_boundary` structurally
+bounds that owner to `player_capacity == 1 && enemy_capacity == 1` — no doubles
+battle can ever carry it. The helper was replaced by dropping the owner entirely
+(`state.current_battle_participation = None`): participation is opt-in
+("absent in the qualified observation-only path"), and the fixture's subject is
+defender-ability dispatch, not XP. A secondary effect: with no participation
+owner, `observe_events`' revival/faint-capacity `Unsupported` edges cannot fire
+on this checkpoint. The dead `reseed_controlled_participation` helper was
+removed with its stale comment claiming the owner "STILL rejects" doubles at
+reward admission — the owner cannot exist there at all.
