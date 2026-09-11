@@ -832,29 +832,27 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
     ));
     journal.accept(&kernel, content.as_ref(), &step)?;
     journal.settle_actual_presentations(&mut kernel)?;
-    let owned = kernel.state().ok_or("owned state absent")?;
-    let turn = owned
-        .current_turn_execution
-        .as_ref()
-        .ok_or("actual turn absent")?;
-    let dump: Vec<_> = turn
-        .actions
-        .iter()
-        .map(|a| {
-            (
-                a.command.actor(),
-                a.effective_speed,
-                a.priority,
-                a.source_slot,
-            )
-        })
-        .collect();
-    assert_eq!(
-        turn.actions[usize::from(turn.next_action)].command.actor(),
-        active_run(owned)?.party[0].id,
-        "DBG next_action={} actions={dump:?}",
-        turn.next_action
-    );
+    let player_action_index = {
+        let owned = kernel.state().ok_or("owned state absent")?;
+        let turn = owned
+            .current_turn_execution
+            .as_ref()
+            .ok_or("actual turn absent")?;
+        assert_eq!(usize::from(turn.next_action), 0);
+        let player = active_run(owned)?.party[0].id;
+        // The priority-1 Withdraw actions resolve before the player's
+        // priority-0 move; the unsupported multi-hit is reached only at the
+        // player's own step.
+        turn.actions
+            .iter()
+            .position(|action| action.command.actor() == player)
+            .ok_or("actual player action absent")?
+    };
+    for _ in 0..player_action_index {
+        let step = kernel.advance_time(SafeU53::ZERO)?;
+        journal.accept(&kernel, content.as_ref(), &step)?;
+        journal.settle_actual_presentations(&mut kernel)?;
+    }
     let before = canonical_bytes(&kernel.snapshot()?)?;
     assert!(
         kernel.advance_time(SafeU53::ZERO).is_err(),
