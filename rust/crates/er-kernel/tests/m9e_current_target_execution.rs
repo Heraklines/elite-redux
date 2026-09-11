@@ -367,10 +367,14 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
     }
     Err("actual raw option unreachable".into())
 }
-fn natural(content: Arc<PreparedGameContentV2>, index: usize) -> Result<GameKernelV7> {
+fn natural(
+    content: Arc<PreparedGameContentV2>,
+    index: usize,
+    seed: &str,
+) -> Result<GameKernelV7> {
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile: profile()?,
-        seed: format!("m9e-target-execution-v2-{index}"),
+        seed: seed.to_owned(),
         local_seat: seat(),
         save_slots: vec!["target-source-slot".to_owned()],
         content: content.clone(),
@@ -482,7 +486,7 @@ fn restore(
     )?)
 }
 fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnapshotV7> {
-    let mut snapshot = natural(content.clone(), 2)?.snapshot()?;
+    let mut snapshot = natural(content.clone(), 2, "m9e-target-execution-v2-7")?.snapshot()?;
     let state = active_mut(&mut snapshot)?;
     let next = state.identities.next_pokemon_id;
     state.identities.next_pokemon_id = safe(next.get().checked_add(1).ok_or("allocator overflow")?);
@@ -844,7 +848,7 @@ fn commands(
 #[test]
 fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result<()> {
     let content = content()?;
-    let mut kernel = natural(content.clone(), 2)?;
+    let mut kernel = natural(content.clone(), 2, "m9e-target-execution-v2-7")?;
     let before = kernel.snapshot()?;
     let state = active(&before)?;
     let actor = active_run(state)?.party[0].id;
@@ -1298,7 +1302,7 @@ fn queued_faint_retargets_opponents_but_preserves_same_side_cancellation() -> Re
 #[test]
 fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
     let content = content()?;
-    let mut kernel = natural(content.clone(), 2)?;
+    let mut kernel = natural(content.clone(), 2, "m9e-target-execution-v2-7")?;
     let before = kernel.snapshot()?;
     let step = choose_first_move(&mut kernel)?;
     let actual = material(&step)?;
@@ -1354,7 +1358,7 @@ fn current_stat_calculation_matches_six_actual_source_observations() -> Result<(
     use er_types::battle_model::BattleStats;
     use er_types::run_ids::NatureId;
     let content = content()?;
-    let kernel = natural(content.clone(), 0)?;
+    let kernel = natural(content.clone(), 0, "m9e-target-execution-v2-7")?;
     let mut pokemon = kernel
         .state()
         .ok_or("active state absent")?

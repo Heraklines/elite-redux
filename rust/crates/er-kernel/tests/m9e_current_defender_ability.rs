@@ -92,10 +92,14 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
     }
     Err("actual raw option unreachable".into())
 }
-fn natural(content: Arc<PreparedGameContentV2>, index: usize) -> Result<GameKernelV7> {
+fn natural(
+    content: Arc<PreparedGameContentV2>,
+    index: usize,
+    seed: &str,
+) -> Result<GameKernelV7> {
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile: profile()?,
-        seed: format!("m9e-defender-ability-{index}"),
+        seed: seed.to_owned(),
         local_seat: seat(),
         save_slots: vec!["target-source-slot".to_owned()],
         content: content.clone(),
@@ -261,7 +265,7 @@ fn reseed_controlled_participation(
     Ok(())
 }
 fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnapshotV7> {
-    let mut snapshot = natural(content.clone(), 2)?.snapshot()?;
+    let mut snapshot = natural(content.clone(), 2, "m9e-defender-ability-27")?.snapshot()?;
     let state = active_mut(&mut snapshot)?;
     let next = state.identities.next_pokemon_id;
     state.identities.next_pokemon_id = safe(next.get().checked_add(1).ok_or("allocator overflow")?);
@@ -905,7 +909,7 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
 fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Result<()> {
     let content = content()?;
     assert_controlled_withdraw(content.as_ref())?;
-    let mut snapshot = natural(content.clone(), 0)?.snapshot()?;
+    let mut snapshot = natural(content.clone(), 0, "m9e-defender-ability-28")?.snapshot()?;
     let state = active_mut(&mut snapshot)?;
     let species = active_run(state)?.party[0].species_id;
     {
