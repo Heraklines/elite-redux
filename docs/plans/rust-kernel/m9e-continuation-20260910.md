@@ -76,4 +76,64 @@ the retained list to the battle's enemy faints.
 | Candidate | Run | Result | Scope |
 |---|---|---|---|
 | `a8239e7` | `34537007544` | expected red | Stale `snapshot_v7` `after` pin survived into the push; superseded immediately. |
-| `557598b` | pending | pending | First run of the wired interlude drain: pin check, oracle, rustfmt, `clippy --tests -D warnings`, focused targets. |
+| `557598b` | `34537242979` | red | Pins green; remote rustfmt pages outstanding. |
+| `d1c287c` | `34537570526` | red | Formatter pages applied; compile reached; seven ordinary Rust errors in the new owned-phase code. |
+| `dd9bdeb` | `34537910951` | red | Compile errors repaired; one residual rustfmt page in `m9e_runtime_v6`. |
+| `690ac9a` | `34538090497` | red | `er-repro` test stale: `reference_event` missing the train-added `CurrentUtcClockResult` arm. |
+| `4cc683f` | `34538682781` | red | `m9e_current_defender_ability` fixture missing its `Ok(())` tail. |
+| `592ab81` | `34538960006` | red | Pin bookkeeping only: `before` pin added for a train-added file absent at BASE. |
+| `1d667ed` | `34539242864` | red | All targets compile; `proposal-clippy` fires on train-era code. |
+| `23f6599` → `48a58f2` | `34539535673`, `34540028866` | red | `collapsible_if` in `er-state`, `er-battle`, `er-kernel`, `er-game` collapsed; `clone_on_copy` in two kernel witnesses dropped. |
+| `ae96d97`, `6814965` | `34540403940`, `34540761967` | red | Same class sweep; clippy then went green. First test execution: both `m9e_current_defender_ability` witnesses fail at bootstrap. |
+| `6f11f88` | pending | pending | Reseeded three fresh-natural witnesses onto XP-resolvable wave-0 species. |
+
+## Wave-0 XP-source coverage limitation (latent train gap, surfaced 2026-09-10)
+
+`construct_natural_run_v6_with_pending_experience` builds a
+`CurrentExperienceSourceV1` per wave-0 enemy via
+`experience_for_compiled_form(species, pokemon.form_index)`. Wild enemies are
+always generated at `form_index = 0`, and the progression pack stores the
+species-level XP row at compiled index 0 for species *with* source forms —
+`experience_for_compiled_form` deliberately refuses that row
+(`ExperienceUnsupported`; "a species row with source forms is ambiguous and
+cannot stand for forms[0]"). `CurrentExperienceOwnerV1::validate` additionally
+pins `source.compiled_form == pokemon.form_index` and
+`source_form == compiled_form - 1`, so a form-0 pokemon of a multi-source-form
+species can never be a valid XP source. Consequence: any natural bootstrap whose
+seed draws a wave-0 enemy of such a species fails closed at bootstrap.
+
+The tier-0 (time-of-day-agnostic) pool at the CLASSIC starting biome contains 12
+species; 19/21/263 are multi-source-form (roughly a quarter of ordinary wave-0
+outcomes, before tier fallbacks). This is a real content-coverage gap in the
+train's XP model — genuine XP payout parity for those species remains open
+(row-B work), and the model was NOT relaxed to hide it. The witnesses instead
+use seed values whose deterministic wave-0 draw lands on a supported species.
+
+Seed→species prediction: `er-rng`'s `PhaserRdg` was ported to a Python harness
+(exact f64/JS semantics: `sow`, `hash_units`, `rnd`, `frac`,
+`integer_in_range`, `pick_index`). The only run-stream draws before the wave-0
+species pick are 6 IV draws + 1 nature pick per party starter
+(`RngRuntime::from_run_seed` is constructed fresh inside `construct_natural_run_v6`),
+then the 512-wide tier roll and the candidate pick. Verified against the two
+observed failures (`…-source-0` and `…-source-2` both predicted species 21, a
+multi-source-form species, and both failed).
+
+Second bootstrap gate, surfaced by run `34542859467` (`GameRuntimeV6Error::Action`
+wrapped as `NaturalRunV6Error::State`): `initialize_source_stats` calls
+`current_source_progression`, which re-admits every pokemon's ability sources
+through `CurrentTargetExecution::validate_run` + `ability_sources`. Both calls
+run `source_ability` on the pokemon's **active** ability and **every** innate
+`passives[]` entry — `source_ability` admits only the bounded observed set
+{0,18,41,43,47,49,51,62,65,66,67,75,82,94,113,172,192,257,268,5006,5033,5082,5097,5115}.
+Combined with the XP-source gate and the party `passive_attr` restriction
+(starter species must be 1|4|7 = catalog indices 0/1/2, and
+`pokemon.max_hp == pokemon.stats.hp`), the only wave-0 encounter species in the
+CLASSIC starting biome that satisfy all three gates are **276 (Taillow)** and
+**915 (Lechonk)** — i.e. natural bootstrap is currently proven for exactly two
+of the 60+ pool species. This is the real bounded-qualification envelope of the
+current train, not a test artifact; broadening it is row-B work.
+
+Witness seeds now decouple the seed string from the starter index:
+`natural(content, index, seed)`. Eligible draws:
+`"m9e-defender-ability-27"` → 276, `"m9e-defender-ability-28"` → 915,
+`"m9e-target-execution-v2-7"` → 915, `"m9e-fresh-friendship-v6"` → 915.
