@@ -92,11 +92,7 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
     }
     Err("actual raw option unreachable".into())
 }
-fn natural(
-    content: Arc<PreparedGameContentV2>,
-    index: usize,
-    seed: &str,
-) -> Result<GameKernelV7> {
+fn natural(content: Arc<PreparedGameContentV2>, index: usize, seed: &str) -> Result<GameKernelV7> {
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile: profile()?,
         seed: seed.to_owned(),
