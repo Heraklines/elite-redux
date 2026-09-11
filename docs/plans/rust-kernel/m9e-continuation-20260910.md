@@ -89,6 +89,8 @@ the retained list to the battle's enemy faints.
 | `341360f` | `34579067892` | red | Ledger doc itself is pinned in DELTAS; stale pin check fired. |
 | `9aaa2da` | `34579557081` | red | Remote formatter wanted single-line `natural` signatures. |
 | `7f26121` | `34580074905` | red | `actual_innate_absorb` green; poison-redirect witness hit `CurrentBattleParticipationError::Unsupported` — participation owner is 1v1-bounded, cannot exist on the (2,2) controlled checkpoint. Dropped to `None`. |
+| `3afed27` | `34586258120` | red | `actual_innate_absorb` green; poison-redirect witness reached the turn-order assertion — priority-1 enemy Withdraw steps legitimately act before the player's priority-0 move. |
+| `06f1539` | `34587095343` | red | Both `m9e_current_defender_ability` witnesses green; suite advanced to `m9e_current_starter_pokerus`: `picks_retain_their_source_day_through_reentry_and_natural_construction` failed at `construct_natural_run_v6` — seed `daily-owned-natural` draws wave-0 enemy 504 (Lillipup), whose abilities (active 50, passives 148/51/107) are outside the `source_ability` whitelist. Reseeded to `m9e-starter-pokerus-8` → enemy 915 under this file's two-starter draw sequence. |
 
 ## Wave-0 XP-source coverage limitation (latent train gap, surfaced 2026-09-10)
 
@@ -139,7 +141,8 @@ current train, not a test artifact; broadening it is row-B work.
 Witness seeds now decouple the seed string from the starter index:
 `natural(content, index, seed)`. Eligible draws:
 `"m9e-defender-ability-27"` → 276, `"m9e-defender-ability-28"` → 915,
-`"m9e-target-execution-v2-7"` → 915, `"m9e-fresh-friendship-v6"` → 915.
+`"m9e-target-execution-v2-7"` → 915, `"m9e-fresh-friendship-v6"` → 915,
+`"m9e-starter-pokerus-8"` → 915 (two-starter draw sequence).
 
 Third bootstrap gate, surfaced by run `34580074905` (`Error: Unsupported` =
 `CurrentBattleParticipationError::Unsupported`): `two_enemies`' controlled

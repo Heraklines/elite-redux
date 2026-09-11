@@ -102,7 +102,7 @@ fn bootstrap(content: &PreparedGameContentV2, current: bool) -> Result<RunBootst
         developer_mode: false,
     };
     let mut bootstrap =
-        RunBootstrapMachineV1::new(profile, "daily-owned-natural".to_owned(), owner, catalog)?;
+        RunBootstrapMachineV1::new(profile, "m9e-starter-pokerus-8".to_owned(), owner, catalog)?;
     if current {
         bootstrap.current_friendship_profile = Some(
             er_game::current_friendship_profile::fresh_profile(content, owner)?,
