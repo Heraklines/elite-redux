@@ -251,11 +251,13 @@ impl GameStateV6 {
         }
         if let Some(turn) = &self.current_turn_execution {
             let run = self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?;
+            // Participation is an opt-in sidecar; when one is present its
+            // experience owner must still carry the fresh source origin.
             if self.current_targeting.is_none() || self.current_presentation.is_none()
                 || self.current_battle_participation.as_ref()
-                    .and_then(|owner| owner.experience.as_ref())
-                    .is_none_or(|owner| owner.execution_origin
-                        != Some(crate::current_experience_owner::CurrentExperienceExecutionOriginV1::FreshNormalClassic))
+                    .is_some_and(|participation| participation.experience.as_ref()
+                        .is_none_or(|owner| owner.execution_origin
+                            != Some(crate::current_experience_owner::CurrentExperienceExecutionOriginV1::FreshNormalClassic)))
             {
                 return Err(GameStateV6Error::Invalid);
             }
