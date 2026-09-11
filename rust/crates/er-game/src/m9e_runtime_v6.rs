@@ -899,11 +899,17 @@ fn execute_battle(
     else {
         return Err(GameRuntimeV6Error::Invalid);
     };
+    // The retained owned turn pipeline is format-agnostic. Participation/XP is
+    // an optional observation sidecar bounded to single battles, so an
+    // owned-capable state that does not carry one still takes the owned path.
     if before
         .current_battle_participation
         .as_ref()
         .and_then(|value| value.experience.as_ref())
         .is_some_and(|owner| owner.execution_origin.is_some())
+        || (before.current_battle_participation.is_none()
+            && before.current_presentation.is_some()
+            && before.current_targeting.is_some())
     {
         return current_phase_runtime::begin_owned_turn(before, content, commands, authority);
     }

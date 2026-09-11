@@ -484,16 +484,21 @@ fn turn_step_transition(
         .active_run
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
-    let participation = before
-        .current_battle_participation
-        .as_ref()
-        .ok_or(GameRuntimeV6Error::Action)?
-        .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
-        .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
+    // Participation is an opt-in observation sidecar (absent in the qualified
+    // observation-only path); a participation-less state steps without
+    // recording causal evidence.
+    let participation = match before.current_battle_participation.as_ref() {
+        Some(participation) => Some(
+            participation
+                .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+        ),
+        None => None,
+    };
     let mut candidate = adopt_v5_with_turn(
         before,
         chunk.transition.after_state,
-        Some(participation),
+        participation,
         Some(chunk.continuation),
     )?;
     install_waiting(&mut candidate, revision)?;

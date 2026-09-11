@@ -146,11 +146,21 @@ Third bootstrap gate, surfaced by run `34580074905` (`Error: Unsupported` =
 doubles checkpoint rebuilt its participation/XP owner via
 `CurrentBattleParticipationV1::fresh`, but `validate_at_boundary` structurally
 bounds that owner to `player_capacity == 1 && enemy_capacity == 1` — no doubles
-battle can ever carry it. The helper was replaced by dropping the owner entirely
+battle can ever carry it. The owner is now dropped
 (`state.current_battle_participation = None`): participation is opt-in
 ("absent in the qualified observation-only path"), and the fixture's subject is
-defender-ability dispatch, not XP. A secondary effect: with no participation
-owner, `observe_events`' revival/faint-capacity `Unsupported` edges cannot fire
-on this checkpoint. The dead `reseed_controlled_participation` helper was
-removed with its stale comment claiming the owner "STILL rejects" doubles at
-reward admission — the owner cannot exist there at all.
+defender-ability dispatch, not XP. The dead `reseed_controlled_participation`
+helper was removed.
+
+That exposed the owned-path coupling fixed in this push: the battle-turn
+dispatch routed to `begin_owned_turn` only when
+`experience.execution_origin.is_some()`, and `turn_step_transition`
+hard-required a participation owner for `observe_current_chunk`. Both were
+relaxed — the owned turn machinery (presentation + targeting owners) is
+format-agnostic and now admits participation-less states, while causal
+evidence recording stays conditional on the owner's presence. Production
+natural constructs always install all three owners together, so this changes
+no production path; it only lets controlled owned-capable fixtures (the (2,2)
+redirect/spread witnesses) run through the owned pipeline instead of silently
+falling back to the one-shot resolver that never populates
+`current_defender_dispatch`.
