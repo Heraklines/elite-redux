@@ -1,0 +1,354 @@
+{
+  "invariant": "no-park",
+  "seed": 20260911,
+  "wave": 5,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 4 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260911",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 4,
+    "guestInteractionCounter": 4,
+    "hostWave": 5,
+    "hostBattleType": 1,
+    "hostPlayerField": [
+      {
+        "id": 267981887,
+        "battlerIndex": 0,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 205,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 3688735373,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 224,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1726960832,
+        "battlerIndex": 2,
+        "speciesId": 399,
+        "speciesName": "Bidoof",
+        "hp": 0,
+        "maxHp": 20,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 70,
+            "ppUsed": 0
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 2213492136,
+        "battlerIndex": 3,
+        "speciesId": 19,
+        "speciesName": "Rattata",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 424,
+            "ppUsed": 0
+          },
+          {
+            "id": 184,
+            "ppUsed": 0
+          },
+          {
+            "id": 422,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 267981887,
+        "battlerIndex": -1,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 205,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 3688735373,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 224,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1726960832,
+        "battlerIndex": -1,
+        "speciesId": 399,
+        "speciesName": "Bidoof",
+        "hp": 0,
+        "maxHp": 20,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 70,
+            "ppUsed": 0
+          },
+          {
+            "id": 300,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 2213492136,
+        "battlerIndex": -1,
+        "speciesId": 19,
+        "speciesName": "Rattata",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 98,
+            "ppUsed": 0
+          },
+          {
+            "id": 424,
+            "ppUsed": 0
+          },
+          {
+            "id": 184,
+            "ppUsed": 0
+          },
+          {
+            "id": 422,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260911 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=85 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[143:303/303]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2 turn 1: host SWITCH -> party[2]",
+    "wave 2: host slot move=53 guest slot move=53",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[276:16/16,19:13/13] playerHp=[149:206/213,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=53 guest slot move=85",
+    "wave 3 turn 1: progress enemyHp=[265:0/16,661:0/16] playerHp=[149:206/213,248:225/225]",
+    "wave 3: reward shop owner=host leave",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4 turn 1: host SWITCH -> party[2]",
+    "wave 4: host slot move=53 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[273:18/18,48:0/20] playerHp=[143:303/303,248:225/225]",
+    "wave 4 turn 2: replay guest crossed cmd:4:2 through real public COMMAND=opened",
+    "wave 4 turn 2: host SWITCH -> party[2]",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=85 guest slot move=85",
+    "wave 5 turn 1: progress enemyHp=[399:0/20,19:0/17] playerHp=[149:205/213,248:224/225]"
+  ]
+}
