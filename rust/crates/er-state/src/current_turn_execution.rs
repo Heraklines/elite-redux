@@ -163,22 +163,38 @@ impl CurrentTurnExecutionV1 {
                         faint.source_move.as_ref().is_none_or(|source| {
                             source.pokemon.get() != SafeU53::ZERO
                                 && source.move_id.get() != SafeU53::ZERO
-                                && run.party.iter().chain(battle.enemy_party.iter())
-                                    .any(|pokemon| {
-                                        if pokemon.id != source.pokemon { return false; }
-                                        let BattleCommand::Fight { move_slot, .. } = self.actions[usize::from(self.next_action - 1)].command else { return false; };
+                                && run.party.iter().chain(battle.enemy_party.iter()).any(
+                                    |pokemon| {
+                                        if pokemon.id != source.pokemon {
+                                            return false;
+                                        }
+                                        let BattleCommand::Fight { move_slot, .. } =
+                                            self.actions[usize::from(self.next_action - 1)].command
+                                        else {
+                                            return false;
+                                        };
                                         match &source.struggle_pp_before {
-                                            Some(slots) => source.move_id.get().get() == 165 && &pokemon.moves == slots
-                                                && slots[usize::from(move_slot.get())].is_some(),
-                                            None => pokemon.moves[usize::from(move_slot.get())].as_ref()
+                                            Some(slots) => {
+                                                source.move_id.get().get() == 165
+                                                    && &pokemon.moves == slots
+                                                    && slots[usize::from(move_slot.get())].is_some()
+                                            }
+                                            None => pokemon.moves[usize::from(move_slot.get())]
+                                                .as_ref()
                                                 .is_some_and(|slot| slot.move_id == source.move_id),
                                         }
-                                    })
+                                    },
+                                )
                                 && !self.finalization_done
-                                && self.actions[usize::from(self.next_action - 1)].command.actor() == source.pokemon
-                                && matches!(self.actions[usize::from(self.next_action - 1)].command, BattleCommand::Fight { .. })
-                        })
-                            && battle.field.slots.iter().any(|row| row.slot == faint.slot)
+                                && self.actions[usize::from(self.next_action - 1)]
+                                    .command
+                                    .actor()
+                                    == source.pokemon
+                                && matches!(
+                                    self.actions[usize::from(self.next_action - 1)].command,
+                                    BattleCommand::Fight { .. }
+                                )
+                        }) && battle.field.slots.iter().any(|row| row.slot == faint.slot)
                             && match faint.slot.side {
                                 er_types::battle_ids::BattleSide::Player => {
                                     run.party.iter().any(|pokemon| pokemon.id == faint.pokemon)

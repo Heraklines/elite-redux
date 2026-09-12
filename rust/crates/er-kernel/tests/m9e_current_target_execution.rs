@@ -1488,7 +1488,10 @@ fn last_pp_knockout_retains_resolved_move_across_interlude_restore() -> Result<(
     let state = active_mut(&mut snapshot)?;
     assign_move(state, 33)?;
     let run = active_run_mut(state)?;
-    run.party[0].moves[0].as_mut().ok_or("move absent")?.max_pp_override = Some(1);
+    run.party[0].moves[0]
+        .as_mut()
+        .ok_or("move absent")?
+        .max_pp_override = Some(1);
     run.party[0].hp = 1;
     run.party[0].stats.speed = 500;
     run.party[0].stats.attack = 500;
@@ -1536,7 +1539,10 @@ fn last_pp_knockout_retains_resolved_move_across_interlude_restore() -> Result<(
         return Err("missing actual faint interlude".into());
     };
     assert_eq!(faints.len(), 1);
-    let source_move = faints[0].source_move.as_ref().ok_or("missing resolved KO move")?;
+    let source_move = faints[0]
+        .source_move
+        .as_ref()
+        .ok_or("missing resolved KO move")?;
     assert_eq!(source_move.pokemon, actor);
     assert_eq!(source_move.move_id, MoveId::new(safe(33)));
     assert!(source_move.struggle_pp_before.is_none());
@@ -1549,7 +1555,10 @@ fn last_pp_knockout_retains_resolved_move_across_interlude_restore() -> Result<(
         .active_run
         .as_ref()
         .ok_or("run absent")?;
-    assert_eq!(run.party[0].moves[0].as_ref().ok_or("move absent")?.pp_used, 1);
+    assert_eq!(
+        run.party[0].moves[0].as_ref().ok_or("move absent")?.pp_used,
+        1
+    );
     assert_eq!(run.party[0].id, actor);
     assert_eq!(run.party[0].hp, 1);
     assert_eq!(
@@ -1575,7 +1584,11 @@ fn last_pp_knockout_retains_resolved_move_across_interlude_restore() -> Result<(
     assert!(invalid.validate(run).is_err());
     let mut substituted = restored.clone();
     if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut substituted.stage {
-        faints[0].source_move.as_mut().ok_or("source missing")?.move_id = MoveId::new(safe(10));
+        faints[0]
+            .source_move
+            .as_mut()
+            .ok_or("source missing")?
+            .move_id = MoveId::new(safe(10));
     }
     assert!(substituted.validate(run).is_err());
     let frozen = canonical_bytes(&chunk.transition.after_state)?;
@@ -1615,7 +1628,10 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
     let state = active_mut(&mut snapshot)?;
     assign_move(state, 33)?;
     let run = active_run_mut(state)?;
-    run.party[0].moves[0].as_mut().ok_or("move absent")?.max_pp_override = Some(1);
+    run.party[0].moves[0]
+        .as_mut()
+        .ok_or("move absent")?
+        .max_pp_override = Some(1);
     run.party[0].moves[0].as_mut().ok_or("move absent")?.pp_used = 1;
     run.party[0].moves[1..].fill(None);
     run.party[0].hp = run.party[0].max_hp;
@@ -1665,7 +1681,10 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         return Err("missing actual faint interlude".into());
     };
     assert_eq!(faints.len(), 1);
-    let source_move = faints[0].source_move.as_ref().ok_or("missing resolved KO move")?;
+    let source_move = faints[0]
+        .source_move
+        .as_ref()
+        .ok_or("missing resolved KO move")?;
     assert_eq!(source_move.pokemon, actor);
     assert_eq!(source_move.move_id, MoveId::new(safe(165)));
     assert!(source_move.struggle_pp_before.is_some());
@@ -1678,7 +1697,10 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         .active_run
         .as_ref()
         .ok_or("run absent")?;
-    assert_eq!(run.party[0].moves[0].as_ref().ok_or("move absent")?.pp_used, 1);
+    assert_eq!(
+        run.party[0].moves[0].as_ref().ok_or("move absent")?.pp_used,
+        1
+    );
     assert_eq!(run.party[0].id, actor);
     assert!(run.party[0].hp > 0 && run.party[0].hp < run.party[0].max_hp);
     assert_eq!(
@@ -1704,18 +1726,32 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
     assert!(invalid.validate(run).is_err());
     let mut substituted = restored.clone();
     if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut substituted.stage {
-        faints[0].source_move.as_mut().ok_or("source missing")?.move_id = MoveId::new(safe(10));
+        faints[0]
+            .source_move
+            .as_mut()
+            .ok_or("source missing")?
+            .move_id = MoveId::new(safe(10));
     }
     assert!(substituted.validate(run).is_err());
     let mut altered_pp = restored.clone();
     if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut altered_pp.stage {
-        let slots = faints[0].source_move.as_mut().ok_or("source missing")?.struggle_pp_before.as_mut().ok_or("preimage missing")?;
+        let slots = faints[0]
+            .source_move
+            .as_mut()
+            .ok_or("source missing")?
+            .struggle_pp_before
+            .as_mut()
+            .ok_or("preimage missing")?;
         slots[0].as_mut().ok_or("slot missing")?.pp_used = 0;
     }
     assert!(altered_pp.validate(run).is_err());
     let mut stripped_fallback = restored.clone();
     if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut stripped_fallback.stage {
-        faints[0].source_move.as_mut().ok_or("source missing")?.struggle_pp_before = None;
+        faints[0]
+            .source_move
+            .as_mut()
+            .ok_or("source missing")?
+            .struggle_pp_before = None;
     }
     assert!(stripped_fallback.validate(run).is_err());
     let frozen = canonical_bytes(&chunk.transition.after_state)?;

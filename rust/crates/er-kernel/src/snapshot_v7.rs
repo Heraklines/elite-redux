@@ -90,7 +90,11 @@ pub struct PendingVictoryAckV1 {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CurrentPhasePresentationKindV1 { Victory, FaintAnimation, FaintMessage }
+pub enum CurrentPhasePresentationKindV1 {
+    Victory,
+    FaintAnimation,
+    FaintMessage,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -148,19 +152,34 @@ impl CoreGameKernelSnapshotV7 {
             if self.private_battle_control.is_some() || self.protocol.is_some() {
                 return Err(SnapshotV7Error::Invalid);
             }
-            let seat = state.active_run.as_ref().and_then(|run| run.control.owner_seat)
+            let seat = state
+                .active_run
+                .as_ref()
+                .and_then(|run| run.control.owner_seat)
                 .ok_or(SnapshotV7Error::Invalid)?;
             crate::game_kernel_v7::current_learning_control_v7::validate_private_learning_control(
-                state, self.private_learning_control.as_ref(), seat,
-            ).map_err(|_| SnapshotV7Error::Invalid)?;
+                state,
+                self.private_learning_control.as_ref(),
+                seat,
+            )
+            .map_err(|_| SnapshotV7Error::Invalid)?;
         }
         if let GameKernelLifecycleSnapshotV7::Active(state) = &self.lifecycle {
-            for ack in crate::game_kernel_v7::current_phase_receipt_v7::expected_presentations(state) {
-                let waiting = self.pending_presentations.iter().any(|effect| effect.event_id == ack.event_id);
+            for ack in
+                crate::game_kernel_v7::current_phase_receipt_v7::expected_presentations(state)
+            {
+                let waiting = self
+                    .pending_presentations
+                    .iter()
+                    .any(|effect| effect.event_id == ack.event_id);
                 let acknowledged = self.pending_current_phase_ack == Some(ack);
                 if waiting == acknowledged
-                    || !crate::game_kernel_v7::current_phase_receipt_v7::receipt_matches(state, content, ack)
-                { return Err(SnapshotV7Error::Invalid); }
+                    || !crate::game_kernel_v7::current_phase_receipt_v7::receipt_matches(
+                        state, content, ack,
+                    )
+                {
+                    return Err(SnapshotV7Error::Invalid);
+                }
             }
         }
         if let Some(ack) = self.pending_current_phase_ack {
@@ -168,9 +187,16 @@ impl CoreGameKernelSnapshotV7 {
                 return Err(SnapshotV7Error::Invalid);
             };
             if self.protocol.is_some()
-                || self.pending_presentations.iter().any(|pending| pending.event_id == ack.event_id)
-                || !crate::game_kernel_v7::current_phase_receipt_v7::receipt_matches(state, content, ack)
-            { return Err(SnapshotV7Error::Invalid); }
+                || self
+                    .pending_presentations
+                    .iter()
+                    .any(|pending| pending.event_id == ack.event_id)
+                || !crate::game_kernel_v7::current_phase_receipt_v7::receipt_matches(
+                    state, content, ack,
+                )
+            {
+                return Err(SnapshotV7Error::Invalid);
+            }
         }
         if self.schema_version != CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7
             || self.next_menu_instance_id == MenuInstanceId::ZERO

@@ -367,16 +367,25 @@ impl GameStateV6 {
         }) {
             return Err(GameStateV6Error::Content);
         }
-        if self.current_battle_participation.as_ref()
+        if self
+            .current_battle_participation
+            .as_ref()
             .and_then(|owner| owner.experience.as_ref())
             .is_some_and(|owner| owner.source_progression.is_some())
             && !content.current_faint_progress_matches(self)
         {
             return Err(GameStateV6Error::Content);
         }
-        if self.current_battle_participation.as_ref()
+        if self
+            .current_battle_participation
+            .as_ref()
             .and_then(|owner| owner.experience.as_ref())
-            .is_some_and(|owner| owner.pending.iter().any(|pending| pending.victory.is_some()))
+            .is_some_and(|owner| {
+                owner
+                    .pending
+                    .iter()
+                    .any(|pending| pending.victory.is_some())
+            })
             && !content.current_experience_progress_matches(self)
         {
             return Err(GameStateV6Error::Content);

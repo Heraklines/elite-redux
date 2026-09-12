@@ -1,11 +1,11 @@
 //! GameKernelV7: sole production owner for the direct M9-E runtime path.
 
-#[path = "current_phase_v7.rs"]
-pub(crate) mod current_phase_v7;
 #[path = "current_learning_control_v7.rs"]
 pub(crate) mod current_learning_control_v7;
 #[path = "current_phase_receipt_v7.rs"]
 pub(crate) mod current_phase_receipt_v7;
+#[path = "current_phase_v7.rs"]
+pub(crate) mod current_phase_v7;
 
 #[path = "current_coop_rebind_v7.rs"]
 pub mod current_coop_rebind_v7;
@@ -1589,19 +1589,29 @@ impl GameKernelV7 {
         }
         // Preflight the sole remaining fallible step before retiring ownership.
         let phase_ack = match &self.lifecycle {
-            GameKernelLifecycleV7::Active(runtime) => runtime.state()
+            GameKernelLifecycleV7::Active(runtime) => runtime
+                .state()
                 .and_then(|state| current_phase_receipt_v7::expected_presentation(state, event_id)),
             _ => None,
         };
-        if phase_ack.is_some() && (self.pending_current_phase_ack.is_some()
-            || self.role != GameKernelRoleV7::Authority || self.protocol.is_some())
-        { return Err(GameKernelV7Error::Invalid); }
-        if phase_ack.is_some_and(|ack| ack.kind == crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation)
-            && !completed
-        { return Err(GameKernelV7Error::Invalid); }
+        if phase_ack.is_some()
+            && (self.pending_current_phase_ack.is_some()
+                || self.role != GameKernelRoleV7::Authority
+                || self.protocol.is_some())
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
+        if phase_ack.is_some_and(|ack| {
+            ack.kind == crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation
+        }) && !completed
+        {
+            return Err(GameKernelV7Error::Invalid);
+        }
         let next_replay_sequence = increment_safe(self.replay_sequence)?;
         self.pending_presentations.remove(&event_id);
-        if let Some(ack) = phase_ack { self.pending_current_phase_ack = Some(ack); }
+        if let Some(ack) = phase_ack {
+            self.pending_current_phase_ack = Some(ack);
+        }
         self.replay_sequence = next_replay_sequence;
         Ok(())
     }
@@ -1727,7 +1737,7 @@ impl GameKernelV7 {
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.next_menu_instance_id = next_menu_instance_id;
                 self.private_battle_control = None;
-        self.private_learning_control = None;
+                self.private_learning_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot.clone(), save.generation);
                 self.synchronize_menu_allocator()?;
@@ -1892,7 +1902,7 @@ impl GameKernelV7 {
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.next_menu_instance_id = next_menu;
                 self.private_battle_control = None;
-        self.private_learning_control = None;
+                self.private_learning_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot, save.generation);
             }
@@ -2148,14 +2158,20 @@ impl GameKernelV7 {
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
         if self.private_learning_control.is_some()
-            || self.state().is_some_and(|state| current_learning_control_v7::current_batch(state).is_some())
+            || self
+                .state()
+                .is_some_and(|state| current_learning_control_v7::current_batch(state).is_some())
         {
-            if self.role != GameKernelRoleV7::Authority || self.protocol.is_some()
+            if self.role != GameKernelRoleV7::Authority
+                || self.protocol.is_some()
                 || self.private_battle_control.is_some()
-            { return Err(GameKernelV7Error::Invalid); }
+            {
+                return Err(GameKernelV7Error::Invalid);
+            }
             current_learning_control_v7::validate_private_learning_control(
                 self.state().ok_or(GameKernelV7Error::Invalid)?,
-                self.private_learning_control.as_ref(), self.local_seat,
+                self.private_learning_control.as_ref(),
+                self.local_seat,
             )?;
         }
         let profile = match &self.lifecycle {
@@ -2693,17 +2709,18 @@ impl GameKernelV7 {
                 internal_events: Vec::new(),
             });
         }
-        let (action, action_context) = if let Some(submission) = self.current_learning_submission(button)? {
-            submission
-        } else if button == GameButton::Action {
-            self.active_runtime()?
-                .selected_action()
-                .map_err(runtime_error)?
-        } else {
-            self.active_runtime()?
-                .cancel_action()
-                .map_err(runtime_error)?
-        };
+        let (action, action_context) =
+            if let Some(submission) = self.current_learning_submission(button)? {
+                submission
+            } else if button == GameButton::Action {
+                self.active_runtime()?
+                    .selected_action()
+                    .map_err(runtime_error)?
+            } else {
+                self.active_runtime()?
+                    .cancel_action()
+                    .map_err(runtime_error)?
+            };
         match &action {
             GameActionV1::Battle {
                 action: er_types::BattleUiActionV1::OpenFight,

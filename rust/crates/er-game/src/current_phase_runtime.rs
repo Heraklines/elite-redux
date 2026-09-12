@@ -10,10 +10,22 @@ pub enum GameOwnedPhaseV1 {
     TurnStep,
     TurnFinish,
     FriendshipBegin,
-    FaintBegin { pending: SafeU53 },
-    FaintPresentation { pending: SafeU53, event_id: PresentationEventId, animation: bool },
-    Victory { pending: SafeU53, menu_instance: MenuInstanceId },
-    VictoryPresentation { pending: SafeU53, event_id: PresentationEventId },
+    FaintBegin {
+        pending: SafeU53,
+    },
+    FaintPresentation {
+        pending: SafeU53,
+        event_id: PresentationEventId,
+        animation: bool,
+    },
+    Victory {
+        pending: SafeU53,
+        menu_instance: MenuInstanceId,
+    },
+    VictoryPresentation {
+        pending: SafeU53,
+        event_id: PresentationEventId,
+    },
     FriendshipClock {
         request: CurrentFriendshipClockRequestV1,
         utc_milliseconds: i64,
@@ -41,7 +53,8 @@ pub(super) fn begin_owned_turn(
     commands: &CommandSet,
     authority: &TurnAuthorityContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
-    if before.current_turn_execution.is_some() || before.current_presentation.is_none()
+    if before.current_turn_execution.is_some()
+        || before.current_presentation.is_none()
         || (before.current_battle_participation.is_none() && !unobserved_mechanical_doubles(before))
     {
         return Err(GameRuntimeV6Error::Action);
@@ -100,19 +113,23 @@ fn fold_action_tracker(
     cues: &[er_battle::m7_resolver::BattlePresentationCueV5],
 ) -> Result<(), GameRuntimeV6Error> {
     use er_state::current_achievement_tracker::CurrentAchievementHistoryV1;
-    let tracker = before.current_achievement_tracker.as_ref()
+    let tracker = before
+        .current_achievement_tracker
+        .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
     if candidate.current_achievement_tracker.as_ref() != Some(tracker) {
         return Err(GameRuntimeV6Error::CandidateMismatch);
     }
     match tracker.history {
         CurrentAchievementHistoryV1::FreshComplete => {
-            let (next, requests) = crate::current_achievement_action::fold_current_achievement_action(
-                before, candidate, content, events, cues,
-            )?;
+            let (next, requests) =
+                crate::current_achievement_action::fold_current_achievement_action(
+                    before, candidate, content, events, cues,
+                )?;
             if !requests.is_empty() {
                 return Err(GameRuntimeV6Error::Domain(format!(
-                    "action achievement requests require owned reward dispatch: {}", requests.join(",")
+                    "action achievement requests require owned reward dispatch: {}",
+                    requests.join(",")
                 )));
             }
             candidate.current_achievement_tracker = Some(next);
@@ -287,11 +304,31 @@ fn phase_transition(
         .current_turn_execution
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
-    if matches!(phase, GameOwnedPhaseV1::FaintBegin { .. } | GameOwnedPhaseV1::FaintPresentation { .. }) {
-        return current_faint_transition::transition(before, content, operation_id, authority_seat, revision, phase);
+    if matches!(
+        phase,
+        GameOwnedPhaseV1::FaintBegin { .. } | GameOwnedPhaseV1::FaintPresentation { .. }
+    ) {
+        return current_faint_transition::transition(
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
+        );
     }
-    if matches!(phase, GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. }) {
-        return current_victory_transition::transition(before, content, operation_id, authority_seat, revision, phase);
+    if matches!(
+        phase,
+        GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. }
+    ) {
+        return current_victory_transition::transition(
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
+        );
     }
     if matches!(
         phase,
@@ -344,9 +381,12 @@ fn phase_transition(
         .as_ref()
         .and_then(|value| value.clock.as_ref());
     let (mut candidate, payloads) = match &phase {
-        GameOwnedPhaseV1::TurnStep | GameOwnedPhaseV1::TurnFinish
-        | GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. }
-        | GameOwnedPhaseV1::FaintBegin { .. } | GameOwnedPhaseV1::FaintPresentation { .. } => {
+        GameOwnedPhaseV1::TurnStep
+        | GameOwnedPhaseV1::TurnFinish
+        | GameOwnedPhaseV1::Victory { .. }
+        | GameOwnedPhaseV1::VictoryPresentation { .. }
+        | GameOwnedPhaseV1::FaintBegin { .. }
+        | GameOwnedPhaseV1::FaintPresentation { .. } => {
             return Err(GameRuntimeV6Error::Invalid);
         }
         GameOwnedPhaseV1::FriendshipBegin => {
@@ -450,10 +490,10 @@ fn phase_transition(
     })
 }
 
-#[path = "current_victory_transition.rs"]
-mod current_victory_transition;
 #[path = "current_faint_transition.rs"]
 mod current_faint_transition;
+#[path = "current_victory_transition.rs"]
+mod current_victory_transition;
 
 fn turn_step_transition(
     before: &GameStateV6,
@@ -516,9 +556,11 @@ fn turn_step_transition(
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
     let participation = match before.current_battle_participation.as_ref() {
-        Some(participation) => Some(participation
-            .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
-            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?),
+        Some(participation) => Some(
+            participation
+                .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
+                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
+        ),
         None if unobserved_mechanical_doubles(before) => None,
         None => return Err(GameRuntimeV6Error::Action),
     };
@@ -555,8 +597,14 @@ fn turn_step_transition(
         )?;
     }
     fold_action_tracker(
-        before, &mut candidate, content,
-        chunk.transition.source_events.as_deref().ok_or(GameRuntimeV6Error::Invalid)?,
+        before,
+        &mut candidate,
+        content,
+        chunk
+            .transition
+            .source_events
+            .as_deref()
+            .ok_or(GameRuntimeV6Error::Invalid)?,
         &chunk.transition.presentation,
     )?;
     let mut presentation = super::current_battle_presentation::project_current_battle_cues(

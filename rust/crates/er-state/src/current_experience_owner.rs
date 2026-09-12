@@ -191,7 +191,8 @@ impl CurrentExperienceOwnerV1 {
             .ok_or(CurrentExperienceOwnerError::Invalid)?;
         if self.source_progression.as_ref().is_some_and(|source| {
             self.execution_origin != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
-                || source.profile_owner != self.authority || !source.valid(run)
+                || source.profile_owner != self.authority
+                || !source.valid(run)
         }) {
             return Err(CurrentExperienceOwnerError::Invalid);
         }
@@ -255,9 +256,13 @@ impl CurrentExperienceOwnerV1 {
             match (&self.execution_origin, &pending.friendship) {
                 (Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic), Some(phase)) => {
                     phase.validate(pending)?;
-                    if pending.victory.as_ref().is_some_and(|victory|
-                        !phase.complete || !victory.valid(pending.id))
-                    { return Err(CurrentExperienceOwnerError::Invalid); }
+                    if pending
+                        .victory
+                        .as_ref()
+                        .is_some_and(|victory| !phase.complete || !victory.valid(pending.id))
+                    {
+                        return Err(CurrentExperienceOwnerError::Invalid);
+                    }
                 }
                 (None, None) if pending.victory.is_none() => {}
                 _ => return Err(CurrentExperienceOwnerError::Invalid),
@@ -284,15 +289,20 @@ impl CurrentExperienceOwnerV1 {
                     // still binds every recipient and the captured stat shape.
                     self.source_progression.is_none()
                         || pending.recipients.len() != recipients.len()
-                        || pending.recipients.iter().zip(&recipients).any(|(captured, live)| {
-                            captured.pokemon != live.pokemon
-                                || captured.owner != live.owner
-                                || captured.pokerus != live.pokerus
-                                || captured.stats.as_ref().is_none_or(|value| {
-                                    value.max_hp == 0 || value.max_hp != value.stats.hp
-                                        || captured.hp > value.max_hp
-                                })
-                        })
+                        || pending
+                            .recipients
+                            .iter()
+                            .zip(&recipients)
+                            .any(|(captured, live)| {
+                                captured.pokemon != live.pokemon
+                                    || captured.owner != live.owner
+                                    || captured.pokerus != live.pokerus
+                                    || captured.stats.as_ref().is_none_or(|value| {
+                                        value.max_hp == 0
+                                            || value.max_hp != value.stats.hp
+                                            || captured.hp > value.max_hp
+                                    })
+                            })
                 } else {
                     pending.recipients != recipients
                 }
@@ -387,7 +397,9 @@ impl CurrentExperienceOwnerV1 {
                 participants: faint.participants.clone(),
                 recipients: recipient_snapshot(run, self.source_progression.is_some())?,
                 continuation: continuation(battle.outcome),
-                friendship: self.execution_origin.map(|_| CurrentFriendshipPhaseV1::default()),
+                friendship: self
+                    .execution_origin
+                    .map(|_| CurrentFriendshipPhaseV1::default()),
                 victory_defeated_total: None,
                 victory: None,
             });
@@ -416,7 +428,8 @@ fn recipient_snapshot(
                 experience: pokemon.experience,
                 pokerus: pokemon.pokerus,
                 stats: source_owned.then_some(CurrentExperienceRecipientStatsV1 {
-                    stats: pokemon.stats, max_hp: pokemon.max_hp,
+                    stats: pokemon.stats,
+                    max_hp: pokemon.max_hp,
                 }),
             })
         })

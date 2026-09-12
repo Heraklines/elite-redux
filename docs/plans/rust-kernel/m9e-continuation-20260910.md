@@ -181,3 +181,5 @@ in the working tree are not a green result. M9 Engineering is not complete.
 ## Reconciled candidate, 2026-09-12
 
 Next diagnostic selects 19 whole targets / 81 tests, including the complete 12-test er-game library target and two additional KO source witnesses. The unreachable learning draft is archived as source text, excluded from execution and completion claims. Both large co-op tests preserve their existing test identities and assertions in smaller non-inlined helpers. This candidate has not yet passed remote compilation or execution. M9 remains incomplete.
+
+Remote run 34690000546 on 791f755 stopped at formatting, with zero compiler/test results. Applied its exact 218773-byte formatter page (SHA256 6ca1abb4c2522d2a1125552b053f0b42d073e7acdfe19d08d8709dfff6e46202), verifying all 32 source before/after hashes. The formatter successor keeps all 19 targets / 81 tests; execution remains unproven.

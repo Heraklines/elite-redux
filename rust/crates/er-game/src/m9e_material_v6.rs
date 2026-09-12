@@ -464,11 +464,17 @@ pub fn apply_game_material_v6_with_retention(
         .validate_with(content)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     validate_presentation_frontier(live.as_ref(), transition)?;
-    let owned_learning = matches!(transition.accepted_action, Some(GameActionV1::CurrentLearnMoveBatch { .. }));
+    let owned_learning = matches!(
+        transition.accepted_action,
+        Some(GameActionV1::CurrentLearnMoveBatch { .. })
+    );
     if owned_learning {
         crate::m9e_runtime_v6::validate_current_learning_transition(
-            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?, content, transition)
-            .map_err(|_| GameMaterialV6Error::Invalid)?;
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
+            content,
+            transition,
+        )
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     if transition.owned_phase.is_none()
         && !owned_learning
@@ -512,16 +518,36 @@ pub fn apply_game_material_v6_with_retention(
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     if let Some(prior) = live.as_ref() {
         let same_run = prior.active_run.as_ref().map(|run| run.run_id)
-            == transition.after_state.active_run.as_ref().map(|run| run.run_id);
+            == transition
+                .after_state
+                .active_run
+                .as_ref()
+                .map(|run| run.run_id);
         let genuine_turn_begin = prior.current_turn_execution.is_none()
             && transition.after_state.current_turn_execution.is_some()
             && transition.domain == GameActionDomainV2::BattleTurn
-            && matches!(transition.accepted_action, Some(GameActionV1::Battle { .. }));
-        if same_run && (prior.current_achievement_tracker.as_ref().map(|tracker| tracker.history)
-            != transition.after_state.current_achievement_tracker.as_ref().map(|tracker| tracker.history)
-            || transition.owned_phase.is_none() && !owned_learning && !genuine_turn_begin
-                && prior.current_achievement_tracker != transition.after_state.current_achievement_tracker)
-        { return Err(GameMaterialV6Error::Invalid); }
+            && matches!(
+                transition.accepted_action,
+                Some(GameActionV1::Battle { .. })
+            );
+        if same_run
+            && (prior
+                .current_achievement_tracker
+                .as_ref()
+                .map(|tracker| tracker.history)
+                != transition
+                    .after_state
+                    .current_achievement_tracker
+                    .as_ref()
+                    .map(|tracker| tracker.history)
+                || transition.owned_phase.is_none()
+                    && !owned_learning
+                    && !genuine_turn_begin
+                    && prior.current_achievement_tracker
+                        != transition.after_state.current_achievement_tracker)
+        {
+            return Err(GameMaterialV6Error::Invalid);
+        }
     }
     if transition.owned_phase.is_some() {
         crate::m9e_runtime_v6::validate_owned_phase_transition(
@@ -671,7 +697,9 @@ fn action_matches_domain(action: Option<&GameActionV1>, domain: GameActionDomain
                 GameActionDomainV2::Progression
             )
             | (
-                Some(GameActionV1::MoveLearning { .. } | GameActionV1::CurrentLearnMoveBatch { .. }),
+                Some(
+                    GameActionV1::MoveLearning { .. } | GameActionV1::CurrentLearnMoveBatch { .. }
+                ),
                 GameActionDomainV2::MoveLearning
             )
             | (

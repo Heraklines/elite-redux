@@ -3,56 +3,111 @@ use super::*;
 use er_game::m9e_runtime_v6::GameOwnedPhaseV1;
 use er_state::current_turn_execution::CurrentTurnStageV1;
 
-pub(crate) fn victory_presentation(state: &GameStateV6, event_id: er_types::PresentationEventId)
-    -> Option<crate::snapshot_v7::PendingVictoryAckV1>
-{
+pub(crate) fn victory_presentation(
+    state: &GameStateV6,
+    event_id: er_types::PresentationEventId,
+) -> Option<crate::snapshot_v7::PendingVictoryAckV1> {
     use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;
-    state.current_battle_participation.as_ref()?.experience.as_ref()?.pending.iter().find_map(|pending| {
-        let expected = match &pending.victory.as_ref()?.descendant {
-            D::AwardPresentation { event_id, .. } | D::PartyAwardPresentation { event_id, .. }
-            | D::LevelUpPresentation { event_id, .. } | D::HidePartyBarPresentation { event_id, .. } => *event_id,
-            _ => return None,
-        };
-        (expected == event_id).then_some(crate::snapshot_v7::PendingVictoryAckV1 { pending: pending.id, event_id })
-    })
+    state
+        .current_battle_participation
+        .as_ref()?
+        .experience
+        .as_ref()?
+        .pending
+        .iter()
+        .find_map(|pending| {
+            let expected = match &pending.victory.as_ref()?.descendant {
+                D::AwardPresentation { event_id, .. }
+                | D::PartyAwardPresentation { event_id, .. }
+                | D::LevelUpPresentation { event_id, .. }
+                | D::HidePartyBarPresentation { event_id, .. } => *event_id,
+                _ => return None,
+            };
+            (expected == event_id).then_some(crate::snapshot_v7::PendingVictoryAckV1 {
+                pending: pending.id,
+                event_id,
+            })
+        })
 }
 
 pub(crate) fn victory_receipt_matches(
-    state: &GameStateV6, content: &PreparedGameContentV2, ack: crate::snapshot_v7::PendingVictoryAckV1,
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+    ack: crate::snapshot_v7::PendingVictoryAckV1,
 ) -> bool {
+    use er_game::m9e_content_v2::{PresentationCueFamilyV1, PresentationSemanticIdV1};
     use er_game::m9e_material_v6::GamePresentationPayloadV1 as P;
-    use er_game::m9e_content_v2::{PresentationSemanticIdV1, PresentationCueFamilyV1};
     use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;
     let payload = (|| {
-        let pending = state.current_battle_participation.as_ref()?.experience.as_ref()?.pending.iter()
+        let pending = state
+            .current_battle_participation
+            .as_ref()?
+            .experience
+            .as_ref()?
+            .pending
+            .iter()
             .find(|pending| pending.id == ack.pending)?;
         Some(match &pending.victory.as_ref()?.descendant {
-            D::AwardPresentation { award, event_id } if *event_id == ack.event_id => P::ExperienceGain {
-                holder: award.phase.pokemon, amount: award.experience, party_bar: false,
-            },
-            D::PartyAwardPresentation { award, event_id, .. } if *event_id == ack.event_id => P::ExperienceGain {
-                holder: award.phase.pokemon, amount: award.experience, party_bar: true,
+            D::AwardPresentation { award, event_id } if *event_id == ack.event_id => {
+                P::ExperienceGain {
+                    holder: award.phase.pokemon,
+                    amount: award.experience,
+                    party_bar: false,
+                }
+            }
+            D::PartyAwardPresentation {
+                award, event_id, ..
+            } if *event_id == ack.event_id => P::ExperienceGain {
+                holder: award.phase.pokemon,
+                amount: award.experience,
+                party_bar: true,
             },
             D::LevelUpPresentation { end, event_id } if *event_id == ack.event_id => {
                 let level = &end.level_up;
-                let pokemon = state.active_run.as_ref()?.party.get(usize::from(level.award.phase.party_index))?;
-                P::LevelStats { holder: pokemon.id, previous_level: level.previous_level, level: level.new_level,
-                    previous_stats: level.previous_stats, stats: pokemon.stats }
+                let pokemon = state
+                    .active_run
+                    .as_ref()?
+                    .party
+                    .get(usize::from(level.award.phase.party_index))?;
+                P::LevelStats {
+                    holder: pokemon.id,
+                    previous_level: level.previous_level,
+                    level: level.new_level,
+                    previous_stats: level.previous_stats,
+                    stats: pokemon.stats,
+                }
             }
-            D::HidePartyBarPresentation { award, event_id } if *event_id == ack.event_id =>
-                P::HidePartyExperience { holder: award.phase.pokemon },
+            D::HidePartyBarPresentation { award, event_id } if *event_id == ack.event_id => {
+                P::HidePartyExperience {
+                    holder: award.phase.pokemon,
+                }
+            }
             _ => return None,
         })
     })();
-    let Some(payload) = payload else { return false; };
+    let Some(payload) = payload else {
+        return false;
+    };
     let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
-    let Some(mapping) = content.presentation(semantic) else { return false; };
-    let effect = GamePresentationEffectV2 { event_id: ack.event_id, semantic,
-        blocking: mapping.blocking, skip: mapping.skip, payload: Some(payload) };
-    er_canonical::fixture_digest(&effect).ok().is_some_and(|hash| {
-        state.current_presentation.as_ref().is_some_and(|owner|
-            owner.receipts.iter().any(|receipt| receipt.event_id == ack.event_id && receipt.effect_sha256 == hash))
-    })
+    let Some(mapping) = content.presentation(semantic) else {
+        return false;
+    };
+    let effect = GamePresentationEffectV2 {
+        event_id: ack.event_id,
+        semantic,
+        blocking: mapping.blocking,
+        skip: mapping.skip,
+        payload: Some(payload),
+    };
+    er_canonical::fixture_digest(&effect)
+        .ok()
+        .is_some_and(|hash| {
+            state.current_presentation.as_ref().is_some_and(|owner| {
+                owner.receipts.iter().any(|receipt| {
+                    receipt.event_id == ack.event_id && receipt.effect_sha256 == hash
+                })
+            })
+        })
 }
 
 pub(super) fn bootstrap_clock_effect(
@@ -150,7 +205,9 @@ impl GameKernelV7 {
         };
         if current_learning_control_v7::current_batch(state).is_some() {
             current_learning_control_v7::validate_private_learning_control(
-                state, self.private_learning_control.as_ref(), self.local_seat,
+                state,
+                self.private_learning_control.as_ref(),
+                self.local_seat,
             )?;
             // Human learning choices are never synthesized by the phase pump.
             return Ok(());
@@ -164,9 +221,14 @@ impl GameKernelV7 {
             self.pending_current_phase_ack = None;
             use crate::snapshot_v7::CurrentPhasePresentationKindV1 as K;
             let phase = match ack.kind {
-                K::Victory => GameOwnedPhaseV1::VictoryPresentation { pending: ack.pending, event_id: ack.event_id },
+                K::Victory => GameOwnedPhaseV1::VictoryPresentation {
+                    pending: ack.pending,
+                    event_id: ack.event_id,
+                },
                 K::FaintAnimation | K::FaintMessage => GameOwnedPhaseV1::FaintPresentation {
-                    pending: ack.pending, event_id: ack.event_id, animation: ack.kind == K::FaintAnimation,
+                    pending: ack.pending,
+                    event_id: ack.event_id,
+                    animation: ack.kind == K::FaintAnimation,
                 },
             };
             let step = self.execute_owned_phase(phase)?;
@@ -184,19 +246,35 @@ impl GameKernelV7 {
             }
             CurrentTurnStageV1::AwaitingInterlude { .. } => {
                 use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
-                let owner = state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+                let owner = state
+                    .current_battle_participation
+                    .as_ref()
+                    .and_then(|owner| owner.experience.as_ref())
                     .ok_or(GameKernelV7Error::Invalid)?;
                 let pending = owner.pending.first().ok_or(GameKernelV7Error::Invalid)?;
-                let source = owner.source_progression.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+                let source = owner
+                    .source_progression
+                    .as_ref()
+                    .ok_or(GameKernelV7Error::Invalid)?;
                 match &source.initial_faint.phase {
-                    None => GameOwnedPhaseV1::FaintBegin { pending: pending.id },
+                    None => GameOwnedPhaseV1::FaintBegin {
+                        pending: pending.id,
+                    },
                     Some(F::Animation { .. } | F::Message { .. }) => return Ok(()),
                     Some(F::MessageReady { .. }) => return Err(GameKernelV7Error::Invalid),
                     Some(F::ReadyForVictory { address }) => {
-                        if address.pending_id != pending.id { return Err(GameKernelV7Error::Invalid); }
-                        let friendship = pending.friendship.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+                        if address.pending_id != pending.id {
+                            return Err(GameKernelV7Error::Invalid);
+                        }
+                        let friendship = pending
+                            .friendship
+                            .as_ref()
+                            .ok_or(GameKernelV7Error::Invalid)?;
                         if friendship.complete {
-                            GameOwnedPhaseV1::Victory { pending: pending.id, menu_instance: self.next_menu_instance_id }
+                            GameOwnedPhaseV1::Victory {
+                                pending: pending.id,
+                                menu_instance: self.next_menu_instance_id,
+                            }
                         } else if friendship.clock.is_some() {
                             return Ok(());
                         } else {

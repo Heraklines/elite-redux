@@ -407,10 +407,25 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     let (mut authority, mut replica, initial_turn) =
         coop_wait_bootstrap(content.clone(), host, guest, generation)?;
     coop_wait_private_navigation(&mut authority, &mut replica, host, guest)?;
-    let retained_material = coop_wait_retain_host(&mut authority, &mut replica, guest, initial_turn)?;
+    let retained_material =
+        coop_wait_retain_host(&mut authority, &mut replica, guest, initial_turn)?;
     let mut continued = coop_wait_restore_private(&mut replica, content.clone(), host, guest)?;
-    let proposal = coop_wait_guest_proposal(&mut replica, &mut continued, &retained_material[0], content.clone(), guest)?;
-    coop_wait_resolve(&mut authority, &mut replica, &proposal, content, guest, generation, initial_turn)
+    let proposal = coop_wait_guest_proposal(
+        &mut replica,
+        &mut continued,
+        &retained_material[0],
+        content.clone(),
+        guest,
+    )?;
+    coop_wait_resolve(
+        &mut authority,
+        &mut replica,
+        &proposal,
+        content,
+        guest,
+        generation,
+        initial_turn,
+    )
 }
 
 // Keep independent snapshot rejection cases out of one unoptimized libtest
@@ -418,8 +433,18 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
 // all original state, atomicity, replay and control assertions are retained.
 #[inline(never)]
 fn coop_wait_bootstrap(
-    content: Arc<PreparedGameContentV2>, host: SeatId, guest: SeatId, generation: ConnectionGeneration,
-) -> Result<(Box<GameKernelV7>, Box<GameKernelV7>, er_types::battle_ids::TurnIndex), Box<dyn Error>> {
+    content: Arc<PreparedGameContentV2>,
+    host: SeatId,
+    guest: SeatId,
+    generation: ConnectionGeneration,
+) -> Result<
+    (
+        Box<GameKernelV7>,
+        Box<GameKernelV7>,
+        er_types::battle_ids::TurnIndex,
+    ),
+    Box<dyn Error>,
+> {
     let authority_protocol =
         initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)?;
     let replica_protocol =
@@ -487,7 +512,12 @@ fn coop_wait_bootstrap(
 }
 
 #[inline(never)]
-fn coop_wait_private_navigation(authority: &mut GameKernelV7, replica: &mut GameKernelV7, host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
+fn coop_wait_private_navigation(
+    authority: &mut GameKernelV7,
+    replica: &mut GameKernelV7,
+    host: SeatId,
+    guest: SeatId,
+) -> Result<(), Box<dyn Error>> {
     let shared_host_root = authority
         .current_control()
         .cloned()
@@ -520,7 +550,12 @@ fn coop_wait_private_navigation(authority: &mut GameKernelV7, replica: &mut Game
 }
 
 #[inline(never)]
-fn coop_wait_retain_host(authority: &mut GameKernelV7, replica: &mut GameKernelV7, guest: SeatId, initial_turn: er_types::battle_ids::TurnIndex) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+fn coop_wait_retain_host(
+    authority: &mut GameKernelV7,
+    replica: &mut GameKernelV7,
+    guest: SeatId,
+    initial_turn: er_types::battle_ids::TurnIndex,
+) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
     press(authority, PhysicalKey::Space)
         .map_err(|error| format!("host Fight navigation failed: {error}"))?;
     let retained = press(authority, PhysicalKey::Space)
@@ -568,7 +603,12 @@ fn coop_wait_retain_host(authority: &mut GameKernelV7, replica: &mut GameKernelV
 }
 
 #[inline(never)]
-fn coop_wait_restore_private(replica: &mut GameKernelV7, content: Arc<PreparedGameContentV2>, host: SeatId, guest: SeatId) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
+fn coop_wait_restore_private(
+    replica: &mut GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+    host: SeatId,
+    guest: SeatId,
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     press(replica, PhysicalKey::Space)
         .map_err(|error| format!("guest Fight navigation failed: {error}"))?;
     assert_eq!(
@@ -592,7 +632,12 @@ fn coop_wait_restore_private(replica: &mut GameKernelV7, content: Arc<PreparedGa
 }
 
 #[inline(never)]
-fn coop_wait_reject_missing_owner(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, _host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
+fn coop_wait_reject_missing_owner(
+    private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    _host: SeatId,
+    guest: SeatId,
+) -> Result<(), Box<dyn Error>> {
     let mut missing_owner = private_move_menu.clone();
     missing_owner.private_battle_control = None;
     assert!(
@@ -608,7 +653,12 @@ fn coop_wait_reject_missing_owner(private_move_menu: &er_kernel::snapshot_v7::Co
 }
 
 #[inline(never)]
-fn coop_wait_reject_wrong_context(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, _host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
+fn coop_wait_reject_wrong_context(
+    private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    _host: SeatId,
+    guest: SeatId,
+) -> Result<(), Box<dyn Error>> {
     let mut wrong_context = private_move_menu.clone();
     wrong_context
         .private_battle_control
@@ -632,7 +682,12 @@ fn coop_wait_reject_wrong_context(private_move_menu: &er_kernel::snapshot_v7::Co
 }
 
 #[inline(never)]
-fn coop_wait_reject_wrong_owner(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
+fn coop_wait_reject_wrong_owner(
+    private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    host: SeatId,
+    guest: SeatId,
+) -> Result<(), Box<dyn Error>> {
     let mut wrong_owner = private_move_menu.clone();
     wrong_owner
         .private_battle_control
@@ -652,7 +707,12 @@ fn coop_wait_reject_wrong_owner(private_move_menu: &er_kernel::snapshot_v7::Core
 }
 
 #[inline(never)]
-fn coop_wait_reject_wrong_canonical_selection(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, _host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
+fn coop_wait_reject_wrong_canonical_selection(
+    private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    _host: SeatId,
+    guest: SeatId,
+) -> Result<(), Box<dyn Error>> {
     let mut wrong_canonical_selection = private_move_menu.clone();
     let canonical_menu = wrong_canonical_selection
         .private_battle_control
@@ -682,7 +742,13 @@ fn coop_wait_reject_wrong_canonical_selection(private_move_menu: &er_kernel::sna
 }
 
 #[inline(never)]
-fn coop_wait_guest_proposal(replica: &mut GameKernelV7, continued: &mut GameKernelV7, retained_material: &[u8], content: Arc<PreparedGameContentV2>, guest: SeatId) -> Result<Vec<u8>, Box<dyn Error>> {
+fn coop_wait_guest_proposal(
+    replica: &mut GameKernelV7,
+    continued: &mut GameKernelV7,
+    retained_material: &[u8],
+    content: Arc<PreparedGameContentV2>,
+    guest: SeatId,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     for _ in 0..3 {
         assert_eq!(
             press(replica, PhysicalKey::Escape)?,
@@ -746,7 +812,11 @@ fn coop_wait_guest_proposal(replica: &mut GameKernelV7, continued: &mut GameKern
 }
 
 #[inline(never)]
-fn coop_wait_exhausted_press(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, guest: SeatId) -> Result<(), Box<dyn Error>> {
+fn coop_wait_exhausted_press(
+    private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    guest: SeatId,
+) -> Result<(), Box<dyn Error>> {
     let mut exhausted_press = private_move_menu.clone();
     exhausted_press.replay_sequence = safe(9_007_199_254_740_991);
     let mut exhausted_press = GameKernelV7::from_snapshot(
@@ -762,7 +832,15 @@ fn coop_wait_exhausted_press(private_move_menu: &er_kernel::snapshot_v7::CoreGam
 }
 
 #[inline(never)]
-fn coop_wait_resolve(authority: &mut GameKernelV7, replica: &mut GameKernelV7, proposal: &[u8], content: Arc<PreparedGameContentV2>, guest: SeatId, generation: ConnectionGeneration, initial_turn: er_types::battle_ids::TurnIndex) -> Result<(), Box<dyn Error>> {
+fn coop_wait_resolve(
+    authority: &mut GameKernelV7,
+    replica: &mut GameKernelV7,
+    proposal: &[u8],
+    content: Arc<PreparedGameContentV2>,
+    guest: SeatId,
+    generation: ConnectionGeneration,
+    initial_turn: er_types::battle_ids::TurnIndex,
+) -> Result<(), Box<dyn Error>> {
     let resolved = authority
         .ingest_network_frame(generation, proposal)
         .map_err(|error| format!("guest command admission failed: {error}"))?;
@@ -775,7 +853,14 @@ fn coop_wait_resolve(authority: &mut GameKernelV7, replica: &mut GameKernelV7, p
         })
         .collect::<Vec<_>>();
     assert_eq!(turn_material.len(), 1);
-    coop_wait_collision(replica, &resolved, &turn_material[0], content.clone(), guest, generation)?;
+    coop_wait_collision(
+        replica,
+        &resolved,
+        &turn_material[0],
+        content.clone(),
+        guest,
+        generation,
+    )?;
     let resolved_turn = authority
         .state()
         .and_then(|state| state.active_run.as_ref())
@@ -797,7 +882,14 @@ fn coop_wait_resolve(authority: &mut GameKernelV7, replica: &mut GameKernelV7, p
 }
 
 #[inline(never)]
-fn coop_wait_collision(replica: &GameKernelV7, resolved: &GameKernelStepV7, turn_material: &[u8], content: Arc<PreparedGameContentV2>, guest: SeatId, generation: ConnectionGeneration) -> Result<(), Box<dyn Error>> {
+fn coop_wait_collision(
+    replica: &GameKernelV7,
+    resolved: &GameKernelStepV7,
+    turn_material: &[u8],
+    content: Arc<PreparedGameContentV2>,
+    guest: SeatId,
+    generation: ConnectionGeneration,
+) -> Result<(), Box<dyn Error>> {
     let presentation = resolved
         .effects
         .iter()

@@ -656,8 +656,9 @@ fn execute_domain(
         GameActionV1::MoveLearning { action } => {
             execute_move_learning(before, action, &context.input)
         }
-        GameActionV1::CurrentLearnMoveBatch { action } => current_learning_runtime::execute(
-            require_state(before)?, content, action, context),
+        GameActionV1::CurrentLearnMoveBatch { action } => {
+            current_learning_runtime::execute(require_state(before)?, content, action, context)
+        }
         GameActionV1::Fusion { action } => execute_fusion(before, action, &context.input),
         GameActionV1::World { action } => execute_world(before, action, &context.input),
         GameActionV1::Scenario { action } => {

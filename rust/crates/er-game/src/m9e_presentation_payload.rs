@@ -15,8 +15,13 @@ pub enum GamePresentationAchievementV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum GamePresentationPayloadV1 {
-    FaintAnimation { holder: PokemonId, tween_milliseconds: u16 },
-    FaintMessage { holder: PokemonId },
+    FaintAnimation {
+        holder: PokemonId,
+        tween_milliseconds: u16,
+    },
+    FaintMessage {
+        holder: PokemonId,
+    },
     ExperienceGain {
         holder: PokemonId,
         amount: er_types::run_ids::Experience,
@@ -29,7 +34,9 @@ pub enum GamePresentationPayloadV1 {
         previous_stats: er_types::battle_model::BattleStats,
         stats: er_types::battle_model::BattleStats,
     },
-    HidePartyExperience { holder: PokemonId },
+    HidePartyExperience {
+        holder: PokemonId,
+    },
     StarterCandy {
         root: SpeciesId,
         /// Source displays the complete scaled request, even when saturated.
@@ -75,19 +82,34 @@ pub enum GamePresentationPayloadV1 {
 impl GamePresentationPayloadV1 {
     pub fn validate(&self, semantic: PresentationSemanticIdV1) -> Result<(), GameMaterialV6Error> {
         let (family, valid) = match self {
-            Self::FaintAnimation { holder, tween_milliseconds } => (
-                PresentationCueFamilyV1::Faint, holder.get() != SafeU53::ZERO && *tween_milliseconds == 500,
+            Self::FaintAnimation {
+                holder,
+                tween_milliseconds,
+            } => (
+                PresentationCueFamilyV1::Faint,
+                holder.get() != SafeU53::ZERO && *tween_milliseconds == 500,
             ),
             Self::FaintMessage { holder } => (
-                PresentationCueFamilyV1::Faint, holder.get() != SafeU53::ZERO,
+                PresentationCueFamilyV1::Faint,
+                holder.get() != SafeU53::ZERO,
             ),
             Self::ExperienceGain { holder, .. } | Self::HidePartyExperience { holder } => (
-                PresentationCueFamilyV1::Progression, holder.get() != SafeU53::ZERO,
-            ),
-            Self::LevelStats { holder, previous_level, level, previous_stats, stats } => (
                 PresentationCueFamilyV1::Progression,
-                holder.get() != SafeU53::ZERO && *previous_level > 0 && level > previous_level
-                    && previous_stats.hp > 0 && stats.hp > 0,
+                holder.get() != SafeU53::ZERO,
+            ),
+            Self::LevelStats {
+                holder,
+                previous_level,
+                level,
+                previous_stats,
+                stats,
+            } => (
+                PresentationCueFamilyV1::Progression,
+                holder.get() != SafeU53::ZERO
+                    && *previous_level > 0
+                    && level > previous_level
+                    && previous_stats.hp > 0
+                    && stats.hp > 0,
             ),
             Self::StarterCandy {
                 root,

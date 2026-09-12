@@ -41,5 +41,5 @@ pub mod current_victory_execution;
 pub mod current_battle_source_events;
 
 pub mod current_achievement_tracker;
-pub mod current_source_progression;
 pub mod current_faint_execution;
+pub mod current_source_progression;

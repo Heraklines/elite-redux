@@ -18,9 +18,16 @@ pub(crate) fn current_source_progression<'a>(
     content: &PreparedGameContentV2,
 ) -> Result<&'a CurrentSourceProgressionV1, GameRuntimeV6Error> {
     let failure = || GameRuntimeV6Error::Action;
-    if !state.current_achievement_tracker.as_ref().is_some_and(|tracker|
-        tracker.history == er_state::current_achievement_tracker::CurrentAchievementHistoryV1::FreshComplete)
-    { return Err(failure()); }
+    if !state
+        .current_achievement_tracker
+        .as_ref()
+        .is_some_and(|tracker| {
+            tracker.history
+                == er_state::current_achievement_tracker::CurrentAchievementHistoryV1::FreshComplete
+        })
+    {
+        return Err(failure());
+    }
     let run = state.active_run.as_ref().ok_or_else(failure)?;
     let battle = run.battle.as_ref().ok_or_else(failure)?;
     let profile = state

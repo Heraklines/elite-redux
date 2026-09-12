@@ -35,28 +35,46 @@ pub struct CurrentFriendshipRewardProfileV1 {
 impl CurrentFriendshipRewardProfileV1 {
     pub fn fresh() -> Self {
         // GameData640/652 and initDexData6851 at pinned399d: {}, [] and 0.
-        Self { schema_version: 1, highest_level: SafeU53::ZERO, pokemon_defeated: SafeU53::ZERO, max_friendship_unlocked_at: None,
-            ribbons: Vec::new(), cosmetic_bits: Vec::new() }
+        Self {
+            schema_version: 1,
+            highest_level: SafeU53::ZERO,
+            pokemon_defeated: SafeU53::ZERO,
+            max_friendship_unlocked_at: None,
+            ribbons: Vec::new(),
+            cosmetic_bits: Vec::new(),
+        }
     }
 
     pub fn max_is_unlocked(&self) -> bool {
-        self.max_friendship_unlocked_at.is_some_and(|date| date != 0)
+        self.max_friendship_unlocked_at
+            .is_some_and(|date| date != 0)
     }
 
     pub fn validate(&self) -> Result<(), CurrentFriendshipProfileError> {
         if self.schema_version != 1
-            || self.max_friendship_unlocked_at.is_some_and(|date| !(-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&date))
+            || self.max_friendship_unlocked_at.is_some_and(|date| {
+                !(-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&date)
+            })
             || self.ribbons.len() > MAX_CURRENT_FRIENDSHIP_ACCOUNTS_V1
-            || self.ribbons.iter().any(|ribbon| ribbon.species.get() == SafeU53::ZERO
-                || ribbon.bits.get() != CURRENT_FRIENDSHIP_RIBBON_V1)
-            || self.ribbons.windows(2).any(|pair| pair[0].species >= pair[1].species)
+            || self.ribbons.iter().any(|ribbon| {
+                ribbon.species.get() == SafeU53::ZERO
+                    || ribbon.bits.get() != CURRENT_FRIENDSHIP_RIBBON_V1
+            })
+            || self
+                .ribbons
+                .windows(2)
+                .any(|pair| pair[0].species >= pair[1].species)
         {
             return Err(CurrentFriendshipProfileError);
         }
         match self.max_friendship_unlocked_at {
             None if self.ribbons.is_empty() && self.cosmetic_bits.is_empty() => Ok(()),
-            Some(_) if !self.ribbons.is_empty()
-                && self.cosmetic_bits.as_slice() == [0, 0, 0, 0, 128, 1] => Ok(()),
+            Some(_)
+                if !self.ribbons.is_empty()
+                    && self.cosmetic_bits.as_slice() == [0, 0, 0, 0, 128, 1] =>
+            {
+                Ok(())
+            }
             _ => Err(CurrentFriendshipProfileError),
         }
     }
