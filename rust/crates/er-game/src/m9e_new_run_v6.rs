@@ -133,7 +133,13 @@ pub fn construct_natural_run_v6(
             || biome.trainer_chance_denominator != 0
             || difficulty == er_types::RunDifficultyV1::Mystery
         {
-            return Err(NaturalRunV6Error::Invalid);
+            return Err(NaturalRunV6Error::State(format!(
+                "initial current constructor admission: mode={}, cooperative={}, challenge_selection={}, supported={}, choices={}, owner_match={}, content_match={}, biome={}, trainer_denominator={}, difficulty={difficulty:?}",
+                mode.key, mode.cooperative, mode.challenge_selection, mode.supported,
+                bootstrap.selections.choices.len(), shared.owner_seat == owner,
+                shared.content_identity == *content.identity(), biome.key,
+                biome.trainer_chance_denominator,
+            )));
         }
         // Initialized ordinary Classic getLevelForWave curve settings.
         // Construction owns an isolated scope; it consumes neither encounter
@@ -188,7 +194,9 @@ pub fn construct_natural_run_v6(
         .as_ref()
         .is_some_and(|value| value.battle_seed != battle_rng.battle_seed)
     {
-        return Err(NaturalRunV6Error::Invalid);
+        return Err(NaturalRunV6Error::State(
+            "initial current constructor battle seed mismatch".to_owned(),
+        ));
     }
     let format = BattleFormat::single();
     let player_slot =
@@ -1232,7 +1240,10 @@ fn pokemon(
         });
     let selected = moves.into_iter().rev().take(4).collect::<Vec<_>>();
     if selected.is_empty() {
-        return Err(NaturalRunV6Error::Invalid);
+        return Err(NaturalRunV6Error::State(format!(
+            "constructed Pokemon has no level moves: species={}, form={form_index}, level={level}",
+            species_id.get().get(),
+        )));
     }
     let mut move_slots = [None; 4];
     for (index, move_id) in selected.into_iter().rev().enumerate() {
