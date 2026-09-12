@@ -1,3 +1,4 @@
+import { BattleScene } from "#app/battle-scene";
 import { MoveEffectPhase } from "#phases/move-effect-phase";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { getErEarlyWaveMovePowerMultiplier, getErRunPacing } from "#data/elite-redux/er-run-pacing";
@@ -57,6 +58,8 @@ const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 const SEED = "m9e-target-registry-source-v1";
 const ABILITIES = [0, 18, 41, 43, 47, 49, 51, 62, 65, 66, 67, 75, 82, 94, 113, 172, 192, 257, 268, 5006, 5033, 5082, 5097, 5115];
 const MOVES = [10, 33, 39, 40, 43, 45, 57, 61, 64, 78, 79, 98, 103, 105, 108, 110, 165, 230, 310, 331, 336, 448, 458, 497, 501, 541, 580];
+// Capture before GameManager constructor replaces this prototype with max rolls.
+const SOURCE_BATTLE_RNG = BattleScene.prototype.randBattleSeedInt;
 let game: Phaser.Game | null = null;
 let manager: GameManager | null = null;
 
@@ -810,6 +813,9 @@ function observeActualGrowlChild() {
 
 
 function observeActualGrowlDispatch() {
+  BattleScene.prototype.randBattleSeedInt=SOURCE_BATTLE_RNG;
+  expect(globalScene.randBattleSeedInt).toBe(SOURCE_BATTLE_RNG);
+  expect(vi.isMockFunction(SOURCE_BATTLE_RNG)).toBe(false);
   const scene=globalScene, user=scene.getEnemyParty()[0], target=scene.getPlayerParty()[0], move=allMoves[45];
   const phase=new MoveEffectPhase(user.getBattlerIndex(),[target.getBattlerIndex()],move,MoveUseMode.NORMAL);
   const actual=phase as unknown as {firstHit:boolean;lastHit:boolean;hitCheck:(target:typeof user)=>[number,number];applyMoveEffects:(target:typeof user,effectiveness:number,firstTarget:boolean)=>void};
