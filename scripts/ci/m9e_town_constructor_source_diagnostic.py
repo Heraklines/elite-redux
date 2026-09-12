@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "0fd9105db0d95f8084a5c16522bac98eb65f5a810933d92a5e319a89025a3d25"
+EXPORTER_SHA256 = "876e34c5cfebba559c60632ee5b3af10089b1d17f7c4079337218177368a6430"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -45,6 +45,7 @@ logs = {}
 failed_log = None
 active_step = "initialization"
 ORACLE_PINS = {
+  "src/data/elite-redux/archetypes/nullify-first-n-hits.ts": ["749106b48f84163a555794b61a724da1901fd639b5ae6e73db84b466c952b97a", 2853],
   "src/data/elite-redux/omniform-movesets.ts": ["89bb80280bce2674d5a8c7370ad0655510022014c93a7c5cc01c02d4bc31d521", 21630],
   "src/data/pokemon/pokemon-data.ts": ["ce9b474196c5a3c68e0d1c11b23804632d7931f65715eb11a687ec8de667675c", 32866],
   "test/framework/phase-interceptor.ts": ["4646673b9e7648ff27bdf950368d1bd340b1e45e5adfbe1f0d9c6cad3c294b37", 13494],
