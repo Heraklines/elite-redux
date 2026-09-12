@@ -3,6 +3,7 @@ use super::*;
 use crate::snapshot_v7::{CurrentPhasePresentationKindV1 as K, PendingCurrentPhaseAckV1};
 use er_game::m9e_material_v6::GamePresentationPayloadV1 as P;
 use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
+use er_types::PresentationEventId;
 
 pub(crate) fn expected_presentations(state: &GameStateV6) -> Vec<PendingCurrentPhaseAckV1> {
     use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;

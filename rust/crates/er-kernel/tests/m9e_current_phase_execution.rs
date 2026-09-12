@@ -361,63 +361,140 @@ fn admit_knockout(
 
 #[inline(never)]
 fn assert_faint_timeline(
-    kernel: &mut GameKernelV7, content: Arc<PreparedGameContentV2>,
+    kernel: &mut GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
     seen: &mut [Option<er_types::PresentationEventId>; 2],
 ) -> Result<()> {
-    use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
     use er_game::m9e_material_v6::GamePresentationPayloadV1 as P;
+    use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
     let checkpoint = kernel.snapshot()?;
     let state = active(&checkpoint)?;
-    let owner = state.current_battle_participation.as_ref()
-        .and_then(|owner| owner.experience.as_ref()).ok_or("experience owner absent")?;
-    let faint = &owner.source_progression.as_ref().ok_or("source owner absent")?.initial_faint;
-    let Some(phase) = &faint.phase else { return Ok(()); };
+    let owner = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|owner| owner.experience.as_ref())
+        .ok_or("experience owner absent")?;
+    let faint = &owner
+        .source_progression
+        .as_ref()
+        .ok_or("source owner absent")?
+        .initial_faint;
+    let Some(phase) = &faint.phase else {
+        return Ok(());
+    };
     let address = phase.address();
     assert_eq!(faint.enemy_faints, 1);
     assert_eq!(faint.history.len(), 1);
     assert_eq!(faint.history[0].pokemon, address.pokemon);
     assert_eq!(faint.history[0].turn, address.turn);
-    let battle = state.active_run.as_ref().and_then(|run| run.battle.as_ref()).ok_or("battle absent")?;
-    let slot = battle.field.slots.iter().find(|slot| slot.slot == address.slot).ok_or("faint slot absent")?;
-    let enemy = battle.enemy_party.iter().find(|enemy| enemy.id == address.pokemon).ok_or("faint enemy absent")?;
-    let tracker = state.current_achievement_tracker.as_ref().and_then(|tracker| tracker.battle.as_ref()).ok_or("tracker absent")?;
-    assert_eq!(tracker.enemy_ko_turns.get(&address.pokemon), Some(&address.turn));
+    let battle = state
+        .active_run
+        .as_ref()
+        .and_then(|run| run.battle.as_ref())
+        .ok_or("battle absent")?;
+    let slot = battle
+        .field
+        .slots
+        .iter()
+        .find(|slot| slot.slot == address.slot)
+        .ok_or("faint slot absent")?;
+    let enemy = battle
+        .enemy_party
+        .iter()
+        .find(|enemy| enemy.id == address.pokemon)
+        .ok_or("faint enemy absent")?;
+    let tracker = state
+        .current_achievement_tracker
+        .as_ref()
+        .and_then(|tracker| tracker.battle.as_ref())
+        .ok_or("tracker absent")?;
+    assert_eq!(
+        tracker.enemy_ko_turns.get(&address.pokemon),
+        Some(&address.turn)
+    );
     assert!(tracker.enemy_field_faints.contains(&address.pokemon));
     let (index, event_id, payload) = match phase {
         F::Animation { event_id, .. } => {
-            assert_eq!(slot.occupant, Some(address.pokemon), "leaveField must wait for the animation callback");
+            assert_eq!(
+                slot.occupant,
+                Some(address.pokemon),
+                "leaveField must wait for the animation callback"
+            );
             assert_eq!(faint.battle_score, SafeU53::ZERO);
-            (0, *event_id, P::FaintAnimation { holder: address.pokemon, tween_milliseconds: 500 })
+            (
+                0,
+                *event_id,
+                P::FaintAnimation {
+                    holder: address.pokemon,
+                    tween_milliseconds: 500,
+                },
+            )
         }
         F::Message { event_id, .. } => {
             assert!(seen[0].is_some(), "faint message cannot bypass animation");
             assert_eq!(slot.occupant, None);
             assert_eq!(faint.battle_score, address.score_increase);
             assert_eq!(enemy.status.kind, er_types::battle_model::StatusKind::None);
-            assert_ne!(Some(*event_id), seen[0], "message owns a distinct presentation event");
-            (1, *event_id, P::FaintMessage { holder: address.pokemon })
+            assert_ne!(
+                Some(*event_id),
+                seen[0],
+                "message owns a distinct presentation event"
+            );
+            (
+                1,
+                *event_id,
+                P::FaintMessage {
+                    holder: address.pokemon,
+                },
+            )
         }
         F::ReadyForVictory { .. } => {
-            assert!(seen.iter().all(Option::is_some), "Victory must follow both actual faint callbacks");
+            assert!(
+                seen.iter().all(Option::is_some),
+                "Victory must follow both actual faint callbacks"
+            );
             assert_eq!(slot.occupant, None);
             assert_eq!(faint.battle_score, address.score_increase);
             return Ok(());
         }
-        F::MessageReady { .. } => return Err("unpublished intermediate faint state escaped its transaction".into()),
+        F::MessageReady { .. } => {
+            return Err("unpublished intermediate faint state escaped its transaction".into());
+        }
     };
     assert!(seen[index].is_none(), "acknowledged faint phase repeated");
     seen[index] = Some(event_id);
-    assert!(owner.pending.iter().all(|pending| pending.victory.is_none()), "Victory started before Faint finished");
-    let effect = checkpoint.pending_presentations.iter().find(|pending| pending.event_id == event_id).ok_or("owned faint presentation absent")?;
+    assert!(
+        owner
+            .pending
+            .iter()
+            .all(|pending| pending.victory.is_none()),
+        "Victory started before Faint finished"
+    );
+    let effect = checkpoint
+        .pending_presentations
+        .iter()
+        .find(|pending| pending.event_id == event_id)
+        .ok_or("owned faint presentation absent")?;
     assert_eq!(effect.payload.as_ref(), Some(&payload));
     let original = canonical_bytes(&checkpoint)?;
     if index == 0 {
-        assert!(kernel.settle_presentation_outcome(event_id,
-            er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::IntentionallySkipped).is_err());
+        assert!(
+            kernel
+                .settle_presentation_outcome(
+                    event_id,
+                    er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::IntentionallySkipped
+                )
+                .is_err()
+        );
         assert_eq!(canonical_bytes(&kernel.snapshot()?)?, original);
     }
     let blocked = kernel.advance_time(SafeU53::ZERO)?;
-    assert!(!blocked.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+    assert!(
+        !blocked
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
     assert_eq!(kernel.state(), Some(state));
     assert_missing_phase_wait_rejected(&checkpoint, event_id, content)?;
     Ok(())
@@ -425,16 +502,30 @@ fn assert_faint_timeline(
 
 #[inline(never)]
 fn assert_missing_phase_wait_rejected(
-    checkpoint: &CoreGameKernelSnapshotV7, event_id: er_types::PresentationEventId,
+    checkpoint: &CoreGameKernelSnapshotV7,
+    event_id: er_types::PresentationEventId,
     content: Arc<PreparedGameContentV2>,
 ) -> Result<()> {
+    assert_phase_title_read_reissues(checkpoint, event_id, content.clone())?;
     let mut missing = checkpoint.clone();
-    missing.pending_presentations.retain(|pending| pending.event_id != event_id);
-    assert!(restore(missing, content.clone()).is_err(), "removing a presentation is not acknowledgement");
+    missing
+        .pending_presentations
+        .retain(|pending| pending.event_id != event_id);
+    assert!(
+        restore(missing, content.clone()).is_err(),
+        "removing a presentation is not acknowledgement"
+    );
     let mut changed = checkpoint.clone();
-    changed.pending_presentations.iter_mut().find(|pending| pending.event_id == event_id)
-        .ok_or("owned presentation absent")?.payload = None;
-    assert!(restore(changed, content).is_err(), "presentation payload must match the exact phase receipt");
+    changed
+        .pending_presentations
+        .iter_mut()
+        .find(|pending| pending.event_id == event_id)
+        .ok_or("owned presentation absent")?
+        .payload = None;
+    assert!(
+        restore(changed, content).is_err(),
+        "presentation payload must match the exact phase receipt"
+    );
     Ok(())
 }
 
@@ -475,6 +566,7 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
         if let Some(victory) = pending.and_then(|pending| pending.victory.as_ref()) {
             match &victory.descendant {
                 CurrentVictoryDescendantV1::AwardPresentation { award, event_id } => {
+                    assert_phase_title_read_reissues(&checkpoint, *event_id, content.clone())?;
                     assert!(
                         !saw_award,
                         "same award prompt repeated after its exact acknowledgement"
@@ -543,6 +635,7 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
                     );
                 }
                 CurrentVictoryDescendantV1::LevelUpPresentation { end, event_id } => {
+                    assert_phase_title_read_reissues(&checkpoint, *event_id, content.clone())?;
                     assert!(saw_award && saw_level_start);
                     assert_eq!(pokemon.level, end.level_up.new_level);
                     assert_eq!(
@@ -585,8 +678,11 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
             kernel.settle_presentation(presentation.event_id)?;
             let settled = canonical_bytes(&kernel.snapshot()?)?;
             assert!(kernel.settle_presentation(presentation.event_id).is_err());
-            assert_eq!(canonical_bytes(&kernel.snapshot()?)?, settled,
-                "duplicate presentation callback must be rejected atomically");
+            assert_eq!(
+                canonical_bytes(&kernel.snapshot()?)?,
+                settled,
+                "duplicate presentation callback must be rejected atomically"
+            );
             assert_eq!(live.as_ref(), kernel.state());
         }
         let snapshot = kernel.snapshot()?;
@@ -658,5 +754,90 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
         er_save::m9e_save_v2::GameSaveV2::decode(&save.encode()?)?.state,
         *state
     );
+    Ok(())
+}
+
+// Called at the actual Faint and XP boundaries of the existing raw witness.
+// Save bytes use the real retained state; this does not claim a mid-phase Save UI.
+#[inline(never)]
+fn assert_phase_title_read_reissues(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    event_id: er_types::PresentationEventId,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    use er_kernel::game_kernel_v7::KernelStorageResultV2;
+    use er_game::m9e_material_v6::GamePresentationEffectV2;
+    let original = active(checkpoint)?;
+    let pending = checkpoint.pending_presentations.iter()
+        .find(|pending| pending.event_id == event_id).ok_or("phase prompt absent")?;
+    let expected = GamePresentationEffectV2 { event_id, semantic: pending.semantic,
+        blocking: pending.blocking, skip: pending.skip, payload: pending.payload.clone() };
+    let saved = er_save::m9e_save_v2::GameSaveV2::new(
+        original.content_identity.clone(), safe(1)?, original.clone(),
+    )?.encode()?;
+    let mut reader = GameKernelV7::natural_start(
+        original.profile.clone(), "phase-title-read".to_owned(), seat()?,
+        vec!["phase-source-slot".to_owned()], true, content.clone(),
+        KernelSchedulerSnapshotV2 { next_timer_id: Some(SafeU53::ZERO),
+            timers: vec![], pauses: vec![], disposed: false }, None,
+    )?;
+    navigate(&mut reader, "bootstrap/title/existing-saves")?;
+    let listed = press(&mut reader, PhysicalKey::Space)?;
+    let list_request = listed.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageList { request }) => Some(*request),
+        _ => None,
+    }).ok_or("Title LIST absent")?;
+    reader.apply_storage_result(list_request, KernelStorageResultV2::Slots {
+        slots: vec!["phase-source-slot".to_owned()],
+    })?;
+    let reading = press(&mut reader, PhysicalKey::Space)?;
+    let request = reading.effects.iter().find_map(|effect| match effect {
+        GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, slot })
+            if slot == "phase-source-slot" => Some(*request),
+        _ => None,
+    }).ok_or("actual Title READ absent")?;
+    let before_read = reader.snapshot()?;
+    let mut malformed = saved.clone();
+    malformed.push(b' ');
+    assert!(reader.apply_storage_result(request, KernelStorageResultV2::Read {
+        bytes: Some(malformed),
+    }).is_err());
+    assert_eq!(reader.snapshot()?, before_read, "failed READ must preserve its request");
+    let loaded = reader.apply_storage_result(request, KernelStorageResultV2::Read {
+        bytes: Some(saved.clone()),
+    })?;
+    let presentations: Vec<_> = loaded.effects.iter().filter_map(|effect| match effect {
+        GameKernelEffectV7::Presentation(effect) => Some(effect), _ => None,
+    }).collect();
+    assert_eq!(presentations, vec![&expected]);
+    assert!(loaded.internal_events.is_empty());
+    assert!(!loaded.effects.iter().any(|effect| matches!(effect,
+        GameKernelEffectV7::AuthorityMaterial { .. } | GameKernelEffectV7::Platform(_))));
+    let after_read = reader.snapshot()?;
+    assert_eq!(after_read.pending_presentations, vec![pending.clone()]);
+    assert!(after_read.pending_current_phase_ack.is_none());
+    assert_eq!(after_read.replay_sequence.get(), before_read.replay_sequence.get() + 1);
+    let actual = active(&after_read)?;
+    let mut rebound = original.clone();
+    rebound.active_run.as_mut().ok_or("saved run absent")?.control =
+        actual.active_run.as_ref().ok_or("loaded run absent")?.control.clone();
+    rebound.identities.next_platform_request_id = actual.identities.next_platform_request_id;
+    assert_eq!(&rebound, actual, "READ may rebind control/platform frontier, never payout or receipts");
+    assert!(reader.apply_storage_result(request, KernelStorageResultV2::Read {
+        bytes: Some(saved),
+    }).is_err());
+    assert_eq!(reader.snapshot()?, after_read);
+    let blocked = reader.advance_time(SafeU53::ZERO)?;
+    assert!(!blocked.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+    reader.settle_presentation(event_id)?;
+    let acknowledged = reader.snapshot()?;
+    assert!(acknowledged.pending_presentations.is_empty());
+    assert_eq!(acknowledged.pending_current_phase_ack.ok_or("actual READ prompt ack absent")?.event_id, event_id);
+    reader = restore(acknowledged, content.clone())?;
+    let mut live = reader.state().cloned();
+    let mut ledger = reader.snapshot()?.material_ledger;
+    let continuation = reader.advance_time(SafeU53::ZERO)?;
+    accept_material(&mut live, &mut ledger, &reader, &content, &continuation)?;
+    assert!(reader.snapshot()?.pending_current_phase_ack.is_none());
     Ok(())
 }

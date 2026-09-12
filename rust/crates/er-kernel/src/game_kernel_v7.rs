@@ -4,6 +4,8 @@
 pub(crate) mod current_learning_control_v7;
 #[path = "current_phase_receipt_v7.rs"]
 pub(crate) mod current_phase_receipt_v7;
+#[path = "current_phase_restore_v7.rs"]
+mod current_phase_restore_v7;
 #[path = "current_phase_v7.rs"]
 pub(crate) mod current_phase_v7;
 
@@ -1701,6 +1703,19 @@ impl GameKernelV7 {
                         "loaded save content identity differs".to_owned(),
                     ));
                 }
+                // A GameSave retains the phase, but no renderer acknowledgement.
+                // Old acknowledged work belongs to the replaced runtime and may
+                // not be silently consumed by a load callback.
+                if self.pending_current_phase_ack.is_some() {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                let reissued = current_phase_restore_v7::reissue_effects(
+                    &save.state,
+                    &self.content,
+                    self.local_seat,
+                    self.role,
+                    self.protocol.is_some(),
+                )?;
                 let current_revision = self.active_runtime()?.next_authority_revision();
                 let control_revision = save
                     .state
@@ -1735,6 +1750,8 @@ impl GameKernelV7 {
                 )
                 .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.install_step_effects(&reissued)?;
+                step.effects.extend(reissued);
                 self.next_menu_instance_id = next_menu_instance_id;
                 self.private_battle_control = None;
                 self.private_learning_control = None;
@@ -1806,6 +1823,7 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         }
         let floor = storage.next_platform_request_id;
+        let mut restored_effects = Vec::new();
         let bootstrap_revision = bootstrap.control.revision;
         match (effect, result) {
             (GamePlatformEffectV2::StorageList { .. }, KernelStorageResultV2::Slots { slots }) => {
@@ -1848,6 +1866,19 @@ impl GameKernelV7 {
                         "loaded save content identity differs".to_owned(),
                     ));
                 }
+                // A GameSave retains the phase, but no renderer acknowledgement.
+                // Old acknowledged work belongs to the replaced runtime and may
+                // not be silently consumed by a load callback.
+                if self.pending_current_phase_ack.is_some() {
+                    return Err(GameKernelV7Error::Invalid);
+                }
+                let reissued = current_phase_restore_v7::reissue_effects(
+                    &save.state,
+                    &self.content,
+                    self.local_seat,
+                    self.role,
+                    self.protocol.is_some(),
+                )?;
                 save.state
                     .validate_with(self.content.as_ref())
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
@@ -1859,7 +1890,10 @@ impl GameKernelV7 {
                     .world
                     .mode(run.mode)
                     .is_none_or(|mode| mode.cooperative)
-                    || run.control.owner_seat != Some(self.local_seat)
+                    || (run.control.owner_seat != Some(self.local_seat)
+                        && !current_phase_restore_v7::owned_waiting_phase(
+                            &save.state, &self.content, self.local_seat,
+                        ))
                     || run
                         .control
                         .action_context
@@ -1900,6 +1934,8 @@ impl GameKernelV7 {
                 )
                 .map_err(runtime_error)?;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
+                self.install_step_effects(&reissued)?;
+                restored_effects.extend(reissued);
                 self.next_menu_instance_id = next_menu;
                 self.private_battle_control = None;
                 self.private_learning_control = None;
@@ -1920,8 +1956,9 @@ impl GameKernelV7 {
             .current_control()
             .cloned()
             .ok_or(GameKernelV7Error::Invalid)?;
+        restored_effects.push(GameKernelEffectV7::UiChanged(control));
         Ok(GameKernelStepV7 {
-            effects: vec![GameKernelEffectV7::UiChanged(control)],
+            effects: restored_effects,
             internal_events: Vec::new(),
         })
     }
