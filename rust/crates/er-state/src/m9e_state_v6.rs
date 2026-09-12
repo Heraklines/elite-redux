@@ -81,6 +81,9 @@ pub trait GameStateV6ContentContext {
     fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
         false
     }
+    fn current_initial_victory_tail_matches(&self, _state: &GameStateV6) -> bool {
+        false
+    }
     fn current_experience_progress_matches(&self, _state: &GameStateV6) -> bool {
         false
     }
@@ -387,6 +390,12 @@ impl GameStateV6 {
                     .any(|pending| pending.victory.is_some())
             })
             && !content.current_experience_progress_matches(self)
+        {
+            return Err(GameStateV6Error::Content);
+        }
+        if self.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
+            .is_some_and(|o| o.pending.iter().any(|p| p.victory_tail.is_some()))
+            && !content.current_initial_victory_tail_matches(self)
         {
             return Err(GameStateV6Error::Content);
         }

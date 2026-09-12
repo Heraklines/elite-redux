@@ -469,7 +469,15 @@ pub(crate) fn complete_current_faint_message(
     Ok(candidate)
 }
 
-pub(crate) fn validate_current_initial_faint(
+pub(crate) fn validate_current_initial_faint(state: &GameStateV6, content: &PreparedGameContentV2) -> Result<(), GameRuntimeV6Error> {
+    if let Some(projected) = crate::current_initial_victory_tail::settled_projection(state)? {
+        validate_current_initial_faint_at_frontier(&projected, content)
+    } else {
+        validate_current_initial_faint_at_frontier(state, content)
+    }
+}
+
+fn validate_current_initial_faint_at_frontier(
     state: &GameStateV6,
     content: &PreparedGameContentV2,
 ) -> Result<(), GameRuntimeV6Error> {

@@ -16,10 +16,11 @@ pub(super) fn transition(
 ) -> Result<GameTransitionMaterialV6, GameRuntimeV6Error> {
     let failure = || GameRuntimeV6Error::Action;
     let run = before.active_run.as_ref().ok_or_else(failure)?;
-    let turn = before.current_turn_execution.as_ref().ok_or_else(failure)?;
+
     let pending_id = match &phase {
         GameOwnedPhaseV1::Victory { pending, .. }
-        | GameOwnedPhaseV1::VictoryPresentation { pending, .. } => *pending,
+        | GameOwnedPhaseV1::VictoryPresentation { pending, .. }
+        | GameOwnedPhaseV1::VictoryTail { pending } => *pending,
         _ => return Err(failure()),
     };
     let pending = before
@@ -33,6 +34,9 @@ pub(super) fn transition(
                 .find(|pending| pending.id == pending_id)
         })
         .ok_or_else(failure)?;
+    let turn = before.current_turn_execution.as_ref().or_else(|| {
+        pending.victory_tail.as_ref().map(|tail| tail.original_turn.as_ref())
+    }).ok_or_else(failure)?;
     if operation_id.as_str().is_empty()
         || revision == SafeU53::ZERO
         || run.control.revision != revision
@@ -56,9 +60,21 @@ pub(super) fn transition(
                 before, content, pending_id, *event_id,
             )?)
         }
-        GameOwnedPhaseV1::Victory { .. } if pending.victory.is_none() => Pump::Advanced(
-            current_victory_pump::begin_current_victory(before, content, pending_id)?,
-        ),
+        GameOwnedPhaseV1::Victory { .. } if pending.victory.is_none() => {
+            let claimed = crate::current_initial_victory_tail::claim(before, content, pending_id)?;
+            Pump::Advanced(current_victory_pump::begin_current_victory(claimed.as_ref().unwrap_or(before), content, pending_id)?)
+        }
+        GameOwnedPhaseV1::VictoryTail { .. } => {
+            use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
+            let tail = pending.victory_tail.as_ref().ok_or_else(failure)?;
+            let candidate = match &tail.phase {
+                T::TurnSettlement { .. } => crate::current_initial_victory_tail::settle_turn(before, content, pending_id)?,
+                T::BattleEnd { .. } => crate::current_initial_victory_tail::settle_battle_end(before, content, pending_id)?,
+                T::EggLapse { .. } => return Err(GameRuntimeV6Error::Domain("source EggLapse reward boundary remains pending".into())),
+                T::Claimed => return Err(failure()),
+            };
+            Pump::Advanced(candidate)
+        }
         GameOwnedPhaseV1::Victory { .. } => {
             current_victory_pump::pump_current_victory(before, content, pending_id)?
         }
@@ -111,7 +127,8 @@ pub(super) fn transition(
                 children.parent.level_up.award.phase.pokemon.get()
             )));
         }
-        Pump::LevelUpAccount(_) | Pump::Complete => return Err(failure()),
+        Pump::Complete => (crate::current_initial_victory_tail::finish_experience(before, content, pending_id)?, None),
+        Pump::LevelUpAccount(_) => return Err(failure()),
     };
     let mut presentation = Vec::new();
     if let Some(request) = request {

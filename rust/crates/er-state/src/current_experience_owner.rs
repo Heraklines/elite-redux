@@ -109,6 +109,8 @@ pub struct CurrentPendingExperienceV1 {
     pub victory_defeated_total: Option<SafeU53>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub victory: Option<crate::current_victory_execution::CurrentVictoryExecutionV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub victory_tail: Option<crate::current_initial_victory_tail::CurrentInitialVictoryTailV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -253,6 +255,9 @@ impl CurrentExperienceOwnerV1 {
         }
         let recipients = recipient_snapshot(run, self.source_progression.is_some())?;
         for (index, (pending, faint)) in self.pending.iter().zip(expected).enumerate() {
+            if pending.victory_tail.is_some() && self.source_progression.is_none() {
+                return Err(CurrentExperienceOwnerError::Invalid);
+            }
             match (&self.execution_origin, &pending.friendship) {
                 (Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic), Some(phase)) => {
                     phase.validate(pending)?;
@@ -264,7 +269,7 @@ impl CurrentExperienceOwnerV1 {
                         return Err(CurrentExperienceOwnerError::Invalid);
                     }
                 }
-                (None, None) if pending.victory.is_none() => {}
+                (None, None) if pending.victory.is_none() && pending.victory_tail.is_none() => {}
                 _ => return Err(CurrentExperienceOwnerError::Invalid),
             }
             let source = self
@@ -402,6 +407,7 @@ impl CurrentExperienceOwnerV1 {
                     .map(|_| CurrentFriendshipPhaseV1::default()),
                 victory_defeated_total: None,
                 victory: None,
+                victory_tail: None,
             });
             candidate.next_pending_id = next;
         }

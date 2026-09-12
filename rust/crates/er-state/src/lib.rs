@@ -6,6 +6,7 @@ pub mod bespoke_v2;
 pub mod conditions;
 pub mod current_battle_participation;
 pub mod current_experience_owner;
+ pub mod current_initial_victory_tail;
 pub mod current_friendship_profile;
 pub mod current_phase_tree;
 pub mod current_presentation;

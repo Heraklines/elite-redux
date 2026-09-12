@@ -22,6 +22,9 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         menu_instance: MenuInstanceId,
     },
+    VictoryTail {
+        pending: SafeU53,
+    },
     VictoryPresentation {
         pending: SafeU53,
         event_id: PresentationEventId,
@@ -32,18 +35,21 @@ pub enum GameOwnedPhaseV1 {
     },
 }
 
-/// The observation owner remains restricted to 1v1. Controlled doubles may
-/// exercise retained mechanics only with an explicitly incomplete tracker;
+/// The observation owner remains restricted to 1v1. Controlled mechanics may
+/// retain actions only with an explicitly incomplete tracker and no XP owner;
 /// absence alone never grants source progression or achievement authority.
-pub(super) fn unobserved_mechanical_doubles(state: &GameStateV6) -> bool {
-    state.current_battle_participation.is_none()
-        && state.current_presentation.is_some()
+pub(super) fn unobserved_mechanical_battle(state: &GameStateV6) -> bool {
+    state.current_presentation.is_some()
         && state.current_targeting.is_some()
         && state.current_achievement_tracker.as_ref().is_some_and(|tracker| {
             tracker.history == er_state::current_achievement_tracker::CurrentAchievementHistoryV1::UnobservedMechanicalFixture
         })
         && state.active_run.as_ref().and_then(|run| run.battle.as_ref()).is_some_and(|battle| {
-            battle.format.player_capacity == 2 && battle.format.enemy_capacity == 2
+            match state.current_battle_participation.as_ref() {
+                Some(participation) => participation.experience.is_none()
+                    && battle.format == er_types::battle_ids::BattleFormat::single(),
+                None => battle.format.player_capacity == 2 && battle.format.enemy_capacity == 2,
+            }
         })
 }
 
@@ -55,7 +61,7 @@ pub(super) fn begin_owned_turn(
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     if before.current_turn_execution.is_some()
         || before.current_presentation.is_none()
-        || (before.current_battle_participation.is_none() && !unobserved_mechanical_doubles(before))
+        || (before.current_battle_participation.is_none() && !unobserved_mechanical_battle(before))
     {
         return Err(GameRuntimeV6Error::Action);
     }
@@ -300,6 +306,9 @@ fn phase_transition(
         .active_run
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
+    if matches!(phase, GameOwnedPhaseV1::VictoryTail { .. }) {
+        return current_victory_transition::transition(before, content, operation_id, authority_seat, revision, phase);
+    }
     let turn = before
         .current_turn_execution
         .as_ref()
@@ -385,6 +394,7 @@ fn phase_transition(
         | GameOwnedPhaseV1::TurnFinish
         | GameOwnedPhaseV1::Victory { .. }
         | GameOwnedPhaseV1::VictoryPresentation { .. }
+        | GameOwnedPhaseV1::VictoryTail { .. }
         | GameOwnedPhaseV1::FaintBegin { .. }
         | GameOwnedPhaseV1::FaintPresentation { .. } => {
             return Err(GameRuntimeV6Error::Invalid);
@@ -561,7 +571,7 @@ fn turn_step_transition(
                 .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
                 .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
         ),
-        None if unobserved_mechanical_doubles(before) => None,
+        None if unobserved_mechanical_battle(before) => None,
         None => return Err(GameRuntimeV6Error::Action),
     };
     let mut candidate = adopt_v5_with_turn(

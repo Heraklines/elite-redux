@@ -879,7 +879,7 @@ fn execute_battle(
         .as_ref()
         .and_then(|value| value.experience.as_ref())
         .is_some_and(|owner| owner.execution_origin.is_some())
-        || current_phase_runtime::unobserved_mechanical_doubles(before)
+        || current_phase_runtime::unobserved_mechanical_battle(before)
     {
         return current_phase_runtime::begin_owned_turn(before, content, commands, authority);
     }

@@ -50,3 +50,4 @@ pub(crate) mod current_level_account;
 pub(crate) mod current_source_progression;
 pub(crate) mod current_victory_pump;
 pub(crate) mod current_victory_start;
+pub(crate) mod current_initial_victory_tail;
