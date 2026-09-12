@@ -1,3 +1,6 @@
+import { MoveEffectPhase } from "#phases/move-effect-phase";
+import { MoveUseMode } from "#enums/move-use-mode";
+import { getErEarlyWaveMovePowerMultiplier, getErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { BooleanHolder } from "#utils/common";
 import { StatStageChangePhase } from "#phases/stat-stage-change-phase";
 import { Stat } from "#enums/stat";
@@ -305,8 +308,9 @@ test("observe actual initialized target capability registry", async () => {
   const turnCounters=observeActualNeutralTurnEnd();
   const battleScores=observeActualBattleEndScoreTurns();
   const growl=observeActualGrowlChild();
+  const growlDispatch=observeActualGrowlDispatch();
   const tail=`${JSON.stringify({schema_version:4,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
-    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters,battle_scores:battleScores,growl})}\n`;
+    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters,battle_scores:battleScores,growl,growl_dispatch:growlDispatch})}\n`;
   expect(Buffer.byteLength(tail,"utf8")).toBeLessThanOrEqual(16384);
   writeFileSync(tailPath,tail,{encoding:"utf8",flag:"wx"});
 });
@@ -800,6 +804,39 @@ function observeActualGrowlChild() {
     target.setStatStage(Stat.ATK,original.stage);target.turnData.statStagesDecreased=original.decreased;scene.moveAnimations=original.animations;
   }
   return {scope:"actual Growl attr and captured stat child; controlled Attack stages, visual tween disabled; not a selected move or full battle loop",
-    move:{id:move.id,category:move.category,power:move.power,attack_class:move.is("AttackMove"),status_class:move.is("StatusMove"),effective_category:category,effective_power:power,simulated_damage:query.damage,chance:move.chance,stats:attr.stats,stages:attr.stages,self_target:attr.selfTarget},
+    move:{id:move.id,category:move.category,power:move.power,attack_class:move.is("AttackMove"),status_class:move.is("StatusMove"),effective_category:category,effective_power:power,pacing:getErRunPacing(),wave:scene.currentBattle.waveIndex,power_multiplier:getErEarlyWaveMovePowerMultiplier(scene.currentBattle.waveIndex),simulated_damage:query.damage,chance:move.chance,stats:attr.stats,stages:attr.stages,self_target:attr.selfTarget},
     families,abilities,cases,battle_rng_unchanged:scene.currentBattle.captureDeterministicRngState()===battleRng,rng_restored:Phaser.Math.RND.state()===rng};
+}
+
+
+function observeActualGrowlDispatch() {
+  const scene=globalScene, user=scene.getEnemyParty()[0], target=scene.getPlayerParty()[0], move=allMoves[45];
+  const phase=new MoveEffectPhase(user.getBattlerIndex(),[target.getBattlerIndex()],move,MoveUseMode.NORMAL);
+  const actual=phase as unknown as {firstHit:boolean;lastHit:boolean;hitCheck:(target:typeof user)=>[number,number];applyMoveEffects:(target:typeof user,effectiveness:number,firstTarget:boolean)=>void};
+  expect(vi.isMockFunction(actual.hitCheck)).toBe(false);expect(vi.isMockFunction(actual.applyMoveEffects)).toBe(false);
+  expect(vi.isMockFunction(target.damageAndUpdate)).toBe(false);
+  expect(scene.phaseManager.hasPhaseOfType("StatStageChangePhase")).toBe(false);
+  // Explicit single-hit phase context; methods remain actual pinned source.
+  // No menu, PP deduction, animation callback or whole-turn qualification here.
+  user.turnData.hitCount=1;user.turnData.hitsLeft=1;
+  actual.firstHit=true;actual.lastHit=true;
+  scene.currentBattle.lastEnemyInvolved=phase.fieldIndex;
+  scene.moveAnimations=false;
+  const before={hp:target.hp,stage:target.getStatStage(Stat.ATK),damage_taken:target.turnData.damageTaken};
+  const rng=Phaser.Math.RND.state(),battleRng=scene.currentBattle.captureDeterministicRngState();
+  const check=actual.hitCheck(target);expect(check[0]).toBe(1);
+  const afterHitRng=scene.currentBattle.captureDeterministicRngState();
+  actual.applyMoveEffects(target,check[1],true);
+  const queued={hp:target.hp,stage:target.getStatStage(Stat.ATK),damage_taken:target.turnData.damageTaken};
+  expect(queued.hp).toBeGreaterThan(0);expect(queued.hp).toBeLessThan(before.hp);expect(queued.stage).toBe(before.stage);
+  let child:StatStageChangePhase|null=null;
+  expect(scene.phaseManager.hasPhaseOfType("StatStageChangePhase",p=>{child=p;return true;})).toBe(true);
+  expect(scene.phaseManager.tryRemovePhase("StatStageChangePhase",p=>p===child)).toBe(true);
+  const afterDispatchRng=scene.currentBattle.captureDeterministicRngState();
+  (child as unknown as StatStageChangePhase).start();
+  return {scope:"actual hitCheck and applyMoveEffects dispatch with explicit single-hit context, then captured stat child; excludes menu, PP and move animation",
+    before,check,queued,after:{hp:target.hp,stage:target.getStatStage(Stat.ATK),damage_taken:target.turnData.damageTaken},
+    hit_rng_changed:afterHitRng!==battleRng,damage_rng_changed:afterDispatchRng!==afterHitRng,
+    child_rng_unchanged:scene.currentBattle.captureDeterministicRngState()===afterDispatchRng,
+    global_rng_restored:Phaser.Math.RND.state()===rng};
 }
