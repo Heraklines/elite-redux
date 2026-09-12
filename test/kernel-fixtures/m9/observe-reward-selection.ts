@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createArrangement } from "#data/battle-format";
 import { allMoves } from "#data/data-lists";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -127,9 +128,12 @@ function observeBattleFormat(format:Battle["format"]){
   }
   expect(slots.length).toBeLessThanOrEqual(16);expect(new Set(slots).size).toBe(slots.length);
   expect(typeof format.adjacency.reaches).toBe("function");expect(vi.isMockFunction(format.adjacency.reaches)).toBe(false);
+  const arrangement=createArrangement(format);
   const rows:Array<[number,number,boolean]>=[];
   for(const from of slots)for(const to of slots){
-    const reachable=format.adjacency.reaches(from,to);expect(typeof reachable).toBe("boolean");
+    const fromId=arrangement.locate(from);const toId=arrangement.locate(to);
+    expect(arrangement.indexOf(fromId)).toBe(from);expect(arrangement.indexOf(toId)).toBe(to);
+    const reachable=format.adjacency.reaches(fromId,toId);expect(typeof reachable).toBe("boolean");
     expect(Phaser.Math.RND.state()).toBe(before);rows.push([from,to,reachable]);
   }
   return {id:format.id,sides,localPlayerSide:format.localPlayerSide,adjacency:{slots,rows}};
