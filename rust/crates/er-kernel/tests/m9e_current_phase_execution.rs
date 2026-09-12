@@ -312,14 +312,14 @@ fn controlled_before_knockout(
     pokemon.hp = pokemon.max_hp;
     pokemon.stats.speed = 1;
     pokemon.stats.attack = 500;
-    let mut tackle = pokemon.moves[0].clone().ok_or("source move absent")?;
+    let mut tackle = pokemon.moves[0].ok_or("source move absent")?;
     tackle.move_id = MoveId::new(safe(33)?);
     tackle.pp_used = 0;
     tackle.pp_ups = 0;
     tackle.max_pp_override = None;
     pokemon.moves = [None, None, None, None];
     for (slot, id) in moves.iter().enumerate() {
-        let mut entry = tackle.clone();
+        let mut entry = tackle;
         entry.move_id = MoveId::new(safe(*id)?);
         pokemon.moves[slot] = Some(entry);
     }
@@ -931,7 +931,9 @@ fn assert_phase_title_read_reissues(
 #[test]
 fn epoch_zero_max_unlock_does_not_request_or_repeat_achievement_reward() -> Result<()> {
     use er_state::current_experience_owner::CurrentFriendshipClockPurposeV1;
-    use er_state::current_friendship_profile::{CurrentFriendshipRibbonV1, CURRENT_FRIENDSHIP_RIBBON_V1};
+    use er_state::current_friendship_profile::{
+        CURRENT_FRIENDSHIP_RIBBON_V1, CurrentFriendshipRibbonV1,
+    };
     let content = content()?;
     let kernel = controlled_before_knockout(content.clone(), 5, &[33])?;
     let mut snapshot = kernel.snapshot()?;
@@ -941,26 +943,57 @@ fn epoch_zero_max_unlock_does_not_request_or_repeat_achievement_reward() -> Resu
     let pokemon = &mut state.active_run.as_mut().ok_or("run absent")?.party[0];
     pokemon.friendship = 252;
     let species = pokemon.species_id;
-    let profile = state.current_friendship_profile.as_mut().ok_or("fresh account absent")?;
+    let profile = state
+        .current_friendship_profile
+        .as_mut()
+        .ok_or("fresh account absent")?;
     let rewards = profile.rewards.as_mut().ok_or("reward owner absent")?;
     rewards.max_friendship_unlocked_at = Some(0);
-    rewards.ribbons = vec![CurrentFriendshipRibbonV1 { species, bits: safe(CURRENT_FRIENDSHIP_RIBBON_V1)? }];
+    rewards.ribbons = vec![CurrentFriendshipRibbonV1 {
+        species,
+        bits: safe(CURRENT_FRIENDSHIP_RIBBON_V1)?,
+    }];
     rewards.cosmetic_bits = vec![0, 0, 0, 0, 128, 1];
-    let previous_candy = profile.accounts.iter().map(|row| (row.species, row.candy_count)).collect::<Vec<_>>();
+    let previous_candy = profile
+        .accounts
+        .iter()
+        .map(|row| (row.species, row.candy_count))
+        .collect::<Vec<_>>();
     state.validate_with(content.as_ref())?;
-    snapshot.material_ledger = AppliedGameMaterialLedgerV1::new(snapshot.material_ledger.next_authority_revision)?;
+    snapshot.material_ledger =
+        AppliedGameMaterialLedgerV1::new(snapshot.material_ledger.next_authority_revision)?;
     let mut kernel = restore(snapshot, content.clone())?;
     let (mut live, mut ledger) = admit_knockout(&mut kernel, &content)?;
     for _ in 0..96 {
         let current = kernel.snapshot()?;
         for pending in &current.pending_platform {
             if let GamePlatformEffectV2::CurrentFriendshipClock { request } = &pending.effect {
-                assert_eq!(request.purpose, CurrentFriendshipClockPurposeV1::TimedEvent,
-                    "Object.hasOwn treats epoch-zero unlock as present: no second achievement clock");
+                assert_eq!(
+                    request.purpose,
+                    CurrentFriendshipClockPurposeV1::TimedEvent,
+                    "Object.hasOwn treats epoch-zero unlock as present: no second achievement clock"
+                );
                 let state = active(&current)?;
-                let profile = state.current_friendship_profile.as_ref().ok_or("account absent")?;
-                assert_eq!(profile.rewards.as_ref().ok_or("rewards absent")?.max_friendship_unlocked_at, Some(0));
-                assert_eq!(profile.accounts.iter().map(|row| (row.species, row.candy_count)).collect::<Vec<_>>(), previous_candy);
+                let profile = state
+                    .current_friendship_profile
+                    .as_ref()
+                    .ok_or("account absent")?;
+                assert_eq!(
+                    profile
+                        .rewards
+                        .as_ref()
+                        .ok_or("rewards absent")?
+                        .max_friendship_unlocked_at,
+                    Some(0)
+                );
+                assert_eq!(
+                    profile
+                        .accounts
+                        .iter()
+                        .map(|row| (row.species, row.candy_count))
+                        .collect::<Vec<_>>(),
+                    previous_candy
+                );
                 let restored = restore(current.clone(), content.clone())?;
                 assert_eq!(restored.snapshot()?, current);
                 return Ok(());
