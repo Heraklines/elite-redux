@@ -623,7 +623,8 @@ function validateVictoryTail(t) {
     keys(row,["turn","input","multiplier","before","after"]);
     assert.equal(row.turn,2+Math.floor(index/3));assert.equal(row.input,[1,113,10000][index%3]);
     assert.equal(row.before,7);
-    const multiplier=1-Math.cos((1-Math.min(row.turn-2,10)/10)*Math.PI/2);
+    const value=1-Math.min(row.turn-2,10)/10;
+    const multiplier=value===0?0:value===1?1:1-Math.cos(value*Math.PI/2);
     assert.equal(row.multiplier,multiplier);
     assert.equal(row.after,7+Math.ceil(row.input*multiplier));
   }

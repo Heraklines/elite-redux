@@ -181,7 +181,7 @@ STAT_OWNER_PINS = {"src/modifier/modifier.ts":["ce600a1acbe931402679f95832919f8d
 ORACLE_PINS.update(STAT_OWNER_PINS)
 TUNING_PATH = "src/data/elite-redux/er-balance-tuning.json"
 TUNING_BLOB = "04755b16e916c3e364917b67a9718cf0ee01ae6b"
-RNG_FILES = ["node_modules/phaser/package.json", "node_modules/phaser/src/math/random-data-generator/RandomDataGenerator.js"]
+RNG_FILES = ["node_modules/phaser/package.json", "node_modules/phaser/src/math/random-data-generator/RandomDataGenerator.js", "node_modules/phaser/src/math/easing/sine/In.js"]
 
 TAIL_SOURCE_PINS = {
     "src/data/pokemon/pokemon-data.ts": ["ce9b474196c5a3c68e0d1c11b23804632d7931f65715eb11a687ec8de667675c", 32866],
@@ -596,6 +596,7 @@ def main(summary):
     rng_inputs = installed_phaser_inputs()
     require(json.loads((ORACLE / rng_inputs[RNG_FILES[0]]["resolved_path"]).read_bytes()).get("version") == "3.90.0", "qualified Phaser version required")
     summary["phaser_runtime_inputs"] = rng_inputs
+    require(rng_inputs["node_modules/phaser/src/math/easing/sine/In.js"]["sha256"] == "7735907d87f4c3334670b5246a8493d01bb7fce464fb87fbe6fa82ca2e1d62d7" and rng_inputs["node_modules/phaser/src/math/easing/sine/In.js"]["bytes"] == 574, "exact Phaser Sine.In implementation")
     summary["fresh_process_exports"] = []
     for ordinal in ("one", "two"):
         destination = OUTPUT / f"export-{ordinal}.json"
