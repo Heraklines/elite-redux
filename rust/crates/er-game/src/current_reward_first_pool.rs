@@ -114,7 +114,12 @@ impl FirstRewardPool {
             }
         }
         let seed=shift_char_codes(&run.seed,1).map_err(|_|RollError::Invalid)?;
-        Ok(Self{rng:RngRuntime::from_run_seed(&seed),thresholds:std::array::from_fn(|_|Vec::new()),weights,attack_types})
+        let reset_run=RngRuntime::from_run_seed(&seed).run_state();
+        let battle=run.battle.as_ref().ok_or(RollError::Invalid)?;
+        // updateSeed replaces the run stream only. Every audit entry retains
+        // the actual unchanged battle stream instead of claiming its absence.
+        let rng=RngRuntime::from_states(reset_run,Some(battle.battle_rng.clone())).map_err(|_|RollError::Invalid)?;
+        Ok(Self{rng,thresholds:std::array::from_fn(|_|Vec::new()),weights,attack_types})
     }
     pub(crate) fn state(&self)->er_rng::phaser::PhaserRdgState{self.rng.run_state().rdg}
     pub(crate) fn audit(&self)->Vec<RngDraw>{self.rng.audit_entries().to_vec()}

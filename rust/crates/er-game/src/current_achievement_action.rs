@@ -61,7 +61,7 @@ pub(crate) fn fold_current_achievement_action(
             .flat_map(|pool| &pool.species)
             .map(|id| id.get().get())
             .collect();
-        if biome.key != "TOWN"
+        if biome.key != "biome/0"
             || biome.trainer_chance_denominator != 0
             || ids != INITIAL_TOWN_SPECIES.into_iter().collect()
         {

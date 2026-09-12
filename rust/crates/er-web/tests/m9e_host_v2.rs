@@ -868,6 +868,23 @@ fn browser_time_and_lifecycle_requests_execute_kernel_state_changes() -> Result<
 
 #[test]
 fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(), Box<dyn Error>> {
+    let (mut browser, proposal) = network_host_setup()?;
+    network_ingress(&mut browser, proposal)?;
+    let staged = network_transport_changes(&mut browser)?;
+    network_transport_replay(&mut browser, &staged)
+}
+
+#[inline(never)]
+fn network_snapshot(
+    browser: &BrowserKernelHostV2,
+) -> Result<Box<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>, Box<dyn Error>> {
+    Ok(Box::new(
+        browser.kernel_ref().ok_or("kernel missing")?.snapshot()?,
+    ))
+}
+
+#[inline(never)]
+fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>> {
     let prepared = shared_content()?;
     let (source, _) = active_host()?;
     let mut snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
@@ -902,7 +919,7 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
     };
     state.active_run.as_mut().ok_or("run missing")?.control = control.clone();
     let save = GameSaveV2::new(prepared.identity().clone(), safe(1), state.clone())?;
-    let mut browser = BrowserKernelHostV2::from_content(shared_content()?);
+    let mut browser = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
     send(
         &mut browser,
         0,
@@ -930,8 +947,16 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
             },
         },
     };
+    Ok((browser, proposal))
+}
+
+#[inline(never)]
+fn network_ingress(
+    browser: &mut BrowserKernelHostV2,
+    proposal: GameProposalEnvelopeV2,
+) -> Result<(), Box<dyn Error>> {
     let response = send(
-        &mut browser,
+        browser,
         1,
         BrowserRequestV2::NetworkFrame {
             generation: safe(9),
@@ -948,15 +973,22 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
             .any(|effect| matches!(effect, BrowserEffectV2::SendNetworkFrame { .. }))
     );
 
+    Ok(())
+}
+
+#[inline(never)]
+fn network_transport_changes(
+    browser: &mut BrowserKernelHostV2,
+) -> Result<Box<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>, Box<dyn Error>> {
     send(
-        &mut browser,
+        browser,
         2,
         BrowserRequestV2::TransportChanged {
             generation: safe(9),
             connected: false,
         },
     )?;
-    let disconnected = browser.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let disconnected = network_snapshot(browser)?;
     let disconnected_protocol = disconnected.protocol.as_ref().ok_or("protocol missing")?;
     assert_eq!(
         disconnected_protocol.connections[0].state,
@@ -964,14 +996,14 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
     );
     assert!(!disconnected.scheduler.pauses.is_empty());
     send(
-        &mut browser,
+        browser,
         3,
         BrowserRequestV2::TransportChanged {
             generation: safe(9),
             connected: true,
         },
     )?;
-    let connected = browser.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let connected = network_snapshot(browser)?;
     let connected_protocol = connected.protocol.as_ref().ok_or("protocol missing")?;
     assert_eq!(
         connected_protocol.connections[0].state,
@@ -980,14 +1012,14 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
     assert!(connected.scheduler.pauses.is_empty());
     retained_generation_decimal_byte_boundaries(&connected)?;
     send(
-        &mut browser,
+        browser,
         4,
         BrowserRequestV2::TransportChanged {
             generation: safe(10),
             connected: true,
         },
     )?;
-    let staged = browser.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    let staged = network_snapshot(browser)?;
     assert_eq!(
         staged
             .protocol
@@ -997,8 +1029,16 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
             .generation,
         ConnectionGeneration::new(safe(10))
     );
+    Ok(staged)
+}
+
+#[inline(never)]
+fn network_transport_replay(
+    browser: &mut BrowserKernelHostV2,
+    staged: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+) -> Result<(), Box<dyn Error>> {
     let mut sequence = 5;
-    let (capsule_bytes, capsule) = export_current_capsule(&mut browser, &mut sequence)?;
+    let (capsule_bytes, capsule) = export_current_capsule(browser, &mut sequence)?;
     let transport = capsule
         .browser_transport
         .as_ref()
@@ -1009,7 +1049,7 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
         matches!(capsule.attempts.last().ok_or("transport attempt missing")?.event,
         CurrentExternalEvent::TransportChanged { generation, connected: true } if generation == ConnectionGeneration::new(safe(10)))
     );
-    let mut imported = BrowserKernelHostV2::from_content(shared_content()?);
+    let mut imported = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
     send(
         &mut imported,
         0,
@@ -1019,13 +1059,10 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
             }),
         },
     )?;
-    assert_eq!(
-        imported.kernel_ref().ok_or("kernel missing")?.snapshot()?,
-        staged
-    );
+    assert_eq!(network_snapshot(&imported)?.as_ref(), staged);
     // An older transport generation must remain an adapter rejection after
     // import even while the newer generation is only staged in the kernel.
-    for (host, sequence) in [(&mut browser, sequence), (&mut imported, 1)] {
+    for (host, sequence) in [(&mut *browser, sequence), (imported.as_mut(), 1)] {
         assert!(
             send(
                 host,
@@ -1037,10 +1074,7 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
             )
             .is_err()
         );
-        assert_eq!(
-            host.kernel_ref().ok_or("kernel missing")?.snapshot()?,
-            staged
-        );
+        assert_eq!(network_snapshot(host)?.as_ref(), staged);
         assert!(matches!(
             host.capture_status(),
             Some(CurrentCaptureStatusV1::Unavailable { .. })
@@ -1054,8 +1088,8 @@ fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(),
         )?;
     }
     assert_eq!(
-        imported.kernel_ref().ok_or("kernel missing")?.snapshot()?,
-        browser.kernel_ref().ok_or("kernel missing")?.snapshot()?
+        network_snapshot(&imported)?,
+        network_snapshot(browser)?
     );
     Ok(())
 }

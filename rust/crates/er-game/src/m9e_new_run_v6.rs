@@ -129,15 +129,21 @@ pub fn construct_natural_run_v6(
             || !bootstrap.selections.choices.is_empty()
             || shared.owner_seat != owner
             || shared.content_identity != *content.identity()
-            || biome.key != "TOWN"
+            || biome.id.get().get() != 0
+            || biome.key != "biome/0"
             || biome.trainer_chance_denominator != 0
             || difficulty == er_types::RunDifficultyV1::Mystery
         {
             return Err(NaturalRunV6Error::State(format!(
                 "initial current constructor admission: mode={}, cooperative={}, challenge_selection={}, supported={}, choices={}, owner_match={}, content_match={}, biome={}, trainer_denominator={}, difficulty={difficulty:?}",
-                mode.key, mode.cooperative, mode.challenge_selection, mode.supported,
-                bootstrap.selections.choices.len(), shared.owner_seat == owner,
-                shared.content_identity == *content.identity(), biome.key,
+                mode.key,
+                mode.cooperative,
+                mode.challenge_selection,
+                mode.supported,
+                bootstrap.selections.choices.len(),
+                shared.owner_seat == owner,
+                shared.content_identity == *content.identity(),
+                biome.key,
                 biome.trainer_chance_denominator,
             )));
         }

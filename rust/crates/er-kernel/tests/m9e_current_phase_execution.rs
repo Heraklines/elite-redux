@@ -1548,7 +1548,8 @@ fn assert_current_reward_choice_and_pick(
     assert_eq!(selected.rng_audit.last().ok_or("reward audit absent")?.after_state.run.state_string,selected.rng_after);
     *kernel=restore(*checkpoint.clone(),content.clone())?;
     assert_eq!(canonical_bytes(&kernel.snapshot()?)?,canonical_bytes(&*checkpoint)?);
-    assert_reward_forgery_rejected(&checkpoint,content.clone())?;
+    assert_reward_forgery_rejected(&checkpoint,content.clone(),false)?;
+    assert_reward_forgery_rejected(&checkpoint,content.clone(),true)?;
     for pending in kernel.snapshot()?.pending_presentations {kernel.settle_presentation(pending.event_id)?;}
     let frozen=canonical_bytes(kernel.state().ok_or("reward state absent")?)?;
     for _ in 0..3 {
@@ -1609,12 +1610,22 @@ fn assert_current_reward_choice_and_pick(
 }
 
 #[inline(never)]
-fn assert_reward_forgery_rejected(checkpoint:&CoreGameKernelSnapshotV7,content:Arc<PreparedGameContentV2>)->Result<()> {
+fn assert_reward_forgery_rejected(checkpoint:&CoreGameKernelSnapshotV7,content:Arc<PreparedGameContentV2>,alter_rng:bool)->Result<()> {
     let mut forged=Box::new(checkpoint.clone());
     let GameKernelLifecycleSnapshotV7::Active(state)=&mut forged.lifecycle else{return Err("reward state absent".into());};
     let reward=state.current_battle_participation.as_mut().and_then(|p|p.experience.as_mut())
         .and_then(|o|o.pending.first_mut()).and_then(|p|p.victory_tail.as_mut()).and_then(|t|t.reward.as_mut()).ok_or("reward absent")?;
-    reward.offers[0].name.push_str(" forged");
+    if alter_rng {
+        let draw=reward.rng_audit.first_mut().ok_or("reward audit absent")?;
+        assert!(draw.before_state.battle.is_some() && draw.after_state.battle.is_some());
+        draw.before_state.battle=None;
+        draw.after_state.battle=None;
+        draw.before_fingerprint=er_rng::audit::rng_state_fingerprint(&draw.before_state)?;
+        draw.after_fingerprint=er_rng::audit::rng_state_fingerprint(&draw.after_state)?;
+        draw.validate()?;
+    }else{
+        reward.offers[0].name.push_str(" forged");
+    }
     assert!(restore(*forged,content).is_err(),"restore must regenerate full names/identities, not trust snapshot offers");Ok(())
 }
 
