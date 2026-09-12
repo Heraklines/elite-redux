@@ -81,6 +81,25 @@ pub struct PrivateBattleControlSnapshotV7 {
     pub return_control: GameControlPlanV2,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingVictoryAckV1 {
+    pub pending: SafeU53,
+    pub event_id: PresentationEventId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CurrentPhasePresentationKindV1 { Victory, FaintAnimation, FaintMessage }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingCurrentPhaseAckV1 {
+    pub pending: SafeU53,
+    pub event_id: PresentationEventId,
+    pub kind: CurrentPhasePresentationKindV1,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CoreGameKernelSnapshotV7 {
@@ -88,6 +107,10 @@ pub struct CoreGameKernelSnapshotV7 {
     pub lifecycle: GameKernelLifecycleSnapshotV7,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub private_battle_control: Option<PrivateBattleControlSnapshotV7>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub private_learning_control: Option<GameControlPlanV2>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_current_phase_ack: Option<PendingCurrentPhaseAckV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -116,6 +139,39 @@ pub enum SnapshotV7Error {
 
 impl CoreGameKernelSnapshotV7 {
     pub fn validate(&self, content: &PreparedGameContentV2) -> Result<(), SnapshotV7Error> {
+        let learning = matches!(&self.lifecycle, GameKernelLifecycleSnapshotV7::Active(state)
+            if crate::game_kernel_v7::current_learning_control_v7::current_batch(state).is_some());
+        if learning || self.private_learning_control.is_some() {
+            let GameKernelLifecycleSnapshotV7::Active(state) = &self.lifecycle else {
+                return Err(SnapshotV7Error::Invalid);
+            };
+            if self.private_battle_control.is_some() || self.protocol.is_some() {
+                return Err(SnapshotV7Error::Invalid);
+            }
+            let seat = state.active_run.as_ref().and_then(|run| run.control.owner_seat)
+                .ok_or(SnapshotV7Error::Invalid)?;
+            crate::game_kernel_v7::current_learning_control_v7::validate_private_learning_control(
+                state, self.private_learning_control.as_ref(), seat,
+            ).map_err(|_| SnapshotV7Error::Invalid)?;
+        }
+        if let GameKernelLifecycleSnapshotV7::Active(state) = &self.lifecycle {
+            for ack in crate::game_kernel_v7::current_phase_receipt_v7::expected_presentations(state) {
+                let waiting = self.pending_presentations.iter().any(|effect| effect.event_id == ack.event_id);
+                let acknowledged = self.pending_current_phase_ack == Some(ack);
+                if waiting == acknowledged
+                    || !crate::game_kernel_v7::current_phase_receipt_v7::receipt_matches(state, content, ack)
+                { return Err(SnapshotV7Error::Invalid); }
+            }
+        }
+        if let Some(ack) = self.pending_current_phase_ack {
+            let GameKernelLifecycleSnapshotV7::Active(state) = &self.lifecycle else {
+                return Err(SnapshotV7Error::Invalid);
+            };
+            if self.protocol.is_some()
+                || self.pending_presentations.iter().any(|pending| pending.event_id == ack.event_id)
+                || !crate::game_kernel_v7::current_phase_receipt_v7::receipt_matches(state, content, ack)
+            { return Err(SnapshotV7Error::Invalid); }
+        }
         if self.schema_version != CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7
             || self.next_menu_instance_id == MenuInstanceId::ZERO
             || self.prepared_transaction.is_some()
@@ -190,8 +246,8 @@ impl CoreGameKernelSnapshotV7 {
                 {
                     return Err(SnapshotV7Error::Invalid);
                 }
-                if bootstrap.current_storage.is_some()
-                    && (self.protocol.is_some()
+                if bootstrap.current_storage.is_some() {
+                    if self.protocol.is_some()
                         || self.authority_ai.is_none()
                         || self.scheduler.disposed
                         || !self.storage_frontiers.is_empty()
@@ -208,9 +264,10 @@ impl CoreGameKernelSnapshotV7 {
                                 .get()
                                 .get()
                                 .checked_add(1)
-                                .ok_or(SnapshotV7Error::Invalid)?)
-                {
-                    return Err(SnapshotV7Error::Invalid);
+                                .ok_or(SnapshotV7Error::Invalid)?
+                    {
+                        return Err(SnapshotV7Error::Invalid);
+                    }
                 }
                 let mut expected_platform = bootstrap
                     .current_storage_effect()
@@ -411,6 +468,8 @@ impl CoreGameKernelSnapshotV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
             private_battle_control: None,
+            private_learning_control: None,
+            pending_current_phase_ack: None,
             current_proposal: None,
             current_coop_setup: None,
             input_router: source.input_router,

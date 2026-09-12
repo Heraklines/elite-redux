@@ -69,6 +69,14 @@ pub struct CurrentExperienceSourceV1 {
     pub source_sprite_key: String,
 }
 
+/// Exact captured live stat preimage for source-owned payout. Historical
+/// observation-only recipients retain None and their original serialized bytes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentExperienceRecipientStatsV1 {
+    pub stats: er_types::battle_model::BattleStats,
+    pub max_hp: u32,
+}
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CurrentExperienceRecipientV1 {
@@ -79,6 +87,8 @@ pub struct CurrentExperienceRecipientV1 {
     pub experience: Experience,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pokerus: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stats: Option<CurrentExperienceRecipientStatsV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -94,6 +104,9 @@ pub struct CurrentPendingExperienceV1 {
     pub continuation: CurrentExperienceContinuationV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub friendship: Option<CurrentFriendshipPhaseV1>,
+    /// Actual durable pokemonDefeated value after this source Victory.start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub victory_defeated_total: Option<SafeU53>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub victory: Option<crate::current_victory_execution::CurrentVictoryExecutionV1>,
 }
@@ -178,8 +191,7 @@ impl CurrentExperienceOwnerV1 {
             .ok_or(CurrentExperienceOwnerError::Invalid)?;
         if self.source_progression.as_ref().is_some_and(|source| {
             self.execution_origin != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
-                || source.profile_owner != self.authority
-                || !source.valid(run)
+                || source.profile_owner != self.authority || !source.valid(run)
         }) {
             return Err(CurrentExperienceOwnerError::Invalid);
         }
@@ -238,18 +250,14 @@ impl CurrentExperienceOwnerV1 {
         if expected.len() != self.pending.len() {
             return Err(CurrentExperienceOwnerError::Invalid);
         }
-        let recipients = recipient_snapshot(run)?;
+        let recipients = recipient_snapshot(run, self.source_progression.is_some())?;
         for (index, (pending, faint)) in self.pending.iter().zip(expected).enumerate() {
             match (&self.execution_origin, &pending.friendship) {
                 (Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic), Some(phase)) => {
                     phase.validate(pending)?;
-                    if pending
-                        .victory
-                        .as_ref()
-                        .is_some_and(|victory| !phase.complete || !victory.valid(pending.id))
-                    {
-                        return Err(CurrentExperienceOwnerError::Invalid);
-                    }
+                    if pending.victory.as_ref().is_some_and(|victory|
+                        !phase.complete || !victory.valid(pending.id))
+                    { return Err(CurrentExperienceOwnerError::Invalid); }
                 }
                 (None, None) if pending.victory.is_none() => {}
                 _ => return Err(CurrentExperienceOwnerError::Invalid),
@@ -270,7 +278,24 @@ impl CurrentExperienceOwnerV1 {
                 || pending.source != *source
                 || pending.defeated_level != pokemon.level
                 || pending.participants != faint.participants
-                || pending.recipients != recipients
+                || if pending.victory.is_some() {
+                    // Content validation recomputes post-award XP, level, HP and
+                    // stats from this immutable preimage. Structural validation
+                    // still binds every recipient and the captured stat shape.
+                    self.source_progression.is_none()
+                        || pending.recipients.len() != recipients.len()
+                        || pending.recipients.iter().zip(&recipients).any(|(captured, live)| {
+                            captured.pokemon != live.pokemon
+                                || captured.owner != live.owner
+                                || captured.pokerus != live.pokerus
+                                || captured.stats.as_ref().is_none_or(|value| {
+                                    value.max_hp == 0 || value.max_hp != value.stats.hp
+                                        || captured.hp > value.max_hp
+                                })
+                        })
+                } else {
+                    pending.recipients != recipients
+                }
                 || pending.continuation != continuation(battle.outcome)
                 || (index > 0
                     && self.pending[index - 1].id.get().checked_add(1) != Some(pending.id.get()))
@@ -360,11 +385,10 @@ impl CurrentExperienceOwnerV1 {
                 source,
                 defeated_level: defeated.level,
                 participants: faint.participants.clone(),
-                recipients: recipient_snapshot(run)?,
+                recipients: recipient_snapshot(run, self.source_progression.is_some())?,
                 continuation: continuation(battle.outcome),
-                friendship: self
-                    .execution_origin
-                    .map(|_| CurrentFriendshipPhaseV1::default()),
+                friendship: self.execution_origin.map(|_| CurrentFriendshipPhaseV1::default()),
+                victory_defeated_total: None,
                 victory: None,
             });
             candidate.next_pending_id = next;
@@ -377,6 +401,7 @@ impl CurrentExperienceOwnerV1 {
 
 fn recipient_snapshot(
     run: &RunStateV3,
+    source_owned: bool,
 ) -> Result<Vec<CurrentExperienceRecipientV1>, CurrentExperienceOwnerError> {
     run.party
         .iter()
@@ -390,6 +415,9 @@ fn recipient_snapshot(
                 level: pokemon.level,
                 experience: pokemon.experience,
                 pokerus: pokemon.pokerus,
+                stats: source_owned.then_some(CurrentExperienceRecipientStatsV1 {
+                    stats: pokemon.stats, max_hp: pokemon.max_hp,
+                }),
             })
         })
         .collect()

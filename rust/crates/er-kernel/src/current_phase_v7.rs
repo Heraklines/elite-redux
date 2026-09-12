@@ -2,8 +2,58 @@
 use super::*;
 use er_game::m9e_runtime_v6::GameOwnedPhaseV1;
 use er_state::current_turn_execution::CurrentTurnStageV1;
-use er_state::current_victory_execution::CurrentVictoryDescendantV1;
-use er_state::m9e_state_v6::GameStateV6;
+
+pub(crate) fn victory_presentation(state: &GameStateV6, event_id: er_types::PresentationEventId)
+    -> Option<crate::snapshot_v7::PendingVictoryAckV1>
+{
+    use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;
+    state.current_battle_participation.as_ref()?.experience.as_ref()?.pending.iter().find_map(|pending| {
+        let expected = match &pending.victory.as_ref()?.descendant {
+            D::AwardPresentation { event_id, .. } | D::PartyAwardPresentation { event_id, .. }
+            | D::LevelUpPresentation { event_id, .. } | D::HidePartyBarPresentation { event_id, .. } => *event_id,
+            _ => return None,
+        };
+        (expected == event_id).then_some(crate::snapshot_v7::PendingVictoryAckV1 { pending: pending.id, event_id })
+    })
+}
+
+pub(crate) fn victory_receipt_matches(
+    state: &GameStateV6, content: &PreparedGameContentV2, ack: crate::snapshot_v7::PendingVictoryAckV1,
+) -> bool {
+    use er_game::m9e_material_v6::GamePresentationPayloadV1 as P;
+    use er_game::m9e_content_v2::{PresentationSemanticIdV1, PresentationCueFamilyV1};
+    use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;
+    let payload = (|| {
+        let pending = state.current_battle_participation.as_ref()?.experience.as_ref()?.pending.iter()
+            .find(|pending| pending.id == ack.pending)?;
+        Some(match &pending.victory.as_ref()?.descendant {
+            D::AwardPresentation { award, event_id } if *event_id == ack.event_id => P::ExperienceGain {
+                holder: award.phase.pokemon, amount: award.experience, party_bar: false,
+            },
+            D::PartyAwardPresentation { award, event_id, .. } if *event_id == ack.event_id => P::ExperienceGain {
+                holder: award.phase.pokemon, amount: award.experience, party_bar: true,
+            },
+            D::LevelUpPresentation { end, event_id } if *event_id == ack.event_id => {
+                let level = &end.level_up;
+                let pokemon = state.active_run.as_ref()?.party.get(usize::from(level.award.phase.party_index))?;
+                P::LevelStats { holder: pokemon.id, previous_level: level.previous_level, level: level.new_level,
+                    previous_stats: level.previous_stats, stats: pokemon.stats }
+            }
+            D::HidePartyBarPresentation { award, event_id } if *event_id == ack.event_id =>
+                P::HidePartyExperience { holder: award.phase.pokemon },
+            _ => return None,
+        })
+    })();
+    let Some(payload) = payload else { return false; };
+    let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
+    let Some(mapping) = content.presentation(semantic) else { return false; };
+    let effect = GamePresentationEffectV2 { event_id: ack.event_id, semantic,
+        blocking: mapping.blocking, skip: mapping.skip, payload: Some(payload) };
+    er_canonical::fixture_digest(&effect).ok().is_some_and(|hash| {
+        state.current_presentation.as_ref().is_some_and(|owner|
+            owner.receipts.iter().any(|receipt| receipt.event_id == ack.event_id && receipt.effect_sha256 == hash))
+    })
+}
 
 pub(super) fn bootstrap_clock_effect(
     bootstrap: &RunBootstrapMachineV1,
@@ -98,6 +148,32 @@ impl GameKernelV7 {
         let Some(turn) = &state.current_turn_execution else {
             return Ok(());
         };
+        if current_learning_control_v7::current_batch(state).is_some() {
+            current_learning_control_v7::validate_private_learning_control(
+                state, self.private_learning_control.as_ref(), self.local_seat,
+            )?;
+            // Human learning choices are never synthesized by the phase pump.
+            return Ok(());
+        }
+        if let Some(ack) = self.pending_current_phase_ack {
+            if !current_phase_receipt_v7::receipt_matches(state, &self.content, ack) {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            // AdvanceTime already operates on a cloned kernel transaction.
+            // Consume before transition validation; errors discard the clone.
+            self.pending_current_phase_ack = None;
+            use crate::snapshot_v7::CurrentPhasePresentationKindV1 as K;
+            let phase = match ack.kind {
+                K::Victory => GameOwnedPhaseV1::VictoryPresentation { pending: ack.pending, event_id: ack.event_id },
+                K::FaintAnimation | K::FaintMessage => GameOwnedPhaseV1::FaintPresentation {
+                    pending: ack.pending, event_id: ack.event_id, animation: ack.kind == K::FaintAnimation,
+                },
+            };
+            let step = self.execute_owned_phase(phase)?;
+            output.effects.extend(step.effects);
+            output.internal_events.extend(step.internal_events);
+            return Ok(());
+        }
         let phase = match &turn.stage {
             CurrentTurnStageV1::ReadyForMove => {
                 if usize::from(turn.next_action) < turn.actions.len() {
@@ -107,10 +183,27 @@ impl GameKernelV7 {
                 }
             }
             CurrentTurnStageV1::AwaitingInterlude { .. } => {
-                let Some(phase) = self.next_intermission_phase(state)? else {
-                    return Ok(());
-                };
-                phase
+                use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
+                let owner = state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                let pending = owner.pending.first().ok_or(GameKernelV7Error::Invalid)?;
+                let source = owner.source_progression.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+                match &source.initial_faint.phase {
+                    None => GameOwnedPhaseV1::FaintBegin { pending: pending.id },
+                    Some(F::Animation { .. } | F::Message { .. }) => return Ok(()),
+                    Some(F::MessageReady { .. }) => return Err(GameKernelV7Error::Invalid),
+                    Some(F::ReadyForVictory { address }) => {
+                        if address.pending_id != pending.id { return Err(GameKernelV7Error::Invalid); }
+                        let friendship = pending.friendship.as_ref().ok_or(GameKernelV7Error::Invalid)?;
+                        if friendship.complete {
+                            GameOwnedPhaseV1::Victory { pending: pending.id, menu_instance: self.next_menu_instance_id }
+                        } else if friendship.clock.is_some() {
+                            return Ok(());
+                        } else {
+                            GameOwnedPhaseV1::FriendshipBegin
+                        }
+                    }
+                }
             }
             CurrentTurnStageV1::Complete => return Ok(()),
         };
@@ -118,79 +211,6 @@ impl GameKernelV7 {
         output.effects.extend(step.effects);
         output.internal_events.extend(step.internal_events);
         Ok(())
-    }
-
-    /// The next retained interlude step for the oldest unresolved pending.
-    /// `None` means an external edge owns the next step: an outstanding
-    /// friendship clock request, an unacknowledged retained prompt, or an
-    /// actionable learn/evolution control that belongs to the human owner.
-    fn next_intermission_phase(
-        &self,
-        state: &GameStateV6,
-    ) -> Result<Option<GameOwnedPhaseV1>, GameKernelV7Error> {
-        let owner = state
-            .current_battle_participation
-            .as_ref()
-            .and_then(|value| value.experience.as_ref())
-            .ok_or(GameKernelV7Error::Invalid)?;
-        let Some(pending) = owner.pending.iter().find(|pending| {
-            !pending
-                .victory
-                .as_ref()
-                .is_some_and(|victory| victory.descendant == CurrentVictoryDescendantV1::Complete)
-        }) else {
-            return Ok(Some(GameOwnedPhaseV1::PendingResolve));
-        };
-        if let Some(friendship) = &pending.friendship
-            && !friendship.complete
-        {
-            if let Some(request) = &friendship.clock {
-                let issued = self.pending_platform.values().any(|pending| {
-                    matches!(
-                        &pending.effect,
-                        GamePlatformEffectV2::CurrentFriendshipClock {
-                            request: issued
-                        } if issued == request
-                    )
-                });
-                return if issued {
-                    Ok(None)
-                } else {
-                    Err(GameKernelV7Error::Invalid)
-                };
-            }
-            return Ok(Some(GameOwnedPhaseV1::FriendshipBegin));
-        }
-        let Some(victory) = &pending.victory else {
-            return Ok(Some(GameOwnedPhaseV1::VictoryBegin));
-        };
-        Ok(match &victory.descendant {
-            CurrentVictoryDescendantV1::Ready => Some(GameOwnedPhaseV1::AwardBegin),
-            CurrentVictoryDescendantV1::AwardPresentation { event_id, .. } => {
-                if self.pending_presentations.contains_key(event_id) {
-                    None
-                } else {
-                    Some(GameOwnedPhaseV1::AwardApply)
-                }
-            }
-            CurrentVictoryDescendantV1::LevelUpStart { .. } => Some(GameOwnedPhaseV1::LevelUpApply),
-            CurrentVictoryDescendantV1::LevelUpPresentation { event_id, .. } => {
-                if self.pending_presentations.contains_key(event_id) {
-                    None
-                } else {
-                    Some(GameOwnedPhaseV1::LevelUpChildren)
-                }
-            }
-            CurrentVictoryDescendantV1::LevelUpChildren { .. } => {
-                Some(GameOwnedPhaseV1::VictoryDescendant)
-            }
-            CurrentVictoryDescendantV1::LearnMoveBatch { batch } if batch.complete => {
-                Some(GameOwnedPhaseV1::VictoryDescendant)
-            }
-            CurrentVictoryDescendantV1::LearnMoveBatch { .. }
-            | CurrentVictoryDescendantV1::Evolution { .. } => None,
-            CurrentVictoryDescendantV1::Complete => return Err(GameKernelV7Error::Invalid),
-        })
     }
 
     fn execute_owned_phase(

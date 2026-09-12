@@ -1,18 +1,8 @@
 //! Automatic source phase transactions. No public menu action is fabricated.
 use super::*;
-use er_state::current_experience_owner::{
-    CurrentExperienceOwnerV1, CurrentFriendshipClockRequestV1, CurrentPendingExperienceV1,
-};
-use er_state::current_experience_settlement::{
-    CurrentExperienceAwardV1, CurrentLearnMoveBatchV1, CurrentLevelUpChildrenV1,
-};
-use er_state::current_turn_execution::{
-    CurrentTurnExecutionV1, CurrentTurnFaintV1, CurrentTurnStageV1,
-};
-use er_state::current_victory_execution::{CurrentVictoryDescendantV1, CurrentVictoryExecutionV1};
+use er_state::current_experience_owner::CurrentFriendshipClockRequestV1;
+use er_state::current_turn_execution::CurrentTurnStageV1;
 use er_types::SeatId;
-
-use crate::m9e_material_v6::GamePresentationPayloadV1;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
@@ -20,24 +10,29 @@ pub enum GameOwnedPhaseV1 {
     TurnStep,
     TurnFinish,
     FriendshipBegin,
+    FaintBegin { pending: SafeU53 },
+    FaintPresentation { pending: SafeU53, event_id: PresentationEventId, animation: bool },
+    Victory { pending: SafeU53, menu_instance: MenuInstanceId },
+    VictoryPresentation { pending: SafeU53, event_id: PresentationEventId },
     FriendshipClock {
         request: CurrentFriendshipClockRequestV1,
         utc_milliseconds: i64,
     },
-    /// Actual applyPartyExp insertion at the retained Victory frontier.
-    VictoryBegin,
-    /// The source XP gain prompt for the retained phase cursor entry.
-    AwardBegin,
-    /// Runs only after that prompt was acknowledged; applies the award.
-    AwardApply,
-    /// Actual LevelUpPhase.start: recalculate stats after the applied award.
-    LevelUpApply,
-    /// Actual LevelUpPhase.end: create the retained learn/evolution children.
-    LevelUpChildren,
-    /// Spawn or consume the retained child frontier (learn batch, evolution).
-    VictoryDescendant,
-    /// Every retained interlude entry is Complete; return the turn to its owner.
-    PendingResolve,
+}
+
+/// The observation owner remains restricted to 1v1. Controlled doubles may
+/// exercise retained mechanics only with an explicitly incomplete tracker;
+/// absence alone never grants source progression or achievement authority.
+pub(super) fn unobserved_mechanical_doubles(state: &GameStateV6) -> bool {
+    state.current_battle_participation.is_none()
+        && state.current_presentation.is_some()
+        && state.current_targeting.is_some()
+        && state.current_achievement_tracker.as_ref().is_some_and(|tracker| {
+            tracker.history == er_state::current_achievement_tracker::CurrentAchievementHistoryV1::UnobservedMechanicalFixture
+        })
+        && state.active_run.as_ref().and_then(|run| run.battle.as_ref()).is_some_and(|battle| {
+            battle.format.player_capacity == 2 && battle.format.enemy_capacity == 2
+        })
 }
 
 pub(super) fn begin_owned_turn(
@@ -46,7 +41,9 @@ pub(super) fn begin_owned_turn(
     commands: &CommandSet,
     authority: &TurnAuthorityContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
-    if before.current_turn_execution.is_some() || before.current_presentation.is_none() {
+    if before.current_turn_execution.is_some() || before.current_presentation.is_none()
+        || (before.current_battle_participation.is_none() && !unobserved_mechanical_doubles(before))
+    {
         return Err(GameRuntimeV6Error::Action);
     }
     let targeting = er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
@@ -67,6 +64,7 @@ pub(super) fn begin_owned_turn(
         Some(chunk.continuation),
     )?;
     install_waiting(&mut candidate, authority.revision)?;
+    fold_action_tracker(before, &mut candidate, content, &[], &[])?;
     Ok(DomainExecutionV1 {
         candidate: Some(candidate),
         rng_audit: chunk.transition.rng_audit,
@@ -91,6 +89,39 @@ fn install_waiting(
         menu: None,
         actionable: false,
     };
+    Ok(())
+}
+
+fn fold_action_tracker(
+    before: &GameStateV6,
+    candidate: &mut GameStateV6,
+    content: &PreparedGameContentV2,
+    events: &[er_state::current_battle_source_events::CurrentBattleSourceEventV1],
+    cues: &[er_battle::m7_resolver::BattlePresentationCueV5],
+) -> Result<(), GameRuntimeV6Error> {
+    use er_state::current_achievement_tracker::CurrentAchievementHistoryV1;
+    let tracker = before.current_achievement_tracker.as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
+    if candidate.current_achievement_tracker.as_ref() != Some(tracker) {
+        return Err(GameRuntimeV6Error::CandidateMismatch);
+    }
+    match tracker.history {
+        CurrentAchievementHistoryV1::FreshComplete => {
+            let (next, requests) = crate::current_achievement_action::fold_current_achievement_action(
+                before, candidate, content, events, cues,
+            )?;
+            if !requests.is_empty() {
+                return Err(GameRuntimeV6Error::Domain(format!(
+                    "action achievement requests require owned reward dispatch: {}", requests.join(",")
+                )));
+            }
+            candidate.current_achievement_tracker = Some(next);
+        }
+        CurrentAchievementHistoryV1::UnobservedMechanicalFixture => {
+            // This explicit test provenance retains its actual data as an
+            // incomplete history. It cannot authorize Faint, XP or rewards.
+        }
+    }
     Ok(())
 }
 
@@ -256,24 +287,17 @@ fn phase_transition(
         .current_turn_execution
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
+    if matches!(phase, GameOwnedPhaseV1::FaintBegin { .. } | GameOwnedPhaseV1::FaintPresentation { .. }) {
+        return current_faint_transition::transition(before, content, operation_id, authority_seat, revision, phase);
+    }
+    if matches!(phase, GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. }) {
+        return current_victory_transition::transition(before, content, operation_id, authority_seat, revision, phase);
+    }
     if matches!(
         phase,
         GameOwnedPhaseV1::TurnStep | GameOwnedPhaseV1::TurnFinish
     ) {
         return turn_step_transition(
-            before,
-            content,
-            operation_id,
-            authority_seat,
-            revision,
-            phase,
-        );
-    }
-    if !matches!(
-        phase,
-        GameOwnedPhaseV1::FriendshipBegin | GameOwnedPhaseV1::FriendshipClock { .. }
-    ) {
-        return victory_transition(
             before,
             content,
             operation_id,
@@ -320,11 +344,14 @@ fn phase_transition(
         .as_ref()
         .and_then(|value| value.clock.as_ref());
     let (mut candidate, payloads) = match &phase {
-        GameOwnedPhaseV1::TurnStep | GameOwnedPhaseV1::TurnFinish => {
+        GameOwnedPhaseV1::TurnStep | GameOwnedPhaseV1::TurnFinish
+        | GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. }
+        | GameOwnedPhaseV1::FaintBegin { .. } | GameOwnedPhaseV1::FaintPresentation { .. } => {
             return Err(GameRuntimeV6Error::Invalid);
         }
         GameOwnedPhaseV1::FriendshipBegin => {
-            crate::current_friendship_execution::prepare_next_friendship(before, content)?
+            let started = crate::current_victory_start::begin(before, content, pending.id)?;
+            crate::current_friendship_execution::prepare_next_friendship(&started, content)?
         }
         GameOwnedPhaseV1::FriendshipClock {
             request,
@@ -335,7 +362,6 @@ fn phase_transition(
             request,
             *utc_milliseconds,
         )?,
-        _ => return Err(GameRuntimeV6Error::Invalid),
     };
     let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Reward);
     let mapping = content
@@ -424,6 +450,11 @@ fn phase_transition(
     })
 }
 
+#[path = "current_victory_transition.rs"]
+mod current_victory_transition;
+#[path = "current_faint_transition.rs"]
+mod current_faint_transition;
+
 fn turn_step_transition(
     before: &GameStateV6,
     content: &PreparedGameContentV2,
@@ -484,16 +515,12 @@ fn turn_step_transition(
         .active_run
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
-    // Participation is an opt-in observation sidecar (absent in the qualified
-    // observation-only path); a participation-less state steps without
-    // recording causal evidence.
     let participation = match before.current_battle_participation.as_ref() {
-        Some(participation) => Some(
-            participation
-                .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
-                .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?,
-        ),
-        None => None,
+        Some(participation) => Some(participation
+            .observe_current_chunk(run, after_run, &events, owner, &chunk.continuation)
+            .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?),
+        None if unobserved_mechanical_doubles(before) => None,
+        None => return Err(GameRuntimeV6Error::Action),
     };
     let mut candidate = adopt_v5_with_turn(
         before,
@@ -506,7 +533,7 @@ fn turn_step_transition(
         .current_turn_execution
         .as_ref()
         .is_some_and(|turn| turn.stage == CurrentTurnStageV1::Complete)
-        && !has_pending_experience(&candidate)
+        && chunk.transition.outcome == BattleOutcome::Ongoing
     {
         let menu_instance = owner
             .accepted_commands
@@ -518,51 +545,20 @@ fn turn_step_transition(
             })
             .ok_or(GameRuntimeV6Error::Invalid)?;
         candidate.current_turn_execution = None;
-        match chunk.transition.outcome {
-            BattleOutcome::Ongoing => {
-                let next_owner = next_battle_control_owner(&candidate)?;
-                install_battle_command_control(
-                    &mut candidate,
-                    next_owner,
-                    authority_seat,
-                    safe_increment(revision)?,
-                    menu_instance,
-                )?;
-            }
-            BattleOutcome::Victory => {
-                candidate.profile.statistics.battles_won =
-                    safe_increment(candidate.profile.statistics.battles_won)?;
-                let final_wave = candidate
-                    .active_run
-                    .as_ref()
-                    .is_some_and(|run| is_final_wave(content, run.mode, run.wave));
-                if final_wave {
-                    candidate
-                        .active_run
-                        .as_mut()
-                        .ok_or(GameRuntimeV6Error::Action)?
-                        .outcome = RunOutcome::Victory;
-                    candidate.profile.statistics.runs_won =
-                        safe_increment(candidate.profile.statistics.runs_won)?;
-                } else {
-                    install_progression_or_reward_control(
-                        &mut candidate,
-                        content,
-                        authority_seat,
-                        safe_increment(revision)?,
-                        menu_instance,
-                    )?;
-                }
-            }
-            BattleOutcome::Defeat => {
-                candidate
-                    .active_run
-                    .as_mut()
-                    .ok_or(GameRuntimeV6Error::Action)?
-                    .outcome = RunOutcome::Defeat;
-            }
-        }
+        let next_owner = next_battle_control_owner(&candidate)?;
+        install_battle_command_control(
+            &mut candidate,
+            next_owner,
+            authority_seat,
+            safe_increment(revision)?,
+            menu_instance,
+        )?;
     }
+    fold_action_tracker(
+        before, &mut candidate, content,
+        chunk.transition.source_events.as_deref().ok_or(GameRuntimeV6Error::Invalid)?,
+        &chunk.transition.presentation,
+    )?;
     let mut presentation = super::current_battle_presentation::project_current_battle_cues(
         before,
         &mut candidate,
@@ -602,532 +598,6 @@ fn turn_step_transition(
         before_digest,
         after_digest,
         rng_audit: chunk.transition.rng_audit,
-        after_state: candidate,
-        next_control,
-        presentation,
-        platform_effects: Vec::new(),
-    })
-}
-
-fn pending_resolved(pending: &CurrentPendingExperienceV1) -> bool {
-    matches!(
-        pending.victory.as_ref().map(|victory| &victory.descendant),
-        Some(CurrentVictoryDescendantV1::Complete)
-    )
-}
-
-fn active_pending<'a>(
-    owner: &'a CurrentExperienceOwnerV1,
-    faints: &[CurrentTurnFaintV1],
-) -> Result<(usize, &'a CurrentPendingExperienceV1), GameRuntimeV6Error> {
-    let index = owner
-        .pending
-        .iter()
-        .position(|pending| !pending_resolved(pending))
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let pending = &owner.pending[index];
-    if !faints.iter().any(|faint| {
-        faint.pokemon == pending.source.pokemon
-            && faint.slot.side == er_types::battle_ids::BattleSide::Enemy
-    }) {
-        return Err(GameRuntimeV6Error::Action);
-    }
-    Ok((index, pending))
-}
-
-fn pending_mut(
-    state: &mut GameStateV6,
-    index: usize,
-) -> Result<&mut CurrentPendingExperienceV1, GameRuntimeV6Error> {
-    state
-        .current_battle_participation
-        .as_mut()
-        .and_then(|value| value.experience.as_mut())
-        .and_then(|owner| owner.pending.get_mut(index))
-        .ok_or(GameRuntimeV6Error::Invalid)
-}
-
-fn victory_mut(
-    state: &mut GameStateV6,
-    index: usize,
-) -> Result<&mut CurrentVictoryExecutionV1, GameRuntimeV6Error> {
-    pending_mut(state, index)?
-        .victory
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Invalid)
-}
-
-fn advance_victory(
-    victory: &mut CurrentVictoryExecutionV1,
-    award: CurrentExperienceAwardV1,
-) -> Result<(), GameRuntimeV6Error> {
-    victory.completed.push(award);
-    victory.next_phase =
-        u8::try_from(victory.completed.len()).map_err(|_| GameRuntimeV6Error::Invalid)?;
-    victory.descendant = if usize::from(victory.next_phase) == victory.phases.len() {
-        CurrentVictoryDescendantV1::Complete
-    } else {
-        CurrentVictoryDescendantV1::Ready
-    };
-    Ok(())
-}
-
-fn turn_menu_base(turn: &CurrentTurnExecutionV1) -> Result<MenuInstanceId, GameRuntimeV6Error> {
-    turn.accepted_commands
-        .entries
-        .iter()
-        .find_map(|entry| match entry {
-            AcceptedBattleCommand::Human { proposal, .. } => Some(proposal.menu_instance_id),
-            _ => None,
-        })
-        .ok_or(GameRuntimeV6Error::Invalid)
-}
-
-fn descendant_menu_instance(
-    run: &RunStateV3,
-    base: MenuInstanceId,
-) -> Result<MenuInstanceId, GameRuntimeV6Error> {
-    let current = run
-        .control
-        .menu
-        .as_ref()
-        .map(|menu| menu.instance_id)
-        .or_else(|| {
-            run.control
-                .action_context
-                .as_ref()
-                .map(|context| context.menu_instance)
-        })
-        .unwrap_or(base);
-    Ok(MenuInstanceId::new(safe_increment(current.get())?))
-}
-
-fn install_learn_batch_control(
-    candidate: &mut GameStateV6,
-    pending_id: SafeU53,
-    batch: &CurrentLearnMoveBatchV1,
-    authority_seat: SeatId,
-    revision: SafeU53,
-    base_instance: MenuInstanceId,
-) -> Result<(), GameRuntimeV6Error> {
-    let run = candidate
-        .active_run
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let owner = run
-        .party
-        .iter()
-        .find(|pokemon| pokemon.id == batch.children.parent.level_up.award.phase.pokemon)
-        .and_then(|pokemon| pokemon.owner_seat)
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let menu_instance = descendant_menu_instance(run, base_instance)?;
-    let context = GameActionContextV1 {
-        operation_id: OperationId::new(format!(
-            "current/learn-batch/{}/{}",
-            pending_id.get(),
-            revision.get()
-        ))
-        .map_err(|_| GameRuntimeV6Error::Invalid)?,
-        authority_seat: owner,
-        authority_revision: revision,
-        menu_instance,
-    };
-    let mut control =
-        crate::m7_progression_control::current_learn_move_batch_control(&context, batch)
-            .map_err(|_| GameRuntimeV6Error::Invalid)?;
-    control
-        .action_context
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Invalid)?
-        .authority_seat = authority_seat;
-    run.control = control;
-    Ok(())
-}
-
-fn install_evolution_control(
-    candidate: &mut GameStateV6,
-    pending_id: SafeU53,
-    children: &CurrentLevelUpChildrenV1,
-    authority_seat: SeatId,
-    revision: SafeU53,
-    base_instance: MenuInstanceId,
-) -> Result<(), GameRuntimeV6Error> {
-    let pokemon_id = children.parent.level_up.award.phase.pokemon;
-    let run = candidate
-        .active_run
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let owner = run
-        .party
-        .iter()
-        .find(|pokemon| pokemon.id == pokemon_id)
-        .and_then(|pokemon| pokemon.owner_seat)
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let menu_instance = descendant_menu_instance(run, base_instance)?;
-    let operation = OperationId::new(format!(
-        "current/evolution/{}/{}",
-        pending_id.get(),
-        revision.get()
-    ))
-    .map_err(|_| GameRuntimeV6Error::Invalid)?;
-    let mut control = crate::m7_progression_control::evolution_control(
-        menu_instance,
-        revision,
-        owner,
-        operation,
-        pokemon_id,
-        &children.evolution_candidates,
-    )
-    .map_err(|_| GameRuntimeV6Error::Invalid)?;
-    control
-        .action_context
-        .as_mut()
-        .ok_or(GameRuntimeV6Error::Invalid)?
-        .authority_seat = authority_seat;
-    run.control = control;
-    Ok(())
-}
-
-fn finish_owned_battle_tail(
-    candidate: &mut GameStateV6,
-    content: &PreparedGameContentV2,
-    turn: &CurrentTurnExecutionV1,
-    authority_seat: SeatId,
-    revision: SafeU53,
-) -> Result<(), GameRuntimeV6Error> {
-    let outcome = candidate
-        .active_run
-        .as_ref()
-        .and_then(|run| run.battle.as_ref())
-        .map(|battle| battle.outcome)
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let menu_base = turn_menu_base(turn)?;
-    match outcome {
-        BattleOutcome::Ongoing => {
-            let next_owner = next_battle_control_owner(candidate)?;
-            install_battle_command_control(
-                candidate,
-                next_owner,
-                authority_seat,
-                revision,
-                menu_base,
-            )?;
-        }
-        BattleOutcome::Victory => {
-            candidate.profile.statistics.battles_won =
-                safe_increment(candidate.profile.statistics.battles_won)?;
-            let final_wave = candidate
-                .active_run
-                .as_ref()
-                .is_some_and(|run| is_final_wave(content, run.mode, run.wave));
-            if final_wave {
-                candidate
-                    .active_run
-                    .as_mut()
-                    .ok_or(GameRuntimeV6Error::Action)?
-                    .outcome = RunOutcome::Victory;
-                candidate.profile.statistics.runs_won =
-                    safe_increment(candidate.profile.statistics.runs_won)?;
-            } else {
-                install_progression_or_reward_control(
-                    candidate,
-                    content,
-                    authority_seat,
-                    revision,
-                    menu_base,
-                )?;
-            }
-        }
-        BattleOutcome::Defeat => {
-            candidate
-                .active_run
-                .as_mut()
-                .ok_or(GameRuntimeV6Error::Action)?
-                .outcome = RunOutcome::Defeat;
-        }
-    }
-    Ok(())
-}
-
-fn victory_transition(
-    before: &GameStateV6,
-    content: &PreparedGameContentV2,
-    operation_id: OperationId,
-    authority_seat: SeatId,
-    revision: SafeU53,
-    phase: GameOwnedPhaseV1,
-) -> Result<GameTransitionMaterialV6, GameRuntimeV6Error> {
-    let run = before
-        .active_run
-        .as_ref()
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let turn = before
-        .current_turn_execution
-        .as_ref()
-        .ok_or(GameRuntimeV6Error::Action)?;
-    let CurrentTurnStageV1::AwaitingInterlude { faints } = &turn.stage else {
-        return Err(GameRuntimeV6Error::Action);
-    };
-    let owner = before
-        .current_battle_participation
-        .as_ref()
-        .and_then(|value| value.experience.as_ref())
-        .ok_or(GameRuntimeV6Error::Action)?;
-    if operation_id.as_str().is_empty()
-        || revision == SafeU53::ZERO
-        || run.control.revision != revision
-        || run.control.actionable
-        || run.control.kind != GameControlKindV2::Waiting
-        || turn.authority != authority_seat
-        || owner.authority != authority_seat
-        || before.current_presentation.is_none()
-    {
-        return Err(GameRuntimeV6Error::Action);
-    }
-    let next_revision = safe_increment(revision)?;
-    let mut candidate = before.clone();
-    let mut presentation = Vec::new();
-    match &phase {
-        GameOwnedPhaseV1::VictoryBegin => {
-            let (index, pending) = active_pending(owner, faints)?;
-            if pending.victory.is_some()
-                || !pending
-                    .friendship
-                    .as_ref()
-                    .is_some_and(|phase| phase.complete)
-            {
-                return Err(GameRuntimeV6Error::Action);
-            }
-            let phases = crate::current_experience_settlement::plan_current_victory_experience(
-                before, content, pending.id,
-            )?;
-            let descendant = if phases.is_empty() {
-                CurrentVictoryDescendantV1::Complete
-            } else {
-                CurrentVictoryDescendantV1::Ready
-            };
-            pending_mut(&mut candidate, index)?.victory = Some(CurrentVictoryExecutionV1 {
-                phases,
-                next_phase: 0,
-                completed: Vec::new(),
-                descendant,
-            });
-        }
-        GameOwnedPhaseV1::AwardBegin => {
-            let (index, pending) = active_pending(owner, faints)?;
-            let victory = pending.victory.as_ref().ok_or(GameRuntimeV6Error::Action)?;
-            if victory.descendant != CurrentVictoryDescendantV1::Ready {
-                return Err(GameRuntimeV6Error::Action);
-            }
-            let phase_row = victory
-                .phases
-                .get(usize::from(victory.next_phase))
-                .ok_or(GameRuntimeV6Error::Action)?
-                .clone();
-            let award = crate::current_experience_settlement::prepare_current_experience_phase(
-                before, content, &phase_row,
-            )?;
-            let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
-            let mapping = content
-                .presentation(semantic)
-                .ok_or(GameRuntimeV6Error::Invalid)?;
-            presentation.push(GamePresentationEffectV2 {
-                // Overwritten by the canonical current frontier before publication.
-                event_id: PresentationEventId::new(revision),
-                semantic,
-                blocking: mapping.blocking,
-                skip: mapping.skip,
-                payload: Some(GamePresentationPayloadV1::ExperienceGained {
-                    pokemon: award.phase.pokemon,
-                    experience: award.experience,
-                }),
-            });
-            assign_presentations(&mut candidate, &mut presentation)?;
-            let event_id = presentation
-                .first()
-                .map(|effect| effect.event_id)
-                .ok_or(GameRuntimeV6Error::Invalid)?;
-            victory_mut(&mut candidate, index)?.descendant =
-                CurrentVictoryDescendantV1::AwardPresentation { award, event_id };
-        }
-        GameOwnedPhaseV1::AwardApply => {
-            let (index, pending) = active_pending(owner, faints)?;
-            let Some(CurrentVictoryDescendantV1::AwardPresentation { award, .. }) =
-                pending.victory.as_ref().map(|victory| &victory.descendant)
-            else {
-                return Err(GameRuntimeV6Error::Action);
-            };
-            let award = award.clone();
-            let (next, level_up) =
-                crate::current_experience_settlement::apply_current_experience_award(
-                    before, content, &award,
-                )?;
-            candidate = next;
-            let victory = victory_mut(&mut candidate, index)?;
-            if let Some(level_up) = level_up {
-                victory.descendant = CurrentVictoryDescendantV1::LevelUpStart { level_up };
-            } else {
-                advance_victory(victory, award)?;
-            }
-        }
-        GameOwnedPhaseV1::LevelUpApply => {
-            let (index, pending) = active_pending(owner, faints)?;
-            let Some(CurrentVictoryDescendantV1::LevelUpStart { level_up }) =
-                pending.victory.as_ref().map(|victory| &victory.descendant)
-            else {
-                return Err(GameRuntimeV6Error::Action);
-            };
-            let level_up = level_up.clone();
-            let (next, end) = crate::current_experience_settlement::apply_current_level_up(
-                before, content, &level_up,
-            )?;
-            candidate = next;
-            let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Progression);
-            let mapping = content
-                .presentation(semantic)
-                .ok_or(GameRuntimeV6Error::Invalid)?;
-            presentation.push(GamePresentationEffectV2 {
-                // Overwritten by the canonical current frontier before publication.
-                event_id: PresentationEventId::new(revision),
-                semantic,
-                blocking: mapping.blocking,
-                skip: mapping.skip,
-                payload: Some(GamePresentationPayloadV1::LevelUp {
-                    pokemon: level_up.award.phase.pokemon,
-                    previous_level: level_up.previous_level,
-                    new_level: level_up.new_level,
-                }),
-            });
-            assign_presentations(&mut candidate, &mut presentation)?;
-            let event_id = presentation
-                .first()
-                .map(|effect| effect.event_id)
-                .ok_or(GameRuntimeV6Error::Invalid)?;
-            victory_mut(&mut candidate, index)?.descendant =
-                CurrentVictoryDescendantV1::LevelUpPresentation { end, event_id };
-        }
-        GameOwnedPhaseV1::LevelUpChildren => {
-            let (index, pending) = active_pending(owner, faints)?;
-            let Some(CurrentVictoryDescendantV1::LevelUpPresentation { end, .. }) =
-                pending.victory.as_ref().map(|victory| &victory.descendant)
-            else {
-                return Err(GameRuntimeV6Error::Action);
-            };
-            let children = crate::current_experience_settlement::plan_current_level_up_children(
-                before, content, end,
-            )?;
-            victory_mut(&mut candidate, index)?.descendant =
-                CurrentVictoryDescendantV1::LevelUpChildren { children };
-        }
-        GameOwnedPhaseV1::VictoryDescendant => {
-            let (index, pending) = active_pending(owner, faints)?;
-            let victory = pending.victory.as_ref().ok_or(GameRuntimeV6Error::Action)?;
-            let children = match &victory.descendant {
-                CurrentVictoryDescendantV1::LevelUpChildren { children } => children.clone(),
-                CurrentVictoryDescendantV1::LearnMoveBatch { batch } if batch.complete => {
-                    batch.children.clone()
-                }
-                _ => return Err(GameRuntimeV6Error::Action),
-            };
-            let menu_base = turn_menu_base(turn)?;
-            match &victory.descendant {
-                CurrentVictoryDescendantV1::LevelUpChildren { .. }
-                    if !children.learn_move_candidates.is_empty() =>
-                {
-                    let batch =
-                        crate::current_experience_settlement::begin_current_learn_move_batch(
-                            before, content, &children,
-                        )?;
-                    let complete = batch.complete;
-                    victory_mut(&mut candidate, index)?.descendant =
-                        CurrentVictoryDescendantV1::LearnMoveBatch {
-                            batch: batch.clone(),
-                        };
-                    if !complete {
-                        install_learn_batch_control(
-                            &mut candidate,
-                            pending.id,
-                            &batch,
-                            authority_seat,
-                            next_revision,
-                            menu_base,
-                        )?;
-                    }
-                }
-                _ if !children.evolution_candidates.is_empty() => {
-                    victory_mut(&mut candidate, index)?.descendant =
-                        CurrentVictoryDescendantV1::Evolution {
-                            children: children.clone(),
-                        };
-                    install_evolution_control(
-                        &mut candidate,
-                        pending.id,
-                        &children,
-                        authority_seat,
-                        next_revision,
-                        menu_base,
-                    )?;
-                }
-                _ => {
-                    advance_victory(
-                        victory_mut(&mut candidate, index)?,
-                        children.parent.level_up.award,
-                    )?;
-                }
-            }
-        }
-        GameOwnedPhaseV1::PendingResolve => {
-            if owner
-                .pending
-                .iter()
-                .any(|pending| !pending_resolved(pending))
-            {
-                return Err(GameRuntimeV6Error::Action);
-            }
-            if turn.finalization_done {
-                candidate.current_turn_execution = None;
-                finish_owned_battle_tail(
-                    &mut candidate,
-                    content,
-                    turn,
-                    authority_seat,
-                    next_revision,
-                )?;
-            } else {
-                candidate
-                    .current_turn_execution
-                    .as_mut()
-                    .ok_or(GameRuntimeV6Error::Invalid)?
-                    .stage = CurrentTurnStageV1::ReadyForMove;
-            }
-        }
-        _ => return Err(GameRuntimeV6Error::Invalid),
-    }
-    candidate
-        .validate_with(content)
-        .map_err(|_| GameRuntimeV6Error::Invalid)?;
-    let before_digest = game_state_digest(before).map_err(material_error)?;
-    let after_digest = game_state_digest(&candidate).map_err(material_error)?;
-    let next_control = normalize_next_control(&mut candidate, next_revision)?;
-    Ok(GameTransitionMaterialV6 {
-        schema_version: crate::m9e_material_v6::GAME_MATERIAL_SCHEMA_VERSION_V6,
-        domain: GameActionDomainV2::Progression,
-        operation_id,
-        authority_seat,
-        authority_revision: revision,
-        content_identity: before.content_identity.clone(),
-        accepted_action: None,
-        owned_phase: Some(phase),
-        mutations: vec![GameMutationEvidenceV2 {
-            ordinal: 0,
-            domain: GameActionDomainV2::Progression,
-            kind: GameMutationKindV2::StateChanged,
-            before_digest: before_digest.clone(),
-            after_digest: after_digest.clone(),
-        }],
-        before_digest,
-        after_digest,
-        rng_audit: Vec::new(),
         after_state: candidate,
         next_control,
         presentation,

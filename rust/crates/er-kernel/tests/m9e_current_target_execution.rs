@@ -513,6 +513,8 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
     // The bounded participation/XP owner only admits a single 1v1 battle; the
     // controlled doubles checkpoint carries no owner rather than a stale roster.
     state.current_battle_participation = None;
+    state.current_achievement_tracker.as_mut().ok_or("fresh tracker absent")?.history =
+        er_state::current_achievement_tracker::CurrentAchievementHistoryV1::UnobservedMechanicalFixture;
     state.validate_with(content.as_ref())?;
     // This deliberately edited field is a controlled checkpoint, not the state
     // produced by the retained natural bootstrap material. Keep its real next
@@ -1473,5 +1475,272 @@ fn current_stat_calculation_matches_six_actual_source_observations() -> Result<(
     }
     // These source observations discriminate the old floor-only nature path:
     // Lonely Attack is14 rather than13; Modest SpAttack is24 rather than23.
+    Ok(())
+}
+
+// Controlled mechanical fixture: one remaining PP, real resolver KO and retained restore.
+#[test]
+fn last_pp_knockout_retains_resolved_move_across_interlude_restore() -> Result<()> {
+    use er_battle::m7_resolver::{begin_current_turn, finish_current_turn, step_current_turn};
+    use er_state::current_turn_execution::{CurrentTurnExecutionV1, CurrentTurnStageV1};
+    let content = content()?;
+    let mut snapshot = two_enemies(content.clone())?;
+    let state = active_mut(&mut snapshot)?;
+    assign_move(state, 33)?;
+    let run = active_run_mut(state)?;
+    run.party[0].moves[0].as_mut().ok_or("move absent")?.max_pp_override = Some(1);
+    run.party[0].hp = 1;
+    run.party[0].stats.speed = 500;
+    run.party[0].stats.attack = 500;
+    let actor = run.party[0].id;
+    let battle = run.battle.as_mut().ok_or("battle absent")?;
+    for enemy in &mut battle.enemy_party {
+        enemy.moves[0].as_mut().ok_or("move absent")?.move_id = MoveId::new(safe(33));
+        enemy.moves[0].as_mut().ok_or("move absent")?.pp_used = 0;
+        enemy.stats.speed = 1;
+        enemy.stats.attack = 500;
+    }
+    battle.enemy_party[1].hp = 1;
+    let defeated = battle.enemy_party[1].id;
+    let accepted = commands(
+        state,
+        &[
+            slot(BattleSide::Enemy, 1),
+            slot(BattleSide::Player, 0),
+            slot(BattleSide::Player, 0),
+        ],
+        content.as_ref(),
+    )?;
+    let targeting = CurrentTargetExecution::from_state(state)?;
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: seat(),
+        revision: active_run(state)?.control.revision,
+    };
+    let begin = begin_current_turn(
+        &project(state),
+        &accepted,
+        &content.battle,
+        &authority,
+        &targeting,
+        safe(37),
+    )?;
+    let selected = begin.continuation.actions.clone();
+    let chunk = step_current_turn(
+        &begin.transition.after_state,
+        &begin.continuation,
+        &content.battle,
+        &authority,
+        &targeting,
+    )?;
+    let CurrentTurnStageV1::AwaitingInterlude { faints } = &chunk.continuation.stage else {
+        return Err("missing actual faint interlude".into());
+    };
+    assert_eq!(faints.len(), 1);
+    let source_move = faints[0].source_move.as_ref().ok_or("missing resolved KO move")?;
+    assert_eq!(source_move.pokemon, actor);
+    assert_eq!(source_move.move_id, MoveId::new(safe(33)));
+    assert!(source_move.struggle_pp_before.is_none());
+    assert_eq!(faints[0].id, SafeU53::ZERO);
+    assert_eq!(faints[0].pokemon, defeated);
+    assert_eq!(faints[0].slot, slot(BattleSide::Enemy, 1));
+    let run = chunk
+        .transition
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?;
+    assert_eq!(run.party[0].moves[0].as_ref().ok_or("move absent")?.pp_used, 1);
+    assert_eq!(run.party[0].id, actor);
+    assert_eq!(run.party[0].hp, 1);
+    assert_eq!(
+        run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].moves[0]
+            .as_ref()
+            .ok_or("move absent")?
+            .pp_used,
+        0
+    );
+    assert_eq!(chunk.continuation.actions, selected);
+    assert_eq!(chunk.continuation.accepted_commands, accepted);
+    assert_eq!(chunk.continuation.next_action, 1);
+    let restored: CurrentTurnExecutionV1 =
+        serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
+    assert_eq!(restored, chunk.continuation);
+    let mut invalid = restored.clone();
+    invalid.next_action = 0;
+    assert!(invalid.validate(run).is_err());
+    let mut invalid = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut invalid.stage {
+        faints[0].pokemon = actor;
+    }
+    assert!(invalid.validate(run).is_err());
+    let mut substituted = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut substituted.stage {
+        faints[0].source_move.as_mut().ok_or("source missing")?.move_id = MoveId::new(safe(10));
+    }
+    assert!(substituted.validate(run).is_err());
+    let frozen = canonical_bytes(&chunk.transition.after_state)?;
+    assert!(
+        step_current_turn(
+            &chunk.transition.after_state,
+            &restored,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
+    assert!(
+        finish_current_turn(
+            &chunk.transition.after_state,
+            &restored,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
+    assert_eq!(canonical_bytes(&chunk.transition.after_state)?, frozen);
+    // This test stops at the actual boundary. Only the integrated phase owner may
+    // release it after consuming real Faint/Victory/XP records, never a test flag.
+    Ok(())
+}
+
+// Controlled mechanical fixture: all move slots exhausted, real resolver KO and retained restore.
+#[test]
+fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
+    use er_battle::m7_resolver::{begin_current_turn, finish_current_turn, step_current_turn};
+    use er_state::current_turn_execution::{CurrentTurnExecutionV1, CurrentTurnStageV1};
+    let content = content()?;
+    let mut snapshot = two_enemies(content.clone())?;
+    let state = active_mut(&mut snapshot)?;
+    assign_move(state, 33)?;
+    let run = active_run_mut(state)?;
+    run.party[0].moves[0].as_mut().ok_or("move absent")?.max_pp_override = Some(1);
+    run.party[0].moves[0].as_mut().ok_or("move absent")?.pp_used = 1;
+    run.party[0].moves[1..].fill(None);
+    run.party[0].hp = run.party[0].max_hp;
+    run.party[0].stats.speed = 500;
+    run.party[0].stats.attack = 500;
+    let actor = run.party[0].id;
+    let battle = run.battle.as_mut().ok_or("battle absent")?;
+    for enemy in &mut battle.enemy_party {
+        enemy.moves[0].as_mut().ok_or("move absent")?.move_id = MoveId::new(safe(33));
+        enemy.moves[0].as_mut().ok_or("move absent")?.pp_used = 0;
+        enemy.stats.speed = 1;
+        enemy.stats.attack = 500;
+    }
+    battle.enemy_party[1].hp = 1;
+    let defeated = battle.enemy_party[1].id;
+    let accepted = commands(
+        state,
+        &[
+            slot(BattleSide::Enemy, 1),
+            slot(BattleSide::Player, 0),
+            slot(BattleSide::Player, 0),
+        ],
+        content.as_ref(),
+    )?;
+    let targeting = CurrentTargetExecution::from_state(state)?;
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: seat(),
+        revision: active_run(state)?.control.revision,
+    };
+    let begin = begin_current_turn(
+        &project(state),
+        &accepted,
+        &content.battle,
+        &authority,
+        &targeting,
+        safe(37),
+    )?;
+    let selected = begin.continuation.actions.clone();
+    let chunk = step_current_turn(
+        &begin.transition.after_state,
+        &begin.continuation,
+        &content.battle,
+        &authority,
+        &targeting,
+    )?;
+    let CurrentTurnStageV1::AwaitingInterlude { faints } = &chunk.continuation.stage else {
+        return Err("missing actual faint interlude".into());
+    };
+    assert_eq!(faints.len(), 1);
+    let source_move = faints[0].source_move.as_ref().ok_or("missing resolved KO move")?;
+    assert_eq!(source_move.pokemon, actor);
+    assert_eq!(source_move.move_id, MoveId::new(safe(165)));
+    assert!(source_move.struggle_pp_before.is_some());
+    assert_eq!(faints[0].id, SafeU53::ZERO);
+    assert_eq!(faints[0].pokemon, defeated);
+    assert_eq!(faints[0].slot, slot(BattleSide::Enemy, 1));
+    let run = chunk
+        .transition
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("run absent")?;
+    assert_eq!(run.party[0].moves[0].as_ref().ok_or("move absent")?.pp_used, 1);
+    assert_eq!(run.party[0].id, actor);
+    assert!(run.party[0].hp > 0 && run.party[0].hp < run.party[0].max_hp);
+    assert_eq!(
+        run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].moves[0]
+            .as_ref()
+            .ok_or("move absent")?
+            .pp_used,
+        0
+    );
+    assert_eq!(chunk.continuation.actions, selected);
+    assert_eq!(chunk.continuation.accepted_commands, accepted);
+    assert_eq!(chunk.continuation.next_action, 1);
+    let restored: CurrentTurnExecutionV1 =
+        serde_json::from_slice(&canonical_bytes(&chunk.continuation)?)?;
+    assert_eq!(restored, chunk.continuation);
+    let mut invalid = restored.clone();
+    invalid.next_action = 0;
+    assert!(invalid.validate(run).is_err());
+    let mut invalid = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut invalid.stage {
+        faints[0].pokemon = actor;
+    }
+    assert!(invalid.validate(run).is_err());
+    let mut substituted = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut substituted.stage {
+        faints[0].source_move.as_mut().ok_or("source missing")?.move_id = MoveId::new(safe(10));
+    }
+    assert!(substituted.validate(run).is_err());
+    let mut altered_pp = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut altered_pp.stage {
+        let slots = faints[0].source_move.as_mut().ok_or("source missing")?.struggle_pp_before.as_mut().ok_or("preimage missing")?;
+        slots[0].as_mut().ok_or("slot missing")?.pp_used = 0;
+    }
+    assert!(altered_pp.validate(run).is_err());
+    let mut stripped_fallback = restored.clone();
+    if let CurrentTurnStageV1::AwaitingInterlude { faints } = &mut stripped_fallback.stage {
+        faints[0].source_move.as_mut().ok_or("source missing")?.struggle_pp_before = None;
+    }
+    assert!(stripped_fallback.validate(run).is_err());
+    let frozen = canonical_bytes(&chunk.transition.after_state)?;
+    assert!(
+        step_current_turn(
+            &chunk.transition.after_state,
+            &restored,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
+    assert!(
+        finish_current_turn(
+            &chunk.transition.after_state,
+            &restored,
+            &content.battle,
+            &authority,
+            &targeting
+        )
+        .is_err()
+    );
+    assert_eq!(canonical_bytes(&chunk.transition.after_state)?, frozen);
+    // This test stops at the actual boundary. Only the integrated phase owner may
+    // release it after consuming real Faint/Victory/XP records, never a test flag.
     Ok(())
 }

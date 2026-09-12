@@ -2,7 +2,7 @@
 
 use super::*;
 use er_state::current_turn_execution::{
-    CurrentTurnExecutionV1, CurrentTurnFaintV1, CurrentTurnStageV1,
+    CurrentFaintMoveSourceV1, CurrentTurnExecutionV1, CurrentTurnFaintV1, CurrentTurnStageV1,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -209,10 +209,42 @@ fn advance_current_turn(
                 .find(|row| row.occupant == Some(*pokemon))
                 .map(|row| row.slot)
                 .ok_or(BattleV5Error::Target)?;
+            let mut source_move = None;
+            for event in &source_events {
+                use er_state::current_battle_source_events::{CurrentBattleSourceEventV1, CurrentMoveUseModeV1};
+                if let CurrentBattleSourceEventV1::MoveDamage {
+                    user, source_slot, target, target_slot, move_id, use_mode,
+                    damage, target_hp_before, target_hp_after, ..
+                } = event {
+                    if *target != *pokemon || *target_slot != slot
+                        || *target_hp_before != *before || *target_hp_after != 0 || *damage == 0 {
+                        continue;
+                    }
+                    let action = owner.actions.get(usize::from(owner.next_action))
+                        .ok_or(BattleV5Error::Target)?;
+                    if finalize || *user != action.command.actor() || *source_slot != action.source_slot
+                        || !matches!(action.command, BattleCommand::Fight { .. })
+                        || *use_mode != CurrentMoveUseModeV1::Direct || source_move.is_some() {
+                        return Err(BattleV5Error::Target);
+                    }
+                    let BattleCommand::Fight { move_slot, .. } = action.command else {
+                        return Err(BattleV5Error::Target);
+                    };
+                    let before_run = before.active_run.as_ref().ok_or(BattleV5Error::NoBattle)?;
+                    let before_battle = before_run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
+                    let before_actor = before_run.party.iter().chain(&before_battle.enemy_party)
+                        .find(|pokemon| pokemon.id == *user).ok_or(BattleV5Error::Target)?;
+                    let (resolved, struggle) = effective_move_definition_v5(content, before_actor, move_slot)?;
+                    if resolved.id != *move_id { return Err(BattleV5Error::Target); }
+                    source_move = Some(CurrentFaintMoveSourceV1 { pokemon: *user, move_id: *move_id,
+                        struggle_pp_before: struggle.then_some(before_actor.moves) });
+                }
+            }
             faints.push(CurrentTurnFaintV1 {
                 id: next.next_faint_sequence,
                 pokemon: *pokemon,
                 slot,
+                source_move,
             });
             next.next_faint_sequence = SafeU53::new(
                 next.next_faint_sequence

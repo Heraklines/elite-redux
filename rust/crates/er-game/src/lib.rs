@@ -43,4 +43,10 @@ pub mod target_menu;
 pub mod transaction;
 
 pub mod current_experience_settlement;
+pub(crate) mod current_experience_validation;
+pub(crate) mod current_victory_pump;
+pub(crate) mod current_achievement_action;
+pub(crate) mod current_faint_execution;
+pub(crate) mod current_victory_start;
+pub(crate) mod current_level_account;
 pub(crate) mod current_source_progression;

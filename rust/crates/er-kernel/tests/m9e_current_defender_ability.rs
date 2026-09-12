@@ -239,6 +239,8 @@ fn two_enemies(content: Arc<PreparedGameContentV2>) -> Result<CoreGameKernelSnap
     // The bounded participation/XP owner only admits a single 1v1 battle; the
     // controlled doubles checkpoint carries no owner rather than a stale roster.
     state.current_battle_participation = None;
+    state.current_achievement_tracker.as_mut().ok_or("fresh tracker absent")?.history =
+        er_state::current_achievement_tracker::CurrentAchievementHistoryV1::UnobservedMechanicalFixture;
     state.validate_with(content.as_ref())?;
     // This deliberately edited field is a controlled checkpoint, not the state
     // produced by the retained natural bootstrap material. Keep its real next

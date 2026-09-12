@@ -103,6 +103,8 @@ fn active_snapshot(
         schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
         lifecycle: GameKernelLifecycleSnapshotV7::Active(state(content)?),
         private_battle_control: None,
+        private_learning_control: None,
+        pending_current_phase_ack: None,
         current_proposal: None,
         current_coop_setup: None,
         authority_ai: None,

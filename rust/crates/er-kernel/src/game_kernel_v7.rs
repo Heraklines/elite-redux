@@ -1,7 +1,11 @@
 //! GameKernelV7: sole production owner for the direct M9-E runtime path.
 
 #[path = "current_phase_v7.rs"]
-mod current_phase_v7;
+pub(crate) mod current_phase_v7;
+#[path = "current_learning_control_v7.rs"]
+pub(crate) mod current_learning_control_v7;
+#[path = "current_phase_receipt_v7.rs"]
+pub(crate) mod current_phase_receipt_v7;
 
 #[path = "current_coop_rebind_v7.rs"]
 pub mod current_coop_rebind_v7;
@@ -160,6 +164,8 @@ enum GameKernelLifecycleV7 {
 pub struct GameKernelV7 {
     lifecycle: GameKernelLifecycleV7,
     private_battle_control: Option<PrivateBattleControlSnapshotV7>,
+    private_learning_control: Option<GameControlPlanV2>,
+    pending_current_phase_ack: Option<crate::snapshot_v7::PendingCurrentPhaseAckV1>,
     current_proposal: Option<CurrentProposalOwnerSnapshotV1>,
     current_coop_setup: Option<Box<CurrentCoopSetupSnapshotV1>>,
     content: Arc<PreparedGameContentV2>,
@@ -313,6 +319,8 @@ impl GameKernelV7 {
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Bootstrap(bootstrap),
             private_battle_control: None,
+            private_learning_control: None,
+            pending_current_phase_ack: None,
             current_proposal: None,
             current_coop_setup: None,
             content,
@@ -356,6 +364,8 @@ impl GameKernelV7 {
         let value = Self {
             lifecycle: GameKernelLifecycleV7::Active(runtime),
             private_battle_control: None,
+            private_learning_control: None,
+            pending_current_phase_ack: None,
             current_proposal: None,
             current_coop_setup: None,
             content,
@@ -429,6 +439,8 @@ impl GameKernelV7 {
         let value = Self {
             lifecycle,
             private_battle_control: snapshot.private_battle_control,
+            private_learning_control: snapshot.private_learning_control,
+            pending_current_phase_ack: snapshot.pending_current_phase_ack,
             current_proposal: snapshot.current_proposal,
             current_coop_setup: snapshot.current_coop_setup,
             content,
@@ -499,6 +511,8 @@ impl GameKernelV7 {
             schema_version: CORE_GAME_KERNEL_SNAPSHOT_SCHEMA_VERSION_V7,
             lifecycle,
             private_battle_control: self.private_battle_control.clone(),
+            private_learning_control: self.private_learning_control.clone(),
+            pending_current_phase_ack: self.pending_current_phase_ack,
             current_proposal: self.current_proposal.clone(),
             current_coop_setup: self.current_coop_setup.clone(),
             authority_ai: self.authority_ai.as_ref().map(AuthorityAiV2::snapshot),
@@ -535,6 +549,9 @@ impl GameKernelV7 {
     }
 
     pub fn current_control(&self) -> Option<&GameControlPlanV2> {
+        if let Some(control) = &self.private_learning_control {
+            return Some(control);
+        }
         match &self.lifecycle {
             GameKernelLifecycleV7::Bootstrap(bootstrap) => Some(&bootstrap.control),
             GameKernelLifecycleV7::Active(runtime)
@@ -1516,6 +1533,7 @@ impl GameKernelV7 {
             candidate.current_proposal = None;
         }
         candidate.private_battle_control = None;
+        candidate.private_learning_control = None;
         let material = GameMaterialV6::decode(bytes)
             .map_err(|error| GameKernelV7Error::Runtime(error.to_string()))?;
         candidate.advance_replay_sequence()?;
@@ -1557,6 +1575,7 @@ impl GameKernelV7 {
             .pending_presentations
             .get(&event_id)
             .ok_or(GameKernelV7Error::Invalid)?;
+        let completed = matches!(&outcome, KernelPresentationOutcomeV2::Settled);
         match outcome {
             KernelPresentationOutcomeV2::Settled => {}
             KernelPresentationOutcomeV2::IntentionallySkipped
@@ -1569,8 +1588,20 @@ impl GameKernelV7 {
             _ => return Err(GameKernelV7Error::Invalid),
         }
         // Preflight the sole remaining fallible step before retiring ownership.
+        let phase_ack = match &self.lifecycle {
+            GameKernelLifecycleV7::Active(runtime) => runtime.state()
+                .and_then(|state| current_phase_receipt_v7::expected_presentation(state, event_id)),
+            _ => None,
+        };
+        if phase_ack.is_some() && (self.pending_current_phase_ack.is_some()
+            || self.role != GameKernelRoleV7::Authority || self.protocol.is_some())
+        { return Err(GameKernelV7Error::Invalid); }
+        if phase_ack.is_some_and(|ack| ack.kind == crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation)
+            && !completed
+        { return Err(GameKernelV7Error::Invalid); }
         let next_replay_sequence = increment_safe(self.replay_sequence)?;
         self.pending_presentations.remove(&event_id);
+        if let Some(ack) = phase_ack { self.pending_current_phase_ack = Some(ack); }
         self.replay_sequence = next_replay_sequence;
         Ok(())
     }
@@ -1696,6 +1727,7 @@ impl GameKernelV7 {
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.next_menu_instance_id = next_menu_instance_id;
                 self.private_battle_control = None;
+        self.private_learning_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot.clone(), save.generation);
                 self.synchronize_menu_allocator()?;
@@ -1860,6 +1892,7 @@ impl GameKernelV7 {
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.next_menu_instance_id = next_menu;
                 self.private_battle_control = None;
+        self.private_learning_control = None;
                 self.clear_input()?;
                 self.storage_frontiers.insert(slot, save.generation);
             }
@@ -2105,6 +2138,7 @@ impl GameKernelV7 {
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged_runtime);
         self.private_battle_control = None;
+        self.private_learning_control = None;
         self.synchronize_menu_allocator()?;
         self.protocol = Some(staged_protocol);
         self.advance_replay_sequence()?;
@@ -2113,6 +2147,17 @@ impl GameKernelV7 {
         Ok(step)
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
+        if self.private_learning_control.is_some()
+            || self.state().is_some_and(|state| current_learning_control_v7::current_batch(state).is_some())
+        {
+            if self.role != GameKernelRoleV7::Authority || self.protocol.is_some()
+                || self.private_battle_control.is_some()
+            { return Err(GameKernelV7Error::Invalid); }
+            current_learning_control_v7::validate_private_learning_control(
+                self.state().ok_or(GameKernelV7Error::Invalid)?,
+                self.private_learning_control.as_ref(), self.local_seat,
+            )?;
+        }
         let profile = match &self.lifecycle {
             GameKernelLifecycleV7::Bootstrap(bootstrap) => {
                 bootstrap.current_friendship_profile.as_ref()
@@ -2588,6 +2633,9 @@ impl GameKernelV7 {
                     GameButton::Right => NavigationDirection::Right,
                     _ => return Err(GameKernelV7Error::Invalid),
                 };
+                if let Some(step) = self.navigate_current_learning_control(direction)? {
+                    return Ok(step);
+                }
                 self.retain_canonical_battle_control()?;
                 self.active_runtime_mut()?
                     .navigate_control(direction)
@@ -2645,7 +2693,9 @@ impl GameKernelV7 {
                 internal_events: Vec::new(),
             });
         }
-        let (action, action_context) = if button == GameButton::Action {
+        let (action, action_context) = if let Some(submission) = self.current_learning_submission(button)? {
+            submission
+        } else if button == GameButton::Action {
             self.active_runtime()?
                 .selected_action()
                 .map_err(runtime_error)?
@@ -2890,6 +2940,7 @@ impl GameKernelV7 {
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
         self.private_battle_control = None;
+        self.private_learning_control = None;
         self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         let mut step = step;
@@ -3090,6 +3141,7 @@ impl GameKernelV7 {
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
         self.private_battle_control = None;
+        self.private_learning_control = None;
         self.synchronize_menu_allocator()?;
         self.advance_replay_sequence()?;
         self.synchronize_terminal(&mut step)?;
@@ -3194,6 +3246,7 @@ impl GameKernelV7 {
             terminal: terminal.clone(),
         };
         self.private_battle_control = None;
+        self.private_learning_control = None;
         self.clear_input()?;
         step.effects.push(GameKernelEffectV7::Terminal(terminal));
         Ok(())

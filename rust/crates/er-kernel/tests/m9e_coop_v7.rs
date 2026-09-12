@@ -404,6 +404,22 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(1));
+    let (mut authority, mut replica, initial_turn) =
+        coop_wait_bootstrap(content.clone(), host, guest, generation)?;
+    coop_wait_private_navigation(&mut authority, &mut replica, host, guest)?;
+    let retained_material = coop_wait_retain_host(&mut authority, &mut replica, guest, initial_turn)?;
+    let mut continued = coop_wait_restore_private(&mut replica, content.clone(), host, guest)?;
+    let proposal = coop_wait_guest_proposal(&mut replica, &mut continued, &retained_material[0], content.clone(), guest)?;
+    coop_wait_resolve(&mut authority, &mut replica, &proposal, content, guest, generation, initial_turn)
+}
+
+// Keep independent snapshot rejection cases out of one unoptimized libtest
+// frame. Each helper returns before the next large kernel/snapshot is created;
+// all original state, atomicity, replay and control assertions are retained.
+#[inline(never)]
+fn coop_wait_bootstrap(
+    content: Arc<PreparedGameContentV2>, host: SeatId, guest: SeatId, generation: ConnectionGeneration,
+) -> Result<(Box<GameKernelV7>, Box<GameKernelV7>, er_types::battle_ids::TurnIndex), Box<dyn Error>> {
     let authority_protocol =
         initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)?;
     let replica_protocol =
@@ -456,7 +472,7 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         .snapshot()?
         .material_ledger
         .next_authority_revision;
-    let mut replica = GameKernelV7::from_active(
+    let replica = GameKernelV7::from_active(
         initial_state,
         revision,
         guest,
@@ -467,13 +483,18 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         Some(replica_protocol),
     )?;
 
+    Ok((Box::new(authority), Box::new(replica), initial_turn))
+}
+
+#[inline(never)]
+fn coop_wait_private_navigation(authority: &mut GameKernelV7, replica: &mut GameKernelV7, host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
     let shared_host_root = authority
         .current_control()
         .cloned()
         .ok_or("host root missing")?;
     // Local guest leaves must retain the exact host-owned canonical root.
     for _ in 0..3 {
-        press(&mut replica, PhysicalKey::Space)?;
+        press(replica, PhysicalKey::Space)?;
         let private = replica.snapshot()?;
         let owner = private
             .private_battle_control
@@ -482,22 +503,27 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         assert_eq!(owner.owner_seat, guest);
         assert_eq!(owner.canonical_control, shared_host_root);
         assert_eq!(owner.canonical_control.owner_seat, Some(host));
-        press(&mut replica, PhysicalKey::Escape)?;
+        press(replica, PhysicalKey::Escape)?;
         assert_eq!(replica.current_control(), Some(&shared_host_root));
     }
-    press(&mut replica, PhysicalKey::Space)?;
+    press(replica, PhysicalKey::Space)?;
     let premature = replica.snapshot()?;
-    assert!(press(&mut replica, PhysicalKey::Space).is_err());
+    assert!(press(replica, PhysicalKey::Space).is_err());
     assert_eq!(replica.snapshot()?, premature);
     assert!(premature.current_proposal.is_none());
     for _ in 0..3 {
-        press(&mut authority, PhysicalKey::Space)?;
-        press(&mut authority, PhysicalKey::Escape)?;
+        press(authority, PhysicalKey::Space)?;
+        press(authority, PhysicalKey::Escape)?;
         assert_eq!(authority.current_control(), Some(&shared_host_root));
     }
-    press(&mut authority, PhysicalKey::Space)
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_retain_host(authority: &mut GameKernelV7, replica: &mut GameKernelV7, guest: SeatId, initial_turn: er_types::battle_ids::TurnIndex) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    press(authority, PhysicalKey::Space)
         .map_err(|error| format!("host Fight navigation failed: {error}"))?;
-    let retained = press(&mut authority, PhysicalKey::Space)
+    let retained = press(authority, PhysicalKey::Space)
         .map_err(|error| format!("host command retention failed: {error}"))?;
     let retained_material = retained
         .effects
@@ -538,7 +564,12 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    press(&mut replica, PhysicalKey::Space)
+    Ok(retained_material)
+}
+
+#[inline(never)]
+fn coop_wait_restore_private(replica: &mut GameKernelV7, content: Arc<PreparedGameContentV2>, host: SeatId, guest: SeatId) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
+    press(replica, PhysicalKey::Space)
         .map_err(|error| format!("guest Fight navigation failed: {error}"))?;
     assert_eq!(
         replica.current_control().map(|control| control.kind),
@@ -546,13 +577,22 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     );
     let private_move_menu = replica.snapshot()?;
     let encoded_private = serde_json::to_vec(&private_move_menu)?;
-    let mut continued = GameKernelV7::from_snapshot(
+    let continued = GameKernelV7::from_snapshot(
         serde_json::from_slice(&encoded_private)?,
         guest,
         GameKernelRoleV7::Replica,
         content.clone(),
     )?;
     assert_eq!(continued.snapshot()?, private_move_menu);
+    coop_wait_reject_missing_owner(&private_move_menu, content.clone(), host, guest)?;
+    coop_wait_reject_wrong_context(&private_move_menu, content.clone(), host, guest)?;
+    coop_wait_reject_wrong_owner(&private_move_menu, content.clone(), host, guest)?;
+    coop_wait_reject_wrong_canonical_selection(&private_move_menu, content.clone(), host, guest)?;
+    Ok(Box::new(continued))
+}
+
+#[inline(never)]
+fn coop_wait_reject_missing_owner(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, _host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
     let mut missing_owner = private_move_menu.clone();
     missing_owner.private_battle_control = None;
     assert!(
@@ -564,6 +604,11 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         )
         .is_err()
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_reject_wrong_context(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, _host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
     let mut wrong_context = private_move_menu.clone();
     wrong_context
         .private_battle_control
@@ -583,6 +628,11 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         )
         .is_err()
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_reject_wrong_owner(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
     let mut wrong_owner = private_move_menu.clone();
     wrong_owner
         .private_battle_control
@@ -598,6 +648,11 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         )
         .is_err()
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_reject_wrong_canonical_selection(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, _host: SeatId, guest: SeatId) -> Result<(), Box<dyn Error>> {
     let mut wrong_canonical_selection = private_move_menu.clone();
     let canonical_menu = wrong_canonical_selection
         .private_battle_control
@@ -623,26 +678,31 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         )
         .is_err()
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_guest_proposal(replica: &mut GameKernelV7, continued: &mut GameKernelV7, retained_material: &[u8], content: Arc<PreparedGameContentV2>, guest: SeatId) -> Result<Vec<u8>, Box<dyn Error>> {
     for _ in 0..3 {
         assert_eq!(
-            press(&mut replica, PhysicalKey::Escape)?,
-            press(&mut continued, PhysicalKey::Escape)?
+            press(replica, PhysicalKey::Escape)?,
+            press(continued, PhysicalKey::Escape)?
         );
         assert_eq!(
-            press(&mut replica, PhysicalKey::Space)?,
-            press(&mut continued, PhysicalKey::Space)?
+            press(replica, PhysicalKey::Space)?,
+            press(continued, PhysicalKey::Space)?
         );
         assert_eq!(replica.snapshot()?, continued.snapshot()?);
     }
     let private_move_menu = replica.snapshot()?;
     assert_eq!(
-        replica.apply_authority_material(&retained_material[0])?,
+        replica.apply_authority_material(retained_material)?,
         GameKernelStepV7::default()
     );
     assert_eq!(replica.snapshot()?, private_move_menu);
-    let proposal_step = press(&mut replica, PhysicalKey::Space)
+    let proposal_step = press(replica, PhysicalKey::Space)
         .map_err(|error| format!("guest proposal failed: {error}"))?;
-    assert_eq!(proposal_step, press(&mut continued, PhysicalKey::Space)?);
+    assert_eq!(proposal_step, press(continued, PhysicalKey::Space)?);
     assert_eq!(replica.snapshot()?, continued.snapshot()?);
     let proposal = proposal_step
         .effects
@@ -653,6 +713,40 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         })
         .ok_or("guest command proposal missing")?;
     let exact_pending = replica.snapshot()?;
+    coop_wait_exhausted_press(&private_move_menu, content.clone(), guest)?;
+    let previous_option = replica
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .ok_or("pending move menu missing")?
+        .selected_option_id
+        .clone();
+    press(replica, PhysicalKey::ArrowDown)?;
+    let distinct_pending = replica.snapshot()?;
+    assert_ne!(
+        replica
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .ok_or("distinct move menu missing")?
+            .selected_option_id,
+        previous_option
+    );
+    assert!(press(replica, PhysicalKey::Space).is_err());
+    assert_eq!(replica.snapshot()?, distinct_pending);
+    assert_eq!(
+        distinct_pending.current_proposal,
+        exact_pending.current_proposal
+    );
+    *replica = GameKernelV7::from_snapshot(
+        exact_pending,
+        guest,
+        GameKernelRoleV7::Replica,
+        content.clone(),
+    )?;
+    Ok(proposal)
+}
+
+#[inline(never)]
+fn coop_wait_exhausted_press(private_move_menu: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, guest: SeatId) -> Result<(), Box<dyn Error>> {
     let mut exhausted_press = private_move_menu.clone();
     exhausted_press.replay_sequence = safe(9_007_199_254_740_991);
     let mut exhausted_press = GameKernelV7::from_snapshot(
@@ -664,36 +758,13 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     let before_exhausted_press = exhausted_press.snapshot()?;
     assert!(press(&mut exhausted_press, PhysicalKey::Space).is_err());
     assert_eq!(exhausted_press.snapshot()?, before_exhausted_press);
-    let previous_option = replica
-        .current_control()
-        .and_then(|control| control.menu.as_ref())
-        .ok_or("pending move menu missing")?
-        .selected_option_id
-        .clone();
-    press(&mut replica, PhysicalKey::ArrowDown)?;
-    let distinct_pending = replica.snapshot()?;
-    assert_ne!(
-        replica
-            .current_control()
-            .and_then(|control| control.menu.as_ref())
-            .ok_or("distinct move menu missing")?
-            .selected_option_id,
-        previous_option
-    );
-    assert!(press(&mut replica, PhysicalKey::Space).is_err());
-    assert_eq!(replica.snapshot()?, distinct_pending);
-    assert_eq!(
-        distinct_pending.current_proposal,
-        exact_pending.current_proposal
-    );
-    replica = GameKernelV7::from_snapshot(
-        exact_pending,
-        guest,
-        GameKernelRoleV7::Replica,
-        content.clone(),
-    )?;
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_resolve(authority: &mut GameKernelV7, replica: &mut GameKernelV7, proposal: &[u8], content: Arc<PreparedGameContentV2>, guest: SeatId, generation: ConnectionGeneration, initial_turn: er_types::battle_ids::TurnIndex) -> Result<(), Box<dyn Error>> {
     let resolved = authority
-        .ingest_network_frame(generation, &proposal)
+        .ingest_network_frame(generation, proposal)
         .map_err(|error| format!("guest command admission failed: {error}"))?;
     let turn_material = resolved
         .effects
@@ -704,6 +775,29 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         })
         .collect::<Vec<_>>();
     assert_eq!(turn_material.len(), 1);
+    coop_wait_collision(replica, &resolved, &turn_material[0], content.clone(), guest, generation)?;
+    let resolved_turn = authority
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .and_then(|run| run.battle.as_ref())
+        .map(|battle| battle.turn)
+        .ok_or("resolved battle missing")?;
+    assert!(resolved_turn > initial_turn);
+    replica.ingest_network_frame(generation, &turn_material[0])?;
+    assert!(replica.snapshot()?.current_proposal.is_none());
+    assert_eq!(replica.state(), authority.state());
+    assert_eq!(replica.current_control(), authority.current_control());
+    assert!(
+        authority
+            .ingest_network_frame(generation, proposal)?
+            .effects
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[inline(never)]
+fn coop_wait_collision(replica: &GameKernelV7, resolved: &GameKernelStepV7, turn_material: &[u8], content: Arc<PreparedGameContentV2>, guest: SeatId, generation: ConnectionGeneration) -> Result<(), Box<dyn Error>> {
     let presentation = resolved
         .effects
         .iter()
@@ -732,64 +826,28 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
         content.clone(),
     )?;
     assert_eq!(
-        collision.ingest_network_frame(generation, &turn_material[0]),
+        collision.ingest_network_frame(generation, turn_material),
         Err(GameKernelV7Error::Invalid)
     );
     assert_eq!(collision.snapshot()?, collision_snapshot);
-    let resolved_turn = authority
-        .state()
-        .and_then(|state| state.active_run.as_ref())
-        .and_then(|run| run.battle.as_ref())
-        .map(|battle| battle.turn)
-        .ok_or("resolved battle missing")?;
-    assert!(resolved_turn > initial_turn);
-    replica.ingest_network_frame(generation, &turn_material[0])?;
-    assert!(replica.snapshot()?.current_proposal.is_none());
-    assert_eq!(replica.state(), authority.state());
-    assert_eq!(replica.current_control(), authority.current_control());
-    assert!(
-        authority
-            .ingest_network_frame(generation, &proposal)?
-            .effects
-            .is_empty()
-    );
     Ok(())
 }
 
-// Diagnostic writes bypass libtest capture so an abort retains the last boundary.
-fn save_stack_marker(stage: &str) {
-    use std::io::Write;
-    let mut stderr = std::io::stderr().lock();
-    let _ = writeln!(stderr, "m9e-save-stack: {stage}");
+struct SavePresentationKernels {
+    authority: Box<GameKernelV7>,
+    replica: Box<GameKernelV7>,
+    revision: SafeU53,
 }
 
-#[test]
-fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
--> Result<(), Box<dyn Error>> {
-    save_stack_marker("wrapper entered");
-    {
-        use std::io::Write;
-        let _ = writeln!(
-            std::io::stderr().lock(),
-            "m9e-save-stack: sizes kernel={} snapshot={} state={}",
-            std::mem::size_of::<GameKernelV7>(),
-            std::mem::size_of::<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>(),
-            std::mem::size_of::<GameStateV6>(),
-        );
-    }
-    save_presentation_stack_diagnostic()
-}
-
+// Independent snapshot/clone scenarios use separate default-stack frames.
 #[inline(never)]
-fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
-    save_stack_marker("body entered; content");
-    let content = content()?;
-    let host = SeatId::new(safe(1));
-    let guest = SeatId::new(safe(2));
-    let generation = ConnectionGeneration::new(safe(1));
-    save_stack_marker("natural bootstrap");
+fn save_presentation_kernels(
+    content: &Arc<PreparedGameContentV2>,
+    host: SeatId,
+    guest: SeatId,
+    generation: ConnectionGeneration,
+) -> Result<SavePresentationKernels, Box<dyn Error>> {
     let (mut state, revision, menu_instance) = natural_coop_state(content.clone(), host)?;
-    save_stack_marker("bootstrap returned");
     // The run is natural; the Save menu is an explicit controlled action seam.
     let mut control = generic_vertical_control_v2(
         menu_instance,
@@ -815,8 +873,7 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
         .authority_seat = host;
     state.active_run.as_mut().ok_or("run missing")?.control = control;
     state.validate_with(content.as_ref())?;
-    save_stack_marker("authority from_active");
-    let mut authority = GameKernelV7::from_active(
+    let authority = GameKernelV7::from_active(
         state.clone(),
         revision,
         host,
@@ -829,8 +886,7 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
             host,
         )?),
     )?;
-    save_stack_marker("replica from_active");
-    let mut replica = GameKernelV7::from_active(
+    let replica = GameKernelV7::from_active(
         state,
         revision,
         guest,
@@ -843,21 +899,20 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
             guest,
         )?),
     )?;
-    save_stack_marker("replica Save press");
-    let proposal_step = press(&mut replica, PhysicalKey::Space)?;
-    let proposal = proposal_step
-        .effects
-        .iter()
-        .find_map(|effect| match effect {
-            GameKernelEffectV7::ProposalReady { bytes, .. } => Some(bytes),
-            _ => None,
-        })
-        .ok_or("guest Save proposal missing")?;
-    save_stack_marker("replica snapshot");
-    let before_delivery = replica.snapshot()?;
-    save_stack_marker("authority snapshot");
-    let before_admission = authority.snapshot()?;
-    save_stack_marker("exhausted snapshot clone and restore");
+    Ok(SavePresentationKernels {
+        authority: Box::new(authority),
+        replica: Box::new(replica),
+        revision,
+    })
+}
+
+#[inline(never)]
+fn exhausted_save_admission(
+    before_admission: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: &Arc<PreparedGameContentV2>,
+    host: SeatId,
+    proposal: &[u8],
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     let mut exhausted_snapshot = before_admission.clone();
     exhausted_snapshot.replay_sequence = SafeU53::MAX;
     let mut exhausted = GameKernelV7::from_snapshot(
@@ -866,7 +921,6 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
         GameKernelRoleV7::Authority,
         content.clone(),
     )?;
-    save_stack_marker("exhausted admit");
     assert_eq!(
         exhausted.admit_game_proposal(proposal),
         Err(GameKernelV7Error::Invalid),
@@ -877,7 +931,187 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
         exhausted_snapshot,
         "late admission rejection must retain state, effects, private control and protocol"
     );
-    save_stack_marker("authority admit");
+    Ok(Box::new(exhausted))
+}
+
+#[inline(never)]
+fn corrected_save_admission(
+    exhausted: &GameKernelV7,
+    before_admission: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    authority_snapshot: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    authority_step: &GameKernelStepV7,
+    content: &Arc<PreparedGameContentV2>,
+    host: SeatId,
+    proposal: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    // In this controlled fixture, correct only the exhausted replay frontier.
+    // The same real guest proposal must still be available for admission.
+    let mut corrected_snapshot = exhausted.snapshot()?;
+    corrected_snapshot.replay_sequence = before_admission.replay_sequence;
+    assert_eq!(&corrected_snapshot, before_admission);
+    let mut corrected = GameKernelV7::from_snapshot(
+        corrected_snapshot,
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(&corrected.admit_game_proposal(proposal)?, authority_step);
+    assert_eq!(&corrected.snapshot()?, authority_snapshot);
+
+    Ok(())
+}
+
+#[inline(never)]
+fn duplicate_save_admission(
+    authority_snapshot: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: &Arc<PreparedGameContentV2>,
+    host: SeatId,
+    proposal: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    // Exact duplicates remain preflight no-ops even when a new admission's
+    // replay increment would fail. They must not advance the replay sequence
+    // or reinstall effects.
+    let mut duplicate_snapshot = authority_snapshot.clone();
+    duplicate_snapshot.replay_sequence = SafeU53::MAX;
+    let mut duplicate = GameKernelV7::from_snapshot(
+        duplicate_snapshot.clone(),
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        duplicate.admit_game_proposal(proposal)?,
+        GameKernelStepV7::default()
+    );
+    assert_eq!(duplicate.snapshot()?, duplicate_snapshot);
+
+    Ok(())
+}
+
+#[inline(never)]
+fn save_callback_atomicity(
+    authority_snapshot: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    content: &Arc<PreparedGameContentV2>,
+    host: SeatId,
+    request: &er_types::PlatformRequestId,
+    slot: &str,
+    generation: &SafeU53,
+    expected_presentation: &GamePresentationEffectV2,
+) -> Result<(), Box<dyn Error>> {
+    // The actual Save owns both a write and a presentation. At an exhausted
+    // replay frontier, neither callback may retire ownership or publish a CAS
+    // frontier before reporting its late failure.
+    let mut callback_snapshot = authority_snapshot.clone();
+    callback_snapshot.replay_sequence = SafeU53::MAX;
+    let mut callbacks = GameKernelV7::from_snapshot(
+        callback_snapshot.clone(),
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        callbacks.apply_storage_result(*request, KernelStorageResultV2::Written),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(callbacks.snapshot()?, callback_snapshot);
+    assert_eq!(
+        callbacks.settle_presentation(expected_presentation.event_id),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(callbacks.snapshot()?, callback_snapshot);
+
+    let mut callback_retry_snapshot = callbacks.snapshot()?;
+    callback_retry_snapshot.replay_sequence = authority_snapshot.replay_sequence;
+    assert_eq!(&callback_retry_snapshot, authority_snapshot);
+    let mut callback_retry = GameKernelV7::from_snapshot(
+        callback_retry_snapshot,
+        host,
+        GameKernelRoleV7::Authority,
+        content.clone(),
+    )?;
+    assert_eq!(
+        callback_retry.apply_storage_result(*request, KernelStorageResultV2::Written)?,
+        GameKernelStepV7::default()
+    );
+    let mut expected_callbacks = authority_snapshot.clone();
+    expected_callbacks.pending_platform.clear();
+    expected_callbacks.storage_frontiers = vec![StorageFrontierSnapshotV1 {
+        slot: slot.to_owned(),
+        generation: *generation,
+    }];
+    expected_callbacks.replay_sequence = safe(expected_callbacks.replay_sequence.get() + 1);
+    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
+    callback_retry.settle_presentation(expected_presentation.event_id)?;
+    expected_callbacks.pending_presentations.clear();
+    expected_callbacks.replay_sequence = safe(expected_callbacks.replay_sequence.get() + 1);
+    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
+    assert_eq!(
+        callback_retry.apply_storage_result(*request, KernelStorageResultV2::Written),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(
+        callback_retry.settle_presentation(expected_presentation.event_id),
+        Err(GameKernelV7Error::Invalid)
+    );
+    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
+
+    Ok(())
+}
+
+#[inline(never)]
+fn save_delivery_collision(
+    before_delivery: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    pending: &PendingPresentationV3,
+    content: &Arc<PreparedGameContentV2>,
+    guest: SeatId,
+    material: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    // This is a valid pre-delivery snapshot. The collision is detected only
+    // when presentation ownership is installed after common material apply.
+    let mut collision_snapshot = before_delivery.clone();
+    collision_snapshot
+        .pending_presentations
+        .push(pending.clone());
+    let mut collision = GameKernelV7::from_snapshot(
+        collision_snapshot.clone(),
+        guest,
+        GameKernelRoleV7::Replica,
+        content.clone(),
+    )?;
+    assert_eq!(
+        collision.apply_authority_material(material),
+        Err(GameKernelV7Error::Invalid),
+        "replica material must claim pending presentation ownership"
+    );
+    assert_eq!(collision.snapshot()?, collision_snapshot);
+
+    Ok(())
+}
+
+#[test]
+fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
+-> Result<(), Box<dyn Error>> {
+    let content = content()?;
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(1));
+    let SavePresentationKernels {
+        mut authority,
+        mut replica,
+        revision,
+    } = save_presentation_kernels(&content, host, guest, generation)?;
+    let proposal_step = press(&mut replica, PhysicalKey::Space)?;
+    let proposal = proposal_step
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::ProposalReady { bytes, .. } => Some(bytes),
+            _ => None,
+        })
+        .ok_or("guest Save proposal missing")?;
+    let before_delivery = replica.snapshot()?;
+    let before_admission = authority.snapshot()?;
+    let exhausted = exhausted_save_admission(&before_admission, &content, host, proposal)?;
     let authority_step = authority.admit_game_proposal(proposal)?;
     let material = authority_step
         .effects
@@ -887,7 +1121,6 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
             _ => None,
         })
         .ok_or("Save material missing")?;
-    save_stack_marker("material decode");
     let decoded = GameMaterialV6::decode(material)?;
 
     let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Save);
@@ -937,7 +1170,6 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
     assert_eq!(*generation, safe(1));
     assert!(!bytes.is_empty());
     assert_eq!(decoded.transition().platform_effects, platforms);
-    save_stack_marker("post-admission snapshot");
     let authority_snapshot = authority.snapshot()?;
     assert_eq!(
         authority_snapshot.pending_platform,
@@ -958,121 +1190,30 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
         std::slice::from_ref(&pending)
     );
 
-    // In this controlled fixture, correct only the exhausted replay frontier.
-    // The same real guest proposal must still be available for admission.
-    save_stack_marker("corrected snapshot and restore");
-    let mut corrected_snapshot = exhausted.snapshot()?;
-    corrected_snapshot.replay_sequence = before_admission.replay_sequence;
-    assert_eq!(corrected_snapshot, before_admission);
-    let mut corrected = GameKernelV7::from_snapshot(
-        corrected_snapshot,
+    corrected_save_admission(
+        &exhausted,
+        &before_admission,
+        &authority_snapshot,
+        &authority_step,
+        &content,
         host,
-        GameKernelRoleV7::Authority,
-        content.clone(),
+        proposal,
     )?;
-    assert_eq!(corrected.admit_game_proposal(proposal)?, authority_step);
-    assert_eq!(corrected.snapshot()?, authority_snapshot);
 
-    // Exact duplicates remain preflight no-ops even when a new admission's
-    // replay increment would fail. They must not advance the replay sequence
-    // or reinstall effects.
-    save_stack_marker("duplicate snapshot and restore");
-    let mut duplicate_snapshot = authority_snapshot.clone();
-    duplicate_snapshot.replay_sequence = SafeU53::MAX;
-    let mut duplicate = GameKernelV7::from_snapshot(
-        duplicate_snapshot.clone(),
+    duplicate_save_admission(&authority_snapshot, &content, host, proposal)?;
+
+    save_callback_atomicity(
+        &authority_snapshot,
+        &content,
         host,
-        GameKernelRoleV7::Authority,
-        content.clone(),
+        request,
+        slot,
+        generation,
+        &expected_presentation,
     )?;
-    assert_eq!(
-        duplicate.admit_game_proposal(proposal)?,
-        GameKernelStepV7::default()
-    );
-    assert_eq!(duplicate.snapshot()?, duplicate_snapshot);
 
-    // The actual Save owns both a write and a presentation. At an exhausted
-    // replay frontier, neither callback may retire ownership or publish a CAS
-    // frontier before reporting its late failure.
-    save_stack_marker("callback snapshot and restore");
-    let mut callback_snapshot = authority_snapshot.clone();
-    callback_snapshot.replay_sequence = SafeU53::MAX;
-    let mut callbacks = GameKernelV7::from_snapshot(
-        callback_snapshot.clone(),
-        host,
-        GameKernelRoleV7::Authority,
-        content.clone(),
-    )?;
-    save_stack_marker("exhausted storage callback");
-    assert_eq!(
-        callbacks.apply_storage_result(*request, KernelStorageResultV2::Written),
-        Err(GameKernelV7Error::Invalid)
-    );
-    assert_eq!(callbacks.snapshot()?, callback_snapshot);
-    save_stack_marker("exhausted presentation callback");
-    assert_eq!(
-        callbacks.settle_presentation(expected_presentation.event_id),
-        Err(GameKernelV7Error::Invalid)
-    );
-    assert_eq!(callbacks.snapshot()?, callback_snapshot);
+    save_delivery_collision(&before_delivery, &pending, &content, guest, material)?;
 
-    save_stack_marker("callback retry snapshot and restore");
-    let mut callback_retry_snapshot = callbacks.snapshot()?;
-    callback_retry_snapshot.replay_sequence = authority_snapshot.replay_sequence;
-    assert_eq!(callback_retry_snapshot, authority_snapshot);
-    let mut callback_retry = GameKernelV7::from_snapshot(
-        callback_retry_snapshot,
-        host,
-        GameKernelRoleV7::Authority,
-        content.clone(),
-    )?;
-    assert_eq!(
-        callback_retry.apply_storage_result(*request, KernelStorageResultV2::Written)?,
-        GameKernelStepV7::default()
-    );
-    let mut expected_callbacks = authority_snapshot.clone();
-    expected_callbacks.pending_platform.clear();
-    expected_callbacks.storage_frontiers = vec![StorageFrontierSnapshotV1 {
-        slot: slot.clone(),
-        generation: *generation,
-    }];
-    expected_callbacks.replay_sequence = safe(expected_callbacks.replay_sequence.get() + 1);
-    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
-    callback_retry.settle_presentation(expected_presentation.event_id)?;
-    expected_callbacks.pending_presentations.clear();
-    expected_callbacks.replay_sequence = safe(expected_callbacks.replay_sequence.get() + 1);
-    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
-    assert_eq!(
-        callback_retry.apply_storage_result(*request, KernelStorageResultV2::Written),
-        Err(GameKernelV7Error::Invalid)
-    );
-    assert_eq!(
-        callback_retry.settle_presentation(expected_presentation.event_id),
-        Err(GameKernelV7Error::Invalid)
-    );
-    assert_eq!(callback_retry.snapshot()?, expected_callbacks);
-
-    // This is a valid pre-delivery snapshot. The collision is detected only
-    // when presentation ownership is installed after common material apply.
-    save_stack_marker("collision snapshot and restore");
-    let mut collision_snapshot = before_delivery.clone();
-    collision_snapshot
-        .pending_presentations
-        .push(pending.clone());
-    let mut collision = GameKernelV7::from_snapshot(
-        collision_snapshot.clone(),
-        guest,
-        GameKernelRoleV7::Replica,
-        content,
-    )?;
-    assert_eq!(
-        collision.apply_authority_material(material),
-        Err(GameKernelV7Error::Invalid),
-        "replica material must claim pending presentation ownership"
-    );
-    assert_eq!(collision.snapshot()?, collision_snapshot);
-
-    save_stack_marker("replica material delivery");
     let delivered = replica.apply_authority_material(material)?;
     assert_eq!(
         delivered,
@@ -1104,7 +1245,6 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
     );
     assert_eq!(replica.snapshot()?, delivered_snapshot);
 
-    save_stack_marker("replica presentation settle");
     replica.settle_presentation(expected_presentation.event_id)?;
     let settled = replica.snapshot()?;
     assert!(settled.pending_presentations.is_empty());
@@ -1115,7 +1255,6 @@ fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
     assert_eq!(replica.snapshot()?, settled);
     assert!(authority.admit_game_proposal(proposal)?.effects.is_empty());
     assert_eq!(authority.snapshot()?, authority_snapshot);
-    save_stack_marker("body completed");
     Ok(())
 }
 

@@ -81,6 +81,12 @@ pub trait GameStateV6ContentContext {
     fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
         false
     }
+    fn current_experience_progress_matches(&self, _state: &GameStateV6) -> bool {
+        false
+    }
+    fn current_faint_progress_matches(&self, _state: &GameStateV6) -> bool {
+        false
+    }
     fn current_experience_source_matches(
         &self,
         _source: &crate::current_experience_owner::CurrentExperienceSourceV1,
@@ -359,6 +365,20 @@ impl GameStateV6 {
                     })
                 })
         }) {
+            return Err(GameStateV6Error::Content);
+        }
+        if self.current_battle_participation.as_ref()
+            .and_then(|owner| owner.experience.as_ref())
+            .is_some_and(|owner| owner.source_progression.is_some())
+            && !content.current_faint_progress_matches(self)
+        {
+            return Err(GameStateV6Error::Content);
+        }
+        if self.current_battle_participation.as_ref()
+            .and_then(|owner| owner.experience.as_ref())
+            .is_some_and(|owner| owner.pending.iter().any(|pending| pending.victory.is_some()))
+            && !content.current_experience_progress_matches(self)
+        {
             return Err(GameStateV6Error::Content);
         }
         if &self.content_identity != content.identity() {

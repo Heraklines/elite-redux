@@ -381,11 +381,13 @@ fn install_source_progression(
         configuration: CurrentSourceConfigurationV1::FreshOrdinaryClassic399d,
         initial_battle: battle.battle_id,
         initial_wave: run.wave,
+        initial_faint: er_state::current_faint_execution::CurrentInitialEnemyFaintV1::fresh(),
         party,
         initial_enemy: CurrentSourceInitialEnemyV1 {
             pokemon: battle.enemy_party[0].id,
             species: battle.enemy_party[0].species_id,
             form_index: battle.enemy_party[0].form_index,
+            level: battle.enemy_party[0].level,
         },
     };
     if !source.valid(run) {

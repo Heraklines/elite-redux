@@ -85,8 +85,12 @@ pub(super) fn project_current_battle_cues(
             }
             Cue::MoveUsed { .. } => (PresentationCueFamilyV1::Move, None),
             Cue::HpChanged { .. } => (PresentationCueFamilyV1::Hp, None),
-            // The resolver reports the observation. Actual Faint/Victory phase
-            // descendants remain retained and are not completed by this cue.
+            // Source Faint text is queued behind the actual faint animation
+            // callback/removal. Keep this mechanical observation for the
+            // retained phase owner instead of displaying it during MoveEffect.
+            Cue::Fainted { pokemon } if candidate.current_turn_execution.as_ref().is_some_and(|turn|
+                matches!(&turn.stage, er_state::current_turn_execution::CurrentTurnStageV1::AwaitingInterlude { faints }
+                    if faints.iter().any(|faint| faint.pokemon == *pokemon))) => continue,
             Cue::Fainted { .. } => (PresentationCueFamilyV1::Faint, None),
             Cue::BattleWon | Cue::BattleLost => (PresentationCueFamilyV1::Terminal, None),
         };

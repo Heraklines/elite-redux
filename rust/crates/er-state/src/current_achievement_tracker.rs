@@ -6,10 +6,20 @@ use er_types::run_ids::GameRunId;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CurrentAchievementHistoryV1 {
+    FreshComplete,
+    /// Explicit controlled roster/mechanics fixtures retain real data but do
+    /// not claim a complete source action history or authorize rewards.
+    UnobservedMechanicalFixture,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CurrentAchievementTrackerV1 {
     pub run_id: GameRunId,
+    pub history: CurrentAchievementHistoryV1,
     /// Source battleState is lazy and resets on actual wave change.
     pub battle: Option<CurrentAchievementBattleV1>,
     /// Source scene.erAchievementRunState initially contains neither field.
@@ -109,6 +119,7 @@ impl CurrentAchievementTrackerV1 {
     pub fn fresh(run_id: GameRunId) -> Self {
         Self {
             run_id,
+            history: CurrentAchievementHistoryV1::FreshComplete,
             battle: None,
             absol_warning_wave: None,
             absol_warning_failed: None,

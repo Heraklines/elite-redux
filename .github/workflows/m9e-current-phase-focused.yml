@@ -54,7 +54,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - name: Check all68 inherited and added whole-target witnesses
+      - name: Check all81 inherited and added whole-target witnesses
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/ci/m9e_current_phase_diagnostic.py

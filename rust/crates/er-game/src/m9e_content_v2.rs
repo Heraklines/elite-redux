@@ -676,6 +676,17 @@ impl PreparedGameContentV2 {
 }
 
 impl GameStateV6ContentContext for PreparedGameContentV2 {
+    fn current_experience_progress_matches(&self, state: &er_state::m9e_state_v6::GameStateV6) -> bool {
+        crate::current_experience_validation::validate_current_experience_progress(state, self).is_ok()
+    }
+    fn current_faint_progress_matches(&self, state: &er_state::m9e_state_v6::GameStateV6) -> bool {
+        !state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+            .and_then(|owner| owner.source_progression.as_ref()).is_some_and(|source|
+                matches!(source.initial_faint.phase, Some(er_state::current_faint_execution::CurrentFaintPhaseV1::MessageReady { .. })))
+            && crate::current_faint_execution::validate_current_initial_faint(state, self).is_ok()
+            && crate::current_victory_start::validate(state).is_ok()
+    }
+
     fn identity(&self) -> &GameContentIdentityV2 {
         &self.identity
     }

@@ -1,7 +1,7 @@
 //! Durable, nonrecursive ownership of an already selected current battle turn.
 
 use er_types::battle_command::{AcceptedBattleCommand, BattleCommand, CommandSet};
-use er_types::battle_ids::{BattleId, FieldSlot, PokemonId, TurnIndex, WaveIndex};
+use er_types::battle_ids::{BattleId, FieldSlot, MoveId, PokemonId, TurnIndex, WaveIndex};
 use er_types::run_ids::GameRunId;
 use er_types::{SafeU53, SeatId};
 use serde::{Deserialize, Serialize};
@@ -23,10 +23,23 @@ pub struct CurrentTurnActionV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct CurrentFaintMoveSourceV1 {
+    pub pokemon: PokemonId,
+    pub move_id: MoveId,
+    /// Actual pre-action slots only for fallback Struggle, which consumes no PP.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub struggle_pp_before: Option<[Option<er_types::battle_model::MoveSlotState>; 4]>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CurrentTurnFaintV1 {
     pub id: SafeU53,
     pub pokemon: PokemonId,
     pub slot: FieldSlot,
+    /// Actual damage hook identity, retained before subsequent PP-dependent lookup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_move: Option<CurrentFaintMoveSourceV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -147,7 +160,25 @@ impl CurrentTurnExecutionV1 {
                         last.id.get().checked_add(1) == Some(self.next_faint_sequence.get())
                     })
                     && faints.iter().all(|faint| {
-                        battle.field.slots.iter().any(|row| row.slot == faint.slot)
+                        faint.source_move.as_ref().is_none_or(|source| {
+                            source.pokemon.get() != SafeU53::ZERO
+                                && source.move_id.get() != SafeU53::ZERO
+                                && run.party.iter().chain(battle.enemy_party.iter())
+                                    .any(|pokemon| {
+                                        if pokemon.id != source.pokemon { return false; }
+                                        let BattleCommand::Fight { move_slot, .. } = self.actions[usize::from(self.next_action - 1)].command else { return false; };
+                                        match &source.struggle_pp_before {
+                                            Some(slots) => source.move_id.get().get() == 165 && &pokemon.moves == slots
+                                                && slots[usize::from(move_slot.get())].is_some(),
+                                            None => pokemon.moves[usize::from(move_slot.get())].as_ref()
+                                                .is_some_and(|slot| slot.move_id == source.move_id),
+                                        }
+                                    })
+                                && !self.finalization_done
+                                && self.actions[usize::from(self.next_action - 1)].command.actor() == source.pokemon
+                                && matches!(self.actions[usize::from(self.next_action - 1)].command, BattleCommand::Fight { .. })
+                        })
+                            && battle.field.slots.iter().any(|row| row.slot == faint.slot)
                             && match faint.slot.side {
                                 er_types::battle_ids::BattleSide::Player => {
                                     run.party.iter().any(|pokemon| pokemon.id == faint.pokemon)

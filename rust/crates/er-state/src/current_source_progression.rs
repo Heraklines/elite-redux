@@ -36,6 +36,8 @@ pub struct CurrentSourceInitialEnemyV1 {
     pub pokemon: PokemonId,
     pub species: SpeciesId,
     pub form_index: u16,
+    /// Actual constructed level, not an inferred source encounter-level rule.
+    pub level: u16,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -49,6 +51,7 @@ pub struct CurrentSourceProgressionV1 {
     pub initial_battle: BattleId,
     pub initial_wave: WaveIndex,
     pub initial_enemy: CurrentSourceInitialEnemyV1,
+    pub initial_faint: crate::current_faint_execution::CurrentInitialEnemyFaintV1,
     pub party: Vec<CurrentSourcePokemonV1>,
 }
 
@@ -60,6 +63,8 @@ impl CurrentSourceProgressionV1 {
             && self.initial_wave.get().get() == 1
             && self.initial_enemy.pokemon.get().get() != 0
             && self.initial_enemy.species.get().get() != 0
+            && self.initial_enemy.level > 0
+            && self.initial_faint.valid(self.initial_enemy.pokemon)
             && (1..=6).contains(&self.party.len())
             && self.party.len() == run.party.len()
             && self.party.iter().enumerate().all(|(index, row)| {

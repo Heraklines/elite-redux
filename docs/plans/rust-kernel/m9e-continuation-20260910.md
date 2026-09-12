@@ -15,50 +15,46 @@
 - No production branch or the old published final tag is touched. A corrected
   final tag is created only after integrated acceptance.
 
-## Current drain implementation
+## Current drain implementation — repaired source, remote validation pending
 
-`AwaitingInterlude` now drives the retained source-ordered descendant chain
-through owned phases instead of refusing:
+The September 12 review found that the prior drain hashed its state before
+normalizing control, retained pre-award recipient equality after changing XP,
+used absence of a pending presentation as acknowledgement, and bypassed actual
+Faint execution. Those paths are being replaced with the previously reviewed,
+source-owned phase implementation, reconciled against the green 58-test work.
 
-| `GameOwnedPhaseV1` | Source-ordered step |
-|---|---|
-| `FriendshipBegin` / `FriendshipClock` | friendship recipients + UTC platform request (pre-existing) |
-| `VictoryBegin` | plan retained `phases` for the pending (`plan_current_victory_experience`) |
-| `AwardBegin` | emit blocking `Progression` XP prompt → `AwardPresentation{award,event_id}` |
-| `AwardApply` | apply retained award → `LevelUpStart` or descendant advance |
-| `LevelUpApply` | `apply_current_level_up` → stat recalc + blocking prompt → `LevelUpPresentation{end,event_id}` |
-| `LevelUpChildren` | `plan_current_level_up_children` → `LevelUpChildren{children}` |
-| `VictoryDescendant` | begin learn batch (+`MoveLearn` control) or `Evolution{children}` (+`Evolution` control) or advance the phase cursor |
-| `PendingResolve` | all pendings `Complete` → resume turn (`ReadyForMove`) or clear the finished turn and run the battle tail |
+- Actual Faint prelude binds its animation in the same material. Its exact
+  acknowledged animation callback updates status/score and removes the enemy;
+  the separately queued faint message completes before friendship and XP.
+- The actual KO move is retained from MoveDamage, including explicit pre-action
+  exhausted slots for Struggle. Last-PP lookup never uses post-action eligibility.
+- Victory.start records pokemonDefeated before friendship; captured XP recipients
+  retain their pre-award stats. Content-aware validation verifies actual XP,
+  level, HP and stat arithmetic for every represented descendant.
+- Typed private acknowledgements survive snapshot restore. Every retained prompt
+  must be either pending or actually acknowledged, never missing from both.
+- Current Faint/XP material digests are computed after the final control state.
+- Doubles mechanics fixtures explicitly carry UnobservedMechanicalFixture history;
+  they do not silently claim complete source action history or authorize rewards.
 
-External edges stay external: the kernel pump (`next_intermission_phase`)
-returns no phase while a friendship clock request is outstanding, while the
-retained `event_id` still sits in `pending_presentations`, or while an
-actionable learn/evolution control belongs to the human owner.
-`GameActionV1::CurrentLearnMoveBatch` is dispatched to
-`apply_current_learn_move_batch`, writes the retained batch back into the
-descendant, and stamps `current_achievement_tracker` in the same material.
-`GameActionV1::Evolution` routes to the owned executor when a pending
-descendant is `Evolution{children}` and advances the phase cursor on
-Complete/Cancel. `has_pending_experience` now means "any unresolved pending",
-so resolved entries no longer block turns while `observe_next` still bounds
-the retained list to the battle's enemy faints.
+The impossible initial-level learning test is preserved as an uncompiled source
+archive. Actual admitted starter learnsets first introduce new groups at level17;
+initial cap10 cannot exercise that journey. The reviewed raw XP/restore test and
+last-PP/Struggle knockout regressions replace that unsupported claim.
 
 ## Honest limits of this increment
 
-- A second *separate* interlude inside one battle is still `Unsupported`:
-  `CurrentExperienceOwnerV1::observe_next` refuses while `pending` is
-  non-empty, and retained pendings persist as `Complete` rows. One faint batch
-  per battle drains fully; sequential KO + new faint in the same battle does
-  not.
-- Prompt acknowledgement ordering is pump-level (kernel
-  `pending_presentations`), not state-level: the material applier recomputes
-  owned-phase transitions deterministically from `before` + retained
-  descendant; the retained `event_id` records that the prompt was emitted
-  before the award applied.
-- The victory tail reuses `install_progression_or_reward_control`; the legacy
-  `prepare_post_battle_progression` `GrantExperience` catch-up tasks are not
-  emitted on the owned path (XP was already paid out by the drain).
+The reconciled implementation is not yet qualified. Actual Victory completion,
+turn-settlement cleanup, BattleEnd, rewards, next-encounter provenance and actual
+save-load prompt reissue still require completion. Complete descendants remain
+explicitly unresolved until these effects have owners; no later Move is resumed
+merely because XP finished. Source queue cleanup cancels post-victory combat
+commands/moves but preserves turn settlement, which must execute once.
+
+The stack-overflow cause is being measured independently without changing stack
+size, test concurrency or dropping assertions. Initial encounter-level generation
+also remains a separately documented source-fidelity gap (Rust constructor uses
+the starter level; source observation included a level2 enemy).
 
 ## Acceptance scoreboard
 
@@ -94,7 +90,7 @@ the retained list to the battle's enemy faints.
 | `8db8236` | `34589049080` | red | `m9e_current_starter_pokerus` green; suite advanced to `m9e_current_target_execution` (8/9 red). Three causes: `two_enemies` still rebuilt the 1v1-bounded participation owner (`Unsupported`); `natural_raw_turn` executed slot-0 move 61, whose MultiHitAttr has no source hit-count owner (`Internal` via `UnsupportedContent` at execution, not admission); `unsupported_selection`'s forged after-state stripped only `current_targeting`, leaving `participation.experience` present — `GameStateV6::validate` rejects (`Invalid`). Fixes: drop the owner in `two_enemies`, execute slot-1 Tackle, strip the dependent owners (turn/dispatch/tracker/experience) from the forged state and the live prior. |
 | `0756988` | `34657294389` | red | Compile only: `active_run_mut` received the snapshot instead of the state in the new `source_spread` HP setup. |
 | `05c3074` | `34657563526` | **green** | All 58 whole-target witnesses pass, including `m9e_current_target_execution` (9/9): participation-less (2,2) fixture drives real owned turns (spread, redirect, target-menu, retained-turn), `natural_raw_turn` executes slot-1 Tackle through the owned path, and the forged-material strip reaches `CurrentTargetOwnership` atomically. |
-| pending | pending | pending | Coverage extension: six whole targets promoted into the diagnostic — `m9e_coop_v7` (4: raw proposal convergence, all-human command wait, private-party restore, replica save presentation), `m9e_current_phase_execution` (2: knockout→XP-prompt→level-stats drain, learn-move batch retention; reseeded `m9e-target-execution-source-0`→`m9e-phase-execution-18` → wave-0 enemy 276), `m9e_natural_progression_v7` (1: legacy GrantExperience victory payout), `m9e_natural_campaign_v7` (1: policy playthrough to wave-200 terminal), `m9e_natural_coop_campaign_v7` (1: owned co-op campaign to wave-200 victory), `m9e_natural_campaign_replay` (1: every external input replayed, resume to wave 200). Plain `natural_start` paths carry no friendship profile → no presentation/participation/XP owners → wave-0 gates do not bind them; only the fresh-friendship path needed the reseed. Selector gains `-p er-repro`; counts 12→18 targets, 58→68 tests. |
+| `3e6e39d` | `34664395911` | red; historical selection | Original coverage extension: six whole targets promoted into the diagnostic — `m9e_coop_v7` (4: raw proposal convergence, all-human command wait, private-party restore, replica save presentation), `m9e_current_phase_execution` (2: knockout→XP-prompt→level-stats drain, learn-move batch retention; reseeded `m9e-target-execution-source-0`→`m9e-phase-execution-18` → wave-0 enemy 276), `m9e_natural_progression_v7` (1: legacy GrantExperience victory payout), `m9e_natural_campaign_v7` (1: policy playthrough to wave-200 terminal), `m9e_natural_coop_campaign_v7` (1: owned co-op campaign to wave-200 victory), `m9e_natural_campaign_replay` (1: every external input replayed, resume to wave 200). Plain `natural_start` paths carry no friendship profile → no presentation/participation/XP owners → wave-0 gates do not bind them; only the fresh-friendship path needed the reseed. Selector gains `-p er-repro`; counts 12→18 targets, 58→68 tests. |
 
 ## Wave-0 XP-source coverage limitation (latent train gap, surfaced 2026-09-10)
 
@@ -171,3 +167,17 @@ no production path; it only lets controlled owned-capable fixtures (the (2,2)
 redirect/spread witnesses) run through the owned pipeline instead of silently
 falling back to the one-shot resolver that never populates
 `current_defender_dispatch`.
+
+## September 12 repair evidence
+
+| Candidate | Run | Result | Scope |
+|---|---|---|---|
+| `6e99504` | `34658587781` | green | Ledger-only successor; configured 58 witnesses. |
+| `3e6e39d` | `34664395911` | red | 18 targets/68 planned; content4 passed, coop binary aborted with stack overflow. Other16 targets unexecuted. |
+| `66ab982` | `34689525206` | red | Isolated stack probe; same18/68, direct stderr markers and type-size wrapper, no changed stack flags or removed assertions. Exact 302-byte log: `coop_waits_for_all_human_commands` overflowed; save probe entered natural bootstrap. Sizes: kernel 8480 B, snapshot 8648 B, state 4024 B. Both snapshot-heavy tests now split into smaller non-inlined helpers; remote proof pending. |
+
+All builds/tests/formatting remain remote. Source reconciliation and test changes
+in the working tree are not a green result. M9 Engineering is not complete.
+## Reconciled candidate, 2026-09-12
+
+Next diagnostic selects 19 whole targets / 81 tests, including the complete 12-test er-game library target and two additional KO source witnesses. The unreachable learning draft is archived as source text, excluded from execution and completion claims. Both large co-op tests preserve their existing test identities and assertions in smaller non-inlined helpers. This candidate has not yet passed remote compilation or execution. M9 remains incomplete.
