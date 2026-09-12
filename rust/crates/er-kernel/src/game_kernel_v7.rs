@@ -2835,7 +2835,11 @@ impl GameKernelV7 {
                     *actor,
                     *move_slot,
                 )?;
-                if plan.selections().map_err(|_| GameKernelV7Error::Invalid)?.is_empty() {
+                if plan
+                    .selections()
+                    .map_err(|_| GameKernelV7Error::Invalid)?
+                    .is_empty()
+                {
                     return Err(GameKernelV7Error::Invalid);
                 }
                 if plan.requires_choice() {
@@ -3153,8 +3157,11 @@ impl GameKernelV7 {
         });
         let input = if human_complete {
             let (ai_state, _) = er_game::current_random_target_admission::stage_human_command(
-                &state, &proposal, self.content.as_ref(),
-            ).map_err(runtime_error)?;
+                &state,
+                &proposal,
+                self.content.as_ref(),
+            )
+            .map_err(runtime_error)?;
             entries.extend(self.prepare_authority_ai_commands_for_state(&ai_state)?);
             entries.sort_by_key(|entry| entry.field_slot());
             let commands = er_types::battle_command::CommandSet::new(entries)
@@ -4045,7 +4052,8 @@ fn target_select_control(
 ) -> Result<GameControlPlanV2, GameKernelV7Error> {
     let (battle, _, field) = local_battle_actor(state, seat)?;
     let er_battle::current_target_execution::CurrentCommandTargetPlan::Deterministic(plan) =
-        current_move_target_plan(state, content, seat, actor, move_slot)? else {
+        current_move_target_plan(state, content, seat, actor, move_slot)?
+    else {
         return Err(GameKernelV7Error::Invalid);
     };
     if plan.multiple || plan.ordered.len() <= 1 {

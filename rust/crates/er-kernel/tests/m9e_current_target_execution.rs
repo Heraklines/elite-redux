@@ -1946,18 +1946,40 @@ fn assert_raw_struggle_admission(
     let prior = active(&before)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     let proof = material(&step)?;
-    let owner = proof.transition().after_state.current_random_target_commands.as_ref()
+    let owner = proof
+        .transition()
+        .after_state
+        .current_random_target_commands
+        .as_ref()
         .ok_or("raw random command proof absent")?;
     assert_eq!(owner.entries.len(), 1);
     let entry = &owner.entries[0];
-    assert_eq!(entry.draw.before_state.battle.as_ref(),
-        Some(&active_run(prior)?.battle.as_ref().ok_or("battle absent")?.battle_rng));
-    assert_eq!(proof.transition().rng_audit.iter()
-        .filter(|draw| draw.reason == er_rng::audit::RngReason::RandomTarget)
-        .collect::<Vec<_>>(), vec![&entry.draw]);
+    assert_eq!(
+        entry.draw.before_state.battle.as_ref(),
+        Some(
+            &active_run(prior)?
+                .battle
+                .as_ref()
+                .ok_or("battle absent")?
+                .battle_rng
+        )
+    );
+    assert_eq!(
+        proof
+            .transition()
+            .rng_audit
+            .iter()
+            .filter(|draw| draw.reason == er_rng::audit::RngReason::RandomTarget)
+            .collect::<Vec<_>>(),
+        vec![&entry.draw]
+    );
     let accepted = struggle_snapshot(&kernel)?;
-    for tamper in [StruggleProofTamper::Missing, StruggleProofTamper::Selection,
-        StruggleProofTamper::CandidateIds, StruggleProofTamper::QueuedSelection] {
+    for tamper in [
+        StruggleProofTamper::Missing,
+        StruggleProofTamper::Selection,
+        StruggleProofTamper::CandidateIds,
+        StruggleProofTamper::QueuedSelection,
+    ] {
         assert_struggle_proof_tamper(&accepted, content.clone(), tamper)?;
     }
     assert_struggle_restore_action(&before, &accepted, &step, content)
@@ -1982,22 +2004,34 @@ fn assert_struggle_proof_tamper(
     match tamper {
         StruggleProofTamper::Missing => state.current_random_target_commands = None,
         StruggleProofTamper::Selection => {
-            let record = &mut state.current_random_target_commands.as_mut()
-                .ok_or("owner absent")?.entries[0];
+            let record = &mut state
+                .current_random_target_commands
+                .as_mut()
+                .ok_or("owner absent")?
+                .entries[0];
             record.selected = slot(BattleSide::Enemy, 1 - record.selected.position);
         }
         StruggleProofTamper::CandidateIds => {
-            let record = &mut state.current_random_target_commands.as_mut()
-                .ok_or("owner absent")?.entries[0];
+            let record = &mut state
+                .current_random_target_commands
+                .as_mut()
+                .ok_or("owner absent")?
+                .entries[0];
             let first_id = record.candidates[0].1;
             record.candidates[0].1 = record.candidates[1].1;
             record.candidates[1].1 = first_id;
         }
         StruggleProofTamper::QueuedSelection => {
-            let chosen = state.current_random_target_commands.as_ref()
-                .ok_or("owner absent")?.entries[0].selected;
+            let chosen = state
+                .current_random_target_commands
+                .as_ref()
+                .ok_or("owner absent")?
+                .entries[0]
+                .selected;
             let turn = state.current_turn_execution.as_mut().ok_or("turn absent")?;
-            let action = turn.actions.iter_mut()
+            let action = turn
+                .actions
+                .iter_mut()
                 .find(|action| action.source_slot.side == BattleSide::Player)
                 .ok_or("player action absent")?;
             action.current_targets = Some(vec![slot(BattleSide::Enemy, 1 - chosen.position)]);
@@ -2015,17 +2049,28 @@ fn assert_struggle_restore_action(
     content: Arc<PreparedGameContentV2>,
 ) -> Result<()> {
     let mut restored = restore_struggle_checkpoint(accepted, content.clone())?;
-    assert_eq!(canonical_bytes(struggle_snapshot(&restored)?.as_ref())?, canonical_bytes(accepted)?);
+    assert_eq!(
+        canonical_bytes(struggle_snapshot(&restored)?.as_ref())?,
+        canonical_bytes(accepted)?
+    );
     let mut journal = MaterialJournal {
-        live: Some(active(before)?.clone()), ledger: before.material_ledger.clone(), materials: Vec::new(),
+        live: Some(active(before)?.clone()),
+        ledger: before.material_ledger.clone(),
+        materials: Vec::new(),
     };
     journal.accept(&restored, content.as_ref(), step)?;
     journal.settle_actual_presentations(&mut restored)?;
     let action = restored.advance_time(SafeU53::ZERO)?;
     let next = material(&action)?;
-    assert!(next.transition().rng_audit.iter()
-        .all(|draw| draw.reason != er_rng::audit::RngReason::RandomTarget));
-    assert_eq!(next.transition().after_state.current_random_target_commands,
-        active(accepted)?.current_random_target_commands);
+    assert!(
+        next.transition()
+            .rng_audit
+            .iter()
+            .all(|draw| draw.reason != er_rng::audit::RngReason::RandomTarget)
+    );
+    assert_eq!(
+        next.transition().after_state.current_random_target_commands,
+        active(accepted)?.current_random_target_commands
+    );
     Ok(())
 }

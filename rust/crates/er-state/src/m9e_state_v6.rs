@@ -48,7 +48,8 @@ pub struct GameStateV6 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_targeting: Option<crate::current_targeting::CurrentTargetingV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_random_target_commands: Option<crate::current_random_target_commands::CurrentRandomTargetCommandsV1>,
+    pub current_random_target_commands:
+        Option<crate::current_random_target_commands::CurrentRandomTargetCommandsV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_turn_execution: Option<crate::current_turn_execution::CurrentTurnExecutionV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -292,8 +293,12 @@ impl GameStateV6 {
             if self.current_targeting.is_none() || self.current_presentation.is_none() {
                 return Err(GameStateV6Error::Invalid);
             }
-            owner.validate(self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?,
-                self.current_turn_execution.as_ref()).map_err(|_| GameStateV6Error::Invalid)?;
+            owner
+                .validate(
+                    self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?,
+                    self.current_turn_execution.as_ref(),
+                )
+                .map_err(|_| GameStateV6Error::Invalid)?;
         }
         if let Some(owner) = self.current_run_difficulty
             && self.active_run.as_ref().map(|run| run.run_id) != Some(owner.run_id)
@@ -382,8 +387,7 @@ impl GameStateV6 {
         {
             return Err(GameStateV6Error::Content);
         }
-        if self.current_targeting.is_some()
-            && !content.current_random_target_commands_match(self) {
+        if self.current_targeting.is_some() && !content.current_random_target_commands_match(self) {
             return Err(GameStateV6Error::Content);
         }
         if self.current_targeting.is_some_and(|owner| {

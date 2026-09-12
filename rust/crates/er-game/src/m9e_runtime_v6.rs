@@ -2836,11 +2836,18 @@ fn adopt_v5_with_turn(
             .flatten(),
         current_presentation: before.current_presentation.clone(),
         current_friendship_profile: before.current_friendship_profile.clone(),
-        current_random_target_commands: before.current_random_target_commands.clone().filter(|owner| {
-            after.active_run.as_ref().is_some_and(|run| run.run_id == owner.run
-                && run.battle.as_ref().is_some_and(|battle| battle.battle_id == owner.battle
-                    && battle.wave == owner.wave && battle.turn == owner.turn))
-        }),
+        current_random_target_commands: before.current_random_target_commands.clone().filter(
+            |owner| {
+                after.active_run.as_ref().is_some_and(|run| {
+                    run.run_id == owner.run
+                        && run.battle.as_ref().is_some_and(|battle| {
+                            battle.battle_id == owner.battle
+                                && battle.wave == owner.wave
+                                && battle.turn == owner.turn
+                        })
+                })
+            },
+        ),
         current_targeting: if after.active_run.is_some() {
             before.current_targeting
         } else {
