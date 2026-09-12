@@ -61,4 +61,17 @@ pub enum CurrentBattleSourceEventV1 {
         hit_count: u8,
         hits_left: u8,
     },
+    /// Pinned RecoilAttr -> damageAndUpdate without a source Pokemon.
+    /// This records the actual indirect HP seam; full callback qualification
+    /// remains a separate requirement of the FreshComplete source wrapper.
+    StruggleRecoilDamage {
+        user: PokemonId,
+        source_slot: FieldSlot,
+        move_id: MoveId,
+        requested_damage: u32,
+        damage: u32,
+        hp_before: u32,
+        hp_after: u32,
+        max_hp: u32,
+    },
 }

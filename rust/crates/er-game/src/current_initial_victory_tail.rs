@@ -1,4 +1,4 @@
-//! Candidate-only execution of the source-neutral first-turn Victory tail.
+//! Candidate-only execution of the source-neutral first-wave Victory tail.
 //! No generic reward chooser or next-wave provenance is fabricated here.
 use crate::m9e_content_v2::PreparedGameContentV2;
 use crate::m9e_runtime_v6::GameRuntimeV6Error;
@@ -192,9 +192,6 @@ pub(crate) fn claim(
         return Err(failure());
     };
     let turn = before.current_turn_execution.as_ref().ok_or_else(failure)?;
-    if turn.turn.get().get() != 1 {
-        return Ok(None);
-    }
     if turn.finalization_done
         || turn.next_action == 0
         || address.pending_id != id
@@ -209,13 +206,25 @@ pub(crate) fn claim(
         .and_then(|t| t.battle.as_ref())
         .ok_or_else(failure)?;
     let flash_reached = tracker.player_ever_acted && !tracker.flash_failed;
+    let run = before.active_run.as_ref().ok_or_else(failure)?;
+    let battle = run.battle.as_ref().ok_or_else(failure)?;
     let mut tail = CurrentInitialVictoryTailV1 {
         faint: address.clone(),
         original_turn: Box::new(turn.clone()),
+        original_rng: Some(Box::new(er_state::current_initial_victory_tail::CurrentInitialTurnRngPreimageV1 { run_rng: run.run_rng.clone(), battle_rng: battle.battle_rng.clone() })),
+        original_random_target: before.current_random_target_commands.as_ref().map(|commands| {
+            Box::new(er_state::current_initial_victory_tail::CurrentInitialRandomTargetPreimageV1 {
+                commands: commands.clone(),
+                run_rng: run.run_rng.clone(),
+                battle_rng: battle.battle_rng.clone(),
+            })
+        }),
+        original_turn_progress: Some(Box::new(source.turn_progress.clone().ok_or_else(failure)?)),
         cancelled_from: turn.next_action,
         cancelled_to: u8::try_from(turn.actions.len()).map_err(|_| failure())?,
         phase: P::Claimed,
         flash: None,
+        reward: None,
     };
     let mut state = before.clone();
     if flash_reached {
@@ -263,7 +272,7 @@ pub(crate) fn finish_experience(
     Ok(state)
 }
 
-/// The first-turn neutral TurnEnd has no RNG draw and no HP/stat mutation.
+/// The admitted neutral TurnEnd has no RNG draw and no HP/stat mutation.
 /// It still increments the public turn, clears the cached battle substream and
 /// command collection, and records both actual active summon turn counters.
 pub(crate) fn settle_turn(
@@ -311,12 +320,15 @@ pub(crate) fn settle_turn(
         .ok_or_else(failure)?
         .continuation =
         er_state::current_experience_owner::CurrentExperienceContinuationV1::WaveVictoryTail;
+    crate::current_source_turn_progress::settle_tail(before, &mut state)?;
+    let progress = crate::current_source_turn_progress::progress(&state)?;
+    let row = progress.pokemon.iter().find(|row| row.pokemon == pokemon).ok_or_else(failure)?;
     tail.phase = P::BattleEnd {
         xp_endpoint,
         field_turns: vec![CurrentFieldTurnCountV1 {
             pokemon,
-            turn_count: one()?,
-            wave_turn_count: one()?,
+            turn_count: row.turn_count,
+            wave_turn_count: row.wave_turn_count,
         }],
     };
     set_tail(&mut state, id, tail)?;
@@ -344,12 +356,11 @@ pub(crate) fn settle_battle_end(
     else {
         return Err(failure());
     };
-    // First source battle, settled turn2, one nonboss enemy: score multiplier
-    // yields ceil(battleScore * Sine.easeIn(1)) == battleScore. No trig shortcut
-    // is admitted for later turns. Fresh durable GameStats.battles starts at0.
+    // Actual first-battle score depends on settled turn; counters survive every
+    // neutral turn. Fresh durable GameStats.battles starts at0.
     let accounting = CurrentInitialBattleEndAccountingV1 {
         battles: one()?,
-        score: tail.faint.score_increase,
+        score: settled_score(tail.faint.score_increase, tail.original_turn.turn.get().get().checked_add(1).ok_or_else(failure)?)?,
         money_multiplier: one()?,
         money_multiplier_captured: true,
         money_streaks: xp_endpoint
@@ -374,6 +385,7 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
     let pending = pending(state, id)?;
     let tail = pending.victory_tail.as_ref().ok_or_else(failure)?;
     crate::current_flash_dispatch::validate(state, id)?;
+    crate::current_reward_selection::validate_live(state, id)?;
     let run = state.active_run.as_ref().ok_or_else(failure)?;
     let battle = run.battle.as_ref().ok_or_else(failure)?;
     let source = state
@@ -386,8 +398,7 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
     {
         return Err(failure());
     }
-    if tail.original_turn.turn.get().get() != 1
-        || tail.original_turn.finalization_done
+    if tail.original_turn.finalization_done
         || tail.original_turn.run != run.run_id
         || tail.original_turn.battle != battle.battle_id
         || tail.original_turn.wave != run.wave
@@ -402,16 +413,28 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
         return Err(failure());
     }
     if let Some(xp) = tail.xp_endpoint()
-        && (xp != endpoint(state)?.as_slice()
+        && (xp != reward_preimage_endpoint(state, id)?.as_slice()
             || !pending.victory.as_ref().is_some_and(|v| {
                 v.valid(id) && v.descendant == CurrentVictoryDescendantV1::Complete
             }))
     {
         return Err(failure());
     }
+    let original_rng = tail.original_rng.as_ref().ok_or_else(failure)?;
+    if original_rng.battle_rng.turn != tail.original_turn.turn
+        || (!tail.turn_is_settled() && (original_rng.run_rng != run.run_rng || original_rng.battle_rng != battle.battle_rng))
+        || tail.original_random_target.as_ref().is_some_and(|random| random.run_rng != original_rng.run_rng || random.battle_rng != original_rng.battle_rng) {
+        return Err(failure());
+    }
+    if matches!(&tail.original_turn.stage, CurrentTurnStageV1::AwaitingInterlude { faints }
+        if faints.iter().any(|faint| faint.source_move.as_ref().is_some_and(|source| source.move_id.get().get() == 165)))
+        && tail.original_random_target.is_none() {
+        return Err(failure());
+    }
     if tail.turn_is_settled() {
         if state.current_turn_execution.is_some()
-            || battle.turn.get().get() != 2
+            || state.current_random_target_commands.is_some()
+            || battle.turn.get().get() != tail.original_turn.turn.get().get().checked_add(1).ok_or_else(failure)?
             || battle.battle_rng.turn != battle.turn
             || battle.battle_rng.saved_substream.is_some()
             || battle.outcome != BattleOutcome::Victory
@@ -421,10 +444,32 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
             return Err(failure());
         }
     } else if state.current_turn_execution.as_ref() != Some(tail.original_turn.as_ref())
-        || battle.turn.get().get() != 1
+        || battle.turn != tail.original_turn.turn
     {
         return Err(failure());
     }
+    if !tail.turn_is_settled() {
+        match (&tail.original_random_target, &state.current_random_target_commands) {
+            (None, None) => {}
+            (Some(preimage), Some(commands)) if preimage.commands == *commands
+                && preimage.run_rng == run.run_rng && preimage.battle_rng == battle.battle_rng => {}
+            _ => return Err(failure()),
+        }
+    }
+    let original_progress = tail.original_turn_progress.as_ref().ok_or_else(failure)?;
+    if original_progress.turn != tail.original_turn.turn {
+        return Err(failure());
+    }
+    let mut expected_progress = *original_progress.clone();
+    if tail.turn_is_settled() {
+        crate::current_source_turn_progress::increment_field(state, &mut expected_progress)?;
+        expected_progress.turn = battle.turn;
+    }
+    if crate::current_source_turn_progress::progress(state)? != &expected_progress {
+        return Err(failure());
+    }
+    let field_row = expected_progress.pokemon.iter()
+        .find(|row| row.pokemon == run.party[0].id).ok_or_else(failure)?;
     let field_turns = match &tail.phase {
         P::BattleEnd { field_turns, .. }
         | P::EggLapse { field_turns, .. }
@@ -436,8 +481,8 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
             || counts.as_slice()
                 != [CurrentFieldTurnCountV1 {
                     pokemon: run.party[0].id,
-                    turn_count: one()?,
-                    wave_turn_count: one()?,
+                    turn_count: field_row.turn_count,
+                    wave_turn_count: field_row.wave_turn_count,
                 }])
     {
         return Err(failure());
@@ -445,7 +490,7 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
     if let P::EggLapse { accounting, .. } | P::RewardSelectionPending { accounting, .. } =
         &tail.phase
         && (accounting.battles != one()?
-            || accounting.score != tail.faint.score_increase
+            || accounting.score != settled_score(tail.faint.score_increase, battle.turn.get().get())?
             || accounting.money_multiplier != one()?
             || !accounting.money_multiplier_captured
             || accounting.money_streaks.as_slice() != [(run.party[0].id, one()?)])
@@ -480,6 +525,9 @@ pub(crate) fn projection_for_validation(
         .ok_or_else(failure)?;
     let mut projected = state.clone();
     let run = projected.active_run.as_mut().ok_or_else(failure)?;
+    if let Some(reward) = tail.reward.as_ref() {
+        run.party = reward.party_before.clone();
+    }
     if let Some(endpoint) = tail.xp_endpoint() {
         if endpoint.len() != run.party.len() {
             return Err(failure());
@@ -494,6 +542,9 @@ pub(crate) fn projection_for_validation(
             p.max_hp = stats.max_hp;
         }
     }
+    let original_rng = tail.original_rng.as_ref().ok_or_else(failure)?;
+    run.run_rng = original_rng.run_rng.clone();
+    run.battle.as_mut().ok_or_else(failure)?.battle_rng = original_rng.battle_rng.clone();
     let battle = run.battle.as_mut().ok_or_else(failure)?;
     battle.turn = tail.original_turn.turn;
     battle.battle_rng.turn = battle.turn;
@@ -511,8 +562,17 @@ pub(crate) fn projection_for_validation(
         .ok_or_else(failure)?
         .continuation =
         er_state::current_experience_owner::CurrentExperienceContinuationV1::BattleTail;
+    if let Some(preimage) = &tail.original_random_target {
+        run.run_rng = preimage.run_rng.clone();
+        run.battle.as_mut().ok_or_else(failure)?.battle_rng = preimage.battle_rng.clone();
+        preimage.commands.validate(run, Some(tail.original_turn.as_ref())).map_err(|_| failure())?;
+        projected.current_random_target_commands = Some(preimage.commands.clone());
+    } else {
+        projected.current_random_target_commands = None;
+    }
     tail.original_turn.validate(run).map_err(|_| failure())?;
     projected.current_turn_execution = Some(*tail.original_turn.clone());
+    crate::current_source_turn_progress::install(&mut projected, *tail.original_turn_progress.clone().ok_or_else(failure)?)?;
     Ok(projected)
 }
 
@@ -551,7 +611,8 @@ pub(crate) fn validate_all(
     if owner.pending.len() != 1 {
         return Err(failure());
     }
-    validate(state, owner.pending[0].id)
+    validate(state, owner.pending[0].id)?;
+    crate::current_reward_selection::validate(state, content, owner.pending[0].id)
 }
 /// Explicit ownership is mandatory: missing historical data is not empty.
 fn empty_egg_account(state: &GameStateV6) -> Result<(), GameRuntimeV6Error> {
@@ -617,4 +678,55 @@ pub(crate) fn settle_egg_lapse(
     set_tail(&mut state, id, tail)?;
     validate(&state, id)?;
     Ok(state)
+}
+
+/// Compare the old XP proof against the retained pre-reward values, while the
+/// independent reward replay binds every live Pokemon field after selection.
+fn reward_preimage_endpoint(state:&GameStateV6,id:SafeU53)->Result<Vec<CurrentExperienceRecipientV1>,GameRuntimeV6Error>{
+    let tail=pending(state,id)?.victory_tail.as_ref().ok_or_else(failure)?;
+    let Some(reward)=tail.reward.as_deref()else{return endpoint(state);};
+    reward.party_before.iter().map(|p|Ok(CurrentExperienceRecipientV1{
+        pokemon:p.id,owner:p.owner_seat.ok_or_else(failure)?,hp:p.hp,level:p.level,
+        experience:p.experience,pokerus:p.pokerus,stats:Some(CurrentExperienceRecipientStatsV1{stats:p.stats,max_hp:p.max_hp}),
+    })).collect()
+}
+
+/// Exact initialized Phaser3.90.0 Sine.In values for source Battle.addBattleScore
+/// at integer settled turns2..12, single ordinary enemy. Source observer records
+/// all11 inputs and33 actual score applications; endpoints are explicitly0/1.
+/// Retaining those binary64 constants avoids a platform libm cosine dependency.
+fn settled_score(score: SafeU53, turn: u64) -> Result<SafeU53, GameRuntimeV6Error> {
+    const FACTORS: [f64; 11] = [
+        1.0, 0.843565534959769, 0.6909830056250525, 0.5460095002604531,
+        0.41221474770752686, 0.2928932188134524, 0.19098300562505255,
+        0.1089934758116321, 0.04894348370484636, 0.01231165940486223, 0.0,
+    ];
+    let index = usize::try_from(turn.checked_sub(2).ok_or_else(failure)?.min(10)).map_err(|_| failure())?;
+    let final_score = ((score.get() as f64) * FACTORS[index]).ceil();
+    if !final_score.is_finite() || !(0.0..=score.get() as f64).contains(&final_score) { return Err(failure()); }
+    SafeU53::new(final_score as u64).map_err(|_| failure())
+}
+
+#[cfg(test)]
+mod source_score_tests {
+    use super::*;
+
+    #[test]
+    fn settled_score_matches_actual_source_turns_two_through_twelve() -> Result<(), GameRuntimeV6Error> {
+        // Actual source run34700591441: scene.score starts at7 for every row.
+        let observed = [
+            [8,120,10007], [8,103,8443], [8,86,6917], [8,69,5468],
+            [8,54,4130], [8,41,2936], [8,29,1917], [8,20,1097],
+            [8,13,497], [8,9,131], [7,7,7],
+        ];
+        for (offset, outputs) in observed.into_iter().enumerate() {
+            for (input, expected) in [1,113,10000].into_iter().zip(outputs) {
+                assert_eq!(settled_score(SafeU53::new(input).map_err(|_| failure())?, 2 + offset as u64)?.get() + 7, expected);
+            }
+        }
+        assert_eq!(settled_score(SafeU53::MAX, 2)?, SafeU53::MAX);
+        assert_eq!(settled_score(SafeU53::MAX, 99)?, SafeU53::ZERO);
+        assert!(settled_score(SafeU53::ZERO, 1).is_err());
+        Ok(())
+    }
 }

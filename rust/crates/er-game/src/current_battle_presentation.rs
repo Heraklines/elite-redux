@@ -69,6 +69,7 @@ pub(super) fn project_current_battle_cues(
                     innate_slot: *innate_slot,
                 }),
             ),
+            Cue::RecoilMessage { pokemon } => (PresentationCueFamilyV1::Move, Some(Payload::RecoilMessage { holder: *pokemon })),
             Cue::MoveNoEffect { pokemon, move_id } => (
                 PresentationCueFamilyV1::Move,
                 Some(Payload::MoveNoEffect {

@@ -14,6 +14,8 @@ pub(crate) enum SpeciesItem {
     DeepSeaTooth,
 }
 impl SpeciesItem {
+    #[cfg(test)]
+#[allow(dead_code)]
     pub(crate) fn source_key(self) -> &'static str {
         match self {
             Self::LightBall => "LIGHT_BALL",

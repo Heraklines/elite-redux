@@ -106,26 +106,78 @@ fn press(session: &mut CurrentGameSession, key: PhysicalKey) -> Result<GameKerne
     Ok(result)
 }
 fn navigate(session: &mut CurrentGameSession, option: &str) -> Result<()> {
-    let bound = session
-        .kernel_ref()?
-        .current_control()
-        .and_then(|c| c.menu.as_ref())
-        .ok_or("menu absent")?
-        .options
-        .len()
-        + 1;
-    for _ in 0..bound {
-        if session
-            .kernel_ref()?
+    // Find a shortest route using only the actual control's Up/Down edges.
+    // Every edge is still executed as a public physical key down/up pair.
+    let route = {
+        let menu = session.kernel_ref()?
             .current_control()
-            .and_then(|c| c.menu.as_ref())
-            .is_some_and(|m| m.selected_option_id.as_str() == option)
+            .and_then(|control| control.menu.as_ref())
+            .ok_or("actual menu absent")?;
+        if !menu
+            .options
+            .iter()
+            .any(|row| row.option_id.as_str() == option)
         {
-            return Ok(());
+            return Err("actual requested row absent".into());
         }
-        press(session, PhysicalKey::ArrowDown)?;
+        let start = menu.selected_option_id.as_str();
+        let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();
+        for edge in &menu.navigation {
+            if matches!(
+                edge.direction,
+                er_types::NavigationDirection::Up | er_types::NavigationDirection::Down
+            ) {
+                adjacent.entry(edge.from.as_str()).or_default().push(edge);
+            }
+        }
+        let mut queue = std::collections::VecDeque::from([start]);
+        let mut seen = std::collections::BTreeSet::from([start]);
+        let mut previous = std::collections::BTreeMap::new();
+        while let Some(node) = queue.pop_front() {
+            if node == option {
+                break;
+            }
+            if seen.len() > menu.options.len() {
+                return Err("actual navigation exceeds menu option bound".into());
+            }
+            for edge in adjacent.get(node).into_iter().flatten() {
+                if seen.insert(edge.to.as_str()) {
+                    let key = match edge.direction {
+                        er_types::NavigationDirection::Up => PhysicalKey::ArrowUp,
+                        er_types::NavigationDirection::Down => PhysicalKey::ArrowDown,
+                        _ => return Err("actual vertical navigation changed direction".into()),
+                    };
+                    previous.insert(edge.to.as_str(), (node, key));
+                    queue.push_back(edge.to.as_str());
+                }
+            }
+        }
+        let mut route = Vec::new();
+        let mut cursor = option;
+        while cursor != start {
+            if route.len() >= menu.options.len() {
+                return Err("actual raw menu option unreachable within bound".into());
+            }
+            let (parent, key) = previous
+                .get(cursor)
+                .ok_or("actual raw menu option unreachable")?;
+            route.push((key.clone(), cursor.to_owned()));
+            cursor = parent;
+        }
+        route.reverse();
+        route
+    };
+    for (key, expected) in route {
+        press(session, key)?;
+        if !session.kernel_ref()?
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == expected)
+        {
+            return Err("actual raw navigation did not follow offered edge".into());
+        }
     }
-    Err(format!("natural option unreachable: {option}").into())
+    Ok(())
 }
 fn captured(
     session: &mut CurrentGameSession,

@@ -1,0 +1,218 @@
+{
+  "source_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "binder": {
+    "party": [
+      {
+        "species": 1,
+        "form": 0,
+        "form_key": "",
+        "level_cap": 10,
+        "level_rows": [
+          [
+            1,
+            22
+          ],
+          [
+            1,
+            33
+          ],
+          [
+            1,
+            45
+          ],
+          [
+            1,
+            74
+          ],
+          [
+            1,
+            77
+          ],
+          [
+            1,
+            78
+          ],
+          [
+            1,
+            79
+          ],
+          [
+            1,
+            331
+          ],
+          [
+            1,
+            580
+          ]
+        ],
+        "all_level_rows_count": 26,
+        "all_level_rows_sha256": "483c8fc6ad75dc8980844fadbe20ea3fa73d43deb049bd6fb8ac0dd4899d49c4",
+        "live_move_ids": [
+          22
+        ],
+        "move_closure": [
+          {
+            "id": 22,
+            "type": 11,
+            "category": 0,
+            "accuracy": 100,
+            "pp": 15,
+            "sound": false,
+            "attack": true,
+            "attrs": [
+              "FlinchAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 33,
+            "type": 0,
+            "category": 0,
+            "accuracy": 100,
+            "pp": 20,
+            "sound": false,
+            "attack": true,
+            "attrs": [
+              "AngelsWrathTackleAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 45,
+            "type": 0,
+            "category": 1,
+            "accuracy": 100,
+            "pp": 15,
+            "sound": true,
+            "attack": false,
+            "attrs": [
+              "StatStageChangeAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 74,
+            "type": 0,
+            "category": 2,
+            "accuracy": -1,
+            "pp": 20,
+            "sound": false,
+            "attack": false,
+            "attrs": [
+              "GrowthStatStageChangeAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 77,
+            "type": 3,
+            "category": 2,
+            "accuracy": 75,
+            "pp": 20,
+            "sound": false,
+            "attack": false,
+            "attrs": [
+              "StatusEffectAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 78,
+            "type": 11,
+            "category": 2,
+            "accuracy": 100,
+            "pp": 20,
+            "sound": false,
+            "attack": false,
+            "attrs": [
+              "StatusEffectAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 79,
+            "type": 11,
+            "category": 2,
+            "accuracy": 75,
+            "pp": 15,
+            "sound": false,
+            "attack": false,
+            "attrs": [
+              "StatusEffectAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 331,
+            "type": 11,
+            "category": 0,
+            "accuracy": 100,
+            "pp": 20,
+            "sound": false,
+            "attack": true,
+            "attrs": [
+              "MultiHitAttr"
+            ],
+            "variable_types": []
+          },
+          {
+            "id": 580,
+            "type": 11,
+            "category": 2,
+            "accuracy": -1,
+            "pp": 10,
+            "sound": false,
+            "attack": false,
+            "attrs": [
+              "TerrainChangeAttr"
+            ],
+            "variable_types": []
+          }
+        ],
+        "evolutions": {
+          "present": true,
+          "rows": [
+            {
+              "species": 2,
+              "pre_form": null,
+              "evo_form": null,
+              "level": 16,
+              "item": null,
+              "conditions": null,
+              "level_threshold": null
+            }
+          ]
+        },
+        "forms": {
+          "present": false,
+          "rows": []
+        },
+        "held": [],
+        "learnable_now": [
+          33,
+          45,
+          74,
+          77,
+          78,
+          79,
+          331,
+          580
+        ]
+      }
+    ],
+    "mode": {
+      "classic": true,
+      "daily": false,
+      "fun": false,
+      "coop": false,
+      "spliced_only": false,
+      "fresh_start": false,
+      "challenges": [],
+      "fun_mega": false
+    },
+    "unlocks": {
+      "eviolite": false,
+      "mini_black_hole": false
+    }
+  }
+}

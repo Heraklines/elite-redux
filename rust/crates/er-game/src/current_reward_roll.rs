@@ -42,6 +42,7 @@ pub(crate) trait SourcePool {
     /// Each row is (exclusive upper bound, original source pool index).
     fn thresholds(&self, tier: u16) -> Result<Vec<(u32, usize)>, RollError>;
     fn party_luck(&self) -> Result<u8, RollError>;
+    fn singleton(&mut self, minimum: u32) -> Result<(), RollError> { let _ = minimum; Ok(()) }
     fn draw(&mut self, range: u32, minimum: u32) -> Result<u32, RollError>;
     /// Actual type generator, preserving generated pregenArgs and display name.
     /// Every internal generator/gate draw must consume the same operation budget.
@@ -77,6 +78,7 @@ pub(super) fn bounded_draw_from(
     *budget = budget.checked_sub(1).ok_or(RollError::Budget)?;
     // Source randSeedInt(1,min) returns min without touching Phaser.RND.
     if range == 1 {
+        pool.singleton(minimum)?;
         return Ok(minimum);
     }
     let value = pool.draw(range, minimum)?;
@@ -187,11 +189,16 @@ fn conflicts(left: &Offer, right: &Offer) -> bool {
 /// Ordinary three-slot source path, without challenges/custom overrides/Moody
 /// rewrites. The caller must positively qualify those conditions before entry.
 /// Source de-duplication may return fewer than three; never fabricate a filler.
+#[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn three_options(pool: &mut impl SourcePool) -> Result<Vec<Offer>, RollError> {
-    let mut budget = 4096;
+    three_options_with_budget(pool, &mut 4096)
+}
+
+pub(crate) fn three_options_with_budget(pool: &mut impl SourcePool, budget: &mut usize) -> Result<Vec<Offer>, RollError> {
     let mut options = Vec::new();
     for _ in 0..3 {
-        let mut candidate = next(pool, None, None, &mut budget)?;
+        let mut candidate = next(pool, None, None, budget)?;
         let mut retry = 0;
         while !options.is_empty() {
             retry += 1;
@@ -202,7 +209,7 @@ pub(crate) fn three_options(pool: &mut impl SourcePool) -> Result<Vec<Offer>, Ro
                 pool,
                 Some(candidate.tier),
                 Some(candidate.upgrade_count),
-                &mut budget,
+                budget,
             )?;
         }
         options.push(candidate);

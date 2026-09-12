@@ -348,24 +348,78 @@ fn press(kernel: &mut GameKernelV7, key: PhysicalKey) -> Result<GameKernelStepV7
     Ok(result)
 }
 fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
-    let bound = kernel
-        .current_control()
-        .and_then(|c| c.menu.as_ref())
-        .ok_or("menu absent")?
-        .options
-        .len()
-        + 1;
-    for _ in 0..bound {
-        if kernel
+    // Find a shortest route using only the actual control's Up/Down edges.
+    // Every edge is still executed as a public physical key down/up pair.
+    let route = {
+        let menu = kernel
             .current_control()
-            .and_then(|c| c.menu.as_ref())
-            .is_some_and(|m| m.selected_option_id.as_str() == option)
+            .and_then(|control| control.menu.as_ref())
+            .ok_or("actual menu absent")?;
+        if !menu
+            .options
+            .iter()
+            .any(|row| row.option_id.as_str() == option)
         {
-            return Ok(());
+            return Err("actual requested row absent".into());
         }
-        press(kernel, PhysicalKey::ArrowDown)?;
+        let start = menu.selected_option_id.as_str();
+        let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();
+        for edge in &menu.navigation {
+            if matches!(
+                edge.direction,
+                er_types::NavigationDirection::Up | er_types::NavigationDirection::Down
+            ) {
+                adjacent.entry(edge.from.as_str()).or_default().push(edge);
+            }
+        }
+        let mut queue = std::collections::VecDeque::from([start]);
+        let mut seen = std::collections::BTreeSet::from([start]);
+        let mut previous = std::collections::BTreeMap::new();
+        while let Some(node) = queue.pop_front() {
+            if node == option {
+                break;
+            }
+            if seen.len() > menu.options.len() {
+                return Err("actual navigation exceeds menu option bound".into());
+            }
+            for edge in adjacent.get(node).into_iter().flatten() {
+                if seen.insert(edge.to.as_str()) {
+                    let key = match edge.direction {
+                        er_types::NavigationDirection::Up => PhysicalKey::ArrowUp,
+                        er_types::NavigationDirection::Down => PhysicalKey::ArrowDown,
+                        _ => return Err("actual vertical navigation changed direction".into()),
+                    };
+                    previous.insert(edge.to.as_str(), (node, key));
+                    queue.push_back(edge.to.as_str());
+                }
+            }
+        }
+        let mut route = Vec::new();
+        let mut cursor = option;
+        while cursor != start {
+            if route.len() >= menu.options.len() {
+                return Err("actual raw menu option unreachable within bound".into());
+            }
+            let (parent, key) = previous
+                .get(cursor)
+                .ok_or("actual raw menu option unreachable")?;
+            route.push((key.clone(), cursor.to_owned()));
+            cursor = parent;
+        }
+        route.reverse();
+        route
+    };
+    for (key, expected) in route {
+        press(kernel, key)?;
+        if !kernel
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == expected)
+        {
+            return Err("actual raw navigation did not follow offered edge".into());
+        }
     }
-    Err("actual raw option unreachable".into())
+    Ok(())
 }
 fn natural(content: Arc<PreparedGameContentV2>, index: usize, seed: &str) -> Result<GameKernelV7> {
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
@@ -1714,6 +1768,7 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         &authority,
         &targeting,
     )?;
+    assert_actual_struggle_recoil_event(&chunk.transition, actor)?;
     let CurrentTurnStageV1::AwaitingInterlude { faints } = &chunk.continuation.stage else {
         return Err("missing actual faint interlude".into());
     };
@@ -2072,5 +2127,38 @@ fn assert_struggle_restore_action(
         next.transition().after_state.current_random_target_commands,
         active(accepted)?.current_random_target_commands
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_actual_struggle_recoil_event(
+    transition: &er_battle::m7_resolver::BattleTransitionV5,
+    actor: PokemonId,
+) -> Result<()> {
+    use er_state::current_battle_source_events::CurrentBattleSourceEventV1 as Event;
+    let events = transition.source_events.as_ref().ok_or("source observations absent")?;
+    let [Event::MoveResolution { move_id, .. }, Event::MoveDamage { target, .. },
+        Event::StruggleRecoilDamage { user, source_slot, move_id: recoil_move,
+            requested_damage, damage, hp_before, hp_after, max_hp }] = events.as_slice() else {
+        return Err("Struggle must emit resolution, direct damage, then actual indirect recoil".into());
+    };
+    assert_eq!(*user, actor);
+    assert_ne!(*target, actor);
+    assert_eq!(*source_slot, slot(BattleSide::Player, 0));
+    assert_eq!(*move_id, MoveId::new(safe(165)));
+    assert_eq!(*recoil_move, *move_id);
+    assert_eq!(*requested_damage, (max_hp / 4).max(1));
+    assert_eq!(*damage, (*requested_damage).min(*hp_before));
+    let recoil_hp = transition.presentation.iter().position(|cue| matches!(cue,
+        er_battle::m7_resolver::BattlePresentationCueV5::HpChanged { pokemon, .. } if *pokemon == actor))
+        .ok_or("actual recoil HP child absent")?;
+    let messages: Vec<_> = transition.presentation.iter().enumerate().filter_map(|(index, cue)| matches!(cue,
+        er_battle::m7_resolver::BattlePresentationCueV5::RecoilMessage { pokemon } if *pokemon == actor).then_some(index)).collect();
+    assert_eq!(messages.len(), 1);
+    assert!(messages[0] > recoil_hp);
+    assert_eq!(hp_before.checked_sub(*damage), Some(*hp_after));
+    assert!(transition.presentation.iter().any(|cue| matches!(cue,
+        er_battle::m7_resolver::BattlePresentationCueV5::HpChanged { pokemon, before, after }
+        if *pokemon == actor && before == hp_before && after == hp_after)));
     Ok(())
 }

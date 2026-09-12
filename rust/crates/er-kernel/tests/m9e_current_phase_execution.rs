@@ -47,40 +47,78 @@ fn press(kernel: &mut GameKernelV7, key: PhysicalKey) -> Result<GameKernelStepV7
     Ok(result)
 }
 fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
-    let count = kernel
-        .current_control()
-        .and_then(|control| control.menu.as_ref())
-        .ok_or("actual menu absent")?
-        .options
-        .len();
-    for _ in 0..=count {
+    // Find a shortest route using only the actual control's Up/Down edges.
+    // Every edge is still executed as a public physical key down/up pair.
+    let route = {
         let menu = kernel
             .current_control()
             .and_then(|control| control.menu.as_ref())
             .ok_or("actual menu absent")?;
-        if menu.selected_option_id.as_str() == option {
-            return Ok(());
+        if !menu
+            .options
+            .iter()
+            .any(|row| row.option_id.as_str() == option)
+        {
+            return Err("actual requested row absent".into());
         }
-        let selected = menu
-            .options
-            .iter()
-            .position(|row| row.option_id == menu.selected_option_id)
-            .ok_or("actual selected row absent")?;
-        let wanted = menu
-            .options
-            .iter()
-            .position(|row| row.option_id.as_str() == option)
-            .ok_or("actual requested row absent")?;
-        press(
-            kernel,
-            if wanted < selected {
-                PhysicalKey::ArrowUp
-            } else {
-                PhysicalKey::ArrowDown
-            },
-        )?;
+        let start = menu.selected_option_id.as_str();
+        let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();
+        for edge in &menu.navigation {
+            if matches!(
+                edge.direction,
+                er_types::NavigationDirection::Up | er_types::NavigationDirection::Down
+            ) {
+                adjacent.entry(edge.from.as_str()).or_default().push(edge);
+            }
+        }
+        let mut queue = std::collections::VecDeque::from([start]);
+        let mut seen = std::collections::BTreeSet::from([start]);
+        let mut previous = std::collections::BTreeMap::new();
+        while let Some(node) = queue.pop_front() {
+            if node == option {
+                break;
+            }
+            if seen.len() > menu.options.len() {
+                return Err("actual navigation exceeds menu option bound".into());
+            }
+            for edge in adjacent.get(node).into_iter().flatten() {
+                if seen.insert(edge.to.as_str()) {
+                    let key = match edge.direction {
+                        er_types::NavigationDirection::Up => PhysicalKey::ArrowUp,
+                        er_types::NavigationDirection::Down => PhysicalKey::ArrowDown,
+                        _ => return Err("actual vertical navigation changed direction".into()),
+                    };
+                    previous.insert(edge.to.as_str(), (node, key));
+                    queue.push_back(edge.to.as_str());
+                }
+            }
+        }
+        let mut route = Vec::new();
+        let mut cursor = option;
+        while cursor != start {
+            if route.len() >= menu.options.len() {
+                return Err("actual raw menu option unreachable within bound".into());
+            }
+            let (parent, key) = previous
+                .get(cursor)
+                .ok_or("actual raw menu option unreachable")?;
+            route.push((key.clone(), cursor.to_owned()));
+            cursor = parent;
+        }
+        route.reverse();
+        route
+    };
+    for (key, expected) in route {
+        press(kernel, key)?;
+        if !kernel
+            .current_control()
+            .and_then(|control| control.menu.as_ref())
+            .is_some_and(|menu| menu.selected_option_id.as_str() == expected)
+        {
+            return Err("actual raw navigation did not follow offered edge".into());
+        }
     }
-    Err("actual raw menu option unreachable".into())
+    Ok(())
 }
 fn restore(
     snapshot: CoreGameKernelSnapshotV7,
@@ -531,6 +569,7 @@ fn assert_missing_phase_wait_rejected(
 
 #[test]
 fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore() -> Result<()> {
+    assert_two_neutral_turns_keep_source_counters()?;
     let content = content()?;
     let mut kernel = Box::new(controlled_before_knockout(content.clone(), 5, &[33])?);
     let pokemon = &kernel
@@ -540,6 +579,7 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
         .as_ref()
         .ok_or("run absent")?
         .party[0];
+    assert_source_counter_checkpoint(&kernel, content.clone())?;
     let before_xp = pokemon.experience;
     let before_stats = pokemon.stats;
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
@@ -1114,6 +1154,10 @@ fn assert_initial_tail_boundary(
     else {
         return Ok(false);
     };
+    if !tail.reward.as_ref().is_some_and(|reward|matches!(reward.stage,
+        er_state::current_reward_selection::CurrentRewardStageV1::Choice)) {
+        return Ok(false);
+    }
     let eggs = state
         .current_friendship_profile
         .as_ref()
@@ -1127,8 +1171,9 @@ fn assert_initial_tail_boundary(
     assert_eq!(accounting.money_multiplier.get(), 1);
     assert!(accounting.money_multiplier_captured);
     assert_eq!(field_turns.len(), 1);
-    assert_eq!(field_turns[0].turn_count.get(), 1);
-    assert_eq!(field_turns[0].wave_turn_count.get(), 1);
+    assert_eq!(field_turns[0].turn_count.get(), 2);
+    assert_eq!(field_turns[0].wave_turn_count.get(), 2);
+    assert_tail_counter_restore_rejects(&checkpoint, content.clone())?;
     assert!(state.current_turn_execution.is_none());
     let battle = state
         .active_run
@@ -1329,6 +1374,7 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
             .and_then(|o| o.pending.first())
             .and_then(|p| p.victory_tail.as_ref())
             && matches!(&tail.phase, T::RewardSelectionPending { .. })
+            && tail.reward.is_some()
         {
             assert!(clock_seen && egg_seen);
             assert!(
@@ -1347,13 +1393,7 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
                 10821,
                 "qualified actual source seed projection"
             );
-            let unchanged = kernel.advance_time(SafeU53::ZERO)?;
-            assert!(
-                !unchanged
-                    .effects
-                    .iter()
-                    .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. }))
-            );
+            assert_current_reward_choice_and_pick(&mut kernel, content.clone(), &mut live, &mut ledger)?;
             return Ok(());
         }
         if !snapshot.pending_presentations.is_empty() {
@@ -1387,7 +1427,10 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
         } else {
             kernel.advance_time(SafeU53::ZERO)?
         };
-        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+        let material=accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+        if let Ok(reward)=current_reward(kernel.state().ok_or("reward state absent")?) {
+            assert_eq!(material.transition().rng_audit,reward.rng_audit,"RewardBegin common material owns the complete generation audit");
+        }
     }
     Err("actual Flash path failed to reach bounded reward frontier".into())
 }
@@ -1478,4 +1521,231 @@ fn accept_flash_test_egg(
     assert!(kernel.apply_current_flash_egg_inputs(input).is_err());
     assert_eq!(kernel.snapshot()?, after);
     Ok(step)
+}
+
+#[inline(never)]
+fn current_reward(state:&GameStateV6)->Result<&er_state::current_reward_selection::CurrentRewardSelectionV1>{
+    state.current_battle_participation.as_ref().and_then(|p|p.experience.as_ref())
+        .and_then(|o|o.pending.first()).and_then(|p|p.victory_tail.as_ref())
+        .and_then(|tail|tail.reward.as_deref()).ok_or_else(||"actual reward receipt absent".into())
+}
+
+// Same controlled combat and original seed. The test consumes the actual menu;
+// it never rewrites RNG, filters production offers, or searches alternate seeds.
+#[inline(never)]
+fn assert_current_reward_choice_and_pick(
+    kernel:&mut GameKernelV7,content:Arc<PreparedGameContentV2>,
+    live:&mut Option<GameStateV6>,ledger:&mut AppliedGameMaterialLedgerV1,
+)->Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1 as Stage;
+    let checkpoint=Box::new(kernel.snapshot()?);
+    let selected=current_reward(active(&checkpoint)?)?.clone();
+    assert!(matches!(selected.stage,Stage::Choice));
+    assert!((1..=3).contains(&selected.offers.len()));
+    assert!(!selected.rng_audit.is_empty());
+    assert!(selected.rng_audit.len()<=4096);
+    for draw in &selected.rng_audit {draw.validate()?;}
+    assert_eq!(selected.rng_audit.last().ok_or("reward audit absent")?.after_state.run.state_string,selected.rng_after);
+    *kernel=restore(*checkpoint.clone(),content.clone())?;
+    assert_eq!(canonical_bytes(&kernel.snapshot()?)?,canonical_bytes(&*checkpoint)?);
+    assert_reward_forgery_rejected(&checkpoint,content.clone())?;
+    for pending in kernel.snapshot()?.pending_presentations {kernel.settle_presentation(pending.event_id)?;}
+    let frozen=canonical_bytes(kernel.state().ok_or("reward state absent")?)?;
+    for _ in 0..3 {
+        let unchanged=kernel.advance_time(SafeU53::ZERO)?;
+        assert!(!unchanged.effects.iter().any(|e|matches!(e,GameKernelEffectV7::AuthorityMaterial{..})),"waiting at Choice must not redraw or grant");
+        assert_eq!(canonical_bytes(kernel.state().ok_or("reward state absent")?)?,frozen);
+        assert_eq!(current_reward(kernel.state().ok_or("reward state absent")?)?,&selected);
+    }
+    let pokemon=&selected.party_before[0];
+    let index=selected.offers.iter().position(|offer|offer.args.is_none()&&match offer.source_id.as_str(){
+        "POKEBALL"|"GREAT_BALL"|"ULTRA_BALL"|"ROGUE_BALL"|"MASTER_BALL"|"LURE"|"SUPER_LURE"|"MAX_LURE"=>true,
+        "POTION"|"SUPER_POTION"|"HYPER_POTION"|"MAX_POTION"=>pokemon.hp>0&&pokemon.hp<pokemon.max_hp,
+        _=>false,
+    });
+    let Some(index)=index else {
+        eprintln!("M9_REWARD_CHOICE_ONLY: fixed controlled seed produced {:?}; selected descendants remain unsupported",selected.offers.iter().map(|offer|offer.source_id.as_str()).collect::<Vec<_>>());
+        return Ok(());
+    };
+    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
+        matches!(&row.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==index as u32)))
+        .ok_or("actual reward option absent")?.option_id.as_str().to_owned();
+    navigate(kernel,&option)?;
+    // Raw navigation is presentation-only; the common material starts from the
+    // same authoritative state, not the local highlighted menu cursor.
+    let before_live=Box::new(live.clone());let before_ledger=ledger.clone();
+    let step=press(kernel,PhysicalKey::Space)?;
+    let mut accepted=accept_material(live,ledger,kernel,content.as_ref(),&step)?;
+    assert_reward_material_forgery_rejected(&before_live,&before_ledger,content.as_ref(),&accepted)?;
+    if matches!(current_reward(kernel.state().ok_or("reward state absent")?)?.stage,Stage::Holder{..}) {
+        for pending in kernel.snapshot()?.pending_presentations {kernel.settle_presentation(pending.event_id)?;}
+        let holder_checkpoint=Box::new(kernel.snapshot()?);
+        *kernel=restore(*holder_checkpoint.clone(),content.clone())?;
+        assert_eq!(canonical_bytes(&kernel.snapshot()?)?,canonical_bytes(&*holder_checkpoint)?);
+        let before_live=Box::new(live.clone());let before_ledger=ledger.clone();
+        let step=press(kernel,PhysicalKey::Space)?;
+        accepted=accept_material(live,ledger,kernel,content.as_ref(),&step)?;
+        assert_reward_material_forgery_rejected(&before_live,&before_ledger,content.as_ref(),&accepted)?;
+    }
+    let after=Box::new(kernel.snapshot()?);
+    let reward=current_reward(active(&after)?)?;
+    assert!(matches!(reward.stage,Stage::Applied{offer,..} if usize::from(offer)==index));
+    assert_eq!(reward.offers,selected.offers);
+    assert_eq!(reward.rng_audit,selected.rng_audit,"selection must not consume generation RNG again");
+    assert_eq!(reward.party_before,selected.party_before);
+    assert_eq!(reward.run_before,selected.run_before);
+    assert_reward_effect(active(&after)?,&selected,index)?;
+    let settled=canonical_bytes(live)?;let settled_ledger=ledger.clone();
+    assert_eq!(apply_game_material_v6(live,ledger,content.as_ref(),&accepted.canonical_bytes()?)?,
+        er_game::m9e_material_v6::GameMaterialApplyOutcomeV6::DuplicateApplied);
+    assert_eq!(canonical_bytes(live)?,settled);assert_eq!(*ledger,settled_ledger);
+    let restored=restore(*after,content.clone())?;
+    assert_eq!(canonical_bytes(restored.state().ok_or("restored reward absent")?)?,canonical_bytes(kernel.state().ok_or("reward absent")?)?);
+    let before_again=canonical_bytes(kernel.state().ok_or("reward absent")?)?;
+    let again=press(kernel,PhysicalKey::Space)?;
+    assert!(!again.effects.iter().any(|e|matches!(e,GameKernelEffectV7::AuthorityMaterial{..})));
+    assert_eq!(canonical_bytes(kernel.state().ok_or("reward absent")?)?,before_again,"Applied reward cannot be selected a second time");
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_reward_forgery_rejected(checkpoint:&CoreGameKernelSnapshotV7,content:Arc<PreparedGameContentV2>)->Result<()> {
+    let mut forged=Box::new(checkpoint.clone());
+    let GameKernelLifecycleSnapshotV7::Active(state)=&mut forged.lifecycle else{return Err("reward state absent".into());};
+    let reward=state.current_battle_participation.as_mut().and_then(|p|p.experience.as_mut())
+        .and_then(|o|o.pending.first_mut()).and_then(|p|p.victory_tail.as_mut()).and_then(|t|t.reward.as_mut()).ok_or("reward absent")?;
+    reward.offers[0].name.push_str(" forged");
+    assert!(restore(*forged,content).is_err(),"restore must regenerate full names/identities, not trust snapshot offers");Ok(())
+}
+
+#[inline(never)]
+fn assert_reward_material_forgery_rejected(before:&Option<GameStateV6>,ledger:&AppliedGameMaterialLedgerV1,content:&PreparedGameContentV2,material:&GameMaterialV6)->Result<()> {
+    let mut forged=material.clone();
+    let transition=match &mut forged{GameMaterialV6::NewRun(t)|GameMaterialV6::BattleTurn(t)|GameMaterialV6::BattleReplacement(t)|GameMaterialV6::GameAction(t)|GameMaterialV6::Terminal(t)=>t};
+    transition.accepted_action=Some(er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal:u32::MAX}});
+    let mut live=before.clone();let mut candidate_ledger=ledger.clone();
+    assert!(apply_game_material_v6(&mut live,&mut candidate_ledger,content,&canonical_bytes(&forged)?).is_err(),"otherwise identical material cannot nominate a different hidden ordinal");
+    assert_eq!(live,*before);assert_eq!(candidate_ledger,*ledger);Ok(())
+}
+
+#[inline(never)]
+fn assert_reward_effect(state:&GameStateV6,before:&er_state::current_reward_selection::CurrentRewardSelectionV1,index:usize)->Result<()> {
+    let run=state.active_run.as_ref().ok_or("reward run absent")?;
+    let owned=state.current_battle_participation.as_ref().and_then(|p|p.experience.as_ref()).and_then(|o|o.source_progression.as_ref()).and_then(|s|s.reward_run.as_ref()).ok_or("owned reward inventory absent")?;
+    let id=before.offers[index].source_id.as_str();
+    let ball=match id{"POKEBALL"=>Some(0),"GREAT_BALL"=>Some(1),"ULTRA_BALL"=>Some(2),"ROGUE_BALL"=>Some(3),"MASTER_BALL"=>Some(4),_=>None};
+    if let Some(ball)=ball {
+        let mut expected=before.run_before.clone();expected.balls[ball]=(expected.balls[ball]+if ball==4{1}else{5}).min(99);
+        assert_eq!(*owned,expected);assert_eq!(run.party,before.party_before);
+    }else if matches!(id,"LURE"|"SUPER_LURE"|"MAX_LURE") {
+        let duration=match id{"LURE"=>10,"SUPER_LURE"=>15,_=>30};
+        assert_eq!(owned.balls,before.run_before.balls);assert_eq!(owned.map_owned,before.run_before.map_owned);
+        assert_eq!(owned.lures,vec![er_state::current_reward_run::CurrentRewardLureV1{duration,remaining:duration}]);
+        assert_eq!(run.party,before.party_before,"Lure is a run modifier, not a Pokemon mutation");
+    }else {
+        let mut expected=before.party_before.clone();let p=&mut expected[0];
+        let (points,percent)=match id{"POTION"=>(20_u64,10_u64),"SUPER_POTION"=>(50,25),"HYPER_POTION"=>(200,50),"MAX_POTION"=>(0,100),_=>return Err("unexpected supported reward".into())};
+        let amount=(u64::from(p.max_hp)*percent/100).max(points).max(1);
+        p.hp=(u64::from(p.hp)+amount).min(u64::from(p.max_hp)) as u32;
+        assert_eq!(run.party,expected);assert_eq!(owned,&before.run_before);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_source_counter_checkpoint(kernel: &GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<()> {
+    let checkpoint = Box::new(kernel.snapshot()?);
+    let state = active(&checkpoint)?;
+    let source = state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+        .and_then(|owner| owner.source_progression.as_ref()).ok_or("source provenance absent")?;
+    let counts = source.turn_progress.as_ref().ok_or("source counters absent")?;
+    assert_eq!(counts.turn.get().get(), 1);
+    assert!(counts.pokemon.iter().all(|row| row.turn_count.get() == 1 && row.wave_turn_count.get() == 1 && row.damage_taken == SafeU53::ZERO));
+    assert_counter_restore_rejects(&checkpoint, content.clone(), false)?;
+    assert_counter_restore_rejects(&checkpoint, content, true)?;
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_counter_restore_rejects(checkpoint: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>, missing: bool) -> Result<()> {
+    let mut forged = Box::new(checkpoint.clone());
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut forged.lifecycle else { return Err("active state absent".into()); };
+    let source = state.current_battle_participation.as_mut().and_then(|owner| owner.experience.as_mut())
+        .and_then(|owner| owner.source_progression.as_mut()).ok_or("source provenance absent")?;
+    if missing { source.turn_progress = None; }
+    else { source.turn_progress.as_mut().ok_or("counters absent")?.turn = er_types::battle_ids::TurnIndex::new(safe(2)?)?; }
+    assert!(restore(*forged, content).is_err());
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_two_neutral_turns_keep_source_counters() -> Result<()> {
+    let content = content()?;
+    let mut kernel = controlled_neutral_turns(content.clone())?;
+    for expected_turn in [2_u64, 3] {
+        let run = kernel.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
+        let before_hp = [run.party[0].hp, run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp];
+        let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
+        let mut finished = false;
+        for _ in 0..32 {
+            let turn = kernel.state().and_then(|state| state.active_run.as_ref()).and_then(|run| run.battle.as_ref())
+                .ok_or("battle absent")?.turn.get().get();
+            if turn == expected_turn {
+                finished = true;
+                break;
+            }
+            let snapshot = Box::new(kernel.snapshot()?);
+            for presentation in &snapshot.pending_presentations {
+                kernel.settle_presentation(presentation.event_id)?;
+            }
+            let step = kernel.advance_time(SafeU53::ZERO)?;
+            accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+            kernel = restore_exact_raw_checkpoint(&kernel, content.clone())?;
+        }
+        assert!(finished, "neutral source turn did not finish within the watchdog");
+        assert_eq!(kernel.current_control().map(|control| control.kind), Some(GameControlKindV2::BattleCommand));
+        let state = kernel.state().ok_or("state absent")?;
+        let run = state.active_run.as_ref().ok_or("run absent")?;
+        let battle = run.battle.as_ref().ok_or("battle absent")?;
+        let counts = state.current_battle_participation.as_ref().and_then(|owner| owner.experience.as_ref())
+            .and_then(|owner| owner.source_progression.as_ref()).and_then(|source| source.turn_progress.as_ref())
+            .ok_or("source counters absent")?;
+        assert_eq!(counts.turn, battle.turn);
+        for (index, pokemon) in [&run.party[0], &battle.enemy_party[0]].into_iter().enumerate() {
+            let row = counts.pokemon.iter().find(|row| row.pokemon == pokemon.id).ok_or("holder absent")?;
+            assert_eq!(row.turn_count.get(), expected_turn);
+            assert_eq!(row.wave_turn_count.get(), expected_turn);
+            assert_eq!(row.last_reset_turn.get().get(), expected_turn - 1);
+            assert_eq!(row.damage_taken.get(), u64::from(before_hp[index] - pokemon.hp));
+            assert!(row.damage_taken.get() > 0);
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn controlled_neutral_turns(content: Arc<PreparedGameContentV2>) -> Result<Box<GameKernelV7>> {
+    let mut checkpoint = Box::new(controlled_before_knockout(content.clone(), 5, &[33])?.snapshot()?);
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else { return Err("active state absent".into()); };
+    let run = state.active_run.as_mut().ok_or("run absent")?;
+    run.party[0].stats.attack = 1;
+    let enemy = &mut run.battle.as_mut().ok_or("battle absent")?.enemy_party[0];
+    enemy.hp = enemy.max_hp;
+    state.validate_with(content.as_ref())?;
+    Ok(Box::new(restore(*checkpoint, content)?))
+}
+
+#[inline(never)]
+fn assert_tail_counter_restore_rejects(checkpoint: &CoreGameKernelSnapshotV7, content: Arc<PreparedGameContentV2>) -> Result<()> {
+    let mut forged = Box::new(checkpoint.clone());
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut forged.lifecycle else { return Err("active state absent".into()); };
+    let tail = state.current_battle_participation.as_mut().and_then(|owner| owner.experience.as_mut())
+        .and_then(|owner| owner.pending.first_mut()).and_then(|pending| pending.victory_tail.as_mut())
+        .ok_or("tail absent")?;
+    let counts = tail.original_turn_progress.as_mut().ok_or("historical counters absent")?;
+    assert_eq!(counts.turn.get().get(), 1);
+    assert_eq!(counts.pokemon[0].turn_count.get(), 1);
+    counts.pokemon[0].turn_count = safe(2)?;
+    assert!(restore(*forged, content).is_err());
+    Ok(())
 }

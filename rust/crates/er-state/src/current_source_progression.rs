@@ -53,13 +53,19 @@ pub struct CurrentSourceProgressionV1 {
     pub initial_enemy: CurrentSourceInitialEnemyV1,
     pub initial_faint: crate::current_faint_execution::CurrentInitialEnemyFaintV1,
     pub party: Vec<CurrentSourcePokemonV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reward_run: Option<crate::current_reward_run::CurrentRewardRunV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_progress: Option<CurrentSourceTurnProgressV1>,
 }
 
 impl CurrentSourceProgressionV1 {
     /// Restore shape and identity checks. Source context still needs the live
     /// content-aware runtime admission; these checks do not recreate history.
     pub fn valid(&self, run: &RunStateV3) -> bool {
-        self.run_id == run.run_id
+        self.reward_run.as_ref().is_none_or(|owner| owner.valid())
+            && self.turn_progress.as_ref().is_none_or(|progress| progress.valid(run))
+            && self.run_id == run.run_id
             && self.initial_wave.get().get() == 1
             && self.initial_enemy.pokemon.get().get() != 0
             && self.initial_enemy.species.get().get() != 0
@@ -79,6 +85,56 @@ impl CurrentSourceProgressionV1 {
                         earlier.pokemon != row.pokemon
                             && earlier.selection.pokemon_id != row.selection.pokemon_id
                     })
+            })
+    }
+}
+
+/// Actual PokemonTempSummonData/PokemonTurnData fields owned since construction.
+/// They are never reconstructed from battle.turn after a switch or restore.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentSourcePokemonTurnsV1 {
+    pub pokemon: PokemonId,
+    pub turn_count: er_types::SafeU53,
+    pub wave_turn_count: er_types::SafeU53,
+    pub damage_taken: er_types::SafeU53,
+    pub last_reset_turn: er_types::battle_ids::TurnIndex,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentSourceTurnProgressV1 {
+    pub battle: BattleId,
+    pub wave: WaveIndex,
+    pub turn: er_types::battle_ids::TurnIndex,
+    pub pokemon: Vec<CurrentSourcePokemonTurnsV1>,
+}
+
+impl CurrentSourceTurnProgressV1 {
+    pub fn fresh(run: &RunStateV3) -> Option<Self> {
+        let battle = run.battle.as_ref()?;
+        if battle.turn.get().get() != 1 { return None; }
+        let one = er_types::SafeU53::new(1).ok()?;
+        Some(Self {
+            battle: battle.battle_id, wave: battle.wave, turn: battle.turn,
+            pokemon: run.party.iter().chain(&battle.enemy_party).map(|pokemon| CurrentSourcePokemonTurnsV1 {
+                pokemon: pokemon.id, turn_count: one, wave_turn_count: one,
+                damage_taken: er_types::SafeU53::ZERO, last_reset_turn: battle.turn,
+            }).collect(),
+        })
+    }
+
+    pub fn valid(&self, run: &RunStateV3) -> bool {
+        let Some(battle) = &run.battle else { return false; };
+        self.battle == battle.battle_id && self.wave == battle.wave && self.turn.get().get() <= battle.turn.get().get()
+            && battle.turn.get().get().saturating_sub(self.turn.get().get()) <= 1
+            && self.pokemon.len() == run.party.len() + battle.enemy_party.len()
+            && self.pokemon.iter().enumerate().all(|(index, row)| {
+                run.party.iter().chain(&battle.enemy_party).any(|pokemon| pokemon.id == row.pokemon)
+                    && !self.pokemon[..index].iter().any(|previous| previous.pokemon == row.pokemon)
+                    && row.turn_count.get() <= self.turn.get().get()
+                    && row.wave_turn_count.get() <= row.turn_count.get()
+                    && row.last_reset_turn <= self.turn
             })
     }
 }

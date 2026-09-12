@@ -25,6 +25,10 @@ pub enum GameOwnedPhaseV1 {
     VictoryTail {
         pending: SafeU53,
     },
+    RewardBegin {
+        pending: SafeU53,
+        menu_instance: MenuInstanceId,
+    },
     VictoryPresentation {
         pending: SafeU53,
         event_id: PresentationEventId,
@@ -113,7 +117,7 @@ pub(super) fn begin_owned_turn(
     })
 }
 
-fn install_waiting(
+pub(super) fn install_waiting(
     candidate: &mut GameStateV6,
     revision: SafeU53,
 ) -> Result<(), GameRuntimeV6Error> {
@@ -150,6 +154,7 @@ fn fold_action_tracker(
     }
     match tracker.history {
         CurrentAchievementHistoryV1::FreshComplete => {
+            crate::current_source_turn_progress::fold(before, candidate, events, cues)?;
             let (next, requests) =
                 crate::current_achievement_action::fold_current_achievement_action(
                     before, candidate, content, events, cues,
@@ -328,6 +333,11 @@ fn phase_transition(
         .active_run
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
+    if matches!(phase, GameOwnedPhaseV1::RewardBegin { .. }) {
+        return current_reward_transition::transition(
+            before, content, operation_id, authority_seat, revision, phase,
+        );
+    }
     if matches!(phase, GameOwnedPhaseV1::VictoryTail { .. }) {
         return current_victory_transition::transition(
             before,
@@ -427,6 +437,7 @@ fn phase_transition(
         | GameOwnedPhaseV1::Victory { .. }
         | GameOwnedPhaseV1::VictoryPresentation { .. }
         | GameOwnedPhaseV1::VictoryTail { .. }
+        | GameOwnedPhaseV1::RewardBegin { .. }
         | GameOwnedPhaseV1::AchievementClock { .. }
         | GameOwnedPhaseV1::FlashEgg { .. }
         | GameOwnedPhaseV1::FaintBegin { .. }
@@ -538,6 +549,8 @@ fn phase_transition(
 mod current_faint_transition;
 #[path = "current_victory_transition.rs"]
 mod current_victory_transition;
+#[path = "current_reward_transition.rs"]
+mod current_reward_transition;
 
 fn turn_step_transition(
     before: &GameStateV6,

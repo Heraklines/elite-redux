@@ -34,6 +34,7 @@ const M5_STATUS_DURATION_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:status-duration";
 const M5_VOLATILE_DURATION_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:volatile-duration";
+const CURRENT_REWARD_ID: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7:src/modifier/modifier-type.ts:PLAYER-reward-generation";
 const CURRENT_MOVE_TARGET_ID: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7:src/data/moves/move-utils.ts:getMoveTargets:RANDOM_NEAR_ENEMY";
 const M5_RANDOM_TARGET_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-target";
@@ -107,6 +108,8 @@ impl RngCallsiteId {
     pub fn battle_seed_character() -> Self {
         Self(BATTLE_SEED_CHARACTER_ID.to_owned())
     }
+
+    pub fn current_reward_generation() -> Self { Self(CURRENT_REWARD_ID.to_owned()) }
 
     pub fn current_move_target() -> Self {
         Self(CURRENT_MOVE_TARGET_ID.to_owned())
@@ -502,6 +505,7 @@ fn validate_stream_state(stream: RngStream, state: &RngAuditState) -> Result<(),
 
 fn callsite_spec(value: &str) -> Option<(RngReason, u8)> {
     match value {
+        CURRENT_REWARD_ID => Some((RngReason::RandomSelector, stream_bit(RngStream::Run))),
         BATTLE_SEED_CHARACTER_ID => Some((
             RngReason::BattleSeedCharacter,
             stream_bit(RngStream::Run) | stream_bit(RngStream::SeedOffset),

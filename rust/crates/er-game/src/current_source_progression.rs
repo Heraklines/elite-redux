@@ -40,7 +40,7 @@ pub(crate) fn current_source_progression<'a>(
         .and_then(|owner| owner.experience.as_ref())
         .ok_or_else(failure)?;
     let source = experience.source_progression.as_ref().ok_or_else(failure)?;
-    if !source.valid(run)
+    if !source.valid(run) || !source.turn_progress.as_ref().is_some_and(|progress| progress.valid(run) && progress.turn == battle.turn)
         || source.profile_owner != profile.owner_seat
         || profile.content_identity != state.content_identity
         || state.content_identity != *content.identity()

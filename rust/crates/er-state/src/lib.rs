@@ -48,3 +48,6 @@ pub mod current_source_progression;
 
 pub mod current_egg_account;
 pub mod current_random_target_commands;
+
+pub mod current_reward_run;
+pub mod current_reward_selection;

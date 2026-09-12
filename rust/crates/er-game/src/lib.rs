@@ -53,8 +53,22 @@ pub(crate) mod current_initial_victory_tail;
 pub(crate) mod current_level_account;
 pub(crate) mod current_level_dispatch;
 pub(crate) mod current_source_progression;
+mod current_source_turn_progress;
 pub(crate) mod current_victory_pump;
 pub(crate) mod current_victory_start;
 
 pub(crate) mod current_initial_battle;
 pub mod current_random_target_admission;
+
+pub(crate) mod current_reward_common;
+pub(crate) mod current_reward_great;
+pub(crate) mod current_reward_ultra;
+pub(crate) mod current_reward_high;
+pub(crate) mod current_reward_pool;
+pub(crate) mod current_reward_tuning;
+pub(crate) mod current_reward_metadata;
+pub(crate) mod current_reward_first_pool;
+pub(crate) mod current_reward_selection;
+pub(crate) mod current_reward_healing;
+pub(crate) mod current_reward_roll;
+pub(crate) mod current_reward_generators;

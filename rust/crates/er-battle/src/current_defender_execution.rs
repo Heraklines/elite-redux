@@ -226,6 +226,20 @@ pub(super) fn execute(
                 let recoil = (actor.max_hp / 4).max(u32::from(total_damage > 0));
                 actor.hp = actor.hp.saturating_sub(recoil);
                 actor.fainted = actor.hp == 0;
+                // The source achievement hook receives actual clamped damage
+                // after damage(), before PostDamage callbacks and recoil text.
+                if let Some(events) = input.source_events.as_deref_mut() {
+                    events.push(CurrentBattleSourceEventV1::StruggleRecoilDamage {
+                        user: actor.id,
+                        source_slot: input.source_slot,
+                        move_id: input.definition.id,
+                        requested_damage: recoil,
+                        damage: before - actor.hp,
+                        hp_before: before,
+                        hp_after: actor.hp,
+                        max_hp: actor.max_hp,
+                    });
+                }
                 mutations.push(BattleMutation::HpChanged {
                     pokemon: actor.id,
                     before,
@@ -236,6 +250,8 @@ pub(super) fn execute(
                     before,
                     after: actor.hp,
                 });
+                // Source recoil text is a child before the deferred Faint phase.
+                presentation.push(BattlePresentationCueV5::RecoilMessage { pokemon: actor.id });
                 if actor.fainted {
                     presentation.push(BattlePresentationCueV5::Fainted { pokemon: actor.id });
                 }

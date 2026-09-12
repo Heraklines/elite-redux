@@ -12,9 +12,17 @@ pub struct CurrentInitialVictoryTailV1 {
     /// Exact selected actions, including the suffix source removes from its queue.
     /// Retaining these is not an assertion that the suffix executed.
     pub original_turn: Box<CurrentTurnExecutionV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_random_target: Option<Box<CurrentInitialRandomTargetPreimageV1>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_rng: Option<Box<CurrentInitialTurnRngPreimageV1>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_turn_progress: Option<Box<crate::current_source_progression::CurrentSourceTurnProgressV1>>,
     pub cancelled_from: u8,
     pub cancelled_to: u8,
     pub phase: CurrentInitialVictoryTailPhaseV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reward: Option<Box<crate::current_reward_selection::CurrentRewardSelectionV1>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flash: Option<crate::current_achievement_execution::CurrentFlashAchievementExecutionV1>,
 }
@@ -31,7 +39,8 @@ pub enum CurrentInitialVictoryTailPhaseV1 {
         xp_endpoint: Vec<CurrentExperienceRecipientV1>,
         field_turns: Vec<CurrentFieldTurnCountV1>,
     },
-    /// Empty solo EggLapse completed; actual modifier choices are not generated.
+    /// Solo EggLapse completed. The separate reward receipt owns generation,
+    /// selection and application without replacing this XP/turn endpoint.
     RewardSelectionPending {
         xp_endpoint: Vec<CurrentExperienceRecipientV1>,
         field_turns: Vec<CurrentFieldTurnCountV1>,
@@ -85,4 +94,20 @@ impl CurrentInitialVictoryTailV1 {
                 | CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { .. }
         )
     }
+}
+
+/// Retained at tail claim and used only to project the historical action frontier.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentInitialRandomTargetPreimageV1 {
+    pub commands: crate::current_random_target_commands::CurrentRandomTargetCommandsV1,
+    pub run_rng: er_rng::phaser::RunRngState,
+    pub battle_rng: er_rng::battle::BattleRngState,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentInitialTurnRngPreimageV1 {
+    pub run_rng: er_rng::phaser::RunRngState,
+    pub battle_rng: er_rng::battle::BattleRngState,
 }

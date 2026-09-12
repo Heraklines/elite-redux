@@ -510,6 +510,15 @@ fn apply_to_validated_ledger(
         .validate_with(content)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     validate_presentation_frontier(live.as_ref(), transition)?;
+    let owned_reward = matches!(transition.accepted_action, Some(GameActionV1::Reward { .. }))
+        && live.as_ref().and_then(|state| state.current_battle_participation.as_ref())
+            .and_then(|owner| owner.experience.as_ref())
+            .is_some_and(|owner| owner.source_progression.is_some());
+    if owned_reward {
+        crate::m9e_runtime_v6::validate_current_reward_transition(
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?, content, transition,
+        ).map_err(|_| GameMaterialV6Error::Invalid)?;
+    }
     let owned_learning = matches!(
         transition.accepted_action,
         Some(GameActionV1::CurrentLearnMoveBatch { .. })
@@ -524,6 +533,7 @@ fn apply_to_validated_ledger(
     }
     if transition.owned_phase.is_none()
         && !owned_learning
+        && !owned_reward
         && live
             .as_ref()
             .and_then(|state| state.current_battle_participation.as_ref())
@@ -616,7 +626,7 @@ fn apply_to_validated_ledger(
             .as_ref()
             .and_then(|owner| owner.experience.as_ref())
             .ok_or(GameMaterialV6Error::Invalid)?;
-        if transition.owned_phase.is_none() && !owned_learning {
+        if transition.owned_phase.is_none() && !owned_learning && !owned_reward {
             prior
                 .validate_successor(next)
                 .map_err(|_| GameMaterialV6Error::Invalid)?;

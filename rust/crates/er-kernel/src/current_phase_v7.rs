@@ -251,7 +251,20 @@ impl GameKernelV7 {
             }
             use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
             if matches!(&tail.phase, T::RewardSelectionPending { .. }) {
-                // Retain the explicit pending source boundary; do not restart or grant a reward.
+                if tail.reward.is_none() {
+                    if self.pending_current_phase_ack.is_some() {
+                        return Err(GameKernelV7Error::Invalid);
+                    }
+                    let phase = GameOwnedPhaseV1::RewardBegin {
+                        pending: pending.id,
+                        menu_instance: self.next_menu_instance_id,
+                    };
+                    let step = self.execute_owned_phase(phase)?;
+                    output.effects.extend(step.effects);
+                    output.internal_events.extend(step.internal_events);
+                }
+                // Choices wait for physical input. Applied receipts remain owned
+                // until the subsequent encounter has its own causal transition.
                 return Ok(());
             }
             if matches!(

@@ -71,6 +71,26 @@ pub(crate) fn fold_current_achievement_action(
     let run = before.active_run.as_ref().ok_or_else(failure)?;
     let targeting = er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
         .map_err(|_| failure())?;
+    if before.current_turn_execution.as_ref().is_some_and(|turn| {
+        usize::from(turn.next_action) == turn.actions.len()
+    }) {
+        // The current finalizer only advances/clears the turn. FreshComplete
+        // cannot silently omit actual residual or PostTurn callbacks.
+        let battle = run.battle.as_ref().ok_or_else(failure)?;
+        for pokemon in run.party.iter().chain(&battle.enemy_party) {
+            if pokemon.status.kind != er_types::battle_model::StatusKind::None
+                || pokemon.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
+                || battle.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
+                || targeting.ability_sources(run, pokemon).map_err(|_| failure())?.iter().any(|source| {
+                    matches!(source, er_types::BehaviorSourceId::ActiveAbility { numeric_id }
+                        | er_types::BehaviorSourceId::PassiveAbility { numeric_id } if numeric_id.get() == 5082)
+                }) {
+                return Err(GameRuntimeV6Error::Domain(
+                    "current TurnFinish requires owned residual or PostTurn execution".to_owned(),
+                ));
+            }
+        }
+    }
     for event in events {
         if let CurrentBattleSourceEventV1::MoveResolution { user, move_id, .. } = event {
             let actor = member(run, *user)?;
@@ -91,9 +111,26 @@ pub(crate) fn fold_current_achievement_action(
                     "current move requires owned source status or stat effect execution".to_owned(),
                 ));
             }
-            targeting
-                .plan(run, actor.id, definition)
-                .map_err(|_| failure())?;
+            if move_id.get().get() == 165 {
+                let turn = before.current_turn_execution.as_ref().ok_or_else(failure)?;
+                let selected = turn.actions.get(usize::from(turn.next_action)).ok_or_else(failure)?;
+                let er_types::battle_command::BattleCommand::Fight { actor: selected_actor, move_slot, .. } = &selected.command else { return Err(failure()); };
+                let (effective, fallback) = er_battle::m7_resolver::effective_move_definition_v5(&content.battle, actor, *move_slot).map_err(|_| failure())?;
+                let owner = before.current_random_target_commands.as_ref().ok_or_else(failure)?;
+                owner.validate(run, Some(turn)).map_err(|_| failure())?;
+                let proof = owner.entries.iter().find(|entry| entry.command == selected.accepted).ok_or_else(failure)?;
+                if !fallback || effective.id != *move_id || *selected_actor != actor.id
+                    || selected.current_targets.as_deref() != Some(&[proof.selected]) {
+                    return Err(failure());
+                }
+                // Actual initialized registry plus complete attribute ancestry:
+                // no admitted recoil multiplier, PostDamage or BoobyTrap callback.
+                // Command ownership supplies the real earlier draw; this call only
+                // rechecks the admitted neutral context and never spends RNG.
+                targeting.random_command_candidates(run, actor.id, definition).map_err(|_| failure())?;
+            } else {
+                targeting.plan(run, actor.id, definition).map_err(|_| failure())?;
+            }
         }
     }
     fold_source_admitted_action(before, after, content, events, cues)
@@ -219,6 +256,12 @@ fn fold_source_admitted_action(
                         move_id,
                         ..
                     }
+                    | CurrentBattleSourceEventV1::StruggleRecoilDamage {
+                        user,
+                        source_slot,
+                        move_id,
+                        ..
+                    }
                     | CurrentBattleSourceEventV1::MoveDamage {
                         user,
                         source_slot,
@@ -300,6 +343,7 @@ impl ActionFold {
         let mut damage_cues = Vec::new();
         let mut resolution = None;
         let mut damaged = BTreeSet::new();
+        let mut recoil_seen = false;
         for event in events {
             match event {
                 CurrentBattleSourceEventV1::MoveResolution {
@@ -323,11 +367,11 @@ impl ActionFold {
                     if actor.fainted
                         || actor.hp == 0
                         || actor.hp > actor.max_hp
-                        || !actor
+                        || (move_id.get().get() != 165 && !actor
                             .moves
                             .iter()
                             .flatten()
-                            .any(|slot| slot.move_id == *move_id)
+                            .any(|slot| slot.move_id == *move_id))
                     {
                         return Err(failure());
                     }
@@ -382,7 +426,7 @@ impl ActionFold {
                     let (resolved_user, resolved_slot, resolved_move, targets) =
                         resolution.ok_or_else(failure)?;
                     let holder = at_slot(before, *target_slot, *target)?;
-                    if (resolved_user, resolved_slot, resolved_move)
+                    if recoil_seen || (resolved_user, resolved_slot, resolved_move)
                         != (*user, *source_slot, *move_id)
                         || *use_mode != CurrentMoveUseModeV1::Direct
                         || (*hit_count, *hits_left) != (1, 1)
@@ -430,10 +474,38 @@ impl ActionFold {
                         }
                     }
                 }
+                CurrentBattleSourceEventV1::StruggleRecoilDamage {
+                    user, source_slot, move_id, requested_damage, damage,
+                    hp_before, hp_after, max_hp,
+                } => {
+                    let (resolved_user, resolved_slot, resolved_move, targets) =
+                        resolution.ok_or_else(failure)?;
+                    let holder = at_slot(before, *source_slot, *user)?;
+                    let expected_request = (holder.max_hp / 4).max(u32::from(!damaged.is_empty()));
+                    if recoil_seen || (resolved_user, resolved_slot, resolved_move) != (*user, *source_slot, *move_id)
+                        || move_id.get().get() != 165
+                        || !targets.iter().any(|target| target.result == CurrentHitCheckV1::Hit)
+                        || hp.get(user) != Some(hp_before)
+                        || *hp_before == 0 || holder.max_hp != *max_hp
+                        || *requested_damage != expected_request
+                        || *damage != expected_request.min(*hp_before)
+                        || hp_before.checked_sub(*damage) != Some(*hp_after) {
+                        return Err(failure());
+                    }
+                    recoil_seen = true;
+                    hp.insert(*user, *hp_after);
+                    damage_cues.push((*user, *hp_before, *hp_after));
+                    if *damage > 0 {
+                        // RecoilAttr supplies no source Pokemon to damageAndUpdate.
+                        // This hook is neither a direct KO nor a longest-turn effect.
+                        self.record_damage_source(*user, "field:indirect".to_owned());
+                    }
+                }
             }
         }
         let mut damage_cursor = 0;
         let mut move_cues = 0;
+        let mut recoil_messages = 0;
         let mut switched = false;
         let mut healing_started = false;
         for cue in cues {
@@ -459,6 +531,14 @@ impl ActionFold {
                     }
                     damage_cursor += 1;
                 }
+                BattlePresentationCueV5::RecoilMessage { pokemon } => {
+                    let (user, _, move_id, _) = resolution.ok_or_else(failure)?;
+                    if !recoil_seen || *pokemon != user || move_id.get().get() != 165
+                        || damage_cursor != damage_cues.len() || recoil_messages != 0 {
+                        return Err(failure());
+                    }
+                    recoil_messages += 1;
+                }
                 BattlePresentationCueV5::AbilityHeal {
                     pokemon,
                     before: old,
@@ -467,7 +547,8 @@ impl ActionFold {
                 } => {
                     healing_started = true;
                     let holder = member(before, *pokemon)?;
-                    if damage_cursor != damage_cues.len()
+                    if recoil_messages != usize::from(recoil_seen)
+            || damage_cursor != damage_cues.len()
                         || hp.get(pokemon) != Some(old)
                         || new <= old
                         || *new > holder.max_hp
@@ -495,7 +576,8 @@ impl ActionFold {
                 _ => {}
             }
         }
-        if damage_cursor != damage_cues.len()
+        if recoil_messages != usize::from(recoil_seen)
+            || damage_cursor != damage_cues.len()
             || move_cues != usize::from(resolution.is_some())
             || after
                 .party
@@ -669,6 +751,10 @@ impl ActionFold {
     }
 
     fn damage_source(&mut self, target: PokemonId, user: PokemonId) {
+        self.record_damage_source(target, format!("move:{}", user.get().get()));
+    }
+
+    fn record_damage_source(&mut self, target: PokemonId, source: String) {
         let turn = self.turn;
         let state = self.state();
         if state.damage_source_turn != turn {
@@ -676,7 +762,7 @@ impl ActionFold {
             state.damage_sources_by_target.clear();
         }
         let sources = state.damage_sources_by_target.entry(target).or_default();
-        sources.insert(format!("move:{}", user.get().get()));
+        sources.insert(source);
         if sources.len() >= 4 {
             self.key("CHAIN_REACTION");
         }
