@@ -61,7 +61,10 @@ fn current_progress(descendant: &D) -> Option<AwardProgress<'_>> {
     })
 }
 
-pub(crate) fn validate_current_experience_progress(state: &GameStateV6, content: &PreparedGameContentV2) -> Result<(), GameRuntimeV6Error> {
+pub(crate) fn validate_current_experience_progress(
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<(), GameRuntimeV6Error> {
     if let Some(projected) = crate::current_initial_victory_tail::settled_projection(state)? {
         validate_current_experience_progress_at_frontier(&projected, content)
     } else {

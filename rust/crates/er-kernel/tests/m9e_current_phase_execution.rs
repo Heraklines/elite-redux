@@ -1016,31 +1016,59 @@ fn controlled_raw_initial_victory_tail_settles_once_and_retains_boundary() -> Re
     let mut kernel = Box::new(controlled_before_knockout(content.clone(), 5, &[33])?);
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
     for _ in 0..96 {
-        if assert_initial_tail_boundary(&mut kernel, content.clone())? { return Ok(()); }
+        if assert_initial_tail_boundary(&mut kernel, content.clone())? {
+            return Ok(());
+        }
         let snapshot = kernel.snapshot()?;
         for presentation in &snapshot.pending_presentations {
             kernel.settle_presentation(presentation.event_id)?;
         }
-        let step = if let Some(clock) = snapshot.pending_platform.iter().find(|p|
-            matches!(&p.effect, GamePlatformEffectV2::CurrentFriendshipClock { .. })) {
+        let step = if let Some(clock) = snapshot.pending_platform.iter().find(|p| {
+            matches!(
+                &p.effect,
+                GamePlatformEffectV2::CurrentFriendshipClock { .. }
+            )
+        }) {
             kernel.apply_current_utc_clock_result(clock.request_id, 0)?
-        } else { kernel.advance_time(SafeU53::ZERO)? };
+        } else {
+            kernel.advance_time(SafeU53::ZERO)?
+        };
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     }
     Err("initial owned TurnEnd/BattleEnd boundary not reached".into())
 }
 
 #[inline(never)]
-fn assert_initial_tail_boundary(kernel: &mut GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<bool> {
+fn assert_initial_tail_boundary(
+    kernel: &mut GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<bool> {
     use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
     let checkpoint = Box::new(kernel.snapshot()?);
     let state = active(&checkpoint)?;
-    let Some(tail) = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
-        .and_then(|o| o.pending.first()).and_then(|p| p.victory_tail.as_ref()) else { return Ok(false); };
+    let Some(tail) = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|p| p.experience.as_ref())
+        .and_then(|o| o.pending.first())
+        .and_then(|p| p.victory_tail.as_ref())
+    else {
+        return Ok(false);
+    };
     assert_eq!(tail.cancelled_from, tail.original_turn.next_action);
-    assert_eq!(usize::from(tail.cancelled_to), tail.original_turn.actions.len());
+    assert_eq!(
+        usize::from(tail.cancelled_to),
+        tail.original_turn.actions.len()
+    );
     assert!(!tail.original_turn.finalization_done);
-    let T::EggLapse { accounting, field_turns, .. } = &tail.phase else { return Ok(false); };
+    let T::EggLapse {
+        accounting,
+        field_turns,
+        ..
+    } = &tail.phase
+    else {
+        return Ok(false);
+    };
     assert_eq!(accounting.battles.get(), 1);
     assert_eq!(accounting.score, tail.faint.score_increase);
     assert_eq!(accounting.money_multiplier.get(), 1);
@@ -1049,22 +1077,47 @@ fn assert_initial_tail_boundary(kernel: &mut GameKernelV7, content: Arc<Prepared
     assert_eq!(field_turns[0].turn_count.get(), 1);
     assert_eq!(field_turns[0].wave_turn_count.get(), 1);
     assert!(state.current_turn_execution.is_none());
-    let battle = state.active_run.as_ref().and_then(|r| r.battle.as_ref()).ok_or("battle absent")?;
+    let battle = state
+        .active_run
+        .as_ref()
+        .and_then(|r| r.battle.as_ref())
+        .ok_or("battle absent")?;
     assert_eq!(battle.turn.get().get(), 2);
     assert!(battle.battle_rng.saved_substream.is_none());
     let frozen = canonical_bytes(state)?;
     let restored = restore(*checkpoint.clone(), content.clone())?;
-    assert_eq!(canonical_bytes(restored.state().ok_or("restored state absent")?)?, frozen);
+    assert_eq!(
+        canonical_bytes(restored.state().ok_or("restored state absent")?)?,
+        frozen
+    );
     for _ in 0..3 {
         let step = kernel.advance_time(SafeU53::ZERO)?;
-        assert!(!step.effects.iter().any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. })));
-        assert_eq!(canonical_bytes(kernel.state().ok_or("live state absent")?)?, frozen);
+        assert!(
+            !step
+                .effects
+                .iter()
+                .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. }))
+        );
+        assert_eq!(
+            canonical_bytes(kernel.state().ok_or("live state absent")?)?,
+            frozen
+        );
     }
     let mut forged = *checkpoint;
-    let GameKernelLifecycleSnapshotV7::Active(state) = &mut forged.lifecycle else { return Err("active state absent".into()); };
-    state.current_battle_participation.as_mut().and_then(|p| p.experience.as_mut())
-        .and_then(|o| o.pending.first_mut()).and_then(|p| p.victory_tail.as_mut())
-        .ok_or("tail absent")?.cancelled_to += 1;
-    assert!(restore(forged, content).is_err(), "retained cancelled suffix must bind its exact original action list");
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut forged.lifecycle else {
+        return Err("active state absent".into());
+    };
+    state
+        .current_battle_participation
+        .as_mut()
+        .and_then(|p| p.experience.as_mut())
+        .and_then(|o| o.pending.first_mut())
+        .and_then(|p| p.victory_tail.as_mut())
+        .ok_or("tail absent")?
+        .cancelled_to += 1;
+    assert!(
+        restore(forged, content).is_err(),
+        "retained cancelled suffix must bind its exact original action list"
+    );
     Ok(true)
 }

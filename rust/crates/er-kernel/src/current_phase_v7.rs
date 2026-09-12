@@ -200,7 +200,10 @@ impl GameKernelV7 {
         let Some(state) = runtime.state() else {
             return Ok(());
         };
-        if let Some(pending) = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
+        if let Some(pending) = state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|p| p.experience.as_ref())
             .and_then(|o| o.pending.first())
         {
             if let Some(tail) = &pending.victory_tail {
@@ -210,8 +213,12 @@ impl GameKernelV7 {
                     return Ok(());
                 }
                 if matches!(&tail.phase, T::TurnSettlement { .. } | T::BattleEnd { .. }) {
-                    if self.pending_current_phase_ack.is_some() { return Err(GameKernelV7Error::Invalid); }
-                    let phase = GameOwnedPhaseV1::VictoryTail { pending: pending.id };
+                    if self.pending_current_phase_ack.is_some() {
+                        return Err(GameKernelV7Error::Invalid);
+                    }
+                    let phase = GameOwnedPhaseV1::VictoryTail {
+                        pending: pending.id,
+                    };
                     let step = self.execute_owned_phase(phase)?;
                     output.effects.extend(step.effects);
                     output.internal_events.extend(step.internal_events);

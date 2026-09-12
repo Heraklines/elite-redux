@@ -1,9 +1,9 @@
 //! Source-addressed first-wave tail; retained independently of a live turn.
-use serde::{Deserialize, Serialize};
-use er_types::{SafeU53, battle_ids::PokemonId};
 use crate::current_experience_owner::CurrentExperienceRecipientV1;
 use crate::current_faint_execution::CurrentFaintAddressV1;
 use crate::current_turn_execution::CurrentTurnExecutionV1;
+use er_types::{SafeU53, battle_ids::PokemonId};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -22,8 +22,13 @@ pub struct CurrentInitialVictoryTailV1 {
 pub enum CurrentInitialVictoryTailPhaseV1 {
     /// Win-site predicates were observed before the queued XP children executed.
     Claimed,
-    TurnSettlement { xp_endpoint: Vec<CurrentExperienceRecipientV1> },
-    BattleEnd { xp_endpoint: Vec<CurrentExperienceRecipientV1>, field_turns: Vec<CurrentFieldTurnCountV1> },
+    TurnSettlement {
+        xp_endpoint: Vec<CurrentExperienceRecipientV1>,
+    },
+    BattleEnd {
+        xp_endpoint: Vec<CurrentExperienceRecipientV1>,
+        field_turns: Vec<CurrentFieldTurnCountV1>,
+    },
     /// This is a real post-BattleEnd state, not a reward or next-wave grant.
     EggLapse {
         xp_endpoint: Vec<CurrentExperienceRecipientV1>,
@@ -62,7 +67,10 @@ impl CurrentInitialVictoryTailV1 {
     }
 
     pub fn turn_is_settled(&self) -> bool {
-        matches!(&self.phase, CurrentInitialVictoryTailPhaseV1::BattleEnd { .. }
-            | CurrentInitialVictoryTailPhaseV1::EggLapse { .. })
+        matches!(
+            &self.phase,
+            CurrentInitialVictoryTailPhaseV1::BattleEnd { .. }
+                | CurrentInitialVictoryTailPhaseV1::EggLapse { .. }
+        )
     }
 }

@@ -13,7 +13,7 @@ use er_state::current_turn_execution::CurrentTurnStageV1;
 use er_state::m7_state::{PokemonStateV5, RunStateV3};
 use er_state::m9e_state_v6::GameStateV6;
 use er_types::battle_ids::{BattleSide, FieldSlot, MoveId, PokemonId, TurnIndex, WaveIndex};
-use er_types::battle_model::MoveCategory;
+use er_types::battle_model::{MoveCategory, MovePower};
 
 use crate::m9e_content_v2::PreparedGameContentV2;
 use crate::m9e_runtime_v6::GameRuntimeV6Error;
@@ -78,6 +78,16 @@ pub(crate) fn fold_current_achievement_action(
                 .battle
                 .move_definition(*move_id)
                 .map_err(|_| failure())?;
+            if matches!(definition.category, MoveCategory::Status)
+                || matches!(definition.power, MovePower::None)
+            {
+                // The current resolver records status hit checks but does not
+                // execute the owned source effect/callback. A complete history
+                // cannot certify this as a successful no-op move.
+                return Err(GameRuntimeV6Error::Domain(
+                    "current status move requires owned source effect execution".to_owned(),
+                ));
+            }
             targeting
                 .plan(run, actor.id, definition)
                 .map_err(|_| failure())?;

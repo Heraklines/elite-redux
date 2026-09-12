@@ -307,7 +307,14 @@ fn phase_transition(
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
     if matches!(phase, GameOwnedPhaseV1::VictoryTail { .. }) {
-        return current_victory_transition::transition(before, content, operation_id, authority_seat, revision, phase);
+        return current_victory_transition::transition(
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
+        );
     }
     let turn = before
         .current_turn_execution
