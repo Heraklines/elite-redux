@@ -101,7 +101,9 @@ impl<'a> CurrentTargetExecution<'a> {
         Ok(value)
     }
 
-    pub(crate) fn source_damage(&self) -> bool { self.source_damage }
+    pub(crate) fn source_damage(&self) -> bool {
+        self.source_damage
+    }
 
     pub fn validate_run(&self, run: &RunStateV3) -> Result<(), CurrentTargetExecutionError> {
         if run.run_id != self.owner.run_id || run.mode != self.owner.mode {
@@ -109,9 +111,13 @@ impl<'a> CurrentTargetExecution<'a> {
         }
         let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
         if self.source_damage
-            && (self.owner.origin != er_state::current_targeting::CurrentTargetingOriginV1::FreshNormalClassic
-                || battle.format.player_capacity != 1 || battle.format.enemy_capacity != 1)
-        { return Err(CurrentTargetExecutionError); }
+            && (self.owner.origin
+                != er_state::current_targeting::CurrentTargetingOriginV1::FreshNormalClassic
+                || battle.format.player_capacity != 1
+                || battle.format.enemy_capacity != 1)
+        {
+            return Err(CurrentTargetExecutionError);
+        }
         if !matches!(
             (battle.format.player_capacity, battle.format.enemy_capacity),
             (1, 1) | (2, 2)

@@ -215,25 +215,47 @@ impl GameStateV6 {
             return Err(GameStateV6Error::Invalid);
         }
         self.identities.validate_against(self.active_run.as_ref())?;
-        if let Some(experience)=self.current_battle_participation.as_ref().and_then(|owner|owner.experience.as_ref()) {
-            let inventory=experience.source_progression.as_ref().and_then(|source|source.reward_run.as_ref());
-            let receipts=experience.pending.iter().filter_map(|pending|pending.victory_tail.as_ref())
-                .filter_map(|tail|tail.reward.as_deref()).collect::<Vec<_>>();
-            if let Some(source)=experience.source_progression.as_ref(){
+        if let Some(experience) = self
+            .current_battle_participation
+            .as_ref()
+            .and_then(|owner| owner.experience.as_ref())
+        {
+            let inventory = experience
+                .source_progression
+                .as_ref()
+                .and_then(|source| source.reward_run.as_ref());
+            let receipts = experience
+                .pending
+                .iter()
+                .filter_map(|pending| pending.victory_tail.as_ref())
+                .filter_map(|tail| tail.reward.as_deref())
+                .collect::<Vec<_>>();
+            if let Some(source) = experience.source_progression.as_ref() {
                 for row in &source.party {
-                    let tm=receipts.iter().filter_map(|r|r.tm.as_deref()).find(|tm|tm.holder==row.pokemon);
-                    let expected=match tm {
-                        None=>row.used_tms.as_ref().is_none_or(|h|matches!(h,crate::current_reward_tm::CurrentUsedTmsV1::Undefined)),
-                        Some(tm)=>{
+                    let tm = receipts
+                        .iter()
+                        .filter_map(|r| r.tm.as_deref())
+                        .find(|tm| tm.holder == row.pokemon);
+                    let expected = match tm {
+                        None => row.used_tms.as_ref().is_none_or(|h| {
+                            matches!(h, crate::current_reward_tm::CurrentUsedTmsV1::Undefined)
+                        }),
+                        Some(tm) => {
                             use crate::current_reward_tm::CurrentUsedTmsV1 as H;
-                            let history=if tm.phase.applied(){H::Undefined.append(tm.movement)}else{Some(H::Undefined)};
-                            tm.history_before==H::Undefined&&row.used_tms==history
+                            let history = if tm.phase.applied() {
+                                H::Undefined.append(tm.movement)
+                            } else {
+                                Some(H::Undefined)
+                            };
+                            tm.history_before == H::Undefined && row.used_tms == history
                         }
                     };
-                    if !expected{return Err(GameStateV6Error::Invalid);}
+                    if !expected {
+                        return Err(GameStateV6Error::Invalid);
+                    }
                 }
             }
-            if !crate::current_reward_selection::initial_inventory_valid(inventory,&receipts) {
+            if !crate::current_reward_selection::initial_inventory_valid(inventory, &receipts) {
                 return Err(GameStateV6Error::Invalid);
             }
         }

@@ -136,9 +136,14 @@ pub fn construct_natural_run_v6(
         {
             return Err(NaturalRunV6Error::State(format!(
                 "initial current constructor admission: mode={}, cooperative={}, challenge_selection={}, supported={}, choices={}, owner_match={}, content_match={}, biome={}, trainer_denominator={}, difficulty={difficulty:?}",
-                mode.key, mode.cooperative, mode.challenge_selection, mode.supported,
-                bootstrap.selections.choices.len(), shared.owner_seat == owner,
-                shared.content_identity == *content.identity(), biome.key,
+                mode.key,
+                mode.cooperative,
+                mode.challenge_selection,
+                mode.supported,
+                bootstrap.selections.choices.len(),
+                shared.owner_seat == owner,
+                shared.content_identity == *content.identity(),
+                biome.key,
                 biome.trainer_chance_denominator,
             )));
         }
@@ -442,10 +447,14 @@ fn install_source_progression(
         configuration: CurrentSourceConfigurationV1::FreshOrdinaryClassic399d,
         initial_battle: battle.battle_id,
         initial_wave: run.wave,
-        reward_run: Some(er_state::current_reward_run::CurrentRewardRunV1::fresh_ordinary_with_startup_map()),
+        reward_run: Some(
+            er_state::current_reward_run::CurrentRewardRunV1::fresh_ordinary_with_startup_map(),
+        ),
         initial_faint: er_state::current_faint_execution::CurrentInitialEnemyFaintV1::fresh(),
-        turn_progress: Some(er_state::current_source_progression::CurrentSourceTurnProgressV1::fresh(run)
-            .ok_or(NaturalRunV6Error::Invalid)?),
+        turn_progress: Some(
+            er_state::current_source_progression::CurrentSourceTurnProgressV1::fresh(run)
+                .ok_or(NaturalRunV6Error::Invalid)?,
+        ),
         party,
         initial_enemy: CurrentSourceInitialEnemyV1 {
             pokemon: battle.enemy_party[0].id,

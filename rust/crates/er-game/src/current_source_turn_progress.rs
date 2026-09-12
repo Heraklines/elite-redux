@@ -65,6 +65,7 @@ pub(crate) fn fold(
                 .any(|slot| slot.occupant == Some(row.pokemon))
             {
                 row.damage_taken = SafeU53::ZERO;
+                row.stat_stages_decreased = false;
                 row.last_reset_turn = battle.turn;
             }
         }
@@ -80,7 +81,7 @@ pub(crate) fn fold(
     } else {
         for event in events {
             let (pokemon, amount) = match event {
-                CurrentBattleSourceEventV1::MoveResolution { .. } => continue,
+                CurrentBattleSourceEventV1::MoveResolution { .. } | CurrentBattleSourceEventV1::StatStageChangeQueued { .. } => continue,
                 CurrentBattleSourceEventV1::MoveDamage { target, damage, .. } => (*target, *damage),
                 CurrentBattleSourceEventV1::StruggleRecoilDamage {
                     user,
@@ -128,6 +129,7 @@ pub(crate) fn fold(
                 incoming.turn_count = SafeU53::ZERO;
                 incoming.wave_turn_count = SafeU53::ZERO;
                 incoming.damage_taken = SafeU53::ZERO;
+                incoming.stat_stages_decreased = false;
                 incoming.last_reset_turn = battle.turn;
             }
         }

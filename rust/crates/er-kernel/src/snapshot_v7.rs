@@ -91,6 +91,8 @@ pub struct PendingVictoryAckV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CurrentPhasePresentationKindV1 {
+    StatAnimation,
+    StatMessage,
     RewardTm,
     Victory,
     FaintAnimation,
@@ -709,9 +711,18 @@ pub(crate) fn state_menu_instance_high_water(state: &GameStateV6) -> Option<Menu
         .and_then(|participation| participation.experience.as_ref())
     {
         for pending in &owner.pending {
-            if let Some(reward) = pending.victory_tail.as_ref().and_then(|tail| tail.reward.as_ref()) {
-                for tm in reward.declined_tms.iter().chain(reward.tm.iter().map(Box::as_ref)) {
-                    maximum = Some(maximum.map_or(tm.menu_instance, |value| value.max(tm.menu_instance)));
+            if let Some(reward) = pending
+                .victory_tail
+                .as_ref()
+                .and_then(|tail| tail.reward.as_ref())
+            {
+                for tm in reward
+                    .declined_tms
+                    .iter()
+                    .chain(reward.tm.iter().map(Box::as_ref))
+                {
+                    maximum =
+                        Some(maximum.map_or(tm.menu_instance, |value| value.max(tm.menu_instance)));
                 }
             }
         }
@@ -721,8 +732,13 @@ pub(crate) fn state_menu_instance_high_water(state: &GameStateV6) -> Option<Menu
 fn next_menu_instance_from_v6(
     source: &RestorableKernelSnapshotV6,
 ) -> Result<MenuInstanceId, SnapshotV7Error> {
-    let mut maximum = state_menu_instance_high_water(&source.game_state)
-        .map(|instance| instance.get())
+    // Historical kernel V6 carries GameStateV5, before retained current TM owners.
+    let mut maximum = source
+        .game_state
+        .active_run
+        .as_ref()
+        .and_then(|run| run.control.menu.as_ref())
+        .map(|menu| menu.instance_id.get())
         .unwrap_or(SafeU53::ZERO);
     for candidate in source
         .input_router

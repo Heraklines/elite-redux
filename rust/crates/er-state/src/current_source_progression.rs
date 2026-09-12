@@ -92,6 +92,10 @@ impl CurrentSourceProgressionV1 {
     }
 }
 
+fn source_flag_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Actual PokemonTempSummonData/PokemonTurnData fields owned since construction.
 /// They are never reconstructed from battle.turn after a switch or restore.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -101,6 +105,8 @@ pub struct CurrentSourcePokemonTurnsV1 {
     pub turn_count: er_types::SafeU53,
     pub wave_turn_count: er_types::SafeU53,
     pub damage_taken: er_types::SafeU53,
+    #[serde(default, skip_serializing_if = "source_flag_false")]
+    pub stat_stages_decreased: bool,
     pub last_reset_turn: er_types::battle_ids::TurnIndex,
 }
 
@@ -122,7 +128,7 @@ impl CurrentSourceTurnProgressV1 {
             battle: battle.battle_id, wave: battle.wave, turn: battle.turn,
             pokemon: run.party.iter().chain(&battle.enemy_party).map(|pokemon| CurrentSourcePokemonTurnsV1 {
                 pokemon: pokemon.id, turn_count: one, wave_turn_count: one,
-                damage_taken: er_types::SafeU53::ZERO, last_reset_turn: battle.turn,
+                damage_taken: er_types::SafeU53::ZERO, stat_stages_decreased: false, last_reset_turn: battle.turn,
             }).collect(),
         })
     }

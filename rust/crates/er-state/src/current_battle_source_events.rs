@@ -61,6 +61,8 @@ pub enum CurrentBattleSourceEventV1 {
         hit_count: u8,
         hits_left: u8,
     },
+    /// Actual successful Growl POST_APPLY queues a child without changing stages.
+    StatStageChangeQueued { user: PokemonId, source_slot: FieldSlot, target: PokemonId, target_slot: FieldSlot, move_id: MoveId, stat: u8, before: i8, stages: i8 },
     /// Pinned RecoilAttr -> damageAndUpdate without a source Pokemon.
     /// This records the actual indirect HP seam; full callback qualification
     /// remains a separate requirement of the FreshComplete source wrapper.

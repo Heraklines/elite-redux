@@ -3,7 +3,7 @@
 use er_types::battle_command::{AcceptedBattleCommand, BattleCommand, CommandSet};
 use er_types::battle_ids::{BattleId, FieldSlot, MoveId, PokemonId, TurnIndex, WaveIndex};
 use er_types::run_ids::GameRunId;
-use er_types::{SafeU53, SeatId};
+use er_types::{PresentationEventId, SafeU53, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -50,6 +50,66 @@ pub enum CurrentTurnStageV1 {
     Complete,
 }
 
+/// Exact queued Growl child, produced by the action's POST_APPLY source hook.
+/// A presentation receipt records issuance; only the separately retained
+/// physical callback may advance this owner.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
+pub enum CurrentStatStageChildPhaseV1 {
+    Ready,
+    Animation { event_id: PresentationEventId },
+    Message { event_id: PresentationEventId },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentStatStageChildV1 {
+    pub action_index: u8,
+    pub source: PokemonId,
+    pub target: PokemonId,
+    pub target_slot: FieldSlot,
+    pub move_id: MoveId,
+    /// Pinned Stat.ATK only; retaining it rejects fabricated other-stat children.
+    pub stat: u8,
+    pub before: i8,
+    pub stages: i8,
+    pub phase: CurrentStatStageChildPhaseV1,
+}
+
+impl CurrentStatStageChildV1 {
+    pub fn after(&self) -> i8 {
+        self.before.saturating_add(self.stages).clamp(-6, 6)
+    }
+
+    fn valid(&self, owner: &CurrentTurnExecutionV1, run: &RunStateV3) -> bool {
+        let Some(battle) = &run.battle else { return false; };
+        let Some(action) = owner.actions.get(usize::from(self.action_index)) else { return false; };
+        let Some(target) = run.party.iter().chain(&battle.enemy_party).find(|pokemon| pokemon.id == self.target) else { return false; };
+        let BattleCommand::Fight { move_slot, .. } = action.command else { return false; };
+        let Some(source) = run.party.iter().chain(&battle.enemy_party).find(|pokemon| pokemon.id == self.source) else { return false; };
+        let expected = match self.phase {
+            CurrentStatStageChildPhaseV1::Ready | CurrentStatStageChildPhaseV1::Animation { .. } => self.before,
+            CurrentStatStageChildPhaseV1::Message { .. } => self.after(),
+        };
+        !owner.finalization_done
+            && matches!(owner.stage, CurrentTurnStageV1::ReadyForMove)
+            && self.action_index.checked_add(1) == Some(owner.next_action)
+            && action.command.actor() == self.source
+            && self.source != self.target
+            && self.move_id.get().get() == 45
+            && self.stat == 1 && self.stages == -1 && (-6..=6).contains(&self.before)
+            && source.moves[usize::from(move_slot.get())].as_ref().is_some_and(|slot| slot.move_id == self.move_id)
+            && target.hp > 0 && !target.fainted && target.stat_stages.attack == expected
+            && action.current_targets.as_ref().is_some_and(|slots| slots == &[self.target_slot])
+            && battle.field.slots.iter().any(|row| row.slot == self.target_slot && row.occupant == Some(self.target))
+            && match self.phase {
+                CurrentStatStageChildPhaseV1::Animation { .. } => self.before > -6,
+                CurrentStatStageChildPhaseV1::Message { .. } => true,
+                CurrentStatStageChildPhaseV1::Ready => true,
+            }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CurrentTurnExecutionV1 {
@@ -68,6 +128,8 @@ pub struct CurrentTurnExecutionV1 {
     pub next_faint_sequence: SafeU53,
     pub finalization_done: bool,
     pub stage: CurrentTurnStageV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stat_child: Option<Box<CurrentStatStageChildV1>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
@@ -144,6 +206,9 @@ impl CurrentTurnExecutionV1 {
                 || (pair[0].priority == pair[1].priority
                     && pair[0].effective_speed < pair[1].effective_speed)
         }) {
+            return Err(CurrentTurnExecutionError);
+        }
+        if self.stat_child.as_ref().is_some_and(|child| !child.valid(self, run)) {
             return Err(CurrentTurnExecutionError);
         }
         match &self.stage {

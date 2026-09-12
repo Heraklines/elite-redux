@@ -58,6 +58,10 @@ pub(super) fn execute(
             }
             continue;
         }
+        if input.targeting.source_damage() && input.definition.id.get().get()==45
+            && input.targeting.ability_sources(run,target).map_err(|_|BattleV5Error::UnsupportedContent)?.iter().any(|source|
+                matches!(source,BehaviorSourceId::ActiveAbility{numeric_id}|BehaviorSourceId::PassiveAbility{numeric_id} if numeric_id.get()==172))
+        {return Err(BattleV5Error::UnsupportedContent);}
         let absorb = pre_hit_absorb(
             input.targeting,
             run,
@@ -147,7 +151,10 @@ pub(super) fn execute(
                     input.definition,
                     input.actor,
                     &target,
-                    DamagePolicy { critical, current_source: input.targeting.source_damage() },
+                    DamagePolicy {
+                        critical,
+                        current_source: input.targeting.source_damage(),
+                    },
                     rng,
                 )?;
                 let damage = calculated.damage;
@@ -194,6 +201,16 @@ pub(super) fn execute(
                         hits_left: 1,
                     });
                 }
+                if input.targeting.source_damage() && input.definition.id.get().get()==45 && !target.fainted {
+                    // Source actual POST_APPLY chance100, after real damage and
+                    // only for a surviving target. Queue ownership is an event;
+                    // it does not apply the stat before its animation callback.
+                    source_events.as_deref_mut().ok_or(BattleV5Error::UnsupportedContent)?.push(
+                        CurrentBattleSourceEventV1::StatStageChangeQueued {
+                            user:input.actor.id,source_slot:input.source_slot,target:holder,target_slot,move_id:input.definition.id,
+                            stat:1,before:target.stat_stages.attack,stages:-1,
+                        });
+                }
                 total_damage = total_damage
                     .checked_add(u64::from(damage_dealt))
                     .ok_or(BattleV5Error::Overflow)?;
@@ -228,7 +245,7 @@ pub(super) fn execute(
                 actor.fainted = actor.hp == 0;
                 // The source achievement hook receives actual clamped damage
                 // after damage(), before PostDamage callbacks and recoil text.
-                if let Some(events) = source_events {
+                if let Some(events) = source_events.as_deref_mut() {
                     events.push(CurrentBattleSourceEventV1::StruggleRecoilDamage {
                         user: actor.id,
                         source_slot: input.source_slot,
@@ -287,7 +304,17 @@ pub(super) fn execute(
     }
     let after_move = execute_hook_v2(input.content, input.mechanics, MechanicHookV2::AfterMove)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
-    mechanics_evidence.extend(after_move.operations);
+    let stat_tail=source_events.as_ref().is_some_and(|events|events.iter().any(|event|
+        matches!(event,CurrentBattleSourceEventV1::StatStageChangeQueued{..})));
+    if stat_tail {
+        // The child retains unfinished MoveEnd. Only a proved neutral tail is
+        // admitted here; the matching message callback executes its completion.
+        if after_move.operations.iter().any(|effect|effect.condition_matched) {
+            return Err(BattleV5Error::UnsupportedContent);
+        }
+    } else {
+        mechanics_evidence.extend(after_move.operations);
+    }
     Ok(if hit_any {
         ActionDisposition::Executed
     } else if missed {

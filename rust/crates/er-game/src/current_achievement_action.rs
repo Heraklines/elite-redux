@@ -102,9 +102,7 @@ pub(crate) fn fold_current_achievement_action(
                 .map_err(|_| failure())?;
             if matches!(definition.category, MoveCategory::Status)
                 || matches!(definition.power, MovePower::None)
-                // Pinned ER Growl is a damaging move with StatStageChangeAttr.
-                // Category alone cannot prove its queued stat child executed.
-                || move_id.get().get() == 45
+
             {
                 // The current resolver records status hit checks but does not
                 // execute the owned source effect/callback. A complete history
@@ -287,6 +285,7 @@ fn fold_source_admitted_action(
                         move_id,
                         ..
                     }
+                    | CurrentBattleSourceEventV1::StatStageChangeQueued { user,source_slot,move_id,.. }
                     | CurrentBattleSourceEventV1::StruggleRecoilDamage {
                         user,
                         source_slot,
@@ -330,6 +329,7 @@ fn fold_source_admitted_action(
         }
         (None, None) => return Err(failure()),
     }
+    validate_stat_child(before, after, events)?;
     fold.action(run, next_run, content, events, cues)?;
     if !fold.tracker.valid(next_run) {
         return Err(failure());
@@ -337,6 +337,42 @@ fn fold_source_admitted_action(
     Ok((fold.tracker, fold.keys))
 }
 
+/// Only the actual POST_APPLY event may introduce the retained child. An absent
+/// child is equally meaningful: KO, MISS and immunity must never fabricate one.
+fn validate_stat_child(
+    before: &GameStateV6,
+    after: &GameStateV6,
+    events: &[CurrentBattleSourceEventV1],
+) -> Result<(), GameRuntimeV6Error> {
+    use er_state::current_turn_execution::{CurrentStatStageChildPhaseV1, CurrentStatStageChildV1};
+    if before.current_turn_execution.as_ref().is_some_and(|turn| turn.stat_child.is_some()) {
+        return Err(failure());
+    }
+    let mut expected = None;
+    for event in events {
+        if let CurrentBattleSourceEventV1::StatStageChangeQueued {
+            user, target, target_slot, move_id, stat, before: before_stage, stages, ..
+        } = event {
+            let previous = before.current_turn_execution.as_ref().ok_or_else(failure)?;
+            if expected.is_some() { return Err(failure()); }
+            expected = Some(Box::new(CurrentStatStageChildV1 {
+                action_index: previous.next_action, source: *user, target: *target,
+                target_slot: *target_slot, move_id: *move_id, stat: *stat,
+                before: *before_stage, stages: *stages, phase: CurrentStatStageChildPhaseV1::Ready,
+            }));
+        }
+    }
+    if after.current_turn_execution.as_ref().and_then(|turn| turn.stat_child.as_ref()) != expected.as_ref() {
+        return Err(failure());
+    }
+    // Actual guaranteed Growl POST_APPLY queues exactly one child if direct
+    // damage left its target alive. This observes the event, never final HP alone.
+    let must_queue = events.iter().any(|event| matches!(event,
+        CurrentBattleSourceEventV1::MoveDamage { move_id, target_hp_after, .. }
+            if move_id.get().get() == 45 && *target_hp_after > 0));
+    if must_queue != expected.is_some() { return Err(failure()); }
+    Ok(())
+}
 /// Created only by the actual source-context admission wrapper above.
 /// This is not an alternate public method accepting arbitrary source booleans.
 struct ActionFold {
@@ -375,6 +411,7 @@ impl ActionFold {
         let mut resolution = None;
         let mut damaged = BTreeSet::new();
         let mut recoil_seen = false;
+        let mut stat_queued = false;
         for event in events {
             match event {
                 CurrentBattleSourceEventV1::MoveResolution {
@@ -458,7 +495,7 @@ impl ActionFold {
                     let (resolved_user, resolved_slot, resolved_move, targets) =
                         resolution.ok_or_else(failure)?;
                     let holder = at_slot(before, *target_slot, *target)?;
-                    if recoil_seen
+                    if stat_queued || recoil_seen
                         || (resolved_user, resolved_slot, resolved_move)
                             != (*user, *source_slot, *move_id)
                         || *use_mode != CurrentMoveUseModeV1::Direct
@@ -507,6 +544,17 @@ impl ActionFold {
                         }
                     }
                 }
+                CurrentBattleSourceEventV1::StatStageChangeQueued {user,source_slot,target,target_slot,move_id,stat,before:before_stage,stages} => {
+                    let (resolved_user,resolved_slot,resolved_move,targets)=resolution.ok_or_else(failure)?;
+                    let holder=at_slot(before,*target_slot,*target)?;
+                    if stat_queued || recoil_seen || (resolved_user,resolved_slot,resolved_move)!=(*user,*source_slot,*move_id)
+                        || move_id.get().get()!=45 || *stat!=1 || *stages != -1
+                        || holder.stat_stages.attack!=*before_stage || !damaged.contains(target)
+                        || !hp.get(target).is_some_and(|hp|*hp>0)
+                        || !targets.iter().any(|row|row.target==*target&&row.slot==*target_slot&&row.result==CurrentHitCheckV1::Hit)
+                    {return Err(failure());}
+                    stat_queued=true;
+                }
                 CurrentBattleSourceEventV1::StruggleRecoilDamage {
                     user,
                     source_slot,
@@ -521,7 +569,7 @@ impl ActionFold {
                         resolution.ok_or_else(failure)?;
                     let holder = at_slot(before, *source_slot, *user)?;
                     let expected_request = (holder.max_hp / 4).max(u32::from(!damaged.is_empty()));
-                    if recoil_seen
+                    if stat_queued || recoil_seen
                         || (resolved_user, resolved_slot, resolved_move)
                             != (*user, *source_slot, *move_id)
                         || move_id.get().get() != 165

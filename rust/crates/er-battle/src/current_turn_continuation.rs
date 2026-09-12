@@ -70,6 +70,7 @@ pub fn begin_current_turn(
         next_rng_sequence: rng.next_audit_sequence().ok_or(BattleV5Error::Overflow)?,
         next_faint_sequence: SafeU53::ZERO,
         finalization_done: false,
+        stat_child: None,
         stage: CurrentTurnStageV1::ReadyForMove,
     };
     let transition = make_chunk(before, after, &owner, rng, ChunkEffects::default())?;
@@ -121,7 +122,7 @@ fn advance_current_turn(
     {
         return Err(BattleV5Error::AuthoritySeat);
     }
-    if owner.stage != CurrentTurnStageV1::ReadyForMove
+    if owner.stat_child.is_some() || owner.stage != CurrentTurnStageV1::ReadyForMove
         || owner.finalization_done
         || finalize != (usize::from(owner.next_action) == owner.actions.len())
     {
@@ -289,6 +290,18 @@ fn advance_current_turn(
     }
     if !faints.is_empty() {
         next.stage = CurrentTurnStageV1::AwaitingInterlude { faints };
+    }
+    for event in &source_events {
+        if let CurrentBattleSourceEventV1::StatStageChangeQueued { user,target,target_slot,move_id,stat,before,stages,.. } = event {
+            if next.stat_child.is_some() || !matches!(next.stage, CurrentTurnStageV1::ReadyForMove) {
+                return Err(BattleV5Error::UnsupportedContent);
+            }
+            next.stat_child=Some(Box::new(er_state::current_turn_execution::CurrentStatStageChildV1 {
+                action_index: next.next_action.checked_sub(1).ok_or(BattleV5Error::Overflow)?,
+                source:*user,target:*target,target_slot:*target_slot,move_id:*move_id,stat:*stat,before:*before,stages:*stages,
+                phase:er_state::current_turn_execution::CurrentStatStageChildPhaseV1::Ready,
+            }));
+        }
     }
     next.next_rng_sequence = rng.next_audit_sequence().ok_or(BattleV5Error::Overflow)?;
     let transition = make_chunk(

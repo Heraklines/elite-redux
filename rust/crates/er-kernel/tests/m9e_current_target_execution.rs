@@ -312,9 +312,20 @@ fn slot(side: BattleSide, position: u8) -> FieldSlot {
     FieldSlot { side, position }
 }
 fn content() -> Result<Arc<PreparedGameContentV2>> {
-    Ok(Arc::new(PreparedGameContentV2::prepare(Arc::new(
-        serde_json::from_slice::<GameContentBundleV2>(BUNDLE)?,
-    ))?))
+    // Prepared content is immutable; each witness still owns its complete game state.
+    static CONTENT: std::sync::OnceLock<std::result::Result<Arc<PreparedGameContentV2>, String>> =
+        std::sync::OnceLock::new();
+    CONTENT
+        .get_or_init(|| {
+            let bundle: GameContentBundleV2 =
+                serde_json::from_slice(BUNDLE).map_err(|error| error.to_string())?;
+            PreparedGameContentV2::prepare(Arc::new(bundle))
+                .map(Arc::new)
+                .map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map(Arc::clone)
+        .map_err(|error| error.clone().into())
 }
 fn profile() -> Result<ProfileStateV1> {
     Ok(ProfileStateV1 {

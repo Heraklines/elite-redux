@@ -25,6 +25,8 @@ pub enum GamePresentationAchievementV1 {
 pub enum GamePresentationPayloadV1 {
     MoveLearning {holder:PokemonId,move_id:MoveId,step:GamePresentationMoveLearningV1},
     MoveLearned { holder: PokemonId, move_id: MoveId },
+    StatStageAnimation { holder: PokemonId, stat: u8, before: i8, after: i8, tween_milliseconds: u16 },
+    StatStageMessage { holder: PokemonId, stat: u8, before: i8, after: i8 },
     FaintAnimation {
         holder: PokemonId,
         tween_milliseconds: u16,
@@ -98,6 +100,10 @@ impl GamePresentationPayloadV1 {
                     GamePresentationMoveLearningV1::Forgot{old_move}=>old_move.get()!=SafeU53::ZERO,_=>true,
                 }),
             Self::MoveLearned { holder, move_id } => (PresentationCueFamilyV1::Progression, holder.get()!=SafeU53::ZERO && move_id.get()!=SafeU53::ZERO),
+            Self::StatStageAnimation { holder, stat, before, after, tween_milliseconds } => (
+                PresentationCueFamilyV1::Move, holder.get()!=SafeU53::ZERO && *stat==1 && (-5..=6).contains(before) && *after==*before-1 && *tween_milliseconds==1750),
+            Self::StatStageMessage { holder, stat, before, after } => (
+                PresentationCueFamilyV1::Move, holder.get()!=SafeU53::ZERO && *stat==1 && (-6..=6).contains(before) && *after==(*before-1).max(-6)),
             Self::FaintAnimation {
                 holder,
                 tween_milliseconds,

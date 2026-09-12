@@ -396,6 +396,19 @@ impl GameKernelV7 {
         snapshot
             .validate(content.as_ref())
             .map_err(|error| GameKernelV7Error::Snapshot(error.to_string()))?;
+        // Only these bootstrap conversions preserve every validated snapshot
+        // field: the ledger is already the emitted empty ledger, AI is retained
+        // verbatim, and validated sorted unique vectors become ordered maps.
+        let unchanged_bootstrap = matches!(
+            &snapshot.lifecycle,
+            GameKernelLifecycleSnapshotV7::Bootstrap(_)
+        ) && snapshot.material_ledger
+            == AppliedGameMaterialLedgerV1::new(safe_one())
+                .map_err(|error| GameKernelV7Error::Snapshot(error.to_string()))?
+            && matches!(
+                (role, snapshot.authority_ai.as_ref()),
+                (GameKernelRoleV7::Authority, Some(_)) | (GameKernelRoleV7::Replica, None)
+            );
         let material_ledger = snapshot.material_ledger.clone();
         let authority_ai = match (role, snapshot.authority_ai.clone()) {
             (GameKernelRoleV7::Authority, Some(snapshot)) => Some(
@@ -470,7 +483,14 @@ impl GameKernelV7 {
                 .collect(),
             replay_sequence: snapshot.replay_sequence,
         };
-        value.validate()?;
+        if unchanged_bootstrap {
+            // Seat/role checks are not part of the portable snapshot proof.
+            // Preserve every one while avoiding another full catalog clone
+            // and validation of the unchanged snapshot above.
+            value.validate_context()?;
+        } else {
+            value.validate()?;
+        }
         Ok(value)
     }
 
@@ -1611,7 +1631,8 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         }
         if phase_ack.is_some_and(|ack| {
-            ack.kind == crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation
+            matches!(ack.kind, crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation
+                | crate::snapshot_v7::CurrentPhasePresentationKindV1::StatAnimation)
         }) && !completed
         {
             return Err(GameKernelV7Error::Invalid);
@@ -2205,6 +2226,11 @@ impl GameKernelV7 {
         Ok(step)
     }
     pub fn validate(&self) -> Result<(), GameKernelV7Error> {
+        self.validate_context()?;
+        self.snapshot().map(|_| ())
+    }
+
+    fn validate_context(&self) -> Result<(), GameKernelV7Error> {
         if self.private_learning_control.is_some()
             || self
                 .state()
@@ -2274,7 +2300,7 @@ impl GameKernelV7 {
                 .validate()
                 .map_err(|_| GameKernelV7Error::Invalid)?;
         }
-        self.snapshot().map(|_| ())
+        Ok(())
     }
 
     fn bootstrap_input(

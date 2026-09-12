@@ -375,6 +375,7 @@ fn install_save_control(
 fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_assets()
 -> Result<(), Box<dyn Error>> {
     let (mut host, mut sequence) = natural_host()?;
+    assert_bootstrap_restore_proof(&host)?;
     assert_unowned_flash_input_rejected(&mut host, &mut sequence)?;
     let first = press(&mut host, &mut sequence, PhysicalKey::Space)?;
     let BrowserResponseV2::Effects { batch } = first else {
@@ -1928,9 +1929,7 @@ fn record_real_generation_event(
 fn retained_generation_decimal_byte_boundaries(
     snapshot: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
 ) -> Result<(), Box<dyn Error>> {
-    use er_repro::current::{
-        CurrentReproLimitsV1, CurrentReproRecorderV1,
-    };
+    use er_repro::current::{CurrentReproLimitsV1, CurrentReproRecorderV1};
     let prepared = shared_content()?;
     let protocol = snapshot
         .protocol
@@ -2025,7 +2024,9 @@ fn retained_generation_one_bound(
     bytes: usize,
     exact: bool,
 ) -> Result<(), Box<dyn Error>> {
-    use er_repro::current::{CurrentReproLimitsV1, CurrentReproRecorderV1, replay_current_capsule_v1};
+    use er_repro::current::{
+        CurrentReproLimitsV1, CurrentReproRecorderV1, replay_current_capsule_v1,
+    };
     let event = CurrentExternalEvent::TransportChanged {
         generation: ConnectionGeneration::new(safe(10)),
         connected: true,
@@ -2080,5 +2081,44 @@ fn retained_generation_one_bound(
             .snapshot()?,
         expected_snapshot
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_bootstrap_restore_proof(host: &BrowserKernelHostV2) -> Result<(), Box<dyn Error>> {
+    let snapshot = Box::new(
+        host.kernel_ref().ok_or("bootstrap kernel absent")?.snapshot()?,
+    );
+    assert!(matches!(
+        snapshot.lifecycle,
+        GameKernelLifecycleSnapshotV7::Bootstrap(_)
+    ));
+    assert!(snapshot.authority_ai.is_some());
+    assert_eq!(
+        snapshot.material_ledger,
+        er_game::m9e_material_v6::AppliedGameMaterialLedgerV1::new(safe(1))?
+    );
+    let restored = Box::new(GameKernelV7::from_snapshot(
+        *snapshot.clone(),
+        context().local_seat,
+        GameKernelRoleV7::Authority,
+        shared_content()?,
+    )?);
+    assert_eq!(restored.snapshot()?, *snapshot);
+    // A portable snapshot proof must never override the caller's role checks.
+    assert!(GameKernelV7::from_snapshot(
+        *snapshot.clone(),
+        context().local_seat,
+        GameKernelRoleV7::Replica,
+        shared_content()?,
+    ).is_err());
+    let mut invalid = snapshot;
+    invalid.next_menu_instance_id = MenuInstanceId::ZERO;
+    assert!(GameKernelV7::from_snapshot(
+        *invalid,
+        context().local_seat,
+        GameKernelRoleV7::Authority,
+        shared_content()?,
+    ).is_err());
     Ok(())
 }

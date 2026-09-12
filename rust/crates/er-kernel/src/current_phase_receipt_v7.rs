@@ -15,6 +15,17 @@ pub(crate) fn expected_presentations(state: &GameStateV6) -> Vec<PendingCurrentP
         return Vec::new();
     };
     let mut expected = Vec::new();
+    if let Some(child)=state.current_turn_execution.as_ref().and_then(|turn|turn.stat_child.as_ref()) {
+        use er_state::current_turn_execution::CurrentStatStageChildPhaseV1 as S;
+        let marker=match child.phase {
+            S::Animation{event_id}=>Some((event_id,K::StatAnimation)),
+            S::Message{event_id}=>Some((event_id,K::StatMessage)),
+            S::Ready=>None,
+        };
+        if let (Some((event_id,kind)),Ok(pending))=(marker,SafeU53::new(u64::from(child.action_index))) {
+            expected.push(PendingCurrentPhaseAckV1{pending,event_id,kind});
+        }
+    }
     if let Some(source) = &owner.source_progression {
         let faint = match &source.initial_faint.phase {
             Some(F::Animation { address, event_id }) => {
@@ -34,9 +45,18 @@ pub(crate) fn expected_presentations(state: &GameStateV6) -> Vec<PendingCurrentP
         }
     }
     for pending in &owner.pending {
-        if let Some(tm)=pending.victory_tail.as_ref().and_then(|t|t.reward.as_ref()).and_then(|r|r.tm.as_ref()) {
-            if let Some(event_id)=tm.phase.event() {
-                expected.push(PendingCurrentPhaseAckV1{pending:pending.id,event_id,kind:K::RewardTm});
+        if let Some(tm) = pending
+            .victory_tail
+            .as_ref()
+            .and_then(|t| t.reward.as_ref())
+            .and_then(|r| r.tm.as_ref())
+        {
+            if let Some(event_id) = tm.phase.event() {
+                expected.push(PendingCurrentPhaseAckV1 {
+                    pending: pending.id,
+                    event_id,
+                    kind: K::RewardTm,
+                });
             }
         }
         let Some(victory) = &pending.victory else {
@@ -81,6 +101,20 @@ pub(crate) fn receipt_matches(
     if expected_presentation(state, ack.event_id) != Some(ack) {
         return false;
     }
+    if matches!(ack.kind,K::StatAnimation|K::StatMessage) {
+        let Some(child)=state.current_turn_execution.as_ref().and_then(|turn|turn.stat_child.as_ref()) else{return false;};
+        let payload=if ack.kind==K::StatAnimation {
+            P::StatStageAnimation{holder:child.target,stat:child.stat,before:child.before,after:child.after(),tween_milliseconds:1750}
+        } else {
+            P::StatStageMessage{holder:child.target,stat:child.stat,before:child.before,after:child.after()}
+        };
+        let semantic=er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(er_game::m9e_content_v2::PresentationCueFamilyV1::Move);
+        let Some(mapping)=content.presentation(semantic)else{return false;};
+        let effect=GamePresentationEffectV2{event_id:ack.event_id,semantic,blocking:mapping.blocking,skip:mapping.skip,payload:Some(payload)};
+        return mapping.blocking==er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
+            && er_canonical::fixture_digest(&effect).ok().is_some_and(|hash|
+                state.current_presentation.as_ref().is_some_and(|owner|owner.receipts.iter().any(|r|r.event_id==ack.event_id&&r.effect_sha256==hash)));
+    }
     if ack.kind == K::Victory {
         let victory = crate::snapshot_v7::PendingVictoryAckV1 {
             pending: ack.pending,
@@ -89,14 +123,35 @@ pub(crate) fn receipt_matches(
         return super::current_phase_v7::victory_presentation(state, ack.event_id) == Some(victory)
             && super::current_phase_v7::victory_receipt_matches(state, content, victory);
     }
-    if ack.kind==K::RewardTm {
-        let Some(payload)=reward_tm_payload(state,ack.event_id)else{return false;};
-        let semantic=er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(er_game::m9e_content_v2::PresentationCueFamilyV1::Progression);
-        let Some(mapping)=content.presentation(semantic)else{return false;};
-        let effect=GamePresentationEffectV2{event_id:ack.event_id,semantic,blocking:mapping.blocking,skip:mapping.skip,
-            payload:Some(payload)};
-        return mapping.blocking==er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput&&er_canonical::fixture_digest(&effect).ok().is_some_and(|hash|
-            state.current_presentation.as_ref().is_some_and(|owner|owner.receipts.iter().any(|r|r.event_id==ack.event_id&&r.effect_sha256==hash)));
+    if ack.kind == K::RewardTm {
+        let Some(payload) = reward_tm_payload(state, ack.event_id) else {
+            return false;
+        };
+        let semantic = er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(
+            er_game::m9e_content_v2::PresentationCueFamilyV1::Progression,
+        );
+        let Some(mapping) = content.presentation(semantic) else {
+            return false;
+        };
+        let effect = GamePresentationEffectV2 {
+            event_id: ack.event_id,
+            semantic,
+            blocking: mapping.blocking,
+            skip: mapping.skip,
+            payload: Some(payload),
+        };
+        return mapping.blocking
+            == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
+            && er_canonical::fixture_digest(&effect)
+                .ok()
+                .is_some_and(|hash| {
+                    state.current_presentation.as_ref().is_some_and(|owner| {
+                        owner
+                            .receipts
+                            .iter()
+                            .any(|r| r.event_id == ack.event_id && r.effect_sha256 == hash)
+                    })
+                });
     }
     let Some(phase) = state
         .current_battle_participation
@@ -114,7 +169,7 @@ pub(crate) fn receipt_matches(
             tween_milliseconds: 500,
         },
         K::FaintMessage => P::FaintMessage { holder },
-        K::Victory | K::RewardTm => return false,
+        K::Victory | K::RewardTm | K::StatAnimation | K::StatMessage => return false,
     };
     let semantic = er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(
         er_game::m9e_content_v2::PresentationCueFamilyV1::Faint,
@@ -140,18 +195,50 @@ pub(crate) fn receipt_matches(
         })
 }
 
-pub(crate) fn reward_tm_payload(state:&GameStateV6,event_id:PresentationEventId)->Option<P>{
-    use er_state::current_reward_tm::CurrentRewardTmMessageKindV1 as K;
+pub(crate) fn reward_tm_payload(state: &GameStateV6, event_id: PresentationEventId) -> Option<P> {
     use er_game::m9e_material_v6::GamePresentationMoveLearningV1 as S;
-    let selection=state.current_battle_participation.as_ref()?.experience.as_ref()?.pending.first()?.victory_tail.as_ref()?.reward.as_ref()?;
-    let tm=selection.tm.as_ref()?;
-    if tm.phase.event()!=Some(event_id){return None;}
-    let kind=tm.messages.last().filter(|m|m.event_id==event_id)?.kind;
-    if kind==K::Learned{return Some(P::MoveLearned{holder:tm.holder,move_id:tm.movement});}
-    let step=match kind{
-        K::Intro=>S::WantsToLearn,K::ForgetQuestion=>S::WhichMove,K::NotLearned=>S::DidNotLearn,
-        K::Forgotten=>S::Forgot{old_move:selection.party_before.iter().find(|p|p.id==tm.holder)?.moves.get(usize::from(tm.slot))?.as_ref()?.move_id},
-        K::Learned=>return None,
+    use er_state::current_reward_tm::CurrentRewardTmMessageKindV1 as K;
+    let selection = state
+        .current_battle_participation
+        .as_ref()?
+        .experience
+        .as_ref()?
+        .pending
+        .first()?
+        .victory_tail
+        .as_ref()?
+        .reward
+        .as_ref()?;
+    let tm = selection.tm.as_ref()?;
+    if tm.phase.event() != Some(event_id) {
+        return None;
+    }
+    let kind = tm.messages.last().filter(|m| m.event_id == event_id)?.kind;
+    if kind == K::Learned {
+        return Some(P::MoveLearned {
+            holder: tm.holder,
+            move_id: tm.movement,
+        });
+    }
+    let step = match kind {
+        K::Intro => S::WantsToLearn,
+        K::ForgetQuestion => S::WhichMove,
+        K::NotLearned => S::DidNotLearn,
+        K::Forgotten => S::Forgot {
+            old_move: selection
+                .party_before
+                .iter()
+                .find(|p| p.id == tm.holder)?
+                .moves
+                .get(usize::from(tm.slot))?
+                .as_ref()?
+                .move_id,
+        },
+        K::Learned => return None,
     };
-    Some(P::MoveLearning{holder:tm.holder,move_id:tm.movement,step})
+    Some(P::MoveLearning {
+        holder: tm.holder,
+        move_id: tm.movement,
+        step,
+    })
 }

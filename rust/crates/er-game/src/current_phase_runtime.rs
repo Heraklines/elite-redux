@@ -9,6 +9,8 @@ use er_types::SeatId;
 pub enum GameOwnedPhaseV1 {
     TurnStep,
     TurnFinish,
+    StatStageBegin,
+    StatStagePresentation { event_id: PresentationEventId, animation: bool },
     FriendshipBegin,
     FaintBegin {
         pending: SafeU53,
@@ -29,8 +31,13 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         menu_instance: MenuInstanceId,
     },
-    RewardTmLearn { pending: SafeU53 },
-    RewardTmPresentation { pending: SafeU53, event_id: PresentationEventId },
+    RewardTmLearn {
+        pending: SafeU53,
+    },
+    RewardTmPresentation {
+        pending: SafeU53,
+        event_id: PresentationEventId,
+    },
     VictoryPresentation {
         pending: SafeU53,
         event_id: PresentationEventId,
@@ -335,9 +342,19 @@ fn phase_transition(
         .active_run
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
-    if matches!(phase, GameOwnedPhaseV1::RewardBegin { .. } | GameOwnedPhaseV1::RewardTmLearn { .. } | GameOwnedPhaseV1::RewardTmPresentation { .. }) {
+    if matches!(
+        phase,
+        GameOwnedPhaseV1::RewardBegin { .. }
+            | GameOwnedPhaseV1::RewardTmLearn { .. }
+            | GameOwnedPhaseV1::RewardTmPresentation { .. }
+    ) {
         return current_reward_transition::transition(
-            before, content, operation_id, authority_seat, revision, phase,
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
         );
     }
     if matches!(phase, GameOwnedPhaseV1::VictoryTail { .. }) {
@@ -349,6 +366,9 @@ fn phase_transition(
             revision,
             phase,
         );
+    }
+    if matches!(phase, GameOwnedPhaseV1::StatStageBegin | GameOwnedPhaseV1::StatStagePresentation { .. }) {
+        return current_stat_stage_transition::transition(before,content,operation_id,authority_seat,revision,phase);
     }
     let turn = before
         .current_turn_execution
@@ -445,6 +465,8 @@ fn phase_transition(
         | GameOwnedPhaseV1::AchievementClock { .. }
         | GameOwnedPhaseV1::FlashEgg { .. }
         | GameOwnedPhaseV1::FaintBegin { .. }
+        | GameOwnedPhaseV1::StatStageBegin
+        | GameOwnedPhaseV1::StatStagePresentation { .. }
         | GameOwnedPhaseV1::FaintPresentation { .. } => {
             return Err(GameRuntimeV6Error::Invalid);
         }
@@ -551,10 +573,10 @@ fn phase_transition(
 
 #[path = "current_faint_transition.rs"]
 mod current_faint_transition;
-#[path = "current_victory_transition.rs"]
-mod current_victory_transition;
 #[path = "current_reward_transition.rs"]
 mod current_reward_transition;
+#[path = "current_victory_transition.rs"]
+mod current_victory_transition;
 
 fn turn_step_transition(
     before: &GameStateV6,
@@ -713,3 +735,6 @@ fn turn_step_transition(
         platform_effects: Vec::new(),
     })
 }
+
+#[path = "current_stat_stage_transition.rs"]
+mod current_stat_stage_transition;

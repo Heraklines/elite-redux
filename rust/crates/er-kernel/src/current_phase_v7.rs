@@ -264,21 +264,38 @@ impl GameKernelV7 {
                     output.internal_events.extend(step.internal_events);
                     return Ok(());
                 }
-                if let Some(tm)=tail.reward.as_ref().and_then(|r|r.tm.as_ref()) {
-                    let phase=if tm.phase.queued(){
-                        if self.pending_current_phase_ack.is_some(){return Err(GameKernelV7Error::Invalid);}
-                        Some(GameOwnedPhaseV1::RewardTmLearn{pending:pending.id})
-                    }else if let Some(event_id)=tm.phase.event(){
-                        let Some(ack)=self.pending_current_phase_ack else{return Ok(());};
-                        if ack.pending!=pending.id||ack.event_id!=event_id
-                            ||ack.kind!=crate::snapshot_v7::CurrentPhasePresentationKindV1::RewardTm
-                            ||!current_phase_receipt_v7::receipt_matches(state,&self.content,ack){return Err(GameKernelV7Error::Invalid);}
-                        self.pending_current_phase_ack=None;
-                        Some(GameOwnedPhaseV1::RewardTmPresentation{pending:pending.id,event_id})
-                    }else{None};
-                    if let Some(phase)=phase {
-                        let step=self.execute_owned_phase(phase)?;
-                        output.effects.extend(step.effects);output.internal_events.extend(step.internal_events);
+                if let Some(tm) = tail.reward.as_ref().and_then(|r| r.tm.as_ref()) {
+                    let phase = if tm.phase.queued() {
+                        if self.pending_current_phase_ack.is_some() {
+                            return Err(GameKernelV7Error::Invalid);
+                        }
+                        Some(GameOwnedPhaseV1::RewardTmLearn {
+                            pending: pending.id,
+                        })
+                    } else if let Some(event_id) = tm.phase.event() {
+                        let Some(ack) = self.pending_current_phase_ack else {
+                            return Ok(());
+                        };
+                        if ack.pending != pending.id
+                            || ack.event_id != event_id
+                            || ack.kind
+                                != crate::snapshot_v7::CurrentPhasePresentationKindV1::RewardTm
+                            || !current_phase_receipt_v7::receipt_matches(state, &self.content, ack)
+                        {
+                            return Err(GameKernelV7Error::Invalid);
+                        }
+                        self.pending_current_phase_ack = None;
+                        Some(GameOwnedPhaseV1::RewardTmPresentation {
+                            pending: pending.id,
+                            event_id,
+                        })
+                    } else {
+                        None
+                    };
+                    if let Some(phase) = phase {
+                        let step = self.execute_owned_phase(phase)?;
+                        output.effects.extend(step.effects);
+                        output.internal_events.extend(step.internal_events);
                     }
                 }
                 // Choices wait for physical input. Applied receipts remain owned
@@ -322,6 +339,7 @@ impl GameKernelV7 {
             self.pending_current_phase_ack = None;
             use crate::snapshot_v7::CurrentPhasePresentationKindV1 as K;
             let phase = match ack.kind {
+                K::StatAnimation | K::StatMessage => GameOwnedPhaseV1::StatStagePresentation { event_id:ack.event_id, animation:ack.kind==K::StatAnimation },
                 K::RewardTm => return Err(GameKernelV7Error::Invalid),
                 K::Victory => GameOwnedPhaseV1::VictoryPresentation {
                     pending: ack.pending,
@@ -336,6 +354,13 @@ impl GameKernelV7 {
             let step = self.execute_owned_phase(phase)?;
             output.effects.extend(step.effects);
             output.internal_events.extend(step.internal_events);
+            return Ok(());
+        }
+        if let Some(child)=&turn.stat_child {
+            if matches!(child.phase,er_state::current_turn_execution::CurrentStatStageChildPhaseV1::Ready) {
+                let step=self.execute_owned_phase(GameOwnedPhaseV1::StatStageBegin)?;
+                output.effects.extend(step.effects);output.internal_events.extend(step.internal_events);
+            }
             return Ok(());
         }
         let phase = match &turn.stage {

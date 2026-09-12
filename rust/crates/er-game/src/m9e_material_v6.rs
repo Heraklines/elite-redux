@@ -19,7 +19,9 @@ use crate::m9e_content_v2::{
 #[path = "m9e_presentation_payload.rs"]
 mod presentation_payload;
 pub use crate::m9e_runtime_v6::GameOwnedPhaseV1;
-pub use presentation_payload::{GamePresentationAchievementV1, GamePresentationPayloadV1, GamePresentationMoveLearningV1};
+pub use presentation_payload::{
+    GamePresentationAchievementV1, GamePresentationMoveLearningV1, GamePresentationPayloadV1,
+};
 
 pub const GAME_MATERIAL_SCHEMA_VERSION_V6: u32 = 6;
 pub const APPLIED_MATERIAL_LEDGER_SCHEMA_VERSION_V1: u32 = 1;
@@ -516,14 +518,22 @@ fn apply_to_validated_ledger(
         .validate_with(content)
         .map_err(|_| invalid_material_at("material-v6:511"))?;
     validate_presentation_frontier(live.as_ref(), transition)?;
-    let owned_reward = matches!(transition.accepted_action, Some(GameActionV1::Reward { .. }))
-        && live.as_ref().and_then(|state| state.current_battle_participation.as_ref())
-            .and_then(|owner| owner.experience.as_ref())
-            .is_some_and(|owner| owner.source_progression.is_some());
+    let owned_reward = matches!(
+        transition.accepted_action,
+        Some(GameActionV1::Reward { .. })
+    ) && live
+        .as_ref()
+        .and_then(|state| state.current_battle_participation.as_ref())
+        .and_then(|owner| owner.experience.as_ref())
+        .is_some_and(|owner| owner.source_progression.is_some());
     if owned_reward {
         crate::m9e_runtime_v6::validate_current_reward_transition(
-            live.as_ref().ok_or_else(|| invalid_material_at("material-v6:519"))?, content, transition,
-        ).map_err(|_| invalid_material_at("material-v6:520"))?;
+            live.as_ref()
+                .ok_or_else(|| invalid_material_at("material-v6:519"))?,
+            content,
+            transition,
+        )
+        .map_err(|_| invalid_material_at("material-v6:520"))?;
     }
     let owned_learning = matches!(
         transition.accepted_action,
@@ -531,7 +541,8 @@ fn apply_to_validated_ledger(
     );
     if owned_learning {
         crate::m9e_runtime_v6::validate_current_learning_transition(
-            live.as_ref().ok_or_else(|| invalid_material_at("material-v6:528"))?,
+            live.as_ref()
+                .ok_or_else(|| invalid_material_at("material-v6:528"))?,
             content,
             transition,
         )
@@ -580,6 +591,14 @@ fn apply_to_validated_ledger(
         .map_err(|_| invalid_material_at("material-v6:574"))?;
     crate::m9e_runtime_v6::validate_current_turn_transition(live.as_ref(), content, transition)
         .map_err(|_| invalid_material_at("material-v6:576"))?;
+    // The preceding validator independently replays the complete turn-begin
+    // candidate. Its real TurnInit resets source damageTaken/last_reset_turn;
+    // the legacy XP successor conservation rule cannot represent that mutation.
+    let genuine_turn_begin = transition.owned_phase.is_none()
+        && live.as_ref().is_some_and(|prior| prior.current_turn_execution.is_none())
+        && transition.after_state.current_turn_execution.is_some()
+        && transition.domain == GameActionDomainV2::BattleTurn
+        && matches!(transition.accepted_action, Some(GameActionV1::Battle { .. }));
     if let Some(prior) = live.as_ref() {
         let same_run = prior.active_run.as_ref().map(|run| run.run_id)
             == transition
@@ -587,13 +606,7 @@ fn apply_to_validated_ledger(
                 .active_run
                 .as_ref()
                 .map(|run| run.run_id);
-        let genuine_turn_begin = prior.current_turn_execution.is_none()
-            && transition.after_state.current_turn_execution.is_some()
-            && transition.domain == GameActionDomainV2::BattleTurn
-            && matches!(
-                transition.accepted_action,
-                Some(GameActionV1::Battle { .. })
-            );
+
         if same_run
             && (prior
                 .current_achievement_tracker
@@ -615,7 +628,8 @@ fn apply_to_validated_ledger(
     }
     if transition.owned_phase.is_some() {
         crate::m9e_runtime_v6::validate_owned_phase_transition(
-            live.as_ref().ok_or_else(|| invalid_material_at("material-v6:612"))?,
+            live.as_ref()
+                .ok_or_else(|| invalid_material_at("material-v6:612"))?,
             content,
             transition,
         )
@@ -632,7 +646,7 @@ fn apply_to_validated_ledger(
             .as_ref()
             .and_then(|owner| owner.experience.as_ref())
             .ok_or_else(|| invalid_material_at("material-v6:628"))?;
-        if transition.owned_phase.is_none() && !owned_learning && !owned_reward {
+        if transition.owned_phase.is_none() && !owned_learning && !owned_reward && !genuine_turn_begin {
             prior
                 .validate_successor(next)
                 .map_err(|_| invalid_material_at("material-v6:632"))?;

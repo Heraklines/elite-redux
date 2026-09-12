@@ -73,3 +73,5 @@ pub(crate) mod current_reward_tm;
 pub(crate) mod current_reward_healing;
 pub(crate) mod current_reward_roll;
 pub(crate) mod current_reward_generators;
+
+mod current_stat_stage_execution;

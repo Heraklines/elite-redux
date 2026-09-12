@@ -32,9 +32,20 @@ fn seat() -> Result<SeatId> {
     Ok(SeatId::new(safe(1)?))
 }
 fn content() -> Result<Arc<PreparedGameContentV2>> {
-    Ok(Arc::new(PreparedGameContentV2::prepare(Arc::new(
-        serde_json::from_slice::<GameContentBundleV2>(BUNDLE)?,
-    ))?))
+    // Prepared content is immutable; each witness still owns its complete game state.
+    static CONTENT: std::sync::OnceLock<std::result::Result<Arc<PreparedGameContentV2>, String>> =
+        std::sync::OnceLock::new();
+    CONTENT
+        .get_or_init(|| {
+            let bundle: GameContentBundleV2 =
+                serde_json::from_slice(BUNDLE).map_err(|error| error.to_string())?;
+            PreparedGameContentV2::prepare(Arc::new(bundle))
+                .map(Arc::new)
+                .map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map(Arc::clone)
+        .map_err(|error| error.clone().into())
 }
 fn press(kernel: &mut GameKernelV7, key: PhysicalKey) -> Result<GameKernelStepV7> {
     let result = kernel.raw_input(RawInputEvent::KeyDown {
@@ -570,6 +581,8 @@ fn assert_missing_phase_wait_rejected(
 #[test]
 fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore() -> Result<()> {
     assert_two_neutral_turns_keep_source_counters()?;
+    assert_growl_child_callbacks(0)?;
+    assert_growl_child_callbacks(-6)?;
     let content = content()?;
     let mut kernel = Box::new(controlled_before_knockout(content.clone(), 5, &[33])?);
     let pokemon = &kernel
@@ -1719,6 +1732,22 @@ fn assert_two_neutral_turns_keep_source_counters() -> Result<()> {
         let run = kernel.state().and_then(|state| state.active_run.as_ref()).ok_or("run absent")?;
         let before_hp = [run.party[0].hp, run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp];
         let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
+        // The second admission must replay real TurnInit: previous damageTaken
+        // was nonzero, yet accepted material resets it before either move runs.
+        {
+            let state = kernel.state().ok_or("state absent")?;
+            let turn = state.current_turn_execution.as_ref().ok_or("turn owner absent")?;
+            assert_eq!(turn.next_action, 0);
+            let counts = state.current_battle_participation.as_ref()
+                .and_then(|owner| owner.experience.as_ref())
+                .and_then(|owner| owner.source_progression.as_ref())
+                .and_then(|source| source.turn_progress.as_ref())
+                .ok_or("source counters absent at admission")?;
+            for row in &counts.pokemon {
+                assert_eq!(row.damage_taken, SafeU53::ZERO);
+                assert_eq!(row.last_reset_turn.get().get(), expected_turn - 1);
+            }
+        }
         let mut finished = false;
         for _ in 0..32 {
             let turn = kernel.state().and_then(|state| state.active_run.as_ref()).and_then(|run| run.battle.as_ref())
@@ -1943,4 +1972,147 @@ fn assert_tm_menu_allocator_bound(
     tm.menu_instance = frontier;
     assert!(restore(*forged, content).is_err(), "retained TM menu must precede allocator frontier");
     Ok(())
+}
+#[inline(never)]
+fn controlled_growl(content: Arc<PreparedGameContentV2>, stage: i8) -> Result<Box<GameKernelV7>> {
+    let mut checkpoint = Box::new(controlled_before_knockout(content.clone(), 5, &[33,45])?.snapshot()?);
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else { return Err("active state absent".into()); };
+    let run = state.active_run.as_mut().ok_or("run absent")?;
+    run.party[0].stats.speed = 500;
+    run.party[0].stats.special_attack = 10;
+    let enemy = &mut run.battle.as_mut().ok_or("battle absent")?.enemy_party[0];
+    enemy.stats.speed = 1;
+    enemy.stats.special_defense = 10;
+    enemy.stats.hp = 20;
+    enemy.max_hp = 20;
+    enemy.hp = 20;
+    enemy.stat_stages.attack = stage;
+    state.validate_with(content.as_ref())?;
+    Ok(Box::new(restore(*checkpoint, content)?))
+}
+
+#[inline(never)]
+fn admit_growl(kernel: &mut GameKernelV7, content: &PreparedGameContentV2)
+    -> Result<(Option<GameStateV6>, AppliedGameMaterialLedgerV1)> {
+    navigate(kernel,"battle/command/fight")?;
+    press(kernel,PhysicalKey::Space)?;
+    navigate(kernel,"battle/move/1")?;
+    let frontier = Box::new(kernel.snapshot()?);
+    let mut canonical = active(&frontier)?.clone();
+    canonical.active_run.as_mut().ok_or("run absent")?.control = frontier.private_battle_control.as_ref()
+        .ok_or("private command owner absent")?.canonical_control.clone();
+    let mut live = Some(canonical);
+    let mut ledger = frontier.material_ledger.clone();
+    let step = press(kernel,PhysicalKey::Space)?;
+    accept_material(&mut live,&mut ledger,kernel,content,&step)?;
+    Ok((live,ledger))
+}
+
+#[inline(never)]
+fn assert_growl_forged_child_rejected(kernel: &GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<()> {
+    let mut forged = Box::new(kernel.snapshot()?);
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut forged.lifecycle else { return Err("state absent".into()); };
+    state.current_turn_execution.as_mut().and_then(|turn|turn.stat_child.as_mut())
+        .ok_or("stat child absent")?.stat = 2;
+    assert!(restore(*forged,content).is_err(),"fabricated stat identity must reject restore");
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_growl_child_callbacks(before_stage: i8) -> Result<()> {
+    use er_state::current_turn_execution::CurrentStatStageChildPhaseV1 as S;
+    let content = content()?;
+    let mut kernel = controlled_growl(content.clone(),before_stage)?;
+    let (mut live,mut ledger) = admit_growl(&mut kernel,content.as_ref())?;
+    settle_growl_ordinary_presentations(&mut kernel)?;
+    let step = kernel.advance_time(SafeU53::ZERO)?;
+    accept_growl_material(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
+
+    let state = kernel.state().ok_or("state absent")?;
+    let turn = state.current_turn_execution.as_ref().ok_or("turn absent")?;
+    let child = turn.stat_child.as_ref().ok_or("actual Growl child was not queued")?;
+    assert!(matches!(child.phase,S::Ready));
+    assert_eq!(child.move_id.get().get(),45);
+    assert_eq!(child.before,before_stage);
+    let enemy = &state.active_run.as_ref().ok_or("run absent")?.battle.as_ref().ok_or("battle absent")?.enemy_party[0];
+    // Controlled level5 special stats10/10, source wave1 power24: normal
+    // variance floors to3; a source critical floors to4 or5. The child follows damage.
+    assert!((3..=5).contains(&(20-enemy.hp)));
+    assert_eq!(enemy.stat_stages.attack,before_stage);
+    assert_growl_forged_child_rejected(&kernel,content.clone())?;
+    kernel = restore_exact_raw_checkpoint(&kernel,content.clone())?;
+    settle_growl_ordinary_presentations(&mut kernel)?;
+    let step = kernel.advance_time(SafeU53::ZERO)?;
+    accept_growl_material(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
+    let after_stage = before_stage.saturating_sub(1).max(-6);
+    if before_stage > -6 {
+        let child = kernel.state().and_then(|state|state.current_turn_execution.as_ref())
+            .and_then(|turn|turn.stat_child.as_ref()).ok_or("animation child absent")?;
+        let S::Animation {event_id} = child.phase else {return Err("actual stat animation absent".into());};
+        assert_growl_title_read_reissues(&kernel,event_id,content.clone())?;
+        let before = growl_checkpoint_bytes(&kernel)?;
+        assert!(kernel.settle_presentation_outcome(event_id,
+            er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::IntentionallySkipped).is_err());
+        assert_eq!(growl_checkpoint_bytes(&kernel)?,before);
+        let waiting = kernel.advance_time(SafeU53::ZERO)?;
+        assert!(waiting.effects.iter().all(|effect|!matches!(effect,GameKernelEffectV7::AuthorityMaterial { .. })));
+        assert_eq!(kernel.state().and_then(|s|s.active_run.as_ref()).and_then(|r|r.battle.as_ref())
+            .ok_or("battle absent")?.enemy_party[0].stat_stages.attack,before_stage);
+        kernel = restore_exact_raw_checkpoint(&kernel,content.clone())?;
+        kernel.settle_presentation(event_id)?;
+        let acknowledged = growl_checkpoint_bytes(&kernel)?;
+        assert!(kernel.settle_presentation(event_id).is_err());
+        assert_eq!(growl_checkpoint_bytes(&kernel)?,acknowledged);
+        kernel = restore_exact_raw_checkpoint(&kernel,content.clone())?;
+        let step = kernel.advance_time(SafeU53::ZERO)?;
+        accept_growl_material(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
+    }
+    let state = kernel.state().ok_or("state absent")?;
+    let child = state.current_turn_execution.as_ref().and_then(|turn|turn.stat_child.as_ref()).ok_or("message child absent")?;
+    let S::Message {event_id} = child.phase else {return Err("actual stat message absent".into());};
+    assert_growl_title_read_reissues(&kernel,event_id,content.clone())?;
+    let enemy = &state.active_run.as_ref().ok_or("run absent")?.battle.as_ref().ok_or("battle absent")?.enemy_party[0];
+    assert_eq!(enemy.stat_stages.attack,after_stage);
+    let progress = state.current_battle_participation.as_ref().and_then(|p|p.experience.as_ref())
+        .and_then(|p|p.source_progression.as_ref()).and_then(|p|p.turn_progress.as_ref()).ok_or("counts absent")?;
+    assert_eq!(progress.pokemon.iter().find(|row|row.pokemon==enemy.id).ok_or("holder absent")?
+        .stat_stages_decreased,before_stage > -6);
+    kernel = restore_exact_raw_checkpoint(&kernel,content.clone())?;
+    kernel.settle_presentation(event_id)?;
+    let step = kernel.advance_time(SafeU53::ZERO)?;
+    accept_growl_material(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
+    assert!(kernel.state().and_then(|state|state.current_turn_execution.as_ref())
+        .is_some_and(|turn|turn.stat_child.is_none() && turn.next_action==1));
+    assert!(kernel.settle_presentation(event_id).is_err());
+    Ok(())
+}
+#[inline(never)]
+fn growl_checkpoint_bytes(kernel: &GameKernelV7) -> Result<Vec<u8>> {
+    Ok(canonical_bytes(&kernel.snapshot()?)?)
+}
+
+#[inline(never)]
+fn settle_growl_ordinary_presentations(kernel: &mut GameKernelV7) -> Result<()> {
+    let checkpoint = Box::new(kernel.snapshot()?);
+    for effect in &checkpoint.pending_presentations { kernel.settle_presentation(effect.event_id)?; }
+    Ok(())
+}
+
+#[inline(never)]
+fn accept_growl_material(live: &mut Option<GameStateV6>, ledger: &mut AppliedGameMaterialLedgerV1,
+    kernel: &GameKernelV7, content: &PreparedGameContentV2, step: &GameKernelStepV7) -> Result<()> {
+    let material = accept_material(live,ledger,kernel,content,step)?;
+    assert!(material.transition().owned_phase.is_some());
+    Ok(())
+}
+#[inline(never)]
+fn assert_growl_title_read_reissues(
+    kernel: &GameKernelV7,
+    event_id: er_types::PresentationEventId,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let checkpoint = Box::new(kernel.snapshot()?);
+    // Real Title LIST/READ restores saved phase state and reissues its exact
+    // event without an acknowledgement; this does not claim a Save UI action.
+    assert_phase_title_read_reissues(&checkpoint,event_id,content)
 }

@@ -1241,9 +1241,18 @@ fn query_simulated_move_damage_inner(
     }
     let sources = current_or_legacy_sources(run, actor, definition.id, targeting)?;
     let context = mechanics_context(actor, battle, &sources);
-    calculate_damage_with_variance(content, &context, definition, actor, target, DamagePolicy { critical: false, current_source: targeting.is_some_and(CurrentTargetExecution::source_damage) }, || {
-        Ok(100)
-    })
+    calculate_damage_with_variance(
+        content,
+        &context,
+        definition,
+        actor,
+        target,
+        DamagePolicy {
+            critical: false,
+            current_source: targeting.is_some_and(CurrentTargetExecution::source_damage),
+        },
+        || Ok(100),
+    )
     .map(|result| result.damage)
 }
 
@@ -1257,12 +1266,26 @@ fn calculate_damage(
     critical: bool,
     rng: &mut RngRuntime,
 ) -> Result<u32, BattleV5Error> {
-    calculate_damage_observed(content, context, definition, actor, target, DamagePolicy { critical, current_source: false }, rng)
-        .map(|result| result.damage)
+    calculate_damage_observed(
+        content,
+        context,
+        definition,
+        actor,
+        target,
+        DamagePolicy {
+            critical,
+            current_source: false,
+        },
+        rng,
+    )
+    .map(|result| result.damage)
 }
 
 #[derive(Clone, Copy)]
-struct DamagePolicy { critical: bool, current_source: bool }
+struct DamagePolicy {
+    critical: bool,
+    current_source: bool,
+}
 
 #[derive(Default)]
 struct CalculatedDamage {
@@ -1279,24 +1302,16 @@ fn calculate_damage_observed(
     policy: DamagePolicy,
     rng: &mut RngRuntime,
 ) -> Result<CalculatedDamage, BattleV5Error> {
-    calculate_damage_with_variance(
-        content,
-        context,
-        definition,
-        actor,
-        target,
-        policy,
-        || {
-            rng.battle_rand_seed_int_range(
-                SafeU53::new(85).map_err(|_| BattleV5Error::Overflow)?,
-                SafeU53::new(100).map_err(|_| BattleV5Error::Overflow)?,
-                RngReason::DamageVariance,
-                RngCallsiteId::damage_variance(),
-            )
-            .map(SafeU53::get)
-            .map_err(|error| BattleV5Error::Rng(error.to_string()))
-        },
-    )
+    calculate_damage_with_variance(content, context, definition, actor, target, policy, || {
+        rng.battle_rand_seed_int_range(
+            SafeU53::new(85).map_err(|_| BattleV5Error::Overflow)?,
+            SafeU53::new(100).map_err(|_| BattleV5Error::Overflow)?,
+            RngReason::DamageVariance,
+            RngCallsiteId::damage_variance(),
+        )
+        .map(SafeU53::get)
+        .map_err(|error| BattleV5Error::Rng(error.to_string()))
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1310,7 +1325,15 @@ fn calculate_damage_with_variance(
     variance: impl FnOnce() -> Result<u64, BattleV5Error>,
 ) -> Result<CalculatedDamage, BattleV5Error> {
     if policy.current_source {
-        return calculate_current_source_damage_with_variance(content, context, definition, actor, target, policy.critical, variance);
+        return calculate_current_source_damage_with_variance(
+            content,
+            context,
+            definition,
+            actor,
+            target,
+            policy.critical,
+            variance,
+        );
     }
     let critical = policy.critical;
     let MovePower::Value(base_power) = definition.power else {
@@ -1418,23 +1441,32 @@ fn calculate_current_source_damage_with_variance(
         || target.status.kind != er_types::battle_model::StatusKind::None
         || actor.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
         || target.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
-        || actor.tera_type.is_some() || target.tera_type.is_some()
+        || actor.tera_type.is_some()
+        || target.tera_type.is_some()
     {
         return Err(BattleV5Error::UnsupportedContent);
     }
     let MovePower::Value(base_power) = definition.power else {
         return Ok(CalculatedDamage::default());
     };
-    let power = execute_query_v2(content, context, MechanicQueryV2::MovePower,
-        QueryValueV2::Unsigned(u64::from(base_power)))
-        .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
-    if power.cancelled || power.allowed == Some(false) { return Ok(CalculatedDamage::default()); }
+    let power = execute_query_v2(
+        content,
+        context,
+        MechanicQueryV2::MovePower,
+        QueryValueV2::Unsigned(u64::from(base_power)),
+    )
+    .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
+    if power.cancelled || power.allowed == Some(false) {
+        return Ok(CalculatedDamage::default());
+    }
     // Prepared evidence owns source/binding order and predicate decisions.
     // Fold supported power multipliers as source Numbers, not from the legacy
     // integer accumulator (e.g. Overgrow must retain 45 * 1.5 == 67.5).
     let mut raw_power = f64::from(base_power);
     for evidence in &power.evidence {
-        if !evidence.condition_matched { continue; }
+        if !evidence.condition_matched {
+            continue;
+        }
         use er_mechanics::selector_operation_v2::QueryModifierV2;
         match &evidence.modifier {
             QueryModifierV2::Multiply { ratio } => {
@@ -1446,28 +1478,69 @@ fn calculate_current_source_damage_with_variance(
             QueryModifierV2::Allow => {}
             _ => return Err(BattleV5Error::UnsupportedContent),
         }
-        if !raw_power.is_finite() || raw_power <= 0.0 { return Err(BattleV5Error::Overflow); }
+        if !raw_power.is_finite() || raw_power <= 0.0 {
+            return Err(BattleV5Error::Overflow);
+        }
     }
     let wave = context.wave_index.min(30) as f64;
-    let pacing = if wave >= 30.0 { 1.0 } else { 0.4 + (1.0 - 0.4) * ((wave - 1.0) / 29.0) };
+    let pacing = if wave >= 30.0 {
+        1.0
+    } else {
+        0.4 + (1.0 - 0.4) * ((wave - 1.0) / 29.0)
+    };
     let power = raw_power * pacing;
     let (attack, defense, attack_stage, defense_stage) = match definition.category {
-        MoveCategory::Physical => (actor.stats.attack, target.stats.defense, actor.stat_stages.attack, target.stat_stages.defense),
-        MoveCategory::Special => (actor.stats.special_attack, target.stats.special_defense, actor.stat_stages.special_attack, target.stat_stages.special_defense),
+        MoveCategory::Physical => (
+            actor.stats.attack,
+            target.stats.defense,
+            actor.stat_stages.attack,
+            target.stat_stages.defense,
+        ),
+        MoveCategory::Special => (
+            actor.stats.special_attack,
+            target.stats.special_defense,
+            actor.stat_stages.special_attack,
+            target.stat_stages.special_defense,
+        ),
         MoveCategory::Status => return Ok(CalculatedDamage::default()),
     };
     // GREEN34703043538 qualifies the exact24 initialized stat families:
     // KeenEye changes Accuracy only, clean Guts is gated false, and Solar
     // Power is gated false in the neutral weather required by targeting.
     // Do not extend this to an unqualified StatMultiplierAbAttr family.
-    let attack_stage = if critical { attack_stage.max(0) } else { attack_stage };
-    let defense_stage = if critical { defense_stage.min(0) } else { defense_stage };
-    let attack = (f64::from(attack) * crate::stat_stage::stage_ratio(attack_stage)).floor().max(1.0);
-    let defense = (f64::from(defense) * crate::stat_stage::stage_ratio(defense_stage)).floor().max(1.0);
+    let attack_stage = if critical {
+        attack_stage.max(0)
+    } else {
+        attack_stage
+    };
+    let defense_stage = if critical {
+        defense_stage.min(0)
+    } else {
+        defense_stage
+    };
+    let attack = (f64::from(attack) * crate::stat_stage::stage_ratio(attack_stage))
+        .floor()
+        .max(1.0);
+    let defense = (f64::from(defense) * crate::stat_stage::stage_ratio(defense_stage))
+        .floor()
+        .max(1.0);
     let typeless = definition.id.get().get() == 165;
-    let effectiveness = if typeless { (1,1) } else { type_effectiveness(content, definition.move_type, target) };
-    if effectiveness.0 == 0 { return Ok(CalculatedDamage::default()); }
-    let stab = if !typeless && (actor.types.primary == definition.move_type || actor.types.secondary == Some(definition.move_type)) { 1.5 } else { 1.0 };
+    let effectiveness = if typeless {
+        (1, 1)
+    } else {
+        type_effectiveness(content, definition.move_type, target)
+    };
+    if effectiveness.0 == 0 {
+        return Ok(CalculatedDamage::default());
+    }
+    let stab = if !typeless
+        && (actor.types.primary == definition.move_type
+            || actor.types.secondary == Some(definition.move_type))
+    {
+        1.5
+    } else {
+        1.0
+    };
     let level = (2.0 * f64::from(actor.level)) / 5.0 + 2.0;
     let mut damage = level * power;
     damage *= attack;
@@ -1482,12 +1555,22 @@ fn calculate_current_source_damage_with_variance(
     damage *= effectiveness.0 as f64 / effectiveness.1 as f64;
     // FreshComplete guard currently rejects statused unsupported contexts;
     // burn's source suppression predicates must be qualified before admission.
-    let damage = crate::damage::to_dmg_value(damage).map_err(|_| BattleV5Error::Overflow)?.get();
-    let query = execute_query_v2(content, context, MechanicQueryV2::Damage, QueryValueV2::Unsigned(damage))
-        .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
-    if query.cancelled || query.allowed == Some(false) { return Ok(CalculatedDamage::default()); }
+    let damage = crate::damage::to_dmg_value(damage)
+        .map_err(|_| BattleV5Error::Overflow)?
+        .get();
+    let query = execute_query_v2(
+        content,
+        context,
+        MechanicQueryV2::Damage,
+        QueryValueV2::Unsigned(damage),
+    )
+    .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
+    if query.cancelled || query.allowed == Some(false) {
+        return Ok(CalculatedDamage::default());
+    }
     Ok(CalculatedDamage {
-        damage: u32::try_from(query_u64(query.after)?.max(1)).map_err(|_| BattleV5Error::Overflow)?,
+        damage: u32::try_from(query_u64(query.after)?.max(1))
+            .map_err(|_| BattleV5Error::Overflow)?,
         super_effective: effectiveness.0 > effectiveness.1,
     })
 }
@@ -1731,4 +1814,31 @@ fn query_u32(value: QueryValueV2) -> Result<u32, BattleV5Error> {
 fn mechanical_digest(state: &GameStateV5) -> Result<String, BattleV5Error> {
     let digest = content_digest(state).map_err(|error| BattleV5Error::Digest(error.to_string()))?;
     Ok(format!("blake3-v1:{digest}"))
+}
+
+/// Drain the source-neutral MoveEnd tail only after the stat message callback.
+/// The current child implicitly retains this unfinished tail; no normal step
+/// can bypass it while stat_child remains present.
+pub fn complete_current_stat_tail(
+    state: &er_state::m9e_state_v6::GameStateV6,
+    content: &PreparedBattleContentV3,
+) -> Result<(), BattleV5Error> {
+    let run=state.active_run.as_ref().ok_or(BattleV5Error::NoBattle)?;
+    let battle=run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
+    let turn=state.current_turn_execution.as_ref().ok_or(BattleV5Error::UnsupportedContent)?;
+    turn.validate(run).map_err(|_| BattleV5Error::UnsupportedContent)?;
+    let child=turn.stat_child.as_ref().ok_or(BattleV5Error::UnsupportedContent)?;
+    if !matches!(child.phase,er_state::current_turn_execution::CurrentStatStageChildPhaseV1::Message{..}) {
+        return Err(BattleV5Error::UnsupportedContent);
+    }
+    let actor=pokemon(run,child.source).ok_or(BattleV5Error::Target)?;
+    let targeting=CurrentTargetExecution::from_state(state).map_err(|_| BattleV5Error::UnsupportedContent)?;
+    let sources=current_or_legacy_sources(run,actor,child.move_id,Some(&targeting))?;
+    let context=mechanics_context(actor,battle,&sources);
+    let tail=execute_hook_v2(content,&context,MechanicHookV2::AfterMove)
+        .map_err(|error|BattleV5Error::Mechanics(error.to_string()))?;
+    if tail.operations.iter().any(|effect|effect.condition_matched) {
+        return Err(BattleV5Error::UnsupportedContent);
+    }
+    Ok(())
 }

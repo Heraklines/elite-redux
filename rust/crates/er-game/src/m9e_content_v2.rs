@@ -711,6 +711,7 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
             })
             && crate::current_faint_execution::validate_current_initial_faint(state, self).is_ok()
             && crate::current_victory_start::validate(state).is_ok()
+            && crate::current_stat_stage_execution::validate_all(state, self).is_ok()
     }
 
     fn identity(&self) -> &GameContentIdentityV2 {
