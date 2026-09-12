@@ -20,6 +20,8 @@ pub struct CurrentRewardSelectionV1 {
     pub stage: CurrentRewardStageV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tm: Option<Box<crate::current_reward_tm::CurrentRewardTmV1>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub candy: Option<Box<crate::current_reward_candy::CurrentRewardCandyV1>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub declined_tms: Vec<crate::current_reward_tm::CurrentRewardTmV1>,
 }
@@ -67,6 +69,7 @@ pub enum CurrentRewardStageV1 {
     Holder {
         offer: u8,
     },
+    CandyPending { offer: u8, holder: PokemonId },
     TmMove {
         offer: u8,
         holder: PokemonId,
@@ -118,6 +121,7 @@ impl CurrentRewardSelectionV1 {
                 CurrentRewardStageV1::Holder { offer }
                 | CurrentRewardStageV1::TmMove { offer, .. }
                 | CurrentRewardStageV1::TmPending { offer, .. }
+                | CurrentRewardStageV1::CandyPending { offer, .. }
                 | CurrentRewardStageV1::Applied { offer, .. } => {
                     usize::from(*offer) < self.offers.len()
                 }

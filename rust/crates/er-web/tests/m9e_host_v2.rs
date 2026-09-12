@@ -869,13 +869,13 @@ fn browser_time_and_lifecycle_requests_execute_kernel_state_changes() -> Result<
 
 #[test]
 fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(), Box<dyn Error>> {
-    eprintln!("M9E_HOST_NETWORK setup");
+    network_marker("setup")?;
     let (mut browser, proposal) = network_host_setup()?;
-    eprintln!("M9E_HOST_NETWORK ingress");
+    network_marker("ingress")?;
     network_ingress(&mut browser, proposal)?;
-    eprintln!("M9E_HOST_NETWORK transport");
+    network_marker("transport")?;
     let staged = network_transport_changes(&mut browser)?;
-    eprintln!("M9E_HOST_NETWORK replay");
+    network_marker("replay")?;
     network_transport_replay(&mut browser, &staged)
 }
 
@@ -889,13 +889,33 @@ fn network_snapshot(
 }
 
 #[inline(never)]
-fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>>
-{
-    let prepared = shared_content()?;
-    eprintln!("M9E_HOST_NETWORK active_host");
+fn network_marker(stage: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    // Direct writes survive process abort; libtest captures eprintln! per thread.
+    writeln!(std::io::stderr().lock(), "M9E_HOST_NETWORK {stage}")
+}
+
+#[inline(never)]
+fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>> {
+    let (save, proposal) = network_save_setup()?;
+    network_marker("save_ready")?;
+    let browser = network_initialize_save(save)?;
+    network_marker("initialized")?;
+    Ok((browser, proposal))
+}
+
+#[inline(never)]
+fn network_source_snapshot() -> Result<Box<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>, Box<dyn Error>> {
     let (source, _) = active_host()?;
-    eprintln!("M9E_HOST_NETWORK active_host_ready");
-    let mut snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
+    network_marker("active_host_ready")?;
+    network_snapshot(&source)
+}
+
+#[inline(never)]
+fn network_save_setup() -> Result<(Box<GameSaveV2>, GameProposalEnvelopeV2), Box<dyn Error>> {
+    let prepared = shared_content()?;
+    network_marker("active_host")?;
+    let mut snapshot = network_source_snapshot()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(9));
@@ -927,22 +947,6 @@ fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelop
     };
     state.active_run.as_mut().ok_or("run missing")?.control = control.clone();
     let save = GameSaveV2::new(prepared.identity().clone(), safe(1), state.clone())?;
-    let mut browser = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
-    send(
-        &mut browser,
-        0,
-        BrowserRequestV2::Initialize {
-            initialization: Box::new(BrowserSessionInitializationV2::ExistingSave {
-                context: BrowserSessionContextV2 {
-                    local_seat: host,
-                    role: GameKernelRoleV7::Authority,
-                    scheduler: context().scheduler,
-                    protocol: Some(authority_protocol(host, guest, generation)?),
-                },
-                save,
-            }),
-        },
-    )?;
     let proposal = GameProposalEnvelopeV2 {
         schema_version: 2,
         sender_seat: guest,
@@ -955,7 +959,31 @@ fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelop
             },
         },
     };
-    Ok((browser, proposal))
+    Ok((Box::new(save), proposal))
+}
+
+#[inline(never)]
+fn network_initialize_save(save: Box<GameSaveV2>) -> Result<Box<BrowserKernelHostV2>, Box<dyn Error>> {
+    let host = SeatId::new(safe(1));
+    let guest = SeatId::new(safe(2));
+    let generation = ConnectionGeneration::new(safe(9));
+    let mut browser = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
+    send(
+        &mut browser,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::ExistingSave {
+                context: BrowserSessionContextV2 {
+                    local_seat: host,
+                    role: GameKernelRoleV7::Authority,
+                    scheduler: context().scheduler,
+                    protocol: Some(authority_protocol(host, guest, generation)?),
+                },
+                save: *save,
+            }),
+        },
+    )?;
+    Ok(browser)
 }
 
 #[inline(never)]
@@ -1018,9 +1046,9 @@ fn network_transport_changes(
         TransportState::Connected
     );
     assert!(connected.scheduler.pauses.is_empty());
-    eprintln!("M9E_HOST_NETWORK byte_boundaries");
+    network_marker("byte_boundaries")?;
     retained_generation_decimal_byte_boundaries(&connected)?;
-    eprintln!("M9E_HOST_NETWORK byte_boundaries_done");
+    network_marker("byte_boundaries_done")?;
     send(
         browser,
         4,
@@ -2087,7 +2115,9 @@ fn retained_generation_one_bound(
 #[inline(never)]
 fn assert_bootstrap_restore_proof(host: &BrowserKernelHostV2) -> Result<(), Box<dyn Error>> {
     let snapshot = Box::new(
-        host.kernel_ref().ok_or("bootstrap kernel absent")?.snapshot()?,
+        host.kernel_ref()
+            .ok_or("bootstrap kernel absent")?
+            .snapshot()?,
     );
     assert!(matches!(
         snapshot.lifecycle,
@@ -2106,19 +2136,25 @@ fn assert_bootstrap_restore_proof(host: &BrowserKernelHostV2) -> Result<(), Box<
     )?);
     assert_eq!(restored.snapshot()?, *snapshot);
     // A portable snapshot proof must never override the caller's role checks.
-    assert!(GameKernelV7::from_snapshot(
-        *snapshot.clone(),
-        context().local_seat,
-        GameKernelRoleV7::Replica,
-        shared_content()?,
-    ).is_err());
+    assert!(
+        GameKernelV7::from_snapshot(
+            *snapshot.clone(),
+            context().local_seat,
+            GameKernelRoleV7::Replica,
+            shared_content()?,
+        )
+        .is_err()
+    );
     let mut invalid = snapshot;
     invalid.next_menu_instance_id = MenuInstanceId::ZERO;
-    assert!(GameKernelV7::from_snapshot(
-        *invalid,
-        context().local_seat,
-        GameKernelRoleV7::Authority,
-        shared_content()?,
-    ).is_err());
+    assert!(
+        GameKernelV7::from_snapshot(
+            *invalid,
+            context().local_seat,
+            GameKernelRoleV7::Authority,
+            shared_content()?,
+        )
+        .is_err()
+    );
     Ok(())
 }

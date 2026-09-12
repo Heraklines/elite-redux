@@ -583,3 +583,17 @@ fn settle_max_clock(
         .map_err(|_| GameRuntimeV6Error::Invalid)?;
     Ok((candidate, payloads))
 }
+
+/// Source event/rate resolution is shared only through the typed Candy receipt.
+/// It does not accept a caller-nominated multiplier or synthesize a Faint cursor.
+pub(crate) fn candy_rates(
+    candy:&er_state::current_reward_candy::CurrentRewardCandyV1,utc:i64,
+    difficulty:RunDifficultyV1,wave:u64,
+)->Result<(u8,bool,u8),GameRuntimeV6Error>{
+    if candy.pokemon_before.id!=candy.holder || candy.profile_before.owner_seat!=candy.pokemon_before.owner_seat.ok_or(GameRuntimeV6Error::Action)?
+        || ![candy.max_utc,candy.event_utc].contains(&Some(utc)) {
+        return Err(GameRuntimeV6Error::Action);
+    }
+    let (multiplier,fusions)=event_rate(utc)?;
+    Ok((multiplier,fusions,candy_rate(difficulty,wave)?))
+}

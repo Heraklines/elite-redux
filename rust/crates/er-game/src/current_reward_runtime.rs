@@ -92,7 +92,7 @@ pub(super) fn execute(
         .is_some_and(|reward| {
             matches!(
                 reward.stage,
-                er_state::current_reward_selection::CurrentRewardStageV1::Applied { .. }
+                er_state::current_reward_selection::CurrentRewardStageV1::Applied { .. } | er_state::current_reward_selection::CurrentRewardStageV1::CandyPending { .. }
             ) || (matches!(
                 reward.stage,
                 er_state::current_reward_selection::CurrentRewardStageV1::TmPending { .. }

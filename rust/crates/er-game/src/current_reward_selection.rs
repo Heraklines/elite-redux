@@ -137,6 +137,7 @@ fn generate(
             run_before,
             stage: Stage::Choice,
             tm: None,
+            candy: None,
             declined_tms: Vec::new(),
         },
         after,
@@ -266,6 +267,11 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
             return Err(invalid());
         }
     }
+    if selection.candy.is_some() {
+        crate::current_reward_candy::validate_live(state,id)?;
+        if owned_run(state)? != &selection.run_before {return Err(invalid());}
+        return Ok(());
+    }
     if let Some(tm) = selection.tm.as_deref() {
         use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
         if matches!(tm.phase, T::Declined { .. }) && matches!(selection.stage, Stage::Choice) {
@@ -317,7 +323,7 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
                 .get(usize::from(offer))
                 .ok_or_else(invalid)?;
             if option.args.is_some()
-                || (healing(&option.source_id).is_none() && option.source_id != "TM_CASE")
+                || (healing(&option.source_id).is_none() && !matches!(option.source_id.as_str(), "TM_CASE" | "RARE_CANDY"))
             {
                 return Err(invalid());
             }
@@ -334,7 +340,7 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
             }
             (selection.party_before.clone(), selection.run_before.clone())
         }
-        Stage::TmPending { .. } => return Err(invalid()),
+        Stage::TmPending { .. } | Stage::CandyPending { .. } => return Err(invalid()),
         Stage::Choice => (selection.party_before.clone(), selection.run_before.clone()),
     };
     if party != run.party || &inventory != owned_run(state)? {
@@ -356,6 +362,10 @@ pub(crate) fn validate(
     let mut before = state.clone();
     before.active_run.as_mut().ok_or_else(invalid)?.party = selection.party_before.clone();
     set_run(&mut before, selection.run_before.clone())?;
+    if let Some(candy)=selection.candy.as_deref(){
+        crate::current_reward_candy::validate(state,content,id)?;
+        before.current_friendship_profile=Some((*candy.profile_before).clone());
+    }
     if let Some(tm) = selection.tm.as_deref() {
         crate::current_reward_tm::set_history(&mut before, tm.holder, tm.history_before.clone())?;
         before.current_achievement_tracker = Some(*tm.tracker_before.clone());
@@ -413,7 +423,7 @@ pub(crate) fn validate(
                 return Err(invalid());
             }
         }
-        let event = tm.phase.event().or_else(|| match tm.phase {
+        let event = tm.phase.event().or(match tm.phase {
             er_state::current_reward_tm::CurrentRewardTmPhaseV1::Complete { event_id }
             | er_state::current_reward_tm::CurrentRewardTmPhaseV1::Declined { event_id } => {
                 Some(event_id)
@@ -467,7 +477,7 @@ pub(crate) fn select(
             let index = usize::try_from(ordinal).map_err(|_| invalid())?;
             let option = selection.offers.get(index).ok_or_else(invalid)?;
             let offer = u8::try_from(index).map_err(|_| invalid())?;
-            if healing(&option.source_id).is_some() || option.source_id == "TM_CASE" {
+            if healing(&option.source_id).is_some() || matches!(option.source_id.as_str(), "TM_CASE" | "RARE_CANDY") {
                 selection.stage = Stage::Holder { offer };
                 let mut state = before.clone();
                 set_selection(&mut state, id, selection)?;
@@ -493,6 +503,9 @@ pub(crate) fn select(
                 set_selection(&mut state, id, selection)?;
                 validate(&state, content, id)?;
                 return Ok(state);
+            }
+            if selection.offers[usize::from(offer)].source_id=="RARE_CANDY" {
+                return crate::current_reward_candy::prepare(before,content,id,offer,p.id);
             }
             (offer, Some(p.id))
         }
@@ -529,7 +542,7 @@ pub(crate) fn select(
             validate(&state, content, id)?;
             return Ok(state);
         }
-        Stage::Applied { .. } => return Err(invalid()),
+        Stage::Applied { .. } | Stage::CandyPending { .. } => return Err(invalid()),
     };
     let (party, inventory) = apply(&selection, offer, holder)?;
     selection.stage = Stage::Applied { offer, holder };
@@ -688,7 +701,7 @@ pub(crate) fn install_control(
                 cancel,
             )
         }
-        Stage::Applied { .. } => return Err(invalid()),
+        Stage::Applied { .. } | Stage::CandyPending { .. } => return Err(invalid()),
     };
     let operation = OperationId::new(format!(
         "m9e/reward/{}/{}/{}",

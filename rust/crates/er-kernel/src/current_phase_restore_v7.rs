@@ -15,6 +15,8 @@ fn retained_requests(state: &GameStateV6) -> Vec<GamePlatformEffectV2> {
         .and_then(|p| p.experience.as_ref())
     {
         for pending in &owner.pending {
+            if let Some(clock)=pending.victory_tail.as_ref().and_then(|t|t.reward.as_ref()).and_then(|r|r.candy.as_deref())
+                .and_then(current_phase_receipt_v7::candy_clock){effects.push(GamePlatformEffectV2::CurrentFriendshipClock{request:clock.clone()});}
             if let Some(request) = pending.friendship.as_ref().and_then(|p| p.clock.as_ref()) {
                 effects.push(GamePlatformEffectV2::CurrentFriendshipClock {
                     request: request.clone(),
@@ -54,15 +56,23 @@ pub(super) fn owned_waiting_phase(
     };
     if state.current_turn_execution.is_none() {
         let expected=current_phase_receipt_v7::expected_presentations(state);
-        return expected.len()==1&&expected[0].kind==K::RewardTm
+        let requests=retained_requests(state);
+        let candy_clock=state.current_battle_participation.as_ref().and_then(|p|p.experience.as_ref())
+            .and_then(|p|p.pending.first()).and_then(|p|p.victory_tail.as_ref()).and_then(|t|t.reward.as_ref())
+            .and_then(|r|r.candy.as_deref()).and_then(current_phase_receipt_v7::candy_clock);
+        let exact_clock=candy_clock.is_some_and(|clock|requests.as_slice()==[GamePlatformEffectV2::CurrentFriendshipClock{request:clock.clone()}]);
+        return ((expected.len()==1&&matches!(expected[0].kind,K::RewardTm|K::RewardCandy)
+                &&current_phase_receipt_v7::receipt_matches(state,content,expected[0])&&requests.is_empty())
+            ||(expected.is_empty()&&exact_clock))
             && run.control.kind==GameControlKindV2::Waiting&&!run.control.actionable
             && run.control.owner_seat.is_none()&&run.control.menu.is_none()&&run.control.action_context.is_none()
             && battle.authority_seat==local_seat
             && content.world.mode(run.mode).is_some_and(|mode|!mode.cooperative)
-            && current_phase_receipt_v7::receipt_matches(state,content,expected[0])
             && state.validate_with(content).is_ok();
     }
-    let Some(turn) = &state.current_turn_execution else {return false;};
+    let Some(turn) = &state.current_turn_execution else {
+        return false;
+    };
     let Some(owner) = state
         .current_battle_participation
         .as_ref()
@@ -73,21 +83,36 @@ pub(super) fn owned_waiting_phase(
     let expected = current_phase_receipt_v7::expected_presentations(state);
     if let Some(child) = &turn.stat_child {
         return run.control.kind == GameControlKindV2::Waiting
-            && !run.control.actionable && run.control.owner_seat.is_none()
-            && run.control.menu.is_none() && run.control.action_context.is_none()
-            && content.world.mode(run.mode).is_some_and(|mode| !mode.cooperative)
-            && battle.authority_seat == local_seat && turn.authority == local_seat
+            && !run.control.actionable
+            && run.control.owner_seat.is_none()
+            && run.control.menu.is_none()
+            && run.control.action_context.is_none()
+            && content
+                .world
+                .mode(run.mode)
+                .is_some_and(|mode| !mode.cooperative)
+            && battle.authority_seat == local_seat
+            && turn.authority == local_seat
             && turn.stage == CurrentTurnStageV1::ReadyForMove
             && owner.authority == local_seat
-            && owner.execution_origin == Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
-            && owner.source_progression.is_some() && owner.pending.is_empty()
-            && expected.len() == 1 && expected[0].pending.get() == u64::from(child.action_index)
+            && owner.execution_origin
+                == Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
+            && owner.source_progression.is_some()
+            && owner.pending.is_empty()
+            && expected.len() == 1
+            && expected[0].pending.get() == u64::from(child.action_index)
             && matches!(expected[0].kind, K::StatAnimation | K::StatMessage)
             && current_phase_receipt_v7::receipt_matches(state, content, expected[0])
             && retained_requests(state).is_empty()
-            && run.party.iter().chain(run.storage.iter().map(|stored| &stored.pokemon))
+            && run
+                .party
+                .iter()
+                .chain(run.storage.iter().map(|stored| &stored.pokemon))
                 .all(|pokemon| pokemon.owner_seat == Some(local_seat))
-            && battle.enemy_party.iter().all(|pokemon| pokemon.owner_seat.is_none())
+            && battle
+                .enemy_party
+                .iter()
+                .all(|pokemon| pokemon.owner_seat.is_none())
             && state.validate_with(content).is_ok();
     }
     let requests = retained_requests(state);
@@ -138,17 +163,38 @@ fn retained_effect(
         .and_then(|participation| participation.experience.as_ref())
         .ok_or(GameKernelV7Error::Invalid)?;
     let (family, payload) = match ack.kind {
+        K::RewardCandy=>(PresentationCueFamilyV1::Progression,current_phase_receipt_v7::candy_payload(state,ack.event_id).ok_or(GameKernelV7Error::Invalid)?),
         K::StatAnimation | K::StatMessage => {
-            let child = state.current_turn_execution.as_ref().and_then(|turn| turn.stat_child.as_ref())
+            let child = state
+                .current_turn_execution
+                .as_ref()
+                .and_then(|turn| turn.stat_child.as_ref())
                 .ok_or(GameKernelV7Error::Invalid)?;
-            (PresentationCueFamilyV1::Move, if ack.kind == K::StatAnimation {
-                P::StatStageAnimation { holder: child.target, stat: child.stat, before: child.before,
-                    after: child.after(), tween_milliseconds: 1750 }
-            } else {
-                P::StatStageMessage { holder: child.target, stat: child.stat, before: child.before, after: child.after() }
-            })
+            (
+                PresentationCueFamilyV1::Move,
+                if ack.kind == K::StatAnimation {
+                    P::StatStageAnimation {
+                        holder: child.target,
+                        stat: child.stat,
+                        before: child.before,
+                        after: child.after(),
+                        tween_milliseconds: 1750,
+                    }
+                } else {
+                    P::StatStageMessage {
+                        holder: child.target,
+                        stat: child.stat,
+                        before: child.before,
+                        after: child.after(),
+                    }
+                },
+            )
         }
-        K::RewardTm=>(PresentationCueFamilyV1::Progression,current_phase_receipt_v7::reward_tm_payload(state,ack.event_id).ok_or(GameKernelV7Error::Invalid)?),
+        K::RewardTm => (
+            PresentationCueFamilyV1::Progression,
+            current_phase_receipt_v7::reward_tm_payload(state, ack.event_id)
+                .ok_or(GameKernelV7Error::Invalid)?,
+        ),
         K::FaintAnimation | K::FaintMessage => {
             let phase = owner
                 .source_progression

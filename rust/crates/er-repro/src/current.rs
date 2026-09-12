@@ -652,14 +652,33 @@ impl CurrentReproRecorderV1 {
         if origin.is_some_and(|value| value.len() > MAXIMUM_ORIGIN_BYTES) {
             return Err(invalid("origin bound"));
         }
-        if !fits(before, self.limits.maximum_bytes)
+        // Native bootstrap checkpoints contain typed integer/string state, not
+        // arbitrary protocol JSON. Exact structural equality here therefore
+        // preserves the encoded snapshot, including its byte bound and digest.
+        // Keep all other lifecycles/owners on the independent encoding path.
+        let initial_checkpoint_digest = self.capsule.as_ref().and_then(|capsule| {
+            (capsule.attempts.is_empty()
+                && matches!(&before.lifecycle, er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7::Bootstrap(_))
+                && before.protocol.is_none()
+                && before.current_proposal.is_none()
+                && before.current_coop_setup.is_none()
+                && before.private_battle_control.is_none()
+                && before.private_learning_control.is_none()
+                && before.prepared_transaction.is_none()
+                && capsule.checkpoint.as_ref() == before)
+                .then(|| capsule.final_snapshot_digest.clone())
+        });
+        if (initial_checkpoint_digest.is_none() && !fits(before, self.limits.maximum_bytes))
             || !fits(after, self.limits.maximum_bytes)
             || !fits(&event, self.limits.maximum_bytes)
             || !outcome.fits(self.limits.maximum_bytes)
         {
             return Err(invalid("single attempt capture bound"));
         }
-        let before_digest = snapshot_digest(before)?;
+        let before_digest = match initial_checkpoint_digest {
+            Some(digest) => digest,
+            None => snapshot_digest(before)?,
+        };
         // The private initial checkpoint is installed only after restoration;
         // later final digests are installed only after the validation below,
         // or full capsule replay on import. Reuse that exact canonical snapshot

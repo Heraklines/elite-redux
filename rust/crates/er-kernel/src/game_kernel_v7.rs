@@ -1631,8 +1631,12 @@ impl GameKernelV7 {
             return Err(GameKernelV7Error::Invalid);
         }
         if phase_ack.is_some_and(|ack| {
-            matches!(ack.kind, crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation
-                | crate::snapshot_v7::CurrentPhasePresentationKindV1::StatAnimation)
+            matches!(
+                ack.kind,
+                crate::snapshot_v7::CurrentPhasePresentationKindV1::FaintAnimation
+                    | crate::snapshot_v7::CurrentPhasePresentationKindV1::StatAnimation
+                    | crate::snapshot_v7::CurrentPhasePresentationKindV1::RewardCandy
+            )
         }) && !completed
         {
             return Err(GameKernelV7Error::Invalid);

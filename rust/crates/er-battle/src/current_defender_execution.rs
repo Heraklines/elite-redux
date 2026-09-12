@@ -201,14 +201,25 @@ pub(super) fn execute(
                         hits_left: 1,
                     });
                 }
-                if input.targeting.source_damage() && input.definition.id.get().get()==45 && !target.fainted {
+                if input.targeting.source_damage()
+                    && input.definition.id.get().get() == 45
+                    && !target.fainted
+                {
                     // Source actual POST_APPLY chance100, after real damage and
                     // only for a surviving target. Queue ownership is an event;
                     // it does not apply the stat before its animation callback.
-                    source_events.as_deref_mut().ok_or(BattleV5Error::UnsupportedContent)?.push(
-                        CurrentBattleSourceEventV1::StatStageChangeQueued {
-                            user:input.actor.id,source_slot:input.source_slot,target:holder,target_slot,move_id:input.definition.id,
-                            stat:1,before:target.stat_stages.attack,stages:-1,
+                    source_events
+                        .as_deref_mut()
+                        .ok_or(BattleV5Error::UnsupportedContent)?
+                        .push(CurrentBattleSourceEventV1::StatStageChangeQueued {
+                            user: input.actor.id,
+                            source_slot: input.source_slot,
+                            target: holder,
+                            target_slot,
+                            move_id: input.definition.id,
+                            stat: 1,
+                            before: target.stat_stages.attack,
+                            stages: -1,
                         });
                 }
                 total_damage = total_damage
@@ -304,12 +315,22 @@ pub(super) fn execute(
     }
     let after_move = execute_hook_v2(input.content, input.mechanics, MechanicHookV2::AfterMove)
         .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
-    let stat_tail=source_events.as_ref().is_some_and(|events|events.iter().any(|event|
-        matches!(event,CurrentBattleSourceEventV1::StatStageChangeQueued{..})));
+    let stat_tail = source_events.as_ref().is_some_and(|events| {
+        events.iter().any(|event| {
+            matches!(
+                event,
+                CurrentBattleSourceEventV1::StatStageChangeQueued { .. }
+            )
+        })
+    });
     if stat_tail {
         // The child retains unfinished MoveEnd. Only a proved neutral tail is
         // admitted here; the matching message callback executes its completion.
-        if after_move.operations.iter().any(|effect|effect.condition_matched) {
+        if after_move
+            .operations
+            .iter()
+            .any(|effect| effect.condition_matched)
+        {
             return Err(BattleV5Error::UnsupportedContent);
         }
     } else {

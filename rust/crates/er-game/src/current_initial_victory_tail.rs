@@ -571,6 +571,7 @@ pub(crate) fn projection_for_validation(
     let run = projected.active_run.as_mut().ok_or_else(failure)?;
     if let Some(reward) = tail.reward.as_ref() {
         run.party = reward.party_before.clone();
+        if let Some(candy)=reward.candy.as_ref(){projected.current_friendship_profile=Some((*candy.profile_before).clone());}
     }
     if let Some(endpoint) = tail.xp_endpoint() {
         if endpoint.len() != run.party.len() {

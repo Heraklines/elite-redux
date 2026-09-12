@@ -10,7 +10,10 @@ pub enum GameOwnedPhaseV1 {
     TurnStep,
     TurnFinish,
     StatStageBegin,
-    StatStagePresentation { event_id: PresentationEventId, animation: bool },
+    StatStagePresentation {
+        event_id: PresentationEventId,
+        animation: bool,
+    },
     FriendshipBegin,
     FaintBegin {
         pending: SafeU53,
@@ -31,6 +34,7 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         menu_instance: MenuInstanceId,
     },
+    RewardCandy { pending: SafeU53, callback: Option<PresentationEventId> },
     RewardTmLearn {
         pending: SafeU53,
     },
@@ -367,8 +371,24 @@ fn phase_transition(
             phase,
         );
     }
-    if matches!(phase, GameOwnedPhaseV1::StatStageBegin | GameOwnedPhaseV1::StatStagePresentation { .. }) {
-        return current_stat_stage_transition::transition(before,content,operation_id,authority_seat,revision,phase);
+    let candy_phase=match &phase{
+        GameOwnedPhaseV1::RewardCandy{..}=>true,
+        GameOwnedPhaseV1::FriendshipClock{request,..}=>crate::current_reward_candy::owner(before,request.pending).is_ok(),
+        _=>false,
+    };
+    if candy_phase{return current_reward_candy_transition::transition(before,content,operation_id,authority_seat,revision,phase);}
+    if matches!(
+        phase,
+        GameOwnedPhaseV1::StatStageBegin | GameOwnedPhaseV1::StatStagePresentation { .. }
+    ) {
+        return current_stat_stage_transition::transition(
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
+        );
     }
     let turn = before
         .current_turn_execution
@@ -461,6 +481,7 @@ fn phase_transition(
         | GameOwnedPhaseV1::VictoryTail { .. }
         | GameOwnedPhaseV1::RewardBegin { .. }
         | GameOwnedPhaseV1::RewardTmLearn { .. }
+        | GameOwnedPhaseV1::RewardCandy { .. }
         | GameOwnedPhaseV1::RewardTmPresentation { .. }
         | GameOwnedPhaseV1::AchievementClock { .. }
         | GameOwnedPhaseV1::FlashEgg { .. }
@@ -738,3 +759,6 @@ fn turn_step_transition(
 
 #[path = "current_stat_stage_transition.rs"]
 mod current_stat_stage_transition;
+
+#[path = "current_reward_candy_transition.rs"]
+mod current_reward_candy_transition;

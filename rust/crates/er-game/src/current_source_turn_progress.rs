@@ -81,7 +81,8 @@ pub(crate) fn fold(
     } else {
         for event in events {
             let (pokemon, amount) = match event {
-                CurrentBattleSourceEventV1::MoveResolution { .. } | CurrentBattleSourceEventV1::StatStageChangeQueued { .. } => continue,
+                CurrentBattleSourceEventV1::MoveResolution { .. }
+                | CurrentBattleSourceEventV1::StatStageChangeQueued { .. } => continue,
                 CurrentBattleSourceEventV1::MoveDamage { target, damage, .. } => (*target, *damage),
                 CurrentBattleSourceEventV1::StruggleRecoilDamage {
                     user,

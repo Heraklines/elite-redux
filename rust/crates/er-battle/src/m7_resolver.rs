@@ -1823,21 +1823,36 @@ pub fn complete_current_stat_tail(
     state: &er_state::m9e_state_v6::GameStateV6,
     content: &PreparedBattleContentV3,
 ) -> Result<(), BattleV5Error> {
-    let run=state.active_run.as_ref().ok_or(BattleV5Error::NoBattle)?;
-    let battle=run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
-    let turn=state.current_turn_execution.as_ref().ok_or(BattleV5Error::UnsupportedContent)?;
-    turn.validate(run).map_err(|_| BattleV5Error::UnsupportedContent)?;
-    let child=turn.stat_child.as_ref().ok_or(BattleV5Error::UnsupportedContent)?;
-    if !matches!(child.phase,er_state::current_turn_execution::CurrentStatStageChildPhaseV1::Message{..}) {
+    let run = state.active_run.as_ref().ok_or(BattleV5Error::NoBattle)?;
+    let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
+    let turn = state
+        .current_turn_execution
+        .as_ref()
+        .ok_or(BattleV5Error::UnsupportedContent)?;
+    turn.validate(run)
+        .map_err(|_| BattleV5Error::UnsupportedContent)?;
+    let child = turn
+        .stat_child
+        .as_ref()
+        .ok_or(BattleV5Error::UnsupportedContent)?;
+    if !matches!(
+        child.phase,
+        er_state::current_turn_execution::CurrentStatStageChildPhaseV1::Message { .. }
+    ) {
         return Err(BattleV5Error::UnsupportedContent);
     }
-    let actor=pokemon(run,child.source).ok_or(BattleV5Error::Target)?;
-    let targeting=CurrentTargetExecution::from_state(state).map_err(|_| BattleV5Error::UnsupportedContent)?;
-    let sources=current_or_legacy_sources(run,actor,child.move_id,Some(&targeting))?;
-    let context=mechanics_context(actor,battle,&sources);
-    let tail=execute_hook_v2(content,&context,MechanicHookV2::AfterMove)
-        .map_err(|error|BattleV5Error::Mechanics(error.to_string()))?;
-    if tail.operations.iter().any(|effect|effect.condition_matched) {
+    let actor = pokemon(run, child.source).ok_or(BattleV5Error::Target)?;
+    let targeting =
+        CurrentTargetExecution::from_state(state).map_err(|_| BattleV5Error::UnsupportedContent)?;
+    let sources = current_or_legacy_sources(run, actor, child.move_id, Some(&targeting))?;
+    let context = mechanics_context(actor, battle, &sources);
+    let tail = execute_hook_v2(content, &context, MechanicHookV2::AfterMove)
+        .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
+    if tail
+        .operations
+        .iter()
+        .any(|effect| effect.condition_matched)
+    {
         return Err(BattleV5Error::UnsupportedContent);
     }
     Ok(())

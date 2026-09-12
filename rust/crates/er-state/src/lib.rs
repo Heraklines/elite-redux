@@ -52,3 +52,5 @@ pub mod current_random_target_commands;
 pub mod current_reward_run;
 pub mod current_reward_selection;
 pub mod current_reward_tm;
+
+pub mod current_reward_candy;

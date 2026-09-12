@@ -241,6 +241,10 @@ pub enum GameMaterialV6Error {
     CurrentTargetOwnership,
     #[error("material V6 is invalid")]
     Invalid,
+    #[error("material V6 decoding failed: {0}")]
+    Decode(String),
+    #[error("material V6 decoded bytes differ from canonical encoding")]
+    NonCanonical,
     #[error("material V6 canonical encoding failed: {0}")]
     Canonical(String),
     #[error("material V6 frontier differs")]
@@ -253,12 +257,6 @@ pub enum GameMaterialV6Error {
     StaleUnverifiable,
     #[error("material V6 applied-material ledger is full or invalid")]
     Ledger,
-}
-
-fn invalid_material_at(site: &'static str) -> GameMaterialV6Error {
-    // Compact causal context only: the error and all acceptance checks stay unchanged.
-    eprintln!("M9E material validation rejected at {site}");
-    GameMaterialV6Error::Invalid
 }
 
 impl GameMaterialV6 {
@@ -287,9 +285,9 @@ impl GameMaterialV6 {
             return Err(GameMaterialV6Error::Invalid);
         }
         let value: Self =
-            serde_json::from_slice(bytes).map_err(|_| GameMaterialV6Error::Invalid)?;
+            serde_json::from_slice(bytes).map_err(|error| GameMaterialV6Error::Decode(error.to_string()))?;
         if value.canonical_bytes()? != bytes {
-            return Err(GameMaterialV6Error::Invalid);
+            return Err(GameMaterialV6Error::NonCanonical);
         }
         Ok(value)
     }
@@ -328,16 +326,16 @@ impl GameMaterialV6 {
                 transition.after_state.identities.next_platform_request_id,
             )
         {
-            return Err(invalid_material_at("material-v6:323"));
+            return Err(GameMaterialV6Error::Invalid);
         }
         transition
             .next_control
             .validate()
-            .map_err(|_| invalid_material_at("material-v6:328"))?;
+            .map_err(|_| GameMaterialV6Error::Invalid)?;
         transition
             .after_state
             .validate()
-            .map_err(|_| invalid_material_at("material-v6:332"))
+            .map_err(|_| GameMaterialV6Error::Invalid)
     }
 }
 
@@ -511,12 +509,12 @@ fn apply_to_validated_ledger(
         return Err(GameMaterialV6Error::Revision);
     }
     if &transition.content_identity != content.identity() {
-        return Err(invalid_material_at("material-v6:506"));
+        return Err(GameMaterialV6Error::Invalid);
     }
     transition
         .after_state
         .validate_with(content)
-        .map_err(|_| invalid_material_at("material-v6:511"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     validate_presentation_frontier(live.as_ref(), transition)?;
     let owned_reward = matches!(
         transition.accepted_action,
@@ -529,11 +527,11 @@ fn apply_to_validated_ledger(
     if owned_reward {
         crate::m9e_runtime_v6::validate_current_reward_transition(
             live.as_ref()
-                .ok_or_else(|| invalid_material_at("material-v6:519"))?,
+                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
             content,
             transition,
         )
-        .map_err(|_| invalid_material_at("material-v6:520"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     let owned_learning = matches!(
         transition.accepted_action,
@@ -542,11 +540,11 @@ fn apply_to_validated_ledger(
     if owned_learning {
         crate::m9e_runtime_v6::validate_current_learning_transition(
             live.as_ref()
-                .ok_or_else(|| invalid_material_at("material-v6:528"))?,
+                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
             content,
             transition,
         )
-        .map_err(|_| invalid_material_at("material-v6:532"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     if transition.owned_phase.is_none()
         && !owned_learning
@@ -563,7 +561,7 @@ fn apply_to_validated_ledger(
     {
         // A caller cannot bypass the runtime's source-context mutation guard by
         // supplying material for an unowned world/modifier/fusion/reward path.
-        return Err(invalid_material_at("material-v6:549"));
+        return Err(GameMaterialV6Error::Invalid);
     }
     // Only independently recomputed owned action phases can introduce an actual
     // defender observation. Other material may only synchronize represented
@@ -577,28 +575,33 @@ fn apply_to_validated_ledger(
                     let mut owner = owner.clone();
                     owner
                         .synchronize(run)
-                        .map_err(|_| invalid_material_at("material-v6:563"))?;
+                        .map_err(|_| GameMaterialV6Error::Invalid)?;
                     Ok::<_, GameMaterialV6Error>(owner)
                 })
                 .transpose()?,
             _ => None,
         };
         if transition.after_state.current_defender_dispatch != expected {
-            return Err(invalid_material_at("material-v6:570"));
+            return Err(GameMaterialV6Error::Invalid);
         }
     }
     crate::current_random_target_admission::validate_transition(live.as_ref(), content, transition)
-        .map_err(|_| invalid_material_at("material-v6:574"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     crate::m9e_runtime_v6::validate_current_turn_transition(live.as_ref(), content, transition)
-        .map_err(|_| invalid_material_at("material-v6:576"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     // The preceding validator independently replays the complete turn-begin
     // candidate. Its real TurnInit resets source damageTaken/last_reset_turn;
     // the legacy XP successor conservation rule cannot represent that mutation.
     let genuine_turn_begin = transition.owned_phase.is_none()
-        && live.as_ref().is_some_and(|prior| prior.current_turn_execution.is_none())
+        && live
+            .as_ref()
+            .is_some_and(|prior| prior.current_turn_execution.is_none())
         && transition.after_state.current_turn_execution.is_some()
         && transition.domain == GameActionDomainV2::BattleTurn
-        && matches!(transition.accepted_action, Some(GameActionV1::Battle { .. }));
+        && matches!(
+            transition.accepted_action,
+            Some(GameActionV1::Battle { .. })
+        );
     if let Some(prior) = live.as_ref() {
         let same_run = prior.active_run.as_ref().map(|run| run.run_id)
             == transition
@@ -623,17 +626,17 @@ fn apply_to_validated_ledger(
                     && prior.current_achievement_tracker
                         != transition.after_state.current_achievement_tracker)
         {
-            return Err(invalid_material_at("material-v6:607"));
+            return Err(GameMaterialV6Error::Invalid);
         }
     }
     if transition.owned_phase.is_some() {
         crate::m9e_runtime_v6::validate_owned_phase_transition(
             live.as_ref()
-                .ok_or_else(|| invalid_material_at("material-v6:612"))?,
+                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
             content,
             transition,
         )
-        .map_err(|_| invalid_material_at("material-v6:616"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     if let Some(prior) = live
         .as_ref()
@@ -645,11 +648,15 @@ fn apply_to_validated_ledger(
             .current_battle_participation
             .as_ref()
             .and_then(|owner| owner.experience.as_ref())
-            .ok_or_else(|| invalid_material_at("material-v6:628"))?;
-        if transition.owned_phase.is_none() && !owned_learning && !owned_reward && !genuine_turn_begin {
+            .ok_or_else(|| GameMaterialV6Error::Invalid)?;
+        if transition.owned_phase.is_none()
+            && !owned_learning
+            && !owned_reward
+            && !genuine_turn_begin
+        {
             prior
                 .validate_successor(next)
-                .map_err(|_| invalid_material_at("material-v6:632"))?;
+                .map_err(|_| GameMaterialV6Error::Invalid)?;
         }
     }
     // Only a fully recomputed owned phase can change an established account.
@@ -659,7 +666,7 @@ fn apply_to_validated_ledger(
             prior.current_friendship_profile != transition.after_state.current_friendship_profile
         })
     {
-        return Err(invalid_material_at("material-v6:642"));
+        return Err(GameMaterialV6Error::Invalid);
     }
     // Current targeting is established only by bootstrap. Same-run material cannot
     // erase or invent it; a true terminal transition may retire the run owner.
@@ -688,7 +695,7 @@ fn apply_to_validated_ledger(
             == Some(run.run_id)
         && transition.after_state.current_run_difficulty != prior.current_run_difficulty
     {
-        return Err(invalid_material_at("material-v6:671"));
+        return Err(GameMaterialV6Error::Invalid);
     }
     let before_digest = match live.as_ref() {
         Some(state) => game_state_digest(state)?,
@@ -937,26 +944,26 @@ fn validate_presentation_frontier(
         {
             return Ok(());
         }
-        _ => return Err(invalid_material_at("material-v6:920")),
+        _ => return Err(GameMaterialV6Error::Invalid),
     };
     let mut next = expected.next_event_id;
     for effect in &transition.presentation {
         if effect.event_id.get() != next {
-            return Err(invalid_material_at("material-v6:925"));
+            return Err(GameMaterialV6Error::Invalid);
         }
         expected.receipts.push(
             er_state::current_presentation::CurrentPresentationReceiptV1 {
                 event_id: effect.event_id,
                 effect_sha256: er_canonical::fixture_digest(effect)
-                    .map_err(|_| invalid_material_at("material-v6:931"))?,
+                    .map_err(|_| GameMaterialV6Error::Invalid)?,
             },
         );
         next = SafeU53::new(
             next.get()
                 .checked_add(1)
-                .ok_or_else(|| invalid_material_at("material-v6:937"))?,
+                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
         )
-        .map_err(|_| invalid_material_at("material-v6:939"))?;
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     let excess = expected
         .receipts
@@ -965,7 +972,7 @@ fn validate_presentation_frontier(
     expected.receipts.drain(..excess);
     expected.next_event_id = next;
     if after != Some(&expected) {
-        return Err(invalid_material_at("material-v6:948"));
+        return Err(GameMaterialV6Error::Invalid);
     }
     Ok(())
 }

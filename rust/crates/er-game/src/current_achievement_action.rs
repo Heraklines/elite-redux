@@ -102,7 +102,6 @@ pub(crate) fn fold_current_achievement_action(
                 .map_err(|_| failure())?;
             if matches!(definition.category, MoveCategory::Status)
                 || matches!(definition.power, MovePower::None)
-
             {
                 // The current resolver records status hit checks but does not
                 // execute the owned source effect/callback. A complete history
@@ -285,7 +284,12 @@ fn fold_source_admitted_action(
                         move_id,
                         ..
                     }
-                    | CurrentBattleSourceEventV1::StatStageChangeQueued { user,source_slot,move_id,.. }
+                    | CurrentBattleSourceEventV1::StatStageChangeQueued {
+                        user,
+                        source_slot,
+                        move_id,
+                        ..
+                    }
                     | CurrentBattleSourceEventV1::StruggleRecoilDamage {
                         user,
                         source_slot,
@@ -345,32 +349,61 @@ fn validate_stat_child(
     events: &[CurrentBattleSourceEventV1],
 ) -> Result<(), GameRuntimeV6Error> {
     use er_state::current_turn_execution::{CurrentStatStageChildPhaseV1, CurrentStatStageChildV1};
-    if before.current_turn_execution.as_ref().is_some_and(|turn| turn.stat_child.is_some()) {
+    if before
+        .current_turn_execution
+        .as_ref()
+        .is_some_and(|turn| turn.stat_child.is_some())
+    {
         return Err(failure());
     }
     let mut expected = None;
     for event in events {
         if let CurrentBattleSourceEventV1::StatStageChangeQueued {
-            user, target, target_slot, move_id, stat, before: before_stage, stages, ..
-        } = event {
+            user,
+            target,
+            target_slot,
+            move_id,
+            stat,
+            before: before_stage,
+            stages,
+            ..
+        } = event
+        {
             let previous = before.current_turn_execution.as_ref().ok_or_else(failure)?;
-            if expected.is_some() { return Err(failure()); }
+            if expected.is_some() {
+                return Err(failure());
+            }
             expected = Some(Box::new(CurrentStatStageChildV1 {
-                action_index: previous.next_action, source: *user, target: *target,
-                target_slot: *target_slot, move_id: *move_id, stat: *stat,
-                before: *before_stage, stages: *stages, phase: CurrentStatStageChildPhaseV1::Ready,
+                action_index: previous.next_action,
+                source: *user,
+                target: *target,
+                target_slot: *target_slot,
+                move_id: *move_id,
+                stat: *stat,
+                before: *before_stage,
+                stages: *stages,
+                phase: CurrentStatStageChildPhaseV1::Ready,
             }));
         }
     }
-    if after.current_turn_execution.as_ref().and_then(|turn| turn.stat_child.as_ref()) != expected.as_ref() {
+    if after
+        .current_turn_execution
+        .as_ref()
+        .and_then(|turn| turn.stat_child.as_ref())
+        != expected.as_ref()
+    {
         return Err(failure());
     }
     // Actual guaranteed Growl POST_APPLY queues exactly one child if direct
     // damage left its target alive. This observes the event, never final HP alone.
-    let must_queue = events.iter().any(|event| matches!(event,
+    let must_queue = events.iter().any(|event| {
+        matches!(event,
         CurrentBattleSourceEventV1::MoveDamage { move_id, target_hp_after, .. }
-            if move_id.get().get() == 45 && *target_hp_after > 0));
-    if must_queue != expected.is_some() { return Err(failure()); }
+            if move_id.get().get() == 45 && *target_hp_after > 0)
+    });
+    if must_queue != expected.is_some() {
+        return Err(failure());
+    }
     Ok(())
 }
 /// Created only by the actual source-context admission wrapper above.
@@ -495,7 +528,8 @@ impl ActionFold {
                     let (resolved_user, resolved_slot, resolved_move, targets) =
                         resolution.ok_or_else(failure)?;
                     let holder = at_slot(before, *target_slot, *target)?;
-                    if stat_queued || recoil_seen
+                    if stat_queued
+                        || recoil_seen
                         || (resolved_user, resolved_slot, resolved_move)
                             != (*user, *source_slot, *move_id)
                         || *use_mode != CurrentMoveUseModeV1::Direct
@@ -544,16 +578,38 @@ impl ActionFold {
                         }
                     }
                 }
-                CurrentBattleSourceEventV1::StatStageChangeQueued {user,source_slot,target,target_slot,move_id,stat,before:before_stage,stages} => {
-                    let (resolved_user,resolved_slot,resolved_move,targets)=resolution.ok_or_else(failure)?;
-                    let holder=at_slot(before,*target_slot,*target)?;
-                    if stat_queued || recoil_seen || (resolved_user,resolved_slot,resolved_move)!=(*user,*source_slot,*move_id)
-                        || move_id.get().get()!=45 || *stat!=1 || *stages != -1
-                        || holder.stat_stages.attack!=*before_stage || !damaged.contains(target)
-                        || !hp.get(target).is_some_and(|hp|*hp>0)
-                        || !targets.iter().any(|row|row.target==*target&&row.slot==*target_slot&&row.result==CurrentHitCheckV1::Hit)
-                    {return Err(failure());}
-                    stat_queued=true;
+                CurrentBattleSourceEventV1::StatStageChangeQueued {
+                    user,
+                    source_slot,
+                    target,
+                    target_slot,
+                    move_id,
+                    stat,
+                    before: before_stage,
+                    stages,
+                } => {
+                    let (resolved_user, resolved_slot, resolved_move, targets) =
+                        resolution.ok_or_else(failure)?;
+                    let holder = at_slot(before, *target_slot, *target)?;
+                    if stat_queued
+                        || recoil_seen
+                        || (resolved_user, resolved_slot, resolved_move)
+                            != (*user, *source_slot, *move_id)
+                        || move_id.get().get() != 45
+                        || *stat != 1
+                        || *stages != -1
+                        || holder.stat_stages.attack != *before_stage
+                        || !damaged.contains(target)
+                        || !hp.get(target).is_some_and(|hp| *hp > 0)
+                        || !targets.iter().any(|row| {
+                            row.target == *target
+                                && row.slot == *target_slot
+                                && row.result == CurrentHitCheckV1::Hit
+                        })
+                    {
+                        return Err(failure());
+                    }
+                    stat_queued = true;
                 }
                 CurrentBattleSourceEventV1::StruggleRecoilDamage {
                     user,
@@ -569,7 +625,8 @@ impl ActionFold {
                         resolution.ok_or_else(failure)?;
                     let holder = at_slot(before, *source_slot, *user)?;
                     let expected_request = (holder.max_hp / 4).max(u32::from(!damaged.is_empty()));
-                    if stat_queued || recoil_seen
+                    if stat_queued
+                        || recoil_seen
                         || (resolved_user, resolved_slot, resolved_move)
                             != (*user, *source_slot, *move_id)
                         || move_id.get().get() != 165

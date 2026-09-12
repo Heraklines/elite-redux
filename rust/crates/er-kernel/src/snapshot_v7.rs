@@ -94,6 +94,7 @@ pub enum CurrentPhasePresentationKindV1 {
     StatAnimation,
     StatMessage,
     RewardTm,
+    RewardCandy,
     Victory,
     FaintAnimation,
     FaintMessage,
@@ -558,7 +559,7 @@ fn validate_active_state(
     {
         return Err(SnapshotV7Error::Invalid);
     }
-    let clocks = state
+    let mut clocks = state
         .current_battle_participation
         .as_ref()
         .and_then(|value| value.experience.as_ref())
@@ -567,6 +568,10 @@ fn validate_active_state(
         .filter_map(|pending| pending.friendship.as_ref())
         .filter_map(|phase| phase.clock.as_ref())
         .collect::<Vec<_>>();
+    clocks.extend(state.current_battle_participation.as_ref().and_then(|p|p.experience.as_ref())
+        .into_iter().flat_map(|o|&o.pending).filter_map(|p|p.victory_tail.as_ref())
+        .filter_map(|t|t.reward.as_ref()).filter_map(|r|r.candy.as_deref())
+        .filter_map(crate::game_kernel_v7::current_phase_receipt_v7::candy_clock));
     let effects = snapshot
         .pending_platform
         .iter()

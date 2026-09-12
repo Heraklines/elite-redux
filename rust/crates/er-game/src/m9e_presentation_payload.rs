@@ -23,10 +23,29 @@ pub enum GamePresentationAchievementV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum GamePresentationPayloadV1 {
-    MoveLearning {holder:PokemonId,move_id:MoveId,step:GamePresentationMoveLearningV1},
-    MoveLearned { holder: PokemonId, move_id: MoveId },
-    StatStageAnimation { holder: PokemonId, stat: u8, before: i8, after: i8, tween_milliseconds: u16 },
-    StatStageMessage { holder: PokemonId, stat: u8, before: i8, after: i8 },
+    CandyLevelMessage { holder: PokemonId, level: u16 },
+    MoveLearning {
+        holder: PokemonId,
+        move_id: MoveId,
+        step: GamePresentationMoveLearningV1,
+    },
+    MoveLearned {
+        holder: PokemonId,
+        move_id: MoveId,
+    },
+    StatStageAnimation {
+        holder: PokemonId,
+        stat: u8,
+        before: i8,
+        after: i8,
+        tween_milliseconds: u16,
+    },
+    StatStageMessage {
+        holder: PokemonId,
+        stat: u8,
+        before: i8,
+        after: i8,
+    },
     FaintAnimation {
         holder: PokemonId,
         tween_milliseconds: u16,
@@ -76,7 +95,9 @@ pub enum GamePresentationPayloadV1 {
         ability: AbilityId,
         innate_slot: Option<u8>,
     },
-    RecoilMessage { holder: PokemonId },
+    RecoilMessage {
+        holder: PokemonId,
+    },
     MoveNoEffect {
         holder: PokemonId,
         move_id: MoveId,
@@ -95,15 +116,52 @@ pub enum GamePresentationPayloadV1 {
 impl GamePresentationPayloadV1 {
     pub fn validate(&self, semantic: PresentationSemanticIdV1) -> Result<(), GameMaterialV6Error> {
         let (family, valid) = match self {
-            Self::MoveLearning {holder,move_id,step} => (PresentationCueFamilyV1::Progression,
-                holder.get()!=SafeU53::ZERO&&move_id.get()!=SafeU53::ZERO&&match step{
-                    GamePresentationMoveLearningV1::Forgot{old_move}=>old_move.get()!=SafeU53::ZERO,_=>true,
-                }),
-            Self::MoveLearned { holder, move_id } => (PresentationCueFamilyV1::Progression, holder.get()!=SafeU53::ZERO && move_id.get()!=SafeU53::ZERO),
-            Self::StatStageAnimation { holder, stat, before, after, tween_milliseconds } => (
-                PresentationCueFamilyV1::Move, holder.get()!=SafeU53::ZERO && *stat==1 && (-5..=6).contains(before) && *after==*before-1 && *tween_milliseconds==1750),
-            Self::StatStageMessage { holder, stat, before, after } => (
-                PresentationCueFamilyV1::Move, holder.get()!=SafeU53::ZERO && *stat==1 && (-6..=6).contains(before) && *after==(*before-1).max(-6)),
+            Self::CandyLevelMessage { holder, level } => (PresentationCueFamilyV1::Progression, holder.get()!=SafeU53::ZERO && (2..=11).contains(level)),
+            Self::MoveLearning {
+                holder,
+                move_id,
+                step,
+            } => (
+                PresentationCueFamilyV1::Progression,
+                holder.get() != SafeU53::ZERO
+                    && move_id.get() != SafeU53::ZERO
+                    && match step {
+                        GamePresentationMoveLearningV1::Forgot { old_move } => {
+                            old_move.get() != SafeU53::ZERO
+                        }
+                        _ => true,
+                    },
+            ),
+            Self::MoveLearned { holder, move_id } => (
+                PresentationCueFamilyV1::Progression,
+                holder.get() != SafeU53::ZERO && move_id.get() != SafeU53::ZERO,
+            ),
+            Self::StatStageAnimation {
+                holder,
+                stat,
+                before,
+                after,
+                tween_milliseconds,
+            } => (
+                PresentationCueFamilyV1::Move,
+                holder.get() != SafeU53::ZERO
+                    && *stat == 1
+                    && (-5..=6).contains(before)
+                    && *after == *before - 1
+                    && *tween_milliseconds == 1750,
+            ),
+            Self::StatStageMessage {
+                holder,
+                stat,
+                before,
+                after,
+            } => (
+                PresentationCueFamilyV1::Move,
+                holder.get() != SafeU53::ZERO
+                    && *stat == 1
+                    && (-6..=6).contains(before)
+                    && *after == (*before - 1).max(-6),
+            ),
             Self::FaintAnimation {
                 holder,
                 tween_milliseconds,
@@ -178,7 +236,9 @@ impl GamePresentationPayloadV1 {
                     && *requested_heal > 0
                     && after - before <= *requested_heal,
             ),
-            Self::RecoilMessage { holder } => (PresentationCueFamilyV1::Move, holder.get() != SafeU53::ZERO),
+            Self::RecoilMessage { holder } => {
+                (PresentationCueFamilyV1::Move, holder.get() != SafeU53::ZERO)
+            }
             Self::MoveNoEffect { holder, move_id } => (
                 PresentationCueFamilyV1::Move,
                 holder.get() != SafeU53::ZERO && move_id.get() != SafeU53::ZERO,
@@ -208,6 +268,11 @@ impl GamePresentationPayloadV1 {
     }
 }
 
-#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
-#[serde(tag="kind",rename_all="SCREAMING_SNAKE_CASE",deny_unknown_fields)]
-pub enum GamePresentationMoveLearningV1 {WantsToLearn,WhichMove,Forgot{old_move:MoveId},DidNotLearn}
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+pub enum GamePresentationMoveLearningV1 {
+    WantsToLearn,
+    WhichMove,
+    Forgot { old_move: MoveId },
+    DidNotLearn,
+}

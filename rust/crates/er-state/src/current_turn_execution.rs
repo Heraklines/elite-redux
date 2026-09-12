@@ -82,13 +82,34 @@ impl CurrentStatStageChildV1 {
     }
 
     fn valid(&self, owner: &CurrentTurnExecutionV1, run: &RunStateV3) -> bool {
-        let Some(battle) = &run.battle else { return false; };
-        let Some(action) = owner.actions.get(usize::from(self.action_index)) else { return false; };
-        let Some(target) = run.party.iter().chain(&battle.enemy_party).find(|pokemon| pokemon.id == self.target) else { return false; };
-        let BattleCommand::Fight { move_slot, .. } = action.command else { return false; };
-        let Some(source) = run.party.iter().chain(&battle.enemy_party).find(|pokemon| pokemon.id == self.source) else { return false; };
+        let Some(battle) = &run.battle else {
+            return false;
+        };
+        let Some(action) = owner.actions.get(usize::from(self.action_index)) else {
+            return false;
+        };
+        let Some(target) = run
+            .party
+            .iter()
+            .chain(&battle.enemy_party)
+            .find(|pokemon| pokemon.id == self.target)
+        else {
+            return false;
+        };
+        let BattleCommand::Fight { move_slot, .. } = action.command else {
+            return false;
+        };
+        let Some(source) = run
+            .party
+            .iter()
+            .chain(&battle.enemy_party)
+            .find(|pokemon| pokemon.id == self.source)
+        else {
+            return false;
+        };
         let expected = match self.phase {
-            CurrentStatStageChildPhaseV1::Ready | CurrentStatStageChildPhaseV1::Animation { .. } => self.before,
+            CurrentStatStageChildPhaseV1::Ready
+            | CurrentStatStageChildPhaseV1::Animation { .. } => self.before,
             CurrentStatStageChildPhaseV1::Message { .. } => self.after(),
         };
         !owner.finalization_done
@@ -97,11 +118,24 @@ impl CurrentStatStageChildV1 {
             && action.command.actor() == self.source
             && self.source != self.target
             && self.move_id.get().get() == 45
-            && self.stat == 1 && self.stages == -1 && (-6..=6).contains(&self.before)
-            && source.moves[usize::from(move_slot.get())].as_ref().is_some_and(|slot| slot.move_id == self.move_id)
-            && target.hp > 0 && !target.fainted && target.stat_stages.attack == expected
-            && action.current_targets.as_ref().is_some_and(|slots| slots == &[self.target_slot])
-            && battle.field.slots.iter().any(|row| row.slot == self.target_slot && row.occupant == Some(self.target))
+            && self.stat == 1
+            && self.stages == -1
+            && (-6..=6).contains(&self.before)
+            && source.moves[usize::from(move_slot.get())]
+                .as_ref()
+                .is_some_and(|slot| slot.move_id == self.move_id)
+            && target.hp > 0
+            && !target.fainted
+            && target.stat_stages.attack == expected
+            && action
+                .current_targets
+                .as_ref()
+                .is_some_and(|slots| slots == &[self.target_slot])
+            && battle
+                .field
+                .slots
+                .iter()
+                .any(|row| row.slot == self.target_slot && row.occupant == Some(self.target))
             && match self.phase {
                 CurrentStatStageChildPhaseV1::Animation { .. } => self.before > -6,
                 CurrentStatStageChildPhaseV1::Message { .. } => true,
@@ -208,7 +242,11 @@ impl CurrentTurnExecutionV1 {
         }) {
             return Err(CurrentTurnExecutionError);
         }
-        if self.stat_child.as_ref().is_some_and(|child| !child.valid(self, run)) {
+        if self
+            .stat_child
+            .as_ref()
+            .is_some_and(|child| !child.valid(self, run))
+        {
             return Err(CurrentTurnExecutionError);
         }
         match &self.stage {
