@@ -33,6 +33,8 @@ function guardFreshNullifyRegistry(){
  initialAbilityCount=allAbilities.length;expect(initialAbilityCount,"Ability registry must be empty before constructor provenance observation").toBe(0);
  for(const {name,descriptor} of nullifyOriginals){expect(Object.getOwnPropertyDescriptor(nullifyPrototype,name)?.value).toBe(descriptor.value);const guard=function(this:unknown,...args:unknown[]){usageMethodCalls++;return Reflect.apply(descriptor.value,this,args);};nullifyGuards.push([name,guard]);Object.defineProperty(nullifyPrototype,name,{...descriptor,value:guard});}
 }
+// Module evaluation precedes setup beforeAll -> initTests -> initializeGame.
+guardFreshNullifyRegistry();
 let game:Phaser.Game|undefined,manager:GameManager|undefined;
 afterAll(()=>{for(const {name,descriptor} of nullifyOriginals)Object.defineProperty(nullifyPrototype,name,descriptor);vi.restoreAllMocks();manager?.promptHandler.clearPrompts();if(PromptHandler.runInterval!=null){clearInterval(PromptHandler.runInterval);PromptHandler.runInterval=undefined;}game?.destroy(true);});
 async function observeTownAtActualEntry(){
@@ -112,7 +114,7 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
 test("observe complete initialized Town constructor closure",async()=>{
  const output=process.env.M9_TOWN_CONSTRUCTOR_OUTPUT,ordinal=process.env.M9_TOWN_CONSTRUCTOR_ORDINAL;expect(output).toBeTruthy();expect(["one","two"]).toContain(ordinal);
  expect(execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()).toBe(PIN);
- guardFreshNullifyRegistry();game=new Phaser.Game({type:Phaser.HEADLESS,seed:[SEED]});await new Promise<void>(resolve=>setTimeout(resolve,0));manager=new GameManager(game);
+ game=new Phaser.Game({type:Phaser.HEADLESS,seed:[SEED]});await new Promise<void>(resolve=>setTimeout(resolve,0));manager=new GameManager(game);
  manager.override.disableShinies=false;manager.override.normalizeIVs=false;manager.override.normalizeNatures=false;
  manager.override.shiny(null).enemyShiny(null).playerIVs(null).enemyIVs(null).nature(null).enemyNature(null).battleStyle(BattleStyle.SET).startingBiome(BiomeId.TOWN).startingWave(1).seed(SEED);
  await manager.classicMode.startBattle(SpeciesId.BULBASAUR);await observeTownAtActualEntry();expect(captured).toBeDefined();assertFreshNullifyRegistry();expect(usageMethodCalls,"No runtime-slot accesses through complete observation").toBe(0);
