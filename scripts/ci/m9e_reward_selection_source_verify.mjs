@@ -8,20 +8,38 @@ assert(raws[0].equals(raws[1]));
 const data=JSON.parse(raws[0]);
 const integer=(n,min,max)=>assert(Number.isSafeInteger(n)&&n>=min&&n<=max);
 const shape=(v,k)=>assert.deepEqual(Object.keys(v).sort(),[...k].sort());
+function exactJsonArg(value,depth=0){
+  assert(depth<=4);
+  if(value===null||typeof value==='boolean')return;
+  if(typeof value==='number'){assert(Number.isFinite(value));return;}
+  if(typeof value==='string'){assert(value.length<=256);return;}
+  if(Array.isArray(value)){assert(value.length<=16);for(let i=0;i<value.length;i++){assert(Object.hasOwn(value,i));exactJsonArg(value[i],depth+1);}return;}
+  assert(typeof value==='object'&&[Object.prototype,null].includes(Object.getPrototypeOf(value)));
+  const keys=Reflect.ownKeys(value);assert(keys.length<=16);
+  for(const key of keys){assert(typeof key==='string'&&key.length<=128);exactJsonArg(value[key],depth+1);}
+}
 function validate(d){
-  shape(d,['schema_version','source_sha','setup_seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities']);
+  shape(d,['schema_version','source_sha','setup_seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls']);
   assert.equal(d.schema_version,1);assert.equal(d.source_sha,'399d5d368f0b5642ebf8f45bd8a5e73350fa4de7');
   assert.equal(d.setup_seed,'m9e-reward-selection-source-v1');
   assert.equal(d.scope,'actual initialized pool predicates and direct SelectModifierPhase generation methods; not a post-victory state or applied reward');
   assert.equal(d.context.wave,1);assert.equal(d.context.party.length,1);assert.equal(d.context.party[0].species,1);
-  shape(d.context.constructor,['seed','wave_seed','battle_seed','enemy_levels','tuning']);
+  shape(d.context.constructor,['seed','wave_seed','battle_seed','enemy_levels','level_calls','tuning']);
   shape(d.context.constructor.tuning,['wave_slope','quad_divisor','boss_mult']);
   for(const value of Object.values(d.context.constructor.tuning))assert(Number.isFinite(value)&&value>0&&value<=1000000);
-  assert.equal(d.context.constructor.seed,'test'); // Pinned test/utils/game-manager-utils.ts:36
+  // Actual getTestRunStarters setup in test/utils/game-manager-utils.ts owns this run seed.
+  assert.equal(d.context.constructor.seed,'test');
   assert(typeof d.context.constructor.wave_seed==='string'&&d.context.constructor.wave_seed.length<=128);
   assert(typeof d.context.constructor.battle_seed==='string'&&d.context.constructor.battle_seed.length===16);
   assert(Array.isArray(d.context.constructor.enemy_levels)&&d.context.constructor.enemy_levels.length===1);
   for(const level of d.context.constructor.enemy_levels)integer(level,1,10000);
+  assert(Array.isArray(d.context.constructor.level_calls)&&d.context.constructor.level_calls.length>0&&d.context.constructor.level_calls.length<=4);
+  for(const call of d.context.constructor.level_calls){
+    shape(call,['wave','battle_seed','entry','exit','level']);assert.equal(call.wave,d.context.wave);
+    assert.equal(call.battle_seed,d.context.constructor.battle_seed);integer(call.level,1,10000);
+    assert(d.context.constructor.enemy_levels.includes(call.level));
+    for(const state of [call.entry,call.exit])assert(typeof state==='string'&&state.startsWith('!rnd,')&&state.length<=512);
+  }
   assert(Array.isArray(d.identities)&&d.identities.length===3);
   for(const identity of d.identities){shape(identity,['name','group']);assert(typeof identity.name==='string'&&identity.name.length<=256);assert(identity.group===null||(typeof identity.group==='string'&&identity.group.length<=128));}
   assert.equal(d.option_count,3);assert.equal(d.free_picks,1);
@@ -46,6 +64,24 @@ function validate(d){
   }
   shape(d.rng,['seed','regenerated','generated']);for(const r of Object.values(d.rng))assert(typeof r==='string'&&r.length<=512&&r.length>0);
   assert.deepEqual(d.count_draws,[]);
+  assert(Array.isArray(d.generator_calls)&&d.generator_calls.length>0&&d.generator_calls.length<=128);
+  for(const call of d.generator_calls){
+    shape(call,['stage','tier','index','id','draws','result']);
+    assert(['regeneration','selection','catalog'].includes(call.stage));integer(call.tier,0,4);integer(call.index,0,1023);
+    const source=d.catalog.find(row=>row[0]===call.tier&&row[1]===call.index);
+    assert(source&&source[4]&&source[2]===call.id);
+    assert(Array.isArray(call.draws)&&call.draws.length<=1024);
+    for(const draw of call.draws){assert(Array.isArray(draw)&&draw.length===3);integer(draw[0],-2147483648,2147483647);integer(draw[1],draw[0],2147483647);integer(draw[2],draw[0],draw[1]);}
+    if(call.result!==null){
+      shape(call.result,['id','name','group','pregen_args']);assert.equal(call.result.id,call.id);
+      assert(typeof call.result.name==='string'&&call.result.name.length<=256);
+      assert(call.result.group===null||(typeof call.result.group==='string'&&call.result.group.length<=128));
+      if(call.result.pregen_args!==null){assert(Array.isArray(call.result.pregen_args)&&call.result.pregen_args.length<=16);exactJsonArg(call.result.pregen_args);}
+    }
+  }
+  const regenerated=d.generator_calls.filter(call=>call.stage==='regeneration');
+  assert.equal(regenerated.length,d.catalog.filter(row=>row[4]).length);
+  assert.equal(new Set(regenerated.map(call=>`${call.tier}/${call.index}`)).size,regenerated.length);
   assert(Array.isArray(d.options)&&d.options.length===3);
   for(const o of d.options){
     const required=['id','tier','upgradeCount','cost'];shape(o,o.pregenArgs===undefined?required:[...required,'pregenArgs']);
@@ -61,6 +97,6 @@ for(const change of mutations){const m=structuredClone(data);change(m);assert.th
 const summary={schema_version:1,status:'passed',source_sha:data.source_sha,scope:data.scope,
  exports:raws.map(r=>({bytes:r.length,sha256:hash(r)})),identical_fresh_processes:2,negative_checks:mutations.length,
  catalog_rows:data.catalog.length,catalog_sha256:hash(Buffer.from(JSON.stringify(data.catalog))),
- constructor_observation_passed:true,setup_seed:data.setup_seed,context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,identities:data.identities,
+ constructor_observation_passed:true,setup_seed:data.setup_seed,context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,identities:data.identities,generator_observation:{calls:data.generator_calls.length,sha256:hash(Buffer.from(JSON.stringify(data.generator_calls))),by_stage:Object.fromEntries(['regeneration','selection','catalog'].map(stage=>[stage,data.generator_calls.filter(call=>call.stage===stage).length]))},
  draw_counts:Object.fromEntries(['predicate_draws','regeneration_draws','count_draws','option_draws'].map(k=>[k,data[k].length])),rng:data.rng};
 const out=Buffer.from(JSON.stringify(summary)+'\n');assert(out.length<=8192);writeFileSync(process.argv[4],out,{flag:'wx'});
