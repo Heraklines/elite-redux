@@ -48,7 +48,7 @@ pub fn begin_current_turn(
         next_rng_sequence,
     )
     .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
-    let mut actions = build_actions(run, commands, content, Some(targeting))?;
+    let mut actions = build_actions(run, commands, content, Some(targeting), &mut rng)?;
     rng.speed_order_shuffle(&mut actions, &battle.wave_seed, battle.turn)
         .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
     actions.sort_by(|left, right| {

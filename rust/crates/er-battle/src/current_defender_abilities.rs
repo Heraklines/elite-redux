@@ -53,7 +53,15 @@ pub(crate) fn pre_hit_absorb(
     attacker: &PokemonStateV5,
     defender: &PokemonStateV5,
     definition: &MoveDefinitionV3,
+    retained_command: bool,
 ) -> Result<Option<AbsorbPlan>, CurrentDefenderAbilityError> {
+    if retained_command && definition.id.get().get() == 165 {
+        owner.validate_resolved_random_hit(run, attacker.id, defender.id, definition)
+            .map_err(|_| CurrentDefenderAbilityError)?;
+        // Actual TypelessAttr bypasses type immunity. The retained command has
+        // already consumed and retained its random target; never draw here.
+        return Ok(None);
+    }
     // validate_run alone does not admit a move definition for the query path.
     // The shared source plan proves its closed ID/target catalog before any
     // defender predicate; it consumes no RNG and does not replace retained targets.

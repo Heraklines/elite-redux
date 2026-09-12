@@ -92,7 +92,9 @@ impl CurrentFriendshipProfileV1 {
         {
             return Err(CurrentFriendshipProfileError);
         }
-        if let Some(eggs) = &self.egg_account { eggs.validate()?; }
+        if let Some(eggs) = &self.egg_account {
+            eggs.validate()?;
+        }
         if let Some(rewards) = &self.rewards {
             rewards.validate()?;
         }

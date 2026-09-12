@@ -18,7 +18,8 @@ pub struct CurrentVictoryExecutionV1 {
     pub completed: Vec<CurrentExperienceAwardV1>,
     pub descendant: CurrentVictoryDescendantV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub level_achievements: Option<crate::current_achievement_execution::CurrentLevelAchievementExecutionV1>,
+    pub level_achievements:
+        Option<crate::current_achievement_execution::CurrentLevelAchievementExecutionV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -66,7 +67,10 @@ impl CurrentVictoryExecutionV1 {
     pub fn valid(&self, pending_id: SafeU53) -> bool {
         if let Some(level) = &self.level_achievements {
             if !level.valid(pending_id)
-                || !matches!(&self.descendant, CurrentVictoryDescendantV1::LevelUpStart { level_up } if level_up == &level.level_up) { return false; }
+                || !matches!(&self.descendant, CurrentVictoryDescendantV1::LevelUpStart { level_up } if level_up == &level.level_up)
+            {
+                return false;
+            }
         }
         let next = usize::from(self.next_phase);
         if self.phases.len() > 6

@@ -34,6 +34,8 @@ const M5_STATUS_DURATION_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:status-duration";
 const M5_VOLATILE_DURATION_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:volatile-duration";
+const CURRENT_MOVE_TARGET_ID: &str =
+    "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7:src/data/moves/move-utils.ts:getMoveTargets:RANDOM_NEAR_ENEMY";
 const M5_RANDOM_TARGET_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-target";
 const M5_RANDOM_MOVE_ID: &str =
@@ -105,6 +107,10 @@ impl RngCallsiteId {
 
     pub fn battle_seed_character() -> Self {
         Self(BATTLE_SEED_CHARACTER_ID.to_owned())
+    }
+
+    pub fn current_move_target() -> Self {
+        Self(CURRENT_MOVE_TARGET_ID.to_owned())
     }
 
     pub fn speed_tie() -> Self {
@@ -525,7 +531,9 @@ fn callsite_spec(value: &str) -> Option<(RngReason, u8)> {
         M5_VOLATILE_DURATION_ID => {
             Some((RngReason::VolatileDuration, stream_bit(RngStream::Battle)))
         }
-        M5_RANDOM_TARGET_ID => Some((RngReason::RandomTarget, stream_bit(RngStream::Battle))),
+        M5_RANDOM_TARGET_ID | CURRENT_MOVE_TARGET_ID => {
+            Some((RngReason::RandomTarget, stream_bit(RngStream::Battle)))
+        }
         M5_RANDOM_MOVE_ID => Some((
             RngReason::RandomMove,
             stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),

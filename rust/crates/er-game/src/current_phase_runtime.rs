@@ -342,7 +342,10 @@ fn phase_transition(
     }
     if matches!(
         phase,
-        GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. } | GameOwnedPhaseV1::AchievementClock { .. } | GameOwnedPhaseV1::FlashEgg { .. }
+        GameOwnedPhaseV1::Victory { .. }
+            | GameOwnedPhaseV1::VictoryPresentation { .. }
+            | GameOwnedPhaseV1::AchievementClock { .. }
+            | GameOwnedPhaseV1::FlashEgg { .. }
     ) {
         return current_victory_transition::transition(
             before,
@@ -409,6 +412,8 @@ fn phase_transition(
         | GameOwnedPhaseV1::Victory { .. }
         | GameOwnedPhaseV1::VictoryPresentation { .. }
         | GameOwnedPhaseV1::VictoryTail { .. }
+        | GameOwnedPhaseV1::AchievementClock { .. }
+        | GameOwnedPhaseV1::FlashEgg { .. }
         | GameOwnedPhaseV1::FaintBegin { .. }
         | GameOwnedPhaseV1::FaintPresentation { .. } => {
             return Err(GameRuntimeV6Error::Invalid);

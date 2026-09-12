@@ -735,22 +735,19 @@ fn commands(
         let target = *targets.get(index).ok_or("exact command targets required")?;
         let pokemon =
             er_battle::current_target_execution::find_pokemon(run, actor).ok_or("actor absent")?;
-        let move_id = pokemon.moves[0].as_ref().ok_or("move absent")?.move_id;
-        // Resolve canonical choices through the same actual source owner. A sole
-        // candidate uses Implicit; Selected is retained only for real choice sets.
-        let plan = CurrentTargetExecution::from_state(state)?.plan(
-            run,
-            actor,
-            prepared.battle.move_definition(move_id)?,
+        let (definition, struggle) = er_battle::m7_resolver::effective_move_definition_v5(
+            &prepared.battle, pokemon, MoveSlotIndex::new(0)?,
         )?;
-        let selection = plan
-            .selections()?
-            .into_iter()
-            .find(|selection| {
-                plan.retain(selection)
-                    .is_ok_and(|targets| targets.contains(&target))
-            })
-            .ok_or("requested controlled target is not a canonical legal choice")?;
+        // Struggle's source random target is resolved by command admission;
+        // the test cannot choose an opponent or consume a separate RNG draw.
+        let selection = if struggle {
+            BattleTargetSelection::implicit()
+        } else {
+            let plan = CurrentTargetExecution::from_state(state)?.plan(run, actor, definition)?;
+            plan.selections()?.into_iter().find(|selection| {
+                plan.retain(selection).is_ok_and(|targets| targets.contains(&target))
+            }).ok_or("requested controlled target is not a canonical legal choice")?
+        };
         let command = BattleCommand::fight(actor, MoveSlotIndex::new(0)?, selection)?;
         if row.slot.side == BattleSide::Player {
             entries.push(AcceptedBattleCommand::human(BattleCommandProposalV1::new(
@@ -842,7 +839,8 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
         materials: Vec::new(),
     };
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+    journal
+        .drain_non_fainting_turn(&mut kernel, content.as_ref())
         .map_err(|error| format!("target witness retained turn drain: {error}"))?;
     assert_eq!(
         actual.transition().after_state.current_targeting,
@@ -978,7 +976,8 @@ fn source_spread_group_executes_all_opponents_and_multihit_exception() -> Result
     navigate(&mut kernel, "battle/move/0")?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+    journal
+        .drain_non_fainting_turn(&mut kernel, content.as_ref())
         .map_err(|error| format!("target witness retained turn drain: {error}"))?;
     let after = active_run(kernel.state().ok_or("state absent")?)?
         .battle
@@ -1107,7 +1106,8 @@ fn poison_redirect_and_source_passive_gate_share_actual_owner() -> Result<()> {
     let mut journal = MaterialJournal::before_command(&kernel.snapshot()?)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+    journal
+        .drain_non_fainting_turn(&mut kernel, content.as_ref())
         .map_err(|error| format!("target witness retained turn drain: {error}"))?;
     let enemies = &active_run(kernel.state().ok_or("state absent")?)?
         .battle
@@ -1652,9 +1652,9 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         enemy.moves[0].as_mut().ok_or("move absent")?.pp_used = 0;
         enemy.stats.speed = 1;
         enemy.stats.attack = 500;
+        enemy.hp = 1;
     }
-    battle.enemy_party[1].hp = 1;
-    let defeated = battle.enemy_party[1].id;
+    let enemy_ids = [battle.enemy_party[0].id, battle.enemy_party[1].id];
     let accepted = commands(
         state,
         &[
@@ -1664,6 +1664,8 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         ],
         content.as_ref(),
     )?;
+    assert_typeless_struggle_damage(state, content.as_ref())?;
+    assert_single_opponent_struggle_rng(state, content.as_ref())?;
     let targeting = CurrentTargetExecution::from_state(state)?;
     let authority = TurnAuthorityContextV1 {
         authority_seat: seat(),
@@ -1677,7 +1679,19 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         &targeting,
         safe(37),
     )?;
+    let draws = begin.transition.rng_audit.iter()
+        .filter(|draw| draw.reason == er_rng::audit::RngReason::RandomTarget)
+        .collect::<Vec<_>>();
+    assert_eq!(draws.len(), 1);
+    assert_eq!(draws[0].cardinality, safe(2));
+    assert_eq!(draws[0].minimum, SafeU53::ZERO);
+    assert!(draws[0].consumed);
+    assert_eq!(draws[0].callsite_id, er_rng::audit::RngCallsiteId::current_move_target());
     let selected = begin.continuation.actions.clone();
+    let selected_slot = selected[0].current_targets.as_ref().ok_or("random target absent")?[0];
+    assert_eq!(selected_slot.side, BattleSide::Enemy);
+    assert_eq!(u64::from(selected_slot.position), draws[0].result.get());
+    let defeated = enemy_ids[usize::from(selected_slot.position)];
     let chunk = step_current_turn(
         &begin.transition.after_state,
         &begin.continuation,
@@ -1698,7 +1712,7 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
     assert!(source_move.struggle_pp_before.is_some());
     assert_eq!(faints[0].id, SafeU53::ZERO);
     assert_eq!(faints[0].pokemon, defeated);
-    assert_eq!(faints[0].slot, slot(BattleSide::Enemy, 1));
+    assert_eq!(faints[0].slot, selected_slot);
     let run = chunk
         .transition
         .after_state
@@ -1718,6 +1732,7 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
             .pp_used,
         0
     );
+    assert!(chunk.transition.rng_audit.iter().all(|draw| draw.reason != er_rng::audit::RngReason::RandomTarget));
     assert_eq!(chunk.continuation.actions, selected);
     assert_eq!(chunk.continuation.accepted_commands, accepted);
     assert_eq!(chunk.continuation.next_action, 1);
@@ -1786,5 +1801,72 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
     assert_eq!(canonical_bytes(&chunk.transition.after_state)?, frozen);
     // This test stops at the actual boundary. Only the integrated phase owner may
     // release it after consuming real Faint/Victory/XP records, never a test flag.
+    Ok(())
+}
+
+fn assert_single_opponent_struggle_rng(
+    initial: &GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<()> {
+    let mut single = initial.clone();
+    let run = active_run_mut(&mut single)?;
+    let battle = run.battle.as_mut().ok_or("battle absent")?;
+    battle.enemy_party[1].hp = 0;
+    battle.enemy_party[1].fainted = true;
+    battle.field.slots.iter_mut()
+        .find(|row| row.slot == slot(BattleSide::Enemy, 1))
+        .ok_or("second opponent field absent")?.occupant = None;
+    let accepted = commands(&single, &[
+        slot(BattleSide::Enemy, 0), slot(BattleSide::Player, 0),
+    ], content)?;
+    let targeting = CurrentTargetExecution::from_state(&single)?;
+    let authority = TurnAuthorityContextV1 {
+        authority_seat: seat(),
+        revision: active_run(&single)?.control.revision,
+    };
+    let begin = er_battle::m7_resolver::begin_current_turn(
+        &project(&single), &accepted, &content.battle, &authority, &targeting, safe(37),
+    )?;
+    let draws = begin.transition.rng_audit.iter()
+        .filter(|draw| draw.reason == er_rng::audit::RngReason::RandomTarget)
+        .collect::<Vec<_>>();
+    assert_eq!(draws.len(), 1);
+    assert_eq!(draws[0].cardinality, safe(1));
+    assert_eq!(draws[0].result, SafeU53::ZERO);
+    assert!(!draws[0].consumed);
+    assert_eq!(draws[0].primitive_draw_count, 0);
+    assert_eq!(draws[0].before_state, draws[0].after_state);
+    assert_eq!(draws[0].before_fingerprint, draws[0].after_fingerprint);
+    assert_eq!(begin.continuation.actions[0].current_targets,
+        Some(vec![slot(BattleSide::Enemy, 0)]));
+    Ok(())
+}
+
+fn assert_typeless_struggle_damage(
+    initial: &GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<()> {
+    use er_types::battle_model::PokemonType;
+    let mut state = initial.clone();
+    let run = active_run_mut(&mut state)?;
+    run.party[0].types.primary = PokemonType::Grass;
+    run.party[0].types.secondary = None;
+    let enemy = &mut run.battle.as_mut().ok_or("battle absent")?.enemy_party[0];
+    enemy.types.primary = PokemonType::Normal;
+    enemy.types.secondary = None;
+    let neutral = er_battle::m7_resolver::query_simulated_move_damage(
+        &content.battle, run, slot(BattleSide::Player, 0),
+        MoveSlotIndex::new(0)?, slot(BattleSide::Enemy, 0),
+    )?;
+    assert!(neutral > 0);
+    run.party[0].types.primary = PokemonType::Normal;
+    run.battle.as_mut().ok_or("battle absent")?.enemy_party[0].types.primary = PokemonType::Ghost;
+    let before = canonical_bytes(run)?;
+    let typeless = er_battle::m7_resolver::query_simulated_move_damage(
+        &content.battle, run, slot(BattleSide::Player, 0),
+        MoveSlotIndex::new(0)?, slot(BattleSide::Enemy, 0),
+    )?;
+    assert_eq!(typeless, neutral, "Struggle neither gains Normal STAB nor meets Ghost immunity");
+    assert_eq!(canonical_bytes(run)?, before);
     Ok(())
 }

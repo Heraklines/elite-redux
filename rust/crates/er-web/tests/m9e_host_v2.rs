@@ -442,19 +442,27 @@ fn assert_unowned_flash_input_rejected(
     sequence: &mut u64,
 ) -> Result<(), Box<dyn Error>> {
     use er_state::current_achievement_execution::{CurrentFlashEggInputsV1, CurrentUnseededUnitV1};
-    let BrowserResponseV2::Snapshot { snapshot: before } = send(host, *sequence, BrowserRequestV2::Snapshot)? else {
+    let BrowserResponseV2::Snapshot { snapshot: before } =
+        send(host, *sequence, BrowserRequestV2::Snapshot)?
+    else {
         return Err("missing browser snapshot".into());
     };
     *sequence += 1;
     let input = CurrentFlashEggInputsV1 {
         request: er_types::PlatformRequestId::new(safe(999)),
         pending: safe(1),
-        seed_draws: std::array::from_fn(|_| CurrentUnseededUnitV1 { ieee754_bits: "0000000000000000".into() }),
-        id_draw: CurrentUnseededUnitV1 { ieee754_bits: "0000000000000000".into() },
+        seed_draws: std::array::from_fn(|_| CurrentUnseededUnitV1 {
+            ieee754_bits: "0000000000000000".into(),
+        }),
+        id_draw: CurrentUnseededUnitV1 {
+            ieee754_bits: "0000000000000000".into(),
+        },
         egg_utc_milliseconds: 0,
     };
     assert!(send(host, *sequence, BrowserRequestV2::FlashEggInputs { input }).is_err());
-    let BrowserResponseV2::Snapshot { snapshot: after } = send(host, *sequence, BrowserRequestV2::Snapshot)? else {
+    let BrowserResponseV2::Snapshot { snapshot: after } =
+        send(host, *sequence, BrowserRequestV2::Snapshot)?
+    else {
         return Err("missing browser snapshot after rejected Flash input".into());
     };
     *sequence += 1;

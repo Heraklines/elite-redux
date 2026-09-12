@@ -122,10 +122,15 @@ pub fn construct_natural_run_v6(
         .biome(mode.starting_biome)
         .ok_or(NaturalRunV6Error::Invalid)?;
     let current_initial = if let Some(shared) = &bootstrap.current_friendship_profile {
-        if mode.key != "CLASSIC" || mode.cooperative || mode.challenge_selection
-            || !mode.supported || !bootstrap.selections.choices.is_empty()
-            || shared.owner_seat != owner || shared.content_identity != *content.identity()
-            || biome.key != "TOWN" || biome.trainer_chance_denominator != 0
+        if mode.key != "CLASSIC"
+            || mode.cooperative
+            || mode.challenge_selection
+            || !mode.supported
+            || !bootstrap.selections.choices.is_empty()
+            || shared.owner_seat != owner
+            || shared.content_identity != *content.identity()
+            || biome.key != "TOWN"
+            || biome.trainer_chance_denominator != 0
             || difficulty == er_types::RunDifficultyV1::Mystery
         {
             return Err(NaturalRunV6Error::Invalid);
@@ -134,15 +139,25 @@ pub fn construct_natural_run_v6(
         // Construction owns an isolated scope; it consumes neither encounter
         // generation RNG nor the retained run RNG while drawing seed and level.
         let mut constructed = crate::current_initial_battle::construct_current_initial_battle(
-            &bootstrap.seed, 2.0, 25.0,
-        ).map_err(|_| NaturalRunV6Error::Invalid)?;
+            &bootstrap.seed,
+            2.0,
+            25.0,
+        )
+        .map_err(|_| NaturalRunV6Error::Invalid)?;
         if difficulty == er_types::RunDifficultyV1::Hell {
             // applyErHellEnemyLevelScaling overrides only after constructor draws.
-            constructed.enemy_level = party.iter().map(|p| p.level).max()
-                .ok_or(NaturalRunV6Error::Invalid)?.saturating_sub(3).max(1);
+            constructed.enemy_level = party
+                .iter()
+                .map(|p| p.level)
+                .max()
+                .ok_or(NaturalRunV6Error::Invalid)?
+                .saturating_sub(3)
+                .max(1);
         }
         Some(constructed)
-    } else { None };
+    } else {
+        None
+    };
     let enemy_species = select_encounter_species(biome, &mut rng)?;
     let enemy_id = identities
         .allocate_pokemon_id()
@@ -154,19 +169,25 @@ pub fn construct_natural_run_v6(
         None,
         enemy_species,
         0,
-        current_initial.as_ref().map_or(mode.starting_level, |value| value.enemy_level),
+        current_initial
+            .as_ref()
+            .map_or(mode.starting_level, |value| value.enemy_level),
     )?;
     let battle_id = identities
         .allocate_battle_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let wave = WaveIndex::new(safe(1)?).map_err(|_| NaturalRunV6Error::Invalid)?;
     let battle_seed = current_initial.as_ref().map_or_else(
-        || format!("{}:battle:1", bootstrap.seed), |value| value.wave_seed.clone(),
+        || format!("{}:battle:1", bootstrap.seed),
+        |value| value.wave_seed.clone(),
     );
     let battle_rng = rng
         .initialize_battle(&battle_seed, wave)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-    if current_initial.as_ref().is_some_and(|value| value.battle_seed != battle_rng.battle_seed) {
+    if current_initial
+        .as_ref()
+        .is_some_and(|value| value.battle_seed != battle_rng.battle_seed)
+    {
         return Err(NaturalRunV6Error::Invalid);
     }
     let format = BattleFormat::single();

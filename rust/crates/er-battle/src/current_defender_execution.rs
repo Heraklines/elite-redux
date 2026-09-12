@@ -58,7 +58,7 @@ pub(super) fn execute(
             }
             continue;
         }
-        let absorb = pre_hit_absorb(input.targeting, run, input.actor, target, input.definition)
+        let absorb = pre_hit_absorb(input.targeting, run, input.actor, target, input.definition, true)
             .map_err(|_| BattleV5Error::UnsupportedContent)?;
         if let Some(plan) = absorb {
             let result = if plan.suppress_no_effect_message() {
@@ -208,17 +208,44 @@ pub(super) fn execute(
         }
     }
     if !status && hit_any {
-        apply_move_recoil_after_damage(
-            run,
-            input.actor.id,
-            input.definition.id,
-            total_damage,
-            input.content,
-            Some(input.targeting),
-            mutations,
-            presentation,
-            mechanics_evidence,
-        )?;
+        if input.definition.id.get().get() == 165 {
+            // 399d RecoilAttr(true, 0.25, true): successful Struggle uses the
+            // user's max HP, floors through toDmgValue and ignores recoil blocks.
+            // Command admission proves the exact24-source recoil-neutral cohort.
+            let actor = pokemon_mut(run, input.actor.id)
+                .ok_or(BattleV5Error::InactiveActor(input.actor.id))?;
+            if !actor.fainted {
+                let before = actor.hp;
+                let recoil = (actor.max_hp / 4).max(u32::from(total_damage > 0));
+                actor.hp = actor.hp.saturating_sub(recoil);
+                actor.fainted = actor.hp == 0;
+                mutations.push(BattleMutation::HpChanged {
+                    pokemon: actor.id,
+                    before,
+                    after: actor.hp,
+                });
+                presentation.push(BattlePresentationCueV5::HpChanged {
+                    pokemon: actor.id,
+                    before,
+                    after: actor.hp,
+                });
+                if actor.fainted {
+                    presentation.push(BattlePresentationCueV5::Fainted { pokemon: actor.id });
+                }
+            }
+        } else {
+            apply_move_recoil_after_damage(
+                run,
+                input.actor.id,
+                input.definition.id,
+                total_damage,
+                input.content,
+                Some(input.targeting),
+                mutations,
+                presentation,
+                mechanics_evidence,
+            )?;
+        }
         let after_hit = execute_hook_v2(input.content, input.mechanics, MechanicHookV2::AfterHit)
             .map_err(|error| BattleV5Error::Mechanics(error.to_string()))?;
         mechanics_evidence.extend(after_hit.operations);

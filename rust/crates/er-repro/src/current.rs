@@ -649,11 +649,23 @@ impl CurrentReproRecorderV1 {
         {
             return Err(invalid("single attempt capture bound"));
         }
-        let before_observation = self.verified_observation(before)?;
+        let before_digest = snapshot_digest(before)?;
+        // The private initial checkpoint is installed only after restoration;
+        // later final digests are installed only after the validation below,
+        // or full capsule replay on import. Reuse that exact canonical snapshot
+        // proof, including at an empty initial checkpoint. No extra cache or
+        // retained observation bytes are needed. Gaps/changed before snapshots
+        // still restore, and every new after snapshot restores independently.
+        if !self
+            .capsule
+            .as_ref()
+            .is_some_and(|capsule| capsule.final_snapshot_digest == before_digest)
+        {
+            self.verified_observation(before)?;
+        }
         if self.verified_observation(after)? != *observation {
             return Err(invalid("after observation"));
         }
-        let before_digest = snapshot_digest(before)?;
         if self
             .capsule
             .as_ref()
@@ -674,7 +686,10 @@ impl CurrentReproRecorderV1 {
                 snapshot_digest: after_digest.clone(),
             },
             CurrentRecordResult::Ordinary(Err(error)) | CurrentRecordResult::Rebind(Err(error)) => {
-                if before != after || before_observation != *observation {
+                // Equal snapshots in this same fixed content/seat/role context
+                // yield the same observation, already independently checked
+                // against `after` above. No second restoration adds evidence.
+                if before != after {
                     return Err(invalid("rejection changed state"));
                 }
                 CurrentReproOutcomeV1::KernelRejected {

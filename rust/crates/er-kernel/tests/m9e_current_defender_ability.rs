@@ -485,8 +485,9 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
                 action: er_types::BattleUiActionV1::SelectMoveTarget { target, move_slot, .. }
             }) if target == slot(BattleSide::Enemy, 1) && move_slot.get() == 0));
         journal.accept(&kernel, content.as_ref(), &step)?;
-        journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
-        .map_err(|error| format!("defender retained turn drain: {error}"))?;
+        journal
+            .drain_non_fainting_turn(&mut kernel, content.as_ref())
+            .map_err(|error| format!("defender retained turn drain: {error}"))?;
         let after = kernel.state().ok_or("current state absent")?;
         let enemies = &active_run(after)?
             .battle
@@ -664,7 +665,8 @@ fn assert_actual_spread_hit_check_order(content: Arc<PreparedGameContentV2>) -> 
         content.as_ref(),
     )?;
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+    journal
+        .drain_non_fainting_turn(&mut kernel, content.as_ref())
         .map_err(|error| format!("defender retained turn drain: {error}"))?;
     let reasons: Vec<_> = journal
         .materials
@@ -1003,12 +1005,21 @@ fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Resul
     let step = press(&mut kernel, PhysicalKey::Space)
         .map_err(|error| format!("innate move admission: {error}"))?;
     let proof = material(&step)?;
+    // This admitted retained turn is mechanical evidence only. Removing the
+    // explicit history marker must not turn its absent XP owner into authority.
+    let mut forged_complete = proof.transition().after_state.clone();
+    assert!(forged_complete.current_turn_execution.is_some());
+    forged_complete.current_achievement_tracker.as_mut()
+        .ok_or("mechanical tracker absent")?.history =
+        er_state::current_achievement_tracker::CurrentAchievementHistoryV1::FreshComplete;
+    assert!(forged_complete.validate_with(content.as_ref()).is_err());
     assert!(matches!(
         proof.transition().accepted_action,
         Some(er_types::GameActionV1::Battle { .. })
     ));
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+    journal
+        .drain_non_fainting_turn(&mut kernel, content.as_ref())
         .map_err(|error| format!("defender retained turn drain: {error}"))?;
     let after = kernel.state().ok_or("current state absent")?;
     assert_eq!(active_run(after)?.party[0].hp, 9);

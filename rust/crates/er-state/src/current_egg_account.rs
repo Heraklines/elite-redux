@@ -1,8 +1,8 @@
 //! Explicit source EggData ownership. Historical absence remains unknown.
+use crate::current_friendship_profile::CurrentFriendshipProfileError;
 use er_types::{SafeU53, battle_ids::SpeciesId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use crate::current_friendship_profile::CurrentFriendshipProfileError;
 
 /// Exact ten fields persisted by cached399d system/egg-data.ts. This is storage
 /// shape only; it never authorizes an arbitrary reward/random construction.
@@ -47,7 +47,9 @@ impl CurrentEggAccountV1 {
         Self {
             eggs: Vec::new(),
             auto_restock: CurrentAutoEggRestockV1 {
-                enabled: false, target_count: 50, gacha_type: 1,
+                enabled: false,
+                target_count: 50,
+                gacha_type: 1,
                 per_voucher: [true, true, true, false],
             },
             voucher_counts: [SafeU53::ZERO; 4],
@@ -57,14 +59,20 @@ impl CurrentEggAccountV1 {
     }
 
     pub fn validate(&self) -> Result<(), CurrentFriendshipProfileError> {
-        if self.eggs.len() > 10_000 || self.auto_restock.target_count > 10_000
-            || self.auto_restock.gacha_type > 3 || self.same_species_counters.len() > 4_096
+        if self.eggs.len() > 10_000
+            || self.auto_restock.target_count > 10_000
+            || self.auto_restock.gacha_type > 3
+            || self.same_species_counters.len() > 4_096
             || self.same_species_counters.contains_key(&0)
             || self.unlock_pity.iter().any(|pity| pity.get() > 10)
-            || self.eggs.iter().any(|egg| egg.tier > 3 || egg.source_type > 5
-                || egg.variant_tier > 2 || egg.egg_move_index > 3
-                || egg.species.get() == SafeU53::ZERO
-                || !(-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&egg.timestamp))
+            || self.eggs.iter().any(|egg| {
+                egg.tier > 3
+                    || egg.source_type > 5
+                    || egg.variant_tier > 2
+                    || egg.egg_move_index > 3
+                    || egg.species.get() == SafeU53::ZERO
+                    || !(-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&egg.timestamp)
+            })
         {
             return Err(CurrentFriendshipProfileError);
         }

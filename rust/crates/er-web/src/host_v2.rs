@@ -383,7 +383,9 @@ impl BrowserKernelHostV2 {
                 };
                 CurrentExternalEvent::PresentationOutcome { event_id, outcome }
             }
-            BrowserRequestV2::FlashEggInputs { input } => CurrentExternalEvent::CurrentFlashEggInputs { input },
+            BrowserRequestV2::FlashEggInputs { input } => {
+                CurrentExternalEvent::CurrentFlashEggInputs { input }
+            }
             BrowserRequestV2::UtcClockResult {
                 request_id,
                 utc_milliseconds,
@@ -802,7 +804,9 @@ fn map_platform(
             });
         }
         GamePlatformEffectV2::CurrentAchievementClock { request } => {
-            output.push(BrowserEffectV2::UtcClockRequest { request_id: request.request });
+            output.push(BrowserEffectV2::UtcClockRequest {
+                request_id: request.request,
+            });
         }
         GamePlatformEffectV2::CurrentFlashEgg { request } => {
             output.push(BrowserEffectV2::FlashEggInputsRequest { request });

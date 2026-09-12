@@ -17,13 +17,21 @@ pub enum CurrentAchievementKeyV1 {
 
 impl CurrentAchievementKeyV1 {
     pub fn level_keys(level: u16) -> Vec<Self> {
-        [(100, Self::Level100), (250, Self::Level250), (1000, Self::Level1000)]
-            .into_iter().filter_map(|(threshold, key)| (level >= threshold).then_some(key)).collect()
+        [
+            (100, Self::Level100),
+            (250, Self::Level250),
+            (1000, Self::Level1000),
+        ]
+        .into_iter()
+        .filter_map(|(threshold, key)| (level >= threshold).then_some(key))
+        .collect()
     }
 
     pub fn level_candy(self) -> Option<u8> {
         match self {
-            Self::Level100 => Some(10), Self::Level250 => Some(20), Self::Level1000 => Some(30),
+            Self::Level100 => Some(10),
+            Self::Level250 => Some(20),
+            Self::Level1000 => Some(30),
             Self::RealisticFlash => None, // Egg must execute before Flash's candy.
         }
     }
@@ -60,9 +68,11 @@ impl CurrentLevelAchievementExecutionV1 {
         self.level_up.award.phase.pending_id == pending
             && self.achievements == CurrentAchievementKeyV1::level_keys(self.level_up.new_level)
             && usize::from(self.next) <= self.achievements.len()
-            && self.clock.is_none_or(|clock|
-                clock.request.get() != SafeU53::ZERO && clock.pending == pending
-                    && self.achievements.get(usize::from(self.next)) == Some(&clock.achievement))
+            && self.clock.is_none_or(|clock| {
+                clock.request.get() != SafeU53::ZERO
+                    && clock.pending == pending
+                    && self.achievements.get(usize::from(self.next)) == Some(&clock.achievement)
+            })
             && (usize::from(self.next) == self.achievements.len() || self.clock.is_some())
     }
 }
@@ -79,8 +89,13 @@ pub struct CurrentUnseededUnitV1 {
 impl CurrentUnseededUnitV1 {
     pub fn value(&self) -> Option<f64> {
         if self.ieee754_bits.len() != 16
-            || !self.ieee754_bits.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        { return None; }
+            || !self
+                .ieee754_bits
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return None;
+        }
         let value = f64::from_bits(u64::from_str_radix(&self.ieee754_bits, 16).ok()?);
         (value.is_finite() && (0.0..1.0).contains(&value)).then_some(value)
     }
@@ -116,14 +131,27 @@ pub struct CurrentFlashAchievementExecutionV1 {
 
 impl CurrentFlashAchievementExecutionV1 {
     pub fn valid(&self, pending: SafeU53) -> bool {
-        match (&self.clock, &self.egg_request, self.unlocked_at, &self.completed_input) {
-            (Some(clock), None, None, None) => clock.pending == pending
-                && clock.request.get() != SafeU53::ZERO && clock.achievement == CurrentAchievementKeyV1::RealisticFlash,
-            (None, Some(request), Some(utc), None) => request.pending == pending
-                && request.request.get() != SafeU53::ZERO
-                && (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&utc),
-            (None, None, Some(utc), Some(input)) => input.pending == pending && input.valid()
-                && (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&utc),
+        match (
+            &self.clock,
+            &self.egg_request,
+            self.unlocked_at,
+            &self.completed_input,
+        ) {
+            (Some(clock), None, None, None) => {
+                clock.pending == pending
+                    && clock.request.get() != SafeU53::ZERO
+                    && clock.achievement == CurrentAchievementKeyV1::RealisticFlash
+            }
+            (None, Some(request), Some(utc), None) => {
+                request.pending == pending
+                    && request.request.get() != SafeU53::ZERO
+                    && (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&utc)
+            }
+            (None, None, Some(utc), Some(input)) => {
+                input.pending == pending
+                    && input.valid()
+                    && (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&utc)
+            }
             _ => false,
         }
     }
@@ -131,7 +159,8 @@ impl CurrentFlashAchievementExecutionV1 {
 
 impl CurrentFlashEggInputsV1 {
     pub fn valid(&self) -> bool {
-        self.request.get() != SafeU53::ZERO && self.pending != SafeU53::ZERO
+        self.request.get() != SafeU53::ZERO
+            && self.pending != SafeU53::ZERO
             && self.seed_draws.iter().all(|draw| draw.value().is_some())
             && self.id_draw.value().is_some()
             && (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&self.egg_utc_milliseconds)
@@ -153,9 +182,13 @@ impl CurrentAchievementUnlocksV1 {
 
     pub fn valid(&self) -> bool {
         self.rows.len() <= 4
-            && self.rows.iter().all(|row|
-                (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&row.utc_milliseconds))
-            && self.rows.windows(2).all(|pair| pair[0].achievement < pair[1].achievement)
+            && self.rows.iter().all(|row| {
+                (-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&row.utc_milliseconds)
+            })
+            && self
+                .rows
+                .windows(2)
+                .all(|pair| pair[0].achievement < pair[1].achievement)
     }
 
     pub fn contains(&self, key: CurrentAchievementKeyV1) -> bool {
@@ -171,10 +204,13 @@ impl CurrentAchievementUnlocksV1 {
         let Err(index) = self.rows.binary_search_by_key(&key, |row| row.achievement) else {
             return false;
         };
-        self.rows.insert(index, CurrentAchievementUnlockV1 {
-            achievement: key,
-            utc_milliseconds: utc,
-        });
+        self.rows.insert(
+            index,
+            CurrentAchievementUnlockV1 {
+                achievement: key,
+                utc_milliseconds: utc,
+            },
+        );
         true
     }
 }
@@ -189,9 +225,18 @@ mod tests {
         assert!(CurrentAchievementKeyV1::level_keys(99).is_empty());
         assert_eq!(CurrentAchievementKeyV1::level_keys(100), [Level100]);
         assert_eq!(CurrentAchievementKeyV1::level_keys(249), [Level100]);
-        assert_eq!(CurrentAchievementKeyV1::level_keys(250), [Level100, Level250]);
-        assert_eq!(CurrentAchievementKeyV1::level_keys(999), [Level100, Level250]);
-        assert_eq!(CurrentAchievementKeyV1::level_keys(1000), [Level100, Level250, Level1000]);
+        assert_eq!(
+            CurrentAchievementKeyV1::level_keys(250),
+            [Level100, Level250]
+        );
+        assert_eq!(
+            CurrentAchievementKeyV1::level_keys(999),
+            [Level100, Level250]
+        );
+        assert_eq!(
+            CurrentAchievementKeyV1::level_keys(1000),
+            [Level100, Level250, Level1000]
+        );
     }
 
     #[test]
@@ -208,30 +253,50 @@ mod tests {
         assert!(unlocks.insert(Level250, -8_640_000_000_000_000));
         assert!(unlocks.valid());
         let bytes = serde_json::to_vec(&unlocks).expect("serialize typed unlock rows");
-        let restored: CurrentAchievementUnlocksV1 = serde_json::from_slice(&bytes).expect("restore exact unlock rows");
+        let restored: CurrentAchievementUnlocksV1 =
+            serde_json::from_slice(&bytes).expect("restore exact unlock rows");
         assert_eq!(restored, unlocks);
     }
 
     #[test]
     fn level_cursor_rejects_wrong_pending_key_and_missing_clock() {
-        use crate::current_experience_settlement::{CurrentExperienceAwardV1, CurrentExperiencePhaseV1};
+        use crate::current_experience_settlement::{
+            CurrentExperienceAwardV1, CurrentExperiencePhaseV1,
+        };
         let id = SafeU53::new(1).expect("valid identity");
         let phase = CurrentExperiencePhaseV1 {
-            pending_id: id, pokemon: er_types::battle_ids::PokemonId::new(id), party_index: 0,
-            on_field: true, phase_argument: er_types::run_ids::Experience::new(id),
+            pending_id: id,
+            pokemon: er_types::battle_ids::PokemonId::new(id),
+            party_index: 0,
+            on_field: true,
+            phase_argument: er_types::run_ids::Experience::new(id),
         };
         let level_up = CurrentLevelUpV1 {
-            award: CurrentExperienceAwardV1 { phase, experience: er_types::run_ids::Experience::new(id),
-                last_level: 99, last_experience: er_types::run_ids::Experience::new(id) },
-            previous_level: 99, new_level: 100,
+            award: CurrentExperienceAwardV1 {
+                phase,
+                experience: er_types::run_ids::Experience::new(id),
+                last_level: 99,
+                last_experience: er_types::run_ids::Experience::new(id),
+            },
+            previous_level: 99,
+            new_level: 100,
             previous_stats: er_types::battle_model::BattleStats {
-                hp: 1, attack: 1, defense: 1, special_attack: 1, special_defense: 1, speed: 1,
+                hp: 1,
+                attack: 1,
+                defense: 1,
+                special_attack: 1,
+                special_defense: 1,
+                speed: 1,
             },
         };
         let mut cursor = CurrentLevelAchievementExecutionV1 {
-            level_up, achievements: CurrentAchievementKeyV1::level_keys(100), next: 0,
+            level_up,
+            achievements: CurrentAchievementKeyV1::level_keys(100),
+            next: 0,
             clock: Some(CurrentAchievementClockRequestV1 {
-                request: PlatformRequestId::new(id), pending: id, achievement: CurrentAchievementKeyV1::Level100,
+                request: PlatformRequestId::new(id),
+                pending: id,
+                achievement: CurrentAchievementKeyV1::Level100,
             }),
         };
         assert!(cursor.valid(id));

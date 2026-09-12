@@ -41,7 +41,10 @@ pub(crate) fn prepare_initial_flash_egg(
     let mut rng = PhaserRdg::from_seed(&seed);
     let total = u64::from(pool::RARE_EVENT_POOL.last().ok_or_else(failure)?.1);
     let draw = rng
-        .integer_in_range(SafeU53::ZERO, SafeU53::new(total - 1).map_err(|_| failure())?)
+        .integer_in_range(
+            SafeU53::ZERO,
+            SafeU53::new(total - 1).map_err(|_| failure())?,
+        )
         .map_err(|_| failure())?
         .get();
     let &(species, _, fresh_caught) = pool::RARE_EVENT_POOL

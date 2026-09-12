@@ -122,14 +122,24 @@ fn validate_current_experience_progress_at_frontier(
     let mut progress = Vec::new();
     if let Some(victory) = &pending.victory {
         if let Some(level) = &victory.level_achievements {
-            let rewards = state.current_friendship_profile.as_ref().and_then(|p| p.rewards.as_ref()).ok_or_else(failure)?;
+            let rewards = state
+                .current_friendship_profile
+                .as_ref()
+                .and_then(|p| p.rewards.as_ref())
+                .ok_or_else(failure)?;
             let unlocks = rewards.achievements.as_ref().ok_or_else(failure)?;
             let clock = level.clock.as_ref().ok_or_else(failure)?;
             if clock.request.get() >= state.identities.next_platform_request_id
                 || rewards.highest_level.get() < u64::from(level.level_up.new_level)
-                || level.achievements.iter().take(usize::from(level.next)).any(|key| !unlocks.contains(*key))
+                || level
+                    .achievements
+                    .iter()
+                    .take(usize::from(level.next))
+                    .any(|key| !unlocks.contains(*key))
                 || unlocks.contains(clock.achievement)
-            { return Err(failure()); }
+            {
+                return Err(failure());
+            }
         }
         if !victory.valid(pending.id)
             || plan_current_victory_experience(&preimage, content, pending.id)? != victory.phases

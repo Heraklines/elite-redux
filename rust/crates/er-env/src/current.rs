@@ -464,7 +464,9 @@ fn reduce(
             request_id,
             utc_milliseconds,
         } => kernel.apply_current_utc_clock_result(request_id, utc_milliseconds),
-        CurrentExternalEvent::CurrentFlashEggInputs { input } => kernel.apply_current_flash_egg_inputs(input),
+        CurrentExternalEvent::CurrentFlashEggInputs { input } => {
+            kernel.apply_current_flash_egg_inputs(input)
+        }
         CurrentExternalEvent::StorageResult { request_id, result } => {
             kernel.apply_storage_result(request_id, result)
         }

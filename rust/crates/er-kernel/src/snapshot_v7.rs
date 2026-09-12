@@ -572,26 +572,64 @@ fn validate_active_state(
             _ => None,
         })
         .collect::<Vec<_>>();
-    let mut achievement_clocks = state.current_battle_participation.as_ref()
-        .and_then(|p| p.experience.as_ref()).into_iter().flat_map(|o| &o.pending)
-        .filter_map(|p| p.victory.as_ref()).filter_map(|v| v.level_achievements.as_ref())
-        .filter_map(|v| v.clock.as_ref()).collect::<Vec<_>>();
-    achievement_clocks.extend(state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
-        .into_iter().flat_map(|o| &o.pending).filter_map(|p| p.victory_tail.as_ref())
-        .filter_map(|t| t.flash.as_ref()).filter_map(|f| f.clock.as_ref()));
-    let egg_requests = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
-        .into_iter().flat_map(|o| &o.pending).filter_map(|p| p.victory_tail.as_ref())
-        .filter_map(|t| t.flash.as_ref()).filter_map(|f| f.egg_request.as_ref()).collect::<Vec<_>>();
-    let egg_effects = snapshot.pending_platform.iter().filter_map(|p| match &p.effect {
-        GamePlatformEffectV2::CurrentFlashEgg { request } => Some(request), _ => None,
-    }).collect::<Vec<_>>();
-    let achievement_effects = snapshot.pending_platform.iter().filter_map(|p| match &p.effect {
-        GamePlatformEffectV2::CurrentAchievementClock { request } => Some(request),
-        _ => None,
-    }).collect::<Vec<_>>();
+    let mut achievement_clocks = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|p| p.experience.as_ref())
+        .into_iter()
+        .flat_map(|o| &o.pending)
+        .filter_map(|p| p.victory.as_ref())
+        .filter_map(|v| v.level_achievements.as_ref())
+        .filter_map(|v| v.clock.as_ref())
+        .collect::<Vec<_>>();
+    achievement_clocks.extend(
+        state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|p| p.experience.as_ref())
+            .into_iter()
+            .flat_map(|o| &o.pending)
+            .filter_map(|p| p.victory_tail.as_ref())
+            .filter_map(|t| t.flash.as_ref())
+            .filter_map(|f| f.clock.as_ref()),
+    );
+    let egg_requests = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|p| p.experience.as_ref())
+        .into_iter()
+        .flat_map(|o| &o.pending)
+        .filter_map(|p| p.victory_tail.as_ref())
+        .filter_map(|t| t.flash.as_ref())
+        .filter_map(|f| f.egg_request.as_ref())
+        .collect::<Vec<_>>();
+    let egg_effects = snapshot
+        .pending_platform
+        .iter()
+        .filter_map(|p| match &p.effect {
+            GamePlatformEffectV2::CurrentFlashEgg { request } => Some(request),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let achievement_effects = snapshot
+        .pending_platform
+        .iter()
+        .filter_map(|p| match &p.effect {
+            GamePlatformEffectV2::CurrentAchievementClock { request } => Some(request),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
     if clocks.len() + achievement_clocks.len() + egg_requests.len() > 1
-        || if snapshot.authority_ai.is_some() { egg_effects != egg_requests } else { !egg_effects.is_empty() }
-        || if snapshot.authority_ai.is_some() { achievement_effects != achievement_clocks } else { !achievement_effects.is_empty() }
+        || if snapshot.authority_ai.is_some() {
+            egg_effects != egg_requests
+        } else {
+            !egg_effects.is_empty()
+        }
+        || if snapshot.authority_ai.is_some() {
+            achievement_effects != achievement_clocks
+        } else {
+            !achievement_effects.is_empty()
+        }
         || if snapshot.authority_ai.is_some() {
             effects != clocks
         } else {

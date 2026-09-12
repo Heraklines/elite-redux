@@ -71,7 +71,9 @@ impl CurrentInitialVictoryTailV1 {
             CurrentInitialVictoryTailPhaseV1::TurnSettlement { xp_endpoint }
             | CurrentInitialVictoryTailPhaseV1::BattleEnd { xp_endpoint, .. }
             | CurrentInitialVictoryTailPhaseV1::EggLapse { xp_endpoint, .. }
-            | CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { xp_endpoint, .. } => Some(xp_endpoint),
+            | CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { xp_endpoint, .. } => {
+                Some(xp_endpoint)
+            }
         }
     }
 

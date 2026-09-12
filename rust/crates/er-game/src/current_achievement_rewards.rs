@@ -40,15 +40,23 @@ pub(crate) fn prepare_achievement_team_candy(
         {
             return Err(fail());
         }
-        let index = candidate.accounts.binary_search_by_key(&pokemon.species_id, |row| row.species)
+        let index = candidate
+            .accounts
+            .binary_search_by_key(&pokemon.species_id, |row| row.species)
             .map_err(|_| fail())?;
         let account = &mut candidate.accounts[index];
         let before = account.candy_count;
         // Source passes fromEgg=true, so there is no rate lookup or scaling.
         // Zero is an unused arithmetic argument here, not an inferred run rate.
         let result = add_resolved_starter_candy(
-            i64::try_from(before.get()).map_err(|_| fail())?, count, true, true, false, 0,
-        ).map_err(|_| fail())?;
+            i64::try_from(before.get()).map_err(|_| fail())?,
+            count,
+            true,
+            true,
+            false,
+            0,
+        )
+        .map_err(|_| fail())?;
         account.candy_count = SafeU53::new(u64::try_from(result.candy_count).map_err(|_| fail())?)
             .map_err(|_| fail())?;
         if let Some(scaled_count) = result.candy_bar_count {

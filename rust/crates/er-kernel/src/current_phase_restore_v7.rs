@@ -9,17 +9,32 @@ use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;
 
 fn retained_requests(state: &GameStateV6) -> Vec<GamePlatformEffectV2> {
     let mut effects = Vec::new();
-    if let Some(owner) = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref()) {
+    if let Some(owner) = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|p| p.experience.as_ref())
+    {
         for pending in &owner.pending {
             if let Some(request) = pending.friendship.as_ref().and_then(|p| p.clock.as_ref()) {
-                effects.push(GamePlatformEffectV2::CurrentFriendshipClock { request: request.clone() });
+                effects.push(GamePlatformEffectV2::CurrentFriendshipClock {
+                    request: request.clone(),
+                });
             }
-            if let Some(request) = pending.victory.as_ref().and_then(|v| v.level_achievements.as_ref()).and_then(|v| v.clock.as_ref()) {
+            if let Some(request) = pending
+                .victory
+                .as_ref()
+                .and_then(|v| v.level_achievements.as_ref())
+                .and_then(|v| v.clock.as_ref())
+            {
                 effects.push(GamePlatformEffectV2::CurrentAchievementClock { request: *request });
             }
             if let Some(flash) = pending.victory_tail.as_ref().and_then(|t| t.flash.as_ref()) {
-                if let Some(request) = flash.clock { effects.push(GamePlatformEffectV2::CurrentAchievementClock { request }); }
-                if let Some(request) = flash.egg_request { effects.push(GamePlatformEffectV2::CurrentFlashEgg { request }); }
+                if let Some(request) = flash.clock {
+                    effects.push(GamePlatformEffectV2::CurrentAchievementClock { request });
+                }
+                if let Some(request) = flash.egg_request {
+                    effects.push(GamePlatformEffectV2::CurrentFlashEgg { request });
+                }
             }
         }
     }
@@ -65,7 +80,8 @@ pub(super) fn owned_waiting_phase(
         && owner.execution_origin == Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
         && owner.source_progression.is_some()
         && owner.pending.len() == 1
-        && ((expected.len() == 1 && requests.is_empty()
+        && ((expected.len() == 1
+            && requests.is_empty()
             && expected[0].pending == owner.pending[0].id
             && current_phase_receipt_v7::receipt_matches(state, content, expected[0]))
             || (expected.is_empty() && requests.len() == 1))
@@ -209,7 +225,10 @@ pub(super) fn reissue_effects(
     if !requests.is_empty() {
         // A save omits private host delivery. Reissue the retained identity;
         // never consume Date/random inputs or allocate another request here.
-        return Ok(requests.into_iter().map(GameKernelEffectV7::Platform).collect());
+        return Ok(requests
+            .into_iter()
+            .map(GameKernelEffectV7::Platform)
+            .collect());
     }
     // No event allocation, receipt append, phase mutation or inferred acknowledgement.
     Ok(vec![GameKernelEffectV7::Presentation(retained_effect(

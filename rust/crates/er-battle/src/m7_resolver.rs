@@ -261,7 +261,7 @@ fn resolve_turn_v5_inner(
     }
     let mut rng = RngRuntime::from_states(run.run_rng.clone(), Some(battle.battle_rng.clone()))
         .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
-    let mut pending = build_actions(run, commands, content, targeting)?;
+    let mut pending = build_actions(run, commands, content, targeting, &mut rng)?;
     rng.speed_order_shuffle(&mut pending, &battle.wave_seed, battle.turn)
         .map_err(|error| BattleV5Error::Rng(error.to_string()))?;
     pending.sort_by(|left, right| {
@@ -492,6 +492,7 @@ fn build_actions(
     commands: &CommandSet,
     content: &PreparedBattleContentV3,
     targeting: Option<&CurrentTargetExecution<'_>>,
+    rng: &mut RngRuntime,
 ) -> Result<Vec<PendingAction>, BattleV5Error> {
     let battle = run.battle.as_ref().ok_or(BattleV5Error::NoBattle)?;
     let mut actions = Vec::with_capacity(commands.entries.len());
@@ -535,11 +536,13 @@ fn build_actions(
                 },
                 Some(owner),
             ) => {
-                let (definition, _) = effective_move_definition_v5(content, actor, *move_slot)?;
+                let (definition, struggle) = effective_move_definition_v5(content, actor, *move_slot)?;
+                if definition.id.get().get() == 165 && !struggle {
+                    return Err(BattleV5Error::UnsupportedContent);
+                }
                 Some(
                     owner
-                        .plan(run, *actor_id, definition)
-                        .and_then(|plan| plan.retain(targets))
+                        .retain_command_targets(run, *actor_id, definition, targets, rng)
                         .map_err(|_| BattleV5Error::Target)?,
                 )
             }
@@ -1219,7 +1222,7 @@ fn query_simulated_move_damage_inner(
         return Err(BattleV5Error::Target);
     }
     if let Some(owner) = targeting
-        && crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition)
+        && crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition, false)
             .map_err(|_| BattleV5Error::UnsupportedContent)?
             .is_some()
     {

@@ -430,6 +430,45 @@ pub fn apply_game_material_v6_with_retention(
     retention: AppliedMaterialRetentionV1,
 ) -> Result<GameMaterialApplyOutcomeV6, GameMaterialV6Error> {
     ledger.validate_with_retention(retention)?;
+    apply_to_validated_ledger(live, ledger, content, bytes, retention)
+}
+
+/// Crate-private proof borrows the exact validated ledger immutably, so no
+/// mutation can invalidate it between preparation admission and common apply.
+#[derive(Debug)]
+pub(crate) struct ValidatedAppliedLedger<'a> {
+    ledger: &'a AppliedGameMaterialLedgerV1,
+    retention: AppliedMaterialRetentionV1,
+}
+
+impl<'a> ValidatedAppliedLedger<'a> {
+    pub(crate) fn new(
+        ledger: &'a AppliedGameMaterialLedgerV1,
+        retention: AppliedMaterialRetentionV1,
+    ) -> Result<Self, GameMaterialV6Error> {
+        ledger.validate_with_retention(retention)?;
+        Ok(Self { ledger, retention })
+    }
+
+    pub(crate) fn apply_clone(
+        &self,
+        live: &mut Option<GameStateV6>,
+        content: &PreparedGameContentV2,
+        bytes: &[u8],
+    ) -> Result<(GameMaterialApplyOutcomeV6, AppliedGameMaterialLedgerV1), GameMaterialV6Error> {
+        let mut ledger = self.ledger.clone();
+        let outcome = apply_to_validated_ledger(live, &mut ledger, content, bytes, self.retention)?;
+        Ok((outcome, ledger))
+    }
+}
+
+fn apply_to_validated_ledger(
+    live: &mut Option<GameStateV6>,
+    ledger: &mut AppliedGameMaterialLedgerV1,
+    content: &PreparedGameContentV2,
+    bytes: &[u8],
+    retention: AppliedMaterialRetentionV1,
+) -> Result<GameMaterialApplyOutcomeV6, GameMaterialV6Error> {
     let material = GameMaterialV6::decode(bytes)?;
     let transition = material.transition();
     if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
@@ -794,8 +833,12 @@ fn invalid_platform_effects(
         let (request, invalid) = match effect {
             // Daily sampling belongs to Bootstrap, outside active game material.
             GamePlatformEffectV2::StarterPokerusClock { request, .. } => (*request, true),
-            GamePlatformEffectV2::CurrentAchievementClock { request } => (request.request, request.pending == SafeU53::ZERO),
-            GamePlatformEffectV2::CurrentFlashEgg { request } => (request.request, request.pending == SafeU53::ZERO),
+            GamePlatformEffectV2::CurrentAchievementClock { request } => {
+                (request.request, request.pending == SafeU53::ZERO)
+            }
+            GamePlatformEffectV2::CurrentFlashEgg { request } => {
+                (request.request, request.pending == SafeU53::ZERO)
+            }
             GamePlatformEffectV2::CurrentFriendshipClock { request } => (
                 request.request,
                 request.pending == SafeU53::ZERO || request.recipient.get() == SafeU53::ZERO,

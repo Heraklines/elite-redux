@@ -548,7 +548,12 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
     // Explicit test watchdog; reaching it is failure, never an implicit drain.
     for _ in 0..96 {
         assert_faint_timeline(&mut kernel, content.clone(), &mut faint_events)?;
-        assert_raw_victory_observation(&mut kernel, content.clone(), (before_xp, before_stats), &mut progress)?;
+        assert_raw_victory_observation(
+            &mut kernel,
+            content.clone(),
+            (before_xp, before_stats),
+            &mut progress,
+        )?;
         kernel = restore_exact_raw_checkpoint(&kernel, content.clone())?;
         if progress[2] {
             break;
@@ -574,175 +579,185 @@ fn assert_raw_victory_observation(
     progress: &mut [bool; 3],
 ) -> Result<()> {
     let (before_xp, before_stats) = before;
-        let checkpoint = kernel.snapshot()?;
-        let state = active(&checkpoint)?;
-        let pokemon = &state.active_run.as_ref().ok_or("run absent")?.party[0];
-        let pending = state
-            .current_battle_participation
-            .as_ref()
-            .and_then(|owner| owner.experience.as_ref())
-            .and_then(|owner| {
-                owner
-                    .pending
-                    .iter()
-                    .find(|pending| pending.victory.is_some())
-            });
-        if let Some(victory) = pending.and_then(|pending| pending.victory.as_ref()) {
-            match &victory.descendant {
-                CurrentVictoryDescendantV1::AwardPresentation { award, event_id } => {
-                    assert_phase_title_read_reissues(&checkpoint, *event_id, content.clone())?;
-                    assert!(
-                        !progress[0],
-                        "same award prompt repeated after its exact acknowledgement"
-                    );
-                    progress[0] = true;
-                    assert_eq!(pokemon.experience, before_xp);
-                    assert_eq!(pokemon.level, 5);
-                    assert_eq!(pokemon.stats, before_stats);
-                    assert_eq!(award.last_experience, before_xp);
-                    assert!(award.experience.get().get() > 0);
-                    assert!(
-                        checkpoint
-                            .pending_presentations
-                            .iter()
-                            .any(|pending| pending.event_id == *event_id)
-                    );
-                    let blocked = kernel.advance_time(SafeU53::ZERO)?;
-                    assert!(!blocked.effects.iter().any(|effect| matches!(
+    let checkpoint = kernel.snapshot()?;
+    let state = active(&checkpoint)?;
+    let pokemon = &state.active_run.as_ref().ok_or("run absent")?.party[0];
+    let pending = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|owner| owner.experience.as_ref())
+        .and_then(|owner| {
+            owner
+                .pending
+                .iter()
+                .find(|pending| pending.victory.is_some())
+        });
+    if let Some(victory) = pending.and_then(|pending| pending.victory.as_ref()) {
+        match &victory.descendant {
+            CurrentVictoryDescendantV1::AwardPresentation { award, event_id } => {
+                assert_phase_title_read_reissues(&checkpoint, *event_id, content.clone())?;
+                assert!(
+                    !progress[0],
+                    "same award prompt repeated after its exact acknowledgement"
+                );
+                progress[0] = true;
+                assert_eq!(pokemon.experience, before_xp);
+                assert_eq!(pokemon.level, 5);
+                assert_eq!(pokemon.stats, before_stats);
+                assert_eq!(award.last_experience, before_xp);
+                assert!(award.experience.get().get() > 0);
+                assert!(
+                    checkpoint
+                        .pending_presentations
+                        .iter()
+                        .any(|pending| pending.event_id == *event_id)
+                );
+                let blocked = kernel.advance_time(SafeU53::ZERO)?;
+                assert!(
+                    !blocked.effects.iter().any(|effect| matches!(
                         effect,
                         GameKernelEffectV7::AuthorityMaterial { .. }
-                    )));
-                    assert_eq!(kernel.state(), Some(state));
-                }
-                CurrentVictoryDescendantV1::LevelUpStart { level_up } => {
-                    progress[1] = true;
-                    assert!(progress[0]);
-                    assert_eq!(pokemon.level, level_up.new_level);
-                    assert!(pokemon.level >= 6);
-                    assert_eq!(
-                        pokemon.stats, before_stats,
-                        "stats must wait for actual LevelUp.start"
-                    );
-                    assert_eq!(
-                        pokemon.experience.get().get(),
-                        before_xp.get().get() + level_up.award.experience.get().get()
-                    );
-                    let mut forged = checkpoint.clone();
-                    let GameKernelLifecycleSnapshotV7::Active(forged_state) = &mut forged.lifecycle
-                    else {
-                        return Err("active level-start snapshot absent".into());
-                    };
-                    let retained = forged_state
-                        .current_battle_participation
-                        .as_mut()
-                        .and_then(|owner| owner.experience.as_mut())
-                        .and_then(|owner| {
-                            owner
-                                .pending
-                                .iter_mut()
-                                .find_map(|pending| pending.victory.as_mut())
-                        })
-                        .ok_or("actual retained victory absent")?;
-                    let CurrentVictoryDescendantV1::LevelUpStart { level_up } =
-                        &mut retained.descendant
-                    else {
-                        return Err("actual level-start cursor absent".into());
-                    };
-                    level_up.previous_stats.attack = level_up
-                        .previous_stats
-                        .attack
-                        .checked_add(1)
-                        .ok_or("stat overflow")?;
-                    assert!(
-                        restore(forged, content.clone()).is_err(),
-                        "retained previous stats must match the captured Faint preimage"
-                    );
-                }
-                CurrentVictoryDescendantV1::LevelUpPresentation { end, event_id } => {
-                    assert_phase_title_read_reissues(&checkpoint, *event_id, content.clone())?;
-                    assert!(progress[0] && progress[1]);
-                    assert_eq!(pokemon.level, end.level_up.new_level);
-                    assert_eq!(
-                        state
-                            .current_friendship_profile
-                            .as_ref()
-                            .and_then(|profile| profile.rewards.as_ref())
-                            .ok_or("actual fresh account rewards absent")?
-                            .highest_level
-                            .get(),
-                        u64::from(pokemon.level),
-                        "highestLevel must be updated before the stat presentation"
-                    );
-                    assert_ne!(pokemon.stats, before_stats);
-                    assert_eq!(pokemon.max_hp, pokemon.stats.hp);
-                    assert!(
-                        checkpoint
-                            .pending_presentations
-                            .iter()
-                            .any(|pending| pending.event_id == *event_id)
-                    );
-                    progress[2] = true;
-                }
-                _ => {}
+                    ))
+                );
+                assert_eq!(kernel.state(), Some(state));
             }
+            CurrentVictoryDescendantV1::LevelUpStart { level_up } => {
+                progress[1] = true;
+                assert!(progress[0]);
+                assert_eq!(pokemon.level, level_up.new_level);
+                assert!(pokemon.level >= 6);
+                assert_eq!(
+                    pokemon.stats, before_stats,
+                    "stats must wait for actual LevelUp.start"
+                );
+                assert_eq!(
+                    pokemon.experience.get().get(),
+                    before_xp.get().get() + level_up.award.experience.get().get()
+                );
+                let mut forged = checkpoint.clone();
+                let GameKernelLifecycleSnapshotV7::Active(forged_state) = &mut forged.lifecycle
+                else {
+                    return Err("active level-start snapshot absent".into());
+                };
+                let retained = forged_state
+                    .current_battle_participation
+                    .as_mut()
+                    .and_then(|owner| owner.experience.as_mut())
+                    .and_then(|owner| {
+                        owner
+                            .pending
+                            .iter_mut()
+                            .find_map(|pending| pending.victory.as_mut())
+                    })
+                    .ok_or("actual retained victory absent")?;
+                let CurrentVictoryDescendantV1::LevelUpStart { level_up } =
+                    &mut retained.descendant
+                else {
+                    return Err("actual level-start cursor absent".into());
+                };
+                level_up.previous_stats.attack = level_up
+                    .previous_stats
+                    .attack
+                    .checked_add(1)
+                    .ok_or("stat overflow")?;
+                assert!(
+                    restore(forged, content.clone()).is_err(),
+                    "retained previous stats must match the captured Faint preimage"
+                );
+            }
+            CurrentVictoryDescendantV1::LevelUpPresentation { end, event_id } => {
+                assert_phase_title_read_reissues(&checkpoint, *event_id, content.clone())?;
+                assert!(progress[0] && progress[1]);
+                assert_eq!(pokemon.level, end.level_up.new_level);
+                assert_eq!(
+                    state
+                        .current_friendship_profile
+                        .as_ref()
+                        .and_then(|profile| profile.rewards.as_ref())
+                        .ok_or("actual fresh account rewards absent")?
+                        .highest_level
+                        .get(),
+                    u64::from(pokemon.level),
+                    "highestLevel must be updated before the stat presentation"
+                );
+                assert_ne!(pokemon.stats, before_stats);
+                assert_eq!(pokemon.max_hp, pokemon.stats.hp);
+                assert!(
+                    checkpoint
+                        .pending_presentations
+                        .iter()
+                        .any(|pending| pending.event_id == *event_id)
+                );
+                progress[2] = true;
+            }
+            _ => {}
         }
+    }
 
     Ok(())
 }
 
 #[inline(never)]
-fn restore_exact_raw_checkpoint(kernel: &GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<Box<GameKernelV7>> {
-        let resumed = restore(
-            serde_json::from_slice(&canonical_bytes(&kernel.snapshot()?)?)?,
-            content.clone(),
-        )?;
-        assert_eq!(
-            canonical_bytes(&resumed.snapshot()?)?,
-            canonical_bytes(&kernel.snapshot()?)?
-        );
-        Ok(Box::new(resumed))
-
+fn restore_exact_raw_checkpoint(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<Box<GameKernelV7>> {
+    let resumed = restore(
+        serde_json::from_slice(&canonical_bytes(&kernel.snapshot()?)?)?,
+        content.clone(),
+    )?;
+    assert_eq!(
+        canonical_bytes(&resumed.snapshot()?)?,
+        canonical_bytes(&kernel.snapshot()?)?
+    );
+    Ok(Box::new(resumed))
 }
 
 #[inline(never)]
-fn advance_raw_phase_after_callbacks(kernel: &mut Box<GameKernelV7>, content: Arc<PreparedGameContentV2>, live: &Option<GameStateV6>) -> Result<GameKernelStepV7> {
-        for presentation in kernel.snapshot()?.pending_presentations {
-            kernel.settle_presentation(presentation.event_id)?;
-            let settled = canonical_bytes(&kernel.snapshot()?)?;
-            assert!(kernel.settle_presentation(presentation.event_id).is_err());
-            assert_eq!(
-                canonical_bytes(&kernel.snapshot()?)?,
-                settled,
-                "duplicate presentation callback must be rejected atomically"
-            );
-            assert_eq!(live.as_ref(), kernel.state());
-        }
-        let snapshot = kernel.snapshot()?;
-        *kernel = Box::new(restore(
-            serde_json::from_slice(&canonical_bytes(&snapshot)?)?,
-            content.clone(),
-        )?);
+fn advance_raw_phase_after_callbacks(
+    kernel: &mut Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+    live: &Option<GameStateV6>,
+) -> Result<GameKernelStepV7> {
+    for presentation in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(presentation.event_id)?;
+        let settled = canonical_bytes(&kernel.snapshot()?)?;
+        assert!(kernel.settle_presentation(presentation.event_id).is_err());
         assert_eq!(
             canonical_bytes(&kernel.snapshot()?)?,
-            canonical_bytes(&snapshot)?,
-            "the actual settled presentation acknowledgement must survive restore before its material step"
+            settled,
+            "duplicate presentation callback must be rejected atomically"
         );
-        let step = if let Some(clock) = snapshot.pending_platform.iter().find(|pending| {
-            matches!(
-                pending.effect,
-                GamePlatformEffectV2::CurrentFriendshipClock { .. }
-            )
-        }) {
-            kernel.apply_current_utc_clock_result(clock.request_id, 0)?
-        } else {
-            kernel.advance_time(SafeU53::ZERO)?
-        };
-        Ok(step)
-
+        assert_eq!(live.as_ref(), kernel.state());
+    }
+    let snapshot = kernel.snapshot()?;
+    *kernel = Box::new(restore(
+        serde_json::from_slice(&canonical_bytes(&snapshot)?)?,
+        content.clone(),
+    )?);
+    assert_eq!(
+        canonical_bytes(&kernel.snapshot()?)?,
+        canonical_bytes(&snapshot)?,
+        "the actual settled presentation acknowledgement must survive restore before its material step"
+    );
+    let step = if let Some(clock) = snapshot.pending_platform.iter().find(|pending| {
+        matches!(
+            pending.effect,
+            GamePlatformEffectV2::CurrentFriendshipClock { .. }
+        )
+    }) {
+        kernel.apply_current_utc_clock_result(clock.request_id, 0)?
+    } else {
+        kernel.advance_time(SafeU53::ZERO)?
+    };
+    Ok(step)
 }
 
 #[inline(never)]
-fn assert_raw_post_stats_integrity(kernel: &GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<()> {
+fn assert_raw_post_stats_integrity(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
     let legitimate = kernel.snapshot()?;
     let original = canonical_bytes(&legitimate)?;
     let mut wrong_xp = legitimate.clone();
@@ -1099,7 +1114,11 @@ fn assert_initial_tail_boundary(
     else {
         return Ok(false);
     };
-    let eggs = state.current_friendship_profile.as_ref().and_then(|p| p.egg_account.as_ref()).ok_or("known Egg account absent")?;
+    let eggs = state
+        .current_friendship_profile
+        .as_ref()
+        .and_then(|p| p.egg_account.as_ref())
+        .ok_or("known Egg account absent")?;
     assert!(eggs.eggs.is_empty());
     assert!(!eggs.auto_restock.enabled);
     assert_eq!(eggs.auto_restock.target_count, 50);
@@ -1157,39 +1176,119 @@ fn assert_initial_tail_boundary(
 }
 
 #[inline(never)]
-fn assert_request_title_read_reissues(checkpoint: &CoreGameKernelSnapshotV7, expected: &GamePlatformEffectV2, content: Arc<PreparedGameContentV2>) -> Result<()> {
+fn assert_request_title_read_reissues(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    expected: &GamePlatformEffectV2,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
     use er_kernel::game_kernel_v7::KernelStorageResultV2 as S;
     let original = active(checkpoint)?;
-    let saved = er_save::m9e_save_v2::GameSaveV2::new(original.content_identity.clone(), safe(1)?, original.clone())?.encode()?;
-    let mut reader = Box::new(GameKernelV7::natural_start(original.profile.clone(), "request-title-read".into(), seat()?, vec!["request-slot".into()], true,
-        content.clone(), KernelSchedulerSnapshotV2 { next_timer_id: Some(SafeU53::ZERO), timers: vec![], pauses: vec![], disposed: false }, None)?);
+    let saved = er_save::m9e_save_v2::GameSaveV2::new(
+        original.content_identity.clone(),
+        safe(1)?,
+        original.clone(),
+    )?
+    .encode()?;
+    let mut reader = Box::new(GameKernelV7::natural_start(
+        original.profile.clone(),
+        "request-title-read".into(),
+        seat()?,
+        vec!["request-slot".into()],
+        true,
+        content.clone(),
+        KernelSchedulerSnapshotV2 {
+            next_timer_id: Some(SafeU53::ZERO),
+            timers: vec![],
+            pauses: vec![],
+            disposed: false,
+        },
+        None,
+    )?);
     navigate(&mut reader, "bootstrap/title/existing-saves")?;
     let list = press(&mut reader, PhysicalKey::Space)?;
-    let list_id = list.effects.iter().find_map(|e| match e { GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageList { request }) => Some(*request), _ => None }).ok_or("LIST absent")?;
-    reader.apply_storage_result(list_id, S::Slots { slots: vec!["request-slot".into()] })?;
+    let list_id = list
+        .effects
+        .iter()
+        .find_map(|e| match e {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageList { request }) => {
+                Some(*request)
+            }
+            _ => None,
+        })
+        .ok_or("LIST absent")?;
+    reader.apply_storage_result(
+        list_id,
+        S::Slots {
+            slots: vec!["request-slot".into()],
+        },
+    )?;
     let read = press(&mut reader, PhysicalKey::Space)?;
-    let read_id = read.effects.iter().find_map(|e| match e { GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, .. }) => Some(*request), _ => None }).ok_or("READ absent")?;
+    let read_id = read
+        .effects
+        .iter()
+        .find_map(|e| match e {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, .. }) => {
+                Some(*request)
+            }
+            _ => None,
+        })
+        .ok_or("READ absent")?;
     let before = reader.snapshot()?;
-    let loaded = reader.apply_storage_result(read_id, S::Read { bytes: Some(saved.clone()) })?;
-    let requests: Vec<_> = loaded.effects.iter().filter_map(|e| match e { GameKernelEffectV7::Platform(p) => Some(p), _ => None }).collect();
+    let loaded = reader.apply_storage_result(
+        read_id,
+        S::Read {
+            bytes: Some(saved.clone()),
+        },
+    )?;
+    let requests: Vec<_> = loaded
+        .effects
+        .iter()
+        .filter_map(|e| match e {
+            GameKernelEffectV7::Platform(p) => Some(p),
+            _ => None,
+        })
+        .collect();
     assert_eq!(requests, [expected]);
-    assert!(!loaded.effects.iter().any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. } | GameKernelEffectV7::Presentation(_))));
+    assert!(!loaded.effects.iter().any(|e| matches!(
+        e,
+        GameKernelEffectV7::AuthorityMaterial { .. } | GameKernelEffectV7::Presentation(_)
+    )));
     assert!(loaded.internal_events.is_empty());
     let after = reader.snapshot()?;
-    assert_eq!(after.replay_sequence.get(), before.replay_sequence.get() + 1);
+    assert_eq!(
+        after.replay_sequence.get(),
+        before.replay_sequence.get() + 1
+    );
     assert!(after.pending_current_phase_ack.is_none());
     assert_eq!(after.pending_platform.len(), 1);
     assert_eq!(&after.pending_platform[0].effect, expected);
     let actual = active(&after)?;
     let mut rebound = original.clone();
-    rebound.active_run.as_mut().ok_or("run absent")?.control = actual.active_run.as_ref().ok_or("loaded run absent")?.control.clone();
+    rebound.active_run.as_mut().ok_or("run absent")?.control = actual
+        .active_run
+        .as_ref()
+        .ok_or("loaded run absent")?
+        .control
+        .clone();
     rebound.identities.next_platform_request_id = actual.identities.next_platform_request_id;
-    assert_eq!(&rebound, actual, "READ cannot consume clock/entropy or execute rewards");
-    assert!(reader.apply_storage_result(read_id, S::Read { bytes: Some(saved) }).is_err());
+    assert_eq!(
+        &rebound, actual,
+        "READ cannot consume clock/entropy or execute rewards"
+    );
+    assert!(
+        reader
+            .apply_storage_result(read_id, S::Read { bytes: Some(saved) })
+            .is_err()
+    );
     assert_eq!(reader.snapshot()?, after);
     reader = Box::new(restore(after.clone(), content)?);
     let blocked = reader.advance_time(SafeU53::ZERO)?;
-    assert!(!blocked.effects.iter().any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. })));
+    assert!(
+        !blocked
+            .effects
+            .iter()
+            .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
     assert_eq!(reader.snapshot()?.pending_platform, after.pending_platform);
     Ok(())
 }
@@ -1197,12 +1296,17 @@ fn assert_request_title_read_reissues(checkpoint: &CoreGameKernelSnapshotV7, exp
 #[inline(never)]
 fn controlled_before_early_knockout(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
     let mut checkpoint = controlled_before_knockout(content.clone(), 5, &[33])?.snapshot()?;
-    let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else { return Err("active absent".into()); };
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else {
+        return Err("active absent".into());
+    };
     let run = state.active_run.as_mut().ok_or("run absent")?;
     run.party[0].stats.speed = 500;
-    run.battle.as_mut().ok_or("battle absent")?.enemy_party[0].stats.speed = 1;
+    run.battle.as_mut().ok_or("battle absent")?.enemy_party[0]
+        .stats
+        .speed = 1;
     state.validate_with(content.as_ref())?;
-    checkpoint.material_ledger = AppliedGameMaterialLedgerV1::new(checkpoint.material_ledger.next_authority_revision)?;
+    checkpoint.material_ledger =
+        AppliedGameMaterialLedgerV1::new(checkpoint.material_ledger.next_authority_revision)?;
     restore(checkpoint, content)
 }
 
@@ -1218,87 +1322,155 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
     for _ in 0..128 {
         let snapshot = kernel.snapshot()?;
         let state = active(&snapshot)?;
-        if let Some(tail) = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
-            .and_then(|o| o.pending.first()).and_then(|p| p.victory_tail.as_ref()) {
+        if let Some(tail) = state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|p| p.experience.as_ref())
+            .and_then(|o| o.pending.first())
+            .and_then(|p| p.victory_tail.as_ref())
+        {
             if matches!(&tail.phase, T::RewardSelectionPending { .. }) {
                 assert!(clock_seen && egg_seen);
-                assert!(tail.cancelled_from < tail.cancelled_to, "enemy action remained in the canceled suffix");
-                let account = state.current_friendship_profile.as_ref().and_then(|p| p.egg_account.as_ref()).ok_or("owned egg account absent")?;
+                assert!(
+                    tail.cancelled_from < tail.cancelled_to,
+                    "enemy action remained in the canceled suffix"
+                );
+                let account = state
+                    .current_friendship_profile
+                    .as_ref()
+                    .and_then(|p| p.egg_account.as_ref())
+                    .ok_or("owned egg account absent")?;
                 assert_eq!(account.eggs.len(), 1);
                 assert_eq!(account.eggs[0].hatch_waves, 24);
-                assert_eq!(account.eggs[0].species.get().get(), 10821, "qualified actual source seed projection");
+                assert_eq!(
+                    account.eggs[0].species.get().get(),
+                    10821,
+                    "qualified actual source seed projection"
+                );
                 let unchanged = kernel.advance_time(SafeU53::ZERO)?;
-                assert!(!unchanged.effects.iter().any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. })));
+                assert!(
+                    !unchanged
+                        .effects
+                        .iter()
+                        .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. }))
+                );
                 return Ok(());
             }
         }
         if !snapshot.pending_presentations.is_empty() {
-            for pending in &snapshot.pending_presentations { kernel.settle_presentation(pending.event_id)?; }
+            for pending in &snapshot.pending_presentations {
+                kernel.settle_presentation(pending.event_id)?;
+            }
             continue;
         }
         let step = if let Some(pending) = snapshot.pending_platform.first() {
             assert_request_title_read_reissues(&snapshot, &pending.effect, content.clone())?;
             kernel = Box::new(restore(snapshot.clone(), content.clone())?);
             match &pending.effect {
-                GamePlatformEffectV2::CurrentFriendshipClock { request } => kernel.apply_current_utc_clock_result(request.request, 1783641600000)?,
+                GamePlatformEffectV2::CurrentFriendshipClock { request } => {
+                    kernel.apply_current_utc_clock_result(request.request, 1783641600000)?
+                }
                 GamePlatformEffectV2::CurrentAchievementClock { request } => {
                     assert_eq!(request.achievement, K::RealisticFlash);
-                    assert!(!clock_seen); clock_seen = true;
+                    assert!(!clock_seen);
+                    clock_seen = true;
                     accept_flash_test_clock(&mut kernel, request)?
                 }
                 GamePlatformEffectV2::CurrentFlashEgg { request } => {
-                    assert!(clock_seen && !egg_seen); egg_seen = true;
+                    assert!(clock_seen && !egg_seen);
+                    egg_seen = true;
                     let step = accept_flash_test_egg(&mut kernel, request)?;
                     assert_flash_completed_request_below_frontier(&kernel, content.clone())?;
                     step
                 }
                 _ => return Err("unexpected request in actual Flash path".into()),
             }
-        } else { kernel.advance_time(SafeU53::ZERO)? };
+        } else {
+            kernel.advance_time(SafeU53::ZERO)?
+        };
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     }
     Err("actual Flash path failed to reach bounded reward frontier".into())
 }
 
 #[inline(never)]
-fn assert_flash_completed_request_below_frontier(kernel: &GameKernelV7, content: Arc<PreparedGameContentV2>) -> Result<()> {
+fn assert_flash_completed_request_below_frontier(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
     let mut forged = kernel.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut forged.lifecycle else {
         return Err("active completed Flash state absent".into());
     };
     let frontier = state.identities.next_platform_request_id;
-    let input = state.current_battle_participation.as_mut().and_then(|p| p.experience.as_mut())
+    let input = state
+        .current_battle_participation
+        .as_mut()
+        .and_then(|p| p.experience.as_mut())
         .and_then(|o| o.pending.iter_mut().find_map(|p| p.victory_tail.as_mut()))
-        .and_then(|t| t.flash.as_mut()).and_then(|f| f.completed_input.as_mut())
+        .and_then(|t| t.flash.as_mut())
+        .and_then(|f| f.completed_input.as_mut())
         .ok_or("actual completed Flash input absent")?;
     input.request = er_types::PlatformRequestId::new(frontier);
-    assert!(restore(forged, content).is_err(), "completed Flash input must precede the allocated request frontier");
+    assert!(
+        restore(forged, content).is_err(),
+        "completed Flash input must precede the allocated request frontier"
+    );
     Ok(())
 }
 
 #[inline(never)]
-fn accept_flash_test_clock(kernel: &mut GameKernelV7, request: &er_state::current_achievement_execution::CurrentAchievementClockRequestV1) -> Result<GameKernelStepV7> {
+fn accept_flash_test_clock(
+    kernel: &mut GameKernelV7,
+    request: &er_state::current_achievement_execution::CurrentAchievementClockRequestV1,
+) -> Result<GameKernelStepV7> {
     let rejected = kernel.snapshot()?;
-    assert!(kernel.apply_current_utc_clock_result(request.request, 8_640_000_000_000_001).is_err());
+    assert!(
+        kernel
+            .apply_current_utc_clock_result(request.request, 8_640_000_000_000_001)
+            .is_err()
+    );
     assert_eq!(kernel.snapshot()?, rejected);
     let step = kernel.apply_current_utc_clock_result(request.request, 0)?;
     let after = kernel.snapshot()?;
-    assert!(kernel.apply_current_utc_clock_result(request.request, 0).is_err());
+    assert!(
+        kernel
+            .apply_current_utc_clock_result(request.request, 0)
+            .is_err()
+    );
     assert_eq!(kernel.snapshot()?, after);
-    assert!(kernel.state().and_then(|s| s.current_friendship_profile.as_ref()).and_then(|p| p.egg_account.as_ref()).ok_or("egg account absent")?.eggs.is_empty());
+    assert!(
+        kernel
+            .state()
+            .and_then(|s| s.current_friendship_profile.as_ref())
+            .and_then(|p| p.egg_account.as_ref())
+            .ok_or("egg account absent")?
+            .eggs
+            .is_empty()
+    );
     Ok(step)
 }
 
 #[inline(never)]
-fn accept_flash_test_egg(kernel: &mut GameKernelV7, request: &er_state::current_achievement_execution::CurrentFlashEggRequestV1) -> Result<GameKernelStepV7> {
+fn accept_flash_test_egg(
+    kernel: &mut GameKernelV7,
+    request: &er_state::current_achievement_execution::CurrentFlashEggRequestV1,
+) -> Result<GameKernelStepV7> {
     use er_state::current_achievement_execution::{CurrentFlashEggInputsV1, CurrentUnseededUnitV1};
     let units = [0.0f64, 0.125, 0.5, 0.875, 1.0 - f64::EPSILON];
     let input = CurrentFlashEggInputsV1 {
-        request: request.request, pending: request.pending,
-        seed_draws: std::array::from_fn(|i| CurrentUnseededUnitV1 { ieee754_bits: format!("{:016x}", units[i % 5].to_bits()) }),
-        id_draw: CurrentUnseededUnitV1 { ieee754_bits: format!("{:016x}", units[4].to_bits()) }, egg_utc_milliseconds: 1783641600006,
+        request: request.request,
+        pending: request.pending,
+        seed_draws: std::array::from_fn(|i| CurrentUnseededUnitV1 {
+            ieee754_bits: format!("{:016x}", units[i % 5].to_bits()),
+        }),
+        id_draw: CurrentUnseededUnitV1 {
+            ieee754_bits: format!("{:016x}", units[4].to_bits()),
+        },
+        egg_utc_milliseconds: 1783641600006,
     };
-    let mut invalid = input.clone(); invalid.id_draw.ieee754_bits = "3ff0000000000000".into();
+    let mut invalid = input.clone();
+    invalid.id_draw.ieee754_bits = "3ff0000000000000".into();
     let rejected = kernel.snapshot()?;
     assert!(kernel.apply_current_flash_egg_inputs(invalid).is_err());
     assert_eq!(kernel.snapshot()?, rejected);

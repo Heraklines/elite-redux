@@ -451,11 +451,14 @@ impl GameActionDispatcherV1 {
         context: GameActionDispatchContextV1,
         retention: AppliedMaterialRetentionV1,
     ) -> Result<PreparedGameTransitionProof, GameRuntimeV6Error> {
-        if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
-            ledger
-                .validate_with_retention(retention)
-                .map_err(material_error)?;
-        }
+        let validated_ledger = if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
+            Some(
+                crate::m9e_material_v6::ValidatedAppliedLedger::new(ledger, retention)
+                    .map_err(material_error)?,
+            )
+        } else {
+            None
+        };
         action.validate().map_err(|_| GameRuntimeV6Error::Action)?;
         if !context.authority
             || context.action.operation_id.as_str().is_empty()
@@ -552,15 +555,22 @@ impl GameActionDispatcherV1 {
         let material = material_for_domain(domain, transition)?;
         let material_bytes = material.canonical_bytes().map_err(material_error)?;
         let mut proof_state = before.cloned();
-        let mut proof_ledger = ledger.clone();
-        let outcome = apply_game_material_v6_with_retention(
-            &mut proof_state,
-            &mut proof_ledger,
-            content,
-            &material_bytes,
-            retention,
-        )
-        .map_err(material_error)?;
+        let (outcome, proof_ledger) = if let Some(validated) = validated_ledger {
+            validated
+                .apply_clone(&mut proof_state, content, &material_bytes)
+                .map_err(material_error)?
+        } else {
+            let mut proof_ledger = ledger.clone();
+            let outcome = apply_game_material_v6_with_retention(
+                &mut proof_state,
+                &mut proof_ledger,
+                content,
+                &material_bytes,
+                retention,
+            )
+            .map_err(material_error)?;
+            (outcome, proof_ledger)
+        };
         if outcome != GameMaterialApplyOutcomeV6::Applied
             || proof_state.as_ref() != Some(&candidate)
         {

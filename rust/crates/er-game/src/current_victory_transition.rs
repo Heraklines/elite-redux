@@ -66,23 +66,47 @@ pub(super) fn transition(
     let mut reward_payloads = Vec::new();
     let result = match &phase {
         GameOwnedPhaseV1::FlashEgg { input } => {
-            let (candidate, payloads) = crate::current_flash_dispatch::settle_egg(before, content, input)?;
+            let (candidate, payloads) =
+                crate::current_flash_dispatch::settle_egg(before, content, input)?;
             reward_payloads = payloads;
-            Pump::Advanced(current_victory_pump::begin_current_victory(&candidate, content, pending_id)?)
+            Pump::Advanced(current_victory_pump::begin_current_victory(
+                &candidate, content, pending_id,
+            )?)
         }
-        GameOwnedPhaseV1::AchievementClock { request, utc_milliseconds }
-            if request.achievement == er_state::current_achievement_execution::CurrentAchievementKeyV1::RealisticFlash => {
-            let (candidate, payloads) = crate::current_flash_dispatch::settle_clock(before, content, request, *utc_milliseconds)?;
+        GameOwnedPhaseV1::AchievementClock {
+            request,
+            utc_milliseconds,
+        } if request.achievement
+            == er_state::current_achievement_execution::CurrentAchievementKeyV1::RealisticFlash =>
+        {
+            let (candidate, payloads) = crate::current_flash_dispatch::settle_clock(
+                before,
+                content,
+                request,
+                *utc_milliseconds,
+            )?;
             reward_payloads = payloads;
             Pump::Advanced(candidate)
         }
-        GameOwnedPhaseV1::AchievementClock { request, utc_milliseconds } => {
-            let (candidate, parent, payloads) = crate::current_level_dispatch::settle(before, content, request, *utc_milliseconds)?;
+        GameOwnedPhaseV1::AchievementClock {
+            request,
+            utc_milliseconds,
+        } => {
+            let (candidate, parent, payloads) =
+                crate::current_level_dispatch::settle(before, content, request, *utc_milliseconds)?;
             reward_payloads = payloads;
             if let Some(level_up) = parent {
-                let (candidate, end) = crate::current_experience_settlement::apply_current_level_up(&candidate, content, &level_up)?;
-                Pump::Present { candidate, request: P::LevelUp(end) }
-            } else { Pump::Advanced(candidate) }
+                let (candidate, end) =
+                    crate::current_experience_settlement::apply_current_level_up(
+                        &candidate, content, &level_up,
+                    )?;
+                Pump::Present {
+                    candidate,
+                    request: P::LevelUp(end),
+                }
+            } else {
+                Pump::Advanced(candidate)
+            }
         }
         GameOwnedPhaseV1::VictoryPresentation { event_id, .. } => {
             Pump::Advanced(current_victory_pump::resume_current_victory_presentation(
@@ -90,12 +114,18 @@ pub(super) fn transition(
             )?)
         }
         GameOwnedPhaseV1::Victory { .. } if pending.victory.is_none() => {
-            if crate::current_flash_dispatch::waiting(before, pending_id) { return Err(failure()); }
+            if crate::current_flash_dispatch::waiting(before, pending_id) {
+                return Err(failure());
+            }
             let claimed = crate::current_initial_victory_tail::claim(before, content, pending_id)?;
             let candidate = claimed.as_ref().unwrap_or(before);
             if crate::current_flash_dispatch::waiting(candidate, pending_id) {
                 Pump::Advanced(candidate.clone())
-            } else { Pump::Advanced(current_victory_pump::begin_current_victory(candidate, content, pending_id)?) }
+            } else {
+                Pump::Advanced(current_victory_pump::begin_current_victory(
+                    candidate, content, pending_id,
+                )?)
+            }
         }
         GameOwnedPhaseV1::VictoryTail { .. } => {
             use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
@@ -126,11 +156,20 @@ pub(super) fn transition(
     };
     let result = match result {
         Pump::LevelUpAccount(level_up) => {
-            let (candidate, parent) = crate::current_level_dispatch::begin(before, content, &level_up)?;
+            let (candidate, parent) =
+                crate::current_level_dispatch::begin(before, content, &level_up)?;
             if let Some(parent) = parent {
-                let (candidate, end) = crate::current_experience_settlement::apply_current_level_up(&candidate, content, &parent)?;
-                Pump::Present { candidate, request: P::LevelUp(end) }
-            } else { Pump::Advanced(candidate) }
+                let (candidate, end) =
+                    crate::current_experience_settlement::apply_current_level_up(
+                        &candidate, content, &parent,
+                    )?;
+                Pump::Present {
+                    candidate,
+                    request: P::LevelUp(end),
+                }
+            } else {
+                Pump::Advanced(candidate)
+            }
         }
         other => other,
     };
@@ -166,10 +205,16 @@ pub(super) fn transition(
     };
     let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Reward);
     let mapping = content.presentation(semantic).ok_or_else(failure)?;
-    let mut presentation = reward_payloads.into_iter().map(|payload| GamePresentationEffectV2 {
-        event_id: PresentationEventId::new(revision), semantic, blocking: mapping.blocking,
-        skip: mapping.skip, payload: Some(payload),
-    }).collect::<Vec<_>>();
+    let mut presentation = reward_payloads
+        .into_iter()
+        .map(|payload| GamePresentationEffectV2 {
+            event_id: PresentationEventId::new(revision),
+            semantic,
+            blocking: mapping.blocking,
+            skip: mapping.skip,
+            payload: Some(payload),
+        })
+        .collect::<Vec<_>>();
     assign_presentations(&mut candidate, &mut presentation)?;
     if let Some(request) = request {
         let payload = match &request {
@@ -211,7 +256,13 @@ pub(super) fn transition(
             skip: mapping.skip,
             payload: Some(payload),
         });
-        assign_presentations(&mut candidate, presentation.last_mut().map(std::slice::from_mut).ok_or_else(failure)?)?;
+        assign_presentations(
+            &mut candidate,
+            presentation
+                .last_mut()
+                .map(std::slice::from_mut)
+                .ok_or_else(failure)?,
+        )?;
         let event_id = presentation.last().ok_or_else(failure)?.event_id;
         let descendant = match request {
             P::FieldAward(award) => D::AwardPresentation { award, event_id },
@@ -292,11 +343,18 @@ pub(super) fn transition(
         .clone();
     let mut platform_effects = crate::current_level_dispatch::clock(&candidate, pending_id)
         .or_else(|| crate::current_flash_dispatch::clock(&candidate, pending_id))
-        .filter(|next| Some(*next) != crate::current_level_dispatch::clock(before, pending_id).or_else(|| crate::current_flash_dispatch::clock(before, pending_id)))
+        .filter(|next| {
+            Some(*next)
+                != crate::current_level_dispatch::clock(before, pending_id)
+                    .or_else(|| crate::current_flash_dispatch::clock(before, pending_id))
+        })
         .map(|request| vec![GamePlatformEffectV2::CurrentAchievementClock { request: *request }])
         .unwrap_or_default();
     if let Some(request) = crate::current_flash_dispatch::egg_request(&candidate, pending_id)
-        .filter(|request| Some(*request) != crate::current_flash_dispatch::egg_request(before, pending_id)) {
+        .filter(|request| {
+            Some(*request) != crate::current_flash_dispatch::egg_request(before, pending_id)
+        })
+    {
         platform_effects.push(GamePlatformEffectV2::CurrentFlashEgg { request: *request });
     }
     let before_digest = game_state_digest(before).map_err(material_error)?;
