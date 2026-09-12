@@ -47,8 +47,9 @@ test("observe actual level and Flash achievement descendants", async () => {
     .startingBiome(BiomeId.TOWN).startingWave(1).seed("m9e-achievement-descendants");
   await manager.classicMode.startBattle(SpeciesId.BULBASAUR);
   const scene = globalScene;
-  expect(scene.gameMode.isCoop).toBe(false);
-  expect(scene.gameMode.isFun).toBe(false);
+  expect(scene.gameMode.isClassic).toBe(true);
+  expect(Boolean(scene.gameMode.isCoop)).toBe(false);
+  expect(Boolean(scene.gameMode.isFun)).toBe(false);
   expect(scene.currentBattle.isBattleMysteryEncounter()).toBe(false);
   expect(Overrides.ACHIEVEMENTS_REUNLOCK_OVERRIDE).toBe(false);
   expect(vi.isMockFunction(scene.validateAchv)).toBe(false);
