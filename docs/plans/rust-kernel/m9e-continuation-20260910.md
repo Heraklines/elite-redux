@@ -58,15 +58,18 @@ the starter level; source observation included a level2 enemy).
 
 ## Acceptance scoreboard
 
-| Row | Meaning | State |
-|---|---|---|
-| A | Shared current runtime behind all entry points | PARTIAL — native owned-phase drain wired; replay/reload/browser parity pending remote proof |
-| B | Natural solo gameplay on production content | IN_FLIGHT — this run is the first drain-capable candidate |
-| C | Two-human co-op + long-session liveness | PENDING |
-| D | Persistence, external events, exact causal replay | PARTIAL — UTC clock + presentation settlement retained; save/replay coverage pending |
-| E | Hot reload + development tooling | PENDING |
-| F | Rust-authoritative browser/semantic presentation | PARTIAL — `ExperienceGained`/`LevelUp` payloads added to the semantic catalog |
+All rows below refer to current source pin399d5d368f0b5642ebf8f45bd8a5e73350fa4de7 and the single current-phase integration branch. The remote command actually used is `python3 scripts/ci/m9e_current_phase_diagnostic.py`; it builds and executes exact whole targets. Additional named acceptance targets are required work, not claimed executions. Latest completed candidate da5ae3c31/run34702366112 failed compilation (zero native tests); successor086613d4a is pending. Earlier b66337a5d/run34700330243 evidence is retained separately and does not qualify the successor.
 
+| Row | State | Actual evidence and required test/command | Next failing condition | Owner |
+|---|---|---|---|---|
+| A — shared current game/agent entry | IMPLEMENTED_UNVERIFIED | Selected `m9e_fresh_friendship_profile`: 3/4 on b663, constructor rejection. Public-process `m9e_current_entry`, `m9e_current_batch`, `m9e_current_native_capture`, and `m9e_current_repro` still need same-candidate execution. | Repaired bootstrap must pass; public commands must prove current identity and all typed external events without legacy fallback. | root |
+| B — continuous natural solo and supported rules | FAILING | Selected phase/target/defender targets rejected bootstrap on b663; natural solo campaign never started. Actual command above retains the full campaign target. Source reward34700286214 and counter/score34700591441 are enabling observations only. | Source-owned damage/stat effects, full reward descendants and next encounter, then complete finite-run corpus and supported branch fixtures. | root; diagnostic_repair damage/stat; xp_repair reward/encounter |
+| C — two-human co-op/liveness | IMPLEMENTED_UNVERIFIED | `m9e_coop_v7` 4/4 on b663 with default stack. `m9e_natural_coop_campaign_v7` never started. | Independent-seat natural startup, continuing shared material, multiple retention windows and real Worker/WebRTC platform witness on final candidate. | root |
+| D — persistence and causal replay | FAILING | `m9e_natural_campaign_replay` timed out600100ms on b663 at1408 captured/replayed bootstrap events; host transport witness stack overflowed. Both repairs await successor execution. | Complete contiguous campaign replay plus normal CLI/Wasm eventwise equality, storage uncertainty/conflict/retry and pending operation restoration. | root; stack_audit replay/host diagnostics |
+| E — current reload/performance/tools | IMPLEMENTED_UNVERIFIED | `m9e_current_reload`, `m9e_current_rulechange_reload`, and current cost probes exist but have no result on this candidate. Material retention3/3 and2/2 on b663 are debug correctness results, not optimized benchmark acceptance. | Current native/browser worker rebuild and incompatibility evidence, quarantined effects, measured execution/hash/copy costs and optimized benchmarks. | root |
+| F — browser semantics and integrated acceptance | IMPLEMENTED_UNVERIFIED | `python3 scripts/ci/m9e_current_phase_js_diagnostic.py` passed18 whole-file checks on da5ae3c31; native host target did not compile on that candidate. | Actual browser matrix and keys/Worker/storage/network seams, complete control producer/continuation and semantic payload evidence, then all six rows at one SHA. | root |
+
+No row is PASS_AT_SHA. Public rollout and polished renderer work remain explicitly deferred under the continuation contract; functional semantic projection, browser platform behavior and the required gameplay scope remain M9 work.
 ## Remote runs
 
 | Candidate | Run | Result | Scope |
@@ -292,3 +295,13 @@ Replay import additionally reuses the exact bounded encoded length already compu
 
 
 Run34702366112 onda5ae3c31 passed JavaScript18 but stopped at native compilation before any tests or Clippy. Exact9203-byte compiler log SHA256092484f4a0c95d1567161d7c4e6fb0d36eec8e34f8b3aa2a39a29c3c6e4d083b identifies current_defender_execution.rs borrowing input.source_events after moving it into the local source_events. The successor borrows that existing local variable, preserving the emitted event and owned buffer. Applied all30 exact remote formatter postimages from149088-byte page SHA2561ae4ffa0b166fd78e25fcf8ae557f3aaf8fcd5d8aa9a09b4f365d17085b9e625, verifying every before/after LF SHA. Inventory remains164/24; native behavior is still pending.
+
+### TM learning and replacement candidate (unqualified)
+
+Integrated21-file TMv3 source overlay from immutable672fae611 ancestry (manifest SHA256bcf126f905d1818181453f5e9c4d7cfbcd592334751bb5cc4a8516127027a2ac), preserving the later compiled biome guard and complete RNG-audit forgery witness. Complete compatible TM registry37 comes from actual source run34700286214; fresh usedTMs is an own undefined property. Raw offer/holder/move/slot ordinals are bound to owned menus. Ordinary empty learning and full-slot Intro/Replace/Forget/Stop/decline paths preserve exact mechanical assignment before Forgotten text, separate Learned acknowledgement, history append and achievement stamp. Decline returns the same generated Choice without RNG reset or regeneration, retaining prior message receipts.
+
+Review caught and corrected two blockers before qualification: full-slot replay incorrectly required the replacement suffix to be empty; pending acknowledgement detection originally recognized only Learned and would stall Intro, ForgetQuestion, Forgotten and DidNotLearn. Replay now separately validates contiguous preimage occupancy and selected slot; pending detection uses the exact live blocking phase event. It excludes queued/actionable/completed phases. The fixed-seed controlled knockout explicitly carries four source-level1 moves33/74/77/78, uses Tackle, and requires an actually generated TM offer; absence is a failing result rather than a conditional coverage claim. Replacement and declined fork must execute, including a forged post-assignment slot4 rejection. No actual remote TM execution is claimed yet. Declined message retention remains bounded initial-owner work, not final long-session retirement qualification.
+
+Source Growl run34702571467 onb4e69783 passed40 tail negatives and two identical8713-byte observations SHA256b0ffd87ceb393400361e16b606d003190528d84f707b3678dbe9c6f7ebff163c, retaining previous33 score applications and turn counters. Restoring the actual source battle RNG method (the GameManager harness had installed a plain max-roll replacement) proves hit/damage RNG advancement and damage20→17 before the queued attack-stage child0→-1. Menu/PP/move animation and the complete native selected turn are outside this probe. Current damage/stat callback ownership remains unfinished; this source result is not native or M9 acceptance.
+
+A second independent TM restore review found retained menu IDs were absent from the allocator bound while their prompts hid the live menu. Core snapshots now require every retained current/declined TM menu ID below next_menu_instance_id. GameSave/Title READ and V6 migration derive the frontier above the same maximum, preserving checked overflow. The existing raw test adds a forged pending menu ID at the allocator frontier and actual Title LIST/READ reissue at Intro and Learned, including acknowledgement and continuation. This verifies the two distinct restoration routes; it does not claim a mid-phase Save UI. All source tests remain remote-only and pending.

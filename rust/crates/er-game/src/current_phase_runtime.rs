@@ -29,6 +29,8 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         menu_instance: MenuInstanceId,
     },
+    RewardTmLearn { pending: SafeU53 },
+    RewardTmPresentation { pending: SafeU53, event_id: PresentationEventId },
     VictoryPresentation {
         pending: SafeU53,
         event_id: PresentationEventId,
@@ -333,14 +335,9 @@ fn phase_transition(
         .active_run
         .as_ref()
         .ok_or(GameRuntimeV6Error::Action)?;
-    if matches!(phase, GameOwnedPhaseV1::RewardBegin { .. }) {
+    if matches!(phase, GameOwnedPhaseV1::RewardBegin { .. } | GameOwnedPhaseV1::RewardTmLearn { .. } | GameOwnedPhaseV1::RewardTmPresentation { .. }) {
         return current_reward_transition::transition(
-            before,
-            content,
-            operation_id,
-            authority_seat,
-            revision,
-            phase,
+            before, content, operation_id, authority_seat, revision, phase,
         );
     }
     if matches!(phase, GameOwnedPhaseV1::VictoryTail { .. }) {
@@ -443,6 +440,8 @@ fn phase_transition(
         | GameOwnedPhaseV1::VictoryPresentation { .. }
         | GameOwnedPhaseV1::VictoryTail { .. }
         | GameOwnedPhaseV1::RewardBegin { .. }
+        | GameOwnedPhaseV1::RewardTmLearn { .. }
+        | GameOwnedPhaseV1::RewardTmPresentation { .. }
         | GameOwnedPhaseV1::AchievementClock { .. }
         | GameOwnedPhaseV1::FlashEgg { .. }
         | GameOwnedPhaseV1::FaintBegin { .. }
@@ -552,10 +551,10 @@ fn phase_transition(
 
 #[path = "current_faint_transition.rs"]
 mod current_faint_transition;
-#[path = "current_reward_transition.rs"]
-mod current_reward_transition;
 #[path = "current_victory_transition.rs"]
 mod current_victory_transition;
+#[path = "current_reward_transition.rs"]
+mod current_reward_transition;
 
 fn turn_step_transition(
     before: &GameStateV6,

@@ -4538,6 +4538,7 @@ fn rebind_loaded_control_v7(
     revision: SafeU53,
     next_menu: MenuInstanceId,
 ) -> Result<MenuInstanceId, GameKernelV7Error> {
+    let next_menu = next_menu.max(next_menu_from_state(state)?);
     let Some(run) = state.active_run.as_mut() else {
         return Ok(next_menu);
     };
@@ -4579,12 +4580,7 @@ fn next_menu_after(current: MenuInstanceId) -> Result<MenuInstanceId, GameKernel
 }
 
 fn next_menu_from_state(state: &GameStateV6) -> Result<MenuInstanceId, GameKernelV7Error> {
-    match state
-        .active_run
-        .as_ref()
-        .and_then(|run| run.control.menu.as_ref())
-        .map(|menu| menu.instance_id)
-    {
+    match crate::snapshot_v7::state_menu_instance_high_water(state) {
         Some(current) => next_menu_after(current),
         None => Ok(MenuInstanceId::new(safe_one())),
     }

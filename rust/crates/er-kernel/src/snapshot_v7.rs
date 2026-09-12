@@ -91,6 +91,7 @@ pub struct PendingVictoryAckV1 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CurrentPhasePresentationKindV1 {
+    RewardTm,
     Victory,
     FaintAnimation,
     FaintMessage,
@@ -686,26 +687,42 @@ fn current_menu_instance(lifecycle: &GameKernelLifecycleSnapshotV7) -> Option<Me
         GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) => {
             Some(bootstrap.menu_instance_high_water)
         }
-        GameKernelLifecycleSnapshotV7::Active(state) => state
-            .active_run
-            .as_ref()
-            .and_then(|run| run.control.menu.as_ref())
-            .map(|menu| menu.instance_id),
+        GameKernelLifecycleSnapshotV7::Active(state) => state_menu_instance_high_water(state),
         GameKernelLifecycleSnapshotV7::Terminal { control, .. } => {
             control.menu.as_ref().map(|menu| menu.instance_id)
         }
     }
 }
 
-fn next_menu_instance_from_v6(
-    source: &RestorableKernelSnapshotV6,
-) -> Result<MenuInstanceId, SnapshotV7Error> {
-    let mut maximum = source
-        .game_state
+// A pending TM prompt temporarily removes its actionable menu, but its retained
+// instance will be installed again after acknowledgement. Keep that ownership
+// below the same allocator frontier as a currently visible menu.
+pub(crate) fn state_menu_instance_high_water(state: &GameStateV6) -> Option<MenuInstanceId> {
+    let mut maximum = state
         .active_run
         .as_ref()
         .and_then(|run| run.control.menu.as_ref())
-        .map(|menu| menu.instance_id.get())
+        .map(|menu| menu.instance_id);
+    if let Some(owner) = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|participation| participation.experience.as_ref())
+    {
+        for pending in &owner.pending {
+            if let Some(reward) = pending.victory_tail.as_ref().and_then(|tail| tail.reward.as_ref()) {
+                for tm in reward.declined_tms.iter().chain(reward.tm.iter().map(Box::as_ref)) {
+                    maximum = Some(maximum.map_or(tm.menu_instance, |value| value.max(tm.menu_instance)));
+                }
+            }
+        }
+    }
+    maximum
+}
+fn next_menu_instance_from_v6(
+    source: &RestorableKernelSnapshotV6,
+) -> Result<MenuInstanceId, SnapshotV7Error> {
+    let mut maximum = state_menu_instance_high_water(&source.game_state)
+        .map(|instance| instance.get())
         .unwrap_or(SafeU53::ZERO);
     for candidate in source
         .input_router

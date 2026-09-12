@@ -19,7 +19,7 @@ use crate::m9e_content_v2::{
 #[path = "m9e_presentation_payload.rs"]
 mod presentation_payload;
 pub use crate::m9e_runtime_v6::GameOwnedPhaseV1;
-pub use presentation_payload::{GamePresentationAchievementV1, GamePresentationPayloadV1};
+pub use presentation_payload::{GamePresentationAchievementV1, GamePresentationPayloadV1, GamePresentationMoveLearningV1};
 
 pub const GAME_MATERIAL_SCHEMA_VERSION_V6: u32 = 6;
 pub const APPLIED_MATERIAL_LEDGER_SCHEMA_VERSION_V1: u32 = 1;
@@ -510,21 +510,14 @@ fn apply_to_validated_ledger(
         .validate_with(content)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     validate_presentation_frontier(live.as_ref(), transition)?;
-    let owned_reward = matches!(
-        transition.accepted_action,
-        Some(GameActionV1::Reward { .. })
-    ) && live
-        .as_ref()
-        .and_then(|state| state.current_battle_participation.as_ref())
-        .and_then(|owner| owner.experience.as_ref())
-        .is_some_and(|owner| owner.source_progression.is_some());
+    let owned_reward = matches!(transition.accepted_action, Some(GameActionV1::Reward { .. }))
+        && live.as_ref().and_then(|state| state.current_battle_participation.as_ref())
+            .and_then(|owner| owner.experience.as_ref())
+            .is_some_and(|owner| owner.source_progression.is_some());
     if owned_reward {
         crate::m9e_runtime_v6::validate_current_reward_transition(
-            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
-            content,
-            transition,
-        )
-        .map_err(|_| GameMaterialV6Error::Invalid)?;
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?, content, transition,
+        ).map_err(|_| GameMaterialV6Error::Invalid)?;
     }
     let owned_learning = matches!(
         transition.accepted_action,
