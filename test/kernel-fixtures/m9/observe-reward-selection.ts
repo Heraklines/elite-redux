@@ -1,3 +1,7 @@
+import { Pokemon,EnemyPokemon } from "#field/pokemon";
+import { Move } from "#data/moves/move";
+import { BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING } from "#balance/moves/moveset-generation";
+const originalMoveMethods=[Pokemon.prototype.getLevelMoves,Move.prototype.calculateEffectivePower,Pokemon.prototype.getStat,EnemyPokemon.prototype.generateAndPopulateMoveset];
 import { createHash } from "node:crypto";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { getEncounterSpeciesWeightMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
@@ -290,6 +294,27 @@ async function observeDirectQueuedEncounter(){
     });cleanups.push(()=>spy.mockRestore());
   }
   for(const key of ["randomSpecies","addEnemyPokemon","generateEnemyModifiers","resetSeed"] as const)wrap(key);
+  // Observe actual generator calls only; never regenerate an enemy or draw for a probe.
+  let activeEnemy:EnemyPokemon|undefined;
+  const moveInputs:Array<{species:number,form:number,level:number,boss:boolean,trainer:boolean,rival:boolean,entry:string,exit:string,start:number,end:number,level_rows:Array<[number,number]>,registry:Array<[number,number,number,boolean,number]>,powers:Array<[number,number]>,stats:Array<[number,number]>,moves:number[]}>=[];
+  expect([Pokemon.prototype.getLevelMoves,Move.prototype.calculateEffectivePower,Pokemon.prototype.getStat,EnemyPokemon.prototype.generateAndPopulateMoveset]).toEqual(originalMoveMethods);
+  const levelActual=Pokemon.prototype.getLevelMoves,powerActual=Move.prototype.calculateEffectivePower,statActual=Pokemon.prototype.getStat;
+  const levelsSpy=vi.spyOn(Pokemon.prototype,"getLevelMoves").mockImplementation(function(...args){const rows=Reflect.apply(levelActual,this,args);if(this===activeEnemy){expect(args).toEqual([1,true,true,false]);expect(moveInputs.at(-1)!.level_rows.length).toBe(0);expect(rows.length).toBeLessThanOrEqual(64);moveInputs.at(-1)!.level_rows=rows.map(row=>[row[0],row[1]]);}return rows;});cleanups.push(()=>levelsSpy.mockRestore());
+  const powersSpy=vi.spyOn(Move.prototype,"calculateEffectivePower").mockImplementation(function(...args){const result=Reflect.apply(powerActual,this,args);if(activeEnemy&&args[0]===activeEnemy){expect(moveInputs.at(-1)!.powers.length).toBeLessThan(64);moveInputs.at(-1)!.powers.push([this.id,result]);}return result;});cleanups.push(()=>powersSpy.mockRestore());
+  const statsSpy=vi.spyOn(Pokemon.prototype,"getStat").mockImplementation(function(...args){const result=Reflect.apply(statActual,this,args);if(this===activeEnemy){expect(moveInputs.at(-1)!.stats.length).toBeLessThan(64);moveInputs.at(-1)!.stats.push([args[0],result]);}return result;});cleanups.push(()=>statsSpy.mockRestore());
+  let moveBattleRngCalls=0;const battleDrawActual=scene.randBattleSeedInt;
+  const battleDrawSpy=vi.spyOn(scene,"randBattleSeedInt").mockImplementation(function(...args){if(activeEnemy)moveBattleRngCalls++;return Reflect.apply(battleDrawActual,scene,args);});cleanups.push(()=>battleDrawSpy.mockRestore());
+  const generateActual=EnemyPokemon.prototype.generateAndPopulateMoveset;
+  const generatorSpy=vi.spyOn(EnemyPokemon.prototype,"generateAndPopulateMoveset").mockImplementation(function(...args){
+    expect(activeEnemy).toBeUndefined();expect(moveInputs.length).toBe(0);
+    const row:typeof moveInputs[number]={species:this.species.speciesId,form:this.formIndex,level:this.level,boss:this.isBoss(),trainer:this.hasTrainer(),rival:args[0]??false,entry:Phaser.Math.RND.state(),exit:"",start:draws.length,end:0,level_rows:[],registry:[],powers:[],stats:[],moves:[]};moveInputs.push(row);activeEnemy=this;
+    try{return Reflect.apply(generateActual,this,args);}finally{
+      activeEnemy=undefined;row.exit=Phaser.Math.RND.state();row.end=draws.length;row.moves=this.getMoveset().map(m=>m.moveId);
+      const attrs=["SacrificialAttrOnHit","DefAtkAttr","PhotonGeyserCategoryAttr","ShellSideArmCategoryAttr","TeraMoveCategoryAttr"] as const;
+      row.registry=[...new Set(row.level_rows.map(r=>r[1]))].map(id=>{const m=allMoves[id];expect(m).toBeDefined();return [id,m.category,m.power,m.name.endsWith(" (N)"),attrs.reduce((flags,name,i)=>flags+(m.hasAttr(name)?2**i:0),0)];});
+      expect(Phaser.Math.RND.state()).toBe(row.exit);
+    }
+  });cleanups.push(()=>generatorSpy.mockRestore());
   const actualBoss=scene.getEncounterBossSegments;expect(vi.isMockFunction(actualBoss)).toBe(false);
   const bossSpy=vi.spyOn(scene,"getEncounterBossSegments").mockImplementation(function(...args){const value=Reflect.apply(actualBoss,scene,args);if(args[2]===undefined){expect(bossCalls.length).toBeLessThan(8);bossCalls.push([args[0],args[1],value]);}return value;});cleanups.push(()=>bossSpy.mockRestore());
   try{
@@ -302,7 +327,8 @@ async function observeDirectQueuedEncounter(){
     expect(pm.getCurrentPhase()).toBe(prior);expect(scene.currentBattle.turn).toBe(1);
     expect(constructed.length).toBe(1);expect(pm.hasPhaseOfType("InitEncounterPhase")).toBe(true);
     expect(pool).toBeDefined();expect(unwrapped.length).toBeGreaterThan(0);expect(Buffer.byteLength(JSON.stringify(unwrapped))).toBeLessThanOrEqual(1000);
-    const result={pool,unwrapped,boss_calls:bossCalls,scope:"direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution",
+    const move_inputs={scope:"actual single wild enemy generator calls and complete returned level registry; no all-species or natural encounter closure",battle_rng_calls:moveBattleRngCalls,calls:moveInputs,tuning:[BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING]};expect(moveInputs.length).toBe(1);expect(moveBattleRngCalls).toBe(0);expect(Buffer.byteLength(JSON.stringify(move_inputs))).toBeLessThanOrEqual(2400);
+    const result={move_inputs,pool,unwrapped,boss_calls:bossCalls,scope:"direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution",
       wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,prior:prior.phaseName,selected:phase.phaseName,restored_same_standby:true,
       before,after:Phaser.Math.RND.state(),draws,trace,constructed,prepared:scene.getEnemyParty().map(pokemonFact),
       modifiers:scene.enemyModifiers.map(m=>({id:m.type.id,class_name:m.constructor.name,stack:m.stackCount})),init_encounter_queued:true};

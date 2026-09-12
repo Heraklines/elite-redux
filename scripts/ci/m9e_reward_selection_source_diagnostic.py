@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "1c0c129e61ae297746b67031f49c591a20712de9937829f3f82367bb1f08cfb8"
+EXPORTER_SHA256 = "677a26f50bccd71f5c9cb189bf0df975decf5f4012d09045781b931a02a9df78"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -241,6 +241,26 @@ TOWN_POOL_SOURCE_PINS = {
   ]
 }
 ORACLE_PINS.update(TOWN_POOL_SOURCE_PINS)
+
+MOVE_INPUT_SOURCE_PINS = {
+  "src/ai/ai-moveset-gen.ts": [
+    "0c8cf494d1e4631b85c060a914391d9aab67164479b7d63ad5b56eacdec7f3fc",
+    46510
+  ],
+  "src/data/balance/moves/moveset-generation.ts": [
+    "c26387b10eb983d6d8cd7c631996d963a85184819f897d2fc09dd8c656c414e4",
+    8986
+  ],
+  "src/data/moves/move.ts": [
+    "d685b7d48caaf9c1428dde1fa497ec31f63b798c1b8bcb19ca7ec9c69188bf4e",
+    585155
+  ],
+  "src/field/pokemon.ts": [
+    "67fdc53c78562c61284861d1687c942500b904bd992d67bec02b0f8ae04ea4c4",
+    444743
+  ]
+}
+ORACLE_PINS.update(MOVE_INPUT_SOURCE_PINS)
 
 def require(condition, message):
     if not condition:

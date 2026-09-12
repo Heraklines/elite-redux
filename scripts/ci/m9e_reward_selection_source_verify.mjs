@@ -66,6 +66,20 @@ function validateBinder(b){
     assert(Array.isArray(p.held)&&p.held.length<=64);for(const h of p.held){shape(h,['id','class_name','stack']);assert(typeof h.id==='string'&&h.id.length<=128);assert(typeof h.class_name==='string'&&h.class_name.length<=128);integer(h.stack,1,100000);}
   }
 }
+function validateMoveInputs(e){
+ const m=e.move_inputs;shape(m,['scope','battle_rng_calls','calls','tuning']);assert.equal(m.scope,'actual single wild enemy generator calls and complete returned level registry; no all-species or natural encounter closure');assert.equal(m.battle_rng_calls,0);
+ assert(Array.isArray(m.tuning)&&m.tuning.length===6);for(const n of m.tuning)assert(Number.isFinite(n)&&n>0&&n<=1000);
+ assert(Array.isArray(m.calls)&&m.calls.length===1);const c=m.calls[0];shape(c,['species','form','level','boss','trainer','rival','entry','exit','start','end','level_rows','registry','powers','stats','moves']);
+ for(const k of ['species','form','level'])assert.equal(c[k],e.constructed[0][k]);for(const k of ['boss','trainer','rival'])assert.equal(c[k],false);
+ for(const k of ['entry','exit'])assert(typeof c[k]==='string'&&c[k].startsWith('!rnd,')&&c[k].length<=256);
+ const t=e.trace.find(t=>t.method==='addEnemyPokemon');integer(c.start,t.start,t.end);integer(c.end,c.start,t.end);
+ assert(Array.isArray(c.level_rows)&&c.level_rows.length>0&&c.level_rows.length<=64);for(const r of c.level_rows){assert(Array.isArray(r)&&r.length===2);integer(r[0],-2,10000);integer(r[1],1,100000);}
+ assert(Array.isArray(c.registry)&&c.registry.length<=64);assert.deepEqual(c.registry.map(r=>r[0]),[...new Set(c.level_rows.map(r=>r[1]))]);
+ for(const r of c.registry){assert(Array.isArray(r)&&r.length===5);integer(r[1],0,2);assert(Number.isFinite(r[2])&&r[2]>=-1&&r[2]<=10000);assert.equal(typeof r[3],'boolean');integer(r[4],0,31);}
+ for(const key of ['powers','stats']){assert(Array.isArray(c[key])&&c[key].length>0&&c[key].length<=64);for(const r of c[key]){assert(Array.isArray(r)&&r.length===2);assert(Number.isFinite(r[1])&&r[1]>=0&&r[1]<=10000000);if(key==='powers')assert(c.registry.some(m=>m[0]===r[0]));else integer(r[0],0,5);}}
+ assert.deepEqual(c.moves,e.constructed[0].moves.map(m=>m.id));assert(c.moves.every(id=>c.registry.some(r=>r[0]===id)));
+ assert(Buffer.byteLength(JSON.stringify(m))<=2400);
+}
 function validateTownPool(p,e){
  shape(p,['scope','wave','level','adjusted_wave','difficulty','vanilla','time_of_day','luck','forced_tier','regional_boost','tiers','rows']);
  assert.equal(p.scope,'complete effective Town rarity pools and pre-substitution weights/gates; no wild level-substitution or moveset closure');
@@ -84,7 +98,7 @@ function validateTownPool(p,e){
  assert(Buffer.byteLength(JSON.stringify(e.unwrapped))<=1000);assert(Array.isArray(e.boss_calls)&&e.boss_calls.length>0&&e.boss_calls.length<=8);for(const r of e.boss_calls){assert(Array.isArray(r)&&r.length===3);assert.equal(r[0],p.wave);assert.equal(r[1],p.level);integer(r[2],0,100);}
 }
 function validateEncounter(e){
- shape(e,['pool','unwrapped','boss_calls','scope','wave','turn','prior','selected','restored_same_standby','before','after','draws','trace','constructed','prepared','modifiers','init_encounter_queued']);
+ shape(e,['move_inputs','pool','unwrapped','boss_calls','scope','wave','turn','prior','selected','restored_same_standby','before','after','draws','trace','constructed','prepared','modifiers','init_encounter_queued']);
  assert.equal(e.scope,'direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution');
  assert.equal(e.wave,2);assert.equal(e.turn,1);assert.equal(e.prior,'CommandPhase');assert.equal(e.selected,'NextEncounterPhase');
  assert.equal(e.restored_same_standby,true);assert.equal(e.init_encounter_queued,true);
@@ -107,7 +121,7 @@ function validateEncounter(e){
  assert(Buffer.byteLength(JSON.stringify(e))<=7500);
 }
 function validate(d){
-  validateBinder(d.binder);validateEncounter(d.direct_queued_encounter);validateTownPool(d.direct_queued_encounter.pool,d.direct_queued_encounter);
+  validateBinder(d.binder);validateEncounter(d.direct_queued_encounter);validateTownPool(d.direct_queued_encounter.pool,d.direct_queued_encounter);validateMoveInputs(d.direct_queued_encounter);
   assert.equal(d.direct_queued_encounter.before,d.direct_next_battle.post.rng);
   assert.deepEqual(d.direct_queued_encounter.constructed.map(p=>p.level),d.direct_next_battle.post.enemy_levels);
   shape(d,['schema_version','source_sha','setup_seed','scope','binder','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls','direct_next_battle','direct_queued_encounter']);
@@ -219,7 +233,7 @@ function validate(d){
   }
 }
 validate(data);
-const mutations=[d=>d.direct_queued_encounter.pool.rows.pop(),d=>d.direct_queued_encounter.pool.rows[0][4]=!d.direct_queued_encounter.pool.rows[0][4],d=>d.direct_queued_encounter.pool.rows[0][1]=0,d=>d.direct_queued_encounter.pool.difficulty="unknown",d=>d.direct_queued_encounter.unwrapped=[],d=>d.direct_queued_encounter.unwrapped[0].frames=["C:/secret.ts:1:1"],d=>d.binder.party[0].tm.max_moves=0,d=>d.binder.party[0].tm.omniform="false",d=>d.binder.party[0].tm.available.push(0),d=>d.binder.rare_candy_friendship=-1,d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
+const mutations=[d=>d.direct_queued_encounter.move_inputs.battle_rng_calls=1,d=>d.direct_queued_encounter.move_inputs.calls[0].registry.pop(),d=>d.direct_queued_encounter.move_inputs.calls[0].species+=1,d=>d.direct_queued_encounter.move_inputs.calls[0].moves=[],d=>d.direct_queued_encounter.move_inputs.calls[0].trainer=true,d=>d.direct_queued_encounter.pool.rows.pop(),d=>d.direct_queued_encounter.pool.rows[0][4]=!d.direct_queued_encounter.pool.rows[0][4],d=>d.direct_queued_encounter.pool.rows[0][1]=0,d=>d.direct_queued_encounter.pool.difficulty="unknown",d=>d.direct_queued_encounter.unwrapped=[],d=>d.direct_queued_encounter.unwrapped[0].frames=["C:/secret.ts:1:1"],d=>d.binder.party[0].tm.max_moves=0,d=>d.binder.party[0].tm.omniform="false",d=>d.binder.party[0].tm.available.push(0),d=>d.binder.rare_candy_friendship=-1,d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
  d=>d.options.pop(),d=>d.count_draws=[[0,1,1]],d=>d.source_sha='bad',
  d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong',
  d=>d.direct_next_battle.post.format.adjacency={},d=>d.direct_next_battle.pre.format.adjacency.rows.pop(),
@@ -237,4 +251,5 @@ summary.direct_next_battle={scope:data.direct_next_battle.scope,pre:data.direct_
  queued:data.direct_next_battle.queued,level_calls:data.direct_next_battle.level_calls};
 summary.direct_queued_encounter={sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter))),wave:data.direct_queued_encounter.wave,turn:data.direct_queued_encounter.turn,draws:data.direct_queued_encounter.draws.length,methods:data.direct_queued_encounter.trace.map(r=>r.method),species:data.direct_queued_encounter.prepared.map(p=>p.species),restored_same_standby:true,init_encounter_queued:true};
 summary.town_pool={sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter.pool))),rows:data.direct_queued_encounter.pool.rows.length,difficulty:data.direct_queued_encounter.pool.difficulty,callers_sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter.unwrapped)))};
+summary.move_inputs={sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter.move_inputs))),registry:data.direct_queued_encounter.move_inputs.calls[0].registry.length,battle_rng_calls:0};
 const out=Buffer.from(JSON.stringify(summary)+'\n');assert(out.length<=8192);writeFileSync(process.argv[4],out,{flag:'wx'});
