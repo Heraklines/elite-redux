@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "f9b86eb47c921a6200a42ccbe8202e67a24358de0c1594445f778fb2aa135ac6"
+EXPORTER_SHA256 = "d27e06f7f77b633955aebe596b0591a6b2684facebbebd209f83d48922e511a7"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -45,6 +45,12 @@ logs = {}
 failed_log = None
 active_step = "initialization"
 ORACLE_PINS = {
+  "src/data/balance/pokemon-level-moves.ts": ["9e0529d2cc63d70ba00484aba958805c3377c5cb4f274bd2308c49aad3b7ae6b", 572049],
+  "src/data/pokemon-species.ts": ["16c53ee35deea1d2d39a6161b86e9c1e8c144c4792f68765cfdd1549fe9b442a", 63883],
+  "src/enums/unlockables.ts": ["4706fd971f59df8f483254bb92ae6e3f002c771e13be6847999f4d95afdbd67d", 99],
+  "src/data/pokemon-forms/form-change-triggers.ts": ["8caf609278dc5f4c515d2def4358a94cc91d6025dfcb7f958f5156e7e8540542", 11827],
+  "src/data/pokemon-forms.ts": ["723836fc9a20d20e77692a88ff444785a4007a8a659dc0c384a0721d9b041260", 50278],
+  "src/data/balance/pokemon-evolutions.ts": ["12ef6b798fed0592591ff6a7d65aab5fa22b5cd6e358356fc689ff3aea6fb87f", 75818],
   "src/data/pokeball.ts": ["408bcf1be5f5a6c20e1149c91b97274e634751ed1cdcca16e1461ab35a26c2b6", 5905],
   "src/enums/pokeball.ts": ["a088dae243702e097ce8bb67e6adf16b867387ddeb3558e63f64bb1b3793458b", 113],
   "package.json": [

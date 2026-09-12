@@ -1,3 +1,71 @@
+import { createHash } from "node:crypto";
+import { allMoves } from "#data/data-lists";
+import { pokemonEvolutions } from "#balance/pokemon-evolutions";
+import { pokemonFormChanges } from "#data/pokemon-forms";
+import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { Unlockables } from "#enums/unlockables";
+import { MoveFlags } from "#enums/move-flags";
+// Read-only complete current-party binder closure. No null-generator lookup.
+function binderFacts(scene:typeof globalScene){
+  const before=Phaser.Math.RND.state();
+  const triggerIds=new Map<object,number>();
+  const sourceFunction=(f:unknown)=>{
+    if(f==null)return null;
+    expect(typeof f).toBe("function");
+    const source=Function.prototype.toString.call(f);expect(source.length).toBeLessThanOrEqual(4096);
+    return {bytes:Buffer.byteLength(source),sha256:createHash("sha256").update(source).digest("hex")};
+  };
+  const facts=scene.getPlayerParty().map(p=>{
+    const species=p.species.speciesId;
+    const evolutionPresent=Object.hasOwn(pokemonEvolutions,species);
+    const evolutions=evolutionPresent?pokemonEvolutions[species]:[];
+    const formPresent=Object.hasOwn(pokemonFormChanges,species);
+    const forms=formPresent?pokemonFormChanges[species]:[];
+    expect(evolutions.length).toBeLessThanOrEqual(16);expect(forms.length).toBeLessThanOrEqual(16);
+    const allLevelRows=p.getSpeciesForm(true).getLevelMoves();
+    expect(allLevelRows.length).toBeLessThanOrEqual(256);
+    const levelRows=allLevelRows.filter(row=>row[0]>0&&row[0]<=10);
+    expect(levelRows.length).toBeLessThanOrEqual(64);
+    const moveIds=[...new Set([...p.getMoveset().map(pm=>pm.getMove().id),...levelRows.map(row=>row[1])])];
+    expect(moveIds.length).toBeLessThanOrEqual(32);
+    const moveFact=(id:number)=>{
+      const move=allMoves[id];const variables=move.getAttrs("VariableMoveTypeAttr");
+      expect(move.attrs.length).toBeLessThanOrEqual(32);expect(variables.length).toBeLessThanOrEqual(16);
+      return {id:move.id,type:move.type,category:move.category,accuracy:move.accuracy,pp:move.pp,sound:move.hasFlag(MoveFlags.SOUND_BASED),
+        attack:move.is("AttackMove"),attrs:move.attrs.map(a=>a.constructor.name),
+        variable_types:variables.map(a=>({class_name:a.constructor.name,types:a.getTypesForItemSpawn(p,move)}))};
+    };
+    return {species,form:p.formIndex,form_key:p.getFormKey(),level_cap:10,level_rows:levelRows,
+      all_level_rows_count:allLevelRows.length,all_level_rows_sha256:createHash("sha256").update(JSON.stringify(allLevelRows)).digest("hex"),
+      live_move_ids:p.getMoveset().map(pm=>pm.getMove().id),move_closure:moveIds.map(moveFact),
+      evolutions:{present:evolutionPresent,rows:evolutions.map(e=>{
+        const conditions=e.condition?.data??null;exactJsonArg(conditions);
+        return {species:e.speciesId,pre_form:e.preFormKey,evo_form:e.evoFormKey,level:e.level,
+          item:e.item,conditions,level_threshold:e.evoLevelThreshold??null};
+      })},
+      forms:{present:formPresent,rows:forms.map(f=>{
+        const trigger=f.findTrigger(SpeciesFormChangeItemTrigger);
+        if(trigger&&!triggerIds.has(trigger))triggerIds.set(trigger,triggerIds.size);
+        expect(f.conditions.length).toBeLessThanOrEqual(16);
+        return {species:f.speciesId,pre_form:f.preFormKey,form:f.formKey,
+          root_trigger_class:f.trigger.constructor.name,
+          item_trigger:trigger?{identity:triggerIds.get(trigger),item:trigger.item,active:trigger.active}:null,
+          conditions:f.conditions.map(c=>({class_name:c.constructor.name,
+            predicate:sourceFunction(c.predicate),enforce:sourceFunction(c.enforceFunc)}))};
+      })},
+      held:p.getHeldItems().map(m=>({id:m.type.id,class_name:m.constructor.name,stack:m.stackCount})),
+      learnable_now:p.getLearnableLevelMoves()};
+  });
+  const result={party:facts,mode:{classic:Boolean(scene.gameMode.isClassic),daily:Boolean(scene.gameMode.isDaily),
+    fun:Boolean(scene.gameMode.isFun),coop:Boolean(scene.gameMode.isCoop),spliced_only:Boolean(scene.gameMode.isSplicedOnly),
+    fresh_start:scene.gameMode.isFreshStartChallenge(),challenges:scene.gameMode.challenges.map(c=>({id:c.id,value:c.value})),
+    fun_mega:getFunModeConfig().megaMode},
+    unlocks:{eviolite:scene.gameData.isUnlocked(Unlockables.EVIOLITE),mini_black_hole:scene.gameData.isUnlocked(Unlockables.MINI_BLACK_HOLE)}};
+  expect(result.mode.challenges.length).toBeLessThanOrEqual(32);
+  expect(Phaser.Math.RND.state()).toBe(before);
+  return result;
+}
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { Battle } from "#app/battle";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
@@ -177,6 +245,7 @@ test("observe actual initialized reward selection",async()=>{
     }));
   }
   try {
+    const binder=binderFacts(scene);
     const context={wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,biome:scene.arena.biomeId,
       constructor:{seed:scene.seed,wave_seed:scene.waveSeed,battle_seed:scene.currentBattle.battleSeed,enemy_levels:scene.currentBattle.enemyLevels,level_calls:levelCalls,
         tuning:{wave_slope:erBalanceNum("vanilla.level.waveSlope"),quad_divisor:erBalanceNum("vanilla.level.quadDivisor"),boss_mult:erBalanceNum("vanilla.level.bossMult")}},
@@ -221,7 +290,7 @@ test("observe actual initialized reward selection",async()=>{
     const predicateDraws=draws.splice(0);
     const data={schema_version:1,source_sha:PIN,setup_seed:SEED,
       scope:"actual initialized pool predicates and direct SelectModifierPhase generation methods; not a post-victory state or applied reward",
-      context,catalog,predicate_draws:predicateDraws,option_count:count,free_picks:freePicks,
+      binder,context,catalog,predicate_draws:predicateDraws,option_count:count,free_picks:freePicks,
       rng:{seed:seedRng,regenerated:regeneratedRng,generated:generatedRng},
       regeneration_draws:regenerationDraws,count_draws:countDraws,option_draws:optionDraws,options:serialized,identities,generator_calls:generatorCalls};
     for(const generatorSpy of generatorSpies)generatorSpy.mockRestore();spy.mockRestore();

@@ -18,8 +18,50 @@ function exactJsonArg(value,depth=0){
   const keys=Reflect.ownKeys(value);assert(keys.length<=16);
   for(const key of keys){assert(typeof key==='string'&&key.length<=128);exactJsonArg(value[key],depth+1);}
 }
+function validateBinder(b){
+  shape(b,['party','mode','unlocks']);assert(Array.isArray(b.party)&&b.party.length===1);
+  shape(b.mode,['classic','daily','fun','coop','spliced_only','fresh_start','challenges','fun_mega']);
+  for(const [key,value] of Object.entries(b.mode))if(key!=='challenges')assert.equal(typeof value,'boolean');
+  assert.equal(b.mode.classic,true);for(const key of ['daily','fun','coop','spliced_only','fresh_start'])assert.equal(b.mode[key],false);
+  assert(Array.isArray(b.mode.challenges)&&b.mode.challenges.length<=32);
+  for(const c of b.mode.challenges){shape(c,['id','value']);integer(c.id,0,100000);integer(c.value,0,100000);}
+  shape(b.unlocks,['eviolite','mini_black_hole']);for(const v of Object.values(b.unlocks))assert.equal(typeof v,'boolean');
+  const functionFact=v=>{if(v===null)return;shape(v,['bytes','sha256']);integer(v.bytes,1,16384);assert(/^[0-9a-f]{64}$/.test(v.sha256));};
+  for(const p of b.party){
+    shape(p,['species','form','form_key','level_cap','level_rows','all_level_rows_count','all_level_rows_sha256','live_move_ids','move_closure','evolutions','forms','held','learnable_now']);
+    assert.equal(p.species,1);integer(p.form,0,255);assert(typeof p.form_key==='string'&&p.form_key.length<=128);assert.equal(p.level_cap,10);
+    integer(p.all_level_rows_count,0,256);assert(/^[0-9a-f]{64}$/.test(p.all_level_rows_sha256));
+    assert(Array.isArray(p.level_rows)&&p.level_rows.length<=64&&p.level_rows.length<=p.all_level_rows_count);
+    for(const row of p.level_rows){assert(Array.isArray(row)&&row.length===2);integer(row[0],1,10);integer(row[1],1,100000);}
+    for(const key of ['live_move_ids','learnable_now']){assert(Array.isArray(p[key])&&p[key].length<=(key==='live_move_ids'?4:256));for(const id of p[key])integer(id,1,100000);}
+    const expected=[...new Set([...p.live_move_ids,...p.level_rows.map(r=>r[1])])];
+    assert(Array.isArray(p.move_closure)&&p.move_closure.length<=32);assert.deepEqual(p.move_closure.map(m=>m.id),expected);
+    for(const m of p.move_closure){
+      shape(m,['id','type','category','accuracy','pp','sound','attack','attrs','variable_types']);
+      integer(m.id,1,100000);integer(m.type,0,18);integer(m.category,0,2);integer(m.accuracy,-1,100);integer(m.pp,1,100);
+      assert.equal(typeof m.sound,'boolean');assert.equal(typeof m.attack,'boolean');assert(Array.isArray(m.attrs)&&m.attrs.length<=32);
+      for(const a of m.attrs)assert(typeof a==='string'&&a.length<=128);
+      assert(Array.isArray(m.variable_types)&&m.variable_types.length<=16);
+      for(const a of m.variable_types){shape(a,['class_name','types']);assert(m.attrs.includes(a.class_name));assert(Array.isArray(a.types)&&a.types.length<=19);for(const type of a.types)integer(type,0,18);}
+    }
+    for(const key of ['evolutions','forms']){shape(p[key],['present','rows']);assert.equal(typeof p[key].present,'boolean');assert(Array.isArray(p[key].rows)&&p[key].rows.length<=16);if(!p[key].present)assert.equal(p[key].rows.length,0);}
+    for(const e of p.evolutions.rows){
+      shape(e,['species','pre_form','evo_form','level','item','conditions','level_threshold']);integer(e.species,1,100000);integer(e.level,0,10000);integer(e.item,0,100000);
+      for(const key of ['pre_form','evo_form'])assert(e[key]===null||(typeof e[key]==='string'&&e[key].length<=128));
+      exactJsonArg(e.conditions);exactJsonArg(e.level_threshold);
+    }
+    for(const f of p.forms.rows){
+      shape(f,['species','pre_form','form','root_trigger_class','item_trigger','conditions']);assert.equal(f.species,p.species);
+      for(const key of ['pre_form','form','root_trigger_class'])assert(typeof f[key]==='string'&&f[key].length<=128);
+      if(f.item_trigger!==null){shape(f.item_trigger,['identity','item','active']);integer(f.item_trigger.identity,0,255);integer(f.item_trigger.item,0,100000);assert.equal(typeof f.item_trigger.active,'boolean');}
+      assert(Array.isArray(f.conditions)&&f.conditions.length<=16);for(const c of f.conditions){shape(c,['class_name','predicate','enforce']);assert(typeof c.class_name==='string'&&c.class_name.length<=128);functionFact(c.predicate);functionFact(c.enforce);}
+    }
+    assert(Array.isArray(p.held)&&p.held.length<=64);for(const h of p.held){shape(h,['id','class_name','stack']);assert(typeof h.id==='string'&&h.id.length<=128);assert(typeof h.class_name==='string'&&h.class_name.length<=128);integer(h.stack,1,100000);}
+  }
+}
 function validate(d){
-  shape(d,['schema_version','source_sha','setup_seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls','direct_next_battle']);
+  validateBinder(d.binder);
+  shape(d,['schema_version','source_sha','setup_seed','scope','binder','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls','direct_next_battle']);
   const next=d.direct_next_battle;
   shape(next,['scope','pre','post','trace','draws','queued','level_calls']);
   assert.equal(next.scope,'direct actual scene.newBattle after initialized wave1; no victory or reward application and no queued phase execution');
@@ -117,12 +159,13 @@ function validate(d){
   }
 }
 validate(data);
-const mutations=[d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
+const mutations=[d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
  d=>d.options.pop(),d=>d.count_draws=[[0,1,1]],d=>d.source_sha='bad',
  d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong'];
 for(const change of mutations){const m=structuredClone(data);change(m);assert.throws(()=>validate(m));}
 const summary={schema_version:1,status:'passed',source_sha:data.source_sha,scope:data.scope,
  exports:raws.map(r=>({bytes:r.length,sha256:hash(r)})),identical_fresh_processes:2,negative_checks:mutations.length,
+ binder:{sha256:hash(Buffer.from(JSON.stringify(data.binder))),party:data.binder.party.map(p=>({species:p.species,form:p.form,level_cap:p.level_cap,moves:p.move_closure.length,evolutions:p.evolutions.rows.length,forms:p.forms.rows.length})),unlocks:data.binder.unlocks},
  catalog_rows:data.catalog.length,catalog_sha256:hash(Buffer.from(JSON.stringify(data.catalog))),
  constructor_observation_passed:true,setup_seed:data.setup_seed,context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,identities:data.identities,generator_observation:{calls:data.generator_calls.length,sha256:hash(Buffer.from(JSON.stringify(data.generator_calls))),by_stage:Object.fromEntries(['regeneration','selection','catalog'].map(stage=>[stage,data.generator_calls.filter(call=>call.stage===stage).length]))},
  draw_counts:Object.fromEntries(['predicate_draws','regeneration_draws','count_draws','option_draws'].map(k=>[k,data[k].length])),rng:data.rng};
