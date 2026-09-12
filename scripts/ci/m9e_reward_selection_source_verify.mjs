@@ -59,9 +59,34 @@ function validateBinder(b){
     assert(Array.isArray(p.held)&&p.held.length<=64);for(const h of p.held){shape(h,['id','class_name','stack']);assert(typeof h.id==='string'&&h.id.length<=128);assert(typeof h.class_name==='string'&&h.class_name.length<=128);integer(h.stack,1,100000);}
   }
 }
+function validateEncounter(e){
+ shape(e,['scope','wave','turn','prior','selected','restored_same_standby','before','after','draws','trace','constructed','prepared','modifiers','init_encounter_queued']);
+ assert.equal(e.scope,'direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution');
+ assert.equal(e.wave,2);assert.equal(e.turn,1);assert.equal(e.prior,'CommandPhase');assert.equal(e.selected,'NextEncounterPhase');
+ assert.equal(e.restored_same_standby,true);assert.equal(e.init_encounter_queued,true);
+ for(const s of [e.before,e.after])assert(typeof s==='string'&&s.startsWith('!rnd,')&&s.length<=256);
+ assert(Array.isArray(e.draws)&&e.draws.length>0&&e.draws.length<=256);
+ for(const r of e.draws){assert(Array.isArray(r));if(r[0]==='frac'){assert.equal(r.length,2);assert(Number.isFinite(r[1])&&r[1]>=0&&r[1]<1);}else{assert.equal(r[0],'integerInRange');assert.equal(r.length,4);for(const n of r.slice(1))assert(Number.isSafeInteger(n));assert(r[1]<=r[3]&&r[3]<=r[2]);}}
+ assert(Array.isArray(e.trace)&&e.trace.length<=16);
+ for(const r of e.trace){shape(r,['method','start','end','entry','exit']);assert(['randomSpecies','addEnemyPokemon','generateEnemyModifiers','resetSeed'].includes(r.method));integer(r.start,0,e.draws.length);integer(r.end,r.start,e.draws.length);for(const s of [r.entry,r.exit])assert(typeof s==='string'&&s.startsWith('!rnd,')&&s.length<=256);}
+ assert.equal(e.trace.filter(r=>r.method==='randomSpecies').length,1);assert.equal(e.trace.filter(r=>r.method==='addEnemyPokemon').length,1);assert.equal(e.trace.filter(r=>r.method==='generateEnemyModifiers').length,1);
+ for(const list of [e.constructed,e.prepared]){assert(Array.isArray(list)&&list.length===1);for(const p of list){
+  shape(p,['id','species','form','level','nature','ability_index','ability','passives','passive_active','ivs','stats','hp','gender','shiny','variant','moves','boss','temp_turn_count','temp_wave_turn_count']);
+  integer(p.temp_turn_count,0,100000);integer(p.temp_wave_turn_count,0,100000);integer(p.id,0,4294967295);integer(p.species,1,100000);integer(p.form,0,255);integer(p.level,1,10000);integer(p.nature,0,24);integer(p.ability_index,0,255);integer(p.ability,0,100000);
+  assert(Array.isArray(p.passives)&&p.passives.length<=3);for(const a of p.passives)if(a!==null)integer(a,0,100000);
+  for(const k of ['passive_active','shiny','boss'])assert.equal(typeof p[k],'boolean');integer(p.gender,0,2);integer(p.variant,0,2);
+  assert(Array.isArray(p.ivs)&&p.ivs.length===6);for(const n of p.ivs)integer(n,0,31);assert(Array.isArray(p.stats)&&p.stats.length===6);for(const n of p.stats)integer(n,1,10000000);integer(p.hp,0,p.stats[0]);
+  assert(Array.isArray(p.moves)&&p.moves.length>0&&p.moves.length<=5);for(const m of p.moves){shape(m,['id','pp_used']);integer(m.id,1,100000);integer(m.pp_used,0,100);}
+ }}
+ assert.equal(e.constructed[0].id,e.prepared[0].id);assert.equal(e.constructed[0].species,e.prepared[0].species);
+ assert(Array.isArray(e.modifiers)&&e.modifiers.length<=32);for(const m of e.modifiers){shape(m,['id','class_name','stack']);for(const k of ['id','class_name'])assert(typeof m[k]==='string'&&m[k].length<=128);integer(m.stack,1,10000);}
+ assert(Buffer.byteLength(JSON.stringify(e))<=7500);
+}
 function validate(d){
-  validateBinder(d.binder);
-  shape(d,['schema_version','source_sha','setup_seed','scope','binder','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls','direct_next_battle']);
+  validateBinder(d.binder);validateEncounter(d.direct_queued_encounter);
+  assert.equal(d.direct_queued_encounter.before,d.direct_next_battle.post.rng);
+  assert.deepEqual(d.direct_queued_encounter.constructed.map(p=>p.level),d.direct_next_battle.post.enemy_levels);
+  shape(d,['schema_version','source_sha','setup_seed','scope','binder','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls','direct_next_battle','direct_queued_encounter']);
   const next=d.direct_next_battle;
   shape(next,['scope','pre','post','trace','draws','queued','level_calls']);
   assert.equal(next.scope,'direct actual scene.newBattle after initialized wave1; no victory or reward application and no queued phase execution');
@@ -170,7 +195,7 @@ function validate(d){
   }
 }
 validate(data);
-const mutations=[d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
+const mutations=[d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
  d=>d.options.pop(),d=>d.count_draws=[[0,1,1]],d=>d.source_sha='bad',
  d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong',
  d=>d.direct_next_battle.post.format.adjacency={},d=>d.direct_next_battle.pre.format.adjacency.rows.pop(),
@@ -186,4 +211,5 @@ summary.direct_next_battle={scope:data.direct_next_battle.scope,pre:data.direct_
  trace_methods:data.direct_next_battle.trace.map(row=>row.method),trace_sha256:hash(Buffer.from(JSON.stringify(data.direct_next_battle.trace))),
  draw_count:data.direct_next_battle.draws.length,draw_sha256:hash(Buffer.from(JSON.stringify(data.direct_next_battle.draws))),
  queued:data.direct_next_battle.queued,level_calls:data.direct_next_battle.level_calls};
+summary.direct_queued_encounter={sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter))),wave:data.direct_queued_encounter.wave,turn:data.direct_queued_encounter.turn,draws:data.direct_queued_encounter.draws.length,methods:data.direct_queued_encounter.trace.map(r=>r.method),species:data.direct_queued_encounter.prepared.map(p=>p.species),restored_same_standby:true,init_encounter_queued:true};
 const out=Buffer.from(JSON.stringify(summary)+'\n');assert(out.length<=8192);writeFileSync(process.argv[4],out,{flag:'wx'});
