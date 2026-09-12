@@ -18,6 +18,14 @@ const expectedNames = ['level-99', 'level-100', 'level-250', 'level-1000', 'leve
   'flash-first', 'flash-repeat', 'max-first-at-zero', 'max-repeat-after-zero'];
 const integer = value => Number.isSafeInteger(value);
 function verify(data) {
+  const egg=data.fresh_egg_account;
+  assert.deepEqual(Object.keys(egg).sort(),['eggs','settings','vouchers','maximum','plan','rng_unchanged'].sort());
+  assert.deepEqual(egg.eggs,[]);
+  assert.deepEqual(egg.settings,{enabled:false,targetCount:50,gachaType:1,perVoucher:{0:true,1:true,2:true,3:false}});
+  assert.deepEqual(egg.vouchers,{0:0,1:0,2:0,3:0});
+  assert.equal(egg.maximum,10000);
+  assert.deepEqual(egg.plan,{purchases:[],eggsAfter:0});
+  assert.equal(egg.rng_unchanged,true);
   assert.equal(data.schema_version, 1);
   assert.equal(data.source_sha, '399d5d368f0b5642ebf8f45bd8a5e73350fa4de7');
   assert.equal(data.scope, 'actual initialized validateAchv/validateAchvs and Egg/reward descendants; no battle win or hatching claim');
@@ -109,6 +117,9 @@ function verify(data) {
 }
 verify(a.data);
 const mutations = [
+  data => data.fresh_egg_account.settings.enabled = true,
+  data => data.fresh_egg_account.eggs = [{}],
+  data => data.fresh_egg_account.plan.eggsAfter = 1,
   data => data.cases[8].result = true,
   data => data.cases[8].after.unlocks.MAX_FRIENDSHIP = 1,
   data => data.cases[5].after.eggs = [],
@@ -127,6 +138,7 @@ for (const mutate of mutations) {
 const result = { schema_version: 1, status: 'passed', source_sha: a.data.source_sha,
   exports: [a.fact, b.fact], identical_fresh_processes: 2, cases: expectedNames,
   negative_checks: mutations.length, zero_timestamp_repeat_is_noop: true,
+  fresh_egg_account:a.data.fresh_egg_account,
   flash: { egg: a.data.cases[5].after.eggs.at(-1), clock_values: a.data.cases[5].clock_values,
     random_values: a.data.cases[5].random_values, seeded_draws: a.data.cases[5].seeded_draws,
     seed_scopes: a.data.cases[5].seed_scopes, grant_calls: a.data.cases[5].grant_calls },

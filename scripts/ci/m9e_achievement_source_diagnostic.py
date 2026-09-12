@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "e87b5a1e55fb672a8443d6979f92c8ab3ffd425aabef680ed0fe8f83ddb3dece"
+EXPORTER_SHA256 = "4653cc54847ef8cd977ddb2ba20dc497bd62e6a69eaa9f870354644104345ab9"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -195,6 +195,12 @@ TAIL_SOURCE_PINS = {
     "src/phases/battle-end-phase.ts": ["47554da75c7a90bd973703cee5b6f56c208acf56e623c08d72cf31e2a4fed65a", 17741],
 }
 ORACLE_PINS.update(TAIL_SOURCE_PINS)
+EGG_DEFAULT_SOURCE_PINS = {
+  "src/system/auto-egg-restock-settings.ts": ["51aef8decccbea5f77f32251d835f70037e2f4e175076646eef49f9e5b1ca919", 1519],
+  "src/system/auto-egg-restock.ts": ["16f740b37ffe5f307ee3f815cac6b34c261a5d0b998dec1eb75ce74c5444c9e6", 2535],
+  "src/enums/gacha-types.ts": ["434afc14cddcc0e39b30989c0305bff42e06b78607c17b81c6683365102a8d7a", 294],
+}
+ORACLE_PINS.update(EGG_DEFAULT_SOURCE_PINS)
 
 def require(condition, message):
     if not condition:

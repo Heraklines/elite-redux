@@ -3,7 +3,9 @@ import Overrides from "#app/overrides";
 import { ER_ACHIEVEMENT_REWARDS, resolveAchievementRewardTeam } from "#data/elite-redux/er-achievement-rewards";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getErShinyLabEffectsForAchv } from "#data/elite-redux/er-shiny-lab-effects";
-import { Egg } from "#data/egg";
+import { Egg, MAX_EGG_COUNT } from "#data/egg";
+import { defaultAutoEggRestockSettings } from "#system/auto-egg-restock-settings";
+import { planAutoRestock } from "#system/auto-egg-restock";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { SpeciesId } from "#enums/species-id";
@@ -58,6 +60,21 @@ test("observe actual level and Flash achievement descendants", async () => {
   const originalAccount = scene.gameData;
   const account = new GameData(true);
   expect(vi.isMockFunction(account.addStarterCandy)).toBe(false);
+  // Actual fresh ownership before any achievement can append an egg. A missing
+  // historical field is never interpreted as empty/disabled by this observer.
+  expect(vi.isMockFunction(defaultAutoEggRestockSettings)).toBe(false);
+  expect(vi.isMockFunction(planAutoRestock)).toBe(false);
+  const eggRng = Phaser.Math.RND.state();
+  const eggDefaults = {eggs:structuredClone(account.eggs),
+    settings:structuredClone(account.autoEggRestock),vouchers:structuredClone(account.voucherCounts)};
+  expect(eggDefaults.eggs).toEqual([]);
+  expect(eggDefaults.settings).toEqual(defaultAutoEggRestockSettings());
+  const autoRestockPlan = planAutoRestock({settings:account.autoEggRestock,
+    eggsHeld:account.eggs.length,voucherCounts:account.voucherCounts,maxEggs:MAX_EGG_COUNT});
+  expect(autoRestockPlan).toEqual({purchases:[],eggsAfter:0});
+  expect({eggs:account.eggs,settings:account.autoEggRestock,vouchers:account.voucherCounts}).toEqual(eggDefaults);
+  expect(Phaser.Math.RND.state()).toBe(eggRng);
+  const freshEggAccount = {...eggDefaults,maximum:MAX_EGG_COUNT,plan:autoRestockPlan,rng_unchanged:true};
   const rng = Phaser.Math.RND.state();
   const randomValues: number[] = [];
   const clockValues: number[] = [];
@@ -141,6 +158,7 @@ test("observe actual level and Flash achievement descendants", async () => {
     expect(cases.every(row => row.battle_rng_unchanged)).toBe(true);
     const bytes = Buffer.from(JSON.stringify({ schema_version: 1, source_sha: PIN,
       scope: "actual initialized validateAchv/validateAchvs and Egg/reward descendants; no battle win or hatching claim",
+      fresh_egg_account:freshEggAccount,
       difficulty: getErDifficulty(), team: team.map(mon => ({ species: mon.species.speciesId,
         root: account.getRootStarterSpeciesId(mon.species.speciesId) })),
       definitions: KEYS.map(key => ({ key, id: achvs[key].id, recipe: ER_ACHIEVEMENT_REWARDS[key],
