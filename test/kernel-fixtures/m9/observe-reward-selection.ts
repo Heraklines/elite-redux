@@ -1,3 +1,4 @@
+import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { Battle } from "#app/battle";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { globalScene } from "#app/global-scene";
@@ -42,6 +43,73 @@ function exactJsonArg(value:unknown,depth=0):void {
   expect([Object.prototype,null].includes(Object.getPrototypeOf(object))).toBe(true);
   const keys=Reflect.ownKeys(object);expect(keys.length).toBeLessThanOrEqual(16);
   for(const key of keys){expect(typeof key).toBe("string");expect(String(key).length).toBeLessThanOrEqual(128);const descriptor=Object.getOwnPropertyDescriptor(object,key)!;expect(descriptor.enumerable).toBe(true);expect(Object.hasOwn(descriptor,"value")).toBe(true);exactJsonArg(descriptor.value,depth+1);}
+}
+
+// An explicit direct-method probe after the existing observations. This is not
+// a victory, applied reward, queued phase execution, or natural wave journey.
+function observeDirectNextBattle(){
+  const scene=globalScene;
+  expect(scene.currentBattle.waveIndex).toBe(1);
+  const cleanups:Array<()=>void>=[];
+  const trace:Array<{method:string,entry:string,exit:string,wave_before:number,wave_after:number,draw_start:number,draw_end:number}>=[];
+  const draws:Array<[string,number|null,number|null,number]>=[];
+  const queued:Array<{method:string,name:string,args:unknown[]}>=[];
+  const metadata=()=>scene.getPlayerParty().map(p=>({id:p.id,species:p.species.speciesId,form:p.formIndex,
+    level:p.level,hp:p.hp,max_hp:p.getMaxHp(),friendship:p.friendship,pokerus:p.pokerus,
+    battle_data_keys:Object.keys(p.battleData).sort(),summon_data_keys:Object.keys(p.summonData).sort(),
+    moves:p.getMoveset().map(m=>({id:m.moveId,pp_used:m.ppUsed}))}));
+  const pre={wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,seed:scene.seed,wave_seed:scene.waveSeed,
+    battle_seed:scene.currentBattle.battleSeed,format:scene.currentBattle.format,enemy_levels:[...scene.currentBattle.enemyLevels],
+    rng:Phaser.Math.RND.state(),party:metadata()};
+  function wrap(target:object,key:string,after?:(args:unknown[],result:unknown,receiver:unknown)=>void){
+    const original:unknown=Reflect.get(target,key);
+    expect(typeof original).toBe("function");expect(vi.isMockFunction(original)).toBe(false);
+    const fn=original as (...args:unknown[])=>unknown;
+    const replacement=function(this:unknown,...args:unknown[]){
+      const row={method:key,entry:Phaser.Math.RND.state(),exit:"",wave_before:scene.currentBattle.waveIndex,wave_after:0,draw_start:draws.length,draw_end:0};
+      expect(trace.length).toBeLessThan(48);trace.push(row);
+      const result=Reflect.apply(fn,this,args);
+      row.exit=Phaser.Math.RND.state();row.wave_after=scene.currentBattle.waveIndex;row.draw_end=draws.length;
+      after?.(args,result,this);return result;
+    };
+    expect(Reflect.set(target,key,replacement)).toBe(true);
+    cleanups.push(()=>{expect(Reflect.set(target,key,original)).toBe(true);});
+  }
+  for(const key of ["newBattle","getNewBattleProps","resetSeed","handleNonFixedBattle","checkIsDouble",
+    "resolveBattleFormat","executeWithSeedOffset","doPostBattleCleanup","trySpreadPokerus","triggerPokemonFormChange"]){wrap(scene,key);}
+  const levelCalls:Array<{wave:number,level:number,battle_seed:string}>=[];
+  wrap(Battle.prototype,"getLevelForWave",(_,level,receiver)=>{
+    expect(typeof level).toBe("number");expect(receiver).toBeInstanceOf(Battle);
+    const battle=receiver as Battle;
+    levelCalls.push({wave:battle.waveIndex,level:level as number,battle_seed:battle.battleSeed});
+  });
+  for(const key of ["pushNew","unshiftNew"]){
+    const original:unknown=Reflect.get(scene.phaseManager,key);
+    expect(typeof original).toBe("function");expect(vi.isMockFunction(original)).toBe(false);
+    const fn=original as (...args:unknown[])=>unknown;
+    expect(Reflect.set(scene.phaseManager,key,function(this:unknown,...args:unknown[]){
+      expect(queued.length).toBeLessThan(16);expect(typeof args[0]).toBe("string");
+      const captured=args.slice(1);exactJsonArg(captured);
+      queued.push({method:key,name:args[0] as string,args:captured});return Reflect.apply(fn,this,args);
+    })).toBe(true);
+    cleanups.push(()=>{expect(Reflect.set(scene.phaseManager,key,original)).toBe(true);});
+  }
+  for(const key of ["frac","integerInRange"] as const){
+    const original=Phaser.Math.RND[key];expect(vi.isMockFunction(original)).toBe(false);
+    const fn=original as (...args:number[])=>number;
+    const spy=vi.spyOn(Phaser.Math.RND,key).mockImplementation((...args:number[])=>{
+      const result=Reflect.apply(fn,Phaser.Math.RND,args);expect(draws.length).toBeLessThan(128);
+      draws.push([key,args[0]??null,args[1]??null,result]);return result;
+    });cleanups.push(()=>spy.mockRestore());
+  }
+  try{
+    const battle=scene.newBattle();
+    const post={wave:battle.waveIndex,turn:battle.turn,seed:scene.seed,wave_seed:scene.waveSeed,
+      battle_seed:battle.battleSeed,format:battle.format,enemy_levels:[...battle.enemyLevels],rng:Phaser.Math.RND.state(),party:metadata()};
+    expect(post.wave).toBe(2);expect(trace.some(row=>row.method==="doPostBattleCleanup")).toBe(true);
+    expect(queued.some(row=>row.name==="NextEncounterPhase")).toBe(true);
+    return {scope:"direct actual scene.newBattle after initialized wave1; no victory or reward application and no queued phase execution",pre,post,trace,draws,queued,level_calls:levelCalls};
+  }finally{for(const cleanup of cleanups.reverse())cleanup();}
 }
 test("observe actual initialized reward selection",async()=>{
   const output=process.env.M9_REWARD_SELECTION_OUTPUT;
@@ -112,6 +180,7 @@ test("observe actual initialized reward selection",async()=>{
     const context={wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,biome:scene.arena.biomeId,
       constructor:{seed:scene.seed,wave_seed:scene.waveSeed,battle_seed:scene.currentBattle.battleSeed,enemy_levels:scene.currentBattle.enemyLevels,level_calls:levelCalls,
         tuning:{wave_slope:erBalanceNum("vanilla.level.waveSlope"),quad_divisor:erBalanceNum("vanilla.level.quadDivisor"),boss_mult:erBalanceNum("vanilla.level.bossMult")}},
+      balls:{counts:{...scene.pokeballCounts},maximum_per_type:MAX_PER_TYPE_POKEBALLS},
       party:party.map(p=>({species:p.species.speciesId,form:p.formIndex,level:p.level,hp:p.hp,max_hp:p.getMaxHp(),
         ability:p.getAbility().id,passives:p.getPassiveAbilities().map(a=>a?.id??null),shiny:p.shiny,variant:p.variant})),
       modifiers:scene.modifiers.map(m=>({id:m.type.id,class_name:m.constructor.name,stack:m.stackCount}))};
@@ -155,7 +224,10 @@ test("observe actual initialized reward selection",async()=>{
       context,catalog,predicate_draws:predicateDraws,option_count:count,free_picks:freePicks,
       rng:{seed:seedRng,regenerated:regeneratedRng,generated:generatedRng},
       regeneration_draws:regenerationDraws,count_draws:countDraws,option_draws:optionDraws,options:serialized,identities,generator_calls:generatorCalls};
-    const bytes=Buffer.from(JSON.stringify(data)+"\n");expect(bytes.length).toBeLessThanOrEqual(32768);
+    for(const generatorSpy of generatorSpies)generatorSpy.mockRestore();spy.mockRestore();
+    Phaser.Math.RND.state(originalRng);
+    const nextBattle=observeDirectNextBattle();
+    const bytes=Buffer.from(JSON.stringify({...data,direct_next_battle:nextBattle})+"\n");expect(bytes.length).toBeLessThanOrEqual(32768);
     writeFileSync(output,bytes,{flag:"wx"});
   } finally {for(const generatorSpy of generatorSpies)generatorSpy.mockRestore();spy.mockRestore();Phaser.Math.RND.state(originalRng);}
 });

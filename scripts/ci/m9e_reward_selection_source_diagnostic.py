@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "4a49207c5592b3e3df66830ca68a7b4a9f741028c00eb60eaf68e7d762e65d64"
+EXPORTER_SHA256 = "f9b86eb47c921a6200a42ccbe8202e67a24358de0c1594445f778fb2aa135ac6"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -45,6 +45,8 @@ logs = {}
 failed_log = None
 active_step = "initialization"
 ORACLE_PINS = {
+  "src/data/pokeball.ts": ["408bcf1be5f5a6c20e1149c91b97274e634751ed1cdcca16e1461ab35a26c2b6", 5905],
+  "src/enums/pokeball.ts": ["a088dae243702e097ce8bb67e6adf16b867387ddeb3558e63f64bb1b3793458b", 113],
   "package.json": [
     "b29655956a73f24aaff59781b9352f937598123900589d055abf1a10fd12f903",
     6588
